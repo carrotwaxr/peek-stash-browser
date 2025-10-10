@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: stashplayer
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+  backend:
+    build: ./server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      STASH_URL: ${STASH_URL}
+      STASH_API_KEY: ${STASH_API_KEY}
+    volumes:
+      # Development: Use CIFS volume to avoid Windows SMB mapping issues
+      - media-share:/app/media
+      # Production: Use direct host path (uncomment line below, comment line above)
+      # - ${STASH_DATA_DIR}:/app/media
+      - ${TMP_DIR}:/app/tmp
+    depends_on:
+      - db
+    networks:
+      - app-network
+  frontend:
+    build: ./client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  # Development: CIFS volume for SMB share access with authentication
+  media-share:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//10.0.0.4/syslib/bunh/stash/vid"
+      o: "username=${SMB_USERNAME},password=${SMB_PASSWORD},uid=1000,gid=1000,iocharset=utf8,file_mode=0644,dir_mode=0755"
+  # Production: Remove media-share volume and use direct host mount above
+  # Alternative for guest access (no auth needed):
+  # media-share:
+  #   driver: local
+  #   driver_opts:
+  #     type: cifs
+  #     device: "//10.0.0.4/syslib/bunh/stash/vid"
+  #     o: "guest,uid=1000,gid=1000,iocharset=utf8,file_mode=0644,dir_mode=0755"

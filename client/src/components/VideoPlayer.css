@@ -1,0 +1,294 @@
+/* VideoPlayer specific styles using CSS custom properties */
+
+.video-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background-color: var(--player-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Poster view styles */
+.video-poster {
+  background: linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+    linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
+    linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-color: #0f0f0f;
+}
+
+.video-poster:hover .poster-play-button {
+  transform: scale(1.1);
+}
+
+.poster-play-button {
+  transition: transform 0.3s ease;
+}
+
+.video-container .video-js {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+/* Override Video.js theme colors to match our theme */
+.video-js .vjs-control-bar {
+  background: var(--controls-bg);
+  backdrop-filter: blur(8px);
+}
+
+.video-js .vjs-big-play-button {
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid var(--accent-primary);
+  border-radius: 50%;
+  font-size: 3rem;
+  transition: all 0.3s ease;
+}
+
+.video-js .vjs-big-play-button:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.video-js .vjs-play-progress {
+  background-color: var(--accent-primary);
+}
+
+.video-js .vjs-load-progress {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.video-js .vjs-progress-holder {
+  background-color: var(--progress-bg);
+}
+
+/* Quality selector styling */
+.vjs-quality-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 0.5rem;
+}
+
+.vjs-quality-button {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.vjs-quality-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.vjs-quality-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md);
+  min-width: 100px;
+  z-index: 1000;
+  margin-bottom: 0.5rem;
+}
+
+.vjs-quality-item {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease;
+}
+
+.vjs-quality-item:hover {
+  background-color: var(--bg-hover);
+}
+
+.vjs-quality-item:first-child {
+  border-radius: 6px 6px 0 0;
+}
+
+.vjs-quality-item:last-child {
+  border-radius: 0 0 6px 6px;
+}
+
+/* Responsive video container */
+@media (max-width: 768px) {
+  .video-container {
+    aspect-ratio: 16 / 9;
+    margin: 0 -1rem; /* Extend to edge on mobile */
+    border-radius: 0;
+  }
+}
+
+/* Full screen improvements */
+.video-js.vjs-fullscreen {
+  background-color: var(--player-bg);
+}
+
+.video-js.vjs-fullscreen .vjs-control-bar {
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+}
+
+/* Loading state */
+.video-js .vjs-loading-spinner {
+  border-color: var(--accent-primary) transparent var(--accent-primary)
+    transparent;
+}
+
+/* Volume control */
+.video-js .vjs-volume-level {
+  background-color: var(--accent-primary);
+}
+
+/* Custom space utilities for VideoPlayer */
+.space-y-4 > * + * {
+  margin-top: 1rem;
+}
+
+.space-y-6 > * + * {
+  margin-top: 1.5rem;
+}
+
+/* Ensure proper text wrapping for long descriptions */
+.card-body p {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Navigation styles */
+.nav-link {
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  background-color: var(--bg-card);
+  color: var(--text-primary) !important;
+}
+
+/* Fix navigation alignment issues */
+nav.flex {
+  width: 100%;
+  max-width: none;
+}
+
+nav.flex .flex:last-child {
+  flex-shrink: 0;
+}
+
+/* Fix grid layout width issues */
+.grid.grid-cols-1.lg\\:grid-cols-3 {
+  width: 100%;
+}
+
+.grid.grid-cols-1.lg\\:grid-cols-3 > div {
+  min-width: 0; /* Prevent grid items from maintaining minimum content width */
+}
+
+/* Ensure cards take full available width */
+.card {
+  width: 100%;
+  min-height: fit-content;
+}
+
+/* Mobile-responsive improvements */
+@media (max-width: 768px) {
+  /* Header adjustments */
+  header.container-fluid {
+    padding: 1rem;
+  }
+
+  nav {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+
+  nav .flex:first-child {
+    width: 100%;
+  }
+
+  /* Navigation menu - horizontal on mobile */
+  nav .flex:last-child {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  /* Scene title */
+  h1 {
+    font-size: 1.5rem !important;
+    line-height: 1.3;
+  }
+
+  /* Video container */
+  .video-container {
+    margin: 0 -1rem; /* Full width on mobile */
+    border-radius: 0;
+  }
+
+  /* Playback controls - stack on mobile */
+  .container-fluid .flex {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+
+  /* Details grid - single column on mobile */
+  .grid.grid-cols-1.sm\\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Performers and tags - smaller on mobile */
+  .flex.flex-wrap.gap-3 > div {
+    font-size: 0.875rem;
+  }
+
+  .flex.flex-wrap.gap-2 > div {
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.75rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Even smaller adjustments for very small screens */
+  .container-fluid {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  /* Reduce button padding on small screens */
+  .btn {
+    padding: 6px 12px !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* Stack select and button vertically on very small screens */
+  .flex.items-center.gap-2 {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  .flex.items-center.gap-2 select {
+    width: 100%;
+  }
+}
