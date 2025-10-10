@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:15
     restart: unless-stopped
+    env_file:
+      - ./.env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: stashplayer
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -15,10 +15,8 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      STASH_URL: ${STASH_URL}
-      STASH_API_KEY: ${STASH_API_KEY}
+    env_file:
+      - ./.env
     volumes:
       # Development: Use CIFS volume to avoid Windows SMB mapping issues
       - media-share:/app/media

@@ -21,18 +21,21 @@ A modern video streaming application with adaptive transcoding capabilities, des
 ### Setup
 
 1. Clone the repository:
+
    ```bash
    git clone <repository-url>
    cd stash-player
    ```
 
 2. Copy and configure environment variables:
+
    ```bash
-   cp server/.env.example server/.env
-   # Edit server/.env with your configuration
+   cp .env.example .env
+   # Edit .env with your configuration
    ```
 
 3. Start the application:
+
    ```bash
    docker-compose up -d
    ```
@@ -41,7 +44,7 @@ A modern video streaming application with adaptive transcoding capabilities, des
 
 ## Configuration
 
-Key environment variables in `server/.env`:
+Key environment variables in `.env`:
 
 - `STASH_URL`: Your Stash server URL (e.g., `http://10.0.0.4:9999/graphql`)
 - `STASH_API_KEY`: API key from your Stash server
@@ -59,6 +62,7 @@ Key environment variables in `server/.env`:
 ## Documentation
 
 See [DOCUMENTATION.md](./DOCUMENTATION.md) for detailed technical documentation covering:
+
 - System architecture
 - Transcoding system details
 - API endpoints
@@ -71,20 +75,22 @@ See [DOCUMENTATION.md](./DOCUMENTATION.md) for detailed technical documentation 
 ### Local Development
 
 1. Install dependencies:
+
    ```bash
    # Client
    cd client && npm install
-   
+
    # Server
    cd server && npm install
    ```
 
 2. Start development servers:
+
    ```bash
    # Terminal 1 - Backend
    cd server && npm run dev
-   
-   # Terminal 2 - Frontend  
+
+   # Terminal 2 - Frontend
    cd client && npm run dev
    ```
 
