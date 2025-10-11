@@ -16,9 +16,9 @@ body {
   line-height: 1.6;
 }
 
-/* Layout utilities */
+/* Layout utilities - Full width for all screen sizes */
 .container {
-  max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
   padding: 0 1rem;
 }
@@ -26,6 +26,20 @@ body {
 .container-fluid {
   width: 100%;
   padding: 0 1rem;
+}
+
+/* Container with max-width for specific use cases where needed */
+.container-constrained {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* Full-width no padding for video and media content */
+.container-fullwidth {
+  width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 /* Card components */
@@ -424,9 +438,79 @@ body {
   display: none;
 }
 
-/* Additional responsive helpers */
-@media (min-width: 1400px) {
+/* Additional responsive helpers for 10ft/TV mode */
+@media (min-width: 1920px) {
   .container {
-    max-width: 1320px;
+    padding: 0 2rem;
+  }
+
+  /* Larger text for TV viewing */
+  body {
+    font-size: 18px;
+  }
+}
+
+/* Ultra-wide and large screen support */
+@media (min-width: 2560px) {
+  .container {
+    padding: 0 4rem;
+  }
+
+  body {
+    font-size: 20px;
+  }
+}
+
+/* Enhanced responsive grid for different screen sizes including 10ft mode */
+
+/* Enhanced breakpoints for ultra-wide screens and 10ft viewing */
+@media (min-width: 1600px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(7, 1fr) !important;
+  }
+}
+
+@media (min-width: 1920px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(8, 1fr) !important;
+    gap: 2rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(10, 1fr) !important;
+    gap: 2.5rem;
+  }
+}
+
+/* 4K and 8K display support */
+@media (min-width: 3840px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(12, 1fr) !important;
+    gap: 3rem;
+  }
+
+  /* Larger touch targets for 10ft mode */
+  .btn {
+    padding: 1rem 1.5rem;
+    font-size: 1.125rem;
+  }
+
+  /* Larger text for better visibility */
+  .text-sm {
+    font-size: 1.125rem;
+  }
+  .text-base {
+    font-size: 1.25rem;
+  }
+  .text-lg {
+    font-size: 1.5rem;
+  }
+  .text-xl {
+    font-size: 1.75rem;
+  }
+  .text-2xl {
+    font-size: 2.25rem;
   }
 }

@@ -6,8 +6,15 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from parent directory (project root)
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+// Load .env from project root (handles both dev and compiled scenarios)
+// In dev: server/ -> ../
+// In compiled: server/dist/ -> ../../
+const envPath =
+  __filename.includes("/dist/") || __filename.includes("\\dist\\")
+    ? path.resolve(__dirname, "../../.env") // From server/dist/ to project root
+    : path.resolve(__dirname, "../.env"); // From server/ to project root
+
+dotenv.config({ path: envPath });
 import { setupAPI } from "./api.js";
 
 const main = async () => {
