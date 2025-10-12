@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { SceneGridItem } from "./SceneGrid/SceneGridItem.jsx";
+import SceneCard from "./ui/SceneCard.jsx";
 
-const SceneCarousel = ({ title, scenes, loading = false }) => {
+const SceneCarousel = ({ title, scenes, loading = false, onSceneClick }) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef(null);
@@ -89,7 +89,7 @@ const SceneCarousel = ({ title, scenes, loading = false }) => {
   }
 
   return (
-    <div className="mb-8">
+    <div className="mb-8 overflow-hidden">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <h2
@@ -146,7 +146,7 @@ const SceneCarousel = ({ title, scenes, loading = false }) => {
       </div>
 
       {/* Carousel Container */}
-      <div className="relative">
+      <div className="relative overflow-hidden">
         <div
           ref={scrollContainerRef}
           className="flex gap-4 overflow-x-auto scrollbar-hide pb-2"
@@ -157,8 +157,24 @@ const SceneCarousel = ({ title, scenes, loading = false }) => {
           onScroll={checkScrollButtons}
         >
           {scenes.map((scene) => (
-            <div key={scene.id} className="flex-shrink-0 w-64">
-              <SceneGridItem scene={scene} />
+            <div
+              key={scene.id}
+              className="flex-shrink-0"
+              style={{ width: "280px", minWidth: "280px" }}
+            >
+              <SceneCard
+                scene={scene}
+                onClick={
+                  onSceneClick ||
+                  ((scene, options) =>
+                    console.log(
+                      "Scene clicked in carousel:",
+                      scene.id,
+                      options
+                    ))
+                }
+                enableKeyboard={false}
+              />
             </div>
           ))}
         </div>

@@ -7,7 +7,13 @@ import {
   getSessionStatus,
   killSession,
 } from "./controllers/video.js";
-import { getSceneLibrary } from "./controllers/library.js";
+import {
+  getSceneLibrary,
+  findScenes,
+  findPerformers,
+  findStudios,
+  findTags,
+} from "./controllers/library.js";
 
 export const setupAPI = () => {
   const app = express();
@@ -17,6 +23,12 @@ export const setupAPI = () => {
   // Library endpoints
   app.get("/api/scenes", getSceneLibrary);
   app.get("/api/videos", getSceneLibrary); // Keep legacy endpoint for compatibility
+
+  // New filtered search endpoints
+  app.post("/api/library/scenes", findScenes);
+  app.post("/api/library/performers", findPerformers);
+  app.post("/api/library/studios", findStudios);
+  app.post("/api/library/tags", findTags);
 
   // Video playback endpoints
   app.get("/api/play/:videoId", playVideo); // Legacy endpoint

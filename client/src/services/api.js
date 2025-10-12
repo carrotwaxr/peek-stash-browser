@@ -1,0 +1,277 @@
+/**
+ * API service for interacting with the stash-player backend
+ * Provides functions for all library endpoints with proper error handling
+ */
+
+const API_BASE_URL = "/api";
+
+/**
+ * Base fetch wrapper with error handling
+ */
+async function apiFetch(endpoint, options = {}) {
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  const config = {
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+    ...options,
+  };
+
+  try {
+    const response = await fetch(url, config);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`API Error [${endpoint}]:`, error);
+    throw error;
+  }
+}
+
+/**
+ * GET request wrapper
+ */
+async function apiGet(endpoint) {
+  return apiFetch(endpoint, { method: "GET" });
+}
+
+/**
+ * POST request wrapper
+ */
+async function apiPost(endpoint, data) {
+  return apiFetch(endpoint, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// Legacy API endpoints (keep for backward compatibility)
+export const legacyApi = {
+  /**
+   * Get scenes using the legacy endpoint
+   */
+  getScenes: () => apiGet("/scenes"),
+
+  /**
+   * Get videos using the legacy endpoint
+   */
+  getVideos: () => apiGet("/videos"),
+};
+
+// New filtered search API endpoints
+export const libraryApi = {
+  /**
+   * Search scenes with filtering and pagination
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @param {Object} params.scene_filter - Scene-specific filters
+   * @param {Array<string>} params.ids - Specific scene IDs to fetch
+   */
+  findScenes: (params = {}) => {
+    const { filter = {}, scene_filter = {}, ids } = params;
+    return apiPost("/library/scenes", { filter, scene_filter, ids });
+  },
+
+  /**
+   * Search performers with filtering and pagination
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @param {Object} params.performer_filter - Performer-specific filters
+   */
+  findPerformers: (params = {}) => {
+    const { filter = {}, performer_filter = {} } = params;
+    return apiPost("/library/performers", { filter, performer_filter });
+  },
+
+  /**
+   * Search studios with filtering and pagination
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @param {Object} params.studio_filter - Studio-specific filters
+   */
+  findStudios: (params = {}) => {
+    const { filter = {}, studio_filter = {} } = params;
+    return apiPost("/library/studios", { filter, studio_filter });
+  },
+
+  /**
+   * Search tags with filtering and pagination
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @param {Object} params.tag_filter - Tag-specific filters
+   */
+  findTags: (params = {}) => {
+    const { filter = {}, tag_filter = {} } = params;
+    return apiPost("/library/tags", { filter, tag_filter });
+  },
+};
+
+// Video playback API endpoints
+export const videoApi = {
+  /**
+   * Start video playback
+   */
+  playVideo: (videoId, params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiGet(`/video/play?videoId=${videoId}&${queryString}`);
+  },
+
+  /**
+   * Seek to a specific time in video
+   */
+  seekVideo: (data) => apiPost("/video/seek", data),
+
+  /**
+   * Get session status
+   */
+  getSessionStatus: (sessionId) => apiGet(`/video/session/${sessionId}/status`),
+
+  /**
+   * Kill a video session
+   */
+  killSession: (sessionId) =>
+    apiFetch(`/video/session/${sessionId}`, { method: "DELETE" }),
+};
+
+// Valid sort field mappings for Stash GraphQL API
+export const sortFieldMap = {
+  // Scene sort fields
+  rating100: "rating", // rating100 field sorts by 'rating'
+  created_at: "created_at", // valid field
+  updated_at: "updated_at", // valid field
+  date: "date", // valid field
+  title: "title", // valid field
+  duration: "duration", // valid field
+
+  // Performer sort fields
+  name: "name", // valid field
+  birthdate: "birthdate", // valid field
+
+  // Studio sort fields
+  scene_count: "scene_count", // valid field
+
+  // Tag sort fields
+  tag_count: "tag_count", // valid field
+};
+
+// Helper functions for common filtering patterns
+export const filterHelpers = {
+  /**
+   * Create basic pagination filter
+   */
+  pagination: (page = 1, perPage = 25, sort = null, direction = "ASC") => {
+    const filter = {
+      page,
+      per_page: perPage,
+    };
+    // Map sort field to correct GraphQL field name and add if valid
+    if (sort && sortFieldMap[sort]) {
+      filter.sort = sortFieldMap[sort];
+      filter.direction = direction;
+    }
+    return filter;
+  },
+
+  /**
+   * Create text search filter
+   */
+  textSearch: (query, page = 1, perPage = 25) => ({
+    q: query,
+    page,
+    per_page: perPage,
+  }),
+
+  /**
+   * Create rating filter for scenes
+   */
+  ratingFilter: (minRating, modifier = "GREATER_THAN") => ({
+    rating100: {
+      modifier,
+      value: minRating,
+    },
+  }),
+
+  /**
+   * Create favorite filter
+   */
+  favoriteFilter: () => ({
+    performer_favorite: true,
+  }),
+
+  /**
+   * Create date range filter
+   */
+  dateRangeFilter: (startDate, endDate) => ({
+    date: {
+      modifier: "BETWEEN",
+      value: startDate,
+      value2: endDate,
+    },
+  }),
+
+  /**
+   * Create duration filter for scenes (in seconds)
+   */
+  durationFilter: (minDuration, modifier = "GREATER_THAN") => ({
+    duration: {
+      modifier,
+      value: minDuration,
+    },
+  }),
+};
+
+// Predefined filter combinations for common use cases
+export const commonFilters = {
+  /**
+   * Get high-rated scenes
+   */
+  highRatedScenes: (page = 1, perPage = 25) => ({
+    filter: filterHelpers.pagination(page, perPage, "rating100", "DESC"),
+    scene_filter: filterHelpers.ratingFilter(80),
+  }),
+
+  /**
+   * Get recently added scenes
+   */
+  recentScenes: (page = 1, perPage = 25) => ({
+    filter: filterHelpers.pagination(page, perPage, "created_at", "DESC"),
+    scene_filter: {},
+  }),
+
+  /**
+   * Get favorite performers
+   */
+  favoritePerformers: (page = 1, perPage = 25) => ({
+    filter: filterHelpers.pagination(page, perPage, "name", "ASC"),
+    performer_filter: { favorite: true },
+  }),
+
+  /**
+   * Get long scenes (over 30 minutes)
+   */
+  longScenes: (page = 1, perPage = 25) => ({
+    filter: filterHelpers.pagination(page, perPage, "duration", "DESC"),
+    scene_filter: filterHelpers.durationFilter(1800), // 30 minutes in seconds
+  }),
+
+  /**
+   * Search scenes by text
+   */
+  searchScenes: (query, page = 1, perPage = 25) => ({
+    filter: filterHelpers.textSearch(query, page, perPage),
+    scene_filter: {},
+  }),
+
+  /**
+   * Search performers by text
+   */
+  searchPerformers: (query, page = 1, perPage = 25) => ({
+    filter: filterHelpers.textSearch(query, page, perPage),
+    performer_filter: {},
+  }),
+};

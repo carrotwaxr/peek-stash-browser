@@ -2,12 +2,9 @@ import Navigation from "./Navigation.jsx";
 
 const Layout = ({ children }) => {
   return (
-    <div
-      className="min-h-screen"
-      style={{ backgroundColor: "var(--bg-primary)" }}
-    >
+    <div className="layout-container">
       <Navigation />
-      <main>{children}</main>
+      <main className="w-full">{children}</main>
     </div>
   );
 };

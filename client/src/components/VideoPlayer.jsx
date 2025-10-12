@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
@@ -743,12 +743,13 @@ const VideoPlayer = ({ scene }) => {
                           >
                             Studio
                           </h3>
-                          <p
-                            className="text-base"
+                          <Link
+                            to={`/studio/${scene.studio.id}`}
+                            className="text-base hover:underline hover:text-blue-400"
                             style={{ color: "var(--text-primary)" }}
                           >
                             {scene.studio.name}
-                          </p>
+                          </Link>
                         </div>
                       )}
 
@@ -815,8 +816,9 @@ const VideoPlayer = ({ scene }) => {
                         </h3>
                         <div className="flex flex-wrap gap-3">
                           {scene.performers.map((performer) => (
-                            <div
+                            <Link
                               key={performer.id}
+                              to={`/performer/${performer.id}`}
                               className="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                               style={{ backgroundColor: "var(--bg-secondary)" }}
                             >
@@ -839,7 +841,7 @@ const VideoPlayer = ({ scene }) => {
                               >
                                 {performer.name}
                               </span>
-                            </div>
+                            </Link>
                           ))}
                         </div>
                       </div>
@@ -856,8 +858,9 @@ const VideoPlayer = ({ scene }) => {
                         </h3>
                         <div className="flex flex-wrap gap-2">
                           {scene.tags.map((tag) => (
-                            <div
+                            <Link
                               key={tag.id}
+                              to={`/tag/${tag.id}`}
                               className="flex items-center gap-2 px-3 py-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
                               style={{ backgroundColor: "var(--bg-secondary)" }}
                             >
@@ -874,7 +877,7 @@ const VideoPlayer = ({ scene }) => {
                               >
                                 {tag.name}
                               </span>
-                            </div>
+                            </Link>
                           ))}
                         </div>
                       </div>
