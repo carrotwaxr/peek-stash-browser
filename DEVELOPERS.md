@@ -99,8 +99,8 @@ This document provides comprehensive information for developers working on Peek,
 1. **Clone and setup repository**:
 
    ```bash
-   git clone https://github.com/carrotwaxr/stash-player.git
-   cd stash-player
+   git clone https://github.com/carrotwaxr/peek-stash-browser.git
+   cd peek-stash-browser
    ```
 
 2. **Environment configuration**:
@@ -140,7 +140,7 @@ This document provides comprehensive information for developers working on Peek,
 
 ```bash
 # Database (SQLite - much simpler!)
-DATABASE_URL="file:./data/stash-player.db"
+DATABASE_URL="file:./data/peek-stash-browser.db"
 
 # Stash Integration
 STASH_URL="http://localhost:9999/graphql"
@@ -198,7 +198,7 @@ JWT_SECRET="dev-secret-change-in-production"
 ### Project Layout
 
 ```
-stash-player/
+peek-stash-browser/
 ├── client/                 # React frontend application
 │   ├── public/            # Static assets
 │   ├── src/
@@ -934,7 +934,7 @@ COPY --from=frontend-build /app/client/dist ./frontend/
 RUN echo 'server { listen 80; location / { root /app/frontend; try_files $uri $uri/ /index.html; } location /api/ { proxy_pass http://localhost:8000; } }' > /etc/nginx/conf.d/default.conf
 
 # Create startup script
-RUN echo '#!/bin/bash\nnginx\nexport DATABASE_URL="file:/app/data/stash-player.db"\ncd /app\nnpx prisma db push --accept-data-loss\nnode backend/index.js' > /app/start.sh && chmod +x /app/start.sh
+RUN echo '#!/bin/bash\nnginx\nexport DATABASE_URL="file:/app/data/peek-stash-browser.db"\ncd /app\nnpx prisma db push --accept-data-loss\nnode backend/index.js' > /app/start.sh && chmod +x /app/start.sh
 
 EXPOSE 80
 CMD ["/app/start.sh"]
@@ -996,7 +996,7 @@ jobs:
 # docker-compose.prod.yml
 services:
   frontend:
-    image: ghcr.io/carrotwaxr/stash-player-frontend:latest
+    image: ghcr.io/carrotwaxr/peek-stash-browser-frontend:latest
     restart: unless-stopped
     ports:
       - "80:80"
@@ -1004,7 +1004,7 @@ services:
       - backend
 
   backend:
-    image: ghcr.io/carrotwaxr/stash-player-backend:latest
+    image: ghcr.io/carrotwaxr/peek-stash-browser-backend:latest
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -1185,8 +1185,8 @@ const scenes = await getCachedData(`scenes:${page}:${filters}`, async () => {
 // Secure JWT configuration
 const jwtOptions = {
   expiresIn: "24h",
-  issuer: "stash-player",
-  audience: "stash-player-users",
+  issuer: "peek-stash-browser",
+  audience: "peek-stash-browser-users",
   algorithm: "HS256",
 };
 
@@ -1430,12 +1430,12 @@ logger.error("Database connection failed", {
 # Build multi-architecture images
 docker buildx create --use --name multiarch
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/carrotwaxr/stash-player-backend:latest \
+  -t ghcr.io/carrotwaxr/peek-stash-browser-backend:latest \
   --push ./server
 
 # Tag versions
-docker tag ghcr.io/carrotwaxr/stash-player-backend:latest \
-  ghcr.io/carrotwaxr/stash-player-backend:v1.0.0
+docker tag ghcr.io/carrotwaxr/peek-stash-browser-backend:latest \
+  ghcr.io/carrotwaxr/peek-stash-browser-backend:v1.0.0
 ```
 
 ### Release Process
@@ -1488,9 +1488,9 @@ docker tag ghcr.io/carrotwaxr/stash-player-backend:latest \
 1. **Fork & Clone**:
 
    ```bash
-   git clone https://github.com/your-username/stash-player.git
-   cd stash-player
-   git remote add upstream https://github.com/carrotwaxr/stash-player.git
+   git clone https://github.com/your-username/peek-stash-browser.git
+   cd peek-stash-browser
+   git remote add upstream https://github.com/carrotwaxr/peek-stash-browser.git
    ```
 
 2. **Set up development environment** (see Development Setup section)
@@ -1550,7 +1550,7 @@ docker tag ghcr.io/carrotwaxr/stash-player-backend:latest \
 
 - [Stash Discord](https://discord.gg/2TsNFKt)
 - [unRAID Forums](https://forums.unraid.net/)
-- [GitHub Discussions](https://github.com/carrotwaxr/stash-player/discussions)
+- [GitHub Discussions](https://github.com/carrotwaxr/peek-stash-browser/discussions)
 
 ### Tools & Extensions
 

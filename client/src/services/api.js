@@ -1,5 +1,5 @@
 /**
- * API service for interacting with the stash-player backend
+ * API service for interacting with the Peek backend
  * Provides functions for all library endpoints with proper error handling
  */
 
