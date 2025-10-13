@@ -8,11 +8,36 @@ import {
   ErrorMessage,
   LoadingSpinner,
 } from "./ui/index.js";
+import {
+  SortControl,
+  FilterPanel,
+  FilterControl,
+} from "./ui/FilterControls.jsx";
+import { useSortAndFilter } from "../hooks/useSortAndFilter.js";
+import {
+  SCENE_SORT_OPTIONS,
+  RATING_OPTIONS,
+  RESOLUTION_OPTIONS,
+  ORGANIZED_OPTIONS,
+  buildSceneFilter,
+} from "../utils/filterConfig.js";
 
 const Scenes = () => {
   const navigate = useNavigate();
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const {
+    sort,
+    sortDirection,
+    handleSortChange,
+    filters,
+    handleFilterChange,
+    clearFilters,
+    hasActiveFilters,
+    isFilterPanelOpen,
+    toggleFilterPanel,
+  } = useSortAndFilter("TITLE", "scene");
 
   const {
     data: paginatedData,
@@ -22,6 +47,9 @@ const Scenes = () => {
   } = useScenesPaginated({
     page: currentPage,
     perPage: 24,
+    sort: sort || undefined,
+    direction: sortDirection,
+    scene_filter: buildSceneFilter(filters),
   });
 
   const {
@@ -103,6 +131,86 @@ const Scenes = () => {
           </button>
         )}
       </PageHeader>
+
+      {/* Sorting and Filtering Controls */}
+      {!searchMode && (
+        <>
+          <div className="flex items-center justify-between mb-6">
+            {/* Sort Control */}
+            <div className="flex items-center space-x-4">
+              <SortControl
+                options={SCENE_SORT_OPTIONS}
+                value={sort}
+                onChange={handleSortChange}
+              />
+              <button
+                onClick={() => handleSortChange(sort)} // This will toggle direction for same field
+                className="px-3 py-2 border rounded-md text-sm"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {sortDirection === "ASC" ? "↑ Ascending" : "↓ Descending"}
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Panel */}
+          <FilterPanel
+            isOpen={isFilterPanelOpen}
+            onToggle={toggleFilterPanel}
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+          >
+            <FilterControl
+              type="select"
+              label="Rating"
+              value={filters.rating || ""}
+              onChange={(value) => handleFilterChange("rating", value)}
+              options={RATING_OPTIONS}
+              placeholder="Any rating"
+            />
+
+            <FilterControl
+              type="range"
+              label="Duration (minutes)"
+              value={filters.duration || {}}
+              onChange={(value) => handleFilterChange("duration", value)}
+              min={1}
+              max={300}
+            />
+
+            <FilterControl
+              type="range"
+              label="O Count"
+              value={filters.oCount || {}}
+              onChange={(value) => handleFilterChange("oCount", value)}
+              min={0}
+              max={50}
+            />
+
+            <FilterControl
+              type="select"
+              label="Resolution"
+              value={filters.resolution || ""}
+              onChange={(value) => handleFilterChange("resolution", value)}
+              options={RESOLUTION_OPTIONS}
+              placeholder="Any resolution"
+            />
+
+            <FilterControl
+              type="select"
+              label="Organized"
+              value={filters.organized || ""}
+              onChange={(value) => handleFilterChange("organized", value)}
+              options={ORGANIZED_OPTIONS}
+              placeholder="Any"
+            />
+          </FilterPanel>
+        </>
+      )}
 
       <SceneGrid
         scenes={currentScenes || []}

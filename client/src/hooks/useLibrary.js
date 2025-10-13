@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import { useAsyncData, useSearch } from "./useApi.js";
-import { libraryApi, legacyApi, commonFilters } from "../services/api.js";
+import {
+  libraryApi,
+  legacyApi,
+  commonFilters,
+  sortFieldMap,
+} from "../services/api.js";
 
 /**
  * Hook for fetching scenes with the legacy endpoint
@@ -24,14 +29,34 @@ export function useScenesSearch() {
  * Hook for paginated scenes with filtering
  */
 export function useScenesPaginated(options = {}) {
-  const { page = 1, perPage = 25, ...filterParams } = options;
+  const {
+    page = 1,
+    perPage = 25,
+    sort,
+    sortDirection,
+    scene_filter: sceneFilter = {},
+    studio_filter: studioFilter,
+    performer_filter: performerFilter,
+    tag_filter: tagFilter,
+    ...otherParams
+  } = options;
 
   const fetchFunction = useCallback(async () => {
-    const response = await libraryApi.findScenes({
-      filter: { page, per_page: perPage },
-      scene_filter: {},
-      ...filterParams,
-    });
+    const requestBody = {
+      filter: {
+        page,
+        per_page: perPage,
+        ...(sort && sortFieldMap[sort] && { sort: sortFieldMap[sort] }),
+        ...(sortDirection && { direction: sortDirection }),
+      },
+      scene_filter: sceneFilter,
+      ...(studioFilter && { studio_filter: studioFilter }),
+      ...(performerFilter && { performer_filter: performerFilter }),
+      ...(tagFilter && { tag_filter: tagFilter }),
+      ...otherParams,
+    };
+
+    const response = await libraryApi.findScenes(requestBody);
 
     // Extract scenes and count from server response structure
     const findScenes = response?.findScenes;
@@ -39,9 +64,29 @@ export function useScenesPaginated(options = {}) {
       scenes: findScenes?.scenes || [],
       count: findScenes?.count || 0,
     };
-  }, [page, perPage, filterParams]);
+  }, [
+    page,
+    perPage,
+    sort,
+    sortDirection,
+    sceneFilter,
+    studioFilter,
+    performerFilter,
+    tagFilter,
+    otherParams,
+  ]);
 
-  return useAsyncData(fetchFunction, [page, perPage, filterParams]);
+  return useAsyncData(fetchFunction, [
+    page,
+    perPage,
+    sort,
+    sortDirection,
+    sceneFilter,
+    studioFilter,
+    performerFilter,
+    tagFilter,
+    otherParams,
+  ]);
 }
 
 /**
@@ -109,14 +154,28 @@ export function usePerformersSearch() {
  * Hook for paginated performers with filtering
  */
 export function usePerformersPaginated(options = {}) {
-  const { page = 1, perPage = 25, ...filterParams } = options;
+  const {
+    page = 1,
+    perPage = 25,
+    sort,
+    sortDirection,
+    filter: performerFilter = {},
+    ...otherParams
+  } = options;
 
   const fetchFunction = useCallback(async () => {
-    const response = await libraryApi.findPerformers({
-      filter: { page, per_page: perPage },
-      performer_filter: {},
-      ...filterParams,
-    });
+    const requestBody = {
+      filter: {
+        page,
+        per_page: perPage,
+        ...(sort && sortFieldMap[sort] && { sort: sortFieldMap[sort] }),
+        ...(sortDirection && { direction: sortDirection }),
+      },
+      performer_filter: performerFilter,
+      ...otherParams,
+    };
+
+    const response = await libraryApi.findPerformers(requestBody);
 
     // Extract performers and count from server response structure
     const findPerformers = response?.findPerformers;
@@ -124,9 +183,16 @@ export function usePerformersPaginated(options = {}) {
       performers: findPerformers?.performers || [],
       count: findPerformers?.count || 0,
     };
-  }, [page, perPage, filterParams]);
+  }, [page, perPage, sort, sortDirection, performerFilter, otherParams]);
 
-  return useAsyncData(fetchFunction, [page, perPage, filterParams]);
+  return useAsyncData(fetchFunction, [
+    page,
+    perPage,
+    sort,
+    sortDirection,
+    performerFilter,
+    otherParams,
+  ]);
 }
 
 /**
@@ -149,14 +215,28 @@ export function useFavoritePerformers(perPage = 25) {
  * Hook for paginated studios with filtering
  */
 export function useStudiosPaginated(options = {}) {
-  const { page = 1, perPage = 25, ...filterParams } = options;
+  const {
+    page = 1,
+    perPage = 25,
+    sort,
+    sortDirection,
+    filter: studioFilter = {},
+    ...otherParams
+  } = options;
 
   const fetchFunction = useCallback(async () => {
-    const response = await libraryApi.findStudios({
-      filter: { page, per_page: perPage },
-      studio_filter: {},
-      ...filterParams,
-    });
+    const requestBody = {
+      filter: {
+        page,
+        per_page: perPage,
+        ...(sort && sortFieldMap[sort] && { sort: sortFieldMap[sort] }),
+        ...(sortDirection && { direction: sortDirection }),
+      },
+      studio_filter: studioFilter,
+      ...otherParams,
+    };
+
+    const response = await libraryApi.findStudios(requestBody);
 
     // Extract studios and count from server response structure
     const findStudios = response?.findStudios;
@@ -164,9 +244,16 @@ export function useStudiosPaginated(options = {}) {
       studios: findStudios?.studios || [],
       count: findStudios?.count || 0,
     };
-  }, [page, perPage, filterParams]);
+  }, [page, perPage, sort, sortDirection, studioFilter, otherParams]);
 
-  return useAsyncData(fetchFunction, [page, perPage, filterParams]);
+  return useAsyncData(fetchFunction, [
+    page,
+    perPage,
+    sort,
+    sortDirection,
+    studioFilter,
+    otherParams,
+  ]);
 }
 
 /**
@@ -187,14 +274,28 @@ export function useStudiosSearch() {
  * Hook for paginated tags with filtering
  */
 export function useTagsPaginated(options = {}) {
-  const { page = 1, perPage = 25, ...filterParams } = options;
+  const {
+    page = 1,
+    perPage = 25,
+    sort,
+    sortDirection,
+    filter: tagFilter = {},
+    ...otherParams
+  } = options;
 
   const fetchFunction = useCallback(async () => {
-    const response = await libraryApi.findTags({
-      filter: { page, per_page: perPage },
-      tag_filter: {},
-      ...filterParams,
-    });
+    const requestBody = {
+      filter: {
+        page,
+        per_page: perPage,
+        ...(sort && sortFieldMap[sort] && { sort: sortFieldMap[sort] }),
+        ...(sortDirection && { direction: sortDirection }),
+      },
+      tag_filter: tagFilter,
+      ...otherParams,
+    };
+
+    const response = await libraryApi.findTags(requestBody);
 
     // Extract tags and count from server response structure
     const findTags = response?.findTags;
@@ -202,9 +303,16 @@ export function useTagsPaginated(options = {}) {
       tags: findTags?.tags || [],
       count: findTags?.count || 0,
     };
-  }, [page, perPage, filterParams]);
+  }, [page, perPage, sort, sortDirection, tagFilter, otherParams]);
 
-  return useAsyncData(fetchFunction, [page, perPage, filterParams]);
+  return useAsyncData(fetchFunction, [
+    page,
+    perPage,
+    sort,
+    sortDirection,
+    tagFilter,
+    otherParams,
+  ]);
 }
 
 /**

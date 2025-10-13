@@ -12,17 +12,48 @@ import {
   EmptyState,
   Pagination,
 } from "./ui/index.js";
+import {
+  SortControl,
+  FilterPanel,
+  FilterControl,
+} from "./ui/FilterControls.jsx";
+import { useSortAndFilter } from "../hooks/useSortAndFilter.js";
+import {
+  PERFORMER_SORT_OPTIONS,
+  GENDER_OPTIONS,
+  RATING_OPTIONS,
+  buildPerformerFilter,
+} from "../utils/filterConfig.js";
 import { formatRating, getInitials, truncateText } from "../utils/format.js";
 
 const Performers = () => {
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const {
+    sort,
+    sortDirection,
+    handleSortChange,
+    filters,
+    handleFilterChange,
+    clearFilters,
+    hasActiveFilters,
+    isFilterPanelOpen,
+    toggleFilterPanel,
+  } = useSortAndFilter("NAME", "performer");
+
   const {
     data: paginatedData,
     loading,
     error,
     refetch,
-  } = usePerformersPaginated({ page: currentPage });
+  } = usePerformersPaginated({
+    page: currentPage,
+    perPage: 24,
+    sort: sort || undefined,
+    sortDirection: sortDirection || undefined,
+    filter: buildPerformerFilter(filters),
+  });
   const {
     query,
     setQuery,
@@ -96,6 +127,97 @@ const Performers = () => {
         )}
       </PageHeader>
 
+      {/* Sorting and Filtering Controls */}
+      {!searchMode && (
+        <>
+          <div className="flex items-center justify-between mb-6">
+            {/* Sort Control */}
+            <div className="flex items-center space-x-4">
+              <SortControl
+                options={PERFORMER_SORT_OPTIONS}
+                value={sort}
+                onChange={handleSortChange}
+              />
+              <button
+                onClick={() => handleSortChange(sort)} // This will toggle direction for same field
+                className="px-3 py-2 border rounded-md text-sm"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+                title={`Sort ${
+                  sortDirection === "ASC" ? "Descending" : "Ascending"
+                }`}
+              >
+                {sortDirection === "ASC" ? "↑" : "↓"}
+              </button>
+            </div>
+
+            {/* Filter Toggle */}
+            <div className="flex items-center space-x-4">
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-3 py-2 text-sm border border-red-500 text-red-500 rounded hover:bg-red-50 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+              <button
+                onClick={toggleFilterPanel}
+                className="px-4 py-2 border rounded-md text-sm transition-colors"
+                style={{
+                  backgroundColor: isFilterPanelOpen
+                    ? "var(--accent-primary)"
+                    : "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  color: isFilterPanelOpen ? "white" : "var(--text-primary)",
+                }}
+              >
+                Filters {hasActiveFilters && `(${Object.keys(filters).length})`}
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Panel */}
+          {isFilterPanelOpen && (
+            <FilterPanel>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <FilterControl
+                  type="select"
+                  label="Gender"
+                  value={filters.gender || ""}
+                  onChange={(value) => handleFilterChange("gender", value)}
+                  options={GENDER_OPTIONS}
+                />
+                <FilterControl
+                  type="select"
+                  label="Rating"
+                  value={filters.rating || ""}
+                  onChange={(value) => handleFilterChange("rating", value)}
+                  options={RATING_OPTIONS}
+                />
+                <FilterControl
+                  type="number"
+                  label="Min Age"
+                  value={filters.minAge || ""}
+                  onChange={(value) => handleFilterChange("minAge", value)}
+                  placeholder="18"
+                  min="18"
+                />
+                <FilterControl
+                  type="checkbox"
+                  label="Favorites Only"
+                  value={filters.favorite || false}
+                  onChange={(value) => handleFilterChange("favorite", value)}
+                />
+              </div>
+            </FilterPanel>
+          )}
+        </>
+      )}
+
       {currentLoading && (
         <div className="flex justify-center py-12">
           <LoadingSpinner size="lg" />
@@ -130,7 +252,7 @@ const Performers = () => {
 
       {!currentLoading && currentPerformers && currentPerformers.length > 0 && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
             {currentPerformers.map((performer) => (
               <PerformerCard key={performer.id} performer={performer} />
             ))}

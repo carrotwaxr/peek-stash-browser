@@ -79,9 +79,18 @@ export const findPerformers = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter, performer_filter } = req.body;
 
+    // Always filter to only show performers with scenes
+    const enhancedFilter = {
+      ...performer_filter,
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
+    };
+
     const performers: FindPerformersQuery = await stash.findPerformers({
       filter: filter as FindFilterType,
-      performer_filter: performer_filter as PerformerFilterType,
+      performer_filter: enhancedFilter as PerformerFilterType,
     });
 
     res.json(performers);
@@ -99,9 +108,18 @@ export const findStudios = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter, studio_filter } = req.body;
 
+    // Always filter to only show studios with scenes
+    const enhancedFilter = {
+      ...studio_filter,
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
+    };
+
     const studios: FindStudiosQuery = await stash.findStudios({
       filter: filter as FindFilterType,
-      studio_filter: studio_filter as StudioFilterType,
+      studio_filter: enhancedFilter as StudioFilterType,
     });
 
     res.json(studios);
@@ -119,9 +137,18 @@ export const findTags = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter, tag_filter } = req.body;
 
+    // Always filter to only show tags with scenes
+    const enhancedFilter = {
+      ...tag_filter,
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
+    };
+
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
-      tag_filter: tag_filter as TagFilterType,
+      tag_filter: enhancedFilter as TagFilterType,
     });
 
     res.json(tags);
@@ -171,5 +198,87 @@ const transformScene = (scene: Scene) => {
   } catch (error) {
     console.error("Error transforming scene:", error);
     return scene; // Return original scene if transformation fails
+  }
+};
+
+// Update endpoints using stashapp-api mutations
+
+export const updateScene = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const stash = getStash();
+    const updatedScene = await stash.sceneUpdate({
+      input: {
+        id,
+        ...updateData,
+      },
+    });
+
+    res.json({ success: true, scene: updatedScene.sceneUpdate });
+  } catch (error) {
+    console.error("Error updating scene:", error);
+    res.status(500).json({ error: "Failed to update scene" });
+  }
+};
+
+export const updatePerformer = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const stash = getStash();
+    const updatedPerformer = await stash.performerUpdate({
+      input: {
+        id,
+        ...updateData,
+      },
+    });
+
+    res.json({ success: true, performer: updatedPerformer.performerUpdate });
+  } catch (error) {
+    console.error("Error updating performer:", error);
+    res.status(500).json({ error: "Failed to update performer" });
+  }
+};
+
+export const updateStudio = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const stash = getStash();
+    const updatedStudio = await stash.studioUpdate({
+      input: {
+        id,
+        ...updateData,
+      },
+    });
+
+    res.json({ success: true, studio: updatedStudio.studioUpdate });
+  } catch (error) {
+    console.error("Error updating studio:", error);
+    res.status(500).json({ error: "Failed to update studio" });
+  }
+};
+
+export const updateTag = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const stash = getStash();
+    const updatedTag = await stash.tagUpdate({
+      input: {
+        id,
+        ...updateData,
+      },
+    });
+
+    res.json({ success: true, tag: updatedTag.tagUpdate });
+  } catch (error) {
+    console.error("Error updating tag:", error);
+    res.status(500).json({ error: "Failed to update tag" });
   }
 };

@@ -1,15 +1,21 @@
-import prisma from "./singleton";
+import prisma from "./singleton.js";
+import bcrypt from "bcryptjs";
 
 async function main() {
-  await prisma.video.upsert({
-    where: { path: "/app/media/sample.mp4" },
+  // Create default admin user
+  const hashedPassword = await bcrypt.hash("admin", 10);
+
+  const admin = await prisma.user.upsert({
+    where: { username: "admin" },
     update: {},
     create: {
-      title: "Sample Video",
-      path: "/app/media/sample.mp4",
-      thumbnail: "https://via.placeholder.com/400x225.png?text=Sample+Video",
+      username: "admin",
+      password: hashedPassword,
+      role: "ADMIN",
     },
   });
+
+  console.log("✅ Seeded admin user:", admin.username);
 }
 
 main()

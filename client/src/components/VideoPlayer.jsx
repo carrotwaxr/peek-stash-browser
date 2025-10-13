@@ -5,6 +5,7 @@ import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
 import axios from "axios";
 import { canDirectPlayVideo } from "../utils/videoFormat.js";
+import Navigation from "./Navigation.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -495,7 +496,10 @@ const VideoPlayer = ({ scene }) => {
       className="min-h-screen"
       style={{ backgroundColor: "var(--bg-primary)" }}
     >
-      {/* Navigation Header */}
+      {/* Full Navigation Header */}
+      <Navigation />
+
+      {/* Video Player Header */}
       <header
         className="container-fluid py-3"
         style={{
@@ -503,48 +507,27 @@ const VideoPlayer = ({ scene }) => {
           borderBottom: "1px solid var(--border-color)",
         }}
       >
-        {/* Navigation Bar */}
-        <nav className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="btn"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border-color)",
-                padding: "8px 16px",
-              }}
-            >
-              ← Back
-            </button>
-          </div>
-
-          {/* Navigation Menu */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate("/")}
-              className="nav-link"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => navigate("/scenes")}
-              className="nav-link"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Scenes
-            </button>
-          </div>
-        </nav>
-
-        {/* Scene Title */}
-        <h1
-          className="text-2xl font-bold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {scene.title}
-        </h1>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="btn"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+              padding: "8px 16px",
+            }}
+          >
+            ← Back
+          </button>
+          {/* Scene Title */}
+          <h1
+            className="text-2xl font-bold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {scene.title}
+          </h1>
+          <div></div> {/* Spacer for flex layout */}
+        </div>
       </header>
 
       {/* Main content area */}

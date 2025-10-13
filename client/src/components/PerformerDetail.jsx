@@ -75,142 +75,403 @@ const PerformerDetail = () => {
       <div className="max-w-none">
         {/* Performer Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-6">
             <Link
               to="/performers"
-              className="text-blue-400 hover:text-blue-300 text-sm"
+              className="inline-flex items-center px-3 py-2 rounded-md text-sm transition-colors"
+              style={{
+                color: "var(--accent-primary)",
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+                border: "1px solid",
+              }}
             >
               ← Back to Performers
             </Link>
           </div>
 
-          <div className="flex items-start gap-6">
+          <div className="flex flex-col lg:flex-row items-start gap-8">
             {/* Performer Image */}
-            {performer?.image_path && (
-              <div className="flex-shrink-0">
-                <img
-                  src={performer.image_path}
-                  alt={performer.name}
-                  className="w-48 h-64 object-cover rounded-lg border border-border"
-                  style={{ borderColor: "var(--border-color)" }}
-                />
+            <div className="flex-shrink-0">
+              <div
+                className="w-64 h-80 rounded-xl overflow-hidden shadow-lg"
+                style={{ backgroundColor: "var(--bg-card)" }}
+              >
+                {performer?.image_path ? (
+                  <img
+                    src={performer.image_path}
+                    alt={performer.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <svg
+                      className="w-24 h-24"
+                      style={{ color: "var(--text-muted)" }}
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Stats Card */}
+              <div
+                className="mt-6 p-4 rounded-lg"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  border: "1px solid",
+                }}
+              >
+                <h3
+                  className="text-lg font-semibold mb-3"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Statistics
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      Scenes:
+                    </span>
+                    <span
+                      className="font-medium"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {totalCount}
+                    </span>
+                  </div>
+                  {performer?.rating100 && (
+                    <div className="flex justify-between">
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Rating:
+                      </span>
+                      <span
+                        className="font-medium"
+                        style={{ color: "var(--accent-primary)" }}
+                      >
+                        {(performer.rating100 / 20).toFixed(1)}/5
+                      </span>
+                    </div>
+                  )}
+                  {performer?.o_counter && (
+                    <div className="flex justify-between">
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        O Count:
+                      </span>
+                      <span
+                        className="font-medium"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.o_counter}
+                      </span>
+                    </div>
+                  )}
+                  {performer?.play_count && (
+                    <div className="flex justify-between">
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        Play Count:
+                      </span>
+                      <span
+                        className="font-medium"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.play_count}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Performer Info */}
             <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-4">
-                {performer?.name || `Performer ${performerId}`}
-              </h1>
-
-              {/* Basic Info Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                {performer?.birthdate && (
-                  <div>
-                    <span className="text-gray-400">Born:</span>
-                    <p className="font-medium">
-                      {new Date(performer.birthdate).toLocaleDateString()}
-                      {age && ` (${age} years old)`}
-                    </p>
-                  </div>
+              <div className="mb-6">
+                <h1
+                  className="text-4xl font-bold mb-2"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {performer?.name || `Performer ${performerId}`}
+                </h1>
+                {performer?.disambiguation && (
+                  <p
+                    className="text-lg mb-3"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {performer.disambiguation}
+                  </p>
                 )}
-
-                {performer?.career_length && (
-                  <div>
-                    <span className="text-gray-400">Career:</span>
-                    <p className="font-medium">{performer.career_length}</p>
-                  </div>
-                )}
-
-                {performer?.country && (
-                  <div>
-                    <span className="text-gray-400">Country:</span>
-                    <p className="font-medium">{performer.country}</p>
-                  </div>
-                )}
-
-                {performer?.ethnicity && (
-                  <div>
-                    <span className="text-gray-400">Ethnicity:</span>
-                    <p className="font-medium">{performer.ethnicity}</p>
-                  </div>
-                )}
-
-                {performer?.eye_color && (
-                  <div>
-                    <span className="text-gray-400">Eye Color:</span>
-                    <p className="font-medium">{performer.eye_color}</p>
-                  </div>
-                )}
-
-                {performer?.hair_color && (
-                  <div>
-                    <span className="text-gray-400">Hair Color:</span>
-                    <p className="font-medium">{performer.hair_color}</p>
-                  </div>
-                )}
-
-                {performer?.height_cm && (
-                  <div>
-                    <span className="text-gray-400">Height:</span>
-                    <p className="font-medium">{performer.height_cm} cm</p>
-                  </div>
-                )}
-
-                {performer?.weight && (
-                  <div>
-                    <span className="text-gray-400">Weight:</span>
-                    <p className="font-medium">{performer.weight} kg</p>
-                  </div>
-                )}
-
-                {performer?.measurements && (
-                  <div>
-                    <span className="text-gray-400">Measurements:</span>
-                    <p className="font-medium">{performer.measurements}</p>
-                  </div>
-                )}
+                <div className="flex flex-wrap gap-2">
+                  {performer?.favorite && (
+                    <span
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                      style={{
+                        backgroundColor: "var(--accent-warning)",
+                        color: "white",
+                      }}
+                    >
+                      ⭐ Favorite
+                    </span>
+                  )}
+                  {performer?.gender && (
+                    <span
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {performer.gender}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {performer?.url && (
-                <p className="mb-4">
-                  <span className="text-gray-400">Website:</span>{" "}
-                  <a
-                    href={performer.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300"
-                  >
-                    {performer.url}
-                  </a>
-                </p>
-              )}
+              {/* Details Section */}
+              <div
+                className="p-6 rounded-lg mb-6"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  border: "1px solid",
+                }}
+              >
+                <h2
+                  className="text-xl font-semibold mb-4"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Details
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {performer?.birthdate && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Born
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {new Date(performer.birthdate).toLocaleDateString()}
+                        {age && ` (${age} years old)`}
+                      </dd>
+                    </div>
+                  )}
 
-              {performer?.details && (
-                <div className="mb-4">
-                  <span className="text-gray-400">Details:</span>
-                  <p className="mt-1 text-gray-300 whitespace-pre-wrap">
-                    {performer.details}
-                  </p>
+                  {performer?.career_length && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Career
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.career_length}
+                      </dd>
+                    </div>
+                  )}
+
+                  {performer?.country && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Country
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.country}
+                      </dd>
+                    </div>
+                  )}
+
+                  {performer?.ethnicity && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Ethnicity
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.ethnicity}
+                      </dd>
+                    </div>
+                  )}
+
+                  {performer?.eye_color && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Eye Color
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.eye_color}
+                      </dd>
+                    </div>
+                  )}
+
+                  {performer?.hair_color && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Hair Color
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.hair_color}
+                      </dd>
+                    </div>
+                  )}
+
+                  {performer?.height_cm && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Height
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.height_cm} cm
+                      </dd>
+                    </div>
+                  )}
+
+                  {performer?.weight && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Weight
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.weight} kg
+                      </dd>
+                    </div>
+                  )}
+
+                  {performer?.measurements && (
+                    <div>
+                      <dt
+                        className="text-sm font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Measurements
+                      </dt>
+                      <dd
+                        className="text-sm"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.measurements}
+                      </dd>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Website and Details */}
+              {(performer?.url || performer?.details) && (
+                <div
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    borderColor: "var(--border-color)",
+                    border: "1px solid",
+                  }}
+                >
+                  {performer?.url && (
+                    <div className="mb-4">
+                      <h3
+                        className="text-sm font-medium mb-2"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Website
+                      </h3>
+                      <a
+                        href={performer.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-sm hover:underline"
+                        style={{ color: "var(--accent-primary)" }}
+                      >
+                        {performer.url} ↗
+                      </a>
+                    </div>
+                  )}
+
+                  {performer?.details && (
+                    <div>
+                      <h3
+                        className="text-sm font-medium mb-2"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Details
+                      </h3>
+                      <p
+                        className="text-sm whitespace-pre-wrap"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {performer.details}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
-
-              <div className="text-sm text-gray-500">
-                {totalCount} scene{totalCount !== 1 ? "s" : ""} featuring this
-                performer
-              </div>
             </div>
           </div>
         </div>
 
         {/* Scenes Section */}
-        <div>
-          <PageHeader
-            title="Scenes"
-            subtitle={`All scenes featuring ${
-              performer?.name || "this performer"
-            }`}
-          />
+        <div className="mt-8">
+          <div className="mb-6">
+            <h2
+              className="text-2xl font-bold mb-2"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Scenes
+            </h2>
+            <p style={{ color: "var(--text-secondary)" }}>
+              {totalCount} scene{totalCount !== 1 ? "s" : ""} featuring{" "}
+              {performer?.name || "this performer"}
+            </p>
+          </div>
 
           {scenes.length === 0 && !scenesLoading ? (
             <div className="text-center py-12">

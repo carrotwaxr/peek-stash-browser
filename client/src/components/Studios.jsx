@@ -9,17 +9,47 @@ import {
   EmptyState,
   Pagination,
 } from "./ui/index.js";
+import {
+  SortControl,
+  FilterPanel,
+  FilterControl,
+} from "./ui/FilterControls.jsx";
+import { useSortAndFilter } from "../hooks/useSortAndFilter.js";
+import {
+  STUDIO_SORT_OPTIONS,
+  RATING_OPTIONS,
+  buildStudioFilter,
+} from "../utils/filterConfig.js";
 import { truncateText } from "../utils/format.js";
 
 const Studios = () => {
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const {
+    sort,
+    sortDirection,
+    handleSortChange,
+    filters,
+    handleFilterChange,
+    clearFilters,
+    hasActiveFilters,
+    isFilterPanelOpen,
+    toggleFilterPanel,
+  } = useSortAndFilter("NAME", "studio");
+
   const {
     data: studios,
     loading,
     error,
     refetch,
-  } = useStudiosPaginated({ page: currentPage });
+  } = useStudiosPaginated({
+    page: currentPage,
+    perPage: 24,
+    sort: sort || undefined,
+    sortDirection: sortDirection || undefined,
+    filter: buildStudioFilter(filters),
+  });
   const {
     query,
     setQuery,
@@ -93,6 +123,90 @@ const Studios = () => {
         )}
       </PageHeader>
 
+      {/* Sorting and Filtering Controls */}
+      {!searchMode && (
+        <>
+          <div className="flex items-center justify-between mb-6">
+            {/* Sort Control */}
+            <div className="flex items-center space-x-4">
+              <SortControl
+                options={STUDIO_SORT_OPTIONS}
+                value={sort}
+                onChange={handleSortChange}
+              />
+              <button
+                onClick={() => handleSortChange(sort)}
+                className="px-3 py-2 border rounded-md text-sm"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+                title={`Sort ${
+                  sortDirection === "ASC" ? "Descending" : "Ascending"
+                }`}
+              >
+                {sortDirection === "ASC" ? "↑" : "↓"}
+              </button>
+            </div>
+
+            {/* Filter Toggle */}
+            <div className="flex items-center space-x-4">
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-3 py-2 text-sm border border-red-500 text-red-500 rounded hover:bg-red-50 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+              <button
+                onClick={toggleFilterPanel}
+                className="px-4 py-2 border rounded-md text-sm transition-colors"
+                style={{
+                  backgroundColor: isFilterPanelOpen
+                    ? "var(--accent-primary)"
+                    : "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  color: isFilterPanelOpen ? "white" : "var(--text-primary)",
+                }}
+              >
+                Filters {hasActiveFilters && `(${Object.keys(filters).length})`}
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Panel */}
+          {isFilterPanelOpen && (
+            <FilterPanel>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <FilterControl
+                  type="select"
+                  label="Rating"
+                  value={filters.rating || ""}
+                  onChange={(value) => handleFilterChange("rating", value)}
+                  options={RATING_OPTIONS}
+                />
+                <FilterControl
+                  type="checkbox"
+                  label="Favorites Only"
+                  value={filters.favorite || false}
+                  onChange={(value) => handleFilterChange("favorite", value)}
+                />
+                <FilterControl
+                  type="number"
+                  label="Min Scene Count"
+                  value={filters.sceneCount || ""}
+                  onChange={(value) => handleFilterChange("sceneCount", value)}
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+            </FilterPanel>
+          )}
+        </>
+      )}
+
       {currentLoading && (
         <div className="flex justify-center py-12">
           <LoadingSpinner size="lg" />
@@ -126,7 +240,7 @@ const Studios = () => {
 
       {!currentLoading && currentStudios && currentStudios.length > 0 && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {currentStudios.map((studio) => (
               <StudioCard key={studio.id} studio={studio} />
             ))}

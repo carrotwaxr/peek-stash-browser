@@ -7,10 +7,60 @@ datasource db {
     url = env("DATABASE_URL")
 }
 
-model Video {
+model User {
     id          Int         @id @default(autoincrement())
-    title       String
-    path        String      @unique
-    thumbnail   String
+    username    String      @unique
+    password    String      // Will be hashed
+    role        UserRole    @default(USER)
     createdAt   DateTime    @default(now())
+    updatedAt   DateTime    @updatedAt
+    
+    // Future features
+    watchHistory WatchHistory[]
+    playlists   Playlist[]
+    customTheme Json?
+}
+
+model WatchHistory {
+    id          Int         @id @default(autoincrement())
+    userId      Int
+    sceneId     String      // Stash scene ID
+    watchedAt   DateTime    @default(now())
+    position    Int         @default(0) // Playback position in seconds
+    duration    Int?        // Total scene duration
+    completed   Boolean     @default(false)
+    
+    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    
+    @@unique([userId, sceneId])
+}
+
+model Playlist {
+    id          Int         @id @default(autoincrement())
+    name        String
+    description String?
+    userId      Int
+    isPublic    Boolean     @default(false)
+    createdAt   DateTime    @default(now())
+    updatedAt   DateTime    @updatedAt
+    
+    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    items       PlaylistItem[]
+}
+
+model PlaylistItem {
+    id          Int         @id @default(autoincrement())
+    playlistId  Int
+    sceneId     String      // Stash scene ID
+    position    Int         // Order in playlist
+    addedAt     DateTime    @default(now())
+    
+    playlist    Playlist    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+    
+    @@unique([playlistId, sceneId])
+}
+
+enum UserRole {
+    ADMIN
+    USER
 }

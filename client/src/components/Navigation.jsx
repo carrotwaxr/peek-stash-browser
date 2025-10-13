@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useTheme } from "../themes/useTheme.js";
+import { useAuth } from "../hooks/useAuth.js";
 
 const Navigation = () => {
   const { changeTheme, availableThemes, currentTheme } = useTheme();
+  const { logout, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Get current page from URL
@@ -94,8 +96,26 @@ const Navigation = () => {
             ))}
           </ul>
 
-          {/* Right side - Theme selector and mobile menu button */}
+          {/* Right side - User info, Theme selector and mobile menu button */}
           <div className="flex items-center gap-4">
+            {/* User info and logout button - hidden on mobile */}
+            <div className="hidden sm:flex items-center gap-3">
+              {user && (
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Welcome, {user.username}
+                </span>
+              )}
+              <button
+                onClick={() => logout()}
+                className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+
             {/* Theme selector - hidden on mobile */}
             <div className="hidden sm:flex items-center gap-2">
               <label
@@ -215,6 +235,31 @@ const Navigation = () => {
                       </option>
                     ))}
                   </select>
+                </div>
+              </li>
+              {/* Mobile user info and logout */}
+              <li
+                className="pt-2 border-t"
+                style={{ borderColor: "var(--border-color)" }}
+              >
+                <div className="px-3 py-2 space-y-2">
+                  {user && (
+                    <div
+                      className="text-sm"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Logged in as: <strong>{user.username}</strong>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full px-3 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                    Logout
+                  </button>
                 </div>
               </li>
             </ul>

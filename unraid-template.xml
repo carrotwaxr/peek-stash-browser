@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>StashPlayer-Stack</Name>
+  <Repository>your-dockerhub-username/stash-player-frontend:latest</Repository>
+  <Registry>https://hub.docker.com/r/your-dockerhub-username/stash-player-frontend/</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/your-github-username/stash-player/issues</Support>
+  <Project>https://github.com/your-github-username/stash-player</Project>
+  <Overview>
+    Stash Player is a modern web application for browsing and managing your Stash media library. 
+    Features include authentication, advanced filtering, sorting, and a beautiful responsive interface.
+    
+    This template sets up a complete stack including:
+    - Frontend web interface (React)
+    - Backend API server (Node.js/Express)  
+    - PostgreSQL database
+    
+    Requirements:
+    - Existing Stash server with GraphQL API enabled
+    - Media files accessible via unRAID shares
+  </Overview>
+  <Category>MediaApp:Video</Category>
+  <WebUI>http://[IP]:[PORT:3000]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/your-github-username/stash-player/master/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/your-github-username/stash-player/master/docs/icon.png</Icon>
+  <ExtraParams>--network=stash-player-network</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Description>
+    Stash Player provides a modern, responsive web interface for your Stash media library with advanced filtering and sorting capabilities.
+  </Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>3000</HostPort>
+        <ContainerPort>80</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/media</HostDir>
+      <ContainerDir>/app/media</ContainerDir>
+      <Mode>ro</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/stash-player</HostDir>
+      <ContainerDir>/app/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value>http://your-stash-server:9999/graphql</Value>
+      <Name>STASH_URL</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>your-stash-api-key</Value>
+      <Name>STASH_API_KEY</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>stashuser</Value>
+      <Name>POSTGRES_USER</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>stashpass</Value>
+      <Name>POSTGRES_PASSWORD</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Labels/>
+  <Config Name="Web UI Port" Target="80" Default="3000" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
+  <Config Name="API Port" Target="8000" Default="8000" Mode="tcp" Description="Backend API port" Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+  <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/media" Mode="ro" Description="Path to your media files (read-only)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media</Config>
+  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/stash-player" Mode="rw" Description="Application data directory" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stash-player</Config>
+  <Config Name="Stash URL" Target="STASH_URL" Default="http://your-stash-server:9999/graphql" Mode="" Description="Your Stash GraphQL endpoint URL" Type="Variable" Display="always" Required="true" Mask="false">http://your-stash-server:9999/graphql</Config>
+  <Config Name="Stash API Key" Target="STASH_API_KEY" Default="your-api-key" Mode="" Description="Your Stash API key for authentication" Type="Variable" Display="always" Required="true" Mask="true">your-api-key</Config>
+  <Config Name="Database User" Target="POSTGRES_USER" Default="stashuser" Mode="" Description="PostgreSQL username" Type="Variable" Display="advanced" Required="true" Mask="false">stashuser</Config>
+  <Config Name="Database Password" Target="POSTGRES_PASSWORD" Default="stashpass" Mode="" Description="PostgreSQL password" Type="Variable" Display="advanced" Required="true" Mask="true">stashpass</Config>
+</Container>
