@@ -1,37 +1,37 @@
 services:
-  db:
-    image: postgres:15
-    restart: unless-stopped
-    env_file:
-      - ./.env
-    environment:
-      POSTGRES_DB: stashplayer
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - app-network
   backend:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
       - ./.env
     volumes:
+      # Hot reloading - mount source code
+      - ./server:/app
+      - /app/node_modules # Prevent overwriting node_modules
       # Development: Use CIFS volume to avoid Windows SMB mapping issues
       - media-share:/app/media
       # Production: Use direct host path (uncomment line below, comment line above)
       # - ${STASH_DATA_DIR}:/app/media
       - ${TMP_DIR}:/app/tmp
-    depends_on:
-      - db
+      # SQLite database persistence
+      - sqlite-data:/app/data
     networks:
       - app-network
   frontend:
-    build: ./client
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "6969:5173" # Vite dev server runs on 5173
+    volumes:
+      # Hot reloading - mount source code
+      - ./client:/app
+      - /app/node_modules # Prevent overwriting node_modules
     depends_on:
       - backend
     networks:
@@ -42,7 +42,7 @@ networks:
     driver: bridge
 
 volumes:
-  postgres-data:
+  sqlite-data:
     driver: local
   # Development: CIFS volume for SMB share access with authentication
   media-share:

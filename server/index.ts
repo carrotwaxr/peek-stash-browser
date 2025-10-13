@@ -43,9 +43,9 @@ const initializeDatabase = async () => {
     console.log("📦 Generating Prisma client...");
     await execAsync("npx prisma generate");
 
-    // Run migrations
-    console.log("🔄 Running database migrations...");
-    await execAsync("npx prisma migrate deploy");
+    // Initialize database schema (SQLite uses db push)
+    console.log("🔄 Initializing database schema...");
+    await execAsync("npx prisma db push --accept-data-loss");
 
     // Create admin user directly
     console.log("🌱 Creating admin user...");

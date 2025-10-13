@@ -1,32 +1,33 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>StashPlayer-Stack</Name>
-  <Repository>your-dockerhub-username/stash-player-frontend:latest</Repository>
-  <Registry>https://hub.docker.com/r/your-dockerhub-username/stash-player-frontend/</Registry>
+  <Name>Stash-Player</Name>
+  <Repository>carrotwaxr/stash-player:latest</Repository>
+  <Registry>https://hub.docker.com/r/carrotwaxr/stash-player/</Registry>
   <Network>bridge</Network>
   <MyIP/>
-  <Shell>sh</Shell>
+  <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/your-github-username/stash-player/issues</Support>
-  <Project>https://github.com/your-github-username/stash-player</Project>
+  <Support>https://github.com/carrotwaxr/stash-player/issues</Support>
+  <Project>https://github.com/carrotwaxr/stash-player</Project>
   <Overview>
     Stash Player is a modern web application for browsing and managing your Stash media library. 
     Features include authentication, advanced filtering, sorting, and a beautiful responsive interface.
     
-    This template sets up a complete stack including:
+    This is a single-container solution that includes:
     - Frontend web interface (React)
     - Backend API server (Node.js/Express)  
-    - PostgreSQL database
+    - SQLite database for user data and preferences
+    - Video transcoding with FFmpeg for HLS streaming
     
     Requirements:
     - Existing Stash server with GraphQL API enabled
     - Media files accessible via unRAID shares
   </Overview>
   <Category>MediaApp:Video</Category>
-  <WebUI>http://[IP]:[PORT:3000]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/your-github-username/stash-player/master/unraid-template.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/your-github-username/stash-player/master/docs/icon.png</Icon>
-  <ExtraParams>--network=stash-player-network</ExtraParams>
+  <WebUI>http://[IP]:[PORT:6969]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/stash-player/main/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/carrotwaxr/stash-player/main/docs/icon.png</Icon>
+  <ExtraParams/>
   <PostArgs/>
   <CPUset/>
   <DateInstalled/>
@@ -39,7 +40,7 @@
     <Mode>bridge</Mode>
     <Publish>
       <Port>
-        <HostPort>3000</HostPort>
+        <HostPort>6969</HostPort>
         <ContainerPort>80</ContainerPort>
         <Protocol>tcp</Protocol>
       </Port>
@@ -52,14 +53,19 @@
       <Mode>ro</Mode>
     </Volume>
     <Volume>
-      <HostDir>/mnt/user/appdata/stash-player</HostDir>
+      <HostDir>/mnt/user/appdata/stash-player/data</HostDir>
       <ContainerDir>/app/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/stash-player/tmp</HostDir>
+      <ContainerDir>/app/tmp</ContainerDir>
       <Mode>rw</Mode>
     </Volume>
   </Data>
   <Environment>
     <Variable>
-      <Value>http://your-stash-server:9999/graphql</Value>
+      <Value>http://[IP]:9999/graphql</Value>
       <Name>STASH_URL</Name>
       <Mode/>
     </Variable>
@@ -69,23 +75,23 @@
       <Mode/>
     </Variable>
     <Variable>
-      <Value>stashuser</Value>
-      <Name>POSTGRES_USER</Name>
+      <Value>file:/app/data/stash-player.db</Value>
+      <Name>DATABASE_URL</Name>
       <Mode/>
     </Variable>
     <Variable>
-      <Value>stashpass</Value>
-      <Name>POSTGRES_PASSWORD</Name>
+      <Value>production</Value>
+      <Name>NODE_ENV</Name>
       <Mode/>
     </Variable>
   </Environment>
   <Labels/>
-  <Config Name="Web UI Port" Target="80" Default="3000" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">3000</Config>
-  <Config Name="API Port" Target="8000" Default="8000" Mode="tcp" Description="Backend API port" Type="Port" Display="always" Required="true" Mask="false">8000</Config>
+  <Config Name="Web UI Port" Target="80" Default="6969" Mode="tcp" Description="Web interface port (single container serves everything)" Type="Port" Display="always" Required="true" Mask="false">6969</Config>
   <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/media" Mode="ro" Description="Path to your media files (read-only)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media</Config>
-  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/stash-player" Mode="rw" Description="Application data directory" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stash-player</Config>
-  <Config Name="Stash URL" Target="STASH_URL" Default="http://your-stash-server:9999/graphql" Mode="" Description="Your Stash GraphQL endpoint URL" Type="Variable" Display="always" Required="true" Mask="false">http://your-stash-server:9999/graphql</Config>
+  <Config Name="Database Directory" Target="/app/data" Default="/mnt/user/appdata/stash-player/data" Mode="rw" Description="SQLite database storage" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stash-player/data</Config>
+  <Config Name="Temp Directory" Target="/app/tmp" Default="/mnt/user/appdata/stash-player/tmp" Mode="rw" Description="Temporary files for video transcoding" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stash-player/tmp</Config>
+  <Config Name="Stash URL" Target="STASH_URL" Default="http://[IP]:9999/graphql" Mode="" Description="Your Stash GraphQL endpoint URL" Type="Variable" Display="always" Required="true" Mask="false">http://[IP]:9999/graphql</Config>
   <Config Name="Stash API Key" Target="STASH_API_KEY" Default="your-api-key" Mode="" Description="Your Stash API key for authentication" Type="Variable" Display="always" Required="true" Mask="true">your-api-key</Config>
-  <Config Name="Database User" Target="POSTGRES_USER" Default="stashuser" Mode="" Description="PostgreSQL username" Type="Variable" Display="advanced" Required="true" Mask="false">stashuser</Config>
-  <Config Name="Database Password" Target="POSTGRES_PASSWORD" Default="stashpass" Mode="" Description="PostgreSQL password" Type="Variable" Display="advanced" Required="true" Mask="true">stashpass</Config>
+  <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/stash-player.db" Mode="" Description="SQLite database file path" Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/stash-player.db</Config>
+  <Config Name="Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment" Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
 </Container>

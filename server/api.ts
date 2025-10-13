@@ -27,7 +27,7 @@ export const setupAPI = () => {
   app.use(
     cors({
       credentials: true,
-      origin: ["http://localhost:5173", "http://localhost:3000"], // Add your client URLs
+      origin: ["http://localhost:5173", "http://localhost:6969"], // Add your client URLs
     })
   );
   app.use(express.json()); // Add JSON body parsing for POST/PUT requests

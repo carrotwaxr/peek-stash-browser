@@ -25,7 +25,7 @@ const Home = () => {
     return (
       <div className="w-full py-8 px-4 lg:px-6 xl:px-8 max-w-none">
         <PageHeader
-          title="Welcome Home"
+          title="Welcome Home - HOT RELOADING WORKS! 🔥"
           subtitle="Discover your favorite content and explore new scenes"
         />
         <ErrorMessage error={error} />

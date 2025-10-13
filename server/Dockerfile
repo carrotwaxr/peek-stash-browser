@@ -14,6 +14,5 @@ COPY . .
 
 EXPOSE 8000
 
-RUN npm run build
-
-CMD ["npm", "run", "serve"]
+# Development mode - don't build, use nodemon for hot reloading
+CMD ["npm", "run", "dev"]
