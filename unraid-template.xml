@@ -75,7 +75,7 @@
       <Mode/>
     </Variable>
     <Variable>
-      <Value>file:/app/data/stash-player.db</Value>
+      <Value>file:/app/data/peek-stash-browser.db</Value>
       <Name>DATABASE_URL</Name>
       <Mode/>
     </Variable>

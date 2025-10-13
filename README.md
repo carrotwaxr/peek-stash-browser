@@ -41,14 +41,14 @@ A modern, responsive web application for browsing and managing your [Stash](http
 
    ```bash
    docker run -d \
-     --name stash-player \
+     --name peek-stash-browser \
      -p 6969:80 \
      -v /path/to/your/media:/app/media:ro \
-     -v /path/to/stash-player/data:/app/data \
-     -v /path/to/stash-player/tmp:/app/tmp \
+     -v /path/to/peek-stash-browser/data:/app/data \
+     -v /path/to/peek-stash-browser/tmp:/app/tmp \
      -e STASH_URL="http://your-stash-server:9999/graphql" \
      -e STASH_API_KEY="your_stash_api_key" \
-     carrotwaxr/stash-player:latest
+     carrotwaxr/peek-stash-browser:latest
    ```
 
 ### Option 3: Docker Compose (Development)
@@ -81,7 +81,7 @@ A modern, responsive web application for browsing and managing your [Stash](http
 
 ## 🏗️ Architecture
 
-Stash Player uses a modern **single-container architecture** for production deployments:
+Peek uses a modern **single-container architecture** for production deployments:
 
 - **Frontend**: React app served by nginx on port 80
 - **Backend**: Node.js/Express API server on port 8000 (proxied through nginx)
@@ -170,7 +170,7 @@ Stash Player uses a modern **single-container architecture** for production depl
 ### Installation via Community Applications (Recommended)
 
 1. **Open** unRAID WebUI → Apps → Community Applications
-2. **Search** for "Stash Player"
+2. **Search** for "Peek Stash Browser"
 3. **Install** and configure:
 
    | Setting                | Value                                 | Notes                        |
@@ -211,7 +211,7 @@ docker run -d \
 
 - Verify media path matches your Stash library path
 - Check file permissions (container runs as user 1000)
-- Ensure Stash and Stash Player point to same media files
+- Ensure Stash and Peek point to same media files
 
 **Performance issues**:
 

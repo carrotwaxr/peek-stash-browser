@@ -1,6 +1,6 @@
-# 🛠️ Stash Player - Developer Documentation
+# 🛠️ Peek - Developer Documentation
 
-This document provides comprehensive information for developers working on Stash Player, including setup, architecture, deployment, and contribution guidelines.
+This document provides comprehensive information for developers working on Peek, including setup, architecture, deployment, and contribution guidelines.
 
 ## 🏗️ Architecture Overview
 

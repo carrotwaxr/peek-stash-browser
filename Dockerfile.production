@@ -79,7 +79,7 @@ RUN echo '#!/bin/bash \n\
 nginx \n\
 \n\
 # Initialize database \n\
-export DATABASE_URL="file:/app/data/stash-player.db" \n\
+export DATABASE_URL="file:/app/data/peek-stash-browser.db" \n\
 cd /app \n\
 npx prisma generate \n\
 npx prisma db push --accept-data-loss \n\
@@ -92,7 +92,7 @@ node backend/index.js' > /app/start.sh && \
 EXPOSE 80
 
 # Set environment variables
-ENV DATABASE_URL="file:/app/data/stash-player.db"
+ENV DATABASE_URL="file:/app/data/peek-stash-browser.db"
 ENV TMP_DIR="/app/tmp"
 ENV NODE_ENV="production"
 

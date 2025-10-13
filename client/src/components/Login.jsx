@@ -54,7 +54,7 @@ const Login = ({ onLoginSuccess }) => {
               color: theme?.properties?.["--text-primary"] || "#ffffff",
             }}
           >
-            Stash Player
+            Peek Stash Browser
           </h1>
           <p
             className="mt-2 text-center text-sm"
