@@ -1,18 +1,17 @@
 import { useState } from "react";
-import { useTheme } from "../themes/useTheme.js";
-import { useAuth } from "../hooks/useAuth.js";
+import { Link, useLocation } from "react-router-dom";
+import { PeekLogo } from "./branding/PeekLogo.jsx";
+import { UserMenu } from "./ui/index.js";
+import { ThemedIcon } from "./icons/index.js";
 
 const Navigation = () => {
-  const { changeTheme, availableThemes, currentTheme } = useTheme();
-  const { logout, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
-  // Get current page from URL
+  // Get current page from React Router location
   const getCurrentPage = () => {
-    const path = window.location.pathname;
+    const path = location.pathname;
     switch (path) {
-      case "/":
-        return "Home";
       case "/scenes":
         return "Scenes";
       case "/performers":
@@ -21,24 +20,25 @@ const Navigation = () => {
         return "Studios";
       case "/tags":
         return "Tags";
+      case "/":
+        return null; // Home page - no nav item should be highlighted
       default:
-        return "Home";
+        return null; // Unknown pages - no nav item should be highlighted
     }
   };
 
   const currentPage = getCurrentPage();
 
   const navItems = [
-    { name: "Home", path: "/" },
-    { name: "Scenes", path: "/scenes" },
-    { name: "Performers", path: "/performers" },
-    { name: "Studios", path: "/studios" },
-    { name: "Tags", path: "/tags" },
+    { name: "Scenes", path: "/scenes", icon: "clapperboard" },
+    { name: "Performers", path: "/performers", icon: "user-star" },
+    { name: "Studios", path: "/studios", icon: "spotlight" },
+    { name: "Tags", path: "/tags", icon: "tags" },
   ];
 
   return (
     <nav
-      className="w-full py-4 px-4 lg:px-6 xl:px-8"
+      className="w-full py-2 px-2"
       style={{
         backgroundColor: "var(--bg-secondary)",
         borderBottom: "1px solid var(--border-color)",
@@ -47,101 +47,44 @@ const Navigation = () => {
       <div className="w-full max-w-none">
         <div className="flex items-center justify-between">
           {/* Logo/Brand */}
-          <div className="flex items-center gap-2">
-            <div className="text-2xl">🎬</div>
-            <span
-              className="text-xl font-bold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              MediaLib
-            </span>
-          </div>
+          <PeekLogo variant="auto" size="default" />
 
           {/* Desktop Navigation Links */}
           <ul className="hidden md:flex items-center gap-6">
             {navItems.map((item) => (
               <li key={item.name}>
-                <a
-                  href={item.path}
-                  className={`text-base font-medium transition-colors duration-200 px-3 py-2 rounded ${
-                    currentPage === item.name ? "text-accent" : ""
+                <Link
+                  to={item.path}
+                  className={`nav-link text-base font-medium transition-colors duration-200 px-3 py-2 rounded ${
+                    currentPage === item.name ? "nav-link-active" : ""
                   }`}
-                  style={{
-                    color:
-                      currentPage === item.name
-                        ? "var(--accent-primary)"
-                        : "var(--text-secondary)",
-                    textDecoration: "none",
-                    backgroundColor:
-                      currentPage === item.name
-                        ? "var(--bg-card)"
-                        : "transparent",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.color = "var(--accent-primary)";
-                    if (currentPage !== item.name) {
-                      e.target.style.backgroundColor = "var(--bg-card)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentPage !== item.name) {
-                      e.target.style.color = "var(--text-secondary)";
-                      e.target.style.backgroundColor = "transparent";
-                    }
-                  }}
                 >
-                  {item.name}
-                </a>
+                  <div className="flex items-center gap-2">
+                    <ThemedIcon name={item.icon} size={18} />
+                    {item.name}
+                  </div>
+                </Link>
               </li>
             ))}
           </ul>
 
-          {/* Right side - User info, Theme selector and mobile menu button */}
-          <div className="flex items-center gap-4">
-            {/* User info and logout button - hidden on mobile */}
-            <div className="hidden sm:flex items-center gap-3">
-              {user && (
-                <span
-                  className="text-sm"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  Welcome, {user.username}
-                </span>
-              )}
-              <button
-                onClick={() => logout()}
-                className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-              >
-                Logout
-              </button>
-            </div>
+          {/* Right side - User menu and mobile menu button */}
+          <div className="flex items-center gap-4 justify-end">
+            {/* Settings button */}
+            <button
+              className="p-2 rounded-lg hover:bg-opacity-80 transition-colors duration-200"
+              style={{
+                backgroundColor: "transparent",
+                color: "var(--text-primary)",
+                border: "1px solid transparent",
+              }}
+              aria-label="Settings"
+            >
+              <ThemedIcon name="settings" size={20} />
+            </button>
 
-            {/* Theme selector - hidden on mobile */}
-            <div className="hidden sm:flex items-center gap-2">
-              <label
-                className="text-sm font-medium"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Theme:
-              </label>
-              <select
-                value={currentTheme}
-                onChange={(e) => changeTheme(e.target.value)}
-                className="form-input text-sm"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  borderColor: "var(--border-color)",
-                  color: "var(--text-primary)",
-                  minWidth: "120px",
-                }}
-              >
-                {availableThemes.map((theme) => (
-                  <option key={theme.key} value={theme.key}>
-                    {theme.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* User Menu - visible on all screen sizes */}
+            <UserMenu />
 
             {/* Mobile menu button */}
             <button
@@ -185,83 +128,20 @@ const Navigation = () => {
             <ul className="flex flex-col space-y-2">
               {navItems.map((item) => (
                 <li key={item.name}>
-                  <a
-                    href={item.path}
-                    className={`block text-base font-medium transition-colors duration-200 px-3 py-2 rounded ${
-                      currentPage === item.name ? "text-accent" : ""
+                  <Link
+                    to={item.path}
+                    className={`nav-link block text-base font-medium transition-colors duration-200 px-3 py-2 rounded ${
+                      currentPage === item.name ? "nav-link-active" : ""
                     }`}
-                    style={{
-                      color:
-                        currentPage === item.name
-                          ? "var(--accent-primary)"
-                          : "var(--text-secondary)",
-                      textDecoration: "none",
-                      backgroundColor:
-                        currentPage === item.name
-                          ? "var(--bg-card)"
-                          : "transparent",
-                    }}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    {item.name}
-                  </a>
+                    <div className="flex items-center gap-2">
+                      <ThemedIcon name={item.icon} size={18} />
+                      {item.name}
+                    </div>
+                  </Link>
                 </li>
               ))}
-              {/* Mobile theme selector */}
-              <li
-                className="pt-2 border-t"
-                style={{ borderColor: "var(--border-color)" }}
-              >
-                <div className="px-3 py-2">
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Theme:
-                  </label>
-                  <select
-                    value={currentTheme}
-                    onChange={(e) => changeTheme(e.target.value)}
-                    className="w-full form-input text-sm"
-                    style={{
-                      backgroundColor: "var(--bg-card)",
-                      borderColor: "var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {availableThemes.map((theme) => (
-                      <option key={theme.key} value={theme.key}>
-                        {theme.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </li>
-              {/* Mobile user info and logout */}
-              <li
-                className="pt-2 border-t"
-                style={{ borderColor: "var(--border-color)" }}
-              >
-                <div className="px-3 py-2 space-y-2">
-                  {user && (
-                    <div
-                      className="text-sm"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Logged in as: <strong>{user.username}</strong>
-                    </div>
-                  )}
-                  <button
-                    onClick={() => {
-                      logout();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full px-3 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
-                  >
-                    Logout
-                  </button>
-                </div>
-              </li>
             </ul>
           </div>
         )}

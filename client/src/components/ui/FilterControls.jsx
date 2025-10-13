@@ -152,87 +152,106 @@ export const FilterControl = ({
 };
 
 /**
- * Filter Panel Component
+ * Collapsible Filter Panel Component with manual submit
  */
 export const FilterPanel = ({
   children,
-  isOpen,
-  onToggle,
   onClear,
   hasActiveFilters,
+  isOpen,
+  onToggle,
+  onSubmit,
 }) => {
+  if (!isOpen) {
+    return null; // Don't render when closed
+  }
+
   return (
     <div className="mb-6">
-      {/* Filter Toggle Button */}
-      <button
-        onClick={onToggle}
-        className="flex items-center space-x-2 px-4 py-2 border rounded-md text-sm font-medium mb-4"
+      {/* Filter Panel - Collapsible */}
+      <div
+        className="p-4 border rounded-md"
         style={{
-          backgroundColor: hasActiveFilters
-            ? "var(--accent-color)"
-            : "var(--bg-card)",
+          backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
-          color: hasActiveFilters ? "white" : "var(--text-primary)",
         }}
       >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fillRule="evenodd"
-            d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-            clipRule="evenodd"
-          />
-        </svg>
-        <span>Filters</span>
-        {hasActiveFilters && <span className="text-xs">(Active)</span>}
-        <svg
-          className={`w-4 h-4 transform transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path
-            fillRule="evenodd"
-            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-            clipRule="evenodd"
-          />
-        </svg>
-      </button>
-
-      {/* Filter Panel */}
-      {isOpen && (
-        <div
-          className="p-4 border rounded-md"
-          style={{
-            backgroundColor: "var(--bg-card)",
-            borderColor: "var(--border-color)",
-          }}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {children}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span
+              className="font-medium"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Filters
+            </span>
+            {hasActiveFilters && (
+              <span
+                className="text-xs px-2 py-1 rounded-full"
+                style={{
+                  backgroundColor: "var(--accent-primary)",
+                  color: "white",
+                }}
+              >
+                Active
+              </span>
+            )}
           </div>
 
           {/* Clear Filters Button */}
           {hasActiveFilters && (
-            <div
-              className="mt-4 pt-4 border-t"
-              style={{ borderColor: "var(--border-color)" }}
+            <button
+              onClick={onClear}
+              className="px-3 py-1 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                borderColor: "var(--border-color)",
+                color: "var(--text-primary)",
+              }}
             >
-              <button
-                onClick={onClear}
-                className="px-4 py-2 border rounded-md text-sm"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  borderColor: "var(--border-color)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                Clear All Filters
-              </button>
-            </div>
+              Clear All
+            </button>
           )}
         </div>
-      )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
+          {children}
+        </div>
+
+        {/* Action Buttons */}
+        <div
+          className="flex items-center justify-end space-x-3 pt-4 border-t"
+          style={{ borderColor: "var(--border-color)" }}
+        >
+          <button
+            onClick={onToggle}
+            className="px-4 py-2 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSubmit}
+            className="px-6 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90"
+            style={{
+              backgroundColor: "var(--accent-primary)",
+              color: "white",
+            }}
+          >
+            Apply Filters
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

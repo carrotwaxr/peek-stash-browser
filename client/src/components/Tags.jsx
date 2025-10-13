@@ -282,13 +282,21 @@ const TagCard = ({ tag }) => {
       }}
     >
       <div className="flex items-start space-x-4">
-        <div
-          className={`w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 ${getTagColor(
-            tag.name
-          )} text-white text-2xl font-bold`}
-        >
-          #
-        </div>
+        {tag.image_path ? (
+          <img
+            src={tag.image_path}
+            alt={tag.name}
+            className="w-16 h-16 rounded-full object-cover flex-shrink-0"
+          />
+        ) : (
+          <div
+            className={`w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 ${getTagColor(
+              tag.name
+            )} text-white text-2xl font-bold`}
+          >
+            #
+          </div>
+        )}
 
         <div className="flex-1 min-w-0">
           <h3

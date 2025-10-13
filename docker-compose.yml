@@ -1,5 +1,5 @@
 services:
-  backend:
+  peek-server:
     build:
       context: ./server
       dockerfile: Dockerfile.dev
@@ -18,10 +18,10 @@ services:
       # - ${STASH_DATA_DIR}:/app/media
       - ${TMP_DIR}:/app/tmp
       # SQLite database persistence
-      - sqlite-data:/app/data
+      - peek-db:/app/data
     networks:
-      - app-network
-  frontend:
+      - peek-network
+  peek-client:
     build:
       context: ./client
       dockerfile: Dockerfile.dev
@@ -33,16 +33,16 @@ services:
       - ./client:/app
       - /app/node_modules # Prevent overwriting node_modules
     depends_on:
-      - backend
+      - peek-server
     networks:
-      - app-network
+      - peek-network
 
 networks:
-  app-network:
+  peek-network:
     driver: bridge
 
 volumes:
-  sqlite-data:
+  peek-db:
     driver: local
   # Development: CIFS volume for SMB share access with authentication
   media-share:

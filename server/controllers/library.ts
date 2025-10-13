@@ -93,7 +93,18 @@ export const findPerformers = async (req: Request, res: Response) => {
       performer_filter: enhancedFilter as PerformerFilterType,
     });
 
-    res.json(performers);
+    // Transform performers to add API key to image paths
+    const transformedPerformers = {
+      ...performers,
+      findPerformers: {
+        ...performers.findPerformers,
+        performers: performers.findPerformers.performers.map((performer) =>
+          transformPerformer(performer as any)
+        ),
+      },
+    };
+
+    res.json(transformedPerformers);
   } catch (error) {
     console.error("Error in findPerformers:", error);
     res.status(500).json({
@@ -122,7 +133,18 @@ export const findStudios = async (req: Request, res: Response) => {
       studio_filter: enhancedFilter as StudioFilterType,
     });
 
-    res.json(studios);
+    // Transform studios to add API key to image paths
+    const transformedStudios = {
+      ...studios,
+      findStudios: {
+        ...studios.findStudios,
+        studios: studios.findStudios.studios.map((studio) =>
+          transformStudio(studio as any)
+        ),
+      },
+    };
+
+    res.json(transformedStudios);
   } catch (error) {
     console.error("Error in findStudios:", error);
     res.status(500).json({
@@ -151,7 +173,16 @@ export const findTags = async (req: Request, res: Response) => {
       tag_filter: enhancedFilter as TagFilterType,
     });
 
-    res.json(tags);
+    // Transform tags to add API key to image paths
+    const transformedTags = {
+      ...tags,
+      findTags: {
+        ...tags.findTags,
+        tags: tags.findTags.tags.map((tag) => transformTag(tag as any)),
+      },
+    };
+
+    res.json(transformedTags);
   } catch (error) {
     console.error("Error in findTags:", error);
     res.status(500).json({
@@ -161,36 +192,36 @@ export const findTags = async (req: Request, res: Response) => {
   }
 };
 
+const appendApiKeyToUrl = (url: string): string => {
+  try {
+    // Skip null, undefined, or empty values
+    if (!url || typeof url !== "string" || url.trim() === "") {
+      return url;
+    }
+
+    const urlObj = new URL(url);
+    if (!urlObj.searchParams.has("apikey")) {
+      const apiKey = process.env.STASH_API_KEY;
+      if (!apiKey) {
+        console.error("STASH_API_KEY not found in environment variables");
+        return url; // Return original if no API key
+      }
+      urlObj.searchParams.append("apikey", apiKey);
+    }
+    return urlObj.toString();
+  } catch (urlError) {
+    console.error(`Error processing URL: ${url}`, urlError);
+    return url; // Return original URL if parsing fails
+  }
+};
+
 const transformScene = (scene: Scene) => {
   try {
     const mutated: Record<string, any> = {
       ...scene,
       paths: Object.entries(scene.paths).reduce((acc, [key, val]) => {
-        try {
-          // Skip null, undefined, or empty values
-          if (!val || typeof val !== "string" || val.trim() === "") {
-            acc[key] = val as string; // Keep original value (could be null)
-            return acc;
-          }
-
-          const urlString = val as string;
-          const url = new URL(urlString);
-          if (!url.searchParams.has("apikey")) {
-            const apiKey = process.env.STASH_API_KEY;
-            if (!apiKey) {
-              console.error("STASH_API_KEY not found in environment variables");
-              acc[key] = urlString; // Return original if no API key
-              return acc;
-            }
-            url.searchParams.append("apikey", apiKey);
-          }
-          acc[key] = url.toString();
-          return acc;
-        } catch (urlError) {
-          console.error(`Error processing URL for ${key}: ${val}`, urlError);
-          acc[key] = val as string; // Return original URL if parsing fails
-          return acc;
-        }
+        acc[key] = appendApiKeyToUrl(val as string);
+        return acc;
       }, {} as { [key: string]: string }),
     };
 
@@ -198,6 +229,48 @@ const transformScene = (scene: Scene) => {
   } catch (error) {
     console.error("Error transforming scene:", error);
     return scene; // Return original scene if transformation fails
+  }
+};
+
+const transformPerformer = (performer: any) => {
+  try {
+    return {
+      ...performer,
+      image_path: performer.image_path
+        ? appendApiKeyToUrl(performer.image_path)
+        : performer.image_path,
+    };
+  } catch (error) {
+    console.error("Error transforming performer:", error);
+    return performer;
+  }
+};
+
+const transformStudio = (studio: any) => {
+  try {
+    return {
+      ...studio,
+      image_path: studio.image_path
+        ? appendApiKeyToUrl(studio.image_path)
+        : studio.image_path,
+    };
+  } catch (error) {
+    console.error("Error transforming studio:", error);
+    return studio;
+  }
+};
+
+const transformTag = (tag: any) => {
+  try {
+    return {
+      ...tag,
+      image_path: tag.image_path
+        ? appendApiKeyToUrl(tag.image_path)
+        : tag.image_path,
+    };
+  } catch (error) {
+    console.error("Error transforming tag:", error);
+    return tag;
   }
 };
 

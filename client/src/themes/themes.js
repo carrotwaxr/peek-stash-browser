@@ -1,41 +1,52 @@
 // Theme definitions for the media application
 export const themes = {
-  dark: {
-    name: "Dark",
+  peek: {
+    name: "Peek",
     properties: {
-      // Background colors
-      "--bg-primary": "#0f0f0f",
-      "--bg-secondary": "#1a1a1a",
-      "--bg-tertiary": "#2d2d2d",
-      "--bg-card": "#1f1f1f",
-      "--bg-hover": "#2a2a2a",
-      "--bg-overlay": "rgba(0, 0, 0, 0.8)",
+      // Background colors - Deep dark for elegant feel
+      "--bg-primary": "#0a0a0b",
+      "--bg-secondary": "#141418",
+      "--bg-tertiary": "#1e1e24",
+      "--bg-card": "#181820",
+      "--bg-hover": "#22222a",
+      "--bg-overlay": "rgba(0, 0, 0, 0.85)",
 
-      // Text colors
+      // Text colors - Clean whites and grays
       "--text-primary": "#ffffff",
-      "--text-secondary": "#b3b3b3",
-      "--text-muted": "#666666",
-      "--text-accent": "#e5e7eb",
+      "--text-secondary": "#c8c8cc",
+      "--text-muted": "#8a8a92",
+      "--text-accent": "#f0f0f2",
 
-      // Accent colors
-      "--accent-primary": "#3b82f6", // Blue
-      "--accent-secondary": "#8b5cf6", // Purple
-      "--accent-success": "#10b981", // Green
-      "--accent-warning": "#f59e0b", // Orange
-      "--accent-error": "#ef4444", // Red
+      // Accent colors - Your logo palette
+      "--accent-primary": "#6D2CE3", // Purple - Primary brand
+      "--accent-secondary": "#FD6B86", // Pink - Secondary actions
+      "--accent-tertiary": "#FA8C2A", // Orange - Highlights
+      "--accent-success": "#0F7173", // Teal - Success states
+      "--accent-info": "#3993DD", // Blue - Info/links
+      "--accent-warning": "#FA8C2A", // Orange - Warnings
+      "--accent-error": "#FD6B86", // Pink - Errors (softer than red)
 
       // Interactive states
-      "--border-color": "#404040",
-      "--border-focus": "#3b82f6",
-      "--shadow-sm": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-      "--shadow-md": "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-      "--shadow-lg": "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+      "--border-color": "#2a2a32",
+      "--border-focus": "#6D2CE3",
+      "--border-hover": "#3a3a42",
+      "--shadow-sm": "0 1px 2px 0 rgba(109, 44, 227, 0.05)",
+      "--shadow-md": "0 4px 6px -1px rgba(109, 44, 227, 0.1)",
+      "--shadow-lg": "0 10px 15px -3px rgba(109, 44, 227, 0.15)",
 
       // Media specific
       "--player-bg": "#000000",
-      "--controls-bg": "rgba(0, 0, 0, 0.7)",
-      "--progress-bg": "#404040",
-      "--progress-fill": "#3b82f6",
+      "--controls-bg": "rgba(10, 10, 11, 0.8)",
+      "--progress-bg": "#2a2a32",
+      "--progress-fill": "#6D2CE3",
+
+      // Button states
+      "--btn-primary-bg": "#6D2CE3",
+      "--btn-primary-hover": "#5a24c0",
+      "--btn-secondary-bg": "#FD6B86",
+      "--btn-secondary-hover": "#fc4f6f",
+      "--btn-tertiary-bg": "#FA8C2A",
+      "--btn-tertiary-hover": "#f77b0a",
     },
   },
 
@@ -118,4 +129,4 @@ export const themes = {
   },
 };
 
-export const defaultTheme = "dark";
+export const defaultTheme = "peek";

@@ -38,8 +38,6 @@ const Performers = () => {
     handleFilterChange,
     clearFilters,
     hasActiveFilters,
-    isFilterPanelOpen,
-    toggleFilterPanel,
   } = useSortAndFilter("NAME", "performer");
 
   const {
@@ -106,6 +104,8 @@ const Performers = () => {
     );
   }
 
+  console.log(currentPerformers);
+
   return (
     <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
       <PageHeader
@@ -127,12 +127,13 @@ const Performers = () => {
         )}
       </PageHeader>
 
-      {/* Sorting and Filtering Controls */}
+      {/* Controls Section */}
       {!searchMode && (
-        <>
-          <div className="flex items-center justify-between mb-6">
+        <div className="space-y-6 mb-6">
+          {/* Top Controls Row - Sort + Pagination */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             {/* Sort Control */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
               <SortControl
                 options={PERFORMER_SORT_OPTIONS}
                 value={sort}
@@ -140,7 +141,7 @@ const Performers = () => {
               />
               <button
                 onClick={() => handleSortChange(sort)} // This will toggle direction for same field
-                className="px-3 py-2 border rounded-md text-sm"
+                className="px-3 py-2 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
                 style={{
                   backgroundColor: "var(--bg-card)",
                   borderColor: "var(--border-color)",
@@ -154,68 +155,53 @@ const Performers = () => {
               </button>
             </div>
 
-            {/* Filter Toggle */}
-            <div className="flex items-center space-x-4">
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="px-3 py-2 text-sm border border-red-500 text-red-500 rounded hover:bg-red-50 transition-colors"
-                >
-                  Clear Filters
-                </button>
-              )}
-              <button
-                onClick={toggleFilterPanel}
-                className="px-4 py-2 border rounded-md text-sm transition-colors"
-                style={{
-                  backgroundColor: isFilterPanelOpen
-                    ? "var(--accent-primary)"
-                    : "var(--bg-card)",
-                  borderColor: "var(--border-color)",
-                  color: isFilterPanelOpen ? "white" : "var(--text-primary)",
-                }}
-              >
-                Filters {hasActiveFilters && `(${Object.keys(filters).length})`}
-              </button>
-            </div>
-          </div>
-
-          {/* Filter Panel */}
-          {isFilterPanelOpen && (
-            <FilterPanel>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FilterControl
-                  type="select"
-                  label="Gender"
-                  value={filters.gender || ""}
-                  onChange={(value) => handleFilterChange("gender", value)}
-                  options={GENDER_OPTIONS}
-                />
-                <FilterControl
-                  type="select"
-                  label="Rating"
-                  value={filters.rating || ""}
-                  onChange={(value) => handleFilterChange("rating", value)}
-                  options={RATING_OPTIONS}
-                />
-                <FilterControl
-                  type="number"
-                  label="Min Age"
-                  value={filters.minAge || ""}
-                  onChange={(value) => handleFilterChange("minAge", value)}
-                  placeholder="18"
-                  min="18"
-                />
-                <FilterControl
-                  type="checkbox"
-                  label="Favorites Only"
-                  value={filters.favorite || false}
-                  onChange={(value) => handleFilterChange("favorite", value)}
+            {/* Top Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center sm:justify-end">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
                 />
               </div>
-            </FilterPanel>
-          )}
-        </>
+            )}
+          </div>
+
+          {/* Filter Panel - Always visible */}
+          <FilterPanel
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+          >
+            <FilterControl
+              type="select"
+              label="Gender"
+              value={filters.gender || ""}
+              onChange={(value) => handleFilterChange("gender", value)}
+              options={GENDER_OPTIONS}
+            />
+            <FilterControl
+              type="select"
+              label="Rating"
+              value={filters.rating || ""}
+              onChange={(value) => handleFilterChange("rating", value)}
+              options={RATING_OPTIONS}
+            />
+            <FilterControl
+              type="number"
+              label="Min Age"
+              value={filters.minAge || ""}
+              onChange={(value) => handleFilterChange("minAge", value)}
+              placeholder="18"
+              min="18"
+            />
+            <FilterControl
+              type="checkbox"
+              label="Favorites Only"
+              value={filters.favorite || false}
+              onChange={(value) => handleFilterChange("favorite", value)}
+            />
+          </FilterPanel>
+        </div>
       )}
 
       {currentLoading && (
@@ -252,15 +238,15 @@ const Performers = () => {
 
       {!currentLoading && currentPerformers && currentPerformers.length > 0 && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+          <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
             {currentPerformers.map((performer) => (
               <PerformerCard key={performer.id} performer={performer} />
             ))}
           </div>
 
-          {/* Pagination */}
+          {/* Bottom Pagination */}
           {totalPages > 1 && !searchMode && (
-            <div className="mt-8">
+            <div className="mt-8 flex justify-center">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -285,23 +271,25 @@ const PerformerCard = ({ performer }) => {
       }}
     >
       <div className="text-center">
-        {performer.image_path ? (
-          <img
-            src={performer.image_path}
-            alt={performer.name}
-            className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
-          />
-        ) : (
-          <div
-            className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-lg font-semibold"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              color: "var(--text-primary)",
-            }}
-          >
-            {getInitials(performer.name)}
-          </div>
-        )}
+        <div className="w-full aspect-[2/3] rounded mb-3 overflow-hidden">
+          {performer.image_path ? (
+            <img
+              src={performer.image_path}
+              alt={performer.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div
+              className="w-full h-full flex items-center justify-center text-lg font-semibold"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {getInitials(performer.name)}
+            </div>
+          )}
+        </div>
 
         <h3
           className="font-semibold mb-1"

@@ -230,7 +230,7 @@ nav.flex .flex:last-child {
   /* Navigation menu - horizontal on mobile */
   nav .flex:last-child {
     width: 100%;
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 
   /* Scene title */

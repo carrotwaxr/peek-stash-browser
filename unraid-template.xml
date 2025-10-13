@@ -1,16 +1,16 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>Stash-Player</Name>
-  <Repository>carrotwaxr/stash-player:latest</Repository>
-  <Registry>https://hub.docker.com/r/carrotwaxr/stash-player/</Registry>
+  <Name>Peek-Stash-Browser</Name>
+  <Repository>carrotwaxr/peek-stash-browser:latest</Repository>
+  <Registry>https://hub.docker.com/r/carrotwaxr/peek-stash-browser/</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/carrotwaxr/stash-player/issues</Support>
-  <Project>https://github.com/carrotwaxr/stash-player</Project>
+  <Support>https://github.com/carrotwaxr/peek-stash-browser/issues</Support>
+  <Project>https://github.com/carrotwaxr/peek-stash-browser</Project>
   <Overview>
-    Stash Player is a modern web application for browsing and managing your Stash media library. 
+    Peek Stash Browser is a modern web application for browsing and managing your Stash media library. 
     Features include authentication, advanced filtering, sorting, and a beautiful responsive interface.
     
     This is a single-container solution that includes:
@@ -25,8 +25,8 @@
   </Overview>
   <Category>MediaApp:Video</Category>
   <WebUI>http://[IP]:[PORT:6969]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/stash-player/main/unraid-template.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/carrotwaxr/stash-player/main/docs/icon.png</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/docs/icon.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>
@@ -34,7 +34,7 @@
   <DonateText/>
   <DonateLink/>
   <Description>
-    Stash Player provides a modern, responsive web interface for your Stash media library with advanced filtering and sorting capabilities.
+    Peek Stash Browser provides a modern, responsive web interface for your Stash media library with advanced filtering and sorting capabilities.
   </Description>
   <Networking>
     <Mode>bridge</Mode>
@@ -53,12 +53,12 @@
       <Mode>ro</Mode>
     </Volume>
     <Volume>
-      <HostDir>/mnt/user/appdata/stash-player/data</HostDir>
+      <HostDir>/mnt/user/appdata/peek-stash-browser/data</HostDir>
       <ContainerDir>/app/data</ContainerDir>
       <Mode>rw</Mode>
     </Volume>
     <Volume>
-      <HostDir>/mnt/user/appdata/stash-player/tmp</HostDir>
+      <HostDir>/mnt/user/appdata/peek-stash-browser/tmp</HostDir>
       <ContainerDir>/app/tmp</ContainerDir>
       <Mode>rw</Mode>
     </Volume>
@@ -88,10 +88,10 @@
   <Labels/>
   <Config Name="Web UI Port" Target="80" Default="6969" Mode="tcp" Description="Web interface port (single container serves everything)" Type="Port" Display="always" Required="true" Mask="false">6969</Config>
   <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/media" Mode="ro" Description="Path to your media files (read-only)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media</Config>
-  <Config Name="Database Directory" Target="/app/data" Default="/mnt/user/appdata/stash-player/data" Mode="rw" Description="SQLite database storage" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stash-player/data</Config>
-  <Config Name="Temp Directory" Target="/app/tmp" Default="/mnt/user/appdata/stash-player/tmp" Mode="rw" Description="Temporary files for video transcoding" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/stash-player/tmp</Config>
+  <Config Name="Database Directory" Target="/app/data" Default="/mnt/user/appdata/peek-stash-browser/data" Mode="rw" Description="SQLite database storage" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser/data</Config>
+  <Config Name="Temp Directory" Target="/app/tmp" Default="/mnt/user/appdata/peek-stash-browser/tmp" Mode="rw" Description="Temporary files for video transcoding" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser/tmp</Config>
   <Config Name="Stash URL" Target="STASH_URL" Default="http://[IP]:9999/graphql" Mode="" Description="Your Stash GraphQL endpoint URL" Type="Variable" Display="always" Required="true" Mask="false">http://[IP]:9999/graphql</Config>
   <Config Name="Stash API Key" Target="STASH_API_KEY" Default="your-api-key" Mode="" Description="Your Stash API key for authentication" Type="Variable" Display="always" Required="true" Mask="true">your-api-key</Config>
-  <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/stash-player.db" Mode="" Description="SQLite database file path" Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/stash-player.db</Config>
+  <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-stash-browser.db" Mode="" Description="SQLite database file path" Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-stash-browser.db</Config>
   <Config Name="Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment" Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
 </Container>

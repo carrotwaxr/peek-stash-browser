@@ -1,4 +1,4 @@
-# 🎬 Stash Player
+# 👁️ Peek Stash Browser
 
 A modern, responsive web application for browsing and managing your [Stash](https://github.com/stashapp/stash) media library with advanced filtering, authentication, and adaptive video streaming.
 
@@ -31,7 +31,7 @@ A modern, responsive web application for browsing and managing your [Stash](http
 ### Option 1: unRAID (Community Applications) - Easiest!
 
 1. **Install from Community Applications**:
-   - Search for "Stash Player" in unRAID's Community Applications
+   - Search for "Peek Stash Browser" in unRAID's Community Applications
    - Click install and configure your settings
    - Access at `http://your-unraid-ip:6969`
 

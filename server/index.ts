@@ -25,7 +25,7 @@ dotenv.config({ path: envPath });
 import { setupAPI } from "./api.js";
 
 const main = async () => {
-  console.log("🚀 Starting Stash Player Backend...");
+  console.log("🚀 Starting Peek server...");
 
   validateStartup();
 

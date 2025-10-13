@@ -576,3 +576,26 @@ body {
   /* Increase z-index to appear above focused elements */
   z-index: 30;
 }
+
+/* Navigation Link Styles - Fix hover state issues */
+.nav-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  background-color: transparent;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.nav-link:hover {
+  color: var(--accent-primary) !important;
+  background-color: var(--bg-card) !important;
+}
+
+.nav-link-active {
+  color: var(--accent-primary) !important;
+  background-color: var(--bg-card) !important;
+}
+
+.nav-link-active:hover {
+  color: var(--accent-primary) !important;
+  background-color: var(--bg-card) !important;
+}

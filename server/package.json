@@ -1,7 +1,7 @@
 {
-  "name": "stash-player-server",
+  "name": "peek-server",
   "version": "1.0.0",
-  "description": "Backend for stash-player. Handles serving the client, API endpoints, communication with media library manager (Stash), and transcoding",
+  "description": "Backend for Peek Stash Browser. Handles serving the client, API endpoints, communication with media library manager (Stash), and transcoding",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -35,6 +35,6 @@
     "express": "^5.1.0",
     "graphql-tag": "^2.12.6",
     "jsonwebtoken": "^9.0.2",
-    "stashapp-api": "^0.2.5"
+    "stashapp-api": "^0.2.6"
   }
 }
