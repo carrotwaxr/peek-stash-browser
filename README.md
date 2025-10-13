@@ -56,8 +56,8 @@ A modern, responsive web application for browsing and managing your [Stash](http
 1. **Clone and setup**:
 
    ```bash
-   git clone https://github.com/carrotwaxr/stash-player.git
-   cd stash-player
+   git clone https://github.com/carrotwaxr/peek-stash-browser.git
+   cd peek-stash-browser
    cp .env.example .env
    ```
 
@@ -66,7 +66,7 @@ A modern, responsive web application for browsing and managing your [Stash](http
    ```bash
    STASH_URL=http://your-stash-server:9999/graphql
    STASH_API_KEY=your_stash_api_key
-   DATABASE_URL=file:./data/stash-player.db
+   DATABASE_URL=file:./data/peek-stash-browser.db
    TMP_DIR=/path/to/temp/directory
    ```
 
@@ -101,12 +101,12 @@ Peek uses a modern **single-container architecture** for production deployments:
 
 ### Optional Settings (Advanced)
 
-| Variable       | Description                | Default                          |
-| -------------- | -------------------------- | -------------------------------- |
-| `DATABASE_URL` | SQLite database file       | `file:/app/data/stash-player.db` |
-| `TMP_DIR`      | Transcoding temp directory | `/app/tmp`                       |
-| `NODE_ENV`     | Environment mode           | `production`                     |
-| `JWT_SECRET`   | JWT signing key            | Auto-generated                   |
+| Variable       | Description                | Default                                |
+| -------------- | -------------------------- | -------------------------------------- |
+| `DATABASE_URL` | SQLite database file       | `file:/app/data/peek-stash-browser.db` |
+| `TMP_DIR`      | Transcoding temp directory | `/app/tmp`                             |
+| `NODE_ENV`     | Environment mode           | `production`                           |
+| `JWT_SECRET`   | JWT signing key            | Auto-generated                         |
 
 ### Port Configuration
 
@@ -173,14 +173,14 @@ Peek uses a modern **single-container architecture** for production deployments:
 2. **Search** for "Peek Stash Browser"
 3. **Install** and configure:
 
-   | Setting                | Value                                 | Notes                        |
-   | ---------------------- | ------------------------------------- | ---------------------------- |
-   | **WebUI Port**         | `6969`                                | No conflicts, single port!   |
-   | **Stash URL**          | `http://[IP]:9999/graphql`            | Replace [IP] with your Stash |
-   | **Stash API Key**      | Your API key                          | From Stash settings          |
-   | **Media Directory**    | `/mnt/user/media`                     | Path to your media files     |
-   | **Database Directory** | `/mnt/user/appdata/stash-player/data` | SQLite database storage      |
-   | **Temp Directory**     | `/mnt/user/appdata/stash-player/tmp`  | Video transcoding temp files |
+   | Setting                | Value                                       | Notes                        |
+   | ---------------------- | ------------------------------------------- | ---------------------------- |
+   | **WebUI Port**         | `6969`                                      | No conflicts, single port!   |
+   | **Stash URL**          | `http://[IP]:9999/graphql`                  | Replace [IP] with your Stash |
+   | **Stash API Key**      | Your API key                                | From Stash settings          |
+   | **Media Directory**    | `/mnt/user/media`                           | Path to your media files     |
+   | **Database Directory** | `/mnt/user/appdata/peek-stash-browser/data` | SQLite database storage      |
+   | **Temp Directory**     | `/mnt/user/appdata/peek-stash-browser/tmp`  | Video transcoding temp files |
 
 4. **Click Apply** - Single container installs and starts automatically!
 5. **Access**: `http://your-unraid-ip:6969`
@@ -189,14 +189,14 @@ Peek uses a modern **single-container architecture** for production deployments:
 
 ```bash
 docker run -d \
-  --name=stash-player \
+  --name=peek-stash-browser \
   -p 6969:80 \
   -v /mnt/user/media:/app/media:ro \
-  -v /mnt/user/appdata/stash-player/data:/app/data \
-  -v /mnt/user/appdata/stash-player/tmp:/app/tmp \
+  -v /mnt/user/appdata/peek-stash-browser/data:/app/data \
+  -v /mnt/user/appdata/peek-stash-browser/tmp:/app/tmp \
   -e STASH_URL="http://[IP]:9999/graphql" \
   -e STASH_API_KEY="your-api-key" \
-  carrotwaxr/stash-player:latest
+  carrotwaxr/peek-stash-browser:latest
 ```
 
 ### Troubleshooting unRAID
@@ -205,7 +205,7 @@ docker run -d \
 
 - Check Stash URL is accessible from unRAID: `ping stash-ip`
 - Verify API key is correct (test in Stash GraphQL playground)
-- Ensure app data directories exist: `/mnt/user/appdata/stash-player/`
+- Ensure app data directories exist: `/mnt/user/appdata/peek-stash-browser/`
 
 **Media files not loading**:
 
@@ -244,7 +244,7 @@ docker run -d \
 
 - Check media file permissions
 - Verify FFmpeg is installed in backend container
-- Monitor transcoding logs: `docker logs stash-player-backend`
+- Monitor transcoding logs: `docker logs peek-stash-browser-backend`
 
 **Slow performance**:
 
@@ -338,10 +338,10 @@ docker image prune -f
 
 ```bash
 # Backup database
-docker exec stash-player-db pg_dump -U $POSTGRES_USER stashplayer > backup.sql
+docker exec peek-stash-browser-db pg_dump -U $POSTGRES_USER stashplayer > backup.sql
 
 # Restore database
-docker exec -i stash-player-db psql -U $POSTGRES_USER stashplayer < backup.sql
+docker exec -i peek-stash-browser-db psql -U $POSTGRES_USER stashplayer < backup.sql
 ```
 
 ## 📚 API Documentation
@@ -403,9 +403,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- **[GitHub Repository](https://github.com/carrotwaxr/stash-player)**
-- **[Docker Images](https://github.com/carrotwaxr/stash-player/pkgs/container/stash-player-frontend)**
-- **[Issues & Support](https://github.com/carrotwaxr/stash-player/issues)**
+- **[GitHub Repository](https://github.com/carrotwaxr/peek-stash-browser)**
+- **[Docker Images](https://github.com/carrotwaxr/peek-stash-browser/pkgs/container/peek-stash-browser-frontend)**
+- **[Issues & Support](https://github.com/carrotwaxr/peek-stash-browser/issues)**
 - **[Stash Community](https://discord.gg/2TsNFKt)**
 - `POSTGRES_USER/PASSWORD`: Database credentials
 - `TMP_DIR`: Temporary directory for transcoding files
