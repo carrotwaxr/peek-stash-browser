@@ -8,11 +8,43 @@ import {
   ErrorMessage,
   LoadingSpinner,
 } from "./ui/index.js";
+import {
+  SortControl,
+  FilterPanel,
+  FilterControl,
+} from "./ui/FilterControls.jsx";
+import { useSortAndFilter } from "../hooks/useSortAndFilter.js";
+import {
+  SCENE_SORT_OPTIONS,
+  RATING_OPTIONS,
+  RESOLUTION_OPTIONS,
+  ORGANIZED_OPTIONS,
+  buildSceneFilter,
+} from "../utils/filterConfig.js";
 
 const Scenes = () => {
   const navigate = useNavigate();
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const {
+    sort,
+    sortDirection,
+    handleSortChange,
+    filters,
+    handleFilterChange,
+    clearFilters,
+    hasActiveFilters,
+    isFilterPanelOpen,
+    toggleFilterPanel,
+  } = useSortAndFilter("TITLE", "scene");
+
+  // Handle filter submission - applies filters and closes panel
+  const handleFilterSubmit = () => {
+    setCurrentPage(1); // Reset to first page when filters change
+    toggleFilterPanel(); // Close the filter panel
+    refetch(); // Refetch data with new filters
+  };
 
   const {
     data: paginatedData,
@@ -22,6 +54,9 @@ const Scenes = () => {
   } = useScenesPaginated({
     page: currentPage,
     perPage: 24,
+    sort: sort || undefined,
+    direction: sortDirection,
+    scene_filter: buildSceneFilter(filters),
   });
 
   const {
@@ -103,6 +138,132 @@ const Scenes = () => {
           </button>
         )}
       </PageHeader>
+
+      {/* Sorting and Filtering Controls */}
+      {!searchMode && (
+        <>
+          <div className="flex items-center justify-between mb-6">
+            {/* Sort Control */}
+            <div className="flex items-center space-x-4">
+              <SortControl
+                options={SCENE_SORT_OPTIONS}
+                value={sort}
+                onChange={handleSortChange}
+              />
+              <button
+                onClick={() => handleSortChange(sort)} // This will toggle direction for same field
+                className="px-3 py-2 border rounded-md text-sm"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {sortDirection === "ASC" ? "↑ Ascending" : "↓ Descending"}
+              </button>
+            </div>
+
+            {/* Filters Toggle Button */}
+            <button
+              onClick={toggleFilterPanel}
+              className="px-4 py-2 border rounded-md text-sm font-medium transition-colors hover:bg-opacity-80 flex items-center space-x-2"
+              style={{
+                backgroundColor: isFilterPanelOpen
+                  ? "var(--accent-primary)"
+                  : "var(--bg-card)",
+                borderColor: isFilterPanelOpen
+                  ? "var(--accent-primary)"
+                  : "var(--border-color)",
+                color: isFilterPanelOpen ? "white" : "var(--text-primary)",
+              }}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>Filters</span>
+              {hasActiveFilters && !isFilterPanelOpen && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full ml-1"
+                  style={{
+                    backgroundColor: "var(--accent-secondary)",
+                    color: "white",
+                  }}
+                >
+                  {
+                    Object.keys(filters).filter(
+                      (key) =>
+                        filters[key] !== undefined &&
+                        filters[key] !== "" &&
+                        (typeof filters[key] !== "object" ||
+                          Object.values(filters[key]).some(
+                            (v) => v !== "" && v !== undefined
+                          ))
+                    ).length
+                  }
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Filter Panel */}
+          <FilterPanel
+            isOpen={isFilterPanelOpen}
+            onToggle={toggleFilterPanel}
+            onClear={clearFilters}
+            onSubmit={handleFilterSubmit}
+            hasActiveFilters={hasActiveFilters}
+          >
+            <FilterControl
+              type="select"
+              label="Rating"
+              value={filters.rating || ""}
+              onChange={(value) => handleFilterChange("rating", value)}
+              options={RATING_OPTIONS}
+              placeholder="Any rating"
+            />
+
+            <FilterControl
+              type="range"
+              label="Duration (minutes)"
+              value={filters.duration || {}}
+              onChange={(value) => handleFilterChange("duration", value)}
+              min={1}
+              max={300}
+            />
+
+            <FilterControl
+              type="range"
+              label="O Count"
+              value={filters.oCount || {}}
+              onChange={(value) => handleFilterChange("oCount", value)}
+              min={0}
+              max={50}
+            />
+
+            <FilterControl
+              type="select"
+              label="Resolution"
+              value={filters.resolution || ""}
+              onChange={(value) => handleFilterChange("resolution", value)}
+              options={RESOLUTION_OPTIONS}
+              placeholder="Any resolution"
+            />
+
+            <FilterControl
+              type="select"
+              label="Organized"
+              value={filters.organized || ""}
+              onChange={(value) => handleFilterChange("organized", value)}
+              options={ORGANIZED_OPTIONS}
+              placeholder="Any"
+            />
+          </FilterPanel>
+        </>
+      )}
 
       <SceneGrid
         scenes={currentScenes || []}

@@ -10,8 +10,8 @@ const SUPPORTED_FORMATS = {
   // Video codecs with browser support
   videoCodecs: {
     h264: ["mp4", "mov"], // H.264/AVC - widely supported
-    h265: [], // H.265/HEVC - limited support, mainly Safari
-    hevc: [], // Same as h265
+    h265: ["mp4", "mov"], // H.265/HEVC - supported in Safari, Edge, Chrome on some systems
+    hevc: ["mp4", "mov"], // Same as h265
     vp8: ["webm"], // VP8 - good support in WebM
     vp9: ["webm"], // VP9 - good support in WebM
     av1: ["mp4", "webm"], // AV1 - modern browsers

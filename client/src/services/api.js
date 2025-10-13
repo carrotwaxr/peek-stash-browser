@@ -141,22 +141,35 @@ export const videoApi = {
 // Valid sort field mappings for Stash GraphQL API
 export const sortFieldMap = {
   // Scene sort fields
-  rating100: "rating", // rating100 field sorts by 'rating'
-  created_at: "created_at", // valid field
-  updated_at: "updated_at", // valid field
-  date: "date", // valid field
-  title: "title", // valid field
-  duration: "duration", // valid field
+  TITLE: "title",
+  DATE: "date",
+  CREATED_AT: "created_at",
+  UPDATED_AT: "updated_at",
+  RATING: "rating100",
+  O_COUNTER: "o_counter",
+  PLAY_COUNT: "play_count",
+  PLAY_DURATION: "play_duration",
+  DURATION: "duration",
+  FILESIZE: "filesize",
+  BITRATE: "bitrate",
+  FRAMERATE: "framerate",
+  PERFORMER_COUNT: "performer_count",
+  TAG_COUNT: "tag_count",
+  LAST_PLAYED_AT: "last_played_at",
+  LAST_O_AT: "last_o_at",
+  RANDOM: "random",
 
   // Performer sort fields
-  name: "name", // valid field
-  birthdate: "birthdate", // valid field
+  NAME: "name",
+  BIRTHDATE: "birthdate",
+  HEIGHT: "height_cm",
+  WEIGHT: "weight",
+  PENIS_LENGTH: "penis_length",
+  SCENE_COUNT: "scene_count",
 
-  // Studio sort fields
-  scene_count: "scene_count", // valid field
+  // Studio sort fields (reusing scene field names where applicable)
 
-  // Tag sort fields
-  tag_count: "tag_count", // valid field
+  // Tag sort fields (reusing scene field names where applicable)
 };
 
 // Helper functions for common filtering patterns

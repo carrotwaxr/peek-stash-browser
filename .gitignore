@@ -61,3 +61,11 @@ Thumbs.db
 
 # Prisma
 prisma/migrations/
+
+# SQLite databases (development)
+*.db
+*.sqlite
+*.sqlite3
+server/*.db
+server/*.sqlite
+server/*.sqlite3

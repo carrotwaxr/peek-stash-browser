@@ -12,17 +12,46 @@ import {
   EmptyState,
   Pagination,
 } from "./ui/index.js";
+import {
+  SortControl,
+  FilterPanel,
+  FilterControl,
+} from "./ui/FilterControls.jsx";
+import { useSortAndFilter } from "../hooks/useSortAndFilter.js";
+import {
+  PERFORMER_SORT_OPTIONS,
+  GENDER_OPTIONS,
+  RATING_OPTIONS,
+  buildPerformerFilter,
+} from "../utils/filterConfig.js";
 import { formatRating, getInitials, truncateText } from "../utils/format.js";
 
 const Performers = () => {
   const [searchMode, setSearchMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const {
+    sort,
+    sortDirection,
+    handleSortChange,
+    filters,
+    handleFilterChange,
+    clearFilters,
+    hasActiveFilters,
+  } = useSortAndFilter("NAME", "performer");
+
   const {
     data: paginatedData,
     loading,
     error,
     refetch,
-  } = usePerformersPaginated({ page: currentPage });
+  } = usePerformersPaginated({
+    page: currentPage,
+    perPage: 24,
+    sort: sort || undefined,
+    sortDirection: sortDirection || undefined,
+    filter: buildPerformerFilter(filters),
+  });
   const {
     query,
     setQuery,
@@ -75,6 +104,8 @@ const Performers = () => {
     );
   }
 
+  console.log(currentPerformers);
+
   return (
     <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
       <PageHeader
@@ -95,6 +126,83 @@ const Performers = () => {
           </button>
         )}
       </PageHeader>
+
+      {/* Controls Section */}
+      {!searchMode && (
+        <div className="space-y-6 mb-6">
+          {/* Top Controls Row - Sort + Pagination */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {/* Sort Control */}
+            <div className="flex items-center space-x-3">
+              <SortControl
+                options={PERFORMER_SORT_OPTIONS}
+                value={sort}
+                onChange={handleSortChange}
+              />
+              <button
+                onClick={() => handleSortChange(sort)} // This will toggle direction for same field
+                className="px-3 py-2 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border-color)",
+                  color: "var(--text-primary)",
+                }}
+                title={`Sort ${
+                  sortDirection === "ASC" ? "Descending" : "Ascending"
+                }`}
+              >
+                {sortDirection === "ASC" ? "↑" : "↓"}
+              </button>
+            </div>
+
+            {/* Top Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center sm:justify-end">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Filter Panel - Always visible */}
+          <FilterPanel
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+          >
+            <FilterControl
+              type="select"
+              label="Gender"
+              value={filters.gender || ""}
+              onChange={(value) => handleFilterChange("gender", value)}
+              options={GENDER_OPTIONS}
+            />
+            <FilterControl
+              type="select"
+              label="Rating"
+              value={filters.rating || ""}
+              onChange={(value) => handleFilterChange("rating", value)}
+              options={RATING_OPTIONS}
+            />
+            <FilterControl
+              type="number"
+              label="Min Age"
+              value={filters.minAge || ""}
+              onChange={(value) => handleFilterChange("minAge", value)}
+              placeholder="18"
+              min="18"
+            />
+            <FilterControl
+              type="checkbox"
+              label="Favorites Only"
+              value={filters.favorite || false}
+              onChange={(value) => handleFilterChange("favorite", value)}
+            />
+          </FilterPanel>
+        </div>
+      )}
 
       {currentLoading && (
         <div className="flex justify-center py-12">
@@ -130,15 +238,15 @@ const Performers = () => {
 
       {!currentLoading && currentPerformers && currentPerformers.length > 0 && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+          <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
             {currentPerformers.map((performer) => (
               <PerformerCard key={performer.id} performer={performer} />
             ))}
           </div>
 
-          {/* Pagination */}
+          {/* Bottom Pagination */}
           {totalPages > 1 && !searchMode && (
-            <div className="mt-8">
+            <div className="mt-8 flex justify-center">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -163,23 +271,25 @@ const PerformerCard = ({ performer }) => {
       }}
     >
       <div className="text-center">
-        {performer.image_path ? (
-          <img
-            src={performer.image_path}
-            alt={performer.name}
-            className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
-          />
-        ) : (
-          <div
-            className="w-16 h-16 rounded-full mx-auto mb-3 flex items-center justify-center text-lg font-semibold"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              color: "var(--text-primary)",
-            }}
-          >
-            {getInitials(performer.name)}
-          </div>
-        )}
+        <div className="w-full aspect-[2/3] rounded mb-3 overflow-hidden">
+          {performer.image_path ? (
+            <img
+              src={performer.image_path}
+              alt={performer.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div
+              className="w-full h-full flex items-center justify-center text-lg font-semibold"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {getInitials(performer.name)}
+            </div>
+          )}
+        </div>
 
         <h3
           className="font-semibold mb-1"

@@ -93,8 +93,18 @@ const SceneCard = forwardRef(
             </div>
           )}
 
-          {/* Overlay with duration only */}
+          {/* Overlay with duration and studio */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent">
+            {/* Studio in top-right */}
+            {scene.studio && (
+              <div className="absolute top-2 right-2">
+                <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
+                  {scene.studio.name}
+                </span>
+              </div>
+            )}
+
+            {/* Duration in bottom-right */}
             <div className="absolute bottom-2 right-2">
               {scene.files?.[0]?.duration && (
                 <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
@@ -110,7 +120,7 @@ const SceneCard = forwardRef(
           {/* Title - 2 lines max */}
           <Tooltip content={title} disabled={title.length <= 50}>
             <h3
-              className="font-semibold mb-2 leading-tight"
+              className="font-semibold mb-1 leading-tight"
               style={{
                 color: "var(--text-primary)",
                 display: "-webkit-box",
@@ -125,6 +135,20 @@ const SceneCard = forwardRef(
               {title}
             </h3>
           </Tooltip>
+
+          {/* Date directly under title */}
+          <div
+            className="mb-3 text-xs"
+            style={{ color: "var(--text-muted)", minHeight: "1rem" }}
+          >
+            {scene.date ? (
+              formatRelativeTime(scene.date)
+            ) : scene.created_at ? (
+              formatRelativeTime(scene.created_at)
+            ) : (
+              <span className="italic">No date</span>
+            )}
+          </div>
 
           {/* Rating, O-Count, Play Count - Fixed height container */}
           <div
@@ -178,53 +202,18 @@ const SceneCard = forwardRef(
             </Tooltip>
           </div>
 
-          {/* Performers and Tags - Fixed height container */}
-          <div className="mb-3" style={{ minHeight: "2.5rem" }}>
-            {/* Performers Row */}
-            <div className="mb-1" style={{ minHeight: "1.125rem" }}>
-              {scene.performers && scene.performers.length > 0 ? (
-                <Tooltip content={performersContent}>
-                  <div
-                    className="flex items-center text-xs"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    <svg
-                      className="w-3 h-3 mr-1 flex-shrink-0"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <div className="truncate flex flex-wrap gap-1">
-                      {scene.performers.slice(0, 2).map((performer, index) => (
-                        <span key={performer.id}>
-                          <Link
-                            to={`/performer/${performer.id}`}
-                            className="hover:text-blue-400 hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {performer.name}
-                          </Link>
-                          {index < Math.min(scene.performers.length, 2) - 1 &&
-                            ", "}
-                        </span>
-                      ))}
-                      {scene.performers.length > 2 &&
-                        ` +${scene.performers.length - 2}`}
-                    </div>
-                  </div>
-                </Tooltip>
-              ) : (
-                <div
-                  className="flex items-center text-xs"
-                  style={{ color: "var(--text-muted)", fontStyle: "italic" }}
-                >
+          {/* Performers and Tags Icons - Centered */}
+          <div
+            className="mb-3 flex justify-center items-center space-x-3"
+            style={{ minHeight: "2rem" }}
+          >
+            {/* Performers Icon */}
+            {scene.performers && scene.performers.length > 0 ? (
+              <Tooltip content={performersContent}>
+                <div className="flex items-center">
                   <svg
-                    className="w-3 h-3 mr-1 flex-shrink-0"
+                    className="w-5 h-5"
+                    style={{ color: "var(--text-muted)" }}
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -234,54 +223,38 @@ const SceneCard = forwardRef(
                       clipRule="evenodd"
                     />
                   </svg>
-                  <span>No performers</span>
-                </div>
-              )}
-            </div>
-
-            {/* Tags Row */}
-            <div style={{ minHeight: "1.125rem" }}>
-              {scene.tags && scene.tags.length > 0 ? (
-                <Tooltip content={tagsContent}>
-                  <div
-                    className="flex items-center text-xs"
+                  <span
+                    className="ml-1 text-xs"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    <svg
-                      className="w-3 h-3 mr-1 flex-shrink-0"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <div className="truncate flex flex-wrap gap-1">
-                      {scene.tags.slice(0, 3).map((tag, index) => (
-                        <span key={tag.id}>
-                          <Link
-                            to={`/tag/${tag.id}`}
-                            className="hover:text-blue-400 hover:underline"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {tag.name}
-                          </Link>
-                          {index < Math.min(scene.tags.length, 3) - 1 && ", "}
-                        </span>
-                      ))}
-                      {scene.tags.length > 3 && ` +${scene.tags.length - 3}`}
-                    </div>
-                  </div>
-                </Tooltip>
-              ) : (
-                <div
-                  className="flex items-center text-xs"
-                  style={{ color: "var(--text-muted)", fontStyle: "italic" }}
+                    {scene.performers.length}
+                  </span>
+                </div>
+              </Tooltip>
+            ) : (
+              <div className="flex items-center opacity-50">
+                <svg
+                  className="w-5 h-5"
+                  style={{ color: "var(--text-muted)" }}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
                 >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            )}
+
+            {/* Tags Icon */}
+            {scene.tags && scene.tags.length > 0 ? (
+              <Tooltip content={tagsContent}>
+                <div className="flex items-center">
                   <svg
-                    className="w-3 h-3 mr-1 flex-shrink-0"
+                    className="w-5 h-5"
+                    style={{ color: "var(--text-muted)" }}
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -291,10 +264,30 @@ const SceneCard = forwardRef(
                       clipRule="evenodd"
                     />
                   </svg>
-                  <span>No tags</span>
+                  <span
+                    className="ml-1 text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {scene.tags.length}
+                  </span>
                 </div>
-              )}
-            </div>
+              </Tooltip>
+            ) : (
+              <div className="flex items-center opacity-50">
+                <svg
+                  className="w-5 h-5"
+                  style={{ color: "var(--text-muted)" }}
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+            )}
           </div>
 
           {/* Bottom Metadata - Fixed height container */}
@@ -303,25 +296,20 @@ const SceneCard = forwardRef(
               className="flex items-center justify-between text-xs"
               style={{ color: "var(--text-muted)" }}
             >
-              <div className="flex items-center space-x-2">
-                {scene.studio?.name ? (
-                  <Link
-                    to={`/studio/${scene.studio.id}`}
-                    className="truncate max-w-24 hover:text-blue-400 hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {scene.studio.name}
-                  </Link>
+              {/* Resolution (calculated from width/height or use existing field) */}
+              <div>
+                {scene.files?.[0]?.width && scene.files?.[0]?.height ? (
+                  <span>
+                    {scene.files[0].width}×{scene.files[0].height}
+                  </span>
+                ) : scene.files?.[0]?.resolution ? (
+                  <span>{scene.files[0].resolution}</span>
                 ) : (
-                  <span className="italic">No studio</span>
-                )}
-                {scene.date ? (
-                  <span>{formatRelativeTime(scene.date)}</span>
-                ) : (
-                  <span className="italic">No date</span>
+                  <span className="italic">Unknown resolution</span>
                 )}
               </div>
 
+              {/* File size */}
               {scene.files?.[0]?.size && (
                 <span>{formatFileSize(scene.files[0].size)}</span>
               )}

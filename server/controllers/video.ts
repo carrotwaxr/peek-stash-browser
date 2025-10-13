@@ -220,7 +220,9 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
     // Handle direct play
     if (direct === "true") {
       try {
-        res.sendFile(sceneFilePath);
+        // Ensure absolute path for sendFile
+        const absolutePath = path.resolve(sceneFilePath);
+        res.sendFile(absolutePath);
       } catch (error) {
         console.error(`Error serving file for scene ${sceneId}:`, error);
         res.status(500).json({ error: "Failed to serve video file" });

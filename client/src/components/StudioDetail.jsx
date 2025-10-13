@@ -51,59 +51,157 @@ const StudioDetail = () => {
       <div className="max-w-none">
         {/* Studio Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center justify-between mb-6">
             <Link
               to="/studios"
-              className="text-blue-400 hover:text-blue-300 text-sm"
+              className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-primary/10"
+              style={{ color: "var(--text-secondary)" }}
             >
-              ← Back to Studios
+              <svg
+                className="w-4 h-4 mr-1.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              Back to Studios
             </Link>
           </div>
 
-          <div className="flex items-start gap-6">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-6">
             {/* Studio Image */}
-            {studio?.image_path && (
-              <div className="flex-shrink-0">
+            <div className="flex-shrink-0 mx-auto lg:mx-0">
+              {studio?.image_path ? (
                 <img
                   src={studio.image_path}
                   alt={studio.name}
-                  className="w-32 h-32 object-cover rounded-lg border border-border"
-                  style={{ borderColor: "var(--border-color)" }}
+                  className="w-40 h-40 lg:w-48 lg:h-48 object-cover rounded-lg shadow-lg"
+                  style={{
+                    borderColor: "var(--border-color)",
+                    border: "1px solid var(--border-color)",
+                  }}
                 />
-              </div>
-            )}
+              ) : (
+                <div
+                  className="w-40 h-40 lg:w-48 lg:h-48 rounded-lg flex items-center justify-center shadow-lg"
+                  style={{
+                    backgroundColor: "var(--background-secondary)",
+                    border: "1px solid var(--border-color)",
+                  }}
+                >
+                  <svg
+                    className="w-16 h-16"
+                    style={{ color: "var(--text-secondary)" }}
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </div>
+              )}
+            </div>
 
             {/* Studio Info */}
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-2">
+            <div className="flex-1 text-center lg:text-left">
+              <h1
+                className="text-3xl lg:text-4xl font-bold mb-4"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {studio?.name || `Studio ${studioId}`}
               </h1>
 
-              {studio?.url && (
-                <p className="mb-2">
-                  <span className="text-gray-400">Website:</span>{" "}
-                  <a
-                    href={studio.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300"
-                  >
-                    {studio.url}
-                  </a>
-                </p>
-              )}
-
-              {studio?.details && (
-                <div className="mb-4">
-                  <span className="text-gray-400">Details:</span>
-                  <p className="mt-1 text-gray-300 whitespace-pre-wrap">
-                    {studio.details}
-                  </p>
+              {/* Statistics Card */}
+              <div
+                className="p-4 rounded-lg mb-6 inline-block"
+                style={{
+                  backgroundColor: "var(--background-secondary)",
+                  border: "1px solid var(--border-color)",
+                }}
+              >
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <div>
+                    <span style={{ color: "var(--text-secondary)" }}>
+                      Total Scenes:{" "}
+                    </span>
+                    <span
+                      className="font-semibold"
+                      style={{ color: "var(--primary-color)" }}
+                    >
+                      {totalCount}
+                    </span>
+                  </div>
                 </div>
-              )}
+              </div>
 
-              <div className="text-sm text-gray-500">
-                {totalCount} scene{totalCount !== 1 ? "s" : ""} from this studio
+              {/* Website and Details Cards */}
+              <div className="grid grid-cols-1 gap-4 mb-6">
+                {studio?.url && (
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{
+                      backgroundColor: "var(--background-secondary)",
+                      border: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <h3
+                      className="font-semibold mb-2"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Website
+                    </h3>
+                    <a
+                      href={studio.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center hover:underline transition-colors"
+                      style={{ color: "var(--primary-color)" }}
+                    >
+                      {studio.url}
+                      <svg
+                        className="w-4 h-4 ml-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                        />
+                      </svg>
+                    </a>
+                  </div>
+                )}
+
+                {studio?.details && (
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{
+                      backgroundColor: "var(--background-secondary)",
+                      border: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <h3
+                      className="font-semibold mb-2"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      Details
+                    </h3>
+                    <p
+                      className="whitespace-pre-wrap"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {studio.details}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -111,10 +209,23 @@ const StudioDetail = () => {
 
         {/* Scenes Section */}
         <div>
-          <PageHeader
-            title="Scenes"
-            subtitle={`All scenes from ${studio?.name || "this studio"}`}
-          />
+          <div className="mb-6">
+            <h2
+              className="text-2xl font-bold mb-2"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Scenes
+              <span
+                className="ml-2 text-lg font-normal"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                ({totalCount})
+              </span>
+            </h2>
+            <p style={{ color: "var(--text-secondary)" }}>
+              All scenes from {studio?.name || "this studio"}
+            </p>
+          </div>
 
           {scenes.length === 0 && !scenesLoading ? (
             <div className="text-center py-12">

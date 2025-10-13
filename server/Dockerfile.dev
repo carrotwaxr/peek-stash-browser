@@ -1,0 +1,22 @@
+FROM node:18-slim
+
+WORKDIR /app
+
+# Install system dependencies including OpenSSL and FFmpeg
+RUN apt-get update && apt-get install -y ffmpeg openssl && rm -rf /var/lib/apt/lists/*
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy prisma schema and generate client
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copy source code (this will be overridden by volume mount)
+COPY . .
+
+EXPOSE 8000
+
+# Development mode with nodemon for hot reloading
+CMD ["npm", "run", "dev"]
