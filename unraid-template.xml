@@ -92,6 +92,7 @@
   <Config Name="Temp Directory" Target="/app/tmp" Default="/mnt/user/appdata/peek-stash-browser/tmp" Mode="rw" Description="Temporary files for video transcoding" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser/tmp</Config>
   <Config Name="Stash URL" Target="STASH_URL" Default="http://[IP]:9999/graphql" Mode="" Description="Your Stash GraphQL endpoint URL" Type="Variable" Display="always" Required="true" Mask="false">http://[IP]:9999/graphql</Config>
   <Config Name="Stash API Key" Target="STASH_API_KEY" Default="your-api-key" Mode="" Description="Your Stash API key for authentication" Type="Variable" Display="always" Required="true" Mask="true">your-api-key</Config>
+  <Config Name="JWT Secret" Target="JWT_SECRET" Default="change-this-to-a-secure-random-string" Mode="" Description="Secret key for JWT token signing (change to a secure random string)" Type="Variable" Display="always" Required="true" Mask="true">change-this-to-a-secure-random-string</Config>
   <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-stash-browser.db" Mode="" Description="SQLite database file path" Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-stash-browser.db</Config>
   <Config Name="Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment" Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
 </Container>
