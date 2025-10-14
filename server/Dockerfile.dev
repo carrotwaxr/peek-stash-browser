@@ -2,8 +2,8 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Install system dependencies including OpenSSL and FFmpeg
-RUN apt-get update && apt-get install -y ffmpeg openssl && rm -rf /var/lib/apt/lists/*
+# Install system dependencies including OpenSSL, FFmpeg, and SQLite
+RUN apt-get update && apt-get install -y ffmpeg openssl sqlite3 && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY package*.json ./

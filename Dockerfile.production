@@ -12,9 +12,9 @@ RUN npm run build
 
 FROM node:18-slim as backend-build
 
-# Install FFmpeg for video processing
+# Install FFmpeg for video processing and SQLite for database
 RUN apt-get update && \
-    apt-get install -y ffmpeg && \
+    apt-get install -y ffmpeg sqlite3 && \
     rm -rf /var/lib/apt/lists/*
 
 # Build backend
@@ -28,9 +28,9 @@ RUN npm run build
 
 FROM node:18-slim as production
 
-# Install FFmpeg and nginx for serving both frontend and backend
+# Install FFmpeg, nginx, and SQLite for serving both frontend and backend
 RUN apt-get update && \
-    apt-get install -y ffmpeg nginx && \
+    apt-get install -y ffmpeg nginx sqlite3 && \
     rm -rf /var/lib/apt/lists/*
 
 # Create application directory
