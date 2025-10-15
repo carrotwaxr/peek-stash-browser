@@ -16,45 +16,18 @@ import {
   FindFilterType,
 } from "stashapp-api/dist/generated/graphql.js";
 
-export const getSceneLibrary = async (req: Request, res: Response) => {
-  try {
-    const stash = getStash();
-    const scenes: FindScenesQuery = await stash.findScenes({
-      filter: { per_page: 5 },
-      scene_filter: {
-        rating100: { modifier: CriterionModifier.GreaterThan, value: 80 },
-        performer_favorite: true,
-      },
-    });
-
-    const mutatedScenes = scenes.findScenes.scenes.map((s) =>
-      transformScene(s as Scene)
-    );
-
-    res.json({
-      ...scenes,
-      findScenes: { ...scenes.findScenes, scenes: mutatedScenes },
-    });
-  } catch (error) {
-    console.error("Error in getVideoLibrary:", error);
-    res.status(500).json({
-      error: "Failed to fetch video library",
-      details: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-};
-
 // New POST endpoints for filtered searching
 
 export const findScenes = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
-    const { filter, scene_filter, ids } = req.body;
+    const { filter, scene_filter, ids, scene_ids } = req.body;
 
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
       scene_filter: scene_filter as SceneFilterType,
       ids: ids as string[],
+      scene_ids: scene_ids as number[],
     });
 
     const mutatedScenes = scenes.findScenes.scenes.map((s) =>
@@ -74,10 +47,16 @@ export const findScenes = async (req: Request, res: Response) => {
   }
 };
 
+const removeEmptyValues = (obj: any) => {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([_, v]) => v != null && v !== "")
+  );
+};
+
 export const findPerformers = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
-    const { filter, performer_filter } = req.body;
+    const { filter, performer_filter, ids, performer_ids } = req.body;
 
     // Always filter to only show performers with scenes
     const enhancedFilter = {
@@ -88,10 +67,19 @@ export const findPerformers = async (req: Request, res: Response) => {
       },
     };
 
-    const performers: FindPerformersQuery = await stash.findPerformers({
+    const queryInputs = removeEmptyValues({
       filter: filter as FindFilterType,
-      performer_filter: enhancedFilter as PerformerFilterType,
+      ids: ids as string[],
+      performer_ids: performer_ids as number[],
+      performer_filter:
+        ids || performer_ids
+          ? performer_filter
+          : (enhancedFilter as PerformerFilterType),
     });
+
+    const performers: FindPerformersQuery = await stash.findPerformers(
+      queryInputs
+    );
 
     // Transform performers to add API key to image paths
     const transformedPerformers = {
@@ -117,7 +105,7 @@ export const findPerformers = async (req: Request, res: Response) => {
 export const findStudios = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
-    const { filter, studio_filter } = req.body;
+    const { filter, studio_filter, ids } = req.body;
 
     // Always filter to only show studios with scenes
     const enhancedFilter = {
@@ -131,6 +119,7 @@ export const findStudios = async (req: Request, res: Response) => {
     const studios: FindStudiosQuery = await stash.findStudios({
       filter: filter as FindFilterType,
       studio_filter: enhancedFilter as StudioFilterType,
+      ids: ids as string[],
     });
 
     // Transform studios to add API key to image paths
@@ -157,7 +146,7 @@ export const findStudios = async (req: Request, res: Response) => {
 export const findTags = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
-    const { filter, tag_filter } = req.body;
+    const { filter, tag_filter, ids } = req.body;
 
     // Always filter to only show tags with scenes
     const enhancedFilter = {
@@ -171,6 +160,7 @@ export const findTags = async (req: Request, res: Response) => {
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
       tag_filter: enhancedFilter as TagFilterType,
+      ids: ids as string[],
     });
 
     // Transform tags to add API key to image paths

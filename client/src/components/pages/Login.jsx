@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { useTheme } from "../themes/useTheme";
-import { useAuth } from "../hooks/useAuth.js";
+import { useTheme } from "../../themes/useTheme.js";
+import { useAuth } from "../../hooks/useAuth.js";
 
 const Login = ({ onLoginSuccess }) => {
   const { login } = useAuth();

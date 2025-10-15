@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { PeekLogo } from "./branding/PeekLogo.jsx";
-import { UserMenu } from "./ui/index.js";
-import { ThemedIcon } from "./icons/index.js";
+import { PeekLogo } from "../branding/PeekLogo.jsx";
+import UserMenu from "./UserMenu.jsx";
+import { ThemedIcon } from "../icons/index.js";
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

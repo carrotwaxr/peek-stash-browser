@@ -4,58 +4,58 @@
 
 // Scene sorting options
 export const SCENE_SORT_OPTIONS = [
-  { value: "TITLE", label: "Title" },
-  { value: "DATE", label: "Date" },
-  { value: "CREATED_AT", label: "Created At" },
-  { value: "UPDATED_AT", label: "Updated At" },
-  { value: "RATING", label: "Rating" },
-  { value: "O_COUNTER", label: "O Count" },
-  { value: "PLAY_COUNT", label: "Play Count" },
-  { value: "PLAY_DURATION", label: "Play Duration" },
-  { value: "DURATION", label: "Duration" },
-  { value: "FILESIZE", label: "File Size" },
-  { value: "BITRATE", label: "Bit Rate" },
-  { value: "FRAMERATE", label: "Frame Rate" },
-  { value: "PERFORMER_COUNT", label: "Performer Count" },
-  { value: "TAG_COUNT", label: "Tag Count" },
-  { value: "LAST_PLAYED_AT", label: "Last Played At" },
-  { value: "LAST_O_AT", label: "Last O At" },
-  { value: "RANDOM", label: "Random" },
+  { value: "title", label: "Title" },
+  { value: "date", label: "Date" },
+  { value: "created_at", label: "Created At" },
+  { value: "updated_at", label: "Updated At" },
+  { value: "rating", label: "Rating" },
+  { value: "o_counter", label: "O Count" },
+  { value: "play_count", label: "Play Count" },
+  { value: "play_duration", label: "Play Duration" },
+  { value: "duration", label: "Duration" },
+  { value: "filesize", label: "File Size" },
+  { value: "bitrate", label: "Bit Rate" },
+  { value: "framerate", label: "Frame Rate" },
+  { value: "performer_count", label: "Performer Count" },
+  { value: "tag_count", label: "Tag Count" },
+  { value: "last_played_at", label: "Last Played At" },
+  { value: "last_o_at", label: "Last O At" },
+  { value: "random", label: "Random" },
 ];
 
 // Performer sorting options
 export const PERFORMER_SORT_OPTIONS = [
-  { value: "NAME", label: "Name" },
-  { value: "BIRTHDATE", label: "Birthdate" },
-  { value: "CREATED_AT", label: "Created At" },
-  { value: "UPDATED_AT", label: "Updated At" },
-  { value: "HEIGHT", label: "Height" },
-  { value: "WEIGHT", label: "Weight" },
-  { value: "RATING", label: "Rating" },
-  { value: "O_COUNTER", label: "O Count" },
-  { value: "PLAY_COUNT", label: "Play Count" },
-  { value: "SCENE_COUNT", label: "Scene Count" },
-  { value: "PENIS_LENGTH", label: "Penis Length" },
-  { value: "RANDOM", label: "Random" },
+  { value: "name", label: "Name" },
+  { value: "birthdate", label: "Birthdate" },
+  { value: "created_at", label: "Created At" },
+  { value: "updated_at", label: "Updated At" },
+  { value: "height", label: "Height" },
+  { value: "weight", label: "Weight" },
+  { value: "rating", label: "Rating" },
+  { value: "o_counter", label: "O Count" },
+  { value: "play_count", label: "Play Count" },
+  { value: "scenes_count", label: "Scene Count" },
+  { value: "penis_length", label: "Penis Length" },
+  { value: "random", label: "Random" },
 ];
 
 // Studio sorting options
 export const STUDIO_SORT_OPTIONS = [
-  { value: "NAME", label: "Name" },
-  { value: "CREATED_AT", label: "Created At" },
-  { value: "UPDATED_AT", label: "Updated At" },
-  { value: "RATING", label: "Rating" },
-  { value: "SCENE_COUNT", label: "Scene Count" },
-  { value: "RANDOM", label: "Random" },
+  { value: "name", label: "Name" },
+  { value: "created_at", label: "Created At" },
+  { value: "updated_at", label: "Updated At" },
+  { value: "rating", label: "Rating" },
+  { value: "scenes_count", label: "Scene Count" },
+  { value: "random", label: "Random" },
 ];
 
 // Tag sorting options
 export const TAG_SORT_OPTIONS = [
-  { value: "NAME", label: "Name" },
-  { value: "CREATED_AT", label: "Created At" },
-  { value: "UPDATED_AT", label: "Updated At" },
-  { value: "SCENE_COUNT", label: "Scene Count" },
-  { value: "RANDOM", label: "Random" },
+  { value: "name", label: "Name" },
+  { value: "created_at", label: "Created At" },
+  { value: "updated_at", label: "Updated At" },
+  { value: "scenes_count", label: "Scene Count" },
+  { value: "random", label: "Random" },
 ];
 
 // Filter type options for different data types
@@ -131,48 +131,164 @@ export const RESOLUTION_OPTIONS = [
   { value: "2160", label: "4K" },
 ];
 
+export const SCENE_FILTER_OPTIONS = [
+  {
+    key: "rating",
+    label: "Rating",
+    type: "select",
+    defaultValue: "",
+    options: RATING_OPTIONS,
+    placeholder: "Any rating",
+  },
+  {
+    key: "duration",
+    label: "Duration (minutes)",
+    type: "range",
+    defaultValue: {},
+    min: 1,
+    max: 300,
+  },
+  {
+    key: "oCount",
+    label: "O Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 300,
+  },
+  {
+    key: "resolution",
+    label: "Resolution",
+    type: "select",
+    defaultValue: "",
+    options: RESOLUTION_OPTIONS,
+    placeholder: "Any resolution",
+  },
+  {
+    key: "organized",
+    label: "Organized",
+    type: "select",
+    defaultValue: "",
+    options: ORGANIZED_OPTIONS,
+    placeholder: "Any",
+  },
+];
+
+export const PERFORMER_FILTER_OPTIONS = [
+  {
+    key: "gender",
+    label: "Gender",
+    type: "select",
+    defaultValue: "",
+    options: GENDER_OPTIONS,
+  },
+  {
+    key: "rating",
+    label: "Rating",
+    type: "select",
+    defaultValue: "",
+    options: RATING_OPTIONS,
+  },
+  {
+    key: "minAge",
+    label: "Min Age",
+    type: "number",
+    defaultValue: "",
+    placeholder: "18",
+    min: "18",
+  },
+  {
+    key: "favorite",
+    label: "Favorites Only",
+    type: "checkbox",
+    defaultValue: false,
+  },
+];
+
+export const STUDIO_FILTER_OPTIONS = [
+  {
+    key: "rating",
+    label: "Rating",
+    type: "select",
+    defaultValue: "",
+    options: RATING_OPTIONS,
+  },
+  {
+    key: "favorite",
+    label: "Favorites Only",
+    type: "checkbox",
+    defaultValue: false,
+  },
+  {
+    key: "sceneCount",
+    label: "Min Scene Count",
+    type: "number",
+    defaultValue: "",
+    placeholder: "0",
+    min: "0",
+  },
+];
+
+export const TAG_FILTER_OPTIONS = [
+  {
+    key: "favorite",
+    label: "Favorites Only",
+    type: "checkbox",
+    defaultValue: false,
+  },
+  {
+    key: "sceneCount",
+    label: "Min Scene Count",
+    type: "number",
+    defaultValue: "",
+    placeholder: "0",
+    min: "0",
+  },
+];
+
 /**
  * Helper functions to convert UI filter values to GraphQL filter format
  */
 
 export const buildSceneFilter = (filters) => {
-  const sceneFilter = {};
+  const {
+    duration,
+    oCount,
+    organized,
+    rating,
+    resolution,
+    ...straightThruFilters
+  } = filters;
 
-  if (filters.rating) {
+  const sceneFilter = { ...straightThruFilters };
+
+  if (rating) {
     sceneFilter.rating = {
-      value: parseInt(filters.rating) * 20, // Convert 1-5 to 20-100 scale
+      value: parseInt(rating) * 20, // Convert 1-5 to 20-100 scale
       modifier: "EQUALS",
     };
   }
 
-  if (filters.duration?.min || filters.duration?.max) {
+  if (duration?.min || duration?.max) {
     sceneFilter.duration = {};
-    if (filters.duration.min)
-      sceneFilter.duration.value = parseInt(filters.duration.min) * 60;
-    sceneFilter.duration.modifier = filters.duration.max
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.duration.max)
-      sceneFilter.duration.value2 = parseInt(filters.duration.max) * 60;
+    if (duration.min) sceneFilter.duration.value = parseInt(duration.min) * 60;
+    sceneFilter.duration.modifier = duration.max ? "BETWEEN" : "GREATER_THAN";
+    if (duration.max) sceneFilter.duration.value2 = parseInt(duration.max) * 60;
   }
 
-  if (filters.oCount?.min || filters.oCount?.max) {
+  if (oCount?.min || oCount?.max) {
     sceneFilter.o_counter = {};
-    if (filters.oCount.min)
-      sceneFilter.o_counter.value = parseInt(filters.oCount.min);
-    sceneFilter.o_counter.modifier = filters.oCount.max
-      ? "BETWEEN"
-      : "GREATER_THAN";
-    if (filters.oCount.max)
-      sceneFilter.o_counter.value2 = parseInt(filters.oCount.max);
+    if (oCount.min) sceneFilter.o_counter.value = parseInt(oCount.min);
+    sceneFilter.o_counter.modifier = oCount.max ? "BETWEEN" : "GREATER_THAN";
+    if (oCount.max) sceneFilter.o_counter.value2 = parseInt(oCount.max);
   }
 
-  if (filters.organized) {
-    sceneFilter.organized = filters.organized === "TRUE";
+  if (organized) {
+    sceneFilter.organized = organized === "TRUE";
   }
 
-  if (filters.resolution) {
-    const height = parseInt(filters.resolution);
+  if (resolution) {
+    const height = parseInt(resolution);
     sceneFilter.resolution = {
       value: `${height}p`,
       modifier: "EQUALS",

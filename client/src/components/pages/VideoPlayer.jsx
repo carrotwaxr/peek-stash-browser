@@ -1,11 +1,11 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
 import axios from "axios";
-import { canDirectPlayVideo } from "../utils/videoFormat.js";
-import Navigation from "./Navigation.jsx";
+import { canDirectPlayVideo } from "../../utils/videoFormat.js";
+import Navigation from "../ui/Navigation.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -13,85 +13,102 @@ const api = axios.create({
 
 // Helper function to configure HLS for VOD (Video On Demand) behavior
 const setupHLSforVOD = (player, scene) => {
-  player.ready(() => {
-    // Force the player to treat HLS as VOD, not live
-    const tech = player.tech();
-    if (tech && tech.vhs) {
-      const vhs = tech.vhs;
+  // Only set duration once when metadata loads if it's Infinity
+  let durationSet = false;
 
-      // Wait for playlists to be loaded
-      vhs.playlists.on("loadedplaylist", () => {
-        const media = vhs.playlists.media();
-        if (media) {
-          console.log("Configuring playlist for VOD:", media);
-
-          // Force VOD characteristics
-          media.endList = true; // Mark playlist as ended (VOD)
-          media.live = false; // Not live
-          media.dvr = false; // Not DVR
-
-          // Remove any live-related metadata
-          if (media.playlistType) {
-            delete media.playlistType;
-          }
-
-          // Set duration from scene metadata if available
-          const duration = scene?.files?.[0]?.duration;
-          if (duration) {
-            media.totalDuration = duration;
-            media.targetDuration = Math.min(10, duration / 100); // Reasonable segment duration
-          }
-        }
-      });
-
-      // Override seekable range to enable full seeking
-      const originalSeekable = tech.seekable;
-      tech.seekable = function () {
-        const seekableRange = originalSeekable.call(this);
-
-        // If we have duration info, create a full seekable range
-        const duration = scene?.files?.[0]?.duration;
-        if (duration && seekableRange.length === 0) {
-          console.log("Creating seekable range for VOD:", duration);
-          return videojs.createTimeRanges([[0, duration]]);
-        }
-
-        // If we have a seekable range but it's restricted, expand it
-        if (seekableRange.length > 0) {
-          const start = Math.max(0, seekableRange.start(0));
-          const end =
-            scene?.files?.[0]?.duration ||
-            seekableRange.end(seekableRange.length - 1);
-          return videojs.createTimeRanges([[start, end]]);
-        }
-
-        return seekableRange;
-      };
-
-      // Force duration setting
-      const duration = scene?.files?.[0]?.duration;
-      if (duration) {
-        player.duration(duration);
-        console.log("Set player duration:", duration);
-      }
-    }
-  });
-
-  // Handle metadata loaded to set duration
   player.on("loadedmetadata", () => {
     const duration = scene?.files?.[0]?.duration;
-    if (duration && player.duration() === Infinity) {
+    if (!durationSet && duration && player.duration() === Infinity) {
       player.duration(duration);
-      console.log("Updated duration after metadata:", duration);
+      durationSet = true;
+      console.log("Set player duration from scene metadata:", duration);
+    }
+  });
+};
+
+// Helper function to manage loading buffer for smooth playback
+const setupLoadingBuffer = (player, minBufferSeconds = 5) => {
+  let isWaitingForBuffer = false;
+  let hasStartedPlayback = false;
+  let userPaused = false; // Track if user manually paused
+
+  const checkBuffer = () => {
+    const currentTime = player.currentTime();
+    const buffered = player.buffered();
+
+    if (buffered.length > 0) {
+      const bufferedEnd = buffered.end(buffered.length - 1);
+      const bufferAhead = bufferedEnd - currentTime;
+
+      console.log(
+        `Buffer check: ${bufferAhead.toFixed(1)}s ahead (target: ${minBufferSeconds}s)`
+      );
+
+      // If we're playing and buffer is low, pause and wait
+      if (
+        !player.paused() &&
+        bufferAhead < minBufferSeconds &&
+        !isWaitingForBuffer
+      ) {
+        console.log(
+          `Buffer low (${bufferAhead.toFixed(
+            1
+          )}s), pausing until ${minBufferSeconds}s buffered...`
+        );
+        isWaitingForBuffer = true;
+        userPaused = false; // This is automatic buffering pause, not user action
+        player.pause();
+        player.addClass("vjs-waiting");
+      }
+
+      // If we're waiting for buffer and it's now sufficient, resume
+      if (isWaitingForBuffer && bufferAhead >= minBufferSeconds) {
+        console.log(
+          `Buffer ready (${bufferAhead.toFixed(1)}s), resuming playback`
+        );
+        isWaitingForBuffer = false;
+        player.removeClass("vjs-waiting");
+
+        // Only auto-resume if user didn't manually pause
+        if (!userPaused) {
+          player.play().catch((err) => {
+            console.warn("Failed to resume playback after buffering:", err);
+          });
+        }
+      }
+    }
+  };
+
+  // Track user-initiated pauses
+  player.on("pause", () => {
+    // If we're not waiting for buffer, this is a user action
+    if (!isWaitingForBuffer) {
+      userPaused = true;
     }
   });
 
-  // Handle duration changes
-  player.on("durationchange", () => {
-    console.log("Duration changed:", player.duration());
-    const duration = scene?.files?.[0]?.duration;
-    if (player.duration() === Infinity && duration) {
-      player.duration(duration);
+  // Track user-initiated plays
+  player.on("play", () => {
+    userPaused = false;
+  });
+
+  // Track when playback actually starts
+  player.on("playing", () => {
+    hasStartedPlayback = true;
+    userPaused = false; // Clear user pause state when playback starts
+    console.log("Playback started, monitoring buffer...");
+  });
+
+  // Check buffer on progress events (new data loaded)
+  player.on("progress", () => {
+    // Always check buffer when new data arrives, even if paused
+    checkBuffer();
+  });
+
+  // Check buffer during playback
+  player.on("timeupdate", () => {
+    if (hasStartedPlayback && !player.paused()) {
+      checkBuffer();
     }
   });
 };
@@ -100,9 +117,13 @@ const setupHLSforVOD = (player, scene) => {
 const setupQualitySelector = (player) => {
   player.ready(() => {
     const qualityLevels = player.qualityLevels();
+    let qualitySelectorCreated = false; // Flag to prevent duplicates
 
     // Create quality selector menu
     const createQualityMenu = () => {
+      // Only create once
+      if (qualitySelectorCreated) return;
+
       const qualities = ["Auto"];
       const qualityMap = new Map();
 
@@ -120,18 +141,29 @@ const setupQualitySelector = (player) => {
 
       // Add quality selector to control bar
       if (qualities.length > 1) {
+        qualitySelectorCreated = true; // Mark as created
+
         const qualityButton = document.createElement("div");
         qualityButton.className = "vjs-quality-selector vjs-control vjs-button";
+
+        // Get current active quality
+        const activeQuality =
+          qualityLevels.selectedIndex >= 0
+            ? `${qualityLevels[qualityLevels.selectedIndex].height}p`
+            : "Auto";
+
         qualityButton.innerHTML = `
           <button class="vjs-quality-button" type="button" aria-live="polite" title="Quality">
             <span class="vjs-icon-chapters"></span>
-            <span class="vjs-quality-text">Auto</span>
+            <span class="vjs-quality-text">${activeQuality}</span>
           </button>
           <div class="vjs-quality-menu" style="display: none;">
             ${qualities
               .map(
                 (q) =>
-                  `<div class="vjs-quality-item" data-quality="${q}">${q}</div>`
+                  `<div class="vjs-quality-item ${
+                    q === activeQuality ? "vjs-selected" : ""
+                  }" data-quality="${q}">${q}</div>`
               )
               .join("")}
           </div>
@@ -155,6 +187,12 @@ const setupQualitySelector = (player) => {
             const button = qualityButton.querySelector(".vjs-quality-text");
             button.textContent = selectedQuality;
 
+            // Update selected class
+            qualityButton
+              .querySelectorAll(".vjs-quality-item")
+              .forEach((i) => i.classList.remove("vjs-selected"));
+            e.target.classList.add("vjs-selected");
+
             if (selectedQuality === "Auto") {
               // Enable all qualities for auto selection
               for (let i = 0; i < qualityLevels.length; i++) {
@@ -175,10 +213,23 @@ const setupQualitySelector = (player) => {
               "none";
           });
         });
+
+        // Update displayed quality when it changes
+        qualityLevels.on("change", () => {
+          const currentQuality =
+            qualityLevels.selectedIndex >= 0
+              ? `${qualityLevels[qualityLevels.selectedIndex].height}p`
+              : "Auto";
+          const button = qualityButton.querySelector(".vjs-quality-text");
+          if (button && button.textContent === "Auto") {
+            // Only update if in Auto mode
+            button.textContent = currentQuality;
+          }
+        });
       }
     };
 
-    // Wait for quality levels to be populated
+    // Wait for quality levels to be populated (but only create once)
     qualityLevels.on("addqualitylevel", createQualityMenu);
   });
 };
@@ -187,10 +238,23 @@ const setupQualitySelector = (player) => {
 const setupTranscodedSeeking = (player, sessionId) => {
   let isTranscodedSeeking = false;
   let lastSeekTime = 0;
+  let hasPlayedOnce = false; // Track if playback has started at least once
   const SEEK_THRESHOLD = 10; // Only restart transcoding if seeking more than 10 seconds
+
+  // Enable seeking only after playback has started
+  player.one("playing", () => {
+    hasPlayedOnce = true;
+    console.log("Playback started, user seeking now enabled");
+  });
 
   player.on("seeking", () => {
     if (isTranscodedSeeking) return; // Prevent recursive calls
+
+    // Ignore seeks before playback has started (e.g., browser auto-resume)
+    if (!hasPlayedOnce) {
+      console.log("Ignoring seek before playback started (likely auto-resume)");
+      return;
+    }
 
     const currentTime = player.currentTime();
     const duration = player.duration();
@@ -239,29 +303,13 @@ const setupTranscodedSeeking = (player, sessionId) => {
   player.on("loadedmetadata", () => {
     console.log("Metadata loaded, duration:", player.duration());
   });
-
-  // Monitor buffering for transcoded content
-  player.on("progress", () => {
-    const buffered = player.buffered();
-    if (buffered.length > 0) {
-      const bufferedEnd = buffered.end(buffered.length - 1);
-      const currentTime = player.currentTime();
-      const bufferAhead = bufferedEnd - currentTime;
-
-      console.log(`Buffer: ${bufferAhead.toFixed(1)}s ahead`);
-
-      // If buffer is running low, might need to adjust transcoding
-      if (bufferAhead < 10 && !player.paused()) {
-        console.log("Buffer running low, may need transcoding adjustment");
-      }
-    }
-  });
 };
 
 const VideoPlayer = ({ scene }) => {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const playerRef = useRef(null);
+  const prevPlaybackModeRef = useRef(null); // Track previous playback mode
   const [video, setVideo] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [transcodingStatus, setTranscodingStatus] = useState("loading");
@@ -271,62 +319,145 @@ const VideoPlayer = ({ scene }) => {
   const [isLoadingAPI, setIsLoadingAPI] = useState(false);
   const [showDetails, setShowDetails] = useState(true); // Accordion for Details section
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false); // Accordion for Technical Details section
+  const [isAutoFallback, setIsAutoFallback] = useState(false); // Track if we're in automatic fallback
+  const [isSwitchingMode, setIsSwitchingMode] = useState(false); // Prevent initialization during mode switch
 
   // Use the first file for compatibility checking
   const firstFile = scene.files?.[0];
   const compatibility = firstFile ? canDirectPlayVideo(firstFile) : null;
 
   // Function to fetch video data when user clicks play
-  const fetchVideoData = async () => {
-    if (!scene.id || video || isLoadingAPI) return; // Also check if already loading
+  const fetchVideoData = useCallback(
+    async (force = false) => {
+      if (!force && (!scene.id || video || isLoadingAPI)) return; // Also check if already loading
 
-    const canDirectPlay = compatibility?.canDirectPlay || false;
+      const canDirectPlay =
+        playbackMode === "transcode"
+          ? false
+          : compatibility?.canDirectPlay || false;
 
-    console.log(
-      `Making API call for ${
-        canDirectPlay ? "direct" : "transcoded"
-      } session...`
-    );
-    setIsLoadingAPI(true);
+      console.log(
+        `Making API call for ${
+          canDirectPlay ? "direct" : "transcoded"
+        } session...`
+      );
+      setIsLoadingAPI(true);
 
-    try {
-      if (canDirectPlay) {
-        // For direct play, we don't need to fetch JSON data
-        // The API endpoint will serve the video file directly
-        setVideo({ directPlay: true }); // Just a flag to trigger player init
-        setShowPoster(false);
-      } else {
-        // For transcoded content, we need session info
-        const response = await api.get(
-          `/video/play?sceneId=${scene.id}&direct=false&userId=user1`
-        );
+      try {
+        if (canDirectPlay) {
+          // For direct play, we don't need to fetch JSON data
+          // The API endpoint will serve the video file directly
+          setVideo({ directPlay: true }); // Just a flag to trigger player init
+          setShowPoster(false);
+        } else {
+          // For transcoded content, we need session info
+          const response = await api.get(
+            `/video/play?sceneId=${scene.id}&direct=false&userId=user1`
+          );
 
-        console.log("API response:", response.data);
-        setVideo(response.data.scene);
-        setSessionId(response.data.sessionId);
-        setTranscodingStatus(response.data.status);
-        console.log("Set sessionId:", response.data.sessionId);
-        setShowPoster(false);
+          console.log("API response:", response.data);
+          setVideo(response.data.scene);
+          setSessionId(response.data.sessionId);
+          setTranscodingStatus(response.data.status);
+          console.log("Set sessionId:", response.data.sessionId);
+          setShowPoster(false);
+        }
+      } catch (error) {
+        console.error("Error fetching video:", error);
+      } finally {
+        setIsLoadingAPI(false);
+        setIsInitializing(false);
       }
-    } catch (error) {
-      console.error("Error fetching video:", error);
-    } finally {
-      setIsLoadingAPI(false);
-      setIsInitializing(false);
-    }
-  };
+    },
+    [scene.id, video, isLoadingAPI, playbackMode, compatibility]
+  );
 
   // Effect to restart player when mode changes
   useEffect(() => {
-    if (playerRef.current) {
-      // Clean up existing player when mode changes
-      playerRef.current.dispose();
-      playerRef.current = null;
+    // Only trigger if playbackMode actually changed (not on initial mount or other dependency changes)
+    if (
+      playerRef.current &&
+      !isAutoFallback &&
+      prevPlaybackModeRef.current !== null &&
+      prevPlaybackModeRef.current !== playbackMode
+    ) {
+      const player = playerRef.current;
+
+      console.log(
+        `Manual mode switch: ${prevPlaybackModeRef.current} -> ${playbackMode}`
+      );
+
+      // Set switching flag to prevent conflicts during mode change
+      setIsSwitchingMode(true);
+
+      // Pause current playback
+      player.pause();
+
+      // Determine which mode we're switching to
+      const isDirect = playbackMode === "direct";
+
+      // Fetch new session with the correct mode
+      api
+        .get(`/video/play?sceneId=${scene.id}&direct=${isDirect}&userId=user1`)
+        .then((response) => {
+          console.log("Mode switch session created:", response.data);
+
+          if (isDirect) {
+            // Switch to direct play
+            const directUrl = `/api/video/play?sceneId=${scene.id}&direct=true`;
+            player.src({ src: directUrl, type: "video/mp4" });
+            setSessionId(null);
+            setVideo({ directPlay: true });
+          } else {
+            // Switch to transcoded play
+            player.src({
+              src: response.data.playlistUrl,
+              type: "application/x-mpegURL",
+            });
+
+            // Reset playback to start
+            player.currentTime(0);
+
+            setSessionId(response.data.sessionId);
+            setVideo(response.data.scene);
+
+            // Setup HLS features
+            setupHLSforVOD(player, response.data.scene);
+            setupQualitySelector(player);
+            setupTranscodedSeeking(player, response.data.sessionId);
+            setupLoadingBuffer(player, 10); // Monitor buffer during playback
+
+            // CRITICAL: Disable live tracker after mode switch to prevent live UI mode
+            if (player.liveTracker) {
+              console.log("Disabling live tracker after mode switch to force VOD UI");
+              player.liveTracker.dispose();
+              player.liveTracker = null;
+            }
+          }
+
+          // Resume playback
+          player.play().catch((e) => {
+            console.log(
+              "Autoplay failed after mode switch, user interaction required:",
+              e
+            );
+          });
+
+          setIsSwitchingMode(false);
+        })
+        .catch((error) => {
+          console.error("Mode switch failed:", error);
+          setIsSwitchingMode(false);
+        });
     }
-  }, [playbackMode]);
+
+    // Update previous playback mode
+    prevPlaybackModeRef.current = playbackMode;
+  }, [playbackMode, scene.id, isAutoFallback]);
 
   useEffect(() => {
-    if (!playerRef.current && video && !showPoster) {
+    // Don't initialize player if we're switching modes
+    if (!playerRef.current && video && !showPoster && !isSwitchingMode) {
       const videoElement = videoRef.current;
       if (!videoElement) return;
 
@@ -389,6 +520,7 @@ const VideoPlayer = ({ scene }) => {
         fluid: true,
         sources: sources,
         playbackRates: [0.5, 1, 1.25, 1.5, 2], // Playback speed options
+        liveui: false, // CRITICAL: Force VOD UI (prevents live mode switch)
         html5: {
           vhs: {
             // VOD Configuration - Force Video On Demand behavior
@@ -419,6 +551,14 @@ const VideoPlayer = ({ scene }) => {
 
         const player = playerRef.current;
 
+        // CRITICAL: Force VOD behavior by disabling live tracker
+        // This prevents Video.js from switching to live mode with event playlists
+        if (!canDirectPlay && player.liveTracker) {
+          console.log("Disabling live tracker to force VOD UI");
+          player.liveTracker.dispose();
+          player.liveTracker = null;
+        }
+
         // Clear initializing state and start playback
         setIsInitializing(false);
 
@@ -429,9 +569,97 @@ const VideoPlayer = ({ scene }) => {
           });
         });
 
+        // Add error handler for direct play failures
+        if (canDirectPlay) {
+          let hasTriggeredFallback = false;
+
+          player.on("error", () => {
+            // Prevent multiple fallback triggers
+            if (hasTriggeredFallback) return;
+
+            const error = player.error();
+            if (error) {
+              console.error("Direct play error:", error);
+
+              // Check if this is a decode error (MEDIA_ERR_DECODE = 3) or source not supported (MEDIA_ERR_SRC_NOT_SUPPORTED = 4)
+              if (error.code === 3 || error.code === 4) {
+                hasTriggeredFallback = true;
+                console.log(
+                  "Direct play failed, automatically switching to transcoding..."
+                );
+
+                // Remove error listener to prevent further triggers
+                player.off("error");
+
+                // Instead of disposing, keep player and switch source
+                // This avoids React DOM conflicts
+                setIsAutoFallback(true);
+                setPlaybackMode("transcode");
+
+                // Fetch transcoded session
+                api
+                  .get(
+                    `/video/play?sceneId=${scene.id}&direct=false&userId=user1`
+                  )
+                  .then((response) => {
+                    console.log(
+                      "Fallback transcode session created:",
+                      response.data
+                    );
+
+                    // Update state
+                    setVideo(response.data.scene);
+                    setSessionId(response.data.sessionId);
+                    setTranscodingStatus(response.data.status);
+
+                    // Setup event listeners BEFORE changing source
+                    setupHLSforVOD(player, response.data.scene);
+                    // NOTE: setupQualitySelector will be called later in main player init (line 257)
+                    setupTranscodedSeeking(player, response.data.sessionId);
+                    setupLoadingBuffer(player, 10); // Add listeners before src change!
+
+                    // Change player source to HLS (don't dispose!)
+                    const playlistUrl = response.data.playlistUrl;
+                    player.src({
+                      src: playlistUrl,
+                      type: "application/x-mpegURL",
+                    });
+
+                    // CRITICAL: Disable live tracker after fallback to prevent live UI mode
+                    if (player.liveTracker) {
+                      console.log("Disabling live tracker after fallback to force VOD UI");
+                      player.liveTracker.dispose();
+                      player.liveTracker = null;
+                    }
+
+                    // Reset playback to start (don't resume from where direct play failed)
+                    // Must be done in loadedmetadata to ensure it takes effect
+                    player.one("loadedmetadata", () => {
+                      player.currentTime(0);
+                      console.log("Reset currentTime to 0 after source change");
+                    });
+
+                    // Wait for buffer before allowing playback
+                    // The loading buffer will manage this
+                    console.log(
+                      "Transcoded stream ready. Waiting for buffer..."
+                    );
+
+                    setIsAutoFallback(false);
+                  })
+                  .catch((error) => {
+                    console.error("Error fetching transcoded session:", error);
+                    setIsAutoFallback(false);
+                  });
+              }
+            }
+          });
+        }
+
         // Configure HLS for VOD behavior if not direct play
         if (!canDirectPlay) {
           setupHLSforVOD(player, scene);
+          setupLoadingBuffer(player, 10); // Monitor buffer during playback
         }
 
         // Setup quality selector
@@ -451,14 +679,24 @@ const VideoPlayer = ({ scene }) => {
     compatibility?.canDirectPlay,
     playbackMode,
     showPoster,
+    fetchVideoData,
+    isSwitchingMode,
   ]); // Include all dependencies
 
   useEffect(() => {
-    const player = playerRef.current;
     return () => {
+      const player = playerRef.current;
       if (player) {
-        player.dispose();
         playerRef.current = null;
+        // Dispose asynchronously to avoid React conflicts during unmount
+        setTimeout(() => {
+          try {
+            player.dispose();
+          } catch (e) {
+            // Ignore disposal errors during unmount
+            console.warn("Player disposal warning:", e);
+          }
+        }, 0);
       }
     };
   }, []);
@@ -570,12 +808,14 @@ const VideoPlayer = ({ scene }) => {
                 </div>
 
                 {/* Loading indicator if initializing or loading API */}
-                {(isInitializing || isLoadingAPI) && (
+                {(isInitializing || isLoadingAPI || isAutoFallback) && (
                   <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
                     <div className="text-white text-center">
                       <div className="animate-spin w-8 h-8 border-4 border-white border-t-transparent rounded-full mx-auto mb-3"></div>
                       <p>
-                        {isLoadingAPI
+                        {isAutoFallback
+                          ? "Preparing transcoded stream..."
+                          : isLoadingAPI
                           ? "Connecting to server..."
                           : "Loading video..."}
                       </p>

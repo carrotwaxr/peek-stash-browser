@@ -5,17 +5,17 @@ import {
   useLocation,
   useParams,
 } from "react-router-dom";
-import Layout from "./components/Layout.jsx";
-import Home from "./components/Home.jsx";
-import Scenes from "./components/Scenes.jsx";
-import Performers from "./components/Performers.jsx";
-import Studios from "./components/Studios.jsx";
-import Tags from "./components/Tags.jsx";
-import VideoPlayer from "./components/VideoPlayer.jsx";
-import PerformerDetail from "./components/PerformerDetail.jsx";
-import StudioDetail from "./components/StudioDetail.jsx";
-import TagDetail from "./components/TagDetail.jsx";
-import Login from "./components/Login.jsx";
+import Layout from "./components/ui/Layout.jsx";
+import Home from "./components/pages/Home.jsx";
+import Scenes from "./components/pages/Scenes.jsx";
+import Performers from "./components/pages/Performers.jsx";
+import Studios from "./components/pages/Studios.jsx";
+import Tags from "./components/pages/Tags.jsx";
+import VideoPlayer from "./components/pages/VideoPlayer.jsx";
+import PerformerDetail from "./components/pages/PerformerDetail.jsx";
+import StudioDetail from "./components/pages/StudioDetail.jsx";
+import TagDetail from "./components/pages/TagDetail.jsx";
+import Login from "./components/pages/Login.jsx";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { useAuth } from "./hooks/useAuth.js";

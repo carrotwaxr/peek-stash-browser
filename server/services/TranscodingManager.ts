@@ -3,6 +3,9 @@ import fs from "fs";
 import path from "path";
 import { Scene } from "stashapp-api";
 
+// Use POSIX paths since we always run in Docker/Linux containers
+const posixPath = path.posix;
+
 // Quality configurations
 export const QUALITY_PRESETS = {
   "360p": { width: 640, height: 360, bitrate: "800k", audioBitrate: "96k" },
@@ -28,6 +31,8 @@ export interface TranscodingSession {
   lastAccess: number;
   status: "starting" | "active" | "completed" | "error";
   scene?: Scene;
+  backgroundTranscoding?: boolean; // Track if background transcoding is active
+  currentSegment?: number; // Track which segment we're transcoding in background
 }
 
 export interface VideoSegment {
@@ -45,7 +50,22 @@ export class TranscodingManager {
   private tmpDir: string;
 
   constructor(tmpDir: string) {
-    this.tmpDir = tmpDir;
+    // Normalize path to POSIX format for Docker/Linux containers
+    // Replace Windows backslashes and drive letters
+    this.tmpDir = tmpDir
+      .replace(/\\/g, "/") // Convert backslashes to forward slashes
+      .replace(/^[A-Z]:/i, ""); // Remove Windows drive letters (C:, D:, etc.)
+
+    // If path started with drive letter, make it absolute from root
+    if (!this.tmpDir.startsWith("/")) {
+      this.tmpDir = "/" + this.tmpDir;
+    }
+
+    console.log(`TranscodingManager tmpDir normalized to: ${this.tmpDir}`);
+
+    // Clean up old transcoding sessions on startup
+    this.cleanupOnStartup();
+
     this.startCleanupTimer();
   }
 
@@ -69,7 +89,7 @@ export class TranscodingManager {
 
     // Create new session
     const sessionId = `${videoId}_${startTime}_${Date.now()}`;
-    const outputDir = path.join(
+    const outputDir = posixPath.join(
       this.tmpDir,
       "segments",
       `${videoId}_${Math.floor(startTime)}`
@@ -80,10 +100,10 @@ export class TranscodingManager {
       videoId,
       userId,
       startTime,
-      qualities: Object.keys(QUALITY_PRESETS),
+      qualities: ["480p"], // Use 480p for faster transcoding during testing
       processes: new Map(),
       outputDir,
-      masterPlaylistPath: path.join(outputDir, "master.m3u8"),
+      masterPlaylistPath: posixPath.join(outputDir, "master.m3u8"),
       lastAccess: Date.now(),
       status: "starting",
       scene,
@@ -112,6 +132,7 @@ export class TranscodingManager {
 
   /**
    * Start transcoding for a session
+   * Pre-generates complete VOD playlists then pre-transcodes initial segments
    */
   async startTranscoding(
     session: TranscodingSession,
@@ -123,22 +144,91 @@ export class TranscodingManager {
 
       // Create quality-specific directories
       for (const quality of session.qualities) {
-        const qualityDir = path.join(session.outputDir, quality);
+        const qualityDir = posixPath.join(session.outputDir, quality);
         fs.mkdirSync(qualityDir, { recursive: true });
       }
 
-      // Start transcoding for each quality
-      const transcodingPromises = session.qualities.map((quality) =>
-        this.startQualityTranscoding(session, quality, sceneFilePath)
-      );
+      // Get video duration from scene metadata
+      const duration = session.scene?.files?.[0]?.duration || 0;
+      if (!duration) {
+        throw new Error("Cannot generate VOD playlist without video duration");
+      }
+
+      // PRE-GENERATE complete VOD playlists for all qualities
+      // This gives the player full seeking capability from the start
+      const segmentDuration = 2; // seconds per segment
+      const totalSegments = Math.ceil(duration / segmentDuration);
+
+      console.log(`Pre-generating VOD playlists for ${duration}s video (${totalSegments} segments)`);
+
+      for (const quality of session.qualities) {
+        const qualityDir = posixPath.join(session.outputDir, quality);
+        const playlistPath = posixPath.join(qualityDir, "index.m3u8");
+
+        // Generate complete VOD playlist
+        let playlist = "#EXTM3U\n";
+        playlist += "#EXT-X-VERSION:6\n";
+        playlist += "#EXT-X-TARGETDURATION:3\n";
+        playlist += "#EXT-X-MEDIA-SEQUENCE:0\n";
+        playlist += "#EXT-X-PLAYLIST-TYPE:VOD\n";
+        playlist += "#EXT-X-INDEPENDENT-SEGMENTS\n";
+
+        // Add all segments to playlist
+        for (let i = 0; i < totalSegments; i++) {
+          const segmentDur = i === totalSegments - 1
+            ? duration - (i * segmentDuration) // Last segment might be shorter
+            : segmentDuration;
+
+          playlist += `#EXTINF:${segmentDur.toFixed(6)},\n`;
+          playlist += `segment_${String(i).padStart(3, '0')}.ts\n`;
+        }
+
+        playlist += "#EXT-X-ENDLIST\n";
+
+        fs.writeFileSync(playlistPath, playlist);
+        console.log(`Generated complete VOD playlist: ${playlistPath} (${totalSegments} segments)`);
+      }
 
       // Create master playlist
       this.createMasterPlaylist(session);
 
       session.status = "active";
+      console.log(`Session ${session.sessionId} ready - pre-transcoding initial segments`);
 
-      // Wait for all qualities to start
-      await Promise.all(transcodingPromises);
+      // PRE-TRANSCODE first 20 segments (40 seconds) to build initial buffer
+      // This gives smooth playback start since real-time transcoding isn't possible
+      const { translateStashPath } = await import("../utils/pathMapping.js");
+      const absoluteSceneFilePath = translateStashPath(sceneFilePath);
+
+      const preTranscodeCount = 20; // Pre-transcode 40 seconds
+      for (const quality of session.qualities) {
+        console.log(`Pre-transcoding first ${preTranscodeCount} segments for ${quality}...`);
+
+        // Transcode segments sequentially
+        for (let i = 0; i < Math.min(preTranscodeCount, totalSegments); i++) {
+          const segmentStartTime = session.startTime + (i * segmentDuration);
+
+          try {
+            await this.transcodeSpecificSegment(
+              session,
+              quality,
+              i,
+              segmentStartTime,
+              absoluteSceneFilePath
+            );
+          } catch (error) {
+            console.error(`Failed to pre-transcode segment ${i}:`, error);
+            // Continue with next segment even if one fails
+          }
+        }
+
+        console.log(`Pre-transcoding complete for ${quality}`);
+      }
+
+      // Start continuous background transcoding to stay ahead of playback
+      session.currentSegment = preTranscodeCount;
+      session.backgroundTranscoding = true;
+      this.startBackgroundTranscoding(session, absoluteSceneFilePath, totalSegments);
     } catch (error) {
       console.error("Error starting transcoding:", error);
       session.status = "error";
@@ -147,7 +237,72 @@ export class TranscodingManager {
   }
 
   /**
+   * Continuously transcode segments in the background to stay ahead of playback
+   */
+  private async startBackgroundTranscoding(
+    session: TranscodingSession,
+    sceneFilePath: string,
+    totalSegments: number
+  ): Promise<void> {
+    const segmentDuration = 2;
+
+    console.log(`Starting background transcoding from segment ${session.currentSegment}`);
+
+    // Transcode remaining segments in background
+    while (
+      session.backgroundTranscoding &&
+      session.currentSegment !== undefined &&
+      session.currentSegment < totalSegments
+    ) {
+      const segmentNumber = session.currentSegment;
+
+      for (const quality of session.qualities) {
+        const qualityDir = posixPath.join(session.outputDir, quality);
+        const segmentFileName = `segment_${String(segmentNumber).padStart(3, '0')}.ts`;
+        const segmentPath = posixPath.join(qualityDir, segmentFileName);
+
+        // Skip if already exists
+        if (fs.existsSync(segmentPath)) {
+          continue;
+        }
+
+        const segmentStartTime = session.startTime + (segmentNumber * segmentDuration);
+
+        try {
+          await this.transcodeSpecificSegment(
+            session,
+            quality,
+            segmentNumber,
+            segmentStartTime,
+            sceneFilePath
+          );
+        } catch (error) {
+          console.error(`Background transcode failed for segment ${segmentNumber}:`, error);
+          // Continue with next segment
+        }
+      }
+
+      session.currentSegment++;
+
+      // Check if session is still active (not killed/abandoned)
+      if (!this.sessions.has(session.sessionId)) {
+        console.log(`Session ${session.sessionId} no longer exists, stopping background transcoding`);
+        break;
+      }
+    }
+
+    // Mark session as completed when all segments are transcoded
+    if (session.currentSegment && session.currentSegment >= totalSegments) {
+      session.status = "completed";
+      session.backgroundTranscoding = false;
+      this.markSegmentCompleted(session.videoId, session.startTime);
+      console.log(`Background transcoding complete for session ${session.sessionId}`);
+    }
+  }
+
+  /**
    * Start transcoding for a specific quality
+   * Playlist is already pre-generated, just transcode segments
    */
   private async startQualityTranscoding(
     session: TranscodingSession,
@@ -155,8 +310,10 @@ export class TranscodingManager {
     sceneFilePath: string
   ): Promise<void> {
     const preset = QUALITY_PRESETS[quality as keyof typeof QUALITY_PRESETS];
-    const qualityDir = path.join(session.outputDir, quality);
-    const playlistPath = path.join(qualityDir, "index.m3u8");
+    const qualityDir = posixPath.join(session.outputDir, quality);
+
+    // Playlist already exists - we pre-generated it
+    const playlistPath = posixPath.join(qualityDir, "index.m3u8");
 
     const args = [
       "-ss",
@@ -182,9 +339,9 @@ export class TranscodingManager {
       "-maxrate",
       preset.bitrate,
       "-bufsize",
-      `${parseInt(preset.bitrate) * 1}k`, // Smaller buffer for faster startup
+      `${parseInt(preset.bitrate) * 1}k`,
       "-g",
-      "48", // GOP size (2 seconds at 24fps) - keep keyframes frequent
+      "48", // GOP size (2 seconds at 24fps)
       "-keyint_min",
       "48",
       "-sc_threshold",
@@ -204,52 +361,292 @@ export class TranscodingManager {
       "-f",
       "hls",
       "-hls_time",
-      "2", // 2-second segments for faster startup
+      "2", // 2-second segments
       "-hls_list_size",
-      "0", // Keep all segments (don't limit playlist size)
-      "-hls_playlist_type",
-      "event", // Event playlist type for live transcoding with end
+      "0",
       "-hls_segment_filename",
-      path.join(qualityDir, "segment_%03d.ts"),
+      posixPath.join(qualityDir, "segment_%03d.ts"),
       "-hls_flags",
-      "independent_segments+temp_file", // Use temp files and independent segments
-      "-hls_start_number_source",
-      "datetime", // Use datetime for segment numbering
+      "independent_segments+temp_file+omit_endlist", // omit_endlist: don't overwrite our pre-generated playlist
       "-hls_allow_cache",
-      "1", // Allow caching
+      "1",
       "-y", // Overwrite output files
       playlistPath,
     ];
 
-    const ffmpeg = spawn("ffmpeg", args);
+    return new Promise<void>((resolve, reject) => {
+      const ffmpeg = spawn("ffmpeg", args);
+      let resolved = false;
+      let ffmpegStarted = false;
 
-    ffmpeg.stderr.on("data", (data) => {
-      // Log FFmpeg progress (you might want to parse this for progress updates)
-      console.log(
-        `FFmpeg [${quality}] ${session.sessionId}: ${data.toString().trim()}`
-      );
+      ffmpeg.stderr.on("data", (data) => {
+        const output = data.toString().trim();
+
+        // Log non-verbose output
+        if (output.length > 0 && !output.includes("frame=")) {
+          console.log(`FFmpeg [${quality}] ${session.sessionId}: ${output}`);
+        }
+
+        // Resolve once FFmpeg starts outputting (playlist already exists)
+        if (!ffmpegStarted && output.includes("Output #0")) {
+          ffmpegStarted = true;
+          console.log(`FFmpeg [${quality}] started for ${session.sessionId}`);
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        }
+      });
+
+      ffmpeg.on("close", (code) => {
+        console.log(
+          `FFmpeg [${quality}] ${session.sessionId} finished with code: ${code}`
+        );
+        session.processes.delete(quality);
+
+        // Mark segment as completed if all processes are done
+        if (session.processes.size === 0) {
+          this.markSegmentCompleted(session.videoId, session.startTime);
+          session.status = "completed";
+        }
+
+        // Resolve if we haven't already
+        if (!resolved) {
+          if (code === 0) {
+            resolved = true;
+            resolve();
+          } else {
+            reject(new Error(`FFmpeg exited with code ${code}`));
+          }
+        }
+      });
+
+      ffmpeg.on("error", (error) => {
+        console.error(`FFmpeg [${quality}] ${session.sessionId} error:`, error);
+        session.processes.delete(quality);
+        session.status = "error";
+        if (!resolved) {
+          resolved = true;
+          reject(error);
+        }
+      });
+
+      session.processes.set(quality, ffmpeg);
+
+      // Fallback timeout
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error(`Timeout waiting for FFmpeg to start: ${quality}`));
+        }
+      }, 15000);
     });
+  }
 
-    ffmpeg.on("close", (code) => {
-      console.log(
-        `FFmpeg [${quality}] ${session.sessionId} finished with code: ${code}`
-      );
-      session.processes.delete(quality);
+  /**
+   * Transcode a specific segment on-demand with read-ahead buffering
+   * This enables instant seeking anywhere in the video
+   */
+  async transcodeSegmentOnDemand(
+    sessionId: string,
+    quality: string,
+    segmentNumber: number
+  ): Promise<void> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      throw new Error(`Session ${sessionId} not found`);
+    }
 
-      // Mark segment as completed if all processes are done
-      if (session.processes.size === 0) {
-        this.markSegmentCompleted(session.videoId, session.startTime);
-        session.status = "completed";
+    if (!session.scene) {
+      throw new Error(`Session ${sessionId} has no scene metadata`);
+    }
+
+    // Calculate time offset for this segment (2 seconds per segment)
+    const segmentDuration = 2;
+    const segmentStartTime = session.startTime + (segmentNumber * segmentDuration);
+
+    // Get scene file path
+    const sceneFilePath = session.scene.files?.[0]?.path;
+    if (!sceneFilePath) {
+      throw new Error(`Session ${sessionId} has no scene file path`);
+    }
+
+    // Translate path using the same logic as the video controller
+    const { translateStashPath } = await import("../utils/pathMapping.js");
+    const absoluteSceneFilePath = translateStashPath(sceneFilePath);
+
+    // Check if segment already exists or is being transcoded
+    const qualityDir = posixPath.join(session.outputDir, quality);
+    const segmentFileName = `segment_${String(segmentNumber).padStart(3, '0')}.ts`;
+    const segmentPath = posixPath.join(qualityDir, segmentFileName);
+
+    if (fs.existsSync(segmentPath)) {
+      console.log(`Segment ${segmentNumber} already exists, skipping transcode`);
+      return;
+    }
+
+    // Check if already being transcoded (process exists for this segment)
+    const processKey = `${quality}_seg_${segmentNumber}`;
+    if (session.processes.has(processKey)) {
+      console.log(`Segment ${segmentNumber} already being transcoded, skipping`);
+      return;
+    }
+
+    console.log(`Transcoding segment ${segmentNumber} on-demand (time: ${segmentStartTime}s)`);
+
+    // Transcode this specific segment
+    await this.transcodeSpecificSegment(
+      session,
+      quality,
+      segmentNumber,
+      segmentStartTime,
+      absoluteSceneFilePath
+    );
+
+    // Read-ahead: Transcode the next 10 segments ahead
+    const readAheadCount = 10; // Transcode 10 segments ahead (20 seconds of video)
+    for (let i = 1; i <= readAheadCount; i++) {
+      const aheadSegmentNumber = segmentNumber + i;
+      const aheadSegmentFileName = `segment_${String(aheadSegmentNumber).padStart(3, '0')}.ts`;
+      const aheadSegmentPath = posixPath.join(qualityDir, aheadSegmentFileName);
+
+      // Only transcode if segment doesn't exist and isn't being transcoded
+      if (!fs.existsSync(aheadSegmentPath) && !session.processes.has(`${quality}_seg_${aheadSegmentNumber}`)) {
+        const aheadStartTime = session.startTime + (aheadSegmentNumber * segmentDuration);
+
+        console.log(`Read-ahead: transcoding segment ${aheadSegmentNumber} (time: ${aheadStartTime}s)`);
+
+        // Don't await - let these transcode in background
+        this.transcodeSpecificSegment(
+          session,
+          quality,
+          aheadSegmentNumber,
+          aheadStartTime,
+          absoluteSceneFilePath
+        ).catch(err => {
+          console.error(`Read-ahead transcode failed for segment ${aheadSegmentNumber}:`, err);
+        });
       }
-    });
+    }
+  }
 
-    ffmpeg.on("error", (error) => {
-      console.error(`FFmpeg [${quality}] ${session.sessionId} error:`, error);
-      session.processes.delete(quality);
-      session.status = "error";
-    });
+  /**
+   * Transcode a specific segment using FFmpeg with precise seeking
+   */
+  private async transcodeSpecificSegment(
+    session: TranscodingSession,
+    quality: string,
+    segmentNumber: number,
+    startTime: number,
+    sceneFilePath: string
+  ): Promise<void> {
+    const preset = QUALITY_PRESETS[quality as keyof typeof QUALITY_PRESETS];
+    const qualityDir = posixPath.join(session.outputDir, quality);
+    const segmentFileName = `segment_${String(segmentNumber).padStart(3, '0')}.ts`;
+    const segmentPath = posixPath.join(qualityDir, segmentFileName);
 
-    session.processes.set(quality, ffmpeg);
+    // Ensure quality directory exists
+    fs.mkdirSync(qualityDir, { recursive: true });
+
+    const segmentDuration = 2; // 2 seconds per segment
+
+    const args = [
+      "-ss",
+      startTime.toString(), // Seek to exact segment start time
+      "-i",
+      sceneFilePath,
+      "-t",
+      segmentDuration.toString(), // Transcode only this segment's duration
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast", // Faster than ultrafast for better speed/quality balance
+      "-crf",
+      "23", // Constant quality mode (faster than bitrate mode)
+      "-profile:v",
+      "main", // Main profile (faster than baseline)
+      "-pix_fmt",
+      "yuv420p",
+      "-vf",
+      `scale=${preset.width}:${preset.height}`,
+      "-maxrate",
+      preset.bitrate,
+      "-bufsize",
+      `${parseInt(preset.bitrate) * 2}k`, // Larger buffer for smoother encoding
+      "-g",
+      "60", // Larger GOP for faster encoding
+      "-sc_threshold",
+      "0",
+      "-threads",
+      "0",
+      "-c:a",
+      "aac",
+      "-b:a",
+      preset.audioBitrate,
+      "-ar",
+      "48000",
+      "-ac",
+      "2",
+      "-f",
+      "mpegts", // Output as MPEG-TS segment
+      "-y",
+      segmentPath,
+    ];
+
+    return new Promise<void>((resolve, reject) => {
+      const ffmpeg = spawn("ffmpeg", args);
+      const processKey = `${quality}_seg_${segmentNumber}`;
+      let resolved = false;
+
+      ffmpeg.stderr.on("data", (data) => {
+        const output = data.toString().trim();
+
+        // Log progress for debugging (only key messages)
+        if (output.includes("time=") || output.includes("Output #0")) {
+          console.log(`FFmpeg [${quality}] seg ${segmentNumber}: ${output}`);
+        }
+      });
+
+      ffmpeg.on("close", (code) => {
+        session.processes.delete(processKey);
+
+        if (code === 0) {
+          console.log(`Segment ${segmentNumber} [${quality}] transcoded successfully`);
+          if (!resolved) {
+            resolved = true;
+            resolve();
+          }
+        } else {
+          console.error(`Segment ${segmentNumber} [${quality}] failed with code ${code}`);
+          if (!resolved) {
+            resolved = true;
+            reject(new Error(`FFmpeg exited with code ${code}`));
+          }
+        }
+      });
+
+      ffmpeg.on("error", (error) => {
+        console.error(`FFmpeg segment ${segmentNumber} [${quality}] error:`, error);
+        session.processes.delete(processKey);
+        if (!resolved) {
+          resolved = true;
+          reject(error);
+        }
+      });
+
+      // Track this process
+      session.processes.set(processKey, ffmpeg);
+
+      // Timeout for segment transcoding (120 seconds max)
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          session.processes.delete(processKey);
+          ffmpeg.kill("SIGTERM");
+          reject(new Error(`Timeout transcoding segment ${segmentNumber}`));
+        }
+      }, 120000);
+    });
   }
 
   /**
@@ -287,6 +684,12 @@ export class TranscodingManager {
   async killSession(sessionId: string): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) return;
+
+    // Stop background transcoding
+    if (session.backgroundTranscoding) {
+      console.log(`Stopping background transcoding for session ${sessionId}`);
+      session.backgroundTranscoding = false;
+    }
 
     // Kill all FFmpeg processes
     for (const [quality, process] of session.processes) {
@@ -373,7 +776,7 @@ export class TranscodingManager {
       qualities: segment.qualities,
       processes: new Map(),
       outputDir: segment.outputDir,
-      masterPlaylistPath: path.join(segment.outputDir, "master.m3u8"),
+      masterPlaylistPath: posixPath.join(segment.outputDir, "master.m3u8"),
       lastAccess: Date.now(),
       status: "completed",
     };
@@ -438,10 +841,14 @@ export class TranscodingManager {
   }
 
   /**
-   * Get session by ID
+   * Get session by ID and update last access time
    */
   getSession(sessionId: string): TranscodingSession | undefined {
-    return this.sessions.get(sessionId);
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.lastAccess = Date.now(); // Update access time to prevent cleanup
+    }
+    return session;
   }
 
   /**
@@ -515,9 +922,30 @@ export class TranscodingManager {
       }
     }
   }
+
+  /**
+   * Cleanup all old transcoding data on server startup
+   * Removes all segment directories but preserves other files in tmpDir
+   */
+  private cleanupOnStartup(): void {
+    const segmentsDir = posixPath.join(this.tmpDir, "segments");
+
+    console.log(`Cleaning up old transcoding sessions from: ${segmentsDir}`);
+
+    try {
+      if (fs.existsSync(segmentsDir)) {
+        fs.rmSync(segmentsDir, { recursive: true, force: true });
+        console.log("Old transcoding sessions cleaned up successfully");
+      } else {
+        console.log("No existing segments directory to clean up");
+      }
+    } catch (error) {
+      console.error("Error cleaning up old transcoding sessions:", error);
+    }
+  }
 }
 
 // Singleton instance
 export const transcodingManager = new TranscodingManager(
-  process.env.TMP_DIR || "/app/tmp"
+  process.env.CONFIG_DIR || "/app/data"
 );

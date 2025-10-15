@@ -3,10 +3,14 @@ import { useState, useCallback, useMemo } from "react";
 /**
  * Custom hook for managing sorting and filtering state
  */
-export const useSortAndFilter = (initialSort = "", entityType = "scene") => {
+export const useSortAndFilter = (
+  initialSort = "",
+  entityType = "scene",
+  permanentFilters = {}
+) => {
   const [sort, setSort] = useState(initialSort);
-  const [sortDirection, setSortDirection] = useState("ASC");
-  const [filters, setFilters] = useState({});
+  const [sortDirection, setSortDirection] = useState("DESC");
+  const [filters, setFilters] = useState({ ...permanentFilters });
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // Handle sort change
@@ -56,7 +60,7 @@ export const useSortAndFilter = (initialSort = "", entityType = "scene") => {
 
   // Build the query object for API calls
   const buildQuery = useCallback(
-    (page = 1, perPage = 25) => {
+    (page = 1, perPage = 24) => {
       const query = {
         filter: {
           page,

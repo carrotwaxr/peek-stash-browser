@@ -41,7 +41,7 @@ export function useAsyncData(fetchFunction, dependencies = []) {
 /**
  * Hook for paginated data fetching
  */
-export function usePaginatedData(fetchFunction, initialPage = 1, perPage = 25) {
+export function usePaginatedData(fetchFunction, initialPage = 1, perPage = 24) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

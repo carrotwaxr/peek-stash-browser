@@ -8,7 +8,7 @@
     "build": "tsc",
     "serve": "node dist/index.js",
     "start": "node dist/index.js",
-    "dev": "nodemon --watch './**/*.ts' --exec 'node --loader ts-node/esm' index.ts",
+    "dev": "nodemon --watch './**/*.ts' --watch '../.env' --ext ts --exec 'node --loader ts-node/esm' index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "prisma": {
@@ -35,6 +35,6 @@
     "express": "^5.1.0",
     "graphql-tag": "^2.12.6",
     "jsonwebtoken": "^9.0.2",
-    "stashapp-api": "^0.2.6"
+    "stashapp-api": "^0.2.9"
   }
 }

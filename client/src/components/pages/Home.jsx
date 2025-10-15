@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import SceneCarousel from "./SceneCarousel.jsx";
-import { useHomeData } from "../hooks/useLibrary.js";
-import { PageHeader, ErrorMessage, LoadingSpinner } from "./ui/index.js";
+import SceneCarousel from "../ui/SceneCarousel.jsx";
+import { useHomeData } from "../../hooks/useLibrary.js";
+import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -11,10 +11,6 @@ const Home = () => {
   const favoriteScenes = favorites.data || [];
   const recentScenes = recent.data || [];
   const longVideoScenes = longVideos.data || [];
-
-  console.log("favoriteScenes", favoriteScenes);
-  console.log("recentScenes", recentScenes);
-  console.log("longVideoScenes", longVideoScenes);
 
   const handleSceneClick = (scene) => {
     // Navigate to video player page with scene data

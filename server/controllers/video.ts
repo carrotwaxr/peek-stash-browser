@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { Scene } from "stashapp-api";
 import { transcodingManager } from "../services/TranscodingManager.js";
+import { translateStashPath } from "../utils/pathMapping.js";
 
 interface PlayVideoRequest extends Request {
   query: {
@@ -80,8 +81,9 @@ export const getStreamSegment = (req: Request, res: Response) => {
 
   // Handle master playlist request
   if (segment2 === "master.m3u8") {
-    if (fs.existsSync(session.masterPlaylistPath)) {
-      res.sendFile(session.masterPlaylistPath);
+    const absolutePath = path.resolve(session.masterPlaylistPath);
+    if (fs.existsSync(absolutePath)) {
+      res.sendFile(absolutePath);
     } else {
       res.status(404).send("Master playlist not found");
     }
@@ -92,7 +94,7 @@ export const getStreamSegment = (req: Request, res: Response) => {
   const parts = segment2.split("/");
   if (parts.length === 2) {
     const [quality, file] = parts;
-    const filePath = path.join(session.outputDir, quality, file);
+    const filePath = path.resolve(path.join(session.outputDir, quality, file));
 
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
@@ -113,6 +115,41 @@ export const getStreamSegment = (req: Request, res: Response) => {
           }
         };
         trySend();
+      } else if (file.endsWith(".ts")) {
+        // ON-DEMAND SEGMENT TRANSCODING
+        // Extract segment number from filename (e.g., "segment_042.ts" -> 42)
+        const segmentMatch = file.match(/segment_(\d+)\.ts/);
+        if (!segmentMatch) {
+          return res.status(400).send("Invalid segment filename");
+        }
+
+        const segmentNumber = parseInt(segmentMatch[1], 10);
+        console.log(`Segment ${segmentNumber} requested but not found, transcoding on-demand...`);
+
+        // Request on-demand transcoding with read-ahead
+        transcodingManager.transcodeSegmentOnDemand(
+          sessionId,
+          quality,
+          segmentNumber
+        ).catch(err => {
+          console.error(`Failed to initiate on-demand transcoding for segment ${segmentNumber}:`, err);
+        });
+
+        // Wait for segment to be transcoded
+        let attempts = 0;
+        const maxAttempts = 100; // 10 seconds max wait
+        const interval = 100;
+        const trySend = () => {
+          if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+          } else if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(trySend, interval);
+          } else {
+            res.status(404).send("Segment transcoding timeout");
+          }
+        };
+        trySend();
       } else {
         res.status(404).send("Segment not found");
       }
@@ -124,7 +161,7 @@ export const getStreamSegment = (req: Request, res: Response) => {
 
 const getSceneFilePath = (scene: Scene) => {
   const sceneFile = scene.files?.[0].path;
-  return sceneFile.replace("/data", "/app/media");
+  return translateStashPath(sceneFile);
 };
 
 // Simple scene cache to avoid repeated API calls
@@ -222,7 +259,75 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
       try {
         // Ensure absolute path for sendFile
         const absolutePath = path.resolve(sceneFilePath);
-        res.sendFile(absolutePath);
+
+        // Get file stats for content-length and range support
+        const stats = fs.statSync(absolutePath);
+
+        console.log(`Serving direct play: ${sceneFilePath}`);
+        console.log(
+          `File size: ${stats.size}, Format: ${sceneFile?.format}, Video codec: ${sceneFile?.video_codec}, Audio codec: ${sceneFile?.audio_codec}`
+        );
+
+        // Determine proper MIME type
+        let mimeType = "video/mp4";
+        if (sceneFile?.format) {
+          const format = sceneFile.format.toLowerCase();
+          if (format === "webm") mimeType = "video/webm";
+          else if (format === "mkv") mimeType = "video/x-matroska";
+          else if (format === "avi") mimeType = "video/x-msvideo";
+          else if (format === "mov") mimeType = "video/quicktime";
+          else mimeType = `video/${format}`;
+        }
+
+        // Add codec information to MIME type for better browser compatibility
+        // This helps browsers enable the correct decoder
+        if (sceneFile?.video_codec && sceneFile?.audio_codec) {
+          const videoCodec = sceneFile.video_codec.toLowerCase();
+          const audioCodec = sceneFile.audio_codec.toLowerCase();
+
+          // Map codec names to proper MIME codec strings
+          const codecMap: { [key: string]: string } = {
+            h264: "avc1.42E01E",
+            hevc: "hvc1.1.6.L93.B0", // Changed from hev1 to hvc1
+            h265: "hvc1.1.6.L93.B0", // Changed from hev1 to hvc1
+            aac: "mp4a.40.2",
+            mp3: "mp3",
+          };
+
+          const videoCodecString = codecMap[videoCodec] || videoCodec;
+          const audioCodecString = codecMap[audioCodec] || audioCodec;
+
+          mimeType += `; codecs="${videoCodecString}, ${audioCodecString}"`;
+        }
+
+        console.log(`Using MIME type: ${mimeType}`);
+
+        // Handle range requests for seeking
+        const range = req.headers.range;
+        if (range) {
+          console.log(`Range request: ${range}`);
+          const parts = range.replace(/bytes=/, "").split("-");
+          const start = parseInt(parts[0], 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
+          const chunksize = end - start + 1;
+
+          res.status(206);
+          res.setHeader("Content-Type", mimeType);
+          res.setHeader("Content-Range", `bytes ${start}-${end}/${stats.size}`);
+          res.setHeader("Content-Length", chunksize.toString());
+          res.setHeader("Accept-Ranges", "bytes");
+
+          const stream = fs.createReadStream(absolutePath, { start, end });
+          stream.pipe(res);
+        } else {
+          console.log(`Sending full file`);
+          // Send full file with proper headers
+          res.setHeader("Content-Type", mimeType);
+          res.setHeader("Accept-Ranges", "bytes");
+          res.setHeader("Content-Length", stats.size.toString());
+
+          res.sendFile(absolutePath);
+        }
       } catch (error) {
         console.error(`Error serving file for scene ${sceneId}:`, error);
         res.status(500).json({ error: "Failed to serve video file" });

@@ -3,7 +3,7 @@ import { useTheme } from "../../themes/useTheme.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { ThemedIcon } from "../icons/index.js";
 
-export const UserMenu = () => {
+const UserMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
@@ -162,3 +162,5 @@ export const UserMenu = () => {
     </div>
   );
 };
+
+export default UserMenu;

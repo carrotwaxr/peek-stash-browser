@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import SceneCard from "./ui/SceneCard.jsx";
+import SceneCard from "./SceneCard.jsx";
 
 const SceneCarousel = ({ title, scenes, loading = false, onSceneClick }) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
