@@ -68,20 +68,12 @@ export const setupAPI = () => {
   );
   app.delete("/api/video/session/:sessionId", authenticateToken, killSession);
 
-  // HLS playlist and segment serving (protected)
-  app.get(
-    "/api/video/playlist/:sessionId/:quality/:file",
-    authenticateToken,
-    getStreamSegment
-  );
-  app.get(
-    "/api/video/playlist/:sessionId/:file",
-    authenticateToken,
-    getStreamSegment
-  );
+  // HLS playlist and segment serving (no auth required - sessionId acts as token)
+  app.get("/api/video/playlist/:sessionId/:quality/:file", getStreamSegment);
+  app.get("/api/video/playlist/:sessionId/:file", getStreamSegment);
 
-  // Legacy segment endpoint (keeping for compatibility, protected)
-  app.get("/api/stream/:videoId/:segment", authenticateToken, getStreamSegment);
+  // Legacy segment endpoint (keeping for compatibility, no auth required)
+  app.get("/api/stream/:videoId/:segment", getStreamSegment);
   app.listen(8000, () => {
     console.log("Server is running on http://localhost:8000");
     console.log("New transcoding system active with session management");

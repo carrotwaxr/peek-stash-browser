@@ -6,11 +6,11 @@ import { useState, useCallback, useMemo } from "react";
 export const useSortAndFilter = (
   initialSort = "",
   entityType = "scene",
-  permanentSceneFilters = {}
+  permanentFilters = {}
 ) => {
   const [sort, setSort] = useState(initialSort);
   const [sortDirection, setSortDirection] = useState("DESC");
-  const [filters, setFilters] = useState({ ...permanentSceneFilters });
+  const [filters, setFilters] = useState({ ...permanentFilters });
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   // Handle sort change

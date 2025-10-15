@@ -5,46 +5,36 @@ const Pagination = ({
   currentPage = 1,
   totalPages,
   onPageChange,
+  perPage = 24,
+  onPerPageChange,
   showInfo = true,
+  showPerPageSelector = true,
   className = "",
-  maxVisiblePages = 5,
 }) => {
   if (!totalPages || totalPages <= 1) return null;
 
-  const getVisiblePages = () => {
-    const pages = [];
-    const half = Math.floor(maxVisiblePages / 2);
+  const perPageOptions = [12, 24, 36, 48, 60, 72, 84, 96, 108, 120];
 
-    let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + maxVisiblePages - 1);
-
-    if (end - start + 1 < maxVisiblePages) {
-      start = Math.max(1, end - maxVisiblePages + 1);
-    }
-
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-
-    return pages;
-  };
-
-  const visiblePages = getVisiblePages();
+  // Generate array of all page numbers for dropdown
+  const allPages = Array.from({ length: totalPages }, (_, i) => i + 1);
 
   return (
-    <div className={`flex items-center justify-center gap-4 ${className}`}>
+    <div
+      className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${className}`}
+    >
       {showInfo && (
         <div style={{ color: "var(--text-muted)" }} className="text-sm">
           Page {currentPage} of {totalPages}
         </div>
       )}
 
-      <nav className="flex items-center space-x-1">
+      <nav className="flex items-center gap-2">
+        {/* First Page Button */}
         <button
-          onClick={() => onPageChange?.(currentPage - 1)}
+          onClick={() => onPageChange?.(1)}
           disabled={currentPage <= 1}
           className={`
-            px-3 py-1 rounded text-sm font-medium transition-colors
+            px-2 py-1 rounded text-sm font-medium transition-colors
             ${
               currentPage <= 1
                 ? "opacity-50 cursor-not-allowed"
@@ -56,83 +46,57 @@ const Pagination = ({
             color: "var(--text-primary)",
             border: "1px solid var(--border-color)",
           }}
+          title="First Page"
         >
-          Previous
+          «
         </button>
 
-        {visiblePages[0] > 1 && (
-          <>
-            <button
-              onClick={() => onPageChange?.(1)}
-              className="px-3 py-1 rounded text-sm font-medium hover:opacity-70 transition-colors"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                color: "var(--text-primary)",
-                border: "1px solid var(--border-color)",
-              }}
-            >
-              1
-            </button>
-            {visiblePages[0] > 2 && (
-              <span className="px-2" style={{ color: "var(--text-muted)" }}>
-                ...
-              </span>
-            )}
-          </>
-        )}
-
-        {visiblePages.map((page) => (
-          <button
-            key={page}
-            onClick={() => onPageChange?.(page)}
-            className={`
-              px-3 py-1 rounded text-sm font-medium transition-colors
-              ${
-                currentPage === page
-                  ? "bg-blue-600 text-white"
-                  : "hover:opacity-70"
-              }
-            `}
-            style={
-              currentPage === page
-                ? {}
-                : {
-                    backgroundColor: "var(--bg-card)",
-                    color: "var(--text-primary)",
-                    border: "1px solid var(--border-color)",
-                  }
+        {/* Previous Page Button */}
+        <button
+          onClick={() => onPageChange?.(currentPage - 1)}
+          disabled={currentPage <= 1}
+          className={`
+            px-2 py-1 rounded text-sm font-medium transition-colors
+            ${
+              currentPage <= 1
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:opacity-70"
             }
-          >
-            {page}
-          </button>
-        ))}
+          `}
+          style={{
+            backgroundColor: "var(--bg-card)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-color)",
+          }}
+          title="Previous Page"
+        >
+          ‹
+        </button>
 
-        {visiblePages[visiblePages.length - 1] < totalPages && (
-          <>
-            {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
-              <span className="px-2" style={{ color: "var(--text-muted)" }}>
-                ...
-              </span>
-            )}
-            <button
-              onClick={() => onPageChange?.(totalPages)}
-              className="px-3 py-1 rounded text-sm font-medium hover:opacity-70 transition-colors"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                color: "var(--text-primary)",
-                border: "1px solid var(--border-color)",
-              }}
-            >
-              {totalPages}
-            </button>
-          </>
-        )}
+        {/* Page Dropdown */}
+        <select
+          value={currentPage}
+          onChange={(e) => onPageChange?.(parseInt(e.target.value))}
+          className="px-3 py-1 rounded text-sm font-medium transition-colors"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-color)",
+          }}
+        >
+          {allPages.map((page) => (
+            <option key={page} value={page}>
+              {page} of {totalPages}
+            </option>
+          ))}
+        </select>
 
+        {/* Next Page Button */}
         <button
           onClick={() => onPageChange?.(currentPage + 1)}
           disabled={currentPage >= totalPages}
           className={`
-            px-3 py-1 rounded text-sm font-medium transition-colors
+            px-2 py-1 rounded text-sm font-medium transition-colors
             ${
               currentPage >= totalPages
                 ? "opacity-50 cursor-not-allowed"
@@ -144,10 +108,62 @@ const Pagination = ({
             color: "var(--text-primary)",
             border: "1px solid var(--border-color)",
           }}
+          title="Next Page"
         >
-          Next
+          ›
+        </button>
+
+        {/* Last Page Button */}
+        <button
+          onClick={() => onPageChange?.(totalPages)}
+          disabled={currentPage >= totalPages}
+          className={`
+            px-2 py-1 rounded text-sm font-medium transition-colors
+            ${
+              currentPage >= totalPages
+                ? "opacity-50 cursor-not-allowed"
+                : "hover:opacity-70"
+            }
+          `}
+          style={{
+            backgroundColor: "var(--bg-card)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-color)",
+          }}
+          title="Last Page"
+        >
+          »
         </button>
       </nav>
+
+      {showPerPageSelector && onPerPageChange && (
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor="perPage"
+            className="text-sm whitespace-nowrap"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Per Page:
+          </label>
+          <select
+            id="perPage"
+            value={perPage}
+            onChange={(e) => onPerPageChange(parseInt(e.target.value))}
+            className="px-3 py-1 rounded text-sm font-medium transition-colors"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              color: "var(--text-primary)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            {perPageOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 };

@@ -50,19 +50,6 @@ async function apiPost(endpoint, data) {
   });
 }
 
-// Legacy API endpoints (keep for backward compatibility)
-export const legacyApi = {
-  /**
-   * Get scenes using the legacy endpoint
-   */
-  getScenes: () => apiGet("/scenes"),
-
-  /**
-   * Get videos using the legacy endpoint
-   */
-  getVideos: () => apiGet("/videos"),
-};
-
 // New filtered search API endpoints
 export const libraryApi = {
   /**

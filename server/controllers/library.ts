@@ -58,8 +58,6 @@ export const findPerformers = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter, performer_filter, ids, performer_ids } = req.body;
 
-    console.log("HELLO!", req.body);
-
     // Always filter to only show performers with scenes
     const enhancedFilter = {
       ...performer_filter,
@@ -78,12 +76,10 @@ export const findPerformers = async (req: Request, res: Response) => {
           ? performer_filter
           : (enhancedFilter as PerformerFilterType),
     });
-    console.log("Query inputs:", JSON.stringify(queryInputs, null, 2));
+
     const performers: FindPerformersQuery = await stash.findPerformers(
       queryInputs
     );
-
-    console.log("Performers:", performers);
 
     // Transform performers to add API key to image paths
     const transformedPerformers = {

@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pagination, SearchInput } from "../ui";
+import { LucideArrowDown, LucideArrowUp } from "lucide-react";
+import Pagination from "./Pagination.jsx";
+import SearchInput from "./SearchInput.jsx";
 import {
   SortControl,
   FilterPanel,
@@ -7,21 +9,60 @@ import {
 } from "../ui/FilterControls.jsx";
 import {
   ORGANIZED_OPTIONS,
+  PERFORMER_FILTER_OPTIONS,
+  PERFORMER_SORT_OPTIONS,
   RATING_OPTIONS,
   RESOLUTION_OPTIONS,
+  SCENE_FILTER_OPTIONS,
   SCENE_SORT_OPTIONS,
+  STUDIO_FILTER_OPTIONS,
+  STUDIO_SORT_OPTIONS,
+  TAG_FILTER_OPTIONS,
+  TAG_SORT_OPTIONS,
+  buildPerformerFilter,
   buildSceneFilter,
+  buildStudioFilter,
+  buildTagFilter,
 } from "../../utils/filterConfig";
-import { LucideArrowDown, LucideArrowUp } from "lucide-react";
+
+const buildFilter = (artifactType, filters) => {
+  switch (artifactType) {
+    case "performer":
+      return { performer_filter: buildPerformerFilter(filters) };
+    case "studio":
+      return { studio_filter: buildStudioFilter(filters) };
+    case "tag":
+      return { tag_filter: buildTagFilter(filters) };
+    case "scene":
+    default:
+      return { scene_filter: buildSceneFilter(filters) };
+  }
+};
+
+const getSortOptions = (artifactType) => {
+  switch (artifactType) {
+    case "performer":
+      return PERFORMER_SORT_OPTIONS;
+    case "studio":
+      return STUDIO_SORT_OPTIONS;
+    case "tag":
+      return TAG_SORT_OPTIONS;
+    case "scene":
+    default:
+      return SCENE_SORT_OPTIONS;
+  }
+};
 
 const SearchControls = ({
+  artifactType = "scene",
   initialSort = "o_counter",
   onQueryChange,
-  permanentSceneFilters = {},
+  permanentFilters = {},
   totalPages,
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [filters, setFilters] = useState({ ...permanentSceneFilters });
+  const [perPage, setPerPage] = useState(24);
+  const [filters, setFilters] = useState({ ...permanentFilters });
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [[sortField, sortDirection], setSort] = useState([initialSort, "DESC"]);
@@ -29,18 +70,18 @@ const SearchControls = ({
   // Clear all filters
   const clearFilters = () => {
     setCurrentPage(1);
-    setFilters({ ...permanentSceneFilters });
+    setFilters({ ...permanentFilters });
     setIsFilterPanelOpen(false);
 
     const query = {
       filter: {
         direction: sortDirection,
         page: 1,
-        per_page: 24,
+        per_page: perPage,
         q: searchText,
         sort: sortField,
       },
-      scene_filter: buildSceneFilter({ ...permanentSceneFilters }),
+      ...buildFilter(artifactType, { ...permanentFilters }),
     };
 
     onQueryChange(query);
@@ -64,11 +105,11 @@ const SearchControls = ({
       filter: {
         direction: sortDirection,
         page: 1,
-        per_page: 24,
+        per_page: perPage,
         q: searchText,
         sort: sortField,
       },
-      scene_filter: buildSceneFilter(filters),
+      ...buildFilter(artifactType, { ...permanentFilters }),
     };
 
     onQueryChange(query);
@@ -83,11 +124,11 @@ const SearchControls = ({
       filter: {
         direction: sortDirection,
         page,
-        per_page: 24,
+        per_page: perPage,
         q: searchText,
         sort: sortField,
       },
-      scene_filter: buildSceneFilter(filters),
+      ...buildFilter(artifactType, filters),
     };
 
     onQueryChange(query);
@@ -103,11 +144,11 @@ const SearchControls = ({
       filter: {
         direction: sortDirection,
         page: 1,
-        per_page: 24,
+        per_page: perPage,
         q: searchStr,
         sort: sortField,
       },
-      scene_filter: buildSceneFilter(filters),
+      ...buildFilter(artifactType, filters),
     };
 
     onQueryChange(query);
@@ -132,11 +173,11 @@ const SearchControls = ({
       filter: {
         direction: newSortDirection,
         page: currentPage,
-        per_page: 24,
+        per_page: perPage,
         q: searchText,
         sort: newSortField,
       },
-      scene_filter: buildSceneFilter(filters),
+      ...buildFilter(artifactType, filters),
     };
 
     onQueryChange(query);
@@ -144,6 +185,25 @@ const SearchControls = ({
 
   const handleToggleFilterPanel = () => {
     setIsFilterPanelOpen((prev) => !prev);
+  };
+
+  const handlePerPageChange = (newPerPage) => {
+    setPerPage(newPerPage);
+    setCurrentPage(1); // Reset to first page when changing per page
+
+    // Trigger search with new per page value
+    const query = {
+      filter: {
+        direction: sortDirection,
+        page: 1,
+        per_page: newPerPage,
+        q: searchText,
+        sort: sortField,
+      },
+      ...buildFilter(artifactType, filters),
+    };
+
+    onQueryChange(query);
   };
 
   // Check if any filters are active
@@ -157,6 +217,25 @@ const SearchControls = ({
     );
   }, [filters]);
 
+  const sortOptions = useMemo(
+    () => getSortOptions(artifactType),
+    [artifactType]
+  );
+
+  const filterOptions = useMemo(() => {
+    switch (artifactType) {
+      case "performer":
+        return [...PERFORMER_FILTER_OPTIONS];
+      case "studio":
+        return [...STUDIO_FILTER_OPTIONS];
+      case "tag":
+        return [...TAG_FILTER_OPTIONS];
+      case "scene":
+      default:
+        return [...SCENE_FILTER_OPTIONS];
+    }
+  }, [artifactType]);
+
   return (
     <div className="mb-6">
       <div className="flex items-center justify-center gap-6 mb-4">
@@ -168,7 +247,7 @@ const SearchControls = ({
         {/* Sort Control */}
         <div className="flex items-center space-x-1">
           <SortControl
-            options={SCENE_SORT_OPTIONS}
+            options={sortOptions}
             value={sortField}
             onChange={handleSortChange}
           />
@@ -239,50 +318,17 @@ const SearchControls = ({
         onSubmit={handleFilterSubmit}
         hasActiveFilters={hasActiveFilters}
       >
-        <FilterControl
-          type="select"
-          label="Rating"
-          value={filters.rating || ""}
-          onChange={(value) => handleFilterChange("rating", value)}
-          options={RATING_OPTIONS}
-          placeholder="Any rating"
-        />
-
-        <FilterControl
-          type="range"
-          label="Duration (minutes)"
-          value={filters.duration || {}}
-          onChange={(value) => handleFilterChange("duration", value)}
-          min={1}
-          max={300}
-        />
-
-        <FilterControl
-          type="range"
-          label="O Count"
-          value={filters.oCount || {}}
-          onChange={(value) => handleFilterChange("oCount", value)}
-          min={0}
-          max={50}
-        />
-
-        <FilterControl
-          type="select"
-          label="Resolution"
-          value={filters.resolution || ""}
-          onChange={(value) => handleFilterChange("resolution", value)}
-          options={RESOLUTION_OPTIONS}
-          placeholder="Any resolution"
-        />
-
-        <FilterControl
-          type="select"
-          label="Organized"
-          value={filters.organized || ""}
-          onChange={(value) => handleFilterChange("organized", value)}
-          options={ORGANIZED_OPTIONS}
-          placeholder="Any"
-        />
+        {filterOptions.map((opt) => {
+          const { defaultValue, key, ...rest } = opt;
+          return (
+            <FilterControl
+              key={`FilterControl-${key}`}
+              onChange={(value) => handleFilterChange(key, value)}
+              value={filters[key] || defaultValue}
+              {...rest}
+            />
+          );
+        })}
       </FilterPanel>
 
       {/* Pagination */}
@@ -290,6 +336,8 @@ const SearchControls = ({
         <Pagination
           currentPage={currentPage}
           onPageChange={handlePageChange}
+          perPage={perPage}
+          onPerPageChange={handlePerPageChange}
           showInfo={false}
           totalPages={totalPages}
         />

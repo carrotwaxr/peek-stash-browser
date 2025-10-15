@@ -1,99 +1,90 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useTagsPaginated, useTagsSearch } from "../../hooks/useLibrary.js";
-import {
-  PageHeader,
-  SearchInput,
-  ErrorMessage,
-  LoadingSpinner,
-  EmptyState,
-  Pagination,
-} from "../ui/index.js";
-import {
-  SortControl,
-  FilterPanel,
-  FilterControl,
-} from "../ui/FilterControls.jsx";
-import { useSortAndFilter } from "../../hooks/useSortAndFilter.js";
-import { TAG_SORT_OPTIONS, buildTagFilter } from "../../utils/filterConfig.js";
+import deepEqual from "fast-deep-equal";
+import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
+import SearchControls from "../ui/SearchControls.jsx";
+import { useAuth } from "../../hooks/useAuth.js";
+import { libraryApi } from "../../services/api.js";
 
 const Tags = () => {
-  const [searchMode, setSearchMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  const {
-    sort,
-    sortDirection,
-    handleSortChange,
-    filters,
-    handleFilterChange,
-    clearFilters,
-    hasActiveFilters,
-    isFilterPanelOpen,
-    toggleFilterPanel,
-  } = useSortAndFilter("NAME", "tag");
+  const [lastQuery, setLastQuery] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
 
-  const {
-    data: tags,
-    loading,
-    error,
-    refetch,
-  } = useTagsPaginated({
-    page: currentPage,
-    perPage: 24,
-    sort: sort || undefined,
-    sortDirection: sortDirection || undefined,
-    filter: buildTagFilter(filters),
-  });
-  const {
-    query,
-    setQuery,
-    results: searchResults,
-    loading: searchLoading,
-    error: searchError,
-    clearSearch,
-  } = useTagsSearch();
+  useEffect(() => {
+    // Initial fetch with default parameters
+    const query = {
+      filter: {
+        direction: "DESC",
+        page: 1,
+        per_page: 24,
+        q: "",
+        sort: "scenes_count",
+      },
+    };
 
-  const handleSearch = (searchQuery) => {
-    setQuery(searchQuery);
-    setSearchMode(!!searchQuery);
-    setCurrentPage(1);
+    const fetchInitialData = async () => {
+      // Don't make API calls if not authenticated or still checking auth
+      if (isAuthLoading || !isAuthenticated) {
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setLastQuery(query);
+        setError(null);
+        const result = await getTags(query);
+        setData(result);
+      } catch (err) {
+        console.error("getTags error:", err);
+        setError(err.message || "An error occurred");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, [isAuthLoading, isAuthenticated]);
+
+  const handleQueryChange = async (newQuery) => {
+    // Don't make API calls if not authenticated or still checking auth
+    if (isAuthLoading || !isAuthenticated) {
+      return;
+    }
+
+    // Avoid duplicate queries
+    if (lastQuery && deepEqual(newQuery, lastQuery)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setLastQuery(newQuery);
+      setError(null);
+      const result = await getTags(newQuery);
+      setData(result);
+    } catch (err) {
+      console.error("getTags error:", err);
+      setError(err.message || "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleClearSearch = () => {
-    clearSearch();
-    setSearchMode(false);
-    setCurrentPage(1);
-  };
+  const currentTags = data?.tags || [];
+  const totalCount = data?.count || 0;
+  const perPage = lastQuery?.filter?.per_page || 24;
+  const totalPages = Math.ceil(totalCount / perPage);
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-  };
-
-  const currentError = error || searchError;
-  const currentLoading = searchMode ? searchLoading : loading;
-  const currentTags = searchMode
-    ? searchResults?.findTags?.tags
-    : tags?.tags || [];
-
-  const totalCount = searchMode
-    ? searchResults?.findTags?.count || 0
-    : tags?.count || 0;
-
-  const totalPages = Math.ceil(totalCount / 24);
-
-  if (currentError) {
+  if (error) {
     return (
       <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
-        <PageHeader
-          title="Tags"
-          subtitle="Browse and manage tags in your library"
-        />
-        <ErrorMessage
-          error={currentError}
-          onRetry={searchMode ? () => setQuery(query) : refetch}
-        />
+        <PageHeader title="Tags" />
+        <ErrorMessage error={error} />
       </div>
     );
   }
@@ -103,148 +94,25 @@ const Tags = () => {
       <PageHeader
         title="Tags"
         subtitle="Browse and manage tags in your library"
-      >
-        <SearchInput
-          placeholder="Search tags..."
-          onSearch={handleSearch}
-          className="w-80"
-        />
-        {searchMode && (
-          <button
-            onClick={handleClearSearch}
-            className="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-          >
-            Show All
-          </button>
-        )}
-      </PageHeader>
+      />
 
-      {/* Sorting and Filtering Controls */}
-      {!searchMode && (
-        <>
-          <div className="flex items-center justify-between mb-6">
-            {/* Sort Control */}
-            <div className="flex items-center space-x-4">
-              <SortControl
-                options={TAG_SORT_OPTIONS}
-                value={sort}
-                onChange={handleSortChange}
-              />
-              <button
-                onClick={() => handleSortChange(sort)}
-                className="px-3 py-2 border rounded-md text-sm"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  borderColor: "var(--border-color)",
-                  color: "var(--text-primary)",
-                }}
-                title={`Sort ${
-                  sortDirection === "ASC" ? "Descending" : "Ascending"
-                }`}
-              >
-                {sortDirection === "ASC" ? "↑" : "↓"}
-              </button>
-            </div>
+      {/* Controls Section */}
+      <SearchControls
+        artifactType="tag"
+        initialSort="scenes_count"
+        onQueryChange={handleQueryChange}
+        totalPages={totalPages}
+      />
 
-            {/* Filter Toggle */}
-            <div className="flex items-center space-x-4">
-              {hasActiveFilters && (
-                <button
-                  onClick={clearFilters}
-                  className="px-3 py-2 text-sm border border-red-500 text-red-500 rounded hover:bg-red-50 transition-colors"
-                >
-                  Clear Filters
-                </button>
-              )}
-              <button
-                onClick={toggleFilterPanel}
-                className="px-4 py-2 border rounded-md text-sm transition-colors"
-                style={{
-                  backgroundColor: isFilterPanelOpen
-                    ? "var(--accent-primary)"
-                    : "var(--bg-card)",
-                  borderColor: "var(--border-color)",
-                  color: isFilterPanelOpen ? "white" : "var(--text-primary)",
-                }}
-              >
-                Filters {hasActiveFilters && `(${Object.keys(filters).length})`}
-              </button>
-            </div>
-          </div>
-
-          {/* Filter Panel */}
-          {isFilterPanelOpen && (
-            <FilterPanel>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <FilterControl
-                  type="number"
-                  label="Min Scene Count"
-                  value={filters.sceneCount || ""}
-                  onChange={(value) => handleFilterChange("sceneCount", value)}
-                  placeholder="0"
-                  min="0"
-                />
-                <FilterControl
-                  type="checkbox"
-                  label="Favorites Only"
-                  value={filters.favorite || false}
-                  onChange={(value) => handleFilterChange("favorite", value)}
-                />
-              </div>
-            </FilterPanel>
-          )}
-        </>
-      )}
-
-      {currentLoading && (
-        <div className="flex justify-center py-12">
-          <LoadingSpinner size="lg" />
-        </div>
-      )}
-
-      {!currentLoading && (!currentTags || currentTags.length === 0) && (
-        <EmptyState
-          icon={
-            <svg
-              className="w-16 h-16 mx-auto mb-4"
-              style={{ color: "var(--text-muted)" }}
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
-              <path
-                fillRule="evenodd"
-                d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z"
-                clipRule="evenodd"
-              />
-            </svg>
-          }
-          title={searchMode ? "No tags found" : "No tags"}
-          description={
-            searchMode
-              ? `No tags match your search for "${query}"`
-              : "No tags found in your library"
-          }
-        />
-      )}
-
-      {!currentLoading && currentTags && currentTags.length > 0 && (
+      {isLoading ? (
+        <LoadingSpinner />
+      ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {currentTags.map((tag) => (
               <TagCard key={tag.id} tag={tag} />
             ))}
           </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && !searchMode && (
-            <div className="mt-8">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
-            </div>
-          )}
         </>
       )}
     </div>
@@ -322,6 +190,20 @@ const TagCard = ({ tag }) => {
       </div>
     </Link>
   );
+};
+
+const getTags = async (query) => {
+  console.log("Fetching Tags with query:", query);
+  const response = await libraryApi.findTags(query);
+
+  // Extract tags and count from server response structure
+  const findTags = response?.findTags;
+  const result = {
+    tags: findTags?.tags || [],
+    count: findTags?.count || 0,
+  };
+  console.log("Got Tags:", result);
+  return result;
 };
 
 export default Tags;

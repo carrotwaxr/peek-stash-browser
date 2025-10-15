@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { ErrorMessage, LoadingSpinner, PageHeader } from "../ui";
 import SceneGrid from "./SceneGrid.jsx";
-import SearchControls from "./SearchControls.jsx";
+import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { buildSceneFilter } from "../../utils/filterConfig.js";
@@ -18,7 +18,7 @@ import { buildSceneFilter } from "../../utils/filterConfig.js";
  */
 const SceneSearch = ({
   initialSort = "o_counter",
-  permanentSceneFilters = {},
+  permanentFilters = {},
   subtitle,
   title,
 }) => {
@@ -32,8 +32,8 @@ const SceneSearch = ({
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    const sceneFilter = buildSceneFilter({ ...permanentSceneFilters });
-    console.log("Built scene filter:", sceneFilter, permanentSceneFilters);
+    const sceneFilter = buildSceneFilter({ ...permanentFilters });
+    console.log("Built scene filter:", sceneFilter, permanentFilters);
     // Initial fetch with default parameters
     const query = {
       filter: {
@@ -104,7 +104,8 @@ const SceneSearch = ({
 
   const totalCount = data?.count || 0;
 
-  const totalPages = Math.ceil(totalCount / 24);
+  const perPage = lastQuery?.filter?.per_page || 24;
+  const totalPages = Math.ceil(totalCount / perPage);
 
   if (error) {
     return (
@@ -122,7 +123,7 @@ const SceneSearch = ({
       <SearchControls
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
-        permanentSceneFilters={permanentSceneFilters}
+        permanentFilters={permanentFilters}
         totalPages={totalPages}
       />
 

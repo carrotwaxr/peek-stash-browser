@@ -34,7 +34,7 @@ export const PERFORMER_SORT_OPTIONS = [
   { value: "rating", label: "Rating" },
   { value: "o_counter", label: "O Count" },
   { value: "play_count", label: "Play Count" },
-  { value: "scene_count", label: "Scene Count" },
+  { value: "scenes_count", label: "Scene Count" },
   { value: "penis_length", label: "Penis Length" },
   { value: "random", label: "Random" },
 ];
@@ -45,7 +45,7 @@ export const STUDIO_SORT_OPTIONS = [
   { value: "created_at", label: "Created At" },
   { value: "updated_at", label: "Updated At" },
   { value: "rating", label: "Rating" },
-  { value: "scene_count", label: "Scene Count" },
+  { value: "scenes_count", label: "Scene Count" },
   { value: "random", label: "Random" },
 ];
 
@@ -54,7 +54,7 @@ export const TAG_SORT_OPTIONS = [
   { value: "name", label: "Name" },
   { value: "created_at", label: "Created At" },
   { value: "updated_at", label: "Updated At" },
-  { value: "scene_count", label: "Scene Count" },
+  { value: "scenes_count", label: "Scene Count" },
   { value: "random", label: "Random" },
 ];
 
@@ -129,6 +129,121 @@ export const RESOLUTION_OPTIONS = [
   { value: "1080", label: "1080p" },
   { value: "1440", label: "1440p" },
   { value: "2160", label: "4K" },
+];
+
+export const SCENE_FILTER_OPTIONS = [
+  {
+    key: "rating",
+    label: "Rating",
+    type: "select",
+    defaultValue: "",
+    options: RATING_OPTIONS,
+    placeholder: "Any rating",
+  },
+  {
+    key: "duration",
+    label: "Duration (minutes)",
+    type: "range",
+    defaultValue: {},
+    min: 1,
+    max: 300,
+  },
+  {
+    key: "oCount",
+    label: "O Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 300,
+  },
+  {
+    key: "resolution",
+    label: "Resolution",
+    type: "select",
+    defaultValue: "",
+    options: RESOLUTION_OPTIONS,
+    placeholder: "Any resolution",
+  },
+  {
+    key: "organized",
+    label: "Organized",
+    type: "select",
+    defaultValue: "",
+    options: ORGANIZED_OPTIONS,
+    placeholder: "Any",
+  },
+];
+
+export const PERFORMER_FILTER_OPTIONS = [
+  {
+    key: "gender",
+    label: "Gender",
+    type: "select",
+    defaultValue: "",
+    options: GENDER_OPTIONS,
+  },
+  {
+    key: "rating",
+    label: "Rating",
+    type: "select",
+    defaultValue: "",
+    options: RATING_OPTIONS,
+  },
+  {
+    key: "minAge",
+    label: "Min Age",
+    type: "number",
+    defaultValue: "",
+    placeholder: "18",
+    min: "18",
+  },
+  {
+    key: "favorite",
+    label: "Favorites Only",
+    type: "checkbox",
+    defaultValue: false,
+  },
+];
+
+export const STUDIO_FILTER_OPTIONS = [
+  {
+    key: "rating",
+    label: "Rating",
+    type: "select",
+    defaultValue: "",
+    options: RATING_OPTIONS,
+  },
+  {
+    key: "favorite",
+    label: "Favorites Only",
+    type: "checkbox",
+    defaultValue: false,
+  },
+  {
+    key: "sceneCount",
+    label: "Min Scene Count",
+    type: "number",
+    defaultValue: "",
+    placeholder: "0",
+    min: "0",
+  },
+];
+
+export const TAG_FILTER_OPTIONS = [
+  {
+    key: "favorite",
+    label: "Favorites Only",
+    type: "checkbox",
+    defaultValue: false,
+  },
+  {
+    key: "sceneCount",
+    label: "Min Scene Count",
+    type: "number",
+    defaultValue: "",
+    placeholder: "0",
+    min: "0",
+  },
 ];
 
 /**

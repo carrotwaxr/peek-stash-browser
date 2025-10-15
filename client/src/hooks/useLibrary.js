@@ -1,18 +1,6 @@
 import { useCallback } from "react";
 import { useAsyncData, useSearch } from "./useApi.js";
-import {
-  libraryApi,
-  legacyApi,
-  commonFilters,
-  sortFieldMap,
-} from "../services/api.js";
-
-/**
- * Hook for fetching scenes with the legacy endpoint
- */
-export function useScenes() {
-  return useAsyncData(() => legacyApi.getScenes());
-}
+import { libraryApi, commonFilters, sortFieldMap } from "../services/api.js";
 
 /**
  * Hook for searching scenes with filtering and pagination

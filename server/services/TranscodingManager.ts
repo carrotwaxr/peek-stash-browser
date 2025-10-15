@@ -3,6 +3,9 @@ import fs from "fs";
 import path from "path";
 import { Scene } from "stashapp-api";
 
+// Use POSIX paths since we always run in Docker/Linux containers
+const posixPath = path.posix;
+
 // Quality configurations
 export const QUALITY_PRESETS = {
   "360p": { width: 640, height: 360, bitrate: "800k", audioBitrate: "96k" },
@@ -45,7 +48,22 @@ export class TranscodingManager {
   private tmpDir: string;
 
   constructor(tmpDir: string) {
-    this.tmpDir = tmpDir;
+    // Normalize path to POSIX format for Docker/Linux containers
+    // Replace Windows backslashes and drive letters
+    this.tmpDir = tmpDir
+      .replace(/\\/g, "/") // Convert backslashes to forward slashes
+      .replace(/^[A-Z]:/i, ""); // Remove Windows drive letters (C:, D:, etc.)
+
+    // If path started with drive letter, make it absolute from root
+    if (!this.tmpDir.startsWith("/")) {
+      this.tmpDir = "/" + this.tmpDir;
+    }
+
+    console.log(`TranscodingManager tmpDir normalized to: ${this.tmpDir}`);
+
+    // Clean up old transcoding sessions on startup
+    this.cleanupOnStartup();
+
     this.startCleanupTimer();
   }
 
@@ -69,7 +87,7 @@ export class TranscodingManager {
 
     // Create new session
     const sessionId = `${videoId}_${startTime}_${Date.now()}`;
-    const outputDir = path.join(
+    const outputDir = posixPath.join(
       this.tmpDir,
       "segments",
       `${videoId}_${Math.floor(startTime)}`
@@ -83,7 +101,7 @@ export class TranscodingManager {
       qualities: Object.keys(QUALITY_PRESETS),
       processes: new Map(),
       outputDir,
-      masterPlaylistPath: path.join(outputDir, "master.m3u8"),
+      masterPlaylistPath: posixPath.join(outputDir, "master.m3u8"),
       lastAccess: Date.now(),
       status: "starting",
       scene,
@@ -123,7 +141,7 @@ export class TranscodingManager {
 
       // Create quality-specific directories
       for (const quality of session.qualities) {
-        const qualityDir = path.join(session.outputDir, quality);
+        const qualityDir = posixPath.join(session.outputDir, quality);
         fs.mkdirSync(qualityDir, { recursive: true });
       }
 
@@ -155,8 +173,8 @@ export class TranscodingManager {
     sceneFilePath: string
   ): Promise<void> {
     const preset = QUALITY_PRESETS[quality as keyof typeof QUALITY_PRESETS];
-    const qualityDir = path.join(session.outputDir, quality);
-    const playlistPath = path.join(qualityDir, "index.m3u8");
+    const qualityDir = posixPath.join(session.outputDir, quality);
+    const playlistPath = posixPath.join(qualityDir, "index.m3u8");
 
     const args = [
       "-ss",
@@ -208,11 +226,11 @@ export class TranscodingManager {
       "-hls_list_size",
       "0", // Keep all segments (don't limit playlist size)
       "-hls_playlist_type",
-      "event", // Event playlist type for live transcoding with end
+      "event", // Event playlist - updates as segments are added (suitable for live/progressive transcoding)
       "-hls_segment_filename",
-      path.join(qualityDir, "segment_%03d.ts"),
+      posixPath.join(qualityDir, "segment_%03d.ts"),
       "-hls_flags",
-      "independent_segments+temp_file", // Use temp files and independent segments
+      "independent_segments+temp_file+append_list", // append_list prevents ENDLIST until transcoding completes
       "-hls_start_number_source",
       "datetime", // Use datetime for segment numbering
       "-hls_allow_cache",
@@ -221,35 +239,103 @@ export class TranscodingManager {
       playlistPath,
     ];
 
-    const ffmpeg = spawn("ffmpeg", args);
+    return new Promise<void>((resolve, reject) => {
+      const ffmpeg = spawn("ffmpeg", args);
+      let resolved = false;
+      let ffmpegStarted = false;
+      let playlistCheckInterval: NodeJS.Timeout | null = null;
 
-    ffmpeg.stderr.on("data", (data) => {
-      // Log FFmpeg progress (you might want to parse this for progress updates)
-      console.log(
-        `FFmpeg [${quality}] ${session.sessionId}: ${data.toString().trim()}`
-      );
+      ffmpeg.stderr.on("data", (data) => {
+        const output = data.toString().trim();
+
+        // Log non-verbose output
+        if (output.length > 0 && !output.includes("frame=")) {
+          console.log(`FFmpeg [${quality}] ${session.sessionId}: ${output}`);
+        }
+
+        // Start checking for playlist once FFmpeg starts outputting
+        if (!ffmpegStarted && output.includes("Output #0")) {
+          ffmpegStarted = true;
+          console.log(
+            `FFmpeg [${quality}] started for ${session.sessionId}, waiting for playlist...`
+          );
+
+          // Poll for playlist file creation
+          let attempts = 0;
+          const maxAttempts = 100; // 10 seconds max (100 * 100ms)
+
+          playlistCheckInterval = setInterval(() => {
+            attempts++;
+
+            if (fs.existsSync(playlistPath)) {
+              console.log(`Playlist ready: ${playlistPath}`);
+              if (playlistCheckInterval) clearInterval(playlistCheckInterval);
+              if (!resolved) {
+                resolved = true;
+                resolve();
+              }
+            } else if (attempts >= maxAttempts) {
+              console.warn(
+                `Playlist not found after ${
+                  maxAttempts * 100
+                }ms: ${playlistPath}`
+              );
+              if (playlistCheckInterval) clearInterval(playlistCheckInterval);
+              if (!resolved) {
+                resolved = true;
+                // Resolve anyway - playlist might be created soon
+                resolve();
+              }
+            }
+          }, 100);
+        }
+      });
+
+      ffmpeg.on("close", (code) => {
+        if (playlistCheckInterval) clearInterval(playlistCheckInterval);
+        console.log(
+          `FFmpeg [${quality}] ${session.sessionId} finished with code: ${code}`
+        );
+        session.processes.delete(quality);
+
+        // Mark segment as completed if all processes are done
+        if (session.processes.size === 0) {
+          this.markSegmentCompleted(session.videoId, session.startTime);
+          session.status = "completed";
+        }
+
+        // Resolve if we haven't already
+        if (!resolved) {
+          if (code === 0) {
+            resolved = true;
+            resolve();
+          } else {
+            reject(new Error(`FFmpeg exited with code ${code}`));
+          }
+        }
+      });
+
+      ffmpeg.on("error", (error) => {
+        if (playlistCheckInterval) clearInterval(playlistCheckInterval);
+        console.error(`FFmpeg [${quality}] ${session.sessionId} error:`, error);
+        session.processes.delete(quality);
+        session.status = "error";
+        if (!resolved) {
+          resolved = true;
+          reject(error);
+        }
+      });
+
+      session.processes.set(quality, ffmpeg);
+
+      // Fallback timeout in case FFmpeg never outputs "Output #0"
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          reject(new Error(`Timeout waiting for FFmpeg to start: ${quality}`));
+        }
+      }, 15000); // 15 seconds for FFmpeg to start
     });
-
-    ffmpeg.on("close", (code) => {
-      console.log(
-        `FFmpeg [${quality}] ${session.sessionId} finished with code: ${code}`
-      );
-      session.processes.delete(quality);
-
-      // Mark segment as completed if all processes are done
-      if (session.processes.size === 0) {
-        this.markSegmentCompleted(session.videoId, session.startTime);
-        session.status = "completed";
-      }
-    });
-
-    ffmpeg.on("error", (error) => {
-      console.error(`FFmpeg [${quality}] ${session.sessionId} error:`, error);
-      session.processes.delete(quality);
-      session.status = "error";
-    });
-
-    session.processes.set(quality, ffmpeg);
   }
 
   /**
@@ -373,7 +459,7 @@ export class TranscodingManager {
       qualities: segment.qualities,
       processes: new Map(),
       outputDir: segment.outputDir,
-      masterPlaylistPath: path.join(segment.outputDir, "master.m3u8"),
+      masterPlaylistPath: posixPath.join(segment.outputDir, "master.m3u8"),
       lastAccess: Date.now(),
       status: "completed",
     };
@@ -438,10 +524,14 @@ export class TranscodingManager {
   }
 
   /**
-   * Get session by ID
+   * Get session by ID and update last access time
    */
   getSession(sessionId: string): TranscodingSession | undefined {
-    return this.sessions.get(sessionId);
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.lastAccess = Date.now(); // Update access time to prevent cleanup
+    }
+    return session;
   }
 
   /**
@@ -513,6 +603,27 @@ export class TranscodingManager {
       if (segments.length === 0) {
         this.videoSegments.delete(videoId);
       }
+    }
+  }
+
+  /**
+   * Cleanup all old transcoding data on server startup
+   * Removes all segment directories but preserves other files in tmpDir
+   */
+  private cleanupOnStartup(): void {
+    const segmentsDir = posixPath.join(this.tmpDir, "segments");
+
+    console.log(`Cleaning up old transcoding sessions from: ${segmentsDir}`);
+
+    try {
+      if (fs.existsSync(segmentsDir)) {
+        fs.rmSync(segmentsDir, { recursive: true, force: true });
+        console.log("Old transcoding sessions cleaned up successfully");
+      } else {
+        console.log("No existing segments directory to clean up");
+      }
+    } catch (error) {
+      console.error("Error cleaning up old transcoding sessions:", error);
     }
   }
 }

@@ -96,7 +96,7 @@ const PerformerDetail = () => {
         {/* Scenes Section */}
         <div className="mt-8">
           <SceneSearch
-            permanentSceneFilters={{
+            permanentFilters={{
               performers: { value: [performerId], modifier: "INCLUDES" },
             }}
             title={`Scenes featuring ${performer.name}`}
@@ -407,7 +407,7 @@ const PerformerGenderIcon = ({ gender }) => {
 
 const getPerformer = async (id) => {
   const response = await libraryApi.findPerformers({
-    performer_ids: [parseInt(id)],
+    ids: [id],
   });
 
   return response?.findPerformers?.performers?.[0] || null;

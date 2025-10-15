@@ -1,105 +1,92 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  usePerformersPaginated,
-  usePerformersSearch,
-} from "../../hooks/useLibrary.js";
-import {
-  PageHeader,
-  SearchInput,
-  ErrorMessage,
-  LoadingSpinner,
-  EmptyState,
-  Pagination,
-} from "../ui/index.js";
-import {
-  SortControl,
-  FilterPanel,
-  FilterControl,
-} from "../ui/FilterControls.jsx";
-import { useSortAndFilter } from "../../hooks/useSortAndFilter.js";
-import {
-  PERFORMER_SORT_OPTIONS,
-  GENDER_OPTIONS,
-  RATING_OPTIONS,
-  buildPerformerFilter,
-} from "../../utils/filterConfig.js";
+import deepEqual from "fast-deep-equal";
+import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { formatRating, getInitials, truncateText } from "../../utils/format.js";
+import SearchControls from "../ui/SearchControls.jsx";
+import { useAuth } from "../../hooks/useAuth.js";
+import { libraryApi } from "../../services/api.js";
 
 const Performers = () => {
-  const [searchMode, setSearchMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
-  const {
-    sort,
-    sortDirection,
-    handleSortChange,
-    filters,
-    handleFilterChange,
-    clearFilters,
-    hasActiveFilters,
-  } = useSortAndFilter("NAME", "performer");
+  const [lastQuery, setLastQuery] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [data, setData] = useState(null);
 
-  const {
-    data: paginatedData,
-    loading,
-    error,
-    refetch,
-  } = usePerformersPaginated({
-    page: currentPage,
-    perPage: 24,
-    sort: sort || undefined,
-    sortDirection: sortDirection || undefined,
-    filter: buildPerformerFilter(filters),
-  });
-  const {
-    query,
-    setQuery,
-    results: searchResults,
-    loading: searchLoading,
-    error: searchError,
-    clearSearch,
-  } = usePerformersSearch();
+  useEffect(() => {
+    // Initial fetch with default parameters
+    const query = {
+      filter: {
+        direction: "DESC",
+        page: 1,
+        per_page: 24,
+        q: "",
+        sort: "o_counter",
+      },
+    };
 
-  const handleSearch = (searchQuery) => {
-    setQuery(searchQuery);
-    setSearchMode(!!searchQuery);
-    setCurrentPage(1); // Reset to first page on new search
+    const fetchInitialData = async () => {
+      // Don't make API calls if not authenticated or still checking auth
+      if (isAuthLoading || !isAuthenticated) {
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setLastQuery(query);
+        setError(null);
+        const result = await getPerformers(query);
+        setData(result);
+      } catch (err) {
+        console.error("getPerformers error:", err);
+        setError(err.message || "An error occurred");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, [isAuthLoading, isAuthenticated]);
+
+  const handleQueryChange = async (newQuery) => {
+    // Don't make API calls if not authenticated or still checking auth
+    if (isAuthLoading || !isAuthenticated) {
+      return;
+    }
+
+    // Avoid duplicate queries
+    if (lastQuery && deepEqual(newQuery, lastQuery)) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setLastQuery(newQuery);
+      setError(null);
+      const result = await getPerformers(newQuery);
+      setData(result);
+    } catch (err) {
+      console.error("getPerformers error:", err);
+      setError(err.message || "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleClearSearch = () => {
-    clearSearch();
-    setSearchMode(false);
-    setCurrentPage(1);
-  };
+  const currentPerformers = data?.performers || [];
 
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-  };
+  const totalCount = data?.count || 0;
 
-  const currentError = error || searchError;
-  const currentLoading = searchMode ? searchLoading : loading;
-  const currentPerformers = searchMode
-    ? searchResults?.findPerformers?.performers
-    : paginatedData?.performers || [];
+  const perPage = lastQuery?.filter?.per_page || 24;
+  const totalPages = Math.ceil(totalCount / perPage);
 
-  const totalCount = searchMode
-    ? searchResults?.findPerformers?.count || 0
-    : paginatedData?.count || 0;
-
-  const totalPages = Math.ceil(totalCount / 24);
-
-  if (currentError) {
+  if (error) {
     return (
       <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
-        <PageHeader
-          title="Performers"
-          subtitle="Browse performers and talent in your library"
-        />
-        <ErrorMessage
-          error={currentError}
-          onRetry={searchMode ? () => setQuery(query) : refetch}
-        />
+        <PageHeader title="Performers" />
+        <ErrorMessage error={error} />
       </div>
     );
   }
@@ -109,149 +96,24 @@ const Performers = () => {
       <PageHeader
         title="Performers"
         subtitle="Browse and manage performers in your library"
-      >
-        <SearchInput
-          placeholder="Search performers..."
-          onSearch={handleSearch}
-          className="w-80"
-        />
-        {searchMode && (
-          <button
-            onClick={handleClearSearch}
-            className="px-4 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-          >
-            Show All
-          </button>
-        )}
-      </PageHeader>
+      />
 
       {/* Controls Section */}
-      {!searchMode && (
-        <div className="space-y-6 mb-6">
-          {/* Top Controls Row - Sort + Pagination */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            {/* Sort Control */}
-            <div className="flex items-center space-x-3">
-              <SortControl
-                options={PERFORMER_SORT_OPTIONS}
-                value={sort}
-                onChange={handleSortChange}
-              />
-              <button
-                onClick={() => handleSortChange(sort)} // This will toggle direction for same field
-                className="px-3 py-2 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  borderColor: "var(--border-color)",
-                  color: "var(--text-primary)",
-                }}
-                title={`Sort ${
-                  sortDirection === "ASC" ? "Descending" : "Ascending"
-                }`}
-              >
-                {sortDirection === "ASC" ? "↑" : "↓"}
-              </button>
-            </div>
+      <SearchControls
+        initialSort="o_counter"
+        onQueryChange={handleQueryChange}
+        totalPages={totalPages}
+      />
 
-            {/* Top Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center sm:justify-end">
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={handlePageChange}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Filter Panel - Always visible */}
-          <FilterPanel
-            onClear={clearFilters}
-            hasActiveFilters={hasActiveFilters}
-          >
-            <FilterControl
-              type="select"
-              label="Gender"
-              value={filters.gender || ""}
-              onChange={(value) => handleFilterChange("gender", value)}
-              options={GENDER_OPTIONS}
-            />
-            <FilterControl
-              type="select"
-              label="Rating"
-              value={filters.rating || ""}
-              onChange={(value) => handleFilterChange("rating", value)}
-              options={RATING_OPTIONS}
-            />
-            <FilterControl
-              type="number"
-              label="Min Age"
-              value={filters.minAge || ""}
-              onChange={(value) => handleFilterChange("minAge", value)}
-              placeholder="18"
-              min="18"
-            />
-            <FilterControl
-              type="checkbox"
-              label="Favorites Only"
-              value={filters.favorite || false}
-              onChange={(value) => handleFilterChange("favorite", value)}
-            />
-          </FilterPanel>
-        </div>
-      )}
-
-      {currentLoading && (
-        <div className="flex justify-center py-12">
-          <LoadingSpinner size="lg" />
-        </div>
-      )}
-
-      {!currentLoading &&
-        (!currentPerformers || currentPerformers.length === 0) && (
-          <EmptyState
-            icon={
-              <svg
-                className="w-16 h-16 mx-auto mb-4"
-                style={{ color: "var(--text-muted)" }}
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            }
-            title={searchMode ? "No performers found" : "No performers"}
-            description={
-              searchMode
-                ? `No performers match your search for "${query}"`
-                : "No performers found in your library"
-            }
-          />
-        )}
-
-      {!currentLoading && currentPerformers && currentPerformers.length > 0 && (
+      {isLoading ? (
+        <LoadingSpinner />
+      ) : (
         <>
           <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
             {currentPerformers.map((performer) => (
               <PerformerCard key={performer.id} performer={performer} />
             ))}
           </div>
-
-          {/* Bottom Pagination */}
-          {totalPages > 1 && !searchMode && (
-            <div className="mt-8 flex justify-center">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={handlePageChange}
-              />
-            </div>
-          )}
         </>
       )}
     </div>
@@ -318,6 +180,20 @@ const PerformerCard = ({ performer }) => {
       </div>
     </Link>
   );
+};
+
+const getPerformers = async (query) => {
+  console.log("Fetching Performers with query:", query);
+  const response = await libraryApi.findPerformers(query);
+
+  // Extract performers and count from server response structure
+  const findPerformers = response?.findPerformers;
+  const result = {
+    performers: findPerformers?.performers || [],
+    count: findPerformers?.count || 0,
+  };
+  console.log("Got Performers:", result);
+  return result;
 };
 
 export default Performers;
