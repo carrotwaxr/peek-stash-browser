@@ -1,5 +1,3 @@
-import React from "react";
-
 /**
  * Reusable Sort Control Component
  */
@@ -10,12 +8,12 @@ export const SortControl = ({
   label = "Sort by",
 }) => {
   return (
-    <div className="flex flex-col">
+    <div className="flex">
       <label
-        className="text-sm font-medium mb-2"
+        className="text-sm font-medium mr-2 self-center"
         style={{ color: "var(--text-primary)" }}
       >
-        {label}
+        {label}:
       </label>
       <select
         value={value}

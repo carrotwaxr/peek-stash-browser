@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useTagsPaginated, useTagsSearch } from "../hooks/useLibrary.js";
+import { useTagsPaginated, useTagsSearch } from "../../hooks/useLibrary.js";
 import {
   PageHeader,
   SearchInput,
@@ -8,15 +8,15 @@ import {
   LoadingSpinner,
   EmptyState,
   Pagination,
-} from "./ui/index.js";
+} from "../ui/index.js";
 import {
   SortControl,
   FilterPanel,
   FilterControl,
-} from "./ui/FilterControls.jsx";
-import { useSortAndFilter } from "../hooks/useSortAndFilter.js";
-import { TAG_SORT_OPTIONS, buildTagFilter } from "../utils/filterConfig.js";
-import { truncateText } from "../utils/format.js";
+} from "../ui/FilterControls.jsx";
+import { useSortAndFilter } from "../../hooks/useSortAndFilter.js";
+import { TAG_SORT_OPTIONS, buildTagFilter } from "../../utils/filterConfig.js";
+import { truncateText } from "../../utils/format.js";
 
 const Tags = () => {
   const [searchMode, setSearchMode] = useState(false);

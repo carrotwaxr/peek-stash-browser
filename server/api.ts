@@ -9,7 +9,6 @@ import {
   killSession,
 } from "./controllers/video.js";
 import {
-  getSceneLibrary,
   findScenes,
   findPerformers,
   findStudios,
@@ -45,10 +44,6 @@ export const setupAPI = () => {
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
 
-  // Protected library endpoints - require authentication
-  app.get("/api/scenes", authenticateToken, getSceneLibrary);
-  app.get("/api/videos", authenticateToken, getSceneLibrary); // Keep legacy endpoint for compatibility
-
   // New filtered search endpoints (protected)
   app.post("/api/library/scenes", authenticateToken, findScenes);
   app.post("/api/library/performers", authenticateToken, findPerformers);
@@ -62,7 +57,6 @@ export const setupAPI = () => {
   app.put("/api/library/tags/:id", authenticateToken, updateTag);
 
   // Video playback endpoints (protected)
-  app.get("/api/play/:videoId", authenticateToken, playVideo); // Legacy endpoint
   app.get("/api/video/play", authenticateToken, playVideo); // New endpoint with query params
 
   // Session management endpoints (protected)

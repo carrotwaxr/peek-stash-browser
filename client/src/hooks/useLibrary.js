@@ -31,7 +31,7 @@ export function useScenesSearch() {
 export function useScenesPaginated(options = {}) {
   const {
     page = 1,
-    perPage = 25,
+    perPage = 24,
     sort,
     sortDirection,
     scene_filter: sceneFilter = {},
@@ -92,7 +92,7 @@ export function useScenesPaginated(options = {}) {
 /**
  * Hook for high-rated scenes
  */
-export function useHighRatedScenes(perPage = 25) {
+export function useHighRatedScenes(perPage = 24) {
   const fetchFunction = useCallback(async () => {
     const response = await libraryApi.findScenes(
       commonFilters.highRatedScenes(1, perPage)
@@ -108,7 +108,7 @@ export function useHighRatedScenes(perPage = 25) {
 /**
  * Hook for recent scenes
  */
-export function useRecentScenes(perPage = 25) {
+export function useRecentScenes(perPage = 24) {
   const fetchFunction = useCallback(async () => {
     const response = await libraryApi.findScenes(
       commonFilters.recentScenes(1, perPage)
@@ -124,7 +124,7 @@ export function useRecentScenes(perPage = 25) {
 /**
  * Hook for long scenes (over 30 minutes)
  */
-export function useLongScenes(perPage = 25) {
+export function useLongScenes(perPage = 24) {
   const fetchFunction = useCallback(async () => {
     const response = await libraryApi.findScenes(
       commonFilters.longScenes(1, perPage)
@@ -156,7 +156,7 @@ export function usePerformersSearch() {
 export function usePerformersPaginated(options = {}) {
   const {
     page = 1,
-    perPage = 25,
+    perPage = 24,
     sort,
     sortDirection,
     filter: performerFilter = {},
@@ -198,7 +198,7 @@ export function usePerformersPaginated(options = {}) {
 /**
  * Hook for favorite performers
  */
-export function useFavoritePerformers(perPage = 25) {
+export function useFavoritePerformers(perPage = 24) {
   const fetchFunction = useCallback(async () => {
     const response = await libraryApi.findPerformers(
       commonFilters.favoritePerformers(1, perPage)
@@ -217,7 +217,7 @@ export function useFavoritePerformers(perPage = 25) {
 export function useStudiosPaginated(options = {}) {
   const {
     page = 1,
-    perPage = 25,
+    perPage = 24,
     sort,
     sortDirection,
     filter: studioFilter = {},
@@ -276,7 +276,7 @@ export function useStudiosSearch() {
 export function useTagsPaginated(options = {}) {
   const {
     page = 1,
-    perPage = 25,
+    perPage = 24,
     sort,
     sortDirection,
     filter: tagFilter = {},
@@ -336,10 +336,6 @@ export function useHomeData() {
   const favorites = useHighRatedScenes(12);
   const recent = useRecentScenes(12);
   const longVideos = useLongScenes(12);
-
-  console.log("favorites", favorites);
-  console.log("recent", recent);
-  console.log("longVideos", longVideos);
 
   return {
     favorites,

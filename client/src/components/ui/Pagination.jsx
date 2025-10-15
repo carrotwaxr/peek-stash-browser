@@ -32,7 +32,7 @@ const Pagination = ({
   const visiblePages = getVisiblePages();
 
   return (
-    <div className={`flex items-center justify-between ${className}`}>
+    <div className={`flex items-center justify-center gap-4 ${className}`}>
       {showInfo && (
         <div style={{ color: "var(--text-muted)" }} className="text-sm">
           Page {currentPage} of {totalPages}

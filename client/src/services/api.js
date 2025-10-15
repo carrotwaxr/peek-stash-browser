@@ -73,8 +73,7 @@ export const libraryApi = {
    * @param {Array<string>} params.ids - Specific scene IDs to fetch
    */
   findScenes: (params = {}) => {
-    const { filter = {}, scene_filter = {}, ids } = params;
-    return apiPost("/library/scenes", { filter, scene_filter, ids });
+    return apiPost("/library/scenes", params);
   },
 
   /**
@@ -84,8 +83,7 @@ export const libraryApi = {
    * @param {Object} params.performer_filter - Performer-specific filters
    */
   findPerformers: (params = {}) => {
-    const { filter = {}, performer_filter = {} } = params;
-    return apiPost("/library/performers", { filter, performer_filter });
+    return apiPost("/library/performers", params);
   },
 
   /**
@@ -95,8 +93,7 @@ export const libraryApi = {
    * @param {Object} params.studio_filter - Studio-specific filters
    */
   findStudios: (params = {}) => {
-    const { filter = {}, studio_filter = {} } = params;
-    return apiPost("/library/studios", { filter, studio_filter });
+    return apiPost("/library/studios", params);
   },
 
   /**
@@ -106,8 +103,7 @@ export const libraryApi = {
    * @param {Object} params.tag_filter - Tag-specific filters
    */
   findTags: (params = {}) => {
-    const { filter = {}, tag_filter = {} } = params;
-    return apiPost("/library/tags", { filter, tag_filter });
+    return apiPost("/library/tags", params);
   },
 };
 
@@ -177,7 +173,7 @@ export const filterHelpers = {
   /**
    * Create basic pagination filter
    */
-  pagination: (page = 1, perPage = 25, sort = null, direction = "ASC") => {
+  pagination: (page = 1, perPage = 24, sort = null, direction = "ASC") => {
     const filter = {
       page,
       per_page: perPage,
@@ -193,7 +189,7 @@ export const filterHelpers = {
   /**
    * Create text search filter
    */
-  textSearch: (query, page = 1, perPage = 25) => ({
+  textSearch: (query, page = 1, perPage = 24) => ({
     q: query,
     page,
     per_page: perPage,
@@ -243,7 +239,7 @@ export const commonFilters = {
   /**
    * Get high-rated scenes
    */
-  highRatedScenes: (page = 1, perPage = 25) => ({
+  highRatedScenes: (page = 1, perPage = 24) => ({
     filter: filterHelpers.pagination(page, perPage, "rating100", "DESC"),
     scene_filter: filterHelpers.ratingFilter(80),
   }),
@@ -251,7 +247,7 @@ export const commonFilters = {
   /**
    * Get recently added scenes
    */
-  recentScenes: (page = 1, perPage = 25) => ({
+  recentScenes: (page = 1, perPage = 24) => ({
     filter: filterHelpers.pagination(page, perPage, "created_at", "DESC"),
     scene_filter: {},
   }),
@@ -259,7 +255,7 @@ export const commonFilters = {
   /**
    * Get favorite performers
    */
-  favoritePerformers: (page = 1, perPage = 25) => ({
+  favoritePerformers: (page = 1, perPage = 24) => ({
     filter: filterHelpers.pagination(page, perPage, "name", "ASC"),
     performer_filter: { favorite: true },
   }),
@@ -267,7 +263,7 @@ export const commonFilters = {
   /**
    * Get long scenes (over 30 minutes)
    */
-  longScenes: (page = 1, perPage = 25) => ({
+  longScenes: (page = 1, perPage = 24) => ({
     filter: filterHelpers.pagination(page, perPage, "duration", "DESC"),
     scene_filter: filterHelpers.durationFilter(1800), // 30 minutes in seconds
   }),
@@ -275,7 +271,7 @@ export const commonFilters = {
   /**
    * Search scenes by text
    */
-  searchScenes: (query, page = 1, perPage = 25) => ({
+  searchScenes: (query, page = 1, perPage = 24) => ({
     filter: filterHelpers.textSearch(query, page, perPage),
     scene_filter: {},
   }),
@@ -283,7 +279,7 @@ export const commonFilters = {
   /**
    * Search performers by text
    */
-  searchPerformers: (query, page = 1, perPage = 25) => ({
+  searchPerformers: (query, page = 1, perPage = 24) => ({
     filter: filterHelpers.textSearch(query, page, perPage),
     performer_filter: {},
   }),

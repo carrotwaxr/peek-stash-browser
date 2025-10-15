@@ -5,7 +5,7 @@ import ErrorMessage from "../ui/ErrorMessage.jsx";
 import EmptyState from "../ui/EmptyState.jsx";
 import Pagination from "../ui/Pagination.jsx";
 
-export const SceneGrid = ({
+const SceneGrid = ({
   scenes,
   loading = false,
   error = null,
@@ -104,16 +104,7 @@ export const SceneGrid = ({
     columns,
   ]);
 
-  // Focus the focused item
   useEffect(() => {
-    if (enableKeyboard && sceneRefs.current[focusedIndex]) {
-      sceneRefs.current[focusedIndex].focus();
-    }
-  }, [focusedIndex, enableKeyboard]);
-
-  // Reset focus when scenes change
-  useEffect(() => {
-    setFocusedIndex(0);
     sceneRefs.current = sceneRefs.current.slice(0, scenes?.length || 0);
   }, [scenes]);
 
@@ -183,3 +174,5 @@ export const SceneGrid = ({
     </div>
   );
 };
+
+export default SceneGrid;

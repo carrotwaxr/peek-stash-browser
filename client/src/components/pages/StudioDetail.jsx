@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { SceneGrid } from "./SceneGrid/SceneGrid.jsx";
-import { useScenesPaginated } from "../hooks/useLibrary.js";
-import { PageHeader, ErrorMessage, LoadingSpinner } from "./ui/index.js";
+import SceneGrid from "../scene-search/SceneGrid.jsx";
+import { useScenesPaginated } from "../../hooks/useLibrary.js";
+import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 
-const TagDetail = () => {
-  const { tagId } = useParams();
-  const [tag, setTag] = useState(null);
+const StudioDetail = () => {
+  const { studioId } = useParams();
+  const [studio, setStudio] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetch scenes filtered by this tag
+  // Fetch scenes filtered by this studio
   const {
     data: paginatedData,
     loading: scenesLoading,
@@ -17,21 +17,19 @@ const TagDetail = () => {
   } = useScenesPaginated({
     page: currentPage,
     perPage: 24,
-    scene_filter: { tags: { value: [tagId], modifier: "INCLUDES" } },
+    studio_filter: { studios: { value: [studioId], modifier: "INCLUDES" } },
   });
 
-  // Extract tag info from the first scene (since we don't have a dedicated tag endpoint)
+  // Extract studio info from the first scene (since we don't have a dedicated studio endpoint)
   useEffect(() => {
     if (paginatedData?.scenes?.length > 0) {
-      for (const scene of paginatedData.scenes) {
-        const tagInfo = scene.tags?.find((t) => t.id === tagId);
-        if (tagInfo) {
-          setTag(tagInfo);
-          break;
-        }
+      const firstScene = paginatedData.scenes[0];
+      const studioInfo = firstScene.studio;
+      if (studioInfo && studioInfo.id === studioId) {
+        setStudio(studioInfo);
       }
     }
-  }, [paginatedData, tagId]);
+  }, [paginatedData, studioId]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -40,7 +38,7 @@ const TagDetail = () => {
   const scenes = paginatedData?.scenes || [];
   const totalCount = paginatedData?.count || 0;
 
-  if (scenesLoading && !tag) {
+  if (scenesLoading && !studio) {
     return <LoadingSpinner />;
   }
 
@@ -51,11 +49,11 @@ const TagDetail = () => {
   return (
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
       <div className="max-w-none">
-        {/* Tag Header */}
+        {/* Studio Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <Link
-              to="/tags"
+              to="/studios"
               className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors hover:bg-primary/10"
               style={{ color: "var(--text-secondary)" }}
             >
@@ -72,17 +70,17 @@ const TagDetail = () => {
                   d="M15 19l-7-7 7-7"
                 />
               </svg>
-              Back to Tags
+              Back to Studios
             </Link>
           </div>
 
           <div className="flex flex-col lg:flex-row lg:items-start gap-6">
-            {/* Tag Image */}
+            {/* Studio Image */}
             <div className="flex-shrink-0 mx-auto lg:mx-0">
-              {tag?.image_path ? (
+              {studio?.image_path ? (
                 <img
-                  src={tag.image_path}
-                  alt={tag.name}
+                  src={studio.image_path}
+                  alt={studio.name}
                   className="w-40 h-40 lg:w-48 lg:h-48 object-cover rounded-lg shadow-lg"
                   style={{
                     borderColor: "var(--border-color)",
@@ -103,33 +101,20 @@ const TagDetail = () => {
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path d="M7.5 3A1.5 1.5 0 006 4.5v15A1.5 1.5 0 007.5 21h9a1.5 1.5 0 001.5-1.5V7.621a1.5 1.5 0 00-.44-1.06L13.94 2.94A1.5 1.5 0 0012.879 2.5H7.5z" />
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                   </svg>
                 </div>
               )}
             </div>
 
-            {/* Tag Info */}
+            {/* Studio Info */}
             <div className="flex-1 text-center lg:text-left">
-              <div className="mb-6">
-                <h1
-                  className="text-3xl lg:text-4xl font-bold mb-3"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {tag?.name || `Tag ${tagId}`}
-                </h1>
-
-                {/* Tag Badge */}
-                <div
-                  className="inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold"
-                  style={{
-                    backgroundColor: "var(--primary-color)",
-                    color: "var(--background-primary)",
-                  }}
-                >
-                  #{tag?.name || tagId}
-                </div>
-              </div>
+              <h1
+                className="text-3xl lg:text-4xl font-bold mb-4"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {studio?.name || `Studio ${studioId}`}
+              </h1>
 
               {/* Statistics Card */}
               <div
@@ -154,9 +139,9 @@ const TagDetail = () => {
                 </div>
               </div>
 
-              {/* Description and Aliases Cards */}
+              {/* Website and Details Cards */}
               <div className="grid grid-cols-1 gap-4 mb-6">
-                {tag?.description && (
+                {studio?.url && (
                   <div
                     className="p-4 rounded-lg"
                     style={{
@@ -168,19 +153,34 @@ const TagDetail = () => {
                       className="font-semibold mb-2"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      Description
+                      Website
                     </h3>
-                    <p
-                      className="whitespace-pre-wrap"
-                      style={{ color: "var(--text-secondary)" }}
+                    <a
+                      href={studio.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center hover:underline transition-colors"
+                      style={{ color: "var(--primary-color)" }}
                     >
-                      {tag.description}
-                    </p>
+                      {studio.url}
+                      <svg
+                        className="w-4 h-4 ml-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                        />
+                      </svg>
+                    </a>
                   </div>
                 )}
 
-                {/* Tag Aliases */}
-                {tag?.aliases && tag.aliases.length > 0 && (
+                {studio?.details && (
                   <div
                     className="p-4 rounded-lg"
                     style={{
@@ -189,26 +189,17 @@ const TagDetail = () => {
                     }}
                   >
                     <h3
-                      className="font-semibold mb-3"
+                      className="font-semibold mb-2"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      Aliases
+                      Details
                     </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {tag.aliases.map((alias, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
-                          style={{
-                            backgroundColor: "var(--primary-color)",
-                            color: "var(--background-primary)",
-                            opacity: "0.8",
-                          }}
-                        >
-                          {alias}
-                        </span>
-                      ))}
-                    </div>
+                    <p
+                      className="whitespace-pre-wrap"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {studio.details}
+                    </p>
                   </div>
                 )}
               </div>
@@ -232,15 +223,17 @@ const TagDetail = () => {
               </span>
             </h2>
             <p style={{ color: "var(--text-secondary)" }}>
-              All scenes tagged with {tag?.name || "this tag"}
+              All scenes from {studio?.name || "this studio"}
             </p>
           </div>
 
           {scenes.length === 0 && !scenesLoading ? (
             <div className="text-center py-12">
-              <p className="text-gray-400 mb-2">No scenes found for this tag</p>
+              <p className="text-gray-400 mb-2">
+                No scenes found for this studio
+              </p>
               <p className="text-sm text-gray-500">
-                This might indicate the tag filter isn't working correctly
+                This might indicate the studio filter isn't working correctly
               </p>
             </div>
           ) : (
@@ -253,7 +246,7 @@ const TagDetail = () => {
               itemsPerPage={24}
               onPageChange={handlePageChange}
               enableKeyboard={true}
-              emptyMessage="No scenes found for this tag"
+              emptyMessage="No scenes found for this studio"
             />
           )}
         </div>
@@ -262,4 +255,4 @@ const TagDetail = () => {
   );
 };
 
-export default TagDetail;
+export default StudioDetail;

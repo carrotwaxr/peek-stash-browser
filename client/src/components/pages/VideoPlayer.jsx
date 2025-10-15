@@ -4,8 +4,8 @@ import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
 import axios from "axios";
-import { canDirectPlayVideo } from "../utils/videoFormat.js";
-import Navigation from "./Navigation.jsx";
+import { canDirectPlayVideo } from "../../utils/videoFormat.js";
+import Navigation from "../ui/Navigation.jsx";
 
 const api = axios.create({
   baseURL: "/api",

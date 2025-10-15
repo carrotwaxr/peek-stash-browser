@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   usePerformersPaginated,
   usePerformersSearch,
-} from "../hooks/useLibrary.js";
+} from "../../hooks/useLibrary.js";
 import {
   PageHeader,
   SearchInput,
@@ -11,20 +11,20 @@ import {
   LoadingSpinner,
   EmptyState,
   Pagination,
-} from "./ui/index.js";
+} from "../ui/index.js";
 import {
   SortControl,
   FilterPanel,
   FilterControl,
-} from "./ui/FilterControls.jsx";
-import { useSortAndFilter } from "../hooks/useSortAndFilter.js";
+} from "../ui/FilterControls.jsx";
+import { useSortAndFilter } from "../../hooks/useSortAndFilter.js";
 import {
   PERFORMER_SORT_OPTIONS,
   GENDER_OPTIONS,
   RATING_OPTIONS,
   buildPerformerFilter,
-} from "../utils/filterConfig.js";
-import { formatRating, getInitials, truncateText } from "../utils/format.js";
+} from "../../utils/filterConfig.js";
+import { formatRating, getInitials, truncateText } from "../../utils/format.js";
 
 const Performers = () => {
   const [searchMode, setSearchMode] = useState(false);
@@ -103,8 +103,6 @@ const Performers = () => {
       </div>
     );
   }
-
-  console.log(currentPerformers);
 
   return (
     <div className="w-full py-8 px-4 lg:px-6 xl:px-8">

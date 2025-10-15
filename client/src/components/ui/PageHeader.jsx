@@ -1,7 +1,9 @@
 /**
  * Reusable page header component
  */
-const PageHeader = ({ title, subtitle, children, className = "" }) => {
+const PageHeader = ({ title, subtitle, className = "" }) => {
+  if (!title) return null;
+
   return (
     <div className={`mb-8 ${className}`}>
       <div className="flex items-center justify-between mb-4">
@@ -14,9 +16,6 @@ const PageHeader = ({ title, subtitle, children, className = "" }) => {
           </h1>
           {subtitle && <p style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
         </div>
-        {children && (
-          <div className="flex items-center space-x-4">{children}</div>
-        )}
       </div>
     </div>
   );
