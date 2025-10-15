@@ -5,33 +5,36 @@ services:
       dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${PEEK_BACKEND_PORT:-8000}:8000"
     env_file:
-      - ./.env
+      - .env
+    environment:
+      # These are ALWAYS the same inside Docker - no need in .env file
+      - CONFIG_DIR=/app/data
+      - STASH_MEDIA_PATH=/app/media
+      - STASH_INTERNAL_PATH=/data
     volumes:
       # Hot reloading - mount source code
       - ./server:/app
-      - /app/node_modules # Prevent overwriting node_modules
-      # Development: Use CIFS volume to avoid Windows SMB mapping issues
-      - media-share:/app/media
-      # Production: Use direct host path (uncomment line below, comment line above)
-      # - ${STASH_DATA_DIR}:/app/media
-      - ${TMP_DIR}:/app/tmp
-      # SQLite database persistence
-      - peek-db:/app/data
+      - /app/node_modules
+      # Media access - configured via environment variables
+      - ${MEDIA_VOLUME_CONFIG}
+      # Peek config/data directory
+      - ${PEEK_DATA_DIR:-./.peek-data}:/app/data
     networks:
       - peek-network
+
   peek-client:
     build:
       context: ./client
       dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
-      - "6969:5173" # Vite dev server runs on 5173
+      - "${PEEK_FRONTEND_PORT:-6969}:5173"
     volumes:
       # Hot reloading - mount source code
       - ./client:/app
-      - /app/node_modules # Prevent overwriting node_modules
+      - /app/node_modules
     depends_on:
       - peek-server
     networks:
@@ -42,20 +45,10 @@ networks:
     driver: bridge
 
 volumes:
-  peek-db:
-    driver: local
-  # Development: CIFS volume for SMB share access with authentication
+  # SMB/CIFS volume (only used if MEDIA_VOLUME_CONFIG=media-share:/app/media)
   media-share:
     driver: local
     driver_opts:
       type: cifs
-      device: "//10.0.0.4/syslib/bunh/stash/vid"
+      device: "${SMB_SHARE}"
       o: "username=${SMB_USERNAME},password=${SMB_PASSWORD},uid=1000,gid=1000,iocharset=utf8,file_mode=0644,dir_mode=0755"
-  # Production: Remove media-share volume and use direct host mount above
-  # Alternative for guest access (no auth needed):
-  # media-share:
-  #   driver: local
-  #   driver_opts:
-  #     type: cifs
-  #     device: "//10.0.0.4/syslib/bunh/stash/vid"
-  #     o: "guest,uid=1000,gid=1000,iocharset=utf8,file_mode=0644,dir_mode=0755"

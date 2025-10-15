@@ -13,118 +13,36 @@ const api = axios.create({
 
 // Helper function to configure HLS for VOD (Video On Demand) behavior
 const setupHLSforVOD = (player, scene) => {
-  player.ready(() => {
-    // Configure player for progressive transcoding with full seekability
-    const tech = player.tech();
-    if (tech && tech.vhs) {
-      const vhs = tech.vhs;
+  // Only set duration once when metadata loads if it's Infinity
+  let durationSet = false;
 
-      // Wait for playlists to be loaded
-      vhs.playlists.on("loadedplaylist", () => {
-        const media = vhs.playlists.media();
-        if (media) {
-          console.log("Configuring playlist for progressive VOD:", media);
-
-          // Don't force endList - let FFmpeg control it via #EXT-X-ENDLIST
-          // This allows the playlist to update as transcoding progresses
-          media.live = false; // Not a live stream
-          media.dvr = false; // Not DVR
-
-          // Set duration from scene metadata if available
-          const duration = scene?.files?.[0]?.duration;
-          if (duration) {
-            media.totalDuration = duration;
-            media.targetDuration = Math.min(10, duration / 100); // Reasonable segment duration
-          }
-        }
-      });
-
-      // Override seekable range to enable full seeking
-      const originalSeekable = tech.seekable;
-      tech.seekable = function () {
-        const seekableRange = originalSeekable.call(this);
-
-        // If we have duration info, create a full seekable range
-        const duration = scene?.files?.[0]?.duration;
-        if (duration && seekableRange.length === 0) {
-          console.log("Creating seekable range for VOD:", duration);
-          return videojs.createTimeRanges([[0, duration]]);
-        }
-
-        // If we have a seekable range but it's restricted, expand it
-        if (seekableRange.length > 0) {
-          const start = Math.max(0, seekableRange.start(0));
-          const end =
-            scene?.files?.[0]?.duration ||
-            seekableRange.end(seekableRange.length - 1);
-          return videojs.createTimeRanges([[start, end]]);
-        }
-
-        return seekableRange;
-      };
-
-      // Force duration setting
-      const duration = scene?.files?.[0]?.duration;
-      if (duration) {
-        player.duration(duration);
-        console.log("Set player duration:", duration);
-      }
-    }
-  });
-
-  // Handle metadata loaded to set duration
   player.on("loadedmetadata", () => {
     const duration = scene?.files?.[0]?.duration;
-    if (duration && player.duration() === Infinity) {
+    if (!durationSet && duration && player.duration() === Infinity) {
       player.duration(duration);
-      console.log("Updated duration after metadata:", duration);
-    }
-  });
-
-  // Handle duration changes
-  player.on("durationchange", () => {
-    console.log("Duration changed:", player.duration());
-    const duration = scene?.files?.[0]?.duration;
-    if (player.duration() === Infinity && duration) {
-      player.duration(duration);
+      durationSet = true;
+      console.log("Set player duration from scene metadata:", duration);
     }
   });
 };
 
 // Helper function to manage loading buffer for smooth playback
-const setupLoadingBuffer = (player, minBufferSeconds = 10) => {
+const setupLoadingBuffer = (player, minBufferSeconds = 5) => {
   let isWaitingForBuffer = false;
   let hasStartedPlayback = false;
-  let initialBufferReady = false;
+  let userPaused = false; // Track if user manually paused
 
   const checkBuffer = () => {
     const currentTime = player.currentTime();
     const buffered = player.buffered();
-
-    console.log(
-      `Buffer check: buffered.length=${
-        buffered.length
-      }, currentTime=${currentTime.toFixed(1)}`
-    );
 
     if (buffered.length > 0) {
       const bufferedEnd = buffered.end(buffered.length - 1);
       const bufferAhead = bufferedEnd - currentTime;
 
       console.log(
-        `Buffer: ${bufferAhead.toFixed(
-          1
-        )}s ahead, initialReady=${initialBufferReady}, hasStarted=${hasStartedPlayback}`
+        `Buffer check: ${bufferAhead.toFixed(1)}s ahead (target: ${minBufferSeconds}s)`
       );
-
-      // Track when initial buffer is ready (for first-time playback)
-      if (!initialBufferReady && bufferAhead >= minBufferSeconds) {
-        initialBufferReady = true;
-        console.log(
-          `✓ Initial buffer ready (${bufferAhead.toFixed(1)}s), ready to play!`
-        );
-        player.removeClass("vjs-waiting");
-      }
 
       // If we're playing and buffer is low, pause and wait
       if (
@@ -138,6 +56,7 @@ const setupLoadingBuffer = (player, minBufferSeconds = 10) => {
           )}s), pausing until ${minBufferSeconds}s buffered...`
         );
         isWaitingForBuffer = true;
+        userPaused = false; // This is automatic buffering pause, not user action
         player.pause();
         player.addClass("vjs-waiting");
       }
@@ -149,7 +68,9 @@ const setupLoadingBuffer = (player, minBufferSeconds = 10) => {
         );
         isWaitingForBuffer = false;
         player.removeClass("vjs-waiting");
-        if (hasStartedPlayback) {
+
+        // Only auto-resume if user didn't manually pause
+        if (!userPaused) {
           player.play().catch((err) => {
             console.warn("Failed to resume playback after buffering:", err);
           });
@@ -158,32 +79,29 @@ const setupLoadingBuffer = (player, minBufferSeconds = 10) => {
     }
   };
 
-  // Add initial waiting state
-  player.addClass("vjs-waiting");
-  console.log("Waiting for initial buffer...");
-
-  // Check buffer when playback starts
-  player.on("play", () => {
-    // Don't allow play until initial buffer is ready
-    if (!initialBufferReady) {
-      console.log("Blocking play - waiting for initial buffer...");
-      player.pause();
-      player.addClass("vjs-waiting");
-      return;
+  // Track user-initiated pauses
+  player.on("pause", () => {
+    // If we're not waiting for buffer, this is a user action
+    if (!isWaitingForBuffer) {
+      userPaused = true;
     }
+  });
 
+  // Track user-initiated plays
+  player.on("play", () => {
+    userPaused = false;
+  });
+
+  // Track when playback actually starts
+  player.on("playing", () => {
     hasStartedPlayback = true;
-    checkBuffer();
+    userPaused = false; // Clear user pause state when playback starts
+    console.log("Playback started, monitoring buffer...");
   });
 
   // Check buffer on progress events (new data loaded)
   player.on("progress", () => {
-    checkBuffer();
-  });
-
-  // Check buffer on loadedmetadata
-  player.on("loadedmetadata", () => {
-    console.log("Metadata loaded, checking buffer...");
+    // Always check buffer when new data arrives, even if paused
     checkBuffer();
   });
 
@@ -320,10 +238,23 @@ const setupQualitySelector = (player) => {
 const setupTranscodedSeeking = (player, sessionId) => {
   let isTranscodedSeeking = false;
   let lastSeekTime = 0;
+  let hasPlayedOnce = false; // Track if playback has started at least once
   const SEEK_THRESHOLD = 10; // Only restart transcoding if seeking more than 10 seconds
+
+  // Enable seeking only after playback has started
+  player.one("playing", () => {
+    hasPlayedOnce = true;
+    console.log("Playback started, user seeking now enabled");
+  });
 
   player.on("seeking", () => {
     if (isTranscodedSeeking) return; // Prevent recursive calls
+
+    // Ignore seeks before playback has started (e.g., browser auto-resume)
+    if (!hasPlayedOnce) {
+      console.log("Ignoring seek before playback started (likely auto-resume)");
+      return;
+    }
 
     const currentTime = player.currentTime();
     const duration = player.duration();
@@ -371,23 +302,6 @@ const setupTranscodedSeeking = (player, sessionId) => {
   // Handle when transcoding catches up to seek point
   player.on("loadedmetadata", () => {
     console.log("Metadata loaded, duration:", player.duration());
-  });
-
-  // Monitor buffering for transcoded content
-  player.on("progress", () => {
-    const buffered = player.buffered();
-    if (buffered.length > 0) {
-      const bufferedEnd = buffered.end(buffered.length - 1);
-      const currentTime = player.currentTime();
-      const bufferAhead = bufferedEnd - currentTime;
-
-      console.log(`Buffer: ${bufferAhead.toFixed(1)}s ahead`);
-
-      // If buffer is running low, might need to adjust transcoding
-      if (bufferAhead < 10 && !player.paused()) {
-        console.log("Buffer running low, may need transcoding adjustment");
-      }
-    }
   });
 };
 
@@ -511,7 +425,14 @@ const VideoPlayer = ({ scene }) => {
             setupHLSforVOD(player, response.data.scene);
             setupQualitySelector(player);
             setupTranscodedSeeking(player, response.data.sessionId);
-            setupLoadingBuffer(player, 10); // Wait for 10s buffer before playing
+            setupLoadingBuffer(player, 10); // Monitor buffer during playback
+
+            // CRITICAL: Disable live tracker after mode switch to prevent live UI mode
+            if (player.liveTracker) {
+              console.log("Disabling live tracker after mode switch to force VOD UI");
+              player.liveTracker.dispose();
+              player.liveTracker = null;
+            }
           }
 
           // Resume playback
@@ -599,6 +520,7 @@ const VideoPlayer = ({ scene }) => {
         fluid: true,
         sources: sources,
         playbackRates: [0.5, 1, 1.25, 1.5, 2], // Playback speed options
+        liveui: false, // CRITICAL: Force VOD UI (prevents live mode switch)
         html5: {
           vhs: {
             // VOD Configuration - Force Video On Demand behavior
@@ -628,6 +550,14 @@ const VideoPlayer = ({ scene }) => {
         console.log("Video object:", video);
 
         const player = playerRef.current;
+
+        // CRITICAL: Force VOD behavior by disabling live tracker
+        // This prevents Video.js from switching to live mode with event playlists
+        if (!canDirectPlay && player.liveTracker) {
+          console.log("Disabling live tracker to force VOD UI");
+          player.liveTracker.dispose();
+          player.liveTracker = null;
+        }
 
         // Clear initializing state and start playback
         setIsInitializing(false);
@@ -684,7 +614,7 @@ const VideoPlayer = ({ scene }) => {
 
                     // Setup event listeners BEFORE changing source
                     setupHLSforVOD(player, response.data.scene);
-                    setupQualitySelector(player);
+                    // NOTE: setupQualitySelector will be called later in main player init (line 257)
                     setupTranscodedSeeking(player, response.data.sessionId);
                     setupLoadingBuffer(player, 10); // Add listeners before src change!
 
@@ -695,8 +625,19 @@ const VideoPlayer = ({ scene }) => {
                       type: "application/x-mpegURL",
                     });
 
+                    // CRITICAL: Disable live tracker after fallback to prevent live UI mode
+                    if (player.liveTracker) {
+                      console.log("Disabling live tracker after fallback to force VOD UI");
+                      player.liveTracker.dispose();
+                      player.liveTracker = null;
+                    }
+
                     // Reset playback to start (don't resume from where direct play failed)
-                    player.currentTime(0);
+                    // Must be done in loadedmetadata to ensure it takes effect
+                    player.one("loadedmetadata", () => {
+                      player.currentTime(0);
+                      console.log("Reset currentTime to 0 after source change");
+                    });
 
                     // Wait for buffer before allowing playback
                     // The loading buffer will manage this
@@ -718,7 +659,7 @@ const VideoPlayer = ({ scene }) => {
         // Configure HLS for VOD behavior if not direct play
         if (!canDirectPlay) {
           setupHLSforVOD(player, scene);
-          setupLoadingBuffer(player, 10); // Wait for 10s buffer before playing
+          setupLoadingBuffer(player, 10); // Monitor buffer during playback
         }
 
         // Setup quality selector

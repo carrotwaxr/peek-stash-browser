@@ -10,20 +10,28 @@
   <Support>https://github.com/carrotwaxr/peek-stash-browser/issues</Support>
   <Project>https://github.com/carrotwaxr/peek-stash-browser</Project>
   <Overview>
-    Peek Stash Browser is a modern web application for browsing and managing your Stash media library. 
-    Features include authentication, advanced filtering, sorting, and a beautiful responsive interface.
-    
+    Peek Stash Browser is a modern web application for browsing and streaming your Stash media library with real-time HLS transcoding.
+
+    Features:
+    - Modern React frontend with responsive design
+    - Real-time HLS video transcoding with FFmpeg
+    - Adaptive bitrate streaming (360p/480p/720p/1080p)
+    - JWT-based authentication with admin/user roles
+    - Advanced filtering and search
+    - Full VOD controls with seeking support
+
     This is a single-container solution that includes:
-    - Frontend web interface (React)
-    - Backend API server (Node.js/Express)  
-    - SQLite database for user data and preferences
-    - Video transcoding with FFmpeg for HLS streaming
-    
+    - Frontend web interface (React + Vite)
+    - Backend API server (Node.js/Express + TypeScript)
+    - SQLite database for user data
+    - HLS transcoding with on-demand segment generation
+
     Requirements:
     - Existing Stash server with GraphQL API enabled
-    - Media files accessible via unRAID shares
+    - Media files accessible to unRAID (same location as Stash)
+    - At least 2GB RAM recommended for transcoding
   </Overview>
-  <Category>MediaApp:Video</Category>
+  <Category>MediaApp:Video MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:6969]</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/docs/icon.png</Icon>
@@ -34,7 +42,7 @@
   <DonateText/>
   <DonateLink/>
   <Description>
-    Peek Stash Browser provides a modern, responsive web interface for your Stash media library with advanced filtering and sorting capabilities.
+    Modern web interface for Stash with real-time HLS transcoding, adaptive bitrate streaming, and advanced media browsing capabilities.
   </Description>
   <Networking>
     <Mode>bridge</Mode>
@@ -48,35 +56,50 @@
   </Networking>
   <Data>
     <Volume>
-      <HostDir>/mnt/user/media</HostDir>
+      <HostDir>/mnt/user/videos</HostDir>
       <ContainerDir>/app/media</ContainerDir>
       <Mode>ro</Mode>
     </Volume>
     <Volume>
-      <HostDir>/mnt/user/appdata/peek-stash-browser/data</HostDir>
+      <HostDir>/mnt/user/appdata/peek-stash-browser</HostDir>
       <ContainerDir>/app/data</ContainerDir>
-      <Mode>rw</Mode>
-    </Volume>
-    <Volume>
-      <HostDir>/mnt/user/appdata/peek-stash-browser/tmp</HostDir>
-      <ContainerDir>/app/tmp</ContainerDir>
       <Mode>rw</Mode>
     </Volume>
   </Data>
   <Environment>
     <Variable>
-      <Value>http://[IP]:9999/graphql</Value>
+      <Value>http://10.0.0.4:9999/graphql</Value>
       <Name>STASH_URL</Name>
       <Mode/>
     </Variable>
     <Variable>
-      <Value>your-stash-api-key</Value>
+      <Value>your-stash-api-key-here</Value>
       <Name>STASH_API_KEY</Name>
       <Mode/>
     </Variable>
     <Variable>
-      <Value>file:/app/data/peek-stash-browser.db</Value>
+      <Value>file:/app/data/peek-db.db</Value>
       <Name>DATABASE_URL</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>change-this-to-a-secure-random-string</Value>
+      <Name>JWT_SECRET</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/app/data</Value>
+      <Name>CONFIG_DIR</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/data</Value>
+      <Name>STASH_INTERNAL_PATH</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/app/media</Value>
+      <Name>STASH_MEDIA_PATH</Name>
       <Mode/>
     </Variable>
     <Variable>
@@ -84,16 +107,23 @@
       <Name>NODE_ENV</Name>
       <Mode/>
     </Variable>
+    <Variable>
+      <Value>false</Value>
+      <Name>SECURE_COOKIES</Name>
+      <Mode/>
+    </Variable>
   </Environment>
   <Labels/>
-  <Config Name="Web UI Port" Target="80" Default="6969" Mode="tcp" Description="Web interface port (single container serves everything)" Type="Port" Display="always" Required="true" Mask="false">6969</Config>
-  <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/media" Mode="ro" Description="Path to your media files (read-only)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/media</Config>
-  <Config Name="Database Directory" Target="/app/data" Default="/mnt/user/appdata/peek-stash-browser/data" Mode="rw" Description="SQLite database storage" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser/data</Config>
-  <Config Name="Temp Directory" Target="/app/tmp" Default="/mnt/user/appdata/peek-stash-browser/tmp" Mode="rw" Description="Temporary files for video transcoding" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser/tmp</Config>
-  <Config Name="Stash URL" Target="STASH_URL" Default="http://[IP]:9999/graphql" Mode="" Description="Your Stash GraphQL endpoint URL" Type="Variable" Display="always" Required="true" Mask="false">http://[IP]:9999/graphql</Config>
-  <Config Name="Stash API Key" Target="STASH_API_KEY" Default="your-api-key" Mode="" Description="Your Stash API key for authentication" Type="Variable" Display="always" Required="true" Mask="true">your-api-key</Config>
-  <Config Name="JWT Secret" Target="JWT_SECRET" Default="change-this-to-a-secure-random-string" Mode="" Description="Secret key for JWT token signing (change to a secure random string)" Type="Variable" Display="always" Required="true" Mask="true">change-this-to-a-secure-random-string</Config>
-  <Config Name="Secure Cookies" Target="SECURE_COOKIES" Default="false" Mode="" Description="Enable secure cookies (set to 'true' only if using HTTPS)" Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
-  <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-stash-browser.db" Mode="" Description="SQLite database file path" Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-stash-browser.db</Config>
-  <Config Name="Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment" Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
+  <Config Name="Web UI Port" Target="80" Default="6969" Mode="tcp" Description="Web interface port - access Peek at http://[IP]:6969" Type="Port" Display="always" Required="true" Mask="false">6969</Config>
+  <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/videos" Mode="ro" Description="Path to your media files - MUST be the same path Stash uses (read-only). Example: /mnt/user/videos" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/videos</Config>
+  <Config Name="App Data Directory" Target="/app/data" Default="/mnt/user/appdata/peek-stash-browser" Mode="rw" Description="Peek configuration, database, and HLS transcoding cache. Requires read/write access." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser</Config>
+  <Config Name="Stash GraphQL URL" Target="STASH_URL" Default="http://10.0.0.4:9999/graphql" Mode="" Description="Your Stash server's GraphQL endpoint. Use the unRAID server IP or hostname. Example: http://10.0.0.4:9999/graphql" Type="Variable" Display="always" Required="true" Mask="false">http://10.0.0.4:9999/graphql</Config>
+  <Config Name="Stash API Key" Target="STASH_API_KEY" Default="" Mode="" Description="Your Stash API key from Settings &gt; Security &gt; API Key. REQUIRED for authentication." Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="JWT Secret Key" Target="JWT_SECRET" Default="" Mode="" Description="Secure random string for JWT authentication. Generate a strong random string (e.g., openssl rand -hex 32). CHANGE THIS!" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-db.db" Mode="" Description="SQLite database file path. Leave as default unless you know what you're doing." Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-db.db</Config>
+  <Config Name="Config Directory" Target="CONFIG_DIR" Default="/app/data" Mode="" Description="Directory for config and HLS cache. Should match App Data Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/data</Config>
+  <Config Name="Stash Internal Path" Target="STASH_INTERNAL_PATH" Default="/data" Mode="" Description="The path prefix Stash uses internally for media files. Usually '/data' if Stash runs in Docker." Type="Variable" Display="advanced" Required="false" Mask="false">/data</Config>
+  <Config Name="Peek Media Path" Target="STASH_MEDIA_PATH" Default="/app/media" Mode="" Description="Where Peek accesses media inside its container. Should match Media Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/media</Config>
+  <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment mode. Leave as 'production' for normal use." Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
+  <Config Name="Secure Cookies" Target="SECURE_COOKIES" Default="false" Mode="" Description="Enable secure cookies (HTTPS only). Set to 'true' only if you use HTTPS with a reverse proxy." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
 </Container>

@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { Scene } from "stashapp-api";
 import { transcodingManager } from "../services/TranscodingManager.js";
+import { translateStashPath } from "../utils/pathMapping.js";
 
 interface PlayVideoRequest extends Request {
   query: {
@@ -114,6 +115,41 @@ export const getStreamSegment = (req: Request, res: Response) => {
           }
         };
         trySend();
+      } else if (file.endsWith(".ts")) {
+        // ON-DEMAND SEGMENT TRANSCODING
+        // Extract segment number from filename (e.g., "segment_042.ts" -> 42)
+        const segmentMatch = file.match(/segment_(\d+)\.ts/);
+        if (!segmentMatch) {
+          return res.status(400).send("Invalid segment filename");
+        }
+
+        const segmentNumber = parseInt(segmentMatch[1], 10);
+        console.log(`Segment ${segmentNumber} requested but not found, transcoding on-demand...`);
+
+        // Request on-demand transcoding with read-ahead
+        transcodingManager.transcodeSegmentOnDemand(
+          sessionId,
+          quality,
+          segmentNumber
+        ).catch(err => {
+          console.error(`Failed to initiate on-demand transcoding for segment ${segmentNumber}:`, err);
+        });
+
+        // Wait for segment to be transcoded
+        let attempts = 0;
+        const maxAttempts = 100; // 10 seconds max wait
+        const interval = 100;
+        const trySend = () => {
+          if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+          } else if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(trySend, interval);
+          } else {
+            res.status(404).send("Segment transcoding timeout");
+          }
+        };
+        trySend();
       } else {
         res.status(404).send("Segment not found");
       }
@@ -125,7 +161,7 @@ export const getStreamSegment = (req: Request, res: Response) => {
 
 const getSceneFilePath = (scene: Scene) => {
   const sceneFile = scene.files?.[0].path;
-  return sceneFile.replace("/data", "/app/media");
+  return translateStashPath(sceneFile);
 };
 
 // Simple scene cache to avoid repeated API calls
