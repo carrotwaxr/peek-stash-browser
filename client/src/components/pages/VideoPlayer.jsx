@@ -6,6 +6,7 @@ import "./VideoPlayer.css";
 import axios from "axios";
 import { canDirectPlayVideo } from "../../utils/videoFormat.js";
 import Navigation from "../ui/Navigation.jsx";
+import AddToPlaylistButton from "../ui/AddToPlaylistButton.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -683,6 +684,18 @@ const VideoPlayer = ({ scene }) => {
     isSwitchingMode,
   ]); // Include all dependencies
 
+  // Handle Escape key to go back
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        navigate(-1);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [navigate]);
+
   useEffect(() => {
     return () => {
       const player = playerRef.current;
@@ -928,6 +941,9 @@ const VideoPlayer = ({ scene }) => {
               >
                 🔄 Reset
               </button>
+
+              {/* Add to Playlist Button */}
+              <AddToPlaylistButton sceneId={scene.id} />
             </div>
           </div>
         </section>

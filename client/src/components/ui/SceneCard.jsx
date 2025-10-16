@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   getSceneTitle,
@@ -7,6 +7,13 @@ import {
 } from "../../utils/format.js";
 import { formatRelativeTime } from "../../utils/date.js";
 import Tooltip from "../ui/Tooltip.jsx";
+import SceneContextMenu from "../ui/SceneContextMenu.jsx";
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: "/api",
+  withCredentials: true,
+});
 
 /**
  * Enhanced scene card component with keyboard navigation support
@@ -51,8 +58,9 @@ const SceneCard = forwardRef(
         ref={ref}
         className={`
         relative bg-card rounded-lg border border-border overflow-hidden
-        transition-all duration-200 cursor-pointer
-        hover:shadow-lg hover:scale-105
+        transition-all duration-300 cursor-pointer
+        hover:shadow-2xl hover:scale-[1.03] hover:z-10
+        hover:border-opacity-80
         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         keyboard-focused:ring-2 keyboard-focused:ring-yellow-400 keyboard-focused:ring-offset-2
         ${className}
@@ -70,6 +78,9 @@ const SceneCard = forwardRef(
       >
         {/* Thumbnail */}
         <div className="relative aspect-video bg-gray-800 overflow-hidden">
+          {/* Context Menu */}
+          <SceneContextMenu sceneId={scene.id} />
+
           {scene.paths?.screenshot ? (
             <img
               src={scene.paths.screenshot}

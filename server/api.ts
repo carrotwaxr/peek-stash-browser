@@ -19,6 +19,8 @@ import {
   updateTag,
 } from "./controllers/library.js";
 import authRoutes from "./routes/auth.js";
+import userRoutes from "./routes/user.js";
+import playlistRoutes from "./routes/playlist.js";
 import { authenticateToken } from "./middleware/auth.js";
 
 export const setupAPI = () => {
@@ -43,6 +45,12 @@ export const setupAPI = () => {
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
+
+  // User settings routes (protected)
+  app.use("/api/user", userRoutes);
+
+  // Playlist routes (protected)
+  app.use("/api/playlists", playlistRoutes);
 
   // New filtered search endpoints (protected)
   app.post("/api/library/scenes", authenticateToken, findScenes);

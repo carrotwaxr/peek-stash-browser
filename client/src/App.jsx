@@ -16,6 +16,9 @@ import PerformerDetail from "./components/pages/PerformerDetail.jsx";
 import StudioDetail from "./components/pages/StudioDetail.jsx";
 import TagDetail from "./components/pages/TagDetail.jsx";
 import Login from "./components/pages/Login.jsx";
+import Settings from "./components/pages/Settings.jsx";
+import Playlists from "./components/pages/Playlists.jsx";
+import PlaylistDetail from "./components/pages/PlaylistDetail.jsx";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { useAuth } from "./hooks/useAuth.js";
@@ -101,6 +104,30 @@ const AppContent = () => {
           element={
             <Layout>
               <TagDetail />
+            </Layout>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <Layout>
+              <Settings />
+            </Layout>
+          }
+        />
+        <Route
+          path="/playlists"
+          element={
+            <Layout>
+              <Playlists />
+            </Layout>
+          }
+        />
+        <Route
+          path="/playlist/:playlistId"
+          element={
+            <Layout>
+              <PlaylistDetail />
             </Layout>
           }
         />
