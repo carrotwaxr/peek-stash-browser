@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useTheme } from "../../themes/useTheme.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { ThemedIcon } from "../icons/index.js";
@@ -98,6 +99,30 @@ const UserMenu = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* My Settings Link */}
+          <div
+            className="px-4 py-3 border-b"
+            style={{ borderColor: "var(--border-color)" }}
+          >
+            <Link
+              to="/my-settings"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200"
+              style={{
+                color: "var(--text-primary)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              <ThemedIcon name="settings" size={16} />
+              <span>My Settings</span>
+            </Link>
           </div>
 
           {/* Theme Selector */}

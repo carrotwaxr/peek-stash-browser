@@ -127,10 +127,10 @@ const Settings = () => {
               className="text-3xl font-bold mb-2"
               style={{ color: "var(--text-primary)" }}
             >
-              Settings
+              My Settings
             </h1>
             <p style={{ color: "var(--text-secondary)" }}>
-              Manage your preferences and account settings
+              Manage your personal preferences and account settings
             </p>
           </div>
 

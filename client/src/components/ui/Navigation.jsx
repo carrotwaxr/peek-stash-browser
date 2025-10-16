@@ -3,10 +3,12 @@ import { Link, useLocation } from "react-router-dom";
 import { PeekLogo } from "../branding/PeekLogo.jsx";
 import UserMenu from "./UserMenu.jsx";
 import { ThemedIcon } from "../icons/index.js";
+import { useAuth } from "../../hooks/useAuth.js";
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
 
   // Get current page from React Router location
   const getCurrentPage = () => {
@@ -58,7 +60,7 @@ const Navigation = () => {
               <li key={item.name}>
                 <Link
                   to={item.path}
-                  className={`nav-link text-base font-medium transition-colors duration-200 px-3 py-2 rounded ${
+                  className={`nav-link text-base font-medium transition-colors duration-200 rounded ${
                     currentPage === item.name ? "nav-link-active" : ""
                   }`}
                 >
@@ -73,19 +75,21 @@ const Navigation = () => {
 
           {/* Right side - User menu and mobile menu button */}
           <div className="flex items-center gap-4 justify-end">
-            {/* Settings button */}
-            <Link
-              to="/settings"
-              className="p-2 rounded-lg hover:bg-opacity-80 transition-colors duration-200"
-              style={{
-                backgroundColor: "transparent",
-                color: "var(--text-primary)",
-                border: "1px solid transparent",
-              }}
-              aria-label="Settings"
-            >
-              <ThemedIcon name="settings" size={20} />
-            </Link>
+            {/* Server Settings button (admin only) */}
+            {user && user.role === "ADMIN" && (
+              <Link
+                to="/server-settings"
+                className="p-2 rounded-lg hover:bg-opacity-80 transition-colors duration-200"
+                style={{
+                  backgroundColor: "transparent",
+                  color: "var(--text-primary)",
+                  border: "1px solid transparent",
+                }}
+                aria-label="Server Settings"
+              >
+                <ThemedIcon name="wrench" size={20} />
+              </Link>
+            )}
 
             {/* User Menu - visible on all screen sizes */}
             <UserMenu />

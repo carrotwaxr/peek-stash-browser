@@ -19,6 +19,7 @@ import Login from "./components/pages/Login.jsx";
 import Settings from "./components/pages/Settings.jsx";
 import Playlists from "./components/pages/Playlists.jsx";
 import PlaylistDetail from "./components/pages/PlaylistDetail.jsx";
+import ServerSettings from "./components/pages/ServerSettings.jsx";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { useAuth } from "./hooks/useAuth.js";
@@ -108,10 +109,18 @@ const AppContent = () => {
           }
         />
         <Route
-          path="/settings"
+          path="/my-settings"
           element={
             <Layout>
               <Settings />
+            </Layout>
+          }
+        />
+        <Route
+          path="/server-settings"
+          element={
+            <Layout>
+              <ServerSettings />
             </Layout>
           }
         />
@@ -148,12 +157,15 @@ function App() {
   );
 }
 
-// Wrapper to extract scene object from state
+// Wrapper to extract scene object and playlist context from state
 function VideoPlayerWrapper() {
   const location = useLocation();
+  const { sceneId } = useParams();
   const scene = location.state?.scene;
+  const playlist = location.state?.playlist;
 
-  return <VideoPlayer scene={scene} />;
+  // Force remount when sceneId changes by using it as key
+  return <VideoPlayer key={sceneId} scene={scene} playlist={playlist} />;
 }
 
 // Wrapper that gets scene data from navigation state
