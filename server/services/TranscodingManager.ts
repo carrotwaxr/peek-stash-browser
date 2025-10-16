@@ -156,7 +156,7 @@ export class TranscodingManager {
 
       // PRE-GENERATE complete VOD playlists for all qualities
       // This gives the player full seeking capability from the start
-      const segmentDuration = 2; // seconds per segment
+      const segmentDuration = 4; // seconds per segment (increased from 2s for better efficiency)
       const totalSegments = Math.ceil(duration / segmentDuration);
 
       console.log(`Pre-generating VOD playlists for ${duration}s video (${totalSegments} segments)`);
@@ -168,7 +168,7 @@ export class TranscodingManager {
         // Generate complete VOD playlist
         let playlist = "#EXTM3U\n";
         playlist += "#EXT-X-VERSION:6\n";
-        playlist += "#EXT-X-TARGETDURATION:3\n";
+        playlist += "#EXT-X-TARGETDURATION:5\n";
         playlist += "#EXT-X-MEDIA-SEQUENCE:0\n";
         playlist += "#EXT-X-PLAYLIST-TYPE:VOD\n";
         playlist += "#EXT-X-INDEPENDENT-SEGMENTS\n";
@@ -195,12 +195,12 @@ export class TranscodingManager {
       session.status = "active";
       console.log(`Session ${session.sessionId} ready - pre-transcoding initial segments`);
 
-      // PRE-TRANSCODE first 20 segments (40 seconds) to build initial buffer
-      // This gives smooth playback start since real-time transcoding isn't possible
+      // PRE-TRANSCODE first 6 segments (24 seconds) to build initial buffer
+      // Reduced from 20 to start playback sooner, background worker stays ahead
       const { translateStashPath } = await import("../utils/pathMapping.js");
       const absoluteSceneFilePath = translateStashPath(sceneFilePath);
 
-      const preTranscodeCount = 20; // Pre-transcode 40 seconds
+      const preTranscodeCount = 6; // Pre-transcode 24 seconds
       for (const quality of session.qualities) {
         console.log(`Pre-transcoding first ${preTranscodeCount} segments for ${quality}...`);
 
@@ -238,13 +238,15 @@ export class TranscodingManager {
 
   /**
    * Continuously transcode segments in the background to stay ahead of playback
+   * Transcodes 2 segments in parallel for better performance
    */
   private async startBackgroundTranscoding(
     session: TranscodingSession,
     sceneFilePath: string,
     totalSegments: number
   ): Promise<void> {
-    const segmentDuration = 2;
+    const segmentDuration = 4;
+    const parallelCount = 2; // Transcode 2 segments at once
 
     console.log(`Starting background transcoding from segment ${session.currentSegment}`);
 
@@ -254,35 +256,49 @@ export class TranscodingManager {
       session.currentSegment !== undefined &&
       session.currentSegment < totalSegments
     ) {
-      const segmentNumber = session.currentSegment;
+      // Transcode multiple segments in parallel
+      const transcodePromises: Promise<void>[] = [];
 
-      for (const quality of session.qualities) {
-        const qualityDir = posixPath.join(session.outputDir, quality);
-        const segmentFileName = `segment_${String(segmentNumber).padStart(3, '0')}.ts`;
-        const segmentPath = posixPath.join(qualityDir, segmentFileName);
+      for (let p = 0; p < parallelCount; p++) {
+        const segmentNumber = session.currentSegment! + p;
 
-        // Skip if already exists
-        if (fs.existsSync(segmentPath)) {
-          continue;
-        }
+        // Stop if we've reached the end
+        if (segmentNumber >= totalSegments) break;
 
-        const segmentStartTime = session.startTime + (segmentNumber * segmentDuration);
+        for (const quality of session.qualities) {
+          const qualityDir = posixPath.join(session.outputDir, quality);
+          const segmentFileName = `segment_${String(segmentNumber).padStart(3, '0')}.ts`;
+          const segmentPath = posixPath.join(qualityDir, segmentFileName);
 
-        try {
-          await this.transcodeSpecificSegment(
-            session,
-            quality,
-            segmentNumber,
-            segmentStartTime,
-            sceneFilePath
+          // Skip if already exists
+          if (fs.existsSync(segmentPath)) {
+            continue;
+          }
+
+          const segmentStartTime = session.startTime + (segmentNumber * segmentDuration);
+
+          // Add to parallel transcode queue
+          transcodePromises.push(
+            this.transcodeSpecificSegment(
+              session,
+              quality,
+              segmentNumber,
+              segmentStartTime,
+              sceneFilePath
+            ).catch(error => {
+              console.error(`Background transcode failed for segment ${segmentNumber}:`, error);
+            })
           );
-        } catch (error) {
-          console.error(`Background transcode failed for segment ${segmentNumber}:`, error);
-          // Continue with next segment
         }
       }
 
-      session.currentSegment++;
+      // Wait for all parallel transcodes to complete
+      if (transcodePromises.length > 0) {
+        await Promise.all(transcodePromises);
+      }
+
+      // Move to next batch
+      session.currentSegment += parallelCount;
 
       // Check if session is still active (not killed/abandoned)
       if (!this.sessions.has(session.sessionId)) {
@@ -461,8 +477,8 @@ export class TranscodingManager {
       throw new Error(`Session ${sessionId} has no scene metadata`);
     }
 
-    // Calculate time offset for this segment (2 seconds per segment)
-    const segmentDuration = 2;
+    // Calculate time offset for this segment (4 seconds per segment)
+    const segmentDuration = 4;
     const segmentStartTime = session.startTime + (segmentNumber * segmentDuration);
 
     // Get scene file path
@@ -503,8 +519,8 @@ export class TranscodingManager {
       absoluteSceneFilePath
     );
 
-    // Read-ahead: Transcode the next 10 segments ahead
-    const readAheadCount = 10; // Transcode 10 segments ahead (20 seconds of video)
+    // Read-ahead: Transcode the next 6 segments ahead
+    const readAheadCount = 6; // Transcode 6 segments ahead (24 seconds of video)
     for (let i = 1; i <= readAheadCount; i++) {
       const aheadSegmentNumber = segmentNumber + i;
       const aheadSegmentFileName = `segment_${String(aheadSegmentNumber).padStart(3, '0')}.ts`;
@@ -548,7 +564,7 @@ export class TranscodingManager {
     // Ensure quality directory exists
     fs.mkdirSync(qualityDir, { recursive: true });
 
-    const segmentDuration = 2; // 2 seconds per segment
+    const segmentDuration = 4; // 4 seconds per segment (increased for better efficiency)
 
     const args = [
       "-ss",

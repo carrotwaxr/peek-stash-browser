@@ -20,6 +20,8 @@ const Navigation = () => {
         return "Studios";
       case "/tags":
         return "Tags";
+      case "/playlists":
+        return "Playlists";
       case "/":
         return null; // Home page - no nav item should be highlighted
       default:
@@ -34,6 +36,7 @@ const Navigation = () => {
     { name: "Performers", path: "/performers", icon: "user-star" },
     { name: "Studios", path: "/studios", icon: "spotlight" },
     { name: "Tags", path: "/tags", icon: "tags" },
+    { name: "Playlists", path: "/playlists", icon: "list" },
   ];
 
   return (
@@ -71,7 +74,8 @@ const Navigation = () => {
           {/* Right side - User menu and mobile menu button */}
           <div className="flex items-center gap-4 justify-end">
             {/* Settings button */}
-            <button
+            <Link
+              to="/settings"
               className="p-2 rounded-lg hover:bg-opacity-80 transition-colors duration-200"
               style={{
                 backgroundColor: "transparent",
@@ -81,7 +85,7 @@ const Navigation = () => {
               aria-label="Settings"
             >
               <ThemedIcon name="settings" size={20} />
-            </button>
+            </Link>
 
             {/* User Menu - visible on all screen sizes */}
             <UserMenu />

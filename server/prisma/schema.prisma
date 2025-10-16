@@ -14,7 +14,12 @@ model User {
     role        UserRole    @default(USER)
     createdAt   DateTime    @default(now())
     updatedAt   DateTime    @updatedAt
-    
+
+    // User preferences
+    preferredQuality    String?     @default("auto")    // "auto", "1080p", "720p", "480p", "360p"
+    preferredPlaybackMode String?   @default("auto")    // "auto", "direct", "transcode"
+    theme              String?     @default("dark")    // "dark", "light", "purple", etc.
+
     // Future features
     watchHistory WatchHistory[]
     playlists   Playlist[]
