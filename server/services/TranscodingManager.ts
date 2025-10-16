@@ -136,16 +136,13 @@ export class TranscodingManager {
       const duration = session.scene?.files?.[0]?.duration || 0;
       const preset = QUALITY_PRESETS[session.quality as keyof typeof QUALITY_PRESETS];
 
-      // Calculate segment number to start from (for seeking)
-      const segmentDuration = 4;
-      const startSegment = Math.floor(session.startTime / segmentDuration);
-
-      console.log(`[TranscodingManager] Video duration: ${duration}s, Starting from segment ${startSegment}`);
+      console.log(`[TranscodingManager] Video duration: ${duration}s, Starting transcode from ${session.startTime}s`);
 
       // FFmpeg command for CONTINUOUS HLS streaming
-      // This is the key difference: ONE process generates ALL segments continuously
+      // IMPORTANT: Always start segment numbering from 0, even when seeking mid-video
+      // This prevents Video.js confusion with media sequence numbers
       const args = [
-        "-ss", session.startTime.toString(),  // Seek to start position
+        "-ss", session.startTime.toString(),  // Seek to start position in source file
         "-i", sceneFilePath,                  // Input file
 
         // Video encoding
@@ -174,7 +171,7 @@ export class TranscodingManager {
         "-hls_segment_filename", posixPath.join(qualityDir, "segment_%03d.ts"),
         "-hls_playlist_type", "vod",          // VOD mode for proper seeking
         "-hls_flags", "independent_segments", // Each segment is independently decodable
-        "-start_number", startSegment.toString(), // Start numbering from seek position
+        // NOTE: No -start_number, always start from 0 for clean HLS playlists
 
         posixPath.join(qualityDir, "stream.m3u8")
       ];
@@ -285,31 +282,169 @@ export class TranscodingManager {
   }
 
   /**
-   * Handle seeking - kill existing process and start new one
+   * Handle seeking - restart transcoding from seek position while keeping same session
+   *
+   * Strategy:
+   * - Keep the same session ID and output directory
+   * - Kill the current FFmpeg process and restart from new position
+   * - This allows Video.js to keep using the same playlist URL
+   * - Segments before the seek position won't exist, but that's fine
    */
   async handleSeek(
     sessionId: string,
     newStartTime: number
   ): Promise<TranscodingSession> {
-    const oldSession = this.sessions.get(sessionId);
-    if (!oldSession) {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
       throw new Error("Session not found");
     }
 
-    console.log(`[TranscodingManager] Seeking from ${oldSession.startTime}s to ${newStartTime}s`);
+    const segmentDuration = 4;
+    const currentSegment = Math.floor(session.startTime / segmentDuration);
+    const newSegment = Math.floor(newStartTime / segmentDuration);
+    const segmentDistance = Math.abs(newSegment - currentSegment);
 
-    // Kill existing process
-    await this.killSession(sessionId);
+    console.log(`[SmartSeek] Seek request to ${newStartTime}s (segment ${newSegment})`);
+    console.log(`[SmartSeek] Currently transcoding from segment ${currentSegment}, ${session.completedSegments.size}/${session.totalSegments} segments complete`);
 
-    // Create new session for the new start time
-    const newSession = await this.getOrCreateSession(
-      oldSession.videoId,
-      newStartTime,
-      oldSession.userId,
-      oldSession.scene
-    );
+    // Check if target segment already exists
+    const targetSegmentExists = session.completedSegments.has(newSegment);
+    if (targetSegmentExists) {
+      console.log(`[SmartSeek] ✓ Target segment ${newSegment} already transcoded, no action needed`);
+      return session;
+    }
 
-    return newSession;
+    // Check if transcoder can catch up in time (within 15s timeout)
+    // Assuming ~1.8x transcode speed, distance of 27 segments = 60 seconds of video = ~33s to transcode
+    const estimatedWaitTime = (segmentDistance * segmentDuration) / 1.8;
+    const MAX_WAIT_TIME = 12; // Conservative - segment server waits 15s
+
+    if (estimatedWaitTime <= MAX_WAIT_TIME && newSegment > currentSegment) {
+      console.log(`[SmartSeek] ⏳ Seeking ahead ${segmentDistance} segments (~${estimatedWaitTime.toFixed(1)}s transcode time)`);
+      console.log(`[SmartSeek] ✓ Transcoder will catch up in time, no restart needed`);
+      return session;
+    }
+
+    // Need to restart transcoding from new position
+    console.log(`[SmartSeek] 🔄 Restarting transcoding from ${newStartTime}s, preserving existing segments`);
+
+    // Stop current playlist monitor
+    if (session.playlistMonitor) {
+      clearInterval(session.playlistMonitor);
+      session.playlistMonitor = undefined;
+    }
+
+    // Kill current FFmpeg process
+    if (session.process) {
+      session.process.kill("SIGTERM");
+      session.process = null;
+    }
+
+    // Save old completed segments before we update the session
+    const oldCompletedSegments = new Set(session.completedSegments);
+    const oldQualityDir = posixPath.join(session.outputDir, session.quality);
+
+    // Update session to new start time
+    const alignedStartTime = Math.floor(newStartTime / segmentDuration) * segmentDuration;
+    const newStartSegment = Math.floor(alignedStartTime / segmentDuration);
+
+    session.startTime = alignedStartTime;
+    session.status = "starting";
+
+    // Recalculate total segments from new position
+    const duration = session.scene?.files?.[0]?.duration || 0;
+    session.totalSegments = Math.ceil((duration - alignedStartTime) / segmentDuration);
+
+    // Copy already-transcoded segments that are still useful
+    // We want segments from newStartSegment onwards that already exist
+    const segmentsToCopy: number[] = [];
+    for (const segNum of oldCompletedSegments) {
+      if (segNum >= newStartSegment) {
+        segmentsToCopy.push(segNum);
+      }
+    }
+
+    console.log(`[SmartSeek] Found ${segmentsToCopy.length} segments to preserve (segments ${Math.min(...segmentsToCopy) || 'none'} to ${Math.max(...segmentsToCopy) || 'none'})`);
+
+    // Create a temporary backup directory for old segments we want to keep
+    if (segmentsToCopy.length > 0) {
+      const backupDir = posixPath.join(session.outputDir, `${session.quality}_backup`);
+
+      // Ensure backup directory exists
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+
+      // Copy segments to backup
+      let copiedCount = 0;
+      for (const segNum of segmentsToCopy) {
+        const segmentFile = `segment_${segNum.toString().padStart(3, '0')}.ts`;
+        const oldPath = posixPath.join(oldQualityDir, segmentFile);
+        const backupPath = posixPath.join(backupDir, segmentFile);
+
+        try {
+          if (fs.existsSync(oldPath)) {
+            fs.copyFileSync(oldPath, backupPath);
+            copiedCount++;
+          }
+        } catch (err) {
+          console.warn(`[SmartSeek] Failed to backup segment ${segNum}:`, err);
+        }
+      }
+
+      console.log(`[SmartSeek] ✓ Backed up ${copiedCount} segments to ${backupDir}`);
+
+      // Delete old quality directory (will be recreated by FFmpeg)
+      try {
+        this.deleteDirRecursive(oldQualityDir);
+        console.log(`[SmartSeek] Cleared old quality directory`);
+      } catch (err) {
+        console.warn(`[SmartSeek] Failed to clear old directory:`, err);
+      }
+
+      // Recreate quality directory
+      fs.mkdirSync(oldQualityDir, { recursive: true });
+
+      // Restore backed up segments
+      for (const segNum of segmentsToCopy) {
+        const segmentFile = `segment_${segNum.toString().padStart(3, '0')}.ts`;
+        const backupPath = posixPath.join(backupDir, segmentFile);
+        const newPath = posixPath.join(oldQualityDir, segmentFile);
+
+        try {
+          if (fs.existsSync(backupPath)) {
+            fs.copyFileSync(backupPath, newPath);
+            session.completedSegments.add(segNum);
+          }
+        } catch (err) {
+          console.warn(`[SmartSeek] Failed to restore segment ${segNum}:`, err);
+        }
+      }
+
+      // Delete backup directory
+      try {
+        this.deleteDirRecursive(backupDir);
+      } catch (err) {
+        console.warn(`[SmartSeek] Failed to delete backup directory:`, err);
+      }
+
+      console.log(`[SmartSeek] ✓ Restored ${session.completedSegments.size} segments to new directory`);
+    } else {
+      // No segments to preserve, just clear the directory
+      try {
+        this.deleteDirRecursive(oldQualityDir);
+        fs.mkdirSync(oldQualityDir, { recursive: true });
+        console.log(`[SmartSeek] Cleared quality directory, no segments to preserve`);
+      } catch (err) {
+        console.warn(`[SmartSeek] Failed to clear directory:`, err);
+      }
+
+      session.completedSegments = new Set();
+    }
+
+    console.log(`[SmartSeek] Restarting session ${sessionId} from ${alignedStartTime}s (segment ${newStartSegment})`);
+
+    return session;
   }
 
   /**
@@ -369,46 +504,84 @@ ${session.quality}/stream.m3u8
    * VOD TRICK: We generate a FULL playlist immediately (as if the entire video is transcoded)
    * This shows Video.js a complete VOD with seek controls.
    * We track which segments actually exist and serve them when ready.
+   *
+   * SEGMENT RENAMING: When transcoding starts mid-video (e.g., from 1124s = segment 281),
+   * FFmpeg creates segment_000.ts, segment_001.ts... but we rename them to segment_281.ts,
+   * segment_282.ts... to match the full video timeline.
    */
   private startPlaylistMonitor(session: TranscodingSession): void {
     const qualityDir = posixPath.join(session.outputDir, session.quality);
     const playlistPath = posixPath.join(qualityDir, "stream.m3u8");
     const segmentDuration = 4; // 4-second segments
-    const startSegment = Math.floor(session.startTime / 4);
+    const startSegment = Math.floor(session.startTime / segmentDuration);
 
-    console.log(`[PlaylistMonitor] Starting for session ${session.sessionId} (${session.totalSegments} total segments)`);
+    console.log(`[PlaylistMonitor] Starting for session ${session.sessionId} (${session.totalSegments} total segments, starting from segment ${startSegment})`);
 
-    // Generate FULL playlist immediately (VOD trick)
+    // Generate FULL playlist immediately (VOD trick) - includes ALL segments 0-617
     this.generateFullPlaylist(session);
 
-    // Monitor segment creation to track completion
+    // Monitor segment creation, rename them, and track completion
     session.playlistMonitor = setInterval(() => {
       try {
         if (!fs.existsSync(qualityDir)) return;
 
-        // Find all segment files that actually exist
+        // Find segments that need renaming
+        // FFmpeg creates: segment_000.ts, segment_001.ts, segment_002.ts, ...
+        // We need to rename them to match the video timeline
+        // For a seek to 1052s (segment 263): segment_000 → segment_263, segment_001 → segment_264, etc.
         const files = fs.readdirSync(qualityDir);
-        const existingSegments = files
-          .filter(f => f.match(/segment_\d+\.ts/))
-          .map(f => parseInt(f.match(/segment_(\d+)\.ts/)?.[1] || "0"));
 
-        // Update completed segments set
-        for (const segNum of existingSegments) {
-          if (!session.completedSegments.has(segNum)) {
-            session.completedSegments.add(segNum);
-            console.log(`[PlaylistMonitor] Segment ${segNum} completed (${session.completedSegments.size}/${session.totalSegments})`);
+        // Look for unrenamed segments (those that exist but aren't in completedSegments yet)
+        // OPTIMIZATION: Only check a reasonable range of segments based on current progress
+        // This prevents blocking the event loop with 1000+ fs calls every 500ms
+        const maxSegmentToCheck = Math.min(
+          session.completedSegments.size + 20, // Check 20 segments ahead of current progress
+          session.totalSegments - startSegment // Don't check beyond total segments
+        );
+
+        for (let ffmpegSegNum = 0; ffmpegSegNum <= maxSegmentToCheck; ffmpegSegNum++) {
+          const actualSegNum = startSegment + ffmpegSegNum;
+
+          // Skip if we've already processed this segment
+          if (session.completedSegments.has(actualSegNum)) {
+            continue;
+          }
+
+          const ffmpegPath = posixPath.join(qualityDir, `segment_${ffmpegSegNum.toString().padStart(3, '0')}.ts`);
+          const actualPath = posixPath.join(qualityDir, `segment_${actualSegNum.toString().padStart(3, '0')}.ts`);
+
+          // Check if FFmpeg's segment exists
+          if (fs.existsSync(ffmpegPath)) {
+            // If startSegment is 0, no renaming needed - segment numbers already match timeline
+            if (startSegment === 0) {
+              session.completedSegments.add(actualSegNum);
+              // console.log(`[PlaylistMonitor] Segment ${actualSegNum} ready (no rename needed)`);
+            } else if (!fs.existsSync(actualPath)) {
+              // Need to rename: segment_000 → segment_263, etc.
+              try {
+                fs.renameSync(ffmpegPath, actualPath);
+                session.completedSegments.add(actualSegNum);
+                console.log(`[PlaylistMonitor] Renamed segment_${ffmpegSegNum.toString().padStart(3, '0')}.ts → segment_${actualSegNum.toString().padStart(3, '0')}.ts (${session.completedSegments.size}/${session.totalSegments})`);
+              } catch (err) {
+                // Segment might be in use by FFmpeg, will catch it next iteration
+              }
+            }
+          } else {
+            // If this segment doesn't exist, no point checking higher numbers yet
+            break;
           }
         }
 
         // Check if transcoding is complete
-        const isComplete = session.completedSegments.size >= session.totalSegments ||
-                          session.status === "completed" ||
-                          session.process === null;
+        const expectedSegmentCount = session.totalSegments; // Total segments for the full video
+        const transcodedCount = session.completedSegments.size;
+        const isComplete = transcodedCount >= expectedSegmentCount ||
+                          session.status === "completed";
 
         if (isComplete && session.playlistMonitor) {
           clearInterval(session.playlistMonitor);
           session.playlistMonitor = undefined;
-          console.log(`[PlaylistMonitor] Stopped for session ${session.sessionId} (all segments complete)`);
+          console.log(`[PlaylistMonitor] Stopped for session ${session.sessionId} (${transcodedCount} segments complete)`);
         }
       } catch (error) {
         console.error(`[PlaylistMonitor] Error for session ${session.sessionId}:`, error);
@@ -417,26 +590,33 @@ ${session.quality}/stream.m3u8
   }
 
   /**
-   * Generate FULL VOD playlist (pretending all segments exist)
+   * Generate FULL VOD playlist for the ENTIRE video (all segments 0 to end)
    * This tricks Video.js into showing VOD controls with full seek bar
+   *
+   * The playlist represents the complete video timeline, even if we're only
+   * transcoding from a certain point onwards. Segments before the start point
+   * won't exist, but Video.js can still seek to them (segment serving will wait).
    */
   private generateFullPlaylist(session: TranscodingSession): void {
     const qualityDir = posixPath.join(session.outputDir, session.quality);
     const playlistPath = posixPath.join(qualityDir, "stream.m3u8");
     const segmentDuration = 4;
-    const startSegment = Math.floor(session.startTime / 4);
+    const startSegment = Math.floor(session.startTime / segmentDuration);
 
-    // Generate complete VOD playlist
+    // Calculate total segments for the COMPLETE video (from 0, not from startTime)
+    const videoDuration = session.scene?.files?.[0]?.duration || 0;
+    const totalSegmentsInVideo = Math.ceil(videoDuration / segmentDuration);
+
+    // Generate complete VOD playlist for entire video (0 to end)
     let playlist = `#EXTM3U\n`;
     playlist += `#EXT-X-VERSION:3\n`;
     playlist += `#EXT-X-TARGETDURATION:${segmentDuration}\n`;
-    playlist += `#EXT-X-MEDIA-SEQUENCE:${startSegment}\n`;
+    playlist += `#EXT-X-MEDIA-SEQUENCE:0\n`;
 
-    // Add ALL segments (even ones that don't exist yet)
-    for (let i = 0; i < session.totalSegments; i++) {
-      const segNum = startSegment + i;
+    // Add ALL segments from 0 to end of video (even ones that don't exist)
+    for (let i = 0; i < totalSegmentsInVideo; i++) {
       playlist += `#EXTINF:${segmentDuration}.000,\n`;
-      playlist += `segment_${segNum.toString().padStart(3, '0')}.ts\n`;
+      playlist += `segment_${i.toString().padStart(3, '0')}.ts\n`;
     }
 
     // Always include ENDLIST for VOD (this gives us the seek bar!)
@@ -444,7 +624,7 @@ ${session.quality}/stream.m3u8
 
     // Write playlist
     fs.writeFileSync(playlistPath, playlist);
-    console.log(`[PlaylistMonitor] Generated full VOD playlist with ${session.totalSegments} segments`);
+    console.log(`[PlaylistMonitor] Generated COMPLETE VOD playlist: segments 0-${totalSegmentsInVideo-1} (${totalSegmentsInVideo} total, transcoding from segment ${startSegment})`);
   }
 
   /**

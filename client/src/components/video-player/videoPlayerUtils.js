@@ -314,13 +314,14 @@ export const setupQualitySelector = (player) => {
 
 /**
  * Setup seeking handlers for transcoded content
- * Restarts transcoding from new position when user seeks
+ * Uses smart seeking on backend to reuse segments when possible
  */
 export const setupTranscodedSeeking = (player, sessionId, api) => {
   let isTranscodedSeeking = false;
   let lastSeekTime = 0;
   let hasPlayedOnce = false;
-  const SEEK_THRESHOLD = 10;
+  let currentSessionId = sessionId; // Track current session ID
+  const SEEK_THRESHOLD = 12; // Match backend smart seek threshold (3 segments × 4s)
 
   // Enable seeking only after playback has started
   player.one("playing", () => {
@@ -329,7 +330,10 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
   });
 
   player.on("seeking", () => {
-    if (isTranscodedSeeking) return;
+    if (isTranscodedSeeking) {
+      console.log("Ignoring seek event during transcoded seek operation");
+      return;
+    }
 
     if (!hasPlayedOnce) {
       console.log("Ignoring seek before playback started (likely auto-resume)");
@@ -346,27 +350,50 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
 
     if (seekDistance > SEEK_THRESHOLD) {
       isTranscodedSeeking = true;
+      const targetSeekTime = currentTime; // Save the target time
 
       api
         .post("/video/seek", {
-          sessionId: sessionId,
-          startTime: currentTime,
+          sessionId: currentSessionId,
+          startTime: targetSeekTime,
         })
         .then((response) => {
           console.log("Seek request sent to backend", response.data);
 
-          if (response.data.sessionId && response.data.playlistUrl) {
-            const newPlaylistUrl = response.data.playlistUrl;
-            player.src({
-              src: newPlaylistUrl,
-              type: "application/x-mpegURL",
-            });
+          const newSessionId = response.data.sessionId;
+          const sessionChanged = newSessionId !== currentSessionId;
 
-            player.load();
+          console.log(
+            `Session ${
+              sessionChanged ? "CHANGED" : "REUSED"
+            }: ${currentSessionId} -> ${newSessionId}`
+          );
+
+          if (sessionChanged) {
+            // Backend started transcoding from new position, but we keep using the same playlist
+            // The playlist represents segments 0-end, so Video.js will request the correct segment
+            // Backend's segment renaming will catch up before Video.js requests it
+            console.log(
+              `Backend started new transcoding session from ${response.data.startTime}s, but keeping current playlist`
+            );
+            console.log(
+              `Video.js will naturally seek to ${targetSeekTime}s and request the correct segment`
+            );
+
+            // Update session ID for future seeks
+            currentSessionId = newSessionId;
+          } else {
+            // Same session - Video.js just seeks normally
+            console.log(
+              `Reusing session ${currentSessionId}, Video.js seeking naturally to ${targetSeekTime}s`
+            );
           }
 
+          // In both cases, just let Video.js handle the seek
+          // It will request the correct segment based on the target time
           isTranscodedSeeking = false;
-          lastSeekTime = currentTime;
+
+          lastSeekTime = targetSeekTime;
         })
         .catch((error) => {
           console.error("Error seeking:", error);
