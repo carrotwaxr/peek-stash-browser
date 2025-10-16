@@ -87,7 +87,7 @@ const PlaylistDetail = () => {
     // Play first scene in playlist with playlist context
     if (scenes.length > 0 && scenes[0].exists && scenes[0].scene) {
       const validScenes = scenes.filter(s => s.exists && s.scene);
-      navigate(`/player/${scenes[0].sceneId}`, {
+      navigate(`/scene/${scenes[0].sceneId}`, {
         state: {
           scene: scenes[0].scene,
           playlist: {
@@ -284,7 +284,7 @@ const PlaylistDetail = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {scenes.map((item, index) => {
+            {scenes.map((item) => {
               const scene = item.scene;
               const title = scene ? getSceneTitle(scene) : null;
               const description = scene ? getSceneDescription(scene) : null;
@@ -354,7 +354,7 @@ const PlaylistDetail = () => {
                               <>
                                 {/* Title */}
                                 <Link
-                                  to={`/player/${item.sceneId}`}
+                                  to={`/scene/${item.sceneId}`}
                                   state={{
                                     scene: scene,
                                     playlist: {

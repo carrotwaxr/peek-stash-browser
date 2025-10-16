@@ -1,5 +1,4 @@
-import { forwardRef, useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { forwardRef } from "react";
 import {
   getSceneTitle,
   getSceneDescription,
@@ -8,12 +7,6 @@ import {
 import { formatRelativeTime } from "../../utils/date.js";
 import Tooltip from "../ui/Tooltip.jsx";
 import SceneContextMenu from "../ui/SceneContextMenu.jsx";
-import axios from "axios";
-
-const api = axios.create({
-  baseURL: "/api",
-  withCredentials: true,
-});
 
 /**
  * Enhanced scene card component with keyboard navigation support

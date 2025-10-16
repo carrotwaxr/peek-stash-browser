@@ -116,37 +116,23 @@ export const getStreamSegment = (req: Request, res: Response) => {
         };
         trySend();
       } else if (file.endsWith(".ts")) {
-        // ON-DEMAND SEGMENT TRANSCODING
-        // Extract segment number from filename (e.g., "segment_042.ts" -> 42)
-        const segmentMatch = file.match(/segment_(\d+)\.ts/);
-        if (!segmentMatch) {
-          return res.status(400).send("Invalid segment filename");
-        }
+        // CONTINUOUS TRANSCODING: Wait for segment to be generated
+        // FFmpeg is continuously generating segments, just wait for it
+        console.log(`[SegmentServing] Waiting for segment ${file}...`);
 
-        const segmentNumber = parseInt(segmentMatch[1], 10);
-        console.log(`Segment ${segmentNumber} requested but not found, transcoding on-demand...`);
-
-        // Request on-demand transcoding with read-ahead
-        transcodingManager.transcodeSegmentOnDemand(
-          sessionId,
-          quality,
-          segmentNumber
-        ).catch(err => {
-          console.error(`Failed to initiate on-demand transcoding for segment ${segmentNumber}:`, err);
-        });
-
-        // Wait for segment to be transcoded
         let attempts = 0;
-        const maxAttempts = 100; // 10 seconds max wait
+        const maxAttempts = 150; // 15 seconds max wait (longer for slower transcoding)
         const interval = 100;
         const trySend = () => {
           if (fs.existsSync(filePath)) {
+            console.log(`[SegmentServing] Serving segment ${file}`);
             res.sendFile(filePath);
           } else if (attempts < maxAttempts) {
             attempts++;
             setTimeout(trySend, interval);
           } else {
-            res.status(404).send("Segment transcoding timeout");
+            console.error(`[SegmentServing] Timeout waiting for segment ${file}`);
+            res.status(404).send("Segment not ready yet");
           }
         };
         trySend();
@@ -456,9 +442,9 @@ export async function getSessionStatus(req: Request, res: Response) {
       sessionId: session.sessionId,
       status: session.status,
       startTime: session.startTime,
-      qualities: session.qualities,
+      quality: session.quality,
       lastAccess: session.lastAccess,
-      activeProcesses: Array.from(session.processes.keys()),
+      isProcessActive: session.process !== null,
     });
   } catch (error) {
     console.error("Error in getSessionStatus:", error);
