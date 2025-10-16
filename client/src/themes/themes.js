@@ -3,6 +3,12 @@ export const themes = {
   peek: {
     name: "Peek",
     properties: {
+      // Typography
+      "--font-brand": "'Lilita One', cursive",
+      "--font-heading": "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-mono": "'JetBrains Mono', 'Courier New', monospace",
+
       // Background colors - Deep dark for elegant feel
       "--bg-primary": "#0a0a0b",
       "--bg-secondary": "#141418",
@@ -53,6 +59,12 @@ export const themes = {
   light: {
     name: "Light",
     properties: {
+      // Typography
+      "--font-brand": "'Lilita One', cursive",
+      "--font-heading": "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body": "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-mono": "'Fira Code', 'Courier New', monospace",
+
       // Background colors
       "--bg-primary": "#ffffff",
       "--bg-secondary": "#f8fafc",
@@ -92,6 +104,12 @@ export const themes = {
   midnight: {
     name: "Midnight Blue",
     properties: {
+      // Typography
+      "--font-brand": "'Lilita One', cursive",
+      "--font-heading": "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body": "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-mono": "'Space Mono', 'Courier New', monospace",
+
       // Background colors
       "--bg-primary": "#0c1427",
       "--bg-secondary": "#1e293b",
@@ -127,6 +145,30 @@ export const themes = {
       "--progress-fill": "#0ea5e9",
     },
   },
+};
+
+// Available font options for custom theme creation
+export const fontOptions = {
+  brand: [
+    { value: "'Lilita One', cursive", label: "Lilita One" },
+  ],
+  heading: [
+    { value: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif", label: "Poppins" },
+    { value: "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif", label: "Outfit" },
+    { value: "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif", label: "Space Grotesk" },
+    { value: "'Manrope', -apple-system, BlinkMacSystemFont, sans-serif", label: "Manrope" },
+  ],
+  body: [
+    { value: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "Inter" },
+    { value: "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "Rubik" },
+    { value: "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "Work Sans" },
+    { value: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "DM Sans" },
+  ],
+  mono: [
+    { value: "'JetBrains Mono', 'Courier New', monospace", label: "JetBrains Mono" },
+    { value: "'Fira Code', 'Courier New', monospace", label: "Fira Code" },
+    { value: "'Space Mono', 'Courier New', monospace", label: "Space Mono" },
+  ],
 };
 
 export const defaultTheme = "peek";

@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
+import {
+  getSceneTitle,
+  getSceneDescription,
+  formatFileSize,
+} from "../../utils/format.js";
+import { formatRelativeTime } from "../../utils/date.js";
+import Tooltip from "../ui/Tooltip.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -31,9 +38,13 @@ const PlaylistDetail = () => {
       setEditName(playlistData.name);
       setEditDescription(playlistData.description || "");
 
-      // Fetch scene details from Stash for each item
-      if (playlistData.items.length > 0) {
-        await loadSceneDetails(playlistData.items);
+      // Backend now returns items with scene data attached
+      if (playlistData.items && playlistData.items.length > 0) {
+        const scenesWithDetails = playlistData.items.map(item => ({
+          ...item,
+          exists: item.scene !== null && item.scene !== undefined,
+        }));
+        setScenes(scenesWithDetails);
       } else {
         setScenes([]);
       }
@@ -42,33 +53,6 @@ const PlaylistDetail = () => {
       setError("Failed to load playlist");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadSceneDetails = async (items) => {
-    try {
-      // Fetch all scenes from library (we'll filter client-side)
-      const response = await api.post("/library/scenes", {
-        filter: {},
-        page: 1,
-        perPage: 1000, // Get enough to cover playlists
-      });
-
-      const allScenes = response.data.scenes || [];
-
-      // Map playlist items to full scene objects
-      const sceneMap = new Map(allScenes.map(s => [s.id, s]));
-      const scenesWithDetails = items.map(item => ({
-        ...item,
-        scene: sceneMap.get(item.sceneId),
-        exists: sceneMap.has(item.sceneId),
-      }));
-
-      setScenes(scenesWithDetails);
-    } catch (err) {
-      console.error("Failed to load scene details:", err);
-      // Set scenes without details
-      setScenes(items.map(item => ({ ...item, exists: false })));
     }
   };
 
@@ -100,9 +84,24 @@ const PlaylistDetail = () => {
   };
 
   const playPlaylist = () => {
-    // Play first scene in playlist
+    // Play first scene in playlist with playlist context
     if (scenes.length > 0 && scenes[0].exists && scenes[0].scene) {
-      navigate(`/player/${scenes[0].sceneId}`, { state: { scene: scenes[0].scene } });
+      const validScenes = scenes.filter(s => s.exists && s.scene);
+      navigate(`/player/${scenes[0].sceneId}`, {
+        state: {
+          scene: scenes[0].scene,
+          playlist: {
+            id: playlistId,
+            name: playlist.name,
+            scenes: validScenes.map((s, idx) => ({
+              sceneId: s.sceneId,
+              scene: s.scene,
+              position: idx
+            })),
+            currentIndex: 0
+          }
+        }
+      });
     }
   };
 
@@ -284,99 +283,204 @@ const PlaylistDetail = () => {
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
-            {scenes.map((item, index) => (
-              <div
-                key={item.sceneId}
-                className="card"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-color)",
-                  opacity: item.exists ? 1 : 0.5,
-                }}
-              >
-                <div className="card-body">
-                  <div className="flex gap-4">
-                    {/* Thumbnail */}
-                    <div className="flex-shrink-0">
-                      {item.exists && item.scene?.paths?.screenshot ? (
-                        <img
-                          src={item.scene.paths.screenshot}
-                          alt={item.scene?.title || "Scene"}
-                          className="w-40 h-24 object-cover rounded"
-                        />
-                      ) : (
-                        <div
-                          className="w-40 h-24 rounded flex items-center justify-center"
-                          style={{
-                            backgroundColor: item.exists ? "var(--bg-secondary)" : "rgba(239, 68, 68, 0.1)",
-                            border: item.exists ? "none" : "2px dashed rgba(239, 68, 68, 0.5)",
-                          }}
-                        >
-                          <span
-                            className="text-2xl"
-                            style={{ color: item.exists ? "var(--text-muted)" : "rgb(239, 68, 68)" }}
-                          >
-                            {item.exists ? "No Image" : "⚠️"}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+          <div className="space-y-3">
+            {scenes.map((item, index) => {
+              const scene = item.scene;
+              const title = scene ? getSceneTitle(scene) : null;
+              const description = scene ? getSceneDescription(scene) : null;
 
-                    {/* Details */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          {item.exists && item.scene ? (
-                            <>
-                              <Link
-                                to={`/player/${item.sceneId}`}
-                                state={{ scene: item.scene }}
-                                className="text-lg font-semibold hover:underline"
-                                style={{ color: "var(--text-primary)" }}
-                              >
-                                {item.scene.title}
-                              </Link>
-                              <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-                                Position {index + 1}
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <h3
-                                className="text-lg font-semibold"
-                                style={{ color: "rgb(239, 68, 68)" }}
-                              >
-                                ⚠️ Scene Deleted or Not Found
-                              </h3>
-                              <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-                                Scene ID: {item.sceneId} • This scene was removed from Stash
-                              </p>
-                              <p className="text-xs mt-1 px-2 py-1 rounded inline-block" style={{
-                                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                color: "rgb(239, 68, 68)",
-                              }}>
-                                Click "Remove" to clean up this playlist
-                              </p>
-                            </>
-                          )}
+              return (
+                <div
+                  key={item.sceneId}
+                  className="rounded-lg border transition-all hover:shadow-lg"
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border-color)",
+                    opacity: item.exists ? 1 : 0.6,
+                  }}
+                >
+                  <div className="p-4">
+                    <div className="flex gap-4">
+                      {/* Thumbnail */}
+                      <div className="flex-shrink-0 relative">
+                        {item.exists && scene?.paths?.screenshot ? (
+                          <div className="relative w-64 h-36 rounded overflow-hidden">
+                            <img
+                              src={scene.paths.screenshot}
+                              alt={title || "Scene"}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Overlay with duration and studio */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent">
+                              {scene.studio && (
+                                <div className="absolute top-2 right-2">
+                                  <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
+                                    {scene.studio.name}
+                                  </span>
+                                </div>
+                              )}
+                              {scene.files?.[0]?.duration && (
+                                <div className="absolute bottom-2 right-2">
+                                  <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
+                                    {Math.floor(scene.files[0].duration / 60)}m
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="w-64 h-36 rounded flex items-center justify-center"
+                            style={{
+                              backgroundColor: item.exists ? "var(--bg-secondary)" : "rgba(239, 68, 68, 0.1)",
+                              border: item.exists ? "none" : "2px dashed rgba(239, 68, 68, 0.5)",
+                            }}
+                          >
+                            <span
+                              className="text-3xl"
+                              style={{ color: item.exists ? "var(--text-muted)" : "rgb(239, 68, 68)" }}
+                            >
+                              {item.exists ? "📹" : "⚠️"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0 pr-4">
+                            {item.exists && scene ? (
+                              <>
+                                {/* Title */}
+                                <Link
+                                  to={`/player/${item.sceneId}`}
+                                  state={{
+                                    scene: scene,
+                                    playlist: {
+                                      id: playlistId,
+                                      name: playlist.name,
+                                      scenes: scenes.filter(s => s.exists && s.scene).map((s, idx) => ({
+                                        sceneId: s.sceneId,
+                                        scene: s.scene,
+                                        position: idx
+                                      })),
+                                      currentIndex: scenes.filter(s => s.exists && s.scene).findIndex(s => s.sceneId === item.sceneId)
+                                    }
+                                  }}
+                                  className="font-semibold text-lg hover:underline block mb-1"
+                                  style={{ color: "var(--text-primary)" }}
+                                >
+                                  {title}
+                                </Link>
+
+                                {/* Date */}
+                                <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+                                  {scene.date ? formatRelativeTime(scene.date) : "No date"}
+                                </div>
+
+                                {/* Stats Row */}
+                                <div className="flex items-center gap-4 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+                                  <span>⭐ {scene.rating100 ? `${Math.round(scene.rating100 / 20)}/5` : "No rating"}</span>
+                                  <span>💦 {scene.o_counter || 0}</span>
+                                  <span>▶ {scene.play_count || 0}</span>
+                                  {scene.files?.[0]?.width && scene.files?.[0]?.height && (
+                                    <span>{scene.files[0].width}×{scene.files[0].height}</span>
+                                  )}
+                                  {scene.files?.[0]?.size && (
+                                    <span>{formatFileSize(scene.files[0].size)}</span>
+                                  )}
+                                </div>
+
+                                {/* Description */}
+                                {description && (
+                                  <Tooltip content={description} disabled={description.length <= 150}>
+                                    <p
+                                      className="text-sm mb-2 leading-relaxed"
+                                      style={{
+                                        color: "var(--text-secondary)",
+                                        display: "-webkit-box",
+                                        WebkitLineClamp: 2,
+                                        WebkitBoxOrient: "vertical",
+                                        overflow: "hidden",
+                                      }}
+                                    >
+                                      {description}
+                                    </p>
+                                  </Tooltip>
+                                )}
+
+                                {/* Performers & Tags */}
+                                <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-muted)" }}>
+                                  {scene.performers && scene.performers.length > 0 && (
+                                    <Tooltip content={
+                                      <div>
+                                        <div className="font-semibold mb-1">Performers:</div>
+                                        {scene.performers.map((p) => p.name).join(", ")}
+                                      </div>
+                                    }>
+                                      <span className="flex items-center gap-1">
+                                        👥 {scene.performers.length}
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                  {scene.tags && scene.tags.length > 0 && (
+                                    <Tooltip content={
+                                      <div>
+                                        <div className="font-semibold mb-1">Tags:</div>
+                                        {scene.tags.map((t) => t.name).join(", ")}
+                                      </div>
+                                    }>
+                                      <span className="flex items-center gap-1">
+                                        🏷️ {scene.tags.length}
+                                      </span>
+                                    </Tooltip>
+                                  )}
+                                  {scene.organized && (
+                                    <span className="text-green-500">✓ Organized</span>
+                                  )}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <h3
+                                  className="text-lg font-semibold mb-2"
+                                  style={{ color: "rgb(239, 68, 68)" }}
+                                >
+                                  ⚠️ Scene Deleted or Not Found
+                                </h3>
+                                <p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>
+                                  Scene ID: {item.sceneId} • This scene was removed from Stash
+                                </p>
+                                <p className="text-xs px-2 py-1 rounded inline-block" style={{
+                                  backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                  color: "rgb(239, 68, 68)",
+                                }}>
+                                  Click "Remove" to clean up this playlist
+                                </p>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Remove Button */}
+                          <button
+                            onClick={() => removeScene(item.sceneId)}
+                            className="px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors flex-shrink-0"
+                            style={{
+                              backgroundColor: "rgba(239, 68, 68, 0.1)",
+                              color: "rgb(239, 68, 68)",
+                              height: "fit-content",
+                            }}
+                          >
+                            Remove
+                          </button>
                         </div>
-                        <button
-                          onClick={() => removeScene(item.sceneId)}
-                          className="px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors ml-4"
-                          style={{
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
-                            color: "rgb(239, 68, 68)",
-                          }}
-                        >
-                          Remove
-                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

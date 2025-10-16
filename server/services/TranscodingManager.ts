@@ -195,12 +195,12 @@ export class TranscodingManager {
       session.status = "active";
       console.log(`Session ${session.sessionId} ready - pre-transcoding initial segments`);
 
-      // PRE-TRANSCODE first 6 segments (24 seconds) to build initial buffer
-      // Reduced from 20 to start playback sooner, background worker stays ahead
+      // PRE-TRANSCODE first 12 segments (48 seconds) to build initial buffer
+      // Increased to ensure smooth playback start, especially over network
       const { translateStashPath } = await import("../utils/pathMapping.js");
       const absoluteSceneFilePath = translateStashPath(sceneFilePath);
 
-      const preTranscodeCount = 6; // Pre-transcode 24 seconds
+      const preTranscodeCount = 12; // Pre-transcode 48 seconds
       for (const quality of session.qualities) {
         console.log(`Pre-transcoding first ${preTranscodeCount} segments for ${quality}...`);
 
@@ -238,7 +238,7 @@ export class TranscodingManager {
 
   /**
    * Continuously transcode segments in the background to stay ahead of playback
-   * Transcodes 2 segments in parallel for better performance
+   * Transcodes 4 segments in parallel for better performance
    */
   private async startBackgroundTranscoding(
     session: TranscodingSession,
@@ -246,7 +246,7 @@ export class TranscodingManager {
     totalSegments: number
   ): Promise<void> {
     const segmentDuration = 4;
-    const parallelCount = 2; // Transcode 2 segments at once
+    const parallelCount = 4; // Transcode 4 segments at once for faster throughput
 
     console.log(`Starting background transcoding from segment ${session.currentSegment}`);
 
@@ -564,48 +564,62 @@ export class TranscodingManager {
     // Ensure quality directory exists
     fs.mkdirSync(qualityDir, { recursive: true });
 
-    const segmentDuration = 4; // 4 seconds per segment (increased for better efficiency)
+    const segmentDuration = 4; // 4 seconds per segment
 
+    // FFmpeg arguments for segment transcoding
+    // NOTE: Timestamp issue - see TRANSCODING_TIMESTAMP_DEBUG_SUMMARY.md for details
+    // All attempts to reset timestamps to 0 have failed so far
     const args = [
       "-ss",
-      startTime.toString(), // Seek to exact segment start time
+      startTime.toString(), // Seek to segment start time (fast seek)
       "-i",
       sceneFilePath,
       "-t",
-      segmentDuration.toString(), // Transcode only this segment's duration
+      segmentDuration.toString(), // Duration of this segment
+      // Video encoding
       "-c:v",
       "libx264",
       "-preset",
-      "veryfast", // Faster than ultrafast for better speed/quality balance
+      "ultrafast", // Fastest preset for real-time transcoding
+      "-tune",
+      "zerolatency", // Optimize for low latency
       "-crf",
-      "23", // Constant quality mode (faster than bitrate mode)
+      "26", // Constant quality mode
       "-profile:v",
-      "main", // Main profile (faster than baseline)
+      "baseline", // Most compatible profile
+      "-level:v",
+      "3.0",
       "-pix_fmt",
-      "yuv420p",
+      "yuv420p", // Standard pixel format
       "-vf",
-      `scale=${preset.width}:${preset.height}`,
+      `scale=${preset.width}:${preset.height}`, // Scale to target resolution
       "-maxrate",
       preset.bitrate,
       "-bufsize",
-      `${parseInt(preset.bitrate) * 2}k`, // Larger buffer for smoother encoding
+      `${parseInt(preset.bitrate) * 2}k`, // 2x bitrate for buffer
       "-g",
-      "60", // Larger GOP for faster encoding
+      "120", // GOP size (keyframe every 5 seconds)
+      "-keyint_min",
+      "120",
       "-sc_threshold",
-      "0",
+      "0", // Disable scene change detection
+      "-bf",
+      "0", // No B-frames for faster encoding
       "-threads",
-      "0",
+      "0", // Use all available CPU cores
+      // Audio encoding
       "-c:a",
       "aac",
       "-b:a",
       preset.audioBitrate,
       "-ar",
-      "48000",
+      "48000", // 48kHz sample rate
       "-ac",
-      "2",
+      "2", // Stereo
+      // Output format
       "-f",
-      "mpegts", // Output as MPEG-TS segment
-      "-y",
+      "mpegts", // MPEG-TS container
+      "-y", // Overwrite output file
       segmentPath,
     ];
 

@@ -28,7 +28,7 @@ const setupHLSforVOD = (player, scene) => {
 };
 
 // Helper function to manage loading buffer for smooth playback
-const setupLoadingBuffer = (player, minBufferSeconds = 5) => {
+const setupLoadingBuffer = (player, minBufferSeconds = 6) => {
   let isWaitingForBuffer = false;
   let hasStartedPlayback = false;
   let userPaused = false; // Track if user manually paused
@@ -111,6 +111,82 @@ const setupLoadingBuffer = (player, minBufferSeconds = 5) => {
     if (hasStartedPlayback && !player.paused()) {
       checkBuffer();
     }
+  });
+};
+
+// Helper function to setup playlist navigation buttons
+const setupPlaylistControls = (player, playlist, currentIndex, onPrevious, onNext) => {
+  // Wait for player to be fully ready and control bar rendered
+  const addButtons = () => {
+    const controlBar = player.controlBar.el();
+    const playToggle = controlBar.querySelector(".vjs-play-control");
+
+    if (!playToggle) {
+      console.warn("Play toggle not found, retrying in 200ms...");
+      // Retry after a short delay
+      setTimeout(addButtons, 200);
+      return;
+    }
+
+    console.log("Setting up playlist controls, currentIndex:", currentIndex, "total:", playlist.scenes.length);
+
+    // Remove any existing playlist buttons first (in case of re-initialization)
+    const existingPrev = controlBar.querySelector(".vjs-playlist-prev");
+    const existingNext = controlBar.querySelector(".vjs-playlist-next");
+    if (existingPrev) existingPrev.remove();
+    if (existingNext) existingNext.remove();
+
+    const hasPrevious = currentIndex > 0;
+    const hasNext = currentIndex < playlist.scenes.length - 1;
+
+    // Create Previous button (always render, disable if at start)
+    const prevButton = document.createElement("button");
+    prevButton.className = "vjs-control vjs-button vjs-playlist-prev";
+    prevButton.title = hasPrevious ? "Previous Video" : "No previous video";
+    prevButton.disabled = !hasPrevious;
+    prevButton.innerHTML = `
+      <span class="vjs-icon-placeholder" aria-hidden="true">‹‹</span>
+      <span class="vjs-control-text" aria-live="polite">Previous Video</span>
+    `;
+
+    if (hasPrevious) {
+      prevButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        console.log("Previous button clicked");
+        onPrevious();
+      });
+    }
+
+    // Insert before play button
+    playToggle.parentNode.insertBefore(prevButton, playToggle);
+    console.log("Previous button added to DOM", hasPrevious ? "(enabled)" : "(disabled)");
+
+    // Create Next button (always render, disable if at end)
+    const nextButton = document.createElement("button");
+    nextButton.className = "vjs-control vjs-button vjs-playlist-next";
+    nextButton.title = hasNext ? "Next Video" : "No next video";
+    nextButton.disabled = !hasNext;
+    nextButton.innerHTML = `
+      <span class="vjs-icon-placeholder" aria-hidden="true">››</span>
+      <span class="vjs-control-text" aria-live="polite">Next Video</span>
+    `;
+
+    if (hasNext) {
+      nextButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        console.log("Next button clicked");
+        onNext();
+      });
+    }
+
+    // Insert after play button
+    playToggle.parentNode.insertBefore(nextButton, playToggle.nextSibling);
+    console.log("Next button added to DOM", hasNext ? "(enabled)" : "(disabled)");
+  };
+
+  // Start trying to add buttons after player is ready
+  player.ready(() => {
+    setTimeout(addButtons, 100);
   });
 };
 
@@ -306,7 +382,7 @@ const setupTranscodedSeeking = (player, sessionId) => {
   });
 };
 
-const VideoPlayer = ({ scene }) => {
+const VideoPlayer = ({ scene, playlist }) => {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const playerRef = useRef(null);
@@ -322,6 +398,39 @@ const VideoPlayer = ({ scene }) => {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false); // Accordion for Technical Details section
   const [isAutoFallback, setIsAutoFallback] = useState(false); // Track if we're in automatic fallback
   const [isSwitchingMode, setIsSwitchingMode] = useState(false); // Prevent initialization during mode switch
+  const [currentPlaylistIndex, setCurrentPlaylistIndex] = useState(playlist?.currentIndex || 0); // Track playlist position
+
+  // Sync currentPlaylistIndex with playlist.currentIndex when it changes (e.g., on navigation)
+  useEffect(() => {
+    if (playlist && playlist.currentIndex !== undefined) {
+      setCurrentPlaylistIndex(playlist.currentIndex);
+    }
+  }, [playlist?.currentIndex]);
+
+  // Reset player state when scene changes (playlist navigation)
+  useEffect(() => {
+    console.log("[SCENE CHANGE] Scene ID changed to:", scene.id);
+    // Reset all player-related state to force re-initialization
+    setVideo(null);
+    setSessionId(null);
+    setTranscodingStatus("loading");
+    setShowPoster(true);
+    setIsInitializing(false);
+    setIsLoadingAPI(false);
+    setIsAutoFallback(false);
+    setIsSwitchingMode(false);
+
+    // Dispose existing player if any
+    if (playerRef.current) {
+      try {
+        playerRef.current.dispose();
+        playerRef.current = null;
+        console.log("[SCENE CHANGE] Player disposed");
+      } catch (e) {
+        console.warn("[SCENE CHANGE] Error disposing player:", e);
+      }
+    }
+  }, [scene.id]);
 
   // Use the first file for compatibility checking
   const firstFile = scene.files?.[0];
@@ -372,6 +481,68 @@ const VideoPlayer = ({ scene }) => {
     },
     [scene.id, video, isLoadingAPI, playbackMode, compatibility]
   );
+
+  // Function to go to previous scene in playlist
+  const playPreviousInPlaylist = useCallback(() => {
+    if (!playlist || !playlist.scenes) return;
+
+    const prevIndex = currentPlaylistIndex - 1;
+    if (prevIndex >= 0) {
+      const prevScene = playlist.scenes[prevIndex];
+      console.log(`[PLAYLIST NAV] Going to previous scene:`, {
+        fromIndex: currentPlaylistIndex,
+        toIndex: prevIndex,
+        sceneId: prevScene.sceneId,
+        title: prevScene.scene?.title || 'No title',
+      });
+
+      // Navigate to previous scene with updated playlist context
+      // Let React's useEffect cleanup handle player disposal
+      navigate(`/player/${prevScene.sceneId}`, {
+        replace: false,
+        state: {
+          scene: prevScene.scene,
+          playlist: {
+            ...playlist,
+            currentIndex: prevIndex
+          }
+        }
+      });
+    }
+  }, [playlist, currentPlaylistIndex, navigate]);
+
+  // Function to advance to next scene in playlist
+  const playNextInPlaylist = useCallback(() => {
+    if (!playlist || !playlist.scenes) return;
+
+    const nextIndex = currentPlaylistIndex + 1;
+    if (nextIndex < playlist.scenes.length) {
+      const nextScene = playlist.scenes[nextIndex];
+      console.log(`[PLAYLIST NAV] Going to next scene:`, {
+        fromIndex: currentPlaylistIndex,
+        toIndex: nextIndex,
+        sceneId: nextScene.sceneId,
+        title: nextScene.scene?.title || 'No title',
+      });
+
+      // Navigate to next scene with updated playlist context
+      // Let React's useEffect cleanup handle player disposal
+      navigate(`/player/${nextScene.sceneId}`, {
+        replace: false,
+        state: {
+          scene: nextScene.scene,
+          playlist: {
+            ...playlist,
+            currentIndex: nextIndex
+          }
+        }
+      });
+    } else {
+      console.log("Reached end of playlist");
+      // Optionally navigate back to playlist detail page
+      // navigate(`/playlist/${playlist.id}`);
+    }
+  }, [playlist, currentPlaylistIndex, navigate]);
 
   // Effect to restart player when mode changes
   useEffect(() => {
@@ -550,6 +721,9 @@ const VideoPlayer = ({ scene }) => {
         console.log("player is ready");
         console.log("Video object:", video);
 
+        // Enable verbose HLS/VHS debugging
+        videojs.log.level('debug');
+
         const player = playerRef.current;
 
         // CRITICAL: Force VOD behavior by disabling live tracker
@@ -670,6 +844,23 @@ const VideoPlayer = ({ scene }) => {
         if (!canDirectPlay && sessionId) {
           setupTranscodedSeeking(player, sessionId);
         }
+
+        // Setup playlist navigation controls (Previous/Next buttons)
+        console.log("Playlist check:", { playlist, hasScenes: playlist?.scenes, length: playlist?.scenes?.length, currentIndex: currentPlaylistIndex });
+        if (playlist && playlist.scenes && playlist.scenes.length > 1) {
+          console.log("Calling setupPlaylistControls");
+          setupPlaylistControls(player, playlist, currentPlaylistIndex, playPreviousInPlaylist, playNextInPlaylist);
+        } else {
+          console.log("Skipping playlist controls - not in a playlist or only 1 scene");
+        }
+
+        // Setup auto-play next scene in playlist when video ends
+        if (playlist && playlist.scenes && playlist.scenes.length > 1) {
+          player.on("ended", () => {
+            console.log("Video ended, auto-playing next in playlist...");
+            playNextInPlaylist();
+          });
+        }
       });
     }
   }, [
@@ -682,6 +873,10 @@ const VideoPlayer = ({ scene }) => {
     showPoster,
     fetchVideoData,
     isSwitchingMode,
+    playlist,
+    currentPlaylistIndex,
+    playPreviousInPlaylist,
+    playNextInPlaylist,
   ]); // Include all dependencies
 
   // Handle Escape key to go back
@@ -857,6 +1052,24 @@ const VideoPlayer = ({ scene }) => {
               border: "1px solid var(--border-color)",
             }}
           >
+            {/* Playlist Indicator */}
+            {playlist && playlist.scenes && (
+              <div className="flex items-center gap-2">
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Playlist:
+                </span>
+                <span
+                  className="text-sm"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {playlist.name} ({currentPlaylistIndex + 1}/{playlist.scenes.length})
+                </span>
+              </div>
+            )}
+
             {/* Playback Mode Selector */}
             <div className="flex items-center gap-2">
               <label

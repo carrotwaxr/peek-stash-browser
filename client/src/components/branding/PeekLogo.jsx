@@ -1,15 +1,15 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 // import { useTheme } from '../../themes/useTheme.js'; // Will be used for theme-specific logos
 
 export const PeekLogo = ({
   size = "default", // 'small', 'default', 'large'
   variant = "auto", // 'auto', 'active', 'inactive', 'text-only', 'icon-only'
 }) => {
-  const location = useLocation();
+  //const location = useLocation();
   // const { currentTheme } = useTheme(); // Will be used when we implement theme-specific logos
 
-  const isHome = location.pathname === "/";
-  const isActive = variant === "auto" ? isHome : variant === "active";
+  //const isHome = location.pathname === "/";
+  //const isActive = variant === "auto" ? isHome : variant === "active";
 
   // Size configurations
   const sizeConfig = {
@@ -20,7 +20,7 @@ export const PeekLogo = ({
     },
     default: {
       container: "gap-2",
-      logoHeight: "h-12", // 32px
+      logoHeight: "h-8", // 32px
       logoWidth: "w-auto",
     },
     large: {
@@ -35,9 +35,8 @@ export const PeekLogo = ({
   // Get logo image paths
   const getLogoPath = () => {
     const basePath = "/branding/logos";
-    const activeFile = isActive ? "peek-logo-active" : "peek-logo-inactive";
 
-    return `${basePath}/${activeFile}.svg`;
+    return `${basePath}/peek-logo.svg`;
   };
 
   const renderLogo = () => {
@@ -78,6 +77,15 @@ export const PeekLogo = ({
       className={`flex items-center ${config.container} hover:opacity-80 transition-opacity duration-200`}
     >
       {renderLogo()}
+      <span
+        className="text-3xl font-brand"
+        style={{
+          color: "var(--accent-primary)",
+          fontFamily: "var(--font-brand)"
+        }}
+      >
+        peek
+      </span>
     </Link>
   );
 };

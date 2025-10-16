@@ -1,6 +1,52 @@
 import { Request, Response } from "express";
 import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import { Scene } from "stashapp-api";
+
+/**
+ * Helper function to append API key to Stash URLs
+ */
+const appendApiKeyToUrl = (url: string): string => {
+  try {
+    if (!url || typeof url !== "string" || url.trim() === "") {
+      return url;
+    }
+
+    const urlObj = new URL(url);
+    if (!urlObj.searchParams.has("apikey")) {
+      const apiKey = process.env.STASH_API_KEY;
+      if (!apiKey) {
+        console.error("STASH_API_KEY not found in environment variables");
+        return url;
+      }
+      urlObj.searchParams.append("apikey", apiKey);
+    }
+    return urlObj.toString();
+  } catch (urlError) {
+    console.error(`Error processing URL: ${url}`, urlError);
+    return url;
+  }
+};
+
+/**
+ * Transform scene to add API key to image paths
+ */
+const transformScene = (scene: Scene) => {
+  try {
+    const mutated: Record<string, any> = {
+      ...scene,
+      paths: Object.entries(scene.paths).reduce((acc, [key, val]) => {
+        acc[key] = appendApiKeyToUrl(val as string);
+        return acc;
+      }, {} as { [key: string]: string }),
+    };
+
+    return mutated;
+  } catch (error) {
+    console.error("Error transforming scene:", error);
+    return scene;
+  }
+};
 
 /**
  * Get all playlists for current user
@@ -35,7 +81,7 @@ export const getUserPlaylists = async (req: AuthenticatedRequest, res: Response)
 };
 
 /**
- * Get single playlist with items
+ * Get single playlist with items and scene details from Stash
  */
 export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -68,7 +114,47 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Playlist not found" });
     }
 
-    res.json({ playlist });
+    // Fetch scene details from Stash for all items
+    if (playlist.items.length > 0) {
+      const sceneIds = playlist.items.map(item => item.sceneId);
+
+      // Import getStash and fetch scenes
+      const getStash = (await import("../stash.js")).default;
+      const stash = getStash();
+
+      try {
+        const scenesResponse = await stash.findScenes({
+          scene_ids: sceneIds.map(id => parseInt(id)),
+        });
+
+        const scenes = scenesResponse.findScenes.scenes;
+
+        // Transform scenes to add API key to image paths
+        const transformedScenes = scenes.map((s: any) => transformScene(s as Scene));
+
+        // Create a map of scene ID to scene data
+        const sceneMap = new Map(transformedScenes.map((s: any) => [s.id, s]));
+
+        // Attach scene data to each playlist item
+        const itemsWithScenes = playlist.items.map(item => ({
+          ...item,
+          scene: sceneMap.get(item.sceneId) || null,
+        }));
+
+        res.json({
+          playlist: {
+            ...playlist,
+            items: itemsWithScenes,
+          }
+        });
+      } catch (stashError) {
+        console.error("Error fetching scenes from Stash:", stashError);
+        // Return playlist without scene details if Stash fails
+        res.json({ playlist });
+      }
+    } else {
+      res.json({ playlist });
+    }
   } catch (error) {
     console.error("Error getting playlist:", error);
     res.status(500).json({ error: "Failed to get playlist" });
