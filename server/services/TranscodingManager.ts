@@ -26,6 +26,8 @@ export interface TranscodingSession {
   status: "starting" | "active" | "completed" | "error";
   scene?: Scene;
   playlistMonitor?: NodeJS.Timeout; // Timer for dynamic playlist generation
+  completedSegments: Set<number>; // Track which segments are actually transcoded
+  totalSegments: number; // Total segments for the full video
 }
 
 /**
@@ -82,6 +84,11 @@ export class TranscodingManager {
       sessionId
     );
 
+    // Calculate total segments from video duration
+    const duration = scene?.files?.[0]?.duration || 0;
+    const segmentDuration = 4;
+    const totalSegments = Math.ceil((duration - startTime) / segmentDuration);
+
     const session: TranscodingSession = {
       sessionId,
       videoId,
@@ -94,11 +101,13 @@ export class TranscodingManager {
       lastAccess: Date.now(),
       status: "starting",
       scene,
+      completedSegments: new Set(),
+      totalSegments,
     };
 
     this.sessions.set(sessionId, session);
 
-    console.log(`[TranscodingManager] Created session ${sessionId} at startTime ${startTime}s`);
+    console.log(`[TranscodingManager] Created session ${sessionId} at startTime ${startTime}s (${totalSegments} segments)`);
 
     return session;
   }
@@ -356,7 +365,10 @@ ${session.quality}/stream.m3u8
 
   /**
    * Start monitoring segment directory and dynamically generate playlist
-   * This is a workaround for FFmpeg VOD mode which only writes playlist at the end
+   *
+   * VOD TRICK: We generate a FULL playlist immediately (as if the entire video is transcoded)
+   * This shows Video.js a complete VOD with seek controls.
+   * We track which segments actually exist and serve them when ready.
    */
   private startPlaylistMonitor(session: TranscodingSession): void {
     const qualityDir = posixPath.join(session.outputDir, session.quality);
@@ -364,58 +376,75 @@ ${session.quality}/stream.m3u8
     const segmentDuration = 4; // 4-second segments
     const startSegment = Math.floor(session.startTime / 4);
 
-    console.log(`[PlaylistMonitor] Starting for session ${session.sessionId}`);
+    console.log(`[PlaylistMonitor] Starting for session ${session.sessionId} (${session.totalSegments} total segments)`);
 
-    // Update playlist every 500ms
+    // Generate FULL playlist immediately (VOD trick)
+    this.generateFullPlaylist(session);
+
+    // Monitor segment creation to track completion
     session.playlistMonitor = setInterval(() => {
       try {
         if (!fs.existsSync(qualityDir)) return;
 
-        // Find all segment files
+        // Find all segment files that actually exist
         const files = fs.readdirSync(qualityDir);
-        const segments = files
+        const existingSegments = files
           .filter(f => f.match(/segment_\d+\.ts/))
-          .map(f => parseInt(f.match(/segment_(\d+)\.ts/)?.[1] || "0"))
-          .sort((a, b) => a - b);
+          .map(f => parseInt(f.match(/segment_(\d+)\.ts/)?.[1] || "0"));
 
-        if (segments.length === 0) return;
-
-        // Calculate total duration from video metadata
-        const totalDuration = session.scene?.files?.[0]?.duration || 0;
-
-        // Determine if transcoding is complete
-        const isComplete = session.status === "completed" || session.process === null;
-
-        // Generate VOD playlist
-        let playlist = `#EXTM3U\n`;
-        playlist += `#EXT-X-VERSION:3\n`;
-        playlist += `#EXT-X-TARGETDURATION:${segmentDuration}\n`;
-        playlist += `#EXT-X-MEDIA-SEQUENCE:${startSegment}\n`;
-
-        // Add each segment
-        for (const segNum of segments) {
-          playlist += `#EXTINF:${segmentDuration}.000,\n`;
-          playlist += `segment_${segNum.toString().padStart(3, '0')}.ts\n`;
+        // Update completed segments set
+        for (const segNum of existingSegments) {
+          if (!session.completedSegments.has(segNum)) {
+            session.completedSegments.add(segNum);
+            console.log(`[PlaylistMonitor] Segment ${segNum} completed (${session.completedSegments.size}/${session.totalSegments})`);
+          }
         }
 
-        // Add end tag if transcoding is complete
-        if (isComplete) {
-          playlist += `#EXT-X-ENDLIST\n`;
-        }
+        // Check if transcoding is complete
+        const isComplete = session.completedSegments.size >= session.totalSegments ||
+                          session.status === "completed" ||
+                          session.process === null;
 
-        // Write playlist
-        fs.writeFileSync(playlistPath, playlist);
-
-        // Stop monitoring if complete
         if (isComplete && session.playlistMonitor) {
           clearInterval(session.playlistMonitor);
           session.playlistMonitor = undefined;
-          console.log(`[PlaylistMonitor] Stopped for session ${session.sessionId} (transcoding complete)`);
+          console.log(`[PlaylistMonitor] Stopped for session ${session.sessionId} (all segments complete)`);
         }
       } catch (error) {
         console.error(`[PlaylistMonitor] Error for session ${session.sessionId}:`, error);
       }
     }, 500);
+  }
+
+  /**
+   * Generate FULL VOD playlist (pretending all segments exist)
+   * This tricks Video.js into showing VOD controls with full seek bar
+   */
+  private generateFullPlaylist(session: TranscodingSession): void {
+    const qualityDir = posixPath.join(session.outputDir, session.quality);
+    const playlistPath = posixPath.join(qualityDir, "stream.m3u8");
+    const segmentDuration = 4;
+    const startSegment = Math.floor(session.startTime / 4);
+
+    // Generate complete VOD playlist
+    let playlist = `#EXTM3U\n`;
+    playlist += `#EXT-X-VERSION:3\n`;
+    playlist += `#EXT-X-TARGETDURATION:${segmentDuration}\n`;
+    playlist += `#EXT-X-MEDIA-SEQUENCE:${startSegment}\n`;
+
+    // Add ALL segments (even ones that don't exist yet)
+    for (let i = 0; i < session.totalSegments; i++) {
+      const segNum = startSegment + i;
+      playlist += `#EXTINF:${segmentDuration}.000,\n`;
+      playlist += `segment_${segNum.toString().padStart(3, '0')}.ts\n`;
+    }
+
+    // Always include ENDLIST for VOD (this gives us the seek bar!)
+    playlist += `#EXT-X-ENDLIST\n`;
+
+    // Write playlist
+    fs.writeFileSync(playlistPath, playlist);
+    console.log(`[PlaylistMonitor] Generated full VOD playlist with ${session.totalSegments} segments`);
   }
 
   /**
