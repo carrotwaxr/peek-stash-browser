@@ -425,7 +425,7 @@ const VideoPlayer = ({ scene }) => {
             setupHLSforVOD(player, response.data.scene);
             setupQualitySelector(player);
             setupTranscodedSeeking(player, response.data.sessionId);
-            setupLoadingBuffer(player, 10); // Monitor buffer during playback
+            setupLoadingBuffer(player, 6); // Monitor buffer during playback
 
             // CRITICAL: Disable live tracker after mode switch to prevent live UI mode
             if (player.liveTracker) {
@@ -616,7 +616,7 @@ const VideoPlayer = ({ scene }) => {
                     setupHLSforVOD(player, response.data.scene);
                     // NOTE: setupQualitySelector will be called later in main player init (line 257)
                     setupTranscodedSeeking(player, response.data.sessionId);
-                    setupLoadingBuffer(player, 10); // Add listeners before src change!
+                    setupLoadingBuffer(player, 6); // Wait for 6s buffer before playback
 
                     // Change player source to HLS (don't dispose!)
                     const playlistUrl = response.data.playlistUrl;
@@ -659,7 +659,7 @@ const VideoPlayer = ({ scene }) => {
         // Configure HLS for VOD behavior if not direct play
         if (!canDirectPlay) {
           setupHLSforVOD(player, scene);
-          setupLoadingBuffer(player, 10); // Monitor buffer during playback
+          setupLoadingBuffer(player, 6); // Monitor buffer during playback
         }
 
         // Setup quality selector
