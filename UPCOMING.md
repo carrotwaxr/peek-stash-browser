@@ -56,22 +56,23 @@ _No items currently at critical priority._
 
 ## Page/Tab Titles
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: High
 - **Description**: Add descriptive `document.title` to each page for better tab identification
-- **Current State**: Page titles not set, browser shows generic title
-- **Needed Work**:
-  - Set default title for homepage: `"Peek"`
-  - Set title pattern for other pages: `"$title - Peek"`
-  - Detail pages (Scene, Studio, Performer, Tag) should use entity name: `"Scene Name - Peek"`
-  - Other pages use page name: `"Scenes - Peek"`, `"User Settings - Peek"`, etc.
-  - Ensure primary header on page matches wording of document title
-  - Use React's `useEffect` or `<Helmet>` to set titles dynamically
-- **Technical Notes**:
-  - Update titles on route changes
-  - Consider creating a `usePageTitle()` hook for consistency
-  - Test with multiple tabs open to verify uniqueness
-- **Benefit**: Easy "at a glance" identification when users have multiple tabs open
+- **Current State**: All pages now have descriptive titles for easy tab identification
+- **Completed Work**:
+  - Created `usePageTitle()` custom hook for consistent title management
+  - Added page titles to all pages following pattern: "Page Name - Peek"
+  - Homepage displays "Peek" only
+  - List pages show "Scenes - Peek", "Performers - Peek", etc.
+  - Detail pages show entity names: "Scene Name - Peek", "Performer Name - Peek", etc.
+  - Settings pages show descriptive titles: "My Settings - Peek", "Server Settings - Peek"
+- **Technical Implementation**:
+  - New hook: `client/src/hooks/usePageTitle.js`
+  - Hook automatically sets and cleans up document title on mount/unmount
+  - Supports dynamic titles that update when entity data loads
+  - All page components updated to use the hook
+- **Benefit**: Users can now easily identify tabs at a glance when working with multiple browser tabs
 
 ## Direct/Bookmark Link Capabilities
 
