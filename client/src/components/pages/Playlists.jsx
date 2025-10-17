@@ -31,7 +31,7 @@ const Playlists = () => {
       setLoading(true);
       const response = await api.get("/playlists");
       setPlaylists(response.data.playlists);
-    } catch (err) {
+    } catch {
       setError("Failed to load playlists");
     } finally {
       setLoading(false);
@@ -54,7 +54,7 @@ const Playlists = () => {
       setNewPlaylistDescription("");
       setShowCreateModal(false);
       loadPlaylists();
-    } catch (err) {
+    } catch {
       showError("Failed to create playlist");
     } finally {
       setCreating(false);
@@ -73,7 +73,7 @@ const Playlists = () => {
       await api.delete(`/playlists/${playlistToDelete.id}`);
       showSuccess("Playlist deleted");
       loadPlaylists();
-    } catch (err) {
+    } catch {
       showError("Failed to delete playlist");
     } finally {
       setPlaylistToDelete(null);

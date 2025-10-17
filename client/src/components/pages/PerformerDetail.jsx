@@ -20,7 +20,8 @@ const PerformerDetail = () => {
         setIsLoading(true);
         const performerData = await getPerformer(performerId);
         setPerformer(performerData);
-      } catch (error) {
+      } catch {
+        // Error loading performer - will show loading spinner
       } finally {
         setIsLoading(false);
       }

@@ -20,7 +20,8 @@ const TagDetail = () => {
         setIsLoading(true);
         const tagData = await getTag(tagId);
         setTag(tagData);
-      } catch (error) {
+      } catch {
+        // Error loading tag - will show loading spinner
       } finally {
         setIsLoading(false);
       }

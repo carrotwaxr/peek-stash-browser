@@ -283,7 +283,7 @@ export class TranscodingManager {
             return;
           }
         }
-      } catch (err) {
+      } catch {
         // Directory might not be accessible yet, continue waiting
       }
 
@@ -571,7 +571,6 @@ ${session.quality}/stream.m3u8
    */
   private startPlaylistMonitor(session: TranscodingSession): void {
     const qualityDir = posixPath.join(session.outputDir, session.quality);
-    const playlistPath = posixPath.join(qualityDir, "stream.m3u8");
     const segmentDuration = 4; // 4-second segments
     const startSegment = Math.floor(session.startTime / segmentDuration);
 
@@ -593,8 +592,6 @@ ${session.quality}/stream.m3u8
         // FFmpeg creates: segment_000.ts, segment_001.ts, segment_002.ts, ...
         // We need to rename them to match the video timeline
         // For a seek to 1052s (segment 263): segment_000 → segment_263, segment_001 → segment_264, etc.
-        const files = fs.readdirSync(qualityDir);
-
         // Look for unrenamed segments (those that exist but aren't in completedSegments yet)
         // OPTIMIZATION: Only check a reasonable range of segments based on current progress
         // This prevents blocking the event loop with 1000+ fs calls every 500ms
@@ -630,7 +627,7 @@ ${session.quality}/stream.m3u8
                   to: `segment_${actualSegNum.toString().padStart(3, '0')}.ts`,
                   progress: `${session.completedSegments.size}/${session.totalSegments}`,
                 });
-              } catch (err) {
+              } catch {
                 // Segment might be in use by FFmpeg, will catch it next iteration
               }
             }
@@ -781,7 +778,7 @@ ${session.quality}/stream.m3u8
           for (const pid of pidArray) {
             try {
               execSync(`kill -9 ${pid}`, { stdio: "pipe" });
-            } catch (err) {
+            } catch {
               // Process might already be dead, ignore
             }
           }
@@ -789,7 +786,7 @@ ${session.quality}/stream.m3u8
         } else {
           logger.debug("No orphaned FFmpeg processes found");
         }
-      } catch (err: any) {
+      } catch {
         // No processes found or error executing - both are fine
         logger.debug("No orphaned FFmpeg processes found");
       }
@@ -872,7 +869,7 @@ ${session.quality}/stream.m3u8
             // Try to remove the now-empty directory
             try {
               fs.rmdirSync(fullPath);
-            } catch (err) {
+            } catch {
               // Might not be empty yet, ignore
             }
           } else {
@@ -890,7 +887,7 @@ ${session.quality}/stream.m3u8
 
       // Finally try to remove the directory itself
       fs.rmdirSync(dirPath);
-    } catch (err) {
+    } catch {
       // Best effort - if we can't delete everything, that's ok
     }
   }

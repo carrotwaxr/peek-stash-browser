@@ -275,7 +275,7 @@ const VideoPlayer = ({
         setTimeout(() => {
           try {
             player.dispose();
-          } catch (e) {
+          } catch {
             // Player disposal warning - can be ignored
           }
         }, 0);

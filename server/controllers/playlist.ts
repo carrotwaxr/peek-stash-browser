@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Scene } from "stashapp-api";

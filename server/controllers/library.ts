@@ -1,5 +1,4 @@
 import {
-  CriterionModifier,
   Scene,
   SceneFilterType,
   PerformerFilterType,

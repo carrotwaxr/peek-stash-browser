@@ -56,7 +56,7 @@ const PlaylistDetail = () => {
       } else {
         setScenes([]);
       }
-    } catch (err) {
+    } catch {
       setError("Failed to load playlist");
     } finally {
       setLoading(false);
@@ -73,7 +73,7 @@ const PlaylistDetail = () => {
       showSuccess("Playlist updated successfully!");
       setIsEditing(false);
       loadPlaylist();
-    } catch (err) {
+    } catch {
       showError("Failed to update playlist");
     }
   };
@@ -90,7 +90,7 @@ const PlaylistDetail = () => {
       await api.delete(`/playlists/${playlistId}/items/${sceneToRemove.sceneId}`);
       showSuccess("Scene removed from playlist");
       loadPlaylist();
-    } catch (err) {
+    } catch {
       showError("Failed to remove scene from playlist");
     } finally {
       setSceneToRemove(null);

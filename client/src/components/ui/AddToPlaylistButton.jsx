@@ -38,7 +38,8 @@ const AddToPlaylistButton = ({ sceneId, compact = false }) => {
       setLoading(true);
       const response = await api.get("/playlists");
       setPlaylists(response.data.playlists || []);
-    } catch (err) {
+    } catch {
+      // Error loading playlists - will show in UI
     } finally {
       setLoading(false);
     }

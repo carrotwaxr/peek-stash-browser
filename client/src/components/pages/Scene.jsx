@@ -20,7 +20,7 @@ const Scene = () => {
 
   // Local state for fetched data
   const [scene, setScene] = useState(sceneFromState);
-  const [playlist, setPlaylist] = useState(playlistFromState);
+  const [playlist] = useState(playlistFromState);
   const [isLoading, setIsLoading] = useState(!sceneFromState);
   const [fetchError, setFetchError] = useState(null);
 
