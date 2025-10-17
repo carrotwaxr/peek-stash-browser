@@ -87,6 +87,46 @@ export const libraryApi = {
   findTags: (params = {}) => {
     return apiPost("/library/tags", params);
   },
+
+  /**
+   * Find a single performer by ID
+   * @param {string} id - Performer ID
+   * @returns {Promise<Object|null>} Performer object or null if not found
+   */
+  findPerformerById: async (id) => {
+    const result = await apiPost("/library/performers", { ids: [id] });
+    return result?.findPerformers?.performers?.[0] || null;
+  },
+
+  /**
+   * Find a single scene by ID
+   * @param {string} id - Scene ID
+   * @returns {Promise<Object|null>} Scene object or null if not found
+   */
+  findSceneById: async (id) => {
+    const result = await apiPost("/library/scenes", { ids: [id] });
+    return result?.findScenes?.scenes?.[0] || null;
+  },
+
+  /**
+   * Find a single studio by ID
+   * @param {string} id - Studio ID
+   * @returns {Promise<Object|null>} Studio object or null if not found
+   */
+  findStudioById: async (id) => {
+    const result = await apiPost("/library/studios", { ids: [id] });
+    return result?.findStudios?.studios?.[0] || null;
+  },
+
+  /**
+   * Find a single tag by ID
+   * @param {string} id - Tag ID
+   * @returns {Promise<Object|null>} Tag object or null if not found
+   */
+  findTagById: async (id) => {
+    const result = await apiPost("/library/tags", { ids: [id] });
+    return result?.findTags?.tags?.[0] || null;
+  },
 };
 
 // Video playback API endpoints
