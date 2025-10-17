@@ -13,7 +13,6 @@ const TagDetail = () => {
   // Set page title to tag name
   usePageTitle(tag?.name || "Tag");
 
-  console.log("TagDetail render:", tag);
 
   useEffect(() => {
     const fetchTag = async () => {
@@ -22,7 +21,6 @@ const TagDetail = () => {
         const tagData = await getTag(tagId);
         setTag(tagData);
       } catch (error) {
-        console.error("Error fetching tag:", error);
       } finally {
         setIsLoading(false);
       }

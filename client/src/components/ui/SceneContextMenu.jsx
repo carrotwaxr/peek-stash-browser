@@ -40,7 +40,6 @@ const SceneContextMenu = ({ sceneId }) => {
       const response = await api.get("/playlists");
       setPlaylists(response.data.playlists || []);
     } catch (err) {
-      console.error("Failed to load playlists:", err);
     } finally {
       setLoadingPlaylists(false);
     }
@@ -52,7 +51,6 @@ const SceneContextMenu = ({ sceneId }) => {
       showSuccess("Added to playlist!");
       setShowMenu(false);
     } catch (err) {
-      console.error("Failed to add to playlist:", err);
       if (err.response?.status === 400) {
         showWarning("Scene already in playlist");
       } else {

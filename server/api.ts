@@ -22,6 +22,7 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import playlistRoutes from "./routes/playlist.js";
 import { authenticateToken } from "./middleware/auth.js";
+import { logger } from "./utils/logger.js";
 
 export const setupAPI = () => {
   const app = express();
@@ -83,8 +84,10 @@ export const setupAPI = () => {
   // Legacy segment endpoint (keeping for compatibility, no auth required)
   app.get("/api/stream/:videoId/:segment", getStreamSegment);
   app.listen(8000, () => {
-    console.log("Server is running on http://localhost:8000");
-    console.log("New transcoding system active with session management");
+    logger.info("Server is running", {
+      url: "http://localhost:8000",
+      transcodingSystem: "session-based",
+    });
   });
 
   return app;

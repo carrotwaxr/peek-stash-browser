@@ -116,7 +116,6 @@ const SearchControls = ({
   };
 
   const handlePageChange = (page) => {
-    console.log("Page change to:", page);
     setCurrentPage(page);
 
     // Trigger search with new page

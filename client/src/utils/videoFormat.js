@@ -76,10 +76,6 @@ function testCodecSupport(container, videoCodec, audioCodec) {
   const canPlay = video.canPlayType(mimeType);
   const supported = canPlay === "probably" || canPlay === "maybe";
 
-  console.log(
-    `Codec test: ${mimeType} = ${canPlay} (${supported ? "✓" : "✗"})`
-  );
-
   codecSupportCache.set(cacheKey, supported);
   return supported;
 }

@@ -22,9 +22,6 @@ export const ThemedIcon = ({
   const LucideIcon = LucideIcons[pascalCaseName];
 
   if (!LucideIcon) {
-    console.warn(
-      `Icon "${iconName}" (${pascalCaseName}) not found for theme "${currentTheme}"`
-    );
     return null;
   }
 

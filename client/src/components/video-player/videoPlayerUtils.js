@@ -1,5 +1,9 @@
 import videojs from "video.js";
 
+// Set VideoJS global log level to reduce console spam
+// Options: 'all', 'debug', 'info', 'warn', 'error', 'off'
+videojs.log.level("warn");
+
 /**
  * Configure HLS for VOD (Video On Demand) behavior
  * Sets duration from scene metadata when player reports Infinity
@@ -12,7 +16,6 @@ export const setupHLSforVOD = (player, scene) => {
     if (!durationSet && duration && player.duration() === Infinity) {
       player.duration(duration);
       durationSet = true;
-      console.log("Set player duration from scene metadata:", duration);
     }
   });
 };
@@ -34,21 +37,12 @@ export const setupLoadingBuffer = (player, minBufferSeconds = 6) => {
       const bufferedEnd = buffered.end(buffered.length - 1);
       const bufferAhead = bufferedEnd - currentTime;
 
-      console.log(
-        `Buffer check: ${bufferAhead.toFixed(1)}s ahead (target: ${minBufferSeconds}s)`
-      );
-
       // If we're playing and buffer is low, pause and wait
       if (
         !player.paused() &&
         bufferAhead < minBufferSeconds &&
         !isWaitingForBuffer
       ) {
-        console.log(
-          `Buffer low (${bufferAhead.toFixed(
-            1
-          )}s), pausing until ${minBufferSeconds}s buffered...`
-        );
         isWaitingForBuffer = true;
         userPaused = false;
         player.pause();
@@ -57,15 +51,12 @@ export const setupLoadingBuffer = (player, minBufferSeconds = 6) => {
 
       // If we're waiting for buffer and it's now sufficient, resume
       if (isWaitingForBuffer && bufferAhead >= minBufferSeconds) {
-        console.log(
-          `Buffer ready (${bufferAhead.toFixed(1)}s), resuming playback`
-        );
         isWaitingForBuffer = false;
         player.removeClass("vjs-waiting");
 
         if (!userPaused) {
-          player.play().catch((err) => {
-            console.warn("Failed to resume playback after buffering:", err);
+          player.play().catch(() => {
+            // Failed to resume playback after buffering
           });
         }
       }
@@ -88,7 +79,6 @@ export const setupLoadingBuffer = (player, minBufferSeconds = 6) => {
   player.on("playing", () => {
     hasStartedPlayback = true;
     userPaused = false;
-    console.log("Playback started, monitoring buffer...");
   });
 
   // Check buffer on progress events (new data loaded)
@@ -120,17 +110,9 @@ export const setupPlaylistControls = (
     const playToggle = controlBar.querySelector(".vjs-play-control");
 
     if (!playToggle) {
-      console.warn("Play toggle not found, retrying in 200ms...");
       setTimeout(addButtons, 200);
       return;
     }
-
-    console.log(
-      "Setting up playlist controls, currentIndex:",
-      currentIndex,
-      "total:",
-      playlist.scenes.length
-    );
 
     // Remove any existing playlist buttons first
     const existingPrev = controlBar.querySelector(".vjs-playlist-prev");
@@ -154,16 +136,11 @@ export const setupPlaylistControls = (
     if (hasPrevious) {
       prevButton.addEventListener("click", (e) => {
         e.preventDefault();
-        console.log("Previous button clicked");
         onPrevious();
       });
     }
 
     playToggle.parentNode.insertBefore(prevButton, playToggle);
-    console.log(
-      "Previous button added to DOM",
-      hasPrevious ? "(enabled)" : "(disabled)"
-    );
 
     // Create Next button
     const nextButton = document.createElement("button");
@@ -178,16 +155,11 @@ export const setupPlaylistControls = (
     if (hasNext) {
       nextButton.addEventListener("click", (e) => {
         e.preventDefault();
-        console.log("Next button clicked");
         onNext();
       });
     }
 
     playToggle.parentNode.insertBefore(nextButton, playToggle.nextSibling);
-    console.log(
-      "Next button added to DOM",
-      hasNext ? "(enabled)" : "(disabled)"
-    );
   };
 
   player.ready(() => {
@@ -326,27 +298,20 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
   // Enable seeking only after playback has started
   player.one("playing", () => {
     hasPlayedOnce = true;
-    console.log("Playback started, user seeking now enabled");
   });
 
   player.on("seeking", () => {
     if (isTranscodedSeeking) {
-      console.log("Ignoring seek event during transcoded seek operation");
       return;
     }
 
     if (!hasPlayedOnce) {
-      console.log("Ignoring seek before playback started (likely auto-resume)");
       return;
     }
 
     const currentTime = player.currentTime();
     const duration = player.duration();
     const seekDistance = Math.abs(currentTime - lastSeekTime);
-
-    console.log(
-      `Seeking to: ${currentTime}s of ${duration}s (distance: ${seekDistance}s)`
-    );
 
     if (seekDistance > SEEK_THRESHOLD) {
       isTranscodedSeeking = true;
@@ -358,35 +323,15 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
           startTime: targetSeekTime,
         })
         .then((response) => {
-          console.log("Seek request sent to backend", response.data);
-
           const newSessionId = response.data.sessionId;
           const sessionChanged = newSessionId !== currentSessionId;
-
-          console.log(
-            `Session ${
-              sessionChanged ? "CHANGED" : "REUSED"
-            }: ${currentSessionId} -> ${newSessionId}`
-          );
 
           if (sessionChanged) {
             // Backend started transcoding from new position, but we keep using the same playlist
             // The playlist represents segments 0-end, so Video.js will request the correct segment
             // Backend's segment renaming will catch up before Video.js requests it
-            console.log(
-              `Backend started new transcoding session from ${response.data.startTime}s, but keeping current playlist`
-            );
-            console.log(
-              `Video.js will naturally seek to ${targetSeekTime}s and request the correct segment`
-            );
-
             // Update session ID for future seeks
             currentSessionId = newSessionId;
-          } else {
-            // Same session - Video.js just seeks normally
-            console.log(
-              `Reusing session ${currentSessionId}, Video.js seeking naturally to ${targetSeekTime}s`
-            );
           }
 
           // In both cases, just let Video.js handle the seek
@@ -395,15 +340,10 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
 
           lastSeekTime = targetSeekTime;
         })
-        .catch((error) => {
-          console.error("Error seeking:", error);
+        .catch(() => {
           isTranscodedSeeking = false;
         });
     }
-  });
-
-  player.on("loadedmetadata", () => {
-    console.log("Metadata loaded, duration:", player.duration());
   });
 };
 
@@ -447,7 +387,6 @@ export const getVideoJsOptions = (sources) => {
  */
 export const disableLiveTracker = (player, context = "") => {
   if (player.liveTracker) {
-    console.log(`Disabling live tracker${context ? ` (${context})` : ""} to force VOD UI`);
     player.liveTracker.dispose();
     player.liveTracker = null;
   }

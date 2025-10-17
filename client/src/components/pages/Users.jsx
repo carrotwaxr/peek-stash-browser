@@ -40,7 +40,6 @@ const Users = () => {
       const response = await api.get("/user/all");
       setUsers(response.data.users || []);
     } catch (err) {
-      console.error("Failed to load users:", err);
       setError(err.response?.data?.error || "Failed to load users");
     } finally {
       setLoading(false);
@@ -80,7 +79,6 @@ const Users = () => {
 
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      console.error("Failed to create user:", err);
       setError(err.response?.data?.error || "Failed to create user");
     } finally {
       setCreating(false);
@@ -103,7 +101,6 @@ const Users = () => {
 
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      console.error("Failed to delete user:", err);
       setError(err.response?.data?.error || "Failed to delete user");
     }
   };
@@ -130,7 +127,6 @@ const Users = () => {
 
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      console.error("Failed to change user role:", err);
       setError(err.response?.data?.error || "Failed to change user role");
     }
   };

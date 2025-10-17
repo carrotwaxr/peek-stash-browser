@@ -1361,30 +1361,53 @@ const Button = ({ variant = "primary", children, ...props }) => (
 
 ### Logging Strategy
 
-```typescript
-// Structured logging
-import winston from "winston";
+Peek uses Winston for structured backend logging and sets Video.js to warn level for frontend logging.
 
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || "info",
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: "app.log" }),
-  ],
+**Backend Logging** (`server/utils/logger.ts`):
+
+```typescript
+import { logger } from './utils/logger.js';
+
+// Available levels: error, warn, info, http, verbose, debug
+logger.info('Session created', {
+  sessionId,
+  sceneId,
+  quality,
+  userId
 });
 
-// Usage
-logger.info("User logged in", { userId: user.id, timestamp: new Date() });
-logger.error("Database connection failed", {
+logger.error('Failed to start transcoding session', {
+  sceneId,
   error: error.message,
-  stack: error.stack,
+  stack: error.stack
+});
+
+logger.debug('Segment completed', {
+  sessionId,
+  segmentNum,
+  totalSegments
 });
 ```
+
+**Frontend Logging**:
+
+Video.js logging is set to `warn` level to reduce console spam:
+
+```javascript
+// client/src/components/video-player/videoPlayerUtils.js
+import videojs from 'video.js';
+
+// Set global log level - options: 'all', 'debug', 'info', 'warn', 'error', 'off'
+videojs.log.level('warn');
+```
+
+**Logging Best Practices**:
+
+- Use structured logging with context objects (not string concatenation)
+- Include relevant IDs (sessionId, sceneId, userId) for traceability
+- Backend: Use appropriate log levels (error for failures, info for important events, debug for detailed flow)
+- Frontend: Avoid console.log in production code - errors/warnings only
+- FFmpeg output is parsed and logged at appropriate levels via `ffmpegLogger.ts`
 
 ### Development Tools
 

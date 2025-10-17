@@ -15,15 +15,12 @@ const PerformerDetail = () => {
   usePageTitle(performer?.name || "Performer");
 
   useEffect(() => {
-    console.log("running effect");
     const fetchPerformer = async () => {
       try {
         setIsLoading(true);
         const performerData = await getPerformer(performerId);
-        console.log("Fetched performer data:", performerData);
         setPerformer(performerData);
       } catch (error) {
-        console.error("Error fetching performer:", error);
       } finally {
         setIsLoading(false);
       }

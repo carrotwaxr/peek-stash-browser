@@ -51,7 +51,6 @@ const Scene = () => {
           setFetchError("Scene not found");
         }
       } catch (error) {
-        console.error("Error fetching scene:", error);
         setFetchError(error.message || "Failed to load scene");
       } finally {
         setIsLoading(false);

@@ -57,7 +57,6 @@ const PlaylistDetail = () => {
         setScenes([]);
       }
     } catch (err) {
-      console.error("Failed to load playlist:", err);
       setError("Failed to load playlist");
     } finally {
       setLoading(false);
@@ -75,7 +74,6 @@ const PlaylistDetail = () => {
       setIsEditing(false);
       loadPlaylist();
     } catch (err) {
-      console.error("Failed to update playlist:", err);
       showError("Failed to update playlist");
     }
   };
@@ -93,7 +91,6 @@ const PlaylistDetail = () => {
       showSuccess("Scene removed from playlist");
       loadPlaylist();
     } catch (err) {
-      console.error("Failed to remove scene:", err);
       showError("Failed to remove scene from playlist");
     } finally {
       setSceneToRemove(null);

@@ -42,7 +42,6 @@ const Tags = () => {
         const result = await getTags(query);
         setData(result);
       } catch (err) {
-        console.error("getTags error:", err);
         setError(err.message || "An error occurred");
       } finally {
         setIsLoading(false);
@@ -70,7 +69,6 @@ const Tags = () => {
       const result = await getTags(newQuery);
       setData(result);
     } catch (err) {
-      console.error("getTags error:", err);
       setError(err.message || "An error occurred");
     } finally {
       setIsLoading(false);
@@ -195,7 +193,6 @@ const TagCard = ({ tag }) => {
 };
 
 const getTags = async (query) => {
-  console.log("Fetching Tags with query:", query);
   const response = await libraryApi.findTags(query);
 
   // Extract tags and count from server response structure
@@ -204,7 +201,6 @@ const getTags = async (query) => {
     tags: findTags?.tags || [],
     count: findTags?.count || 0,
   };
-  console.log("Got Tags:", result);
   return result;
 };
 

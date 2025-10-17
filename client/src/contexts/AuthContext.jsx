@@ -21,7 +21,6 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
       }
     } catch (error) {
-      console.error("Auth check failed:", error);
       setIsAuthenticated(false);
       setUser(null);
     } finally {
@@ -57,7 +56,6 @@ export const AuthProvider = ({ children }) => {
         credentials: "include",
       });
     } catch (error) {
-      console.error("Logout failed:", error);
     } finally {
       setIsAuthenticated(false);
       setUser(null);

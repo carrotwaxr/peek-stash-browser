@@ -6,6 +6,7 @@ import { Scene } from "stashapp-api";
 import { transcodingManager } from "../services/TranscodingManager.js";
 import { translateStashPath } from "../utils/pathMapping.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import { logger } from "../utils/logger.js";
 
 interface PlayVideoRequest extends AuthenticatedRequest {
   query: {
@@ -92,7 +93,10 @@ export const getStreamSegment = (req: Request, res: Response) => {
       res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(session.masterPlaylistPath, (err) => {
         if (err) {
-          console.error(`[getStreamSegment] Error sending master playlist:`, err);
+          logger.error("Error sending master playlist", {
+            sessionId,
+            error: err.message,
+          });
           if (!res.headersSent) {
             res.status(500).send("Error sending master playlist");
           }
@@ -141,21 +145,31 @@ export const getStreamSegment = (req: Request, res: Response) => {
 
           if (segmentExists) {
             // Segment should exist, try serving immediately
-            console.log(`[SegmentServing] Segment ${segmentNum} already completed, serving ${file}`);
+            logger.verbose("Segment already completed, serving", {
+              sessionId,
+              segmentNum,
+              file,
+            });
           } else {
             // Segment not ready yet - check if it's reasonably close to current progress
             const currentProgress = session.completedSegments.size;
             const segmentDistance = segmentNum - currentProgress;
 
-            console.log(
-              `[SegmentServing] Waiting for segment ${segmentNum} (current progress: ${currentProgress}/${session.totalSegments}, distance: ${segmentDistance})`
-            );
+            logger.debug("Waiting for segment", {
+              sessionId,
+              segmentNum,
+              currentProgress,
+              totalSegments: session.totalSegments,
+              distance: segmentDistance,
+            });
 
             // If requesting a segment too far ahead, warn but still wait
             if (segmentDistance > 50) {
-              console.warn(
-                `[SegmentServing] ⚠️ Request for segment ${segmentNum} is ${segmentDistance} segments ahead of current progress!`
-              );
+              logger.warn("Segment request far ahead of current progress", {
+                sessionId,
+                segmentNum,
+                segmentDistance,
+              });
             }
           }
         }
@@ -166,7 +180,11 @@ export const getStreamSegment = (req: Request, res: Response) => {
 
         if (existingRequests) {
           // Another request is already polling for this segment, join that queue
-          console.log(`[SegmentServing] Joining existing wait queue for ${file} (${existingRequests.length} other requests waiting)`);
+          logger.verbose("Joining existing wait queue for segment", {
+            sessionId,
+            file,
+            queueLength: existingRequests.length,
+          });
           existingRequests.push(res);
           return; // This response will be handled when the segment is ready
         }
@@ -184,7 +202,11 @@ export const getStreamSegment = (req: Request, res: Response) => {
             const waitingRequests = pendingSegmentRequests.get(requestKey) || [];
             pendingSegmentRequests.delete(requestKey);
 
-            console.log(`[SegmentServing] ✓ Serving segment ${file} to ${waitingRequests.length} request(s)`);
+            logger.verbose("Serving segment to waiting requests", {
+              sessionId,
+              file,
+              requestCount: waitingRequests.length,
+            });
 
             for (const waitingRes of waitingRequests) {
               if (!waitingRes.headersSent) {
@@ -199,11 +221,12 @@ export const getStreamSegment = (req: Request, res: Response) => {
             const waitingRequests = pendingSegmentRequests.get(requestKey) || [];
             pendingSegmentRequests.delete(requestKey);
 
-            console.error(
-              `[SegmentServing] ✗ Timeout waiting for segment ${file} after ${
-                maxAttempts * interval
-              }ms (${waitingRequests.length} request(s) failed)`
-            );
+            logger.error("Timeout waiting for segment", {
+              sessionId,
+              file,
+              timeoutMs: maxAttempts * interval,
+              failedRequests: waitingRequests.length,
+            });
 
             for (const waitingRes of waitingRequests) {
               if (!waitingRes.headersSent) {
@@ -285,9 +308,13 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
 
     const isDirectPlay = quality === "direct";
 
-    console.log(
-      `${isDirectPlay ? "Direct playing" : `Playing transcoded (${quality})`} scene ${sceneId}`
-    );
+    logger.info("Playing scene", {
+      sceneId,
+      mode: isDirectPlay ? "direct" : "transcoded",
+      quality: isDirectPlay ? undefined : quality,
+      startTime: parseFloat(startTime),
+      userId,
+    });
 
     const startTimeFloat = parseFloat(startTime);
 
@@ -310,10 +337,11 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
           .json({ error: "Scene path exists but is not a file" });
       }
     } catch (error) {
-      console.error(
-        `File access error for scene ${sceneId}: ${sceneFilePath}`,
-        error
-      );
+      logger.error("File access error for scene", {
+        sceneId,
+        path: sceneFilePath,
+        error: error instanceof Error ? error.message : String(error),
+      });
       return res.status(404).json({
         error: "Scene file not found on disk",
         path: sceneFilePath,
@@ -329,10 +357,14 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
         // Get file stats for content-length and range support
         const stats = fs.statSync(absolutePath);
 
-        console.log(`Serving direct play: ${sceneFilePath}`);
-        console.log(
-          `File size: ${stats.size}, Format: ${sceneFile?.format}, Video codec: ${sceneFile?.video_codec}, Audio codec: ${sceneFile?.audio_codec}`
-        );
+        logger.debug("Serving direct play", {
+          sceneId,
+          path: sceneFilePath,
+          size: stats.size,
+          format: sceneFile?.format,
+          videoCodec: sceneFile?.video_codec,
+          audioCodec: sceneFile?.audio_codec,
+        });
 
         // Determine proper MIME type
         let mimeType = "video/mp4";
@@ -366,12 +398,18 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
           mimeType += `; codecs="${videoCodecString}, ${audioCodecString}"`;
         }
 
-        console.log(`Using MIME type: ${mimeType}`);
+        logger.verbose("Using MIME type for direct play", {
+          sceneId,
+          mimeType,
+        });
 
         // Handle range requests for seeking
         const range = req.headers.range;
         if (range) {
-          console.log(`Range request: ${range}`);
+          logger.verbose("Handling range request for direct play", {
+            sceneId,
+            range,
+          });
           const parts = range.replace(/bytes=/, "").split("-");
           const start = parseInt(parts[0], 10);
           const end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
@@ -386,7 +424,7 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
           const stream = fs.createReadStream(absolutePath, { start, end });
           stream.pipe(res);
         } else {
-          console.log(`Sending full file`);
+          logger.verbose("Sending full file for direct play", { sceneId });
           // Send full file with proper headers
           res.setHeader("Content-Type", mimeType);
           res.setHeader("Accept-Ranges", "bytes");
@@ -395,7 +433,10 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
           res.sendFile(absolutePath);
         }
       } catch (error) {
-        console.error(`Error serving file for scene ${sceneId}:`, error);
+        logger.error("Error serving file for scene", {
+          sceneId,
+          error: error instanceof Error ? error.message : String(error),
+        });
         res.status(500).json({ error: "Failed to serve video file" });
       }
       return;
@@ -447,7 +488,13 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
         },
       });
     } catch (transcodingError) {
-      console.error("Transcoding error:", transcodingError);
+      logger.error("Transcoding error", {
+        sceneId,
+        error:
+          transcodingError instanceof Error
+            ? transcodingError.message
+            : String(transcodingError),
+      });
       res.status(500).json({
         error: "Failed to start transcoding",
         details:
@@ -457,7 +504,9 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
       });
     }
   } catch (error) {
-    console.error("Error in playVideo:", error);
+    logger.error("Error in playVideo", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -492,7 +541,10 @@ export async function seekVideo(req: SeekVideoRequest, res: Response) {
 
     // If session was restarted (status = "starting"), restart transcoding
     if (session.status === "starting") {
-      console.log(`[seekVideo] Restarting transcoding for session ${session.sessionId} from ${session.startTime}s`);
+      logger.info("Restarting transcoding after seek", {
+        sessionId: session.sessionId,
+        startTime: session.startTime,
+      });
       await transcodingManager.startTranscoding(session, sceneFilePath);
     }
 
@@ -504,7 +556,9 @@ export async function seekVideo(req: SeekVideoRequest, res: Response) {
       startTime: session.startTime,
     });
   } catch (error) {
-    console.error("Error in seekVideo:", error);
+    logger.error("Error in seekVideo", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -530,7 +584,9 @@ export async function getSessionStatus(req: Request, res: Response) {
       isProcessActive: session.process !== null,
     });
   } catch (error) {
-    console.error("Error in getSessionStatus:", error);
+    logger.error("Error in getSessionStatus", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -546,7 +602,9 @@ export async function killSession(req: Request, res: Response) {
       message: "Session terminated",
     });
   } catch (error) {
-    console.error("Error in killSession:", error);
+    logger.error("Error in killSession", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     res.status(500).json({ error: "Internal server error" });
   }
 }

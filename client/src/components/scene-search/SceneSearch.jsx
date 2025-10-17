@@ -33,7 +33,6 @@ const SceneSearch = ({
 
   useEffect(() => {
     const sceneFilter = buildSceneFilter({ ...permanentFilters });
-    console.log("Built scene filter:", sceneFilter, permanentFilters);
     // Initial fetch with default parameters
     const query = {
       filter: {
@@ -59,7 +58,6 @@ const SceneSearch = ({
         const result = await getScenes(query);
         setData(result);
       } catch (err) {
-        console.error("getScenes error:", err);
         setError(err.message || "An error occurred");
       } finally {
         setIsLoading(false);
@@ -93,7 +91,6 @@ const SceneSearch = ({
       const result = await getScenes(newQuery);
       setData(result);
     } catch (err) {
-      console.error("getScenes error:", err);
       setError(err.message || "An error occurred");
     } finally {
       setIsLoading(false);
@@ -145,7 +142,6 @@ const SceneSearch = ({
 };
 
 const getScenes = async (query) => {
-  console.log("Fetching Scenes with query:", query);
   const response = await libraryApi.findScenes(query);
 
   // Extract scenes and count from server response structure
@@ -154,7 +150,6 @@ const getScenes = async (query) => {
     scenes: findScenes?.scenes || [],
     count: findScenes?.count || 0,
   };
-  console.log("Got Scenes:", result);
   return result;
 };
 

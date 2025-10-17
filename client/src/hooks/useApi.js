@@ -23,7 +23,6 @@ export function useAsyncData(fetchFunction, dependencies = []) {
       const result = await fetchFunction();
       setData(result);
     } catch (err) {
-      console.error("useAsyncData error:", err);
       setError(err.message || "An error occurred");
     } finally {
       setLoading(false);
@@ -84,7 +83,6 @@ export function usePaginatedData(fetchFunction, initialPage = 1, perPage = 24) {
           items.length === perPage && (data?.length || 0) + items.length < count
         );
       } catch (err) {
-        console.error("usePaginatedData error:", err);
         setError(err.message || "An error occurred");
       } finally {
         setLoading(false);
@@ -145,7 +143,6 @@ export function useSearch(searchFunction, debounceMs = 300) {
         const searchResults = await searchFunction(query);
         setResults(searchResults);
       } catch (err) {
-        console.error("useSearch error:", err);
         setError(err.message || "Search failed");
       } finally {
         setLoading(false);

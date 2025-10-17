@@ -40,7 +40,6 @@ const Settings = () => {
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
       setTheme(settings.theme || "dark");
     } catch (err) {
-      console.error("Failed to load settings:", err);
       setError("Failed to load settings");
     } finally {
       setLoading(false);
@@ -63,7 +62,6 @@ const Settings = () => {
       setMessage("Settings saved successfully!");
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      console.error("Failed to save settings:", err);
       setError("Failed to save settings");
     } finally {
       setSaving(false);
@@ -99,7 +97,6 @@ const Settings = () => {
       setConfirmPassword("");
       setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      console.error("Failed to change password:", err);
       setError(err.response?.data?.error || "Failed to change password");
     } finally {
       setPasswordChanging(false);

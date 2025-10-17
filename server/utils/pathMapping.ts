@@ -14,6 +14,7 @@
  */
 
 import path from "path";
+import { logger } from "./logger.js";
 
 interface PathMappingConfig {
   stashInternalPath: string;  // Path prefix Stash uses internally (e.g., "/data")
@@ -29,9 +30,10 @@ class PathMapper {
       peekMediaPath: process.env.STASH_MEDIA_PATH || "/app/media",
     };
 
-    console.log("PathMapper initialized:");
-    console.log(`  Stash internal path: ${this.config.stashInternalPath}`);
-    console.log(`  Peek media path: ${this.config.peekMediaPath}`);
+    logger.info("PathMapper initialized", {
+      stashInternalPath: this.config.stashInternalPath,
+      peekMediaPath: this.config.peekMediaPath,
+    });
   }
 
   /**
@@ -51,12 +53,11 @@ class PathMapper {
 
     // Check if path starts with Stash's internal path
     if (!normalizedPath.startsWith(this.config.stashInternalPath)) {
-      console.warn(
-        `Path does not start with expected Stash internal path: ${stashPath}`
-      );
-      console.warn(
-        `Expected prefix: ${this.config.stashInternalPath}, got: ${normalizedPath}`
-      );
+      logger.warn("Path does not start with expected Stash internal path", {
+        stashPath,
+        expectedPrefix: this.config.stashInternalPath,
+        actualPath: normalizedPath,
+      });
       // Return as-is if it doesn't match the expected pattern
       return stashPath;
     }
@@ -77,7 +78,10 @@ class PathMapper {
       cleanRelativePath
     );
 
-    console.log(`Path translation: ${stashPath} → ${translatedPath}`);
+    logger.verbose("Path translation", {
+      from: stashPath,
+      to: translatedPath,
+    });
 
     return translatedPath;
   }
@@ -94,9 +98,10 @@ class PathMapper {
    */
   updateConfig(newConfig: Partial<PathMappingConfig>): void {
     this.config = { ...this.config, ...newConfig };
-    console.log("PathMapper configuration updated:");
-    console.log(`  Stash internal path: ${this.config.stashInternalPath}`);
-    console.log(`  Peek media path: ${this.config.peekMediaPath}`);
+    logger.info("PathMapper configuration updated", {
+      stashInternalPath: this.config.stashInternalPath,
+      peekMediaPath: this.config.peekMediaPath,
+    });
   }
 }
 
