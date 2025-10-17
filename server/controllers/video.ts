@@ -26,6 +26,10 @@ interface SeekVideoRequest extends Request {
   };
 }
 
+// Track pending segment requests to avoid duplicate polling
+// Map key: "sessionId:segmentFile", value: array of response objects waiting for this segment
+const pendingSegmentRequests = new Map<string, Response[]>();
+
 // Segment serving for both new and legacy routes
 export const getStreamSegment = (req: Request, res: Response) => {
   const { sessionId, videoId, segment, quality, file } = req.params;
@@ -81,9 +85,19 @@ export const getStreamSegment = (req: Request, res: Response) => {
 
   // Handle master playlist request
   if (segment2 === "master.m3u8") {
-    const absolutePath = path.resolve(session.masterPlaylistPath);
-    if (fs.existsSync(absolutePath)) {
-      res.sendFile(absolutePath);
+    // session.masterPlaylistPath is already an absolute path
+    if (fs.existsSync(session.masterPlaylistPath)) {
+      // Use sendFile for better performance (streaming instead of reading entire file into memory)
+      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(session.masterPlaylistPath, (err) => {
+        if (err) {
+          console.error(`[getStreamSegment] Error sending master playlist:`, err);
+          if (!res.headersSent) {
+            res.status(500).send("Error sending master playlist");
+          }
+        }
+      });
     } else {
       res.status(404).send("Master playlist not found");
     }
@@ -116,37 +130,86 @@ export const getStreamSegment = (req: Request, res: Response) => {
         };
         trySend();
       } else if (file.endsWith(".ts")) {
-        // ON-DEMAND SEGMENT TRANSCODING
-        // Extract segment number from filename (e.g., "segment_042.ts" -> 42)
+        // CONTINUOUS TRANSCODING: Wait for segment to be generated
+        // Extract segment number and check if it's within reasonable range
         const segmentMatch = file.match(/segment_(\d+)\.ts/);
-        if (!segmentMatch) {
-          return res.status(400).send("Invalid segment filename");
+        const segmentNum = segmentMatch ? parseInt(segmentMatch[1]) : -1;
+
+        if (segmentNum >= 0) {
+          // Check if this segment is already transcoded
+          const segmentExists = session.completedSegments.has(segmentNum);
+
+          if (segmentExists) {
+            // Segment should exist, try serving immediately
+            console.log(`[SegmentServing] Segment ${segmentNum} already completed, serving ${file}`);
+          } else {
+            // Segment not ready yet - check if it's reasonably close to current progress
+            const currentProgress = session.completedSegments.size;
+            const segmentDistance = segmentNum - currentProgress;
+
+            console.log(
+              `[SegmentServing] Waiting for segment ${segmentNum} (current progress: ${currentProgress}/${session.totalSegments}, distance: ${segmentDistance})`
+            );
+
+            // If requesting a segment too far ahead, warn but still wait
+            if (segmentDistance > 50) {
+              console.warn(
+                `[SegmentServing] ⚠️ Request for segment ${segmentNum} is ${segmentDistance} segments ahead of current progress!`
+              );
+            }
+          }
         }
 
-        const segmentNumber = parseInt(segmentMatch[1], 10);
-        console.log(`Segment ${segmentNumber} requested but not found, transcoding on-demand...`);
+        // Request deduplication: Check if another request is already waiting for this segment
+        const requestKey = `${sessionId}:${file}`;
+        const existingRequests = pendingSegmentRequests.get(requestKey);
 
-        // Request on-demand transcoding with read-ahead
-        transcodingManager.transcodeSegmentOnDemand(
-          sessionId,
-          quality,
-          segmentNumber
-        ).catch(err => {
-          console.error(`Failed to initiate on-demand transcoding for segment ${segmentNumber}:`, err);
-        });
+        if (existingRequests) {
+          // Another request is already polling for this segment, join that queue
+          console.log(`[SegmentServing] Joining existing wait queue for ${file} (${existingRequests.length} other requests waiting)`);
+          existingRequests.push(res);
+          return; // This response will be handled when the segment is ready
+        }
 
-        // Wait for segment to be transcoded
+        // Create new wait queue for this segment
+        pendingSegmentRequests.set(requestKey, [res]);
+
+        // Wait for segment with retry logic (single polling loop for all concurrent requests)
         let attempts = 0;
-        const maxAttempts = 100; // 10 seconds max wait
+        const maxAttempts = 150; // 15 seconds max wait
         const interval = 100;
         const trySend = () => {
           if (fs.existsSync(filePath)) {
-            res.sendFile(filePath);
+            // Segment is ready! Serve it to all waiting requests
+            const waitingRequests = pendingSegmentRequests.get(requestKey) || [];
+            pendingSegmentRequests.delete(requestKey);
+
+            console.log(`[SegmentServing] ✓ Serving segment ${file} to ${waitingRequests.length} request(s)`);
+
+            for (const waitingRes of waitingRequests) {
+              if (!waitingRes.headersSent) {
+                waitingRes.sendFile(filePath);
+              }
+            }
           } else if (attempts < maxAttempts) {
             attempts++;
             setTimeout(trySend, interval);
           } else {
-            res.status(404).send("Segment transcoding timeout");
+            // Timeout - send 404 to all waiting requests
+            const waitingRequests = pendingSegmentRequests.get(requestKey) || [];
+            pendingSegmentRequests.delete(requestKey);
+
+            console.error(
+              `[SegmentServing] ✗ Timeout waiting for segment ${file} after ${
+                maxAttempts * interval
+              }ms (${waitingRequests.length} request(s) failed)`
+            );
+
+            for (const waitingRes of waitingRequests) {
+              if (!waitingRes.headersSent) {
+                waitingRes.status(404).send("Segment not ready yet");
+              }
+            }
           }
         };
         trySend();
@@ -405,14 +468,13 @@ export async function seekVideo(req: SeekVideoRequest, res: Response) {
       });
     }
 
-    // Handle seeking by creating new session
-    const newSession = await transcodingManager.handleSeek(
+    // Handle seeking - may restart transcoding if needed
+    const session = await transcodingManager.handleSeek(
       sessionId,
       startTime
     );
 
-    // Get the scene file path from the new session
-    const session = transcodingManager.getSession(newSession.sessionId);
+    // Get the scene file path
     if (!session?.scene) {
       return res.status(404).json({ error: "Session scene not found" });
     }
@@ -424,15 +486,18 @@ export async function seekVideo(req: SeekVideoRequest, res: Response) {
 
     const sceneFilePath = getSceneFilePath(session.scene);
 
-    // Start transcoding for the new position
-    await transcodingManager.startTranscoding(newSession, sceneFilePath);
+    // If session was restarted (status = "starting"), restart transcoding
+    if (session.status === "starting") {
+      console.log(`[seekVideo] Restarting transcoding for session ${session.sessionId} from ${session.startTime}s`);
+      await transcodingManager.startTranscoding(session, sceneFilePath);
+    }
 
     res.json({
       success: true,
-      sessionId: newSession.sessionId,
-      playlistUrl: `/api/video/playlist/${newSession.sessionId}/master.m3u8`,
-      status: newSession.status,
-      startTime: newSession.startTime,
+      sessionId: session.sessionId,
+      playlistUrl: `/api/video/playlist/${session.sessionId}/master.m3u8`,
+      status: session.status,
+      startTime: session.startTime,
     });
   } catch (error) {
     console.error("Error in seekVideo:", error);
@@ -456,9 +521,9 @@ export async function getSessionStatus(req: Request, res: Response) {
       sessionId: session.sessionId,
       status: session.status,
       startTime: session.startTime,
-      qualities: session.qualities,
+      quality: session.quality,
       lastAccess: session.lastAccess,
-      activeProcesses: Array.from(session.processes.keys()),
+      isProcessActive: session.process !== null,
     });
   } catch (error) {
     console.error("Error in getSessionStatus:", error);

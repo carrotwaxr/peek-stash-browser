@@ -2,8 +2,6 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  useLocation,
-  useParams,
 } from "react-router-dom";
 import Layout from "./components/ui/Layout.jsx";
 import Home from "./components/pages/Home.jsx";
@@ -11,7 +9,7 @@ import Scenes from "./components/pages/Scenes.jsx";
 import Performers from "./components/pages/Performers.jsx";
 import Studios from "./components/pages/Studios.jsx";
 import Tags from "./components/pages/Tags.jsx";
-import VideoPlayer from "./components/pages/VideoPlayer.jsx";
+import Scene from "./components/pages/Scene.jsx";
 import PerformerDetail from "./components/pages/PerformerDetail.jsx";
 import StudioDetail from "./components/pages/StudioDetail.jsx";
 import TagDetail from "./components/pages/TagDetail.jsx";
@@ -140,8 +138,10 @@ const AppContent = () => {
             </Layout>
           }
         />
-        <Route path="/player/:sceneId" element={<VideoPlayerWrapper />} />
-        <Route path="/video/:sceneId" element={<VideoPlayerRouteWrapper />} />
+        <Route path="/scene/:sceneId" element={<Scene />} />
+        {/* Legacy routes for backwards compatibility */}
+        <Route path="/player/:sceneId" element={<Scene />} />
+        <Route path="/video/:sceneId" element={<Scene />} />
       </Routes>
     </Router>
   );
@@ -155,40 +155,6 @@ function App() {
       </AuthProvider>
     </ThemeProvider>
   );
-}
-
-// Wrapper to extract scene object and playlist context from state
-function VideoPlayerWrapper() {
-  const location = useLocation();
-  const { sceneId } = useParams();
-  const scene = location.state?.scene;
-  const playlist = location.state?.playlist;
-
-  // Force remount when sceneId changes by using it as key
-  return <VideoPlayer key={sceneId} scene={scene} playlist={playlist} />;
-}
-
-// Wrapper that gets scene data from navigation state
-function VideoPlayerRouteWrapper() {
-  const location = useLocation();
-  const { sceneId } = useParams();
-  const scene = location.state?.scene;
-
-  if (!scene) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-xl mb-2">Scene not found</h2>
-          <p className="text-gray-600">Scene ID: {sceneId}</p>
-          <p className="text-sm text-gray-500 mt-2">
-            Try navigating from the scenes or home page
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return <VideoPlayer scene={scene} />;
 }
 
 export default App;
