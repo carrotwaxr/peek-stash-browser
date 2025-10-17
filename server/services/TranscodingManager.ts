@@ -351,9 +351,10 @@ export class TranscodingManager {
     session.startTime = alignedStartTime;
     session.status = "starting";
 
-    // Recalculate total segments from new position
+    // Total segments should always represent the FULL video, not from seek position
+    // This ensures consistency with the full playlist (segments 0-617)
     const duration = session.scene?.files?.[0]?.duration || 0;
-    session.totalSegments = Math.ceil((duration - alignedStartTime) / segmentDuration);
+    session.totalSegments = Math.ceil(duration / segmentDuration);
 
     // Copy already-transcoded segments that are still useful
     // We want segments from newStartSegment onwards that already exist
@@ -366,17 +367,13 @@ export class TranscodingManager {
 
     console.log(`[SmartSeek] Found ${segmentsToCopy.length} segments to preserve (segments ${Math.min(...segmentsToCopy) || 'none'} to ${Math.max(...segmentsToCopy) || 'none'})`);
 
-    // Create a temporary backup directory for old segments we want to keep
+    // Preserve segments using move instead of copy for better performance
     if (segmentsToCopy.length > 0) {
       const backupDir = posixPath.join(session.outputDir, `${session.quality}_backup`);
+      fs.mkdirSync(backupDir, { recursive: true });
 
-      // Ensure backup directory exists
-      if (!fs.existsSync(backupDir)) {
-        fs.mkdirSync(backupDir, { recursive: true });
-      }
-
-      // Copy segments to backup
-      let copiedCount = 0;
+      // Move segments to backup (fast, no copying)
+      let movedCount = 0;
       for (const segNum of segmentsToCopy) {
         const segmentFile = `segment_${segNum.toString().padStart(3, '0')}.ts`;
         const oldPath = posixPath.join(oldQualityDir, segmentFile);
@@ -384,17 +381,17 @@ export class TranscodingManager {
 
         try {
           if (fs.existsSync(oldPath)) {
-            fs.copyFileSync(oldPath, backupPath);
-            copiedCount++;
+            fs.renameSync(oldPath, backupPath);
+            movedCount++;
           }
         } catch (err) {
-          console.warn(`[SmartSeek] Failed to backup segment ${segNum}:`, err);
+          console.warn(`[SmartSeek] Failed to move segment ${segNum}:`, err);
         }
       }
 
-      console.log(`[SmartSeek] ✓ Backed up ${copiedCount} segments to ${backupDir}`);
+      console.log(`[SmartSeek] ✓ Moved ${movedCount} segments to backup`);
 
-      // Delete old quality directory (will be recreated by FFmpeg)
+      // Delete old quality directory (segments we care about are already moved out)
       try {
         this.deleteDirRecursive(oldQualityDir);
         console.log(`[SmartSeek] Cleared old quality directory`);
@@ -402,10 +399,9 @@ export class TranscodingManager {
         console.warn(`[SmartSeek] Failed to clear old directory:`, err);
       }
 
-      // Recreate quality directory
+      // Recreate quality directory and move segments back
       fs.mkdirSync(oldQualityDir, { recursive: true });
 
-      // Restore backed up segments
       for (const segNum of segmentsToCopy) {
         const segmentFile = `segment_${segNum.toString().padStart(3, '0')}.ts`;
         const backupPath = posixPath.join(backupDir, segmentFile);
@@ -413,7 +409,7 @@ export class TranscodingManager {
 
         try {
           if (fs.existsSync(backupPath)) {
-            fs.copyFileSync(backupPath, newPath);
+            fs.renameSync(backupPath, newPath);
             session.completedSegments.add(segNum);
           }
         } catch (err) {
@@ -423,12 +419,12 @@ export class TranscodingManager {
 
       // Delete backup directory
       try {
-        this.deleteDirRecursive(backupDir);
+        fs.rmdirSync(backupDir);
       } catch (err) {
         console.warn(`[SmartSeek] Failed to delete backup directory:`, err);
       }
 
-      console.log(`[SmartSeek] ✓ Restored ${session.completedSegments.size} segments to new directory`);
+      console.log(`[SmartSeek] ✓ Restored ${session.completedSegments.size} segments`);
     } else {
       // No segments to preserve, just clear the directory
       try {
