@@ -2,6 +2,8 @@ import { ChildProcess, spawn, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import { Scene } from "stashapp-api";
+import { logger } from "../utils/logger.js";
+import { createThrottledFFmpegHandler } from "../utils/ffmpegLogger.js";
 
 // Use POSIX paths since we always run in Docker/Linux containers
 const posixPath = path.posix;
@@ -57,7 +59,7 @@ export class TranscodingManager {
       this.tmpDir = "/" + this.tmpDir;
     }
 
-    console.log(`[TranscodingManager] Initialized with tmpDir: ${this.tmpDir}`);
+    logger.info("TranscodingManager initialized", { tmpDir: this.tmpDir });
 
     // Kill any orphaned FFmpeg processes from previous runs
     this.killOrphanedFFmpegProcesses();
@@ -109,7 +111,12 @@ export class TranscodingManager {
 
     this.sessions.set(sessionId, session);
 
-    console.log(`[TranscodingManager] Created session ${sessionId} at startTime ${startTime}s (${totalSegments} segments)`);
+    logger.info("Created transcoding session", {
+      sessionId,
+      startTime,
+      totalSegments,
+      quality,
+    });
 
     return session;
   }
@@ -129,16 +136,18 @@ export class TranscodingManager {
       const qualityDir = posixPath.join(session.outputDir, session.quality);
       fs.mkdirSync(qualityDir, { recursive: true });
 
-      console.log(`[TranscodingManager] Starting continuous HLS transcode for session ${session.sessionId}`);
-      console.log(`[TranscodingManager] Input: ${sceneFilePath}`);
-      console.log(`[TranscodingManager] Output: ${qualityDir}`);
-      console.log(`[TranscodingManager] Start time: ${session.startTime}s`);
-
       // Get video duration from scene metadata
       const duration = session.scene?.files?.[0]?.duration || 0;
       const preset = QUALITY_PRESETS[session.quality as keyof typeof QUALITY_PRESETS];
 
-      console.log(`[TranscodingManager] Video duration: ${duration}s, Starting transcode from ${session.startTime}s`);
+      logger.info("Starting continuous HLS transcode", {
+        sessionId: session.sessionId,
+        input: sceneFilePath,
+        output: qualityDir,
+        startTime: session.startTime,
+        duration,
+        quality: session.quality,
+      });
 
       // FFmpeg command for CONTINUOUS HLS streaming
       // IMPORTANT: Always start segment numbering from 0, even when seeking mid-video
@@ -178,43 +187,31 @@ export class TranscodingManager {
         posixPath.join(qualityDir, "stream.m3u8")
       ];
 
-      console.log(`[TranscodingManager] FFmpeg command: ffmpeg ${args.join(" ")}`);
+      logger.debug("FFmpeg command", {
+        sessionId: session.sessionId,
+        command: `ffmpeg ${args.join(" ")}`,
+      });
 
       // Start FFmpeg process
       const ffmpeg = spawn("ffmpeg", args);
       session.process = ffmpeg;
 
-      // Log FFmpeg output
-      ffmpeg.stderr.on("data", (data) => {
-        const output = data.toString().trim();
-
-        // Parse and log important information
-        if (output.includes("Output #0")) {
-          console.log(`[FFmpeg] ${session.sessionId}: Started output`);
-        } else if (output.includes("frame=")) {
-          // Parse progress: frame= 1234 fps= 45 q=28.0 size= 12345kB time=00:00:51.23 bitrate=1234.5kbits/s speed=1.5x
-          const frameMatch = output.match(/frame=\s*(\d+)/);
-          const fpsMatch = output.match(/fps=\s*([\d.]+)/);
-          const timeMatch = output.match(/time=(\d+:\d+:[\d.]+)/);
-          const speedMatch = output.match(/speed=\s*([\d.]+)x/);
-
-          if (frameMatch && timeMatch && speedMatch) {
-            console.log(`[FFmpeg Progress] ${session.sessionId}: time=${timeMatch[1]} speed=${speedMatch[1]}x fps=${fpsMatch?.[1] || "?"}`);
-          }
-        } else if (output.includes("error") || output.includes("Error")) {
-          console.error(`[FFmpeg Error] ${session.sessionId}: ${output}`);
-        } else if (!output.includes("frame=") && output.length > 0) {
-          // Log other important messages (skip repetitive frame= lines)
-          console.log(`[FFmpeg] ${session.sessionId}: ${output}`);
-        }
-      });
+      // Setup throttled FFmpeg output handler (logs progress every 5 seconds)
+      const ffmpegHandler = createThrottledFFmpegHandler(session.sessionId);
+      ffmpeg.stderr.on("data", ffmpegHandler);
 
       ffmpeg.on("close", (code) => {
-        console.log(`[FFmpeg] ${session.sessionId} finished with code: ${code}`);
-
         if (code === 0) {
+          logger.info("FFmpeg process completed successfully", {
+            sessionId: session.sessionId,
+            exitCode: code,
+          });
           session.status = "completed";
         } else {
+          logger.warn("FFmpeg process exited with non-zero code", {
+            sessionId: session.sessionId,
+            exitCode: code,
+          });
           session.status = "error";
         }
 
@@ -222,7 +219,10 @@ export class TranscodingManager {
       });
 
       ffmpeg.on("error", (error) => {
-        console.error(`[FFmpeg Error] ${session.sessionId}:`, error);
+        logger.error("FFmpeg process error", {
+          sessionId: session.sessionId,
+          error: error.message,
+        });
         session.status = "error";
         session.process = null;
       });
@@ -239,10 +239,13 @@ export class TranscodingManager {
       await this.waitForFirstSegment(session);
 
       session.status = "active";
-      console.log(`[TranscodingManager] Session ${session.sessionId} active`);
+      logger.info("Transcoding session active", { sessionId: session.sessionId });
 
     } catch (error) {
-      console.error("[TranscodingManager] Error starting transcoding:", error);
+      logger.error("Error starting transcoding", {
+        sessionId: session.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       session.status = "error";
       throw error;
     }
@@ -256,7 +259,10 @@ export class TranscodingManager {
   private async waitForFirstSegment(session: TranscodingSession): Promise<void> {
     const qualityDir = posixPath.join(session.outputDir, session.quality);
 
-    console.log(`[TranscodingManager] Waiting for first segment in: ${qualityDir}`);
+    logger.debug("Waiting for first segment", {
+      sessionId: session.sessionId,
+      qualityDir,
+    });
 
     const maxAttempts = 150; // 15 seconds
     const interval = 100; // 100ms
@@ -269,7 +275,11 @@ export class TranscodingManager {
           const segmentFiles = files.filter(f => f.endsWith('.ts'));
 
           if (segmentFiles.length > 0) {
-            console.log(`[TranscodingManager] First segment ready after ${i * interval}ms (found ${segmentFiles.length} segments)`);
+            logger.info("First segment ready", {
+              sessionId: session.sessionId,
+              waitTimeMs: i * interval,
+              segmentCount: segmentFiles.length,
+            });
             return;
           }
         }
@@ -306,13 +316,22 @@ export class TranscodingManager {
     const newSegment = Math.floor(newStartTime / segmentDuration);
     const segmentDistance = Math.abs(newSegment - currentSegment);
 
-    console.log(`[SmartSeek] Seek request to ${newStartTime}s (segment ${newSegment})`);
-    console.log(`[SmartSeek] Currently transcoding from segment ${currentSegment}, ${session.completedSegments.size}/${session.totalSegments} segments complete`);
+    logger.info("Seek request received", {
+      sessionId,
+      newStartTime,
+      newSegment,
+      currentSegment,
+      completedSegments: session.completedSegments.size,
+      totalSegments: session.totalSegments,
+    });
 
     // Check if target segment already exists
     const targetSegmentExists = session.completedSegments.has(newSegment);
     if (targetSegmentExists) {
-      console.log(`[SmartSeek] ✓ Target segment ${newSegment} already transcoded, no action needed`);
+      logger.debug("Target segment already transcoded, no action needed", {
+        sessionId,
+        targetSegment: newSegment,
+      });
       return session;
     }
 
@@ -322,13 +341,20 @@ export class TranscodingManager {
     const MAX_WAIT_TIME = 12; // Conservative - segment server waits 15s
 
     if (estimatedWaitTime <= MAX_WAIT_TIME && newSegment > currentSegment) {
-      console.log(`[SmartSeek] ⏳ Seeking ahead ${segmentDistance} segments (~${estimatedWaitTime.toFixed(1)}s transcode time)`);
-      console.log(`[SmartSeek] ✓ Transcoder will catch up in time, no restart needed`);
+      logger.debug("Transcoder will catch up, no restart needed", {
+        sessionId,
+        segmentDistance,
+        estimatedWaitTime,
+      });
       return session;
     }
 
     // Need to restart transcoding from new position
-    console.log(`[SmartSeek] 🔄 Restarting transcoding from ${newStartTime}s, preserving existing segments`);
+    logger.info("Restarting transcoding from new position", {
+      sessionId,
+      newStartTime,
+      preservingSegments: true,
+    });
 
     // Stop current playlist monitor
     if (session.playlistMonitor) {
@@ -367,7 +393,14 @@ export class TranscodingManager {
       }
     }
 
-    console.log(`[SmartSeek] Found ${segmentsToCopy.length} segments to preserve (segments ${Math.min(...segmentsToCopy) || 'none'} to ${Math.max(...segmentsToCopy) || 'none'})`);
+    if (segmentsToCopy.length > 0) {
+      logger.debug("Preserving already-transcoded segments", {
+        sessionId,
+        segmentCount: segmentsToCopy.length,
+        rangeMin: Math.min(...segmentsToCopy),
+        rangeMax: Math.max(...segmentsToCopy),
+      });
+    }
 
     // Preserve segments using move instead of copy for better performance
     if (segmentsToCopy.length > 0) {
@@ -387,18 +420,25 @@ export class TranscodingManager {
             movedCount++;
           }
         } catch (err) {
-          console.warn(`[SmartSeek] Failed to move segment ${segNum}:`, err);
+          logger.warn("Failed to move segment during seek", {
+            sessionId,
+            segmentNum: segNum,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 
-      console.log(`[SmartSeek] ✓ Moved ${movedCount} segments to backup`);
+      logger.debug("Moved segments to backup", { sessionId, movedCount });
 
       // Delete old quality directory (segments we care about are already moved out)
       try {
         this.deleteDirRecursive(oldQualityDir);
-        console.log(`[SmartSeek] Cleared old quality directory`);
+        logger.debug("Cleared old quality directory", { sessionId });
       } catch (err) {
-        console.warn(`[SmartSeek] Failed to clear old directory:`, err);
+        logger.warn("Failed to clear old directory during seek", {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       // Recreate quality directory and move segments back
@@ -415,7 +455,11 @@ export class TranscodingManager {
             session.completedSegments.add(segNum);
           }
         } catch (err) {
-          console.warn(`[SmartSeek] Failed to restore segment ${segNum}:`, err);
+          logger.warn("Failed to restore segment during seek", {
+            sessionId,
+            segmentNum: segNum,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 
@@ -423,24 +467,39 @@ export class TranscodingManager {
       try {
         fs.rmdirSync(backupDir);
       } catch (err) {
-        console.warn(`[SmartSeek] Failed to delete backup directory:`, err);
+        logger.warn("Failed to delete backup directory", {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
-      console.log(`[SmartSeek] ✓ Restored ${session.completedSegments.size} segments`);
+      logger.info("Restored preserved segments", {
+        sessionId,
+        restoredCount: session.completedSegments.size,
+      });
     } else {
       // No segments to preserve, just clear the directory
       try {
         this.deleteDirRecursive(oldQualityDir);
         fs.mkdirSync(oldQualityDir, { recursive: true });
-        console.log(`[SmartSeek] Cleared quality directory, no segments to preserve`);
+        logger.debug("Cleared quality directory, no segments to preserve", {
+          sessionId,
+        });
       } catch (err) {
-        console.warn(`[SmartSeek] Failed to clear directory:`, err);
+        logger.warn("Failed to clear directory during seek", {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
 
       session.completedSegments = new Set();
     }
 
-    console.log(`[SmartSeek] Restarting session ${sessionId} from ${alignedStartTime}s (segment ${newStartSegment})`);
+    logger.info("Session restarted from new position", {
+      sessionId,
+      alignedStartTime,
+      startSegment: newStartSegment,
+    });
 
     return session;
   }
@@ -452,7 +511,7 @@ export class TranscodingManager {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    console.log(`[TranscodingManager] Killing session ${sessionId}`);
+    logger.info("Killing transcoding session", { sessionId });
 
     // Stop playlist monitor
     if (session.playlistMonitor) {
@@ -493,7 +552,10 @@ ${session.quality}/stream.m3u8
 `;
 
     fs.writeFileSync(session.masterPlaylistPath, masterContent);
-    console.log(`[TranscodingManager] Created master playlist: ${session.masterPlaylistPath}`);
+    logger.debug("Created master playlist", {
+      sessionId: session.sessionId,
+      path: session.masterPlaylistPath,
+    });
   }
 
   /**
@@ -513,7 +575,11 @@ ${session.quality}/stream.m3u8
     const segmentDuration = 4; // 4-second segments
     const startSegment = Math.floor(session.startTime / segmentDuration);
 
-    console.log(`[PlaylistMonitor] Starting for session ${session.sessionId} (${session.totalSegments} total segments, starting from segment ${startSegment})`);
+    logger.debug("Starting playlist monitor", {
+      sessionId: session.sessionId,
+      totalSegments: session.totalSegments,
+      startSegment,
+    });
 
     // Generate FULL playlist immediately (VOD trick) - includes ALL segments 0-617
     this.generateFullPlaylist(session);
@@ -553,13 +619,17 @@ ${session.quality}/stream.m3u8
             // If startSegment is 0, no renaming needed - segment numbers already match timeline
             if (startSegment === 0) {
               session.completedSegments.add(actualSegNum);
-              // console.log(`[PlaylistMonitor] Segment ${actualSegNum} ready (no rename needed)`);
             } else if (!fs.existsSync(actualPath)) {
               // Need to rename: segment_000 → segment_263, etc.
               try {
                 fs.renameSync(ffmpegPath, actualPath);
                 session.completedSegments.add(actualSegNum);
-                console.log(`[PlaylistMonitor] Renamed segment_${ffmpegSegNum.toString().padStart(3, '0')}.ts → segment_${actualSegNum.toString().padStart(3, '0')}.ts (${session.completedSegments.size}/${session.totalSegments})`);
+                logger.verbose("Renamed segment", {
+                  sessionId: session.sessionId,
+                  from: `segment_${ffmpegSegNum.toString().padStart(3, '0')}.ts`,
+                  to: `segment_${actualSegNum.toString().padStart(3, '0')}.ts`,
+                  progress: `${session.completedSegments.size}/${session.totalSegments}`,
+                });
               } catch (err) {
                 // Segment might be in use by FFmpeg, will catch it next iteration
               }
@@ -579,10 +649,16 @@ ${session.quality}/stream.m3u8
         if (isComplete && session.playlistMonitor) {
           clearInterval(session.playlistMonitor);
           session.playlistMonitor = undefined;
-          console.log(`[PlaylistMonitor] Stopped for session ${session.sessionId} (${transcodedCount} segments complete)`);
+          logger.info("Playlist monitor stopped - transcoding complete", {
+            sessionId: session.sessionId,
+            completedSegments: transcodedCount,
+          });
         }
       } catch (error) {
-        console.error(`[PlaylistMonitor] Error for session ${session.sessionId}:`, error);
+        logger.error("Playlist monitor error", {
+          sessionId: session.sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }, 500);
   }
@@ -622,7 +698,12 @@ ${session.quality}/stream.m3u8
 
     // Write playlist
     fs.writeFileSync(playlistPath, playlist);
-    console.log(`[PlaylistMonitor] Generated COMPLETE VOD playlist: segments 0-${totalSegmentsInVideo-1} (${totalSegmentsInVideo} total, transcoding from segment ${startSegment})`);
+    logger.debug("Generated complete VOD playlist", {
+      sessionId: session.sessionId,
+      segmentRange: `0-${totalSegmentsInVideo - 1}`,
+      totalSegments: totalSegmentsInVideo,
+      startSegment,
+    });
   }
 
   /**
@@ -663,7 +744,10 @@ ${session.quality}/stream.m3u8
 
     for (const [sessionId, session] of this.sessions) {
       if (session.lastAccess < cutoff) {
-        console.log(`[TranscodingManager] Cleaning up inactive session: ${sessionId}`);
+        logger.info("Cleaning up inactive session", {
+          sessionId,
+          lastAccessAge: Math.floor((Date.now() - session.lastAccess) / 60000) + " minutes",
+        });
         this.killSession(sessionId);
       }
     }
@@ -675,7 +759,7 @@ ${session.quality}/stream.m3u8
    */
   private killOrphanedFFmpegProcesses(): void {
     try {
-      console.log("[TranscodingManager] Checking for orphaned FFmpeg processes...");
+      logger.info("Checking for orphaned FFmpeg processes");
 
       // Use ps + grep + kill to find and kill all ffmpeg processes
       // We're in Docker so this is safe - only affects processes in our container
@@ -688,7 +772,10 @@ ${session.quality}/stream.m3u8
 
         if (pids) {
           const pidArray = pids.split("\n").filter(p => p.trim());
-          console.log(`[TranscodingManager] Found ${pidArray.length} FFmpeg process(es): ${pidArray.join(", ")}`);
+          logger.info("Found orphaned FFmpeg processes", {
+            count: pidArray.length,
+            pids: pidArray.join(", "),
+          });
 
           // Kill each process
           for (const pid of pidArray) {
@@ -698,16 +785,18 @@ ${session.quality}/stream.m3u8
               // Process might already be dead, ignore
             }
           }
-          console.log("[TranscodingManager] Killed orphaned FFmpeg processes");
+          logger.info("Killed orphaned FFmpeg processes");
         } else {
-          console.log("[TranscodingManager] No orphaned FFmpeg processes found");
+          logger.debug("No orphaned FFmpeg processes found");
         }
       } catch (err: any) {
         // No processes found or error executing - both are fine
-        console.log("[TranscodingManager] No orphaned FFmpeg processes found");
+        logger.debug("No orphaned FFmpeg processes found");
       }
     } catch (error) {
-      console.error("[TranscodingManager] Error checking for FFmpeg processes:", error);
+      logger.error("Error checking for FFmpeg processes", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -719,14 +808,16 @@ ${session.quality}/stream.m3u8
   private cleanupOnStartup(): void {
     const segmentsDir = posixPath.join(this.tmpDir, "segments");
 
-    console.log(`[TranscodingManager] Cleaning up old transcoding sessions from: ${segmentsDir}`);
+    logger.info("Cleaning up old transcoding sessions", { segmentsDir });
 
     try {
       if (fs.existsSync(segmentsDir)) {
         // Read all session directories
         const sessions = fs.readdirSync(segmentsDir);
 
-        console.log(`[TranscodingManager] Found ${sessions.length} old session(s) to clean up`);
+        logger.info("Found old sessions to clean up", {
+          count: sessions.length,
+        });
 
         // Delete each session directory individually with best-effort
         let successCount = 0;
@@ -739,18 +830,26 @@ ${session.quality}/stream.m3u8
             this.deleteDirRecursive(fullPath);
             successCount++;
           } catch (err) {
-            console.warn(`[TranscodingManager] Failed to fully delete session ${sessionDir}:`, err instanceof Error ? err.message : err);
+            logger.warn("Failed to delete old session directory", {
+              sessionDir,
+              error: err instanceof Error ? err.message : String(err),
+            });
             errorCount++;
             // Continue with next session even if this one failed
           }
         }
 
-        console.log(`[TranscodingManager] Cleanup complete: ${successCount} deleted, ${errorCount} failed`);
+        logger.info("Cleanup complete", {
+          deleted: successCount,
+          failed: errorCount,
+        });
       } else {
-        console.log("[TranscodingManager] No existing segments directory to clean up");
+        logger.debug("No existing segments directory to clean up");
       }
     } catch (error) {
-      console.error("[TranscodingManager] Error during cleanup:", error instanceof Error ? error.message : error);
+      logger.error("Error during startup cleanup", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -782,7 +881,10 @@ ${session.quality}/stream.m3u8
           }
         } catch (err) {
           // File might be locked, skip it
-          console.warn(`[TranscodingManager] Could not delete ${fullPath}:`, err instanceof Error ? err.message : err);
+          logger.verbose("Could not delete file during cleanup", {
+            path: fullPath,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 

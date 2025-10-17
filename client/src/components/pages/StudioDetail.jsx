@@ -13,7 +13,6 @@ const StudioDetail = () => {
   // Set page title to studio name
   usePageTitle(studio?.name || "Studio");
 
-  console.log("StudioDetail render:", studio);
 
   useEffect(() => {
     const fetchStudio = async () => {
@@ -22,7 +21,6 @@ const StudioDetail = () => {
         const studioData = await getStudio(studioId);
         setStudio(studioData);
       } catch (error) {
-        console.error("Error fetching studio:", error);
       } finally {
         setIsLoading(false);
       }

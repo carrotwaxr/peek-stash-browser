@@ -23,9 +23,10 @@ const envPath =
 
 dotenv.config({ path: envPath });
 import { setupAPI } from "./api.js";
+import { logger } from "./utils/logger.js";
 
 const main = async () => {
-  console.log("🚀 Starting Peek server...");
+  logger.info("Starting Peek server");
 
   validateStartup();
 
@@ -36,24 +37,26 @@ const main = async () => {
 };
 
 const initializeDatabase = async () => {
-  console.log("💾 Initializing database...");
+  logger.info("Initializing database");
 
   try {
     // Generate Prisma client
-    console.log("📦 Generating Prisma client...");
+    logger.info("Generating Prisma client");
     await execAsync("npx prisma generate");
 
     // Initialize database schema (SQLite uses db push)
-    console.log("🔄 Initializing database schema...");
+    logger.info("Initializing database schema");
     await execAsync("npx prisma db push --accept-data-loss");
 
     // Create admin user directly
-    console.log("🌱 Creating admin user...");
+    logger.info("Creating admin user");
     await createAdminUser();
 
-    console.log("✅ Database initialization complete!");
+    logger.info("Database initialization complete");
   } catch (error) {
-    console.error("❌ Database initialization failed:", error);
+    logger.error("Database initialization failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
 
     // If it's a seeding error (admin already exists), continue anyway
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -61,10 +64,10 @@ const initializeDatabase = async () => {
       errorMessage.includes("Unique constraint") ||
       errorMessage.includes("admin user already exists")
     ) {
-      console.log("ℹ️  Admin user already exists, continuing...");
+      logger.info("Admin user already exists, continuing");
     } else {
-      console.log(
-        "⚠️  Database initialization failed, but continuing with server startup..."
+      logger.warn(
+        "Database initialization failed, but continuing with server startup"
       );
     }
   }
@@ -84,11 +87,11 @@ const createAdminUser = async () => {
       },
     });
 
-    console.log("✅ Admin user created/updated successfully");
+    logger.info("Admin user created/updated successfully");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (errorMessage.includes("Unique constraint")) {
-      console.log("ℹ️  Admin user already exists");
+      logger.info("Admin user already exists");
     } else {
       throw new Error(`Failed to create admin user: ${errorMessage}`);
     }
@@ -96,9 +99,10 @@ const createAdminUser = async () => {
 };
 
 const validateStartup = () => {
-  console.log("Environment check:");
-  console.log("STASH_URL:", process.env.STASH_URL);
-  console.log("STASH_API_KEY exists:", !!process.env.STASH_API_KEY);
+  logger.info("Environment check", {
+    STASH_URL: process.env.STASH_URL,
+    STASH_API_KEY_exists: !!process.env.STASH_API_KEY,
+  });
 
   if (!process.env.STASH_URL || !process.env.STASH_API_KEY) {
     throw new Error(
@@ -108,7 +112,9 @@ const validateStartup = () => {
 };
 
 main().catch(async (e) => {
-  console.error("Fatal error:", e);
+  logger.error("Fatal error", {
+    error: e instanceof Error ? e.message : String(e),
+  });
   await prisma.$disconnect();
   process.exit(1);
 });

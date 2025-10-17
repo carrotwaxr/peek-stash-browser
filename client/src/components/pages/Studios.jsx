@@ -42,7 +42,6 @@ const Studios = () => {
         const result = await getStudios(query);
         setData(result);
       } catch (err) {
-        console.error("getStudios error:", err);
         setError(err.message || "An error occurred");
       } finally {
         setIsLoading(false);
@@ -70,7 +69,6 @@ const Studios = () => {
       const result = await getStudios(newQuery);
       setData(result);
     } catch (err) {
-      console.error("getStudios error:", err);
       setError(err.message || "An error occurred");
     } finally {
       setIsLoading(false);
@@ -183,7 +181,6 @@ const StudioCard = ({ studio }) => {
 };
 
 const getStudios = async (query) => {
-  console.log("Fetching Studios with query:", query);
   const response = await libraryApi.findStudios(query);
 
   // Extract studios and count from server response structure
@@ -192,7 +189,6 @@ const getStudios = async (query) => {
     studios: findStudios?.studios || [],
     count: findStudios?.count || 0,
   };
-  console.log("Got Studios:", result);
   return result;
 };
 

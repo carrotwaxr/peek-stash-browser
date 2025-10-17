@@ -14,11 +14,7 @@ import {
   getVideoJsOptions,
   disableLiveTracker,
 } from "./videoPlayerUtils.js";
-import {
-  setupVideoJsLogging,
-  setupNetworkLogging,
-  logInitialSetup,
-} from "./videoPlayerLogging.js";
+// Logging utilities removed - verbose logging disabled for production
 
 const VideoPlayer = ({
   scene,
@@ -59,7 +55,6 @@ const VideoPlayer = ({
   // Sync internal quality with external when external changes
   useEffect(() => {
     if (externalQuality !== undefined && externalQuality !== internalQuality) {
-      console.log("[VideoPlayer] Syncing internal quality to:", externalQuality);
       internalSetQuality(externalQuality);
     }
   }, [externalQuality, internalQuality, internalSetQuality]);
@@ -79,9 +74,6 @@ const VideoPlayer = ({
       prevQualityRef.current !== quality
     ) {
       const player = playerRef.current;
-      console.log(
-        `Manual quality switch: ${prevQualityRef.current} -> ${quality}`
-      );
 
       setIsSwitchingMode(true);
       player.pause();
@@ -91,8 +83,6 @@ const VideoPlayer = ({
       api
         .get(`/video/play?sceneId=${scene.id}&quality=${quality}`)
         .then((response) => {
-          console.log("Quality switch session created:", response.data);
-
           if (isDirectPlay) {
             const directUrl = `/api/video/play?sceneId=${scene.id}&quality=direct`;
             player.src({ src: directUrl, type: "video/mp4" });
@@ -114,17 +104,13 @@ const VideoPlayer = ({
             disableLiveTracker(player, "after quality switch");
           }
 
-          player.play().catch((e) => {
-            console.log(
-              "Autoplay failed after quality switch, user interaction required:",
-              e
-            );
+          player.play().catch(() => {
+            // Autoplay failed, user interaction required
           });
 
           setIsSwitchingMode(false);
         })
-        .catch((error) => {
-          console.error("Quality switch failed:", error);
+        .catch(() => {
           setIsSwitchingMode(false);
         });
     }
@@ -142,23 +128,8 @@ const VideoPlayer = ({
       const isDirectPlay = quality === "direct";
 
       if (!isDirectPlay && !sessionId) {
-        console.log(
-          "Waiting for sessionId before initializing player...",
-          sessionId
-        );
         return;
       }
-
-      console.log(
-        "Initializing player with sessionId:",
-        sessionId,
-        "isDirectPlay:",
-        isDirectPlay,
-        "quality:",
-        quality,
-        "video:",
-        video
-      );
 
       let sources;
       if (isDirectPlay) {
@@ -184,25 +155,17 @@ const VideoPlayer = ({
       const videoJsOptions = getVideoJsOptions(sources);
 
       playerRef.current = videojs(videoElement, videoJsOptions, () => {
-        console.log("player is ready");
-        console.log("Video object:", video);
-
-        videojs.log.level("debug");
-
         const player = playerRef.current;
 
-        // Setup comprehensive logging
-        setupVideoJsLogging(player);
-
-        if (!canDirectPlay && player.liveTracker) {
+        if (!isDirectPlay && player.liveTracker) {
           disableLiveTracker(player);
         }
 
         setIsInitializing(false);
 
         player.ready(() => {
-          player.play().catch((err) => {
-            console.warn("Autoplay failed, user interaction required:", err);
+          player.play().catch(() => {
+            // Autoplay failed, user interaction required
           });
         });
 
@@ -215,13 +178,8 @@ const VideoPlayer = ({
 
             const error = player.error();
             if (error) {
-              console.error("Direct play error:", error);
-
               if (error.code === 3 || error.code === 4) {
                 hasTriggeredFallback = true;
-                console.log(
-                  "Direct play failed, automatically switching to transcoding..."
-                );
 
                 player.off("error");
                 setIsAutoFallback(true);
@@ -232,11 +190,6 @@ const VideoPlayer = ({
                     `/video/play?sceneId=${scene.id}&quality=480p`
                   )
                   .then((response) => {
-                    console.log(
-                      "Fallback transcode session created:",
-                      response.data
-                    );
-
                     setVideo(response.data.scene);
                     setSessionId(response.data.sessionId);
 
@@ -254,17 +207,11 @@ const VideoPlayer = ({
 
                     player.one("loadedmetadata", () => {
                       player.currentTime(0);
-                      console.log("Reset currentTime to 0 after source change");
                     });
-
-                    console.log(
-                      "Transcoded stream ready. Waiting for buffer..."
-                    );
 
                     setIsAutoFallback(false);
                   })
-                  .catch((error) => {
-                    console.error("Error fetching transcoded session:", error);
+                  .catch(() => {
                     setIsAutoFallback(false);
                   });
               }
@@ -285,14 +232,7 @@ const VideoPlayer = ({
         }
 
         // Setup playlist navigation controls
-        console.log("Playlist check:", {
-          playlist,
-          hasScenes: playlist?.scenes,
-          length: playlist?.scenes?.length,
-          currentIndex: currentPlaylistIndex,
-        });
         if (playlist && playlist.scenes && playlist.scenes.length > 1) {
-          console.log("Calling setupPlaylistControls");
           setupPlaylistControls(
             player,
             playlist,
@@ -300,16 +240,11 @@ const VideoPlayer = ({
             playPreviousInPlaylist,
             playNextInPlaylist
           );
-        } else {
-          console.log(
-            "Skipping playlist controls - not in a playlist or only 1 scene"
-          );
         }
 
         // Setup auto-play next scene in playlist when video ends
         if (playlist && playlist.scenes && playlist.scenes.length > 1) {
           player.on("ended", () => {
-            console.log("Video ended, auto-playing next in playlist...");
             playNextInPlaylist();
           });
         }
@@ -341,7 +276,7 @@ const VideoPlayer = ({
           try {
             player.dispose();
           } catch (e) {
-            console.warn("Player disposal warning:", e);
+            // Player disposal warning - can be ignored
           }
         }, 0);
       }
@@ -350,18 +285,9 @@ const VideoPlayer = ({
   }, []);
 
   const handlePlay = () => {
-    console.log("[handlePlay] Called with quality:", quality);
-    logInitialSetup(scene, compatibility, quality);
     setIsInitializing(true);
-    console.log("[handlePlay] About to call fetchVideoData");
     fetchVideoData();
-    console.log("[handlePlay] fetchVideoData called");
   };
-
-  // Setup network logging once on mount
-  useEffect(() => {
-    setupNetworkLogging();
-  }, []);
 
   return (
     <section className="py-6">

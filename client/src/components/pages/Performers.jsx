@@ -42,7 +42,6 @@ const Performers = () => {
         const result = await getPerformers(query);
         setData(result);
       } catch (err) {
-        console.error("getPerformers error:", err);
         setError(err.message || "An error occurred");
       } finally {
         setIsLoading(false);
@@ -70,7 +69,6 @@ const Performers = () => {
       const result = await getPerformers(newQuery);
       setData(result);
     } catch (err) {
-      console.error("getPerformers error:", err);
       setError(err.message || "An error occurred");
     } finally {
       setIsLoading(false);
@@ -185,7 +183,6 @@ const PerformerCard = ({ performer }) => {
 };
 
 const getPerformers = async (query) => {
-  console.log("Fetching Performers with query:", query);
   const response = await libraryApi.findPerformers(query);
 
   // Extract performers and count from server response structure
@@ -194,7 +191,6 @@ const getPerformers = async (query) => {
     performers: findPerformers?.performers || [],
     count: findPerformers?.count || 0,
   };
-  console.log("Got Performers:", result);
   return result;
 };
 

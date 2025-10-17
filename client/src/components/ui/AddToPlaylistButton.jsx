@@ -39,7 +39,6 @@ const AddToPlaylistButton = ({ sceneId, compact = false }) => {
       const response = await api.get("/playlists");
       setPlaylists(response.data.playlists || []);
     } catch (err) {
-      console.error("Failed to load playlists:", err);
     } finally {
       setLoading(false);
     }
@@ -51,7 +50,6 @@ const AddToPlaylistButton = ({ sceneId, compact = false }) => {
       showSuccess("Added to playlist!");
       setShowMenu(false);
     } catch (err) {
-      console.error("Failed to add to playlist:", err);
       if (err.response?.status === 400) {
         showWarning("Scene already in playlist");
       } else {

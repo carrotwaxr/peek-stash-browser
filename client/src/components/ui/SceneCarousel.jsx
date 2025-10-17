@@ -164,15 +164,7 @@ const SceneCarousel = ({ title, scenes, loading = false, onSceneClick }) => {
             >
               <SceneCard
                 scene={scene}
-                onClick={
-                  onSceneClick ||
-                  ((scene, options) =>
-                    console.log(
-                      "Scene clicked in carousel:",
-                      scene.id,
-                      options
-                    ))
-                }
+                onClick={onSceneClick}
                 enableKeyboard={false}
               />
             </div>
