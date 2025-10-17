@@ -3,6 +3,7 @@ import {
   Routes,
   Route,
 } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import Layout from "./components/ui/Layout.jsx";
 import Home from "./components/pages/Home.jsx";
 import Scenes from "./components/pages/Scenes.jsx";
@@ -152,6 +153,15 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <AppContent />
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              padding: '0',
+            },
+          }}
+        />
       </AuthProvider>
     </ThemeProvider>
   );

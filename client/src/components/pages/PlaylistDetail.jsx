@@ -9,6 +9,8 @@ import {
 import { formatRelativeTime } from "../../utils/date.js";
 import Tooltip from "../ui/Tooltip.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { showSuccess, showError } from "../../utils/toast.jsx";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -25,6 +27,8 @@ const PlaylistDetail = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [sceneToRemove, setSceneToRemove] = useState(null);
 
   // Set page title to playlist name
   usePageTitle(playlist?.name || "Playlist");
@@ -67,23 +71,32 @@ const PlaylistDetail = () => {
         name: editName.trim(),
         description: editDescription.trim() || undefined,
       });
+      showSuccess("Playlist updated successfully!");
       setIsEditing(false);
       loadPlaylist();
     } catch (err) {
       console.error("Failed to update playlist:", err);
-      alert("Failed to update playlist");
+      showError("Failed to update playlist");
     }
   };
 
-  const removeScene = async (sceneId) => {
-    if (!confirm("Remove this scene from the playlist?")) return;
+  const handleRemoveClick = (scene) => {
+    setSceneToRemove(scene);
+    setRemoveConfirmOpen(true);
+  };
+
+  const confirmRemove = async () => {
+    if (!sceneToRemove) return;
 
     try {
-      await api.delete(`/playlists/${playlistId}/items/${sceneId}`);
+      await api.delete(`/playlists/${playlistId}/items/${sceneToRemove.sceneId}`);
+      showSuccess("Scene removed from playlist");
       loadPlaylist();
     } catch (err) {
       console.error("Failed to remove scene:", err);
-      alert("Failed to remove scene from playlist");
+      showError("Failed to remove scene from playlist");
+    } finally {
+      setSceneToRemove(null);
     }
   };
 
@@ -468,7 +481,7 @@ const PlaylistDetail = () => {
 
                           {/* Remove Button */}
                           <button
-                            onClick={() => removeScene(item.sceneId)}
+                            onClick={() => handleRemoveClick(item)}
                             className="px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors flex-shrink-0"
                             style={{
                               backgroundColor: "rgba(239, 68, 68, 0.1)",
@@ -488,6 +501,21 @@ const PlaylistDetail = () => {
           </div>
         )}
       </div>
+
+      {/* Remove Scene Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={removeConfirmOpen}
+        onClose={() => {
+          setRemoveConfirmOpen(false);
+          setSceneToRemove(null);
+        }}
+        onConfirm={confirmRemove}
+        title="Remove Scene"
+        message={`Remove "${sceneToRemove?.scene ? getSceneTitle(sceneToRemove.scene) : 'this scene'}" from the playlist?`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmStyle="danger"
+      />
     </>
   );
 };

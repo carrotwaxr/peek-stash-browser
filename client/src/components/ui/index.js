@@ -1,5 +1,9 @@
 export { default as LoadingSpinner } from "./LoadingSpinner.jsx";
 export { default as ErrorMessage } from "./ErrorMessage.jsx";
+export { default as SuccessMessage } from "./SuccessMessage.jsx";
+export { default as WarningMessage } from "./WarningMessage.jsx";
+export { default as InfoMessage } from "./InfoMessage.jsx";
+export { default as ConfirmDialog } from "./ConfirmDialog.jsx";
 export { default as SearchInput } from "./SearchInput.jsx";
 export { default as Pagination } from "./Pagination.jsx";
 export { default as PageHeader } from "./PageHeader.jsx";

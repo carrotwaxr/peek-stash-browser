@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { showSuccess, showError } from "../../utils/toast.jsx";
+import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -17,6 +19,8 @@ const Playlists = () => {
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [playlistToDelete, setPlaylistToDelete] = useState(null);
 
   useEffect(() => {
     loadPlaylists();
@@ -46,27 +50,36 @@ const Playlists = () => {
         description: newPlaylistDescription.trim() || undefined,
       });
 
+      showSuccess("Playlist created successfully!");
       setNewPlaylistName("");
       setNewPlaylistDescription("");
       setShowCreateModal(false);
       loadPlaylists();
     } catch (err) {
       console.error("Failed to create playlist:", err);
-      alert("Failed to create playlist");
+      showError("Failed to create playlist");
     } finally {
       setCreating(false);
     }
   };
 
-  const deletePlaylist = async (id) => {
-    if (!confirm("Are you sure you want to delete this playlist?")) return;
+  const handleDeleteClick = (playlist) => {
+    setPlaylistToDelete(playlist);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!playlistToDelete) return;
 
     try {
-      await api.delete(`/playlists/${id}`);
+      await api.delete(`/playlists/${playlistToDelete.id}`);
+      showSuccess("Playlist deleted");
       loadPlaylists();
     } catch (err) {
       console.error("Failed to delete playlist:", err);
-      alert("Failed to delete playlist");
+      showError("Failed to delete playlist");
+    } finally {
+      setPlaylistToDelete(null);
     }
   };
 
@@ -175,7 +188,7 @@ const Playlists = () => {
                       {playlist._count.items === 1 ? "video" : "videos"}
                     </span>
                     <button
-                      onClick={() => deletePlaylist(playlist.id)}
+                      onClick={() => handleDeleteClick(playlist)}
                       className="px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors"
                       style={{
                         backgroundColor: "rgba(239, 68, 68, 0.1)",
@@ -293,6 +306,21 @@ const Playlists = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => {
+          setDeleteConfirmOpen(false);
+          setPlaylistToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Delete Playlist"
+        message={`Are you sure you want to delete "${playlistToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmStyle="danger"
+      />
     </>
   );
 };
