@@ -33,7 +33,7 @@ const main = async () => {
   // Run database migrations and seeding
   await initializeDatabase();
 
-  const app = setupAPI();
+  setupAPI();
 };
 
 const initializeDatabase = async () => {

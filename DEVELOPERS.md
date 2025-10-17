@@ -168,29 +168,36 @@ JWT_SECRET="dev-secret-change-in-production"
 
 2. **Testing**:
 
+   Peek uses [Vitest](https://vitest.dev/) for unit testing in both frontend and backend.
+
    ```bash
-   # Frontend tests
-   cd client && npm test
+   # Frontend tests (Vitest + happy-dom)
+   cd client && npm test              # Run tests in watch mode
+   cd client && npm run test:ui       # Run tests with Vitest UI
+   cd client && npm run test:run      # Run tests once (CI mode)
 
-   # Backend tests
-   cd server && npm test
+   # Backend tests (Vitest + Node environment)
+   cd server && npm test              # Run tests in watch mode
+   cd server && npm run test:ui       # Run tests with Vitest UI
+   cd server && npm run test:run      # Run tests once (CI mode)
 
-   # Integration tests
-   docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+   # Example test files:
+   # - client/src/components/video-player/videoPlayerUtils.test.js
+   # - server/utils/pathMapping.test.ts
    ```
 
 3. **Code quality**:
 
+   Peek uses ESLint 9 for linting both frontend (React) and backend (TypeScript).
+
    ```bash
-   # Linting
-   cd client && npm run lint
-   cd server && npm run lint
+   # Linting (ESLint 9 with flat config format)
+   cd client && npm run lint          # Lint React/JSX files
+   cd server && npm run lint          # Lint TypeScript files
 
-   # Type checking
-   cd server && npm run type-check
-
-   # Formatting
-   npm run format
+   # Linting configuration:
+   # - Frontend: client/eslint.config.js (React hooks, React refresh)
+   # - Backend: server/eslint.config.js (TypeScript strict mode)
    ```
 
 ## 🏛️ Codebase Structure

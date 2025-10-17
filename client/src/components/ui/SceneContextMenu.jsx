@@ -39,7 +39,8 @@ const SceneContextMenu = ({ sceneId }) => {
       setLoadingPlaylists(true);
       const response = await api.get("/playlists");
       setPlaylists(response.data.playlists || []);
-    } catch (err) {
+    } catch {
+      // Error loading playlists - will show in UI
     } finally {
       setLoadingPlaylists(false);
     }

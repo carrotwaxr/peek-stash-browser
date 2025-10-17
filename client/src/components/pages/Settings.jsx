@@ -39,7 +39,7 @@ const Settings = () => {
       setPreferredQuality(settings.preferredQuality || "auto");
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
       setTheme(settings.theme || "dark");
-    } catch (err) {
+    } catch {
       setError("Failed to load settings");
     } finally {
       setLoading(false);
@@ -61,7 +61,7 @@ const Settings = () => {
 
       setMessage("Settings saved successfully!");
       setTimeout(() => setMessage(null), 3000);
-    } catch (err) {
+    } catch {
       setError("Failed to save settings");
     } finally {
       setSaving(false);

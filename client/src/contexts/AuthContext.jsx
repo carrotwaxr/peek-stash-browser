@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
         setUser(null);
       }
-    } catch (error) {
+    } catch {
       setIsAuthenticated(false);
       setUser(null);
     } finally {
@@ -55,7 +55,8 @@ export const AuthProvider = ({ children }) => {
         method: "POST",
         credentials: "include",
       });
-    } catch (error) {
+    } catch {
+      // Error logging out - clear auth state regardless
     } finally {
       setIsAuthenticated(false);
       setUser(null);

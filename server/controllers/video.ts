@@ -293,7 +293,7 @@ const getSceneData = async (sceneId: string): Promise<Scene> => {
 
 export const playVideo = async (req: PlayVideoRequest, res: Response) => {
   try {
-    const { startTime = "0", sessionId, quality = "direct" } = req.query;
+    const { startTime = "0", sessionId: _sessionId, quality = "direct" } = req.query;
     const { videoId } = req.params;
 
     // Get userId from authenticated user

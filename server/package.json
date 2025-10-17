@@ -9,7 +9,10 @@
     "serve": "node dist/index.js",
     "start": "node dist/index.js",
     "dev": "nodemon --legacy-watch --watch './**/*.ts' --watch '../.env' --ext ts --exec 'node --loader ts-node/esm' index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "eslint .",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run"
   },
   "prisma": {
     "seed": "node --loader ts-node/esm prisma/seed.ts"
@@ -22,9 +25,15 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "@vitest/ui": "^3.2.4",
+    "eslint": "^9.38.0",
+    "globals": "^16.4.0",
     "nodemon": "^3.1.10",
     "prisma": "^6.17.0",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@prisma/client": "^6.17.0",

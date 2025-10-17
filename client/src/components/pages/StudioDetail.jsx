@@ -20,7 +20,8 @@ const StudioDetail = () => {
         setIsLoading(true);
         const studioData = await getStudio(studioId);
         setStudio(studioData);
-      } catch (error) {
+      } catch {
+        // Error loading studio - will show loading spinner
       } finally {
         setIsLoading(false);
       }

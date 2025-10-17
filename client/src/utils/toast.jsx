@@ -28,7 +28,7 @@ export const showSuccess = (message, options = {}) => {
 
 export const showError = (error, options = {}) => {
   return toast.custom(
-    (t) => (
+    () => (
       <ErrorMessage
         error={error}
         mode="toast"

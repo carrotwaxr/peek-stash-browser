@@ -310,7 +310,6 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
     }
 
     const currentTime = player.currentTime();
-    const duration = player.duration();
     const seekDistance = Math.abs(currentTime - lastSeekTime);
 
     if (seekDistance > SEEK_THRESHOLD) {
@@ -385,7 +384,7 @@ export const getVideoJsOptions = (sources) => {
 /**
  * Disable live tracker to force VOD UI mode
  */
-export const disableLiveTracker = (player, context = "") => {
+export const disableLiveTracker = (player) => {
   if (player.liveTracker) {
     player.liveTracker.dispose();
     player.liveTracker = null;
