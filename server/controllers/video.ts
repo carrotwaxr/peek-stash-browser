@@ -5,14 +5,14 @@ import path from "path";
 import { Scene } from "stashapp-api";
 import { transcodingManager } from "../services/TranscodingManager.js";
 import { translateStashPath } from "../utils/pathMapping.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
 
-interface PlayVideoRequest extends Request {
+interface PlayVideoRequest extends AuthenticatedRequest {
   query: {
     sceneId?: string;
     startTime?: string;
     sessionId?: string;
-    userId?: string;
-    direct?: string;
+    quality?: string;
   };
   params: {
     videoId: string;
@@ -270,8 +270,11 @@ const getSceneData = async (sceneId: string): Promise<Scene> => {
 
 export const playVideo = async (req: PlayVideoRequest, res: Response) => {
   try {
-    const { direct, startTime = "0", sessionId, userId } = req.query;
+    const { startTime = "0", sessionId, quality = "direct" } = req.query;
     const { videoId } = req.params;
+
+    // Get userId from authenticated user
+    const userId = req.user?.id.toString();
 
     // Use sceneId from query or fallback to videoId from params
     const sceneId = req.query.sceneId || videoId;
@@ -280,10 +283,10 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
       return res.status(400).json({ error: "Scene ID is required" });
     }
 
+    const isDirectPlay = quality === "direct";
+
     console.log(
-      `${
-        direct === "true" ? "Direct playing" : "Playing transcoded"
-      } scene ${sceneId}`
+      `${isDirectPlay ? "Direct playing" : `Playing transcoded (${quality})`} scene ${sceneId}`
     );
 
     const startTimeFloat = parseFloat(startTime);
@@ -318,7 +321,7 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
     }
 
     // Handle direct play
-    if (direct === "true") {
+    if (isDirectPlay) {
       try {
         // Ensure absolute path for sendFile
         const absolutePath = path.resolve(sceneFilePath);
@@ -404,6 +407,7 @@ export const playVideo = async (req: PlayVideoRequest, res: Response) => {
       const session = await transcodingManager.getOrCreateSession(
         sceneId,
         startTimeFloat,
+        quality,
         userId,
         scene
       );

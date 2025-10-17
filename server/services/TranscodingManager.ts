@@ -11,6 +11,7 @@ export const QUALITY_PRESETS = {
   "360p": { width: 640, height: 360, bitrate: "800k", audioBitrate: "96k" },
   "480p": { width: 854, height: 480, bitrate: "1400k", audioBitrate: "128k" },
   "720p": { width: 1280, height: 720, bitrate: "2800k", audioBitrate: "128k" },
+  "1080p": { width: 1920, height: 1080, bitrate: "5000k", audioBitrate: "192k" },
 };
 
 export interface TranscodingSession {
@@ -74,6 +75,7 @@ export class TranscodingManager {
   async getOrCreateSession(
     videoId: string,
     startTime: number = 0,
+    quality: string = "480p",
     userId?: string,
     scene?: Scene
   ): Promise<TranscodingSession> {
@@ -94,7 +96,7 @@ export class TranscodingManager {
       videoId,
       userId,
       startTime,
-      quality: "480p", // Test with 480p
+      quality,
       process: null,
       outputDir,
       masterPlaylistPath: posixPath.join(outputDir, "master.m3u8"),

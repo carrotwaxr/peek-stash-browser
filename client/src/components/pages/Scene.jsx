@@ -29,8 +29,7 @@ const Scene = () => {
 
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-  const [playbackMode, setPlaybackMode] = useState("auto");
-  const [transcodingStatus, setTranscodingStatus] = useState("loading");
+  const [quality, setQuality] = useState("direct");
 
   // Fetch scene data if not provided via navigation state
   useEffect(() => {
@@ -147,8 +146,8 @@ const Scene = () => {
           playlist={playlist}
           compatibility={compatibility}
           firstFile={firstFile}
-          externalPlaybackMode={playbackMode}
-          externalSetPlaybackMode={setPlaybackMode}
+          externalQuality={quality}
+          externalSetQuality={setQuality}
         />
 
         {/* Playback Controls */}
@@ -156,10 +155,8 @@ const Scene = () => {
           scene={scene}
           playlist={playlist}
           currentPlaylistIndex={playlist?.currentIndex || 0}
-          playbackMode={playbackMode}
-          setPlaybackMode={setPlaybackMode}
-          compatibility={compatibility}
-          transcodingStatus={transcodingStatus}
+          quality={quality}
+          setQuality={setQuality}
           onReset={() => window.location.reload()}
         />
 

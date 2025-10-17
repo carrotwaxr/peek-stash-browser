@@ -25,16 +25,16 @@ const VideoPlayer = ({
   playlist,
   compatibility,
   firstFile,
-  externalPlaybackMode,
-  externalSetPlaybackMode,
+  externalQuality,
+  externalSetQuality,
 }) => {
   const {
     videoRef,
     playerRef,
-    prevPlaybackModeRef,
+    prevQualityRef,
     video,
     sessionId,
-    playbackMode: internalPlaybackMode,
+    quality: internalQuality,
     showPoster,
     isInitializing,
     isLoadingAPI,
@@ -43,8 +43,7 @@ const VideoPlayer = ({
     currentPlaylistIndex,
     setVideo,
     setSessionId,
-    setTranscodingStatus,
-    setPlaybackMode: internalSetPlaybackMode,
+    setQuality: internalSetQuality,
     setIsInitializing,
     setIsAutoFallback,
     setIsSwitchingMode,
@@ -53,17 +52,17 @@ const VideoPlayer = ({
     api,
   } = useVideoPlayer(scene, playlist, compatibility);
 
-  // Use external playback mode if provided, otherwise use internal
-  const playbackMode = externalPlaybackMode !== undefined ? externalPlaybackMode : internalPlaybackMode;
-  const setPlaybackMode = externalSetPlaybackMode || internalSetPlaybackMode;
+  // Use external quality if provided, otherwise use internal
+  const quality = externalQuality !== undefined ? externalQuality : internalQuality;
+  const setQuality = externalSetQuality || internalSetQuality;
 
-  // Sync internal playback mode with external when external changes
+  // Sync internal quality with external when external changes
   useEffect(() => {
-    if (externalPlaybackMode !== undefined && externalPlaybackMode !== internalPlaybackMode) {
-      console.log("[VideoPlayer] Syncing internal playbackMode to:", externalPlaybackMode);
-      internalSetPlaybackMode(externalPlaybackMode);
+    if (externalQuality !== undefined && externalQuality !== internalQuality) {
+      console.log("[VideoPlayer] Syncing internal quality to:", externalQuality);
+      internalSetQuality(externalQuality);
     }
-  }, [externalPlaybackMode, internalPlaybackMode, internalSetPlaybackMode]);
+  }, [externalQuality, internalQuality, internalSetQuality]);
 
   const { playPreviousInPlaylist, playNextInPlaylist } = usePlaylistNavigation(
     playlist,
@@ -71,31 +70,31 @@ const VideoPlayer = ({
     navigate
   );
 
-  // Handle playback mode changes
+  // Handle quality changes
   useEffect(() => {
     if (
       playerRef.current &&
       !isAutoFallback &&
-      prevPlaybackModeRef.current !== null &&
-      prevPlaybackModeRef.current !== playbackMode
+      prevQualityRef.current !== null &&
+      prevQualityRef.current !== quality
     ) {
       const player = playerRef.current;
       console.log(
-        `Manual mode switch: ${prevPlaybackModeRef.current} -> ${playbackMode}`
+        `Manual quality switch: ${prevQualityRef.current} -> ${quality}`
       );
 
       setIsSwitchingMode(true);
       player.pause();
 
-      const isDirect = playbackMode === "direct";
+      const isDirectPlay = quality === "direct";
 
       api
-        .get(`/video/play?sceneId=${scene.id}&direct=${isDirect}&userId=user1`)
+        .get(`/video/play?sceneId=${scene.id}&quality=${quality}`)
         .then((response) => {
-          console.log("Mode switch session created:", response.data);
+          console.log("Quality switch session created:", response.data);
 
-          if (isDirect) {
-            const directUrl = `/api/video/play?sceneId=${scene.id}&direct=true`;
+          if (isDirectPlay) {
+            const directUrl = `/api/video/play?sceneId=${scene.id}&quality=direct`;
             player.src({ src: directUrl, type: "video/mp4" });
             setSessionId(null);
             setVideo({ directPlay: true });
@@ -112,12 +111,12 @@ const VideoPlayer = ({
             setupQualitySelector(player);
             setupTranscodedSeeking(player, response.data.sessionId, api);
             setupLoadingBuffer(player, 6);
-            disableLiveTracker(player, "after mode switch");
+            disableLiveTracker(player, "after quality switch");
           }
 
           player.play().catch((e) => {
             console.log(
-              "Autoplay failed after mode switch, user interaction required:",
+              "Autoplay failed after quality switch, user interaction required:",
               e
             );
           });
@@ -125,14 +124,14 @@ const VideoPlayer = ({
           setIsSwitchingMode(false);
         })
         .catch((error) => {
-          console.error("Mode switch failed:", error);
+          console.error("Quality switch failed:", error);
           setIsSwitchingMode(false);
         });
     }
 
-    prevPlaybackModeRef.current = playbackMode;
+    prevQualityRef.current = quality;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playbackMode, scene.id, isAutoFallback]);
+  }, [quality, scene.id, isAutoFallback]);
 
   // Initialize player
   useEffect(() => {
@@ -140,16 +139,9 @@ const VideoPlayer = ({
       const videoElement = videoRef.current;
       if (!videoElement) return;
 
-      let canDirectPlay;
-      if (playbackMode === "direct") {
-        canDirectPlay = true;
-      } else if (playbackMode === "transcode") {
-        canDirectPlay = false;
-      } else {
-        canDirectPlay = compatibility?.canDirectPlay || false;
-      }
+      const isDirectPlay = quality === "direct";
 
-      if (!canDirectPlay && !sessionId) {
+      if (!isDirectPlay && !sessionId) {
         console.log(
           "Waiting for sessionId before initializing player...",
           sessionId
@@ -160,15 +152,17 @@ const VideoPlayer = ({
       console.log(
         "Initializing player with sessionId:",
         sessionId,
-        "canDirectPlay:",
-        canDirectPlay,
+        "isDirectPlay:",
+        isDirectPlay,
+        "quality:",
+        quality,
         "video:",
         video
       );
 
       let sources;
-      if (canDirectPlay) {
-        const apiUrl = `/api/video/play?sceneId=${scene.id}&direct=true`;
+      if (isDirectPlay) {
+        const apiUrl = `/api/video/play?sceneId=${scene.id}&quality=direct`;
         sources = [
           {
             src: apiUrl,
@@ -213,7 +207,7 @@ const VideoPlayer = ({
         });
 
         // Add error handler for direct play failures
-        if (canDirectPlay) {
+        if (isDirectPlay) {
           let hasTriggeredFallback = false;
 
           player.on("error", () => {
@@ -231,11 +225,11 @@ const VideoPlayer = ({
 
                 player.off("error");
                 setIsAutoFallback(true);
-                setPlaybackMode("transcode");
+                setQuality("480p");
 
                 api
                   .get(
-                    `/video/play?sceneId=${scene.id}&direct=false&userId=user1`
+                    `/video/play?sceneId=${scene.id}&quality=480p`
                   )
                   .then((response) => {
                     console.log(
@@ -245,7 +239,6 @@ const VideoPlayer = ({
 
                     setVideo(response.data.scene);
                     setSessionId(response.data.sessionId);
-                    setTranscodingStatus(response.data.status);
 
                     setupHLSforVOD(player, response.data.scene);
                     setupTranscodedSeeking(player, response.data.sessionId, api);
@@ -280,14 +273,14 @@ const VideoPlayer = ({
         }
 
         // Configure HLS for VOD behavior if not direct play
-        if (!canDirectPlay) {
+        if (!isDirectPlay) {
           setupHLSforVOD(player, scene);
           setupLoadingBuffer(player, 6);
         }
 
         setupQualitySelector(player);
 
-        if (!canDirectPlay && sessionId) {
+        if (!isDirectPlay && sessionId) {
           setupTranscodedSeeking(player, sessionId, api);
         }
 
@@ -328,8 +321,7 @@ const VideoPlayer = ({
     video,
     sessionId,
     firstFile?.format,
-    compatibility?.canDirectPlay,
-    playbackMode,
+    quality,
     showPoster,
     fetchVideoData,
     isSwitchingMode,
@@ -358,9 +350,8 @@ const VideoPlayer = ({
   }, []);
 
   const handlePlay = () => {
-    console.log("[handlePlay] Called with playbackMode:", playbackMode);
-    console.log("[handlePlay] Internal playbackMode:", internalPlaybackMode);
-    logInitialSetup(scene, compatibility, playbackMode);
+    console.log("[handlePlay] Called with quality:", quality);
+    logInitialSetup(scene, compatibility, quality);
     setIsInitializing(true);
     console.log("[handlePlay] About to call fetchVideoData");
     fetchVideoData();

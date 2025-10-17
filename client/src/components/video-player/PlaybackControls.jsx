@@ -4,10 +4,8 @@ const PlaybackControls = ({
   scene,
   playlist,
   currentPlaylistIndex,
-  playbackMode,
-  setPlaybackMode,
-  compatibility,
-  transcodingStatus,
+  quality,
+  setQuality,
   onReset,
 }) => {
   return (
@@ -34,17 +32,17 @@ const PlaybackControls = ({
           </div>
         )}
 
-        {/* Playback Mode Selector */}
+        {/* Quality Selector */}
         <div className="flex items-center gap-2">
           <label
             className="text-sm font-medium"
             style={{ color: "var(--text-secondary)" }}
           >
-            Playback Mode:
+            Quality:
           </label>
           <select
-            value={playbackMode}
-            onChange={(e) => setPlaybackMode(e.target.value)}
+            value={quality}
+            onChange={(e) => setQuality(e.target.value)}
             className="btn text-sm"
             style={{
               backgroundColor: "var(--bg-card)",
@@ -53,48 +51,16 @@ const PlaybackControls = ({
               padding: "8px 12px",
             }}
           >
-            <option value="auto">Auto</option>
             <option value="direct">Direct Play</option>
-            <option value="transcode">Force Transcode</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+            <option value="360p">360p</option>
           </select>
         </div>
 
-        {/* Playback Status and Reset */}
+        {/* Actions */}
         <div className="flex items-center gap-4">
-          {/* Status Indicator */}
-          {compatibility && (
-            <div className="flex items-center gap-2">
-              <span
-                className={`status-indicator ${
-                  compatibility.canDirectPlay
-                    ? "status-success"
-                    : transcodingStatus === "completed"
-                    ? "status-success"
-                    : transcodingStatus === "active"
-                    ? "status-warning"
-                    : "status-error"
-                }`}
-              ></span>
-              <span
-                className="text-sm font-medium"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {playbackMode === "direct"
-                  ? "Direct Play (Forced)"
-                  : playbackMode === "transcode"
-                  ? "Transcoding (Forced)"
-                  : compatibility.canDirectPlay
-                  ? "Direct Play"
-                  : `Transcoding ${
-                      transcodingStatus === "loading"
-                        ? "Starting..."
-                        : transcodingStatus.charAt(0).toUpperCase() +
-                          transcodingStatus.slice(1)
-                    }`}
-              </span>
-            </div>
-          )}
-
           {/* Reset Button */}
           <button
             onClick={onReset}
