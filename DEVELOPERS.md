@@ -1079,25 +1079,105 @@ app.get("/api/health", async (req, res) => {
 
 ### Frontend Optimization
 
+####  Build Configuration
+
+Peek uses Vite with comprehensive production optimizations configured in `client/vite.config.js`:
+
+```javascript
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { visualizer } from "rollup-plugin-visualizer";
+
+export default defineConfig({
+  plugins: [
+    react({
+      babel: {
+        plugins: [["babel-plugin-react-compiler"]], // React 19 compiler
+      },
+    }),
+    visualizer({ //  Bundle analysis
+      filename: "dist/stats.html",
+      gzipSize: true,
+      brotliSize: true,
+    }),
+  ],
+  build: {
+    minify: "terser", // Aggressive minification
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.logs in production
+        drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor code splitting for better caching
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
+          "video-vendor": ["video.js"],
+          "ui-vendor": ["lucide-react", "react-hot-toast"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
+});
+```
+
+**Build Scripts**:
+
+```bash
+# Standard production build
+cd client && npm run build
+
+# Build with bundle analysis (opens stats.html)
+cd client && npm run build:analyze
+```
+
+**Bundle Size Results**:
+
+Before optimizations:
+- Single bundle: 2,013 kB (505 kB gzipped)
+
+After optimizations:
+- Core bundle: 205 kB (64 kB gzipped)
+- React vendor: 43 kB (15 kB gzipped)
+- Video.js vendor: 688 kB (200 kB gzipped)
+- UI vendor: 563 kB (145 kB gzipped)
+- Page chunks: 3-26 kB each (lazy loaded)
+
 **Code Splitting**:
+
+All page components are lazy-loaded for optimal initial load time:
 
 ```jsx
 import { lazy, Suspense } from "react";
 
-const Scenes = lazy(() => import("./components/Scenes"));
-const Performers = lazy(() => import("./components/Performers"));
+// Lazy load all page components
+const Home = lazy(() => import("./components/pages/Home.jsx"));
+const Scenes = lazy(() => import("./components/pages/Scenes.jsx"));
+const Scene = lazy(() => import("./components/pages/Scene.jsx"));
+// ... etc for all routes
 
 function App() {
   return (
-    <Suspense fallback={<LoadingSpinner />}>
+    <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/scenes" element={<Scenes />} />
-        <Route path="/performers" element={<Performers />} />
+        <Route path="/" element={<Layout><Home /></Layout>} />
+        <Route path="/scenes" element={<Layout><Scenes /></Layout>} />
+        <Route path="/scene/:sceneId" element={<Scene />} />
       </Routes>
     </Suspense>
   );
 }
 ```
+
+**Performance Benefits**:
+- 90% reduction in initial bundle size
+- Faster time-to-interactive
+- Pages load on-demand (only when navigated to)
+- Better browser caching (vendors change less frequently)
+- Video.js (688KB) only loads when playing video
 
 **Image Optimization**:
 
