@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -5,24 +6,33 @@ import {
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Layout from "./components/ui/Layout.jsx";
-import Home from "./components/pages/Home.jsx";
-import Scenes from "./components/pages/Scenes.jsx";
-import Performers from "./components/pages/Performers.jsx";
-import Studios from "./components/pages/Studios.jsx";
-import Tags from "./components/pages/Tags.jsx";
-import Scene from "./components/pages/Scene.jsx";
-import PerformerDetail from "./components/pages/PerformerDetail.jsx";
-import StudioDetail from "./components/pages/StudioDetail.jsx";
-import TagDetail from "./components/pages/TagDetail.jsx";
 import Login from "./components/pages/Login.jsx";
-import Settings from "./components/pages/Settings.jsx";
-import Playlists from "./components/pages/Playlists.jsx";
-import PlaylistDetail from "./components/pages/PlaylistDetail.jsx";
-import ServerSettings from "./components/pages/ServerSettings.jsx";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import "./themes/base.css";
+
+// Lazy load page components for code splitting
+const Home = lazy(() => import("./components/pages/Home.jsx"));
+const Scenes = lazy(() => import("./components/pages/Scenes.jsx"));
+const Performers = lazy(() => import("./components/pages/Performers.jsx"));
+const Studios = lazy(() => import("./components/pages/Studios.jsx"));
+const Tags = lazy(() => import("./components/pages/Tags.jsx"));
+const Scene = lazy(() => import("./components/pages/Scene.jsx"));
+const PerformerDetail = lazy(() => import("./components/pages/PerformerDetail.jsx"));
+const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
+const TagDetail = lazy(() => import("./components/pages/TagDetail.jsx"));
+const Settings = lazy(() => import("./components/pages/Settings.jsx"));
+const Playlists = lazy(() => import("./components/pages/Playlists.jsx"));
+const PlaylistDetail = lazy(() => import("./components/pages/PlaylistDetail.jsx"));
+const ServerSettings = lazy(() => import("./components/pages/ServerSettings.jsx"));
+
+// Loading fallback component
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="text-xl">Loading...</div>
+  </div>
+);
 
 // Main app component with authentication
 const AppContent = () => {
@@ -42,108 +52,110 @@ const AppContent = () => {
 
   return (
     <Router>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <Layout>
-              <Home />
-            </Layout>
-          }
-        />
-        <Route
-          path="/scenes"
-          element={
-            <Layout>
-              <Scenes />
-            </Layout>
-          }
-        />
-        <Route
-          path="/performers"
-          element={
-            <Layout>
-              <Performers />
-            </Layout>
-          }
-        />
-        <Route
-          path="/studios"
-          element={
-            <Layout>
-              <Studios />
-            </Layout>
-          }
-        />
-        <Route
-          path="/tags"
-          element={
-            <Layout>
-              <Tags />
-            </Layout>
-          }
-        />
-        <Route
-          path="/performer/:performerId"
-          element={
-            <Layout>
-              <PerformerDetail />
-            </Layout>
-          }
-        />
-        <Route
-          path="/studio/:studioId"
-          element={
-            <Layout>
-              <StudioDetail />
-            </Layout>
-          }
-        />
-        <Route
-          path="/tag/:tagId"
-          element={
-            <Layout>
-              <TagDetail />
-            </Layout>
-          }
-        />
-        <Route
-          path="/my-settings"
-          element={
-            <Layout>
-              <Settings />
-            </Layout>
-          }
-        />
-        <Route
-          path="/server-settings"
-          element={
-            <Layout>
-              <ServerSettings />
-            </Layout>
-          }
-        />
-        <Route
-          path="/playlists"
-          element={
-            <Layout>
-              <Playlists />
-            </Layout>
-          }
-        />
-        <Route
-          path="/playlist/:playlistId"
-          element={
-            <Layout>
-              <PlaylistDetail />
-            </Layout>
-          }
-        />
-        <Route path="/scene/:sceneId" element={<Scene />} />
-        {/* Legacy routes for backwards compatibility */}
-        <Route path="/player/:sceneId" element={<Scene />} />
-        <Route path="/video/:sceneId" element={<Scene />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Layout>
+                <Home />
+              </Layout>
+            }
+          />
+          <Route
+            path="/scenes"
+            element={
+              <Layout>
+                <Scenes />
+              </Layout>
+            }
+          />
+          <Route
+            path="/performers"
+            element={
+              <Layout>
+                <Performers />
+              </Layout>
+            }
+          />
+          <Route
+            path="/studios"
+            element={
+              <Layout>
+                <Studios />
+              </Layout>
+            }
+          />
+          <Route
+            path="/tags"
+            element={
+              <Layout>
+                <Tags />
+              </Layout>
+            }
+          />
+          <Route
+            path="/performer/:performerId"
+            element={
+              <Layout>
+                <PerformerDetail />
+              </Layout>
+            }
+          />
+          <Route
+            path="/studio/:studioId"
+            element={
+              <Layout>
+                <StudioDetail />
+              </Layout>
+            }
+          />
+          <Route
+            path="/tag/:tagId"
+            element={
+              <Layout>
+                <TagDetail />
+              </Layout>
+            }
+          />
+          <Route
+            path="/my-settings"
+            element={
+              <Layout>
+                <Settings />
+              </Layout>
+            }
+          />
+          <Route
+            path="/server-settings"
+            element={
+              <Layout>
+                <ServerSettings />
+              </Layout>
+            }
+          />
+          <Route
+            path="/playlists"
+            element={
+              <Layout>
+                <Playlists />
+              </Layout>
+            }
+          />
+          <Route
+            path="/playlist/:playlistId"
+            element={
+              <Layout>
+                <PlaylistDetail />
+              </Layout>
+            }
+          />
+          <Route path="/scene/:sceneId" element={<Scene />} />
+          {/* Legacy routes for backwards compatibility */}
+          <Route path="/player/:sceneId" element={<Scene />} />
+          <Route path="/video/:sceneId" element={<Scene />} />
+        </Routes>
+      </Suspense>
     </Router>
   );
 };
