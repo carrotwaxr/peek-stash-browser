@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import { showSuccess, showWarning, showError } from "../../utils/toast.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -48,14 +49,14 @@ const SceneContextMenu = ({ sceneId }) => {
   const addToPlaylist = async (playlistId) => {
     try {
       await api.post(`/playlists/${playlistId}/items`, { sceneId });
-      alert("Added to playlist!");
+      showSuccess("Added to playlist!");
       setShowMenu(false);
     } catch (err) {
       console.error("Failed to add to playlist:", err);
       if (err.response?.status === 400) {
-        alert("Scene already in playlist");
+        showWarning("Scene already in playlist");
       } else {
-        alert("Failed to add to playlist");
+        showError("Failed to add to playlist");
       }
     }
   };
