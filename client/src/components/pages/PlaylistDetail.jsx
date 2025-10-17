@@ -8,6 +8,7 @@ import {
 } from "../../utils/format.js";
 import { formatRelativeTime } from "../../utils/date.js";
 import Tooltip from "../ui/Tooltip.jsx";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -24,6 +25,9 @@ const PlaylistDetail = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+
+  // Set page title to playlist name
+  usePageTitle(playlist?.name || "Playlist");
 
   useEffect(() => {
     loadPlaylist();

@@ -6,8 +6,10 @@ import { formatRating, getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const Performers = () => {
+  usePageTitle("Performers");
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const [lastQuery, setLastQuery] = useState(null);

@@ -3,11 +3,15 @@ import { useParams, Link } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const TagDetail = () => {
   const { tagId } = useParams();
   const [isLoading, setIsLoading] = useState(true);
   const [tag, setTag] = useState(null);
+
+  // Set page title to tag name
+  usePageTitle(tag?.name || "Tag");
 
   console.log("TagDetail render:", tag);
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -7,6 +8,7 @@ const api = axios.create({
 });
 
 const Settings = () => {
+  usePageTitle("My Settings");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
