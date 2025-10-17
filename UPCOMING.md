@@ -34,25 +34,26 @@ _No items currently at critical priority._
 
 ## Quality Selector Implementation
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: High
 - **Description**: Replace "Playback Mode" selector with quality-based selection
-- **Current State**: Users select between "Direct Play" and "Transcode" (480p default)
-- **Needed Work**:
-  - Add 1080p preset to `QUALITY_PRESETS` in `server/services/TranscodingManager.ts`
-  - Replace PlaybackControls component's mode selector with quality dropdown
-  - Add quality options: `Direct`, `1080p`, `720p`, `480p`, `360p`
-  - Update video player logic to map quality selection to transcode parameters
-  - Pass selected quality to TranscodingManager session creation
-  - Update UI to show current quality during playback
-  - Test all quality levels for proper transcoding
-- **Technical Notes**:
-  - `Direct` = native playback (no transcoding, current "Direct Play" mode)
-  - All quality options implicitly force transcoding
-  - Transcode on-demand based on user selection (not pre-emptive)
-  - No automatic quality switching needed initially
-  - Infrastructure already exists in QUALITY_PRESETS (360p, 480p, 720p)
-- **Benefit**: Simpler UX, matches standard video player behavior (YouTube, Netflix, etc.)
+- **Current State**: Quality selector implemented with Direct, 1080p, 720p, 480p, 360p options
+- **Completed Work**:
+  - Added 1080p preset to `QUALITY_PRESETS` in `server/services/TranscodingManager.ts`
+  - Replaced PlaybackControls mode selector with quality dropdown
+  - Implemented quality options: `Direct`, `1080p`, `720p`, `480p`, `360p`
+  - Updated VideoPlayer logic to handle quality parameter
+  - Quality passed to TranscodingManager for on-demand transcoding
+  - UI shows current selected quality during playback
+  - All quality levels tested and working
+- **Technical Implementation**:
+  - Component: `client/src/components/video-player/PlaybackControls.jsx`
+  - Backend: `server/services/TranscodingManager.ts` (QUALITY_PRESETS)
+  - `Direct` = native playback (no transcoding)
+  - Other qualities trigger on-demand transcoding
+  - No pre-transcoding or automatic quality switching
+  - Quality parameter flows: UI → VideoPlayer → /api/video/play → TranscodingManager
+- **Benefit**: Intuitive UX matching YouTube/Netflix, users can choose quality based on bandwidth/device
 
 ## Page/Tab Titles
 
