@@ -1,6 +1,8 @@
 import SceneSearch from "../scene-search/SceneSearch.jsx";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const Scenes = () => {
+  usePageTitle("Scenes");
   return (
     <SceneSearch
       initialSort="created_at"

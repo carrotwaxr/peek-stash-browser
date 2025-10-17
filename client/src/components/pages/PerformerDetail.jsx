@@ -4,11 +4,15 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import { LucideMars, LucideStar, LucideUser, LucideVenus } from "lucide-react";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const PerformerDetail = () => {
   const { performerId } = useParams();
   const [isLoading, setIsLoading] = useState(true);
   const [performer, setPerformer] = useState(null);
+
+  // Set page title to performer name
+  usePageTitle(performer?.name || "Performer");
 
   useEffect(() => {
     console.log("running effect");

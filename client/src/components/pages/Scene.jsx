@@ -5,6 +5,7 @@ import Navigation from "../ui/Navigation.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import SceneDetails from "./SceneDetails.jsx";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const Scene = () => {
   const { sceneId } = useParams();
@@ -14,6 +15,9 @@ const Scene = () => {
   // Get scene and playlist from navigation state
   const scene = location.state?.scene;
   const playlist = location.state?.playlist;
+
+  // Set page title to scene title
+  usePageTitle(scene?.title || "Scene");
 
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);

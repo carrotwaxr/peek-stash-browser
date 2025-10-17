@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -9,6 +10,7 @@ const api = axios.create({
 });
 
 const ServerSettings = () => {
+  usePageTitle("Server Settings");
   const navigate = useNavigate();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);

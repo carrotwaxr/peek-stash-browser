@@ -2,8 +2,10 @@ import { useNavigate } from "react-router-dom";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import { useHomeData } from "../../hooks/useLibrary.js";
 import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const Home = () => {
+  usePageTitle(); // Sets "Peek"
   const navigate = useNavigate();
   const { favorites, recent, longVideos, loading, error } = useHomeData();
 
