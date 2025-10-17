@@ -75,23 +75,25 @@ _No items currently at critical priority._
 
 ## Direct/Bookmark Link Capabilities
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: High
 - **Description**: Ensure any frontend route can be loaded independently without navigation context
-- **Current State**: Some detail pages may depend on React Context and fail when accessed directly
-- **Needed Work**:
-  - Audit all routes, especially Scene, Performer, Studio, Tag detail pages
-  - Identify pages that rely on React Context for data
-  - Add fallback data fetching using URL params when Context is unavailable
-  - Verify all `find` API routes support `ids` filter for single-entity fetching
-  - Test direct URL access for all pages (bookmark, new tab, shared link)
-  - Update Router configuration if needed
-- **Technical Notes**:
-  - Keep Context for performance when navigating through app
-  - Add `useEffect` to fetch data from API if Context is empty
-  - Example: `useEffect(() => { if (!contextData && id) fetchById(id) }, [id, contextData])`
-  - Files to check: `client/src/components/pages/SceneDetails.jsx`, similar detail pages
-- **Benefit**: Users can bookmark, open links in new tabs, or share links
+- **Current State**: All detail pages now support direct URL access with fallback data fetching
+- **Completed Work**:
+  - Audited all detail page routes (Scene, Performer, Studio, Tag)
+  - Found PerformerDetail, StudioDetail, and TagDetail already supported direct access
+  - Added fallback data fetching to Scene.jsx for direct URL access
+  - Verified all `find` API routes support `ids` filter for single-entity fetching
+  - Implemented loading and error states for Scene.jsx
+  - Preserved navigation state optimization for performance
+- **Technical Implementation**:
+  - Scene.jsx now checks for navigation state first (performance)
+  - Falls back to API fetch using `libraryApi.findScenes({ ids: [sceneId] })` if no state
+  - Shows loading spinner while fetching
+  - Shows error message with "Browse Scenes" button if fetch fails
+  - Pattern: `useEffect(() => { if (!sceneFromState) fetchScene() }, [sceneId, sceneFromState])`
+  - Files modified: `client/src/components/pages/Scene.jsx`
+- **Benefit**: Users can now bookmark, open links in new tabs, or share direct links to any page
 
 ## Success/Error/Warning/Info Components
 

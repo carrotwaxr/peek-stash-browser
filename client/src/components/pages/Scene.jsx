@@ -6,15 +6,23 @@ import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import SceneDetails from "./SceneDetails.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { libraryApi } from "../../services/api.js";
+import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 
 const Scene = () => {
   const { sceneId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Get scene and playlist from navigation state
-  const scene = location.state?.scene;
-  const playlist = location.state?.playlist;
+  // Get scene and playlist from navigation state (preferred for performance)
+  const sceneFromState = location.state?.scene;
+  const playlistFromState = location.state?.playlist;
+
+  // Local state for fetched data
+  const [scene, setScene] = useState(sceneFromState);
+  const [playlist, setPlaylist] = useState(playlistFromState);
+  const [isLoading, setIsLoading] = useState(!sceneFromState);
+  const [fetchError, setFetchError] = useState(null);
 
   // Set page title to scene title
   usePageTitle(scene?.title || "Scene");
@@ -24,27 +32,69 @@ const Scene = () => {
   const [playbackMode, setPlaybackMode] = useState("auto");
   const [transcodingStatus, setTranscodingStatus] = useState("loading");
 
-  // Redirect if scene data is missing
+  // Fetch scene data if not provided via navigation state
   useEffect(() => {
-    if (!scene) {
-      console.error("No scene data provided, redirecting to home");
-      navigate("/");
-    }
-  }, [scene, navigate]);
+    const fetchScene = async () => {
+      // If we already have scene data from navigation, skip fetching
+      if (sceneFromState) {
+        return;
+      }
 
-  if (!scene) {
+      try {
+        setIsLoading(true);
+        setFetchError(null);
+        const response = await libraryApi.findScenes({ ids: [sceneId] });
+        const sceneData = response?.findScenes?.scenes?.[0];
+
+        if (sceneData) {
+          setScene(sceneData);
+        } else {
+          setFetchError("Scene not found");
+        }
+      } catch (error) {
+        console.error("Error fetching scene:", error);
+        setFetchError(error.message || "Failed to load scene");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchScene();
+  }, [sceneId, sceneFromState]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
+        <Navigation />
+        <div className="flex items-center justify-center min-h-screen">
+          <LoadingSpinner />
+        </div>
+      </div>
+    );
+  }
+
+  // Error or scene not found
+  if (fetchError || !scene) {
     return (
       <div className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
         <Navigation />
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <h2 className="text-xl mb-2" style={{ color: "var(--text-primary)" }}>
-              Scene not found
+              {fetchError || "Scene not found"}
             </h2>
             <p style={{ color: "var(--text-secondary)" }}>Scene ID: {sceneId}</p>
-            <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
-              Try navigating from the scenes or home page
-            </p>
+            <button
+              onClick={() => navigate("/scenes")}
+              className="mt-4 px-4 py-2 rounded-lg"
+              style={{
+                backgroundColor: "var(--accent-color)",
+                color: "white",
+              }}
+            >
+              Browse Scenes
+            </button>
           </div>
         </div>
       </div>
