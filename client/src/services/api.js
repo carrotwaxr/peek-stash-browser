@@ -95,7 +95,7 @@ export const libraryApi = {
    */
   findPerformerById: async (id) => {
     const result = await apiPost("/library/performers", { ids: [id] });
-    return result?.performers?.[0] || null;
+    return result?.findPerformers?.performers?.[0] || null;
   },
 
   /**
@@ -105,7 +105,7 @@ export const libraryApi = {
    */
   findSceneById: async (id) => {
     const result = await apiPost("/library/scenes", { ids: [id] });
-    return result?.scenes?.[0] || null;
+    return result?.findScenes?.scenes?.[0] || null;
   },
 
   /**
@@ -115,7 +115,7 @@ export const libraryApi = {
    */
   findStudioById: async (id) => {
     const result = await apiPost("/library/studios", { ids: [id] });
-    return result?.studios?.[0] || null;
+    return result?.findStudios?.studios?.[0] || null;
   },
 
   /**
@@ -125,7 +125,7 @@ export const libraryApi = {
    */
   findTagById: async (id) => {
     const result = await apiPost("/library/tags", { ids: [id] });
-    return result?.tags?.[0] || null;
+    return result?.findTags?.tags?.[0] || null;
   },
 };
 
