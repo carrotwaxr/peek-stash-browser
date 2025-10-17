@@ -213,23 +213,25 @@ _No items currently at critical priority._
 
 ## Convenience API Methods
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: Medium
 - **Description**: Add convenience methods for fetching single entities by ID
-- **Current State**: Must use `findPerformers()` and extract first result for single performer
-- **Needed Work**:
-  - Add `findPerformerById(id)` method that returns performer object or `null`
-  - Add `findSceneById(id)` method
-  - Add `findStudioById(id)` method
-  - Add `findTagById(id)` method
-  - Each method calls corresponding `find*` method with ID filter
-  - Returns single entity or `null` if not found
-  - Add TypeScript types for return values
-- **Technical Notes**:
-  - File: `client/src/services/libraryApi.js` (or `.ts` if TypeScript)
-  - Example: `async findPerformerById(id) { const result = await this.findPerformers({ ids: [id] }); return result.data[0] || null; }`
-  - Verify all `find` methods support `ids` filter
-- **Benefit**: Cleaner code, less boilerplate for single-entity fetching
+- **Current State**: All convenience methods implemented and working
+- **Completed Work**:
+  - Added `findPerformerById(id)` method to `libraryApi`
+  - Added `findSceneById(id)` method to `libraryApi`
+  - Added `findStudioById(id)` method to `libraryApi`
+  - Added `findTagById(id)` method to `libraryApi`
+  - Each method returns single entity or `null` if not found
+  - All methods use existing `find*` methods with `ids: [id]` parameter
+  - Build and lint pass with no errors
+- **Technical Implementation**:
+  - File: `client/src/services/api.js`
+  - Pattern: `async findPerformerById(id) { const result = await apiPost("/library/performers", { ids: [id] }); return result?.performers?.[0] || null; }`
+  - Same pattern for scenes, studios, and tags
+  - Uses optional chaining and nullish coalescing for clean null handling
+  - Full JSDoc comments for each method
+- **Benefit**: Cleaner code, less boilerplate for single-entity fetching, more intuitive API
 
 ## Playlist Management Enhancements
 
