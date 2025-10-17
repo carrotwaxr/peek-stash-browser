@@ -166,7 +166,7 @@ export const setupNetworkLogging = () => {
 /**
  * Log initial setup information
  */
-export const logInitialSetup = (scene, compatibility, playbackMode) => {
+export const logInitialSetup = (scene, compatibility, quality) => {
   console.log("=".repeat(80));
   console.log("[PLAYBACK INIT] Starting new playback session");
   console.log("=".repeat(80));
@@ -178,6 +178,6 @@ export const logInitialSetup = (scene, compatibility, playbackMode) => {
     resolution: `${scene.files?.[0]?.width}x${scene.files?.[0]?.height}`
   });
   console.log("[PLAYBACK INIT] Compatibility:", compatibility);
-  console.log("[PLAYBACK INIT] Playback mode:", playbackMode);
+  console.log("[PLAYBACK INIT] Quality:", quality);
   console.log("=".repeat(80));
 };

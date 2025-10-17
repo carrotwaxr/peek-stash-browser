@@ -13,12 +13,11 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const playerRef = useRef(null);
-  const prevPlaybackModeRef = useRef(null);
+  const prevQualityRef = useRef(null);
 
   const [video, setVideo] = useState(null);
   const [sessionId, setSessionId] = useState(null);
-  const [transcodingStatus, setTranscodingStatus] = useState("loading");
-  const [playbackMode, setPlaybackMode] = useState("auto");
+  const [quality, setQuality] = useState("direct");
   const [showPoster, setShowPoster] = useState(true);
   const [isInitializing, setIsInitializing] = useState(false);
   const [isLoadingAPI, setIsLoadingAPI] = useState(false);
@@ -40,7 +39,6 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
     console.log("[SCENE CHANGE] Scene ID changed to:", scene.id);
     setVideo(null);
     setSessionId(null);
-    setTranscodingStatus("loading");
     setShowPoster(true);
     setIsInitializing(false);
     setIsLoadingAPI(false);
@@ -66,7 +64,7 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
         sceneId: scene.id,
         video,
         isLoadingAPI,
-        playbackMode,
+        quality,
         compatibility: compatibility?.canDirectPlay
       });
 
@@ -80,31 +78,27 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
         return;
       }
 
-      const canDirectPlay =
-        playbackMode === "transcode"
-          ? false
-          : compatibility?.canDirectPlay || false;
+      const isDirectPlay = quality === "direct";
 
       console.log(
         `[fetchVideoData] Making API call for ${
-          canDirectPlay ? "direct" : "transcoded"
+          isDirectPlay ? "direct" : `transcoded (${quality})`
         } session...`
       );
       setIsLoadingAPI(true);
 
       try {
-        if (canDirectPlay) {
+        if (isDirectPlay) {
           setVideo({ directPlay: true });
           setShowPoster(false);
         } else {
           const response = await api.get(
-            `/video/play?sceneId=${scene.id}&direct=false&userId=user1`
+            `/video/play?sceneId=${scene.id}&quality=${quality}`
           );
 
           console.log("API response:", response.data);
           setVideo(response.data.scene);
           setSessionId(response.data.sessionId);
-          setTranscodingStatus(response.data.status);
           console.log("Set sessionId:", response.data.sessionId);
           setShowPoster(false);
         }
@@ -115,19 +109,18 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
         setIsInitializing(false);
       }
     },
-    [scene.id, video, isLoadingAPI, playbackMode, compatibility]
+    [scene.id, video, isLoadingAPI, quality, compatibility]
   );
 
   return {
     // Refs
     videoRef,
     playerRef,
-    prevPlaybackModeRef,
+    prevQualityRef,
     // State
     video,
     sessionId,
-    transcodingStatus,
-    playbackMode,
+    quality,
     showPoster,
     isInitializing,
     isLoadingAPI,
@@ -137,8 +130,7 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
     // Setters
     setVideo,
     setSessionId,
-    setTranscodingStatus,
-    setPlaybackMode,
+    setQuality,
     setShowPoster,
     setIsInitializing,
     setIsLoadingAPI,
