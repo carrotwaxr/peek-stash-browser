@@ -171,25 +171,28 @@ _No items currently at critical priority._
 
 ## Playlist Status Card on Scene Page
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: Medium
 - **Description**: Show playlist context when viewing a scene that's part of a playlist
-- **Current State**: No indication that scene is part of playlist when viewing scene page
-- **Needed Work**:
-  - Detect if current scene is part of a playlist
-  - Create `PlaylistStatusCard` component showing:
-    - Playlist title
-    - Current position (e.g., "Video 3 of 12")
-    - Thumbnails/list of other videos in playlist
-    - Quick navigation to any video in playlist
-    - Previous/Next buttons
-  - Place card prominently on Scene page
-  - Handle URL params for playlist context
-- **Technical Notes**:
-  - File: `client/src/components/pages/Scene.jsx` or `SceneDetails.jsx`
-  - May need to pass playlist info via URL query params
-  - Component location: `client/src/components/playlist/PlaylistStatusCard.jsx`
-- **Benefit**: Better binge-watching experience, easier playlist navigation
+- **Current State**: Playlist status card implemented and integrated on scene page
+- **Completed Work**:
+  - Created `PlaylistStatusCard` component with full playlist context
+  - Shows playlist name and current position ("3 of 12")
+  - Previous/Next navigation buttons with disabled states
+  - Thumbnail strip showing nearby scenes (2 before/after, plus first/last)
+  - Visual indicators for current scene (larger thumbnail, accent border)
+  - Click any thumbnail to jump to that scene
+  - "View Full Playlist" button
+  - Ellipsis indicators for gaps in thumbnail strip
+  - Integrated on Scene page when playlist context is available
+- **Technical Implementation**:
+  - Component: `client/src/components/playlist/PlaylistStatusCard.jsx`
+  - Updated: `client/src/components/pages/Scene.jsx` - integrated status card
+  - Uses lucide-react icons (ChevronLeft, ChevronRight, List)
+  - Playlist context passed via React Router navigation state
+  - Shows up to 7 thumbnails with smart selection (nearby + endpoints)
+  - Navigation preserves playlist context across scenes
+- **Benefit**: Excellent binge-watching UX, clear playlist context, easy navigation within playlist
 
 ## Scene Preview/Thumbnails (Seek Hover)
 
@@ -235,24 +238,34 @@ _No items currently at critical priority._
 
 ## Playlist Management Enhancements
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: Medium
 - **Description**: Enhanced playlist features beyond basic playback
-- **Current State**: Basic playlist playback exists
-- **Needed Work**:
-  - Create custom playlists (not just from Stash)
-  - Shuffle mode toggle
-  - Repeat mode options (repeat one, repeat all, no repeat)
-  - Save/load playlist state (resume playlist later)
-  - Edit playlist order (drag-and-drop reordering)
-  - Add/remove videos from playlist
-  - Database schema for storing custom playlists
-  - UI for managing playlists
-- **Technical Notes**:
-  - Need new database table: `Playlist` and `PlaylistItem`
-  - Files: `client/src/components/pages/Playlists.jsx`, `PlaylistEditor.jsx`
-  - Consider using DnD library like `react-beautiful-dnd` or `dnd-kit`
-- **Benefit**: Better binge-watching experience, easier playlist navigation
+- **Current State**: Comprehensive playlist management with shuffle, repeat, and drag-drop reordering
+- **Completed Work**:
+  - Database schema already existed (Playlist and PlaylistItem tables)
+  - Custom playlist CRUD operations already working
+  - Added shuffle mode toggle (persists to database)
+  - Added repeat modes (None, Repeat All, Repeat One) with cycle button
+  - Drag-and-drop reordering with HTML5 native DnD
+  - Visual drag handles with position numbers
+  - Real-time reorder preview with Save/Cancel confirmation
+  - Add/remove scenes from playlist (already working)
+  - Shuffle/repeat preferences persist per playlist
+  - Playlist navigation respects shuffle and repeat modes
+- **Technical Implementation**:
+  - Updated: `client/src/components/pages/PlaylistDetail.jsx` - shuffle/repeat/reorder UI
+  - Updated: `client/src/components/video-player/usePlaylistNavigation.js` - shuffle/repeat logic
+  - Updated: `server/prisma/schema.prisma` - added shuffle/repeat fields
+  - Migration: `server/prisma/migrations/20250117_add_playlist_shuffle_repeat/migration.sql`
+  - Updated: `server/controllers/playlist.ts` - support shuffle/repeat in update endpoint
+  - Uses Fisher-Yates shuffle algorithm for unbiased randomization
+  - HTML5 drag events (no external library needed)
+  - Shuffle mode uses useMemo for stable shuffle order
+  - Repeat One replays same scene, Repeat All loops playlist
+  - Reorder uses Prisma transaction for atomic updates
+  - UI icons from lucide-react (Shuffle, Repeat, Repeat1)
+- **Benefit**: Complete playlist experience matching YouTube/Netflix/Spotify - shuffle, repeat, reordering, and status card
 
 ## Build and Performance Optimizations
 
