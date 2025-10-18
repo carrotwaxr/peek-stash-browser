@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="icon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f8fafc;stop-opacity:0.9" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="256" height="256" rx="32" fill="url(#bg)"/>
+  
+  <!-- Play button circle -->
+  <circle cx="128" cy="128" r="64" fill="url(#icon)" opacity="0.9"/>
+  
+  <!-- Play triangle -->
+  <path d="M 108 98 L 108 158 L 158 128 Z" fill="url(#bg)"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="180" cy="76" r="4" fill="white" opacity="0.6"/>
+  <circle cx="196" cy="92" r="3" fill="white" opacity="0.4"/>
+  <circle cx="60" cy="180" r="3" fill="white" opacity="0.5"/>
+  <circle cx="76" cy="164" r="2" fill="white" opacity="0.3"/>
+  
+  <!-- Bottom text -->
+  <text x="128" y="220" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="white">STASH</text>
+  <text x="128" y="240" font-family="system-ui, -apple-system, sans-serif" font-size="12" text-anchor="middle" fill="white" opacity="0.8">PLAYER</text>
+</svg>

@@ -1,0 +1,14 @@
+/* Custom styles for Peek documentation */
+
+:root {
+  --md-primary-fg-color: #2563eb;
+  --md-accent-fg-color: #3b82f6;
+}
+
+.md-typeset .grid.cards {
+  grid-gap: 1rem;
+}
+
+.md-typeset .admonition {
+  margin: 1.5625em 0;
+}
