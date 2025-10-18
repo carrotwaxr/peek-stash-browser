@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import SceneCard from "./SceneCard.jsx";
 
-const SceneCarousel = ({ title, scenes, loading = false, onSceneClick }) => {
+const SceneCarousel = ({ title, titleIcon, scenes, loading = false, onSceneClick }) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef(null);
@@ -93,9 +93,10 @@ const SceneCarousel = ({ title, scenes, loading = false, onSceneClick }) => {
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <h2
-          className="text-2xl font-bold"
+          className="text-2xl font-bold flex items-center gap-2"
           style={{ color: "var(--text-primary)" }}
         >
+          {titleIcon && <span className="flex items-center">{titleIcon}</span>}
           {title}
         </h2>
         <div className="flex items-center gap-2">

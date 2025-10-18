@@ -375,11 +375,7 @@ const StudioDetails = ({ studio }) => {
 };
 
 const getStudio = async (id) => {
-  const response = await libraryApi.findStudios({
-    ids: [id],
-  });
-
-  return response?.findStudios?.studios?.[0] || null;
+  return await libraryApi.findStudioById(id);
 };
 
 export default StudioDetail;
