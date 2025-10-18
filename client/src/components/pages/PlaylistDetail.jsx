@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
+import { Shuffle, Repeat, Repeat1 } from "lucide-react";
 import {
   getSceneTitle,
   getSceneDescription,
@@ -29,6 +30,10 @@ const PlaylistDetail = () => {
   const [editDescription, setEditDescription] = useState("");
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [sceneToRemove, setSceneToRemove] = useState(null);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
 
   // Set page title to playlist name
   usePageTitle(playlist?.name || "Playlist");
@@ -45,6 +50,8 @@ const PlaylistDetail = () => {
       setPlaylist(playlistData);
       setEditName(playlistData.name);
       setEditDescription(playlistData.description || "");
+      setShuffle(playlistData.shuffle || false);
+      setRepeat(playlistData.repeat || "none");
 
       // Backend now returns items with scene data attached
       if (playlistData.items && playlistData.items.length > 0) {
@@ -97,6 +104,82 @@ const PlaylistDetail = () => {
     }
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    // Reorder the scenes array
+    const newScenes = [...scenes];
+    const draggedItem = newScenes[draggedIndex];
+    newScenes.splice(draggedIndex, 1);
+    newScenes.splice(index, 0, draggedItem);
+
+    setScenes(newScenes);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  const saveReorder = async () => {
+    try {
+      // Prepare items array with new positions
+      const items = scenes.map((scene, index) => ({
+        sceneId: scene.sceneId,
+        position: index,
+      }));
+
+      await api.put(`/playlists/${playlistId}/reorder`, { items });
+      showSuccess("Playlist order saved");
+      setReorderMode(false);
+    } catch {
+      showError("Failed to save playlist order");
+      // Reload to reset order
+      loadPlaylist();
+    }
+  };
+
+  const cancelReorder = () => {
+    setReorderMode(false);
+    loadPlaylist(); // Reset to original order
+  };
+
+  const toggleShuffle = async () => {
+    const newShuffle = !shuffle;
+    try {
+      await api.put(`/playlists/${playlistId}`, { shuffle: newShuffle });
+      setShuffle(newShuffle);
+      showSuccess(newShuffle ? "Shuffle enabled" : "Shuffle disabled");
+    } catch {
+      showError("Failed to update shuffle mode");
+    }
+  };
+
+  const cycleRepeat = async () => {
+    const repeatModes = ["none", "all", "one"];
+    const currentIndex = repeatModes.indexOf(repeat);
+    const newRepeat = repeatModes[(currentIndex + 1) % repeatModes.length];
+    try {
+      await api.put(`/playlists/${playlistId}`, { repeat: newRepeat });
+      setRepeat(newRepeat);
+      const messages = {
+        none: "Repeat disabled",
+        all: "Repeat all enabled",
+        one: "Repeat one enabled",
+      };
+      showSuccess(messages[newRepeat]);
+    } catch {
+      showError("Failed to update repeat mode");
+    }
+  };
+
   const playPlaylist = () => {
     // Play first scene in playlist with playlist context
     if (scenes.length > 0 && scenes[0].exists && scenes[0].scene) {
@@ -107,6 +190,8 @@ const PlaylistDetail = () => {
           playlist: {
             id: playlistId,
             name: playlist.name,
+            shuffle,
+            repeat,
             scenes: validScenes.map((s, idx) => ({
               sceneId: s.sceneId,
               scene: s.scene,
@@ -162,30 +247,105 @@ const PlaylistDetail = () => {
             >
               ← Back
             </button>
-            {!isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-2 rounded-lg"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-color)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                Edit
-              </button>
+            {!isEditing && !reorderMode && (
+              <>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-4 py-2 rounded-lg"
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  Edit
+                </button>
+                {scenes.length > 1 && (
+                  <button
+                    onClick={() => setReorderMode(true)}
+                    className="px-4 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: "var(--bg-card)",
+                      border: "1px solid var(--border-color)",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    Reorder
+                  </button>
+                )}
+              </>
             )}
-            {scenes.length > 0 && (
-              <button
-                onClick={playPlaylist}
-                className="px-6 py-2 rounded-lg font-medium"
-                style={{
-                  backgroundColor: "var(--accent-color)",
-                  color: "white",
-                }}
-              >
-                ▶ Play Playlist
-              </button>
+            {reorderMode && (
+              <>
+                <button
+                  onClick={saveReorder}
+                  className="px-4 py-2 rounded-lg"
+                  style={{
+                    backgroundColor: "var(--accent-color)",
+                    color: "white",
+                  }}
+                >
+                  Save Order
+                </button>
+                <button
+                  onClick={cancelReorder}
+                  className="px-4 py-2 rounded-lg"
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border-color)",
+                    color: "var(--text-primary)",
+                  }}
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+            {scenes.length > 0 && !reorderMode && !isEditing && (
+              <>
+                <button
+                  onClick={toggleShuffle}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: shuffle
+                      ? "var(--accent-color)"
+                      : "var(--bg-card)",
+                    border: "1px solid var(--border-color)",
+                    color: shuffle ? "white" : "var(--text-primary)",
+                  }}
+                  title={shuffle ? "Shuffle enabled" : "Shuffle disabled"}
+                >
+                  <Shuffle size={20} />
+                </button>
+                <button
+                  onClick={cycleRepeat}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor:
+                      repeat !== "none" ? "var(--accent-color)" : "var(--bg-card)",
+                    border: "1px solid var(--border-color)",
+                    color: repeat !== "none" ? "white" : "var(--text-primary)",
+                  }}
+                  title={
+                    repeat === "all"
+                      ? "Repeat all"
+                      : repeat === "one"
+                      ? "Repeat one"
+                      : "Repeat off"
+                  }
+                >
+                  {repeat === "one" ? <Repeat1 size={20} /> : <Repeat size={20} />}
+                </button>
+                <button
+                  onClick={playPlaylist}
+                  className="px-6 py-2 rounded-lg font-medium"
+                  style={{
+                    backgroundColor: "var(--accent-color)",
+                    color: "white",
+                  }}
+                >
+                  ▶ Play Playlist
+                </button>
+              </>
             )}
           </div>
 
@@ -298,7 +458,19 @@ const PlaylistDetail = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {scenes.map((item) => {
+            {reorderMode && (
+              <div
+                className="p-4 rounded-lg mb-4"
+                style={{
+                  backgroundColor: "rgba(59, 130, 246, 0.1)",
+                  border: "1px solid rgba(59, 130, 246, 0.3)",
+                  color: "rgb(59, 130, 246)",
+                }}
+              >
+                Drag and drop scenes to reorder them. Click "Save Order" when done.
+              </div>
+            )}
+            {scenes.map((item, index) => {
               const scene = item.scene;
               const title = scene ? getSceneTitle(scene) : null;
               const description = scene ? getSceneDescription(scene) : null;
@@ -306,15 +478,34 @@ const PlaylistDetail = () => {
               return (
                 <div
                   key={item.sceneId}
+                  draggable={reorderMode}
+                  onDragStart={(e) => handleDragStart(e, index)}
+                  onDragOver={(e) => handleDragOver(e, index)}
+                  onDragEnd={handleDragEnd}
                   className="rounded-lg border transition-all hover:shadow-lg"
                   style={{
                     backgroundColor: "var(--bg-card)",
                     border: "1px solid var(--border-color)",
                     opacity: item.exists ? 1 : 0.6,
+                    cursor: reorderMode ? "move" : "default",
                   }}
                 >
                   <div className="p-4">
                     <div className="flex gap-4">
+                      {/* Drag Handle (only in reorder mode) */}
+                      {reorderMode && (
+                        <div
+                          className="flex-shrink-0 flex flex-col items-center justify-center"
+                          style={{
+                            width: "24px",
+                            color: "var(--text-muted)",
+                            cursor: "move",
+                          }}
+                        >
+                          <div className="text-xs font-mono">⋮⋮</div>
+                          <div className="text-xs mt-1">{index + 1}</div>
+                        </div>
+                      )}
                       {/* Thumbnail */}
                       <div className="flex-shrink-0 relative">
                         {item.exists && scene?.paths?.screenshot ? (
@@ -374,6 +565,8 @@ const PlaylistDetail = () => {
                                     playlist: {
                                       id: playlistId,
                                       name: playlist.name,
+                                      shuffle,
+                                      repeat,
                                       scenes: scenes.filter(s => s.exists && s.scene).map((s, idx) => ({
                                         sceneId: s.sceneId,
                                         scene: s.scene,

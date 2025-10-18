@@ -5,6 +5,7 @@ import Navigation from "../ui/Navigation.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import SceneDetails from "./SceneDetails.jsx";
+import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
@@ -158,6 +159,14 @@ const Scene = () => {
           setQuality={setQuality}
           onReset={() => window.location.reload()}
         />
+
+        {/* Playlist Status Card */}
+        {playlist && (
+          <PlaylistStatusCard
+            playlist={playlist}
+            currentIndex={playlist.currentIndex || 0}
+          />
+        )}
 
         {/* Scene Details */}
         <SceneDetails
