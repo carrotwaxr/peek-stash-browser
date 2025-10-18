@@ -78,7 +78,7 @@ Default credentials: `admin` / `admin`
 
 ## Contributing
 
-We welcome contributions! See the [Development Guide](https://carrotwaxr.github.io/peek-stash-browser/development/setup/) for setup instructions and [DEVELOPERS.md](DEVELOPERS.md) for comprehensive technical documentation.
+We welcome contributions! See the [Development Guide](https://carrotwaxr.github.io/peek-stash-browser/development/setup/) and [Contributing Guide](https://carrotwaxr.github.io/peek-stash-browser/development/contributing/) for detailed instructions.
 
 ## Support
 
