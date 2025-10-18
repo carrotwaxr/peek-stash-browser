@@ -215,7 +215,7 @@ export const updatePlaylist = async (req: AuthenticatedRequest, res: Response) =
       return res.status(400).json({ error: "Invalid playlist ID" });
     }
 
-    const { name, description, isPublic } = req.body;
+    const { name, description, isPublic, shuffle, repeat } = req.body;
 
     // Check ownership
     const existing = await prisma.playlist.findFirst({
@@ -235,6 +235,8 @@ export const updatePlaylist = async (req: AuthenticatedRequest, res: Response) =
         ...(name !== undefined && { name: name.trim() }),
         ...(description !== undefined && { description: description?.trim() || null }),
         ...(isPublic !== undefined && { isPublic: isPublic === true }),
+        ...(shuffle !== undefined && { shuffle: shuffle === true }),
+        ...(repeat !== undefined && { repeat }),
       },
       include: {
         _count: {
