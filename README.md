@@ -1,470 +1,100 @@
-# 👁️ Peek Stash Browser
+# Peek Stash Browser
 
 A modern, responsive web application for browsing and managing your [Stash](https://github.com/stashapp/stash) media library with advanced filtering, authentication, and adaptive video streaming.
 
-## ✨ Features
+[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://carrotwaxr.github.io/peek-stash-browser)
+[![Docker](https://img.shields.io/badge/docker-hub-blue)](https://hub.docker.com/r/carrotwaxr/peek-stash-browser)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-### 🎯 Core Functionality
+## Features
 
-- **🔐 Secure Authentication** - JWT-based authentication with role management (admin/user)
-- **🎨 Modern Interface** - Beautiful, responsive React UI with theme support
-- **🔍 Advanced Search & Filtering** - Comprehensive filtering across performers, scenes, studios, and tags
-- **📊 Intelligent Sorting** - Multiple sorting options for all content types
-- **📱 Mobile Ready** - Fully responsive design optimized for all devices
+- **Adaptive Video Streaming** - Real-time HLS transcoding with multiple quality options
+- **Playlist Management** - Create, organize, and play playlists with shuffle/repeat modes
+- **Advanced Filtering** - Comprehensive search and filtering across all content types
+- **Secure Authentication** - JWT-based auth with role management
+- **Modern Interface** - Beautiful, responsive React UI with theme support
+- **Mobile Ready** - Fully optimized for all devices
 
-### 🎥 Video Streaming
+## Quick Start
 
-- **🚀 Adaptive Transcoding** - Real-time HLS transcoding with multiple quality options (720p/480p/360p)
-- **⚡ Smart Playback** - Direct play when possible, seamless fallback to transcoding
-- **🎛️ Quality Controls** - Automatic and manual quality selection
-- **⏯️ Session Management** - Intelligent cleanup of transcoding resources
-
-### 📚 Content Management
-
-- **📊 Detailed Views** - Enhanced detail pages for performers, studios, and tags
-- **🏷️ Rich Metadata** - Display ratings, statistics, and comprehensive information
-- **🔄 CRUD Operations** - Full create, read, update, delete capabilities
-- **🎭 Theme Integration** - Consistent theming across all components
-
-## 🚀 Quick Start
-
-### Option 1: unRAID (Community Applications) - Easiest!
-
-1. **Install from Community Applications**:
-   - Search for "Peek Stash Browser" in unRAID's Community Applications
-   - Click install and configure your settings
-   - Access at `http://your-unraid-ip:6969`
-
-### Option 2: Docker (Single Container) - Recommended
-
-1. **Run with Docker**:
-
-   ```bash
-   docker run -d \
-     --name peek-stash-browser \
-     -p 6969:80 \
-     -v /path/to/your/media:/app/media:ro \
-     -v /path/to/peek-stash-browser/data:/app/data \
-     -v /path/to/peek-stash-browser/tmp:/app/tmp \
-     -e STASH_URL="http://your-stash-server:9999/graphql" \
-     -e STASH_API_KEY="your_stash_api_key" \
-     carrotwaxr/peek-stash-browser:latest
-   ```
-
-### Option 3: Docker Compose (Development)
-
-1. **Clone and setup**:
-
-   ```bash
-   git clone https://github.com/carrotwaxr/peek-stash-browser.git
-   cd peek-stash-browser
-   cp .env.example .env
-   ```
-
-2. **Configure environment** (edit `.env`):
-
-   ```bash
-   STASH_URL=http://your-stash-server:9999/graphql
-   STASH_API_KEY=your_stash_api_key
-   DATABASE_URL=file:./data/peek-stash-browser.db
-   TMP_DIR=/path/to/temp/directory
-   ```
-
-3. **Start services**:
-
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Access the app**: Open `http://localhost:6969`
-5. **Login**: Use `admin` / `admin` (change immediately!)
-
-## 🏗️ Architecture
-
-Peek uses a modern **single-container architecture** for production deployments:
-
-- **Frontend**: React app served by nginx on port 80
-- **Backend**: Node.js/Express API server on port 8000 (proxied through nginx)
-- **Database**: SQLite for user data and preferences (lightweight, no separate container needed)
-- **Transcoding**: FFmpeg for real-time video conversion
-
-**Development** uses Docker Compose with hot reloading for both frontend and backend.
-
-## ⚙️ Configuration
-
-### Required Settings
-
-| Variable        | Description                 | Example                             |
-| --------------- | --------------------------- | ----------------------------------- |
-| `STASH_URL`     | Your Stash GraphQL endpoint | `http://192.168.1.100:9999/graphql` |
-| `STASH_API_KEY` | API key from Stash settings | `eyJhbGciOiJIUzI1NiIsInR5cCI6...`   |
-
-### Optional Settings (Advanced)
-
-| Variable       | Description                | Default                                |
-| -------------- | -------------------------- | -------------------------------------- |
-| `DATABASE_URL` | SQLite database file       | `file:/app/data/peek-stash-browser.db` |
-| `TMP_DIR`      | Transcoding temp directory | `/app/tmp`                             |
-| `NODE_ENV`     | Environment mode           | `production`                           |
-| `JWT_SECRET`   | JWT signing key            | Auto-generated                         |
-
-### Port Configuration
-
-| Environment     | Port   | Service      | Description                              |
-| --------------- | ------ | ------------ | ---------------------------------------- |
-| **Production**  | `6969` | Complete App | nginx serves frontend + proxies API      |
-| **Development** | `6969` | Frontend UI  | Vite dev server with hot reloading       |
-| **Development** | `8000` | Backend API  | Express server (internal Docker network) |
-
-**Production**: Only port `6969` exposed - nginx handles everything internally!  
-**Development**: Both ports exposed for hot reloading, but `8000` is just for dev convenience.
-
-## 🛠️ Setup Requirements
-
-### Prerequisites
-
-- **Stash Server** running with GraphQL API enabled
-- **Docker** installed (Docker Compose only needed for development)
-- **Network access** from container to Stash server
-- **Storage space** for SQLite database and transcoding temp files
-
-### Stash Configuration
-
-1. **Enable API** in Stash settings
-2. **Generate API key** in Settings → Security
-3. **Note GraphQL endpoint** (usually `http://stash-ip:9999/graphql`)
-4. **Ensure network access** from your Docker host to Stash
-
-## 🎯 Usage Guide
-
-### First Login
-
-1. Navigate to `http://localhost:6969`
-2. Login with default credentials: `admin` / `admin`
-3. **⚠️ Important**: Change the password immediately in user settings
-
-### Navigation
-
-- **🏠 Home**: Dashboard with recent activity
-- **🎬 Scenes**: Browse and filter video content
-- **👥 Performers**: Manage talent profiles
-- **🏢 Studios**: Organize by production companies
-- **🏷️ Tags**: Content categorization
-
-### Filtering & Sorting
-
-- **Filter Panel**: Click filter icon to open advanced filters
-- **Sort Controls**: Use dropdown menus to change sorting
-- **Search**: Type to search across all content
-- **Quick Filters**: Use preset filter buttons
-
-### Video Playback
-
-- **Auto Quality**: Automatically selects best quality
-- **Manual Selection**: Click quality button to choose resolution
-- **Seeking**: Full timeline scrubbing support
-- **Keyboard Shortcuts**: Space (play/pause), Arrow keys (seek)
-
-## 🔧 unRAID Setup
-
-### Installation via Community Applications (Recommended)
-
-1. **Open** unRAID WebUI → Apps → Community Applications
-2. **Search** for "Peek Stash Browser"
-3. **Install** and configure:
-
-   | Setting                | Value                                       | Notes                        |
-   | ---------------------- | ------------------------------------------- | ---------------------------- |
-   | **WebUI Port**         | `6969`                                      | No conflicts, single port!   |
-   | **Stash URL**          | `http://[IP]:9999/graphql`                  | Replace [IP] with your Stash |
-   | **Stash API Key**      | Your API key                                | From Stash settings          |
-   | **Media Directory**    | `/mnt/user/media`                           | Path to your media files     |
-   | **Database Directory** | `/mnt/user/appdata/peek-stash-browser/data` | SQLite database storage      |
-   | **Temp Directory**     | `/mnt/user/appdata/peek-stash-browser/tmp`  | Video transcoding temp files |
-
-4. **Click Apply** - Single container installs and starts automatically!
-5. **Access**: `http://your-unraid-ip:6969`
-
-### Manual Docker Run
+### Docker (Recommended)
 
 ```bash
 docker run -d \
-  --name=peek-stash-browser \
+  --name peek-stash-browser \
   -p 6969:80 \
-  -v /mnt/user/media:/app/media:ro \
-  -v /mnt/user/appdata/peek-stash-browser/data:/app/data \
-  -v /mnt/user/appdata/peek-stash-browser/tmp:/app/tmp \
-  -e STASH_URL="http://[IP]:9999/graphql" \
-  -e STASH_API_KEY="your-api-key" \
+  -v /path/to/media:/app/media:ro \
+  -v /path/to/peek/data:/app/data \
+  -e STASH_URL="http://your-stash:9999/graphql" \
+  -e STASH_API_KEY="your_api_key" \
   carrotwaxr/peek-stash-browser:latest
 ```
 
-### Troubleshooting unRAID
+### unRAID
 
-**Container won't start**:
+1. Search "Peek Stash Browser" in Community Applications
+2. Click Install and configure
+3. Access at `http://your-unraid-ip:6969`
 
-- Check Stash URL is accessible from unRAID: `ping stash-ip`
-- Verify API key is correct (test in Stash GraphQL playground)
-- Ensure app data directories exist: `/mnt/user/appdata/peek-stash-browser/`
+## Documentation
 
-**Media files not loading**:
+**Full documentation is available at: [https://carrotwaxr.github.io/peek-stash-browser](https://carrotwaxr.github.io/peek-stash-browser)**
 
-- Verify media path matches your Stash library path
-- Check file permissions (container runs as user 1000)
-- Ensure Stash and Peek point to same media files
+### Quick Links
 
-**Performance issues**:
+- **[Installation Guide](https://carrotwaxr.github.io/peek-stash-browser/getting-started/installation/)** - Docker, unRAID, and development setup
+- **[Configuration](https://carrotwaxr.github.io/peek-stash-browser/getting-started/configuration/)** - Environment variables and settings
+- **[User Guide](https://carrotwaxr.github.io/peek-stash-browser/user-guide/video-playback/)** - Using Peek effectively
+- **[Development](https://carrotwaxr.github.io/peek-stash-browser/development/setup/)** - Contributing to Peek
+- **[API Reference](https://carrotwaxr.github.io/peek-stash-browser/development/api-reference/)** - REST API documentation
+- **[Troubleshooting](https://carrotwaxr.github.io/peek-stash-browser/reference/troubleshooting/)** - Common issues and solutions
 
-- **Use cache drive** for app data (fast SQLite access)
-- **Allocate RAM**: 2GB+ recommended for transcoding
-- **Network**: Gigabit connection to Stash server preferred
+## Requirements
 
-**Port conflicts**:
+- **Stash Server** with GraphQL API enabled
+- **Docker** installed
+- **Network access** to Stash server
+- **Media storage** accessible to both Stash and Peek
 
-- **Problem solved!** Single container uses only port 6969
-- No more PostgreSQL port 5432 or backend port 8000 conflicts
+## First Login
 
-## 🚨 Troubleshooting
+Default credentials: `admin` / `admin`
 
-### Common Issues
+**⚠️ Change the password immediately after first login!**
 
-**"Cannot connect to Stash server"**:
+## Architecture
 
-- Verify Stash is running: `http://stash-ip:9999`
-- Check GraphQL endpoint is enabled in Stash
-- Test API key with GraphQL playground
+- **Frontend**: React 19 + Tailwind CSS + Video.js
+- **Backend**: Node.js/Express + TypeScript
+- **Database**: SQLite (embedded)
+- **Transcoding**: FFmpeg with HLS output
+- **Deployment**: Single Docker container with nginx
 
-**Authentication failures**:
+## Technology Stack
 
-- Check database connection
-- Verify PostgreSQL container is healthy
-- Reset with: `docker-compose restart backend`
+**Frontend**: React 19, Tailwind CSS, Video.js, React Router
+**Backend**: Node.js, Express, TypeScript, Prisma, FFmpeg
+**Infrastructure**: Docker, nginx, SQLite
 
-**Video won't play**:
+## Contributing
 
-- Check media file permissions
-- Verify FFmpeg is installed in backend container
-- Monitor transcoding logs: `docker logs peek-stash-browser-backend`
+We welcome contributions! See the [Development Guide](https://carrotwaxr.github.io/peek-stash-browser/development/setup/) for setup instructions and [DEVELOPERS.md](DEVELOPERS.md) for comprehensive technical documentation.
 
-**Slow performance**:
+## Support
 
-- Use SSD storage for PostgreSQL data
-- Increase container memory limits
-- Check network latency to Stash server
+- **Documentation**: [https://carrotwaxr.github.io/peek-stash-browser](https://carrotwaxr.github.io/peek-stash-browser)
+- **Issues**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
+- **Community**: [Stash Discord](https://discord.gg/2TsNFKt) - #third-party-integrations
 
-### Debugging Commands
-
-```bash
-# Check container status
-docker-compose ps
-
-# View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
-
-# Restart services
-docker-compose restart
-
-# Reset database (⚠️ loses data)
-docker-compose down -v
-docker-compose up -d
-```
-
-## 📊 Performance & Scaling
-
-### Hardware Recommendations
-
-- **CPU**: 2+ cores (4+ for multiple transcoding streams)
-- **RAM**: 2GB minimum (4GB+ recommended)
-- **Storage**: SSD for database, network storage for media
-- **Network**: Gigabit recommended for 4K content
-
-### Optimization Tips
-
-- **Use cache drives** for temporary transcoding files
-- **Enable hardware acceleration** if supported
-- **Limit concurrent streams** based on CPU capacity
-- **Monitor resource usage** regularly
-
-## 🔒 Security Considerations
-
-### Authentication
-
-- **Change default password** immediately after installation
-- **Use strong passwords** for all accounts
-- **Enable HTTPS** in production (reverse proxy recommended)
-- **Regularly update** containers for security patches
-
-### Network Security
-
-- **Restrict access** to internal network if possible
-- **Use reverse proxy** with SSL termination
-- **Keep API keys secure** and rotate periodically
-- **Monitor access logs** for suspicious activity
-
-### Data Protection
-
-- **Backup database** regularly
-- **Use read-only mounts** for media files
-- **Secure temp directories** with proper permissions
-- **Implement access controls** as needed
-
-## 🔄 Updates & Maintenance
-
-### Automatic Updates (Recommended)
-
-```bash
-# Using Watchtower for auto-updates
-docker run -d --name watchtower \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  containrrr/watchtower \
-  --interval 3600
-```
-
-### Manual Updates
-
-```bash
-# Pull latest images
-docker-compose pull
-
-# Restart with new images
-docker-compose up -d
-
-# Clean up old images
-docker image prune -f
-```
-
-### Backup & Recovery
-
-```bash
-# Backup database
-docker exec peek-stash-browser-db pg_dump -U $POSTGRES_USER stashplayer > backup.sql
-
-# Restore database
-docker exec -i peek-stash-browser-db psql -U $POSTGRES_USER stashplayer < backup.sql
-```
-
-## 📚 API Documentation
-
-### Authentication Endpoints
-
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-- `GET /api/auth/me` - Get current user info
-
-### Library Endpoints
-
-- `POST /api/library/scenes` - Filter and search scenes
-- `POST /api/library/performers` - Filter and search performers
-- `POST /api/library/studios` - Filter and search studios
-- `POST /api/library/tags` - Filter and search tags
-
-### Update Endpoints
-
-- `PUT /api/library/scenes/:id` - Update scene
-- `PUT /api/library/performers/:id` - Update performer
-- `PUT /api/library/studios/:id` - Update studio
-- `PUT /api/library/tags/:id` - Update tag
-
-### Streaming Endpoints
-
-- `GET /api/video/play` - Direct video playback
-- `GET /api/stream/:sessionId/master.m3u8` - HLS master playlist
-- `GET /api/stream/:sessionId/:quality/playlist.m3u8` - Quality playlist
-- `GET /api/stream/:sessionId/:quality/segment_:num.ts` - Video segments
-
-## 🤝 Contributing
-
-We welcome contributions! See **[DEVELOPERS.md](DEVELOPERS.md)** for comprehensive developer documentation including:
-
-- **Development Setup** - Environment configuration, dependencies, and workflow
-- **Architecture Overview** - System components, technology stack, and design patterns
-- **API Development** - Authentication, GraphQL integration, and endpoint examples
-- **Frontend Development** - React components, theming, state management, and Video.js configuration
-- **Testing Strategy** - Unit tests, integration tests, and debugging techniques
-- **Deployment & DevOps** - Docker setup, CI/CD pipelines, and production deployment
-- **Performance Optimization** - Frontend optimization, backend caching, and database queries
-- **Security Best Practices** - Authentication, input validation, and file security
-
-New contributors should start with the [Development Setup](DEVELOPERS.md#-development-setup) section.
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- **[Stash](https://github.com/stashapp/stash)** - The amazing media organizer this builds upon
+- **[Stash](https://github.com/stashapp/stash)** - The amazing media organizer
 - **[React](https://reactjs.org/)** - Frontend framework
 - **[Express](https://expressjs.com/)** - Backend framework
 - **[Prisma](https://prisma.io/)** - Database ORM
 - **[Video.js](https://videojs.com/)** - Video player
 - **[FFmpeg](https://ffmpeg.org/)** - Video transcoding
-
-## 🔗 Links
-
-- **[GitHub Repository](https://github.com/carrotwaxr/peek-stash-browser)**
-- **[Docker Images](https://github.com/carrotwaxr/peek-stash-browser/pkgs/container/peek-stash-browser-frontend)**
-- **[Issues & Support](https://github.com/carrotwaxr/peek-stash-browser/issues)**
-- **[Stash Community](https://discord.gg/2TsNFKt)**
-- `POSTGRES_USER/PASSWORD`: Database credentials
-- `TMP_DIR`: Temporary directory for transcoding files
-
-## Architecture
-
-- **Frontend**: React with Vite, using Video.js for playback
-- **Backend**: Node.js/Express with TypeScript
-- **Database**: PostgreSQL with Prisma ORM
-- **Transcoding**: FFmpeg with HLS output
-- **Deployment**: Docker containers with nginx reverse proxy
-
-## Documentation
-
-See [DOCUMENTATION.md](./DOCUMENTATION.md) for detailed technical documentation covering:
-
-- System architecture
-- Transcoding system details
-- API endpoints
-- File management
-- Theming system
-- Performance considerations
-
-## Development
-
-### Local Development
-
-1. Install dependencies:
-
-   ```bash
-   # Client
-   cd client && npm install
-
-   # Server
-   cd server && npm install
-   ```
-
-2. Start development servers:
-
-   ```bash
-   # Terminal 1 - Backend
-   cd server && npm run dev
-
-   # Terminal 2 - Frontend
-   cd client && npm run dev
-   ```
-
-3. Configure your local `.env` file with development settings
-
-### Building
-
-```bash
-# Build frontend
-cd client && npm run build
-
-# Build backend
-cd server && npm run build
-```
-
-## License
-
-ISC License - see individual package.json files for details.

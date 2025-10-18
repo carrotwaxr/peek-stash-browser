@@ -1,0 +1,143 @@
+# Project information
+site_name: Peek Stash Browser
+site_description: Modern web application for browsing and streaming Stash media content with real-time HLS transcoding
+site_author: carrotwaxr
+site_url: https://carrotwaxr.github.io/peek-stash-browser
+
+# Repository
+repo_name: carrotwaxr/peek-stash-browser
+repo_url: https://github.com/carrotwaxr/peek-stash-browser
+edit_uri: edit/master/docs/
+
+# Copyright
+copyright: Copyright &copy; 2025 carrotwaxr
+
+# Theme configuration
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+  favicon: assets/favicon.png
+  logo: assets/logo.png
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - minify:
+      minify_html: true
+
+# Extensions
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Extra CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extra JavaScript
+extra_javascript:
+  - javascripts/extra.js
+
+# Page tree navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+      - Quick Start: getting-started/quick-start.md
+  - User Guide:
+      - Video Playback: user-guide/video-playback.md
+      - Playlists: user-guide/playlists.md
+      - Search & Browse: user-guide/search-browse.md
+      - Settings: user-guide/settings.md
+  - Development:
+      - Setup: development/setup.md
+      - Architecture: development/architecture.md
+      - Video System: development/video-system.md
+      - API Reference: development/api-reference.md
+      - Testing: development/testing.md
+      - Contributing: development/contributing.md
+  - Deployment:
+      - Docker: deployment/docker.md
+      - unRAID: deployment/unraid.md
+      - Environment Variables: deployment/environment.md
+      - Build Checklist: deployment/build-checklist.md
+  - Reference:
+      - Troubleshooting: reference/troubleshooting.md
+      - Performance Tips: reference/performance.md
+      - Security: reference/security.md
+      - FAQ: reference/faq.md
+
+# Social links
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/carrotwaxr/peek-stash-browser
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/carrotwaxr/peek-stash-browser

@@ -68,4 +68,4 @@ prisma/migrations/
 *.sqlite3
 server/*.db
 server/*.sqlite
-server/*.sqlite3
+server/*.sqlite3site/
