@@ -129,33 +129,6 @@ export const libraryApi = {
   },
 };
 
-// Video playback API endpoints
-export const videoApi = {
-  /**
-   * Start video playback
-   */
-  playVideo: (videoId, params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    return apiGet(`/video/play?videoId=${videoId}&${queryString}`);
-  },
-
-  /**
-   * Seek to a specific time in video
-   */
-  seekVideo: (data) => apiPost("/video/seek", data),
-
-  /**
-   * Get session status
-   */
-  getSessionStatus: (sessionId) => apiGet(`/video/session/${sessionId}/status`),
-
-  /**
-   * Kill a video session
-   */
-  killSession: (sessionId) =>
-    apiFetch(`/video/session/${sessionId}`, { method: "DELETE" }),
-};
-
 // Valid sort field mappings for Stash GraphQL API
 export const sortFieldMap = {
   // Scene sort fields
@@ -200,9 +173,9 @@ export const filterHelpers = {
       page,
       per_page: perPage,
     };
-    // Map sort field to correct GraphQL field name and add if valid
-    if (sort && sortFieldMap[sort]) {
-      filter.sort = sortFieldMap[sort];
+
+    if (sort) {
+      filter.sort = sort;
       filter.direction = direction;
     }
     return filter;
@@ -227,33 +200,6 @@ export const filterHelpers = {
     },
   }),
 
-  /**
-   * Create favorite filter
-   */
-  favoriteFilter: () => ({
-    performer_favorite: true,
-  }),
-
-  /**
-   * Create date range filter
-   */
-  dateRangeFilter: (startDate, endDate) => ({
-    date: {
-      modifier: "BETWEEN",
-      value: startDate,
-      value2: endDate,
-    },
-  }),
-
-  /**
-   * Create duration filter for scenes (in seconds)
-   */
-  durationFilter: (minDuration, modifier = "GREATER_THAN") => ({
-    duration: {
-      modifier,
-      value: minDuration,
-    },
-  }),
 };
 
 // Predefined filter combinations for common use cases
@@ -262,24 +208,37 @@ export const commonFilters = {
    * Get high-rated scenes
    */
   highRatedScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "rating100", "DESC"),
-    scene_filter: filterHelpers.ratingFilter(80),
+    filter: filterHelpers.pagination(page, perPage, "rating", "DESC"),
+    scene_filter: filterHelpers.ratingFilter(75),
   }),
 
   /**
    * Get recently added scenes
    */
-  recentScenes: (page = 1, perPage = 24) => ({
+  recentlyAddedScenes: (page = 1, perPage = 24) => ({
     filter: filterHelpers.pagination(page, perPage, "created_at", "DESC"),
     scene_filter: {},
   }),
 
-  /**
-   * Get favorite performers
+  /** Get highest bitrate scenes
    */
-  favoritePerformers: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "name", "ASC"),
-    performer_filter: { favorite: true },
+  highBitrateScenes: (page = 1, perPage = 24) => ({
+    filter: filterHelpers.pagination(page, perPage, "bitrate", "DESC"),
+    scene_filter: {},
+  }),
+
+  /** Get barely legal scenes
+   */
+  barelyLegalScenes: (page = 1, perPage = 24) => ({
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: { performer_age: { modifier: "EQUALS", value: 18 } },
+  }),
+
+  /** Get barely legal scenes
+   */
+  favoritePerformerScenes: (page = 1, perPage = 24) => ({
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: { performer_favorite: true },
   }),
 
   /**
@@ -287,7 +246,6 @@ export const commonFilters = {
    */
   longScenes: (page = 1, perPage = 24) => ({
     filter: filterHelpers.pagination(page, perPage, "duration", "DESC"),
-    scene_filter: filterHelpers.durationFilter(1800), // 30 minutes in seconds
   }),
 
   /**
@@ -299,10 +257,34 @@ export const commonFilters = {
   }),
 
   /**
+   * Get favorite performers
+   */
+  favoritePerformers: (page = 1, perPage = 24) => ({
+    filter: filterHelpers.pagination(page, perPage, "o_counter", "DESC"),
+    performer_filter: { favorite: true },
+  }),
+
+  /**
    * Search performers by text
    */
   searchPerformers: (query, page = 1, perPage = 24) => ({
     filter: filterHelpers.textSearch(query, page, perPage),
     performer_filter: {},
+  }),
+
+  /**
+   * Get favorite studios
+   */
+  favoriteStudios: (page = 1, perPage = 24) => ({
+    filter: filterHelpers.pagination(page, perPage, "scenes_count", "DESC"),
+    studio_filter: { favorite: true },
+  }),
+
+  /**
+   * Get favorite tags
+   */
+  favoriteTags: (page = 1, perPage = 24) => ({
+    filter: filterHelpers.pagination(page, perPage, "scenes_count", "DESC"),
+    tag_filter: { favorite: true },
   }),
 };

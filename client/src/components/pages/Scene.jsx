@@ -43,8 +43,7 @@ const Scene = () => {
       try {
         setIsLoading(true);
         setFetchError(null);
-        const response = await libraryApi.findScenes({ ids: [sceneId] });
-        const sceneData = response?.findScenes?.scenes?.[0];
+        const sceneData = await libraryApi.findSceneById(sceneId);
 
         if (sceneData) {
           setScene(sceneData);

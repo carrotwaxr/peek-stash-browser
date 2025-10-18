@@ -259,11 +259,7 @@ const TagDetails = ({ tag }) => {
 };
 
 const getTag = async (id) => {
-  const response = await libraryApi.findTags({
-    ids: [id],
-  });
-
-  return response?.findTags?.tags?.[0] || null;
+  return await libraryApi.findTagById(id);
 };
 
 export default TagDetail;

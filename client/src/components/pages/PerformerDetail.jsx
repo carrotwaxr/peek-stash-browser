@@ -408,11 +408,7 @@ const PerformerGenderIcon = ({ gender }) => {
 };
 
 const getPerformer = async (id) => {
-  const response = await libraryApi.findPerformers({
-    ids: [id],
-  });
-
-  return response?.findPerformers?.performers?.[0] || null;
+  return await libraryApi.findPerformerById(id);
 };
 
 export default PerformerDetail;
