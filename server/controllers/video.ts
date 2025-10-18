@@ -141,7 +141,8 @@ export const getStreamSegment = (req: Request, res: Response) => {
 
         if (segmentNum >= 0) {
           // Check if this segment is already transcoded
-          const segmentExists = session.completedSegments.has(segmentNum);
+          const segmentState = session.segmentStates.get(segmentNum);
+          const segmentExists = segmentState?.state === "completed";
 
           if (segmentExists) {
             // Segment should exist, try serving immediately
@@ -152,7 +153,12 @@ export const getStreamSegment = (req: Request, res: Response) => {
             });
           } else {
             // Segment not ready yet - check if it's reasonably close to current progress
-            const currentProgress = session.completedSegments.size;
+            // Count completed segments
+            let completedCount = 0;
+            for (const [, metadata] of session.segmentStates) {
+              if (metadata.state === "completed") completedCount++;
+            }
+            const currentProgress = completedCount;
             const segmentDistance = segmentNum - currentProgress;
 
             logger.debug("Waiting for segment", {
@@ -575,6 +581,17 @@ export async function getSessionStatus(req: Request, res: Response) {
     // Update access time
     transcodingManager.updateSessionAccess(sessionId);
 
+    // Count segments by state
+    let completedCount = 0;
+    let transcodingCount = 0;
+    let failedCount = 0;
+
+    for (const [, metadata] of session.segmentStates) {
+      if (metadata.state === "completed") completedCount++;
+      else if (metadata.state === "transcoding") transcodingCount++;
+      else if (metadata.state === "failed") failedCount++;
+    }
+
     res.json({
       sessionId: session.sessionId,
       status: session.status,
@@ -582,9 +599,64 @@ export async function getSessionStatus(req: Request, res: Response) {
       quality: session.quality,
       lastAccess: session.lastAccess,
       isProcessActive: session.process !== null,
+      progress: {
+        completed: completedCount,
+        transcoding: transcodingCount,
+        failed: failedCount,
+        total: session.totalSegments,
+        percentage: Math.round((completedCount / session.totalSegments) * 100),
+      },
     });
   } catch (error) {
     logger.error("Error in getSessionStatus", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+export async function getSegmentStates(req: Request, res: Response) {
+  try {
+    const { sessionId } = req.params;
+
+    const segmentStates = transcodingManager.getSegmentStates(sessionId);
+    if (!segmentStates) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Update access time
+    transcodingManager.updateSessionAccess(sessionId);
+
+    // Convert Map to array for JSON serialization
+    const segments: Array<{ number: number; state: string; startTime?: number; completedTime?: number; retryCount: number; lastError?: string }> = [];
+
+    for (const [segmentNum, metadata] of segmentStates) {
+      segments.push({
+        number: segmentNum,
+        state: metadata.state,
+        startTime: metadata.startTime,
+        completedTime: metadata.completedTime,
+        retryCount: metadata.retryCount,
+        lastError: metadata.lastError,
+      });
+    }
+
+    // Sort by segment number
+    segments.sort((a, b) => a.number - b.number);
+
+    res.json({
+      sessionId,
+      segments,
+      summary: {
+        completed: segments.filter(s => s.state === "completed").length,
+        transcoding: segments.filter(s => s.state === "transcoding").length,
+        failed: segments.filter(s => s.state === "failed").length,
+        waiting: segments.filter(s => s.state === "waiting").length,
+        total: segments.length,
+      },
+    });
+  } catch (error) {
+    logger.error("Error in getSegmentStates", {
       error: error instanceof Error ? error.message : String(error),
     });
     res.status(500).json({ error: "Internal server error" });

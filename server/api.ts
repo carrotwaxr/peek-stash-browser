@@ -6,6 +6,7 @@ import {
   playVideo,
   seekVideo,
   getSessionStatus,
+  getSegmentStates,
   killSession,
 } from "./controllers/video.js";
 import {
@@ -74,6 +75,11 @@ export const setupAPI = () => {
     "/api/video/session/:sessionId/status",
     authenticateToken,
     getSessionStatus
+  );
+  app.get(
+    "/api/video/session/:sessionId/segments",
+    authenticateToken,
+    getSegmentStates
   );
   app.delete("/api/video/session/:sessionId", authenticateToken, killSession);
 
