@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import CarouselSettings from "../settings/CarouselSettings.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -18,6 +19,7 @@ const Settings = () => {
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
   const [theme, setTheme] = useState("dark");
+  const [carouselPreferences, setCarouselPreferences] = useState([]);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -39,10 +41,28 @@ const Settings = () => {
       setPreferredQuality(settings.preferredQuality || "auto");
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
       setTheme(settings.theme || "dark");
+      setCarouselPreferences(settings.carouselPreferences || []);
     } catch {
       setError("Failed to load settings");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveCarouselPreferences = async (newPreferences) => {
+    try {
+      setMessage(null);
+      setError(null);
+
+      await api.put("/user/settings", {
+        carouselPreferences: newPreferences,
+      });
+
+      setCarouselPreferences(newPreferences);
+      setMessage("Carousel preferences saved successfully!");
+      setTimeout(() => setMessage(null), 3000);
+    } catch {
+      setError("Failed to save carousel preferences");
     }
   };
 
@@ -291,6 +311,22 @@ const Settings = () => {
                 </div>
               </div>
             </form>
+          </div>
+
+          {/* Carousel Settings */}
+          <div
+            className="card mb-6"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            <div className="card-body">
+              <CarouselSettings
+                carouselPreferences={carouselPreferences}
+                onSave={saveCarouselPreferences}
+              />
+            </div>
           </div>
 
           {/* Password Change */}

@@ -19,6 +19,7 @@ model User {
     preferredQuality    String?     @default("auto")    // "auto", "1080p", "720p", "480p", "360p"
     preferredPlaybackMode String?   @default("auto")    // "auto", "direct", "transcode"
     theme              String?     @default("dark")    // "dark", "light", "purple", etc.
+    carouselPreferences Json?       // Array of {id, enabled, order} for homepage carousels
 
     // Future features
     watchHistory WatchHistory[]

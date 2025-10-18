@@ -2,6 +2,19 @@ import { Response } from "express";
 import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import bcrypt from "bcryptjs";
+// import { getDefaultCarouselPreferences } from "../utils/carouselDefaults.js";
+
+// Inline the default carousel preferences to avoid ESM loading issues
+const getDefaultCarouselPreferences = () => [
+  { id: "highRatedScenes", enabled: true, order: 0 },
+  { id: "recentlyAddedScenes", enabled: true, order: 1 },
+  { id: "longScenes", enabled: true, order: 2 },
+  { id: "highBitrateScenes", enabled: true, order: 3 },
+  { id: "barelyLegalScenes", enabled: true, order: 4 },
+  { id: "favoritePerformerScenes", enabled: true, order: 5 },
+  { id: "favoriteStudioScenes", enabled: true, order: 6 },
+  { id: "favoriteTagScenes", enabled: true, order: 7 },
+];
 
 /**
  * Get user settings
@@ -24,6 +37,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         preferredPlaybackMode: true,
         theme: true,
         customTheme: true,
+        carouselPreferences: true,
       },
     });
 
@@ -37,6 +51,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         preferredPlaybackMode: user.preferredPlaybackMode,
         theme: user.theme,
         customTheme: user.customTheme,
+        carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
       },
     });
   } catch (error) {
@@ -56,7 +71,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { preferredQuality, preferredPlaybackMode, theme, customTheme } = req.body;
+    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
@@ -70,6 +85,20 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       return res.status(400).json({ error: "Invalid playback mode setting" });
     }
 
+    // Validate carousel preferences if provided
+    if (carouselPreferences !== undefined) {
+      if (!Array.isArray(carouselPreferences)) {
+        return res.status(400).json({ error: "Carousel preferences must be an array" });
+      }
+
+      // Validate each carousel preference
+      for (const pref of carouselPreferences) {
+        if (typeof pref.id !== 'string' || typeof pref.enabled !== 'boolean' || typeof pref.order !== 'number') {
+          return res.status(400).json({ error: "Invalid carousel preference format" });
+        }
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -77,6 +106,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
         ...(theme !== undefined && { theme }),
         ...(customTheme !== undefined && { customTheme }),
+        ...(carouselPreferences !== undefined && { carouselPreferences }),
       },
       select: {
         id: true,
@@ -86,6 +116,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         preferredPlaybackMode: true,
         theme: true,
         customTheme: true,
+        carouselPreferences: true,
       },
     });
 
@@ -96,6 +127,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         preferredPlaybackMode: updatedUser.preferredPlaybackMode,
         theme: updatedUser.theme,
         customTheme: updatedUser.customTheme,
+        carouselPreferences: updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
       },
     });
   } catch (error) {
@@ -222,12 +254,13 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Create user with default carousel preferences
     const newUser = await prisma.user.create({
       data: {
         username,
         password: hashedPassword,
         role: role || "USER",
+        carouselPreferences: getDefaultCarouselPreferences() as any,
       },
       select: {
         id: true,

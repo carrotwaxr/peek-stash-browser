@@ -139,23 +139,42 @@ _No items currently at high priority._
 
 ## Homepage Carousel Customization
 
-- **Status**: Blocked
+- **Status**: Fixed
 - **Priority**: Low
-- **Description**: Add more carousel types and allow user customization
-- **Current State**: ⚠️ **BLOCKED - Needs manual inspection to document existing carousels**
-- **Needed Work**:
-  - ⚠️ **TODO**: Document currently implemented carousel types
-  - Add additional carousel types (Recently Added, Trending, By Studio, By Performer, Random, etc.)
-  - Create user settings page for carousel preferences
-  - Toggle to enable/disable specific carousels
-  - Drag-and-drop to reorder carousels
-  - Store carousel preferences per user in database
-  - Add API endpoints for saving/loading carousel preferences
-- **Technical Notes**:
-  - Files: `client/src/components/pages/Home.jsx`
-  - Database: Add `user_preferences` table or JSON field in User model
-  - Consider carousel templates vs. dynamic configuration
-- **Benefit**: Personalized homepage, better content discovery
+- **Description**: Allow user customization of homepage carousels
+- **Completed Work**:
+  - Added `carouselPreferences` JSON field to User database schema
+  - Created database migration for the new field
+  - Set default carousel preferences on user creation (8 carousels, all enabled)
+  - Updated getUserSettings and updateUserSettings API endpoints to handle carousel preferences
+  - Added comprehensive validation for carousel preference format (id/enabled/order)
+  - Created CarouselSettings component with HTML5 drag-and-drop for reordering
+  - Toggle carousel visibility with eye icon button
+  - Save/Cancel buttons appear only when changes are made
+  - Homepage fetches user preferences and filters/sorts carousels accordingly
+  - Integrated carousel settings into user settings page
+  - All 8 existing carousel types are customizable
+- **Current Carousels**:
+  - High Rated - Top rated scenes
+  - Recently Added - Newly added content
+  - Feature Length - Longer duration scenes
+  - High Bitrate - Highest quality videos
+  - Barely Legal - 18 year old performers
+  - Favorite Performers - Scenes with favorite performers
+  - Favorite Studios - Content from favorite studios
+  - Favorite Tags - Scenes with favorite tags
+- **Technical Implementation**:
+  - Database: `server/prisma/schema.prisma` - added carouselPreferences JSON field
+  - Migration: `server/prisma/migrations/20250118000000_add_carousel_preferences/migration.sql`
+  - Backend: `server/controllers/user.ts` - carousel preference handling with validation
+  - Component: `client/src/components/settings/CarouselSettings.jsx` - drag-and-drop UI
+  - Updated: `client/src/components/pages/Home.jsx` - fetches and applies user preferences
+  - Updated: `client/src/components/pages/Settings.jsx` - integrated carousel settings section
+  - Carousel preferences stored as JSON array: `[{id: string, enabled: boolean, order: number}]`
+  - Default preferences inlined in user.ts to avoid ESM loading issues
+  - Homepage filters disabled carousels and sorts by user's preferred order
+  - Drag-and-drop uses native HTML5 events with visual feedback (opacity changes)
+- **Benefit**: Personalized homepage, users control which carousels they see and in what order
 
 ## Loading State Improvements
 
