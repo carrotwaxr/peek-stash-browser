@@ -69,3 +69,6 @@ prisma/migrations/
 server/*.db
 server/*.sqlite
 server/*.sqlite3
+
+# MkDocs build output
+site/
