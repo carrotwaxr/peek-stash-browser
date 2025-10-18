@@ -100,6 +100,7 @@ const Performers = () => {
 
       {/* Controls Section */}
       <SearchControls
+        artifactType="performer"
         initialSort="o_counter"
         onQueryChange={handleQueryChange}
         totalPages={totalPages}
