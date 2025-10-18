@@ -713,4 +713,4 @@ Add to `.vscode/launch.json`:
 
 - [Contributing Guide](contributing.md) - How to contribute code
 - [API Reference](api-reference.md) - Testing API endpoints
-- [CI/CD](../reference/ci-cd.md) - Automated testing pipeline
+- [Architecture](architecture.md) - System overview
