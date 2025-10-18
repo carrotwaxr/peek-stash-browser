@@ -16,6 +16,26 @@ export const QUALITY_PRESETS = {
   "1080p": { width: 1920, height: 1080, bitrate: "5000k", audioBitrate: "192k" },
 };
 
+// Segment state enum
+export enum SegmentState {
+  WAITING = "waiting",         // Segment not yet started transcoding
+  TRANSCODING = "transcoding", // Segment currently being transcoded
+  COMPLETED = "completed",     // Segment successfully transcoded
+  FAILED = "failed",           // Segment transcoding failed
+}
+
+// Segment metadata interface
+export interface SegmentMetadata {
+  state: SegmentState;
+  startTime?: number;     // When transcoding started (timestamp)
+  completedTime?: number; // When transcoding completed (timestamp)
+  lastError?: string;     // Error message if failed
+  retryCount: number;     // Number of retry attempts (default 0)
+}
+
+// Maximum retry attempts for failed segments
+const MAX_SEGMENT_RETRIES = 3;
+
 export interface TranscodingSession {
   sessionId: string;
   videoId: string;
@@ -29,7 +49,7 @@ export interface TranscodingSession {
   status: "starting" | "active" | "completed" | "error";
   scene?: Scene;
   playlistMonitor?: NodeJS.Timeout; // Timer for dynamic playlist generation
-  completedSegments: Set<number>; // Track which segments are actually transcoded
+  segmentStates: Map<number, SegmentMetadata>; // Track state of each segment with metadata
   totalSegments: number; // Total segments for the full video
 }
 
@@ -105,7 +125,7 @@ export class TranscodingManager {
       lastAccess: Date.now(),
       status: "starting",
       scene,
-      completedSegments: new Set(),
+      segmentStates: new Map(),
       totalSegments,
     };
 
@@ -321,12 +341,13 @@ export class TranscodingManager {
       newStartTime,
       newSegment,
       currentSegment,
-      completedSegments: session.completedSegments.size,
+      completedSegments: session.segmentStates.size,
       totalSegments: session.totalSegments,
     });
 
-    // Check if target segment already exists
-    const targetSegmentExists = session.completedSegments.has(newSegment);
+    // Check if target segment already exists and is completed
+    const targetSegmentState = session.segmentStates.get(newSegment);
+    const targetSegmentExists = targetSegmentState?.state === SegmentState.COMPLETED;
     if (targetSegmentExists) {
       logger.debug("Target segment already transcoded, no action needed", {
         sessionId,
@@ -369,7 +390,7 @@ export class TranscodingManager {
     }
 
     // Save old completed segments before we update the session
-    const oldCompletedSegments = new Set(session.completedSegments);
+    const oldCompletedSegments = new Map(session.segmentStates);
     const oldQualityDir = posixPath.join(session.outputDir, session.quality);
 
     // Update session to new start time
@@ -387,8 +408,8 @@ export class TranscodingManager {
     // Copy already-transcoded segments that are still useful
     // We want segments from newStartSegment onwards that already exist
     const segmentsToCopy: number[] = [];
-    for (const segNum of oldCompletedSegments) {
-      if (segNum >= newStartSegment) {
+    for (const [segNum, metadata] of oldCompletedSegments) {
+      if (segNum >= newStartSegment && metadata.state === SegmentState.COMPLETED) {
         segmentsToCopy.push(segNum);
       }
     }
@@ -452,7 +473,11 @@ export class TranscodingManager {
         try {
           if (fs.existsSync(backupPath)) {
             fs.renameSync(backupPath, newPath);
-            session.completedSegments.add(segNum);
+            // Restore segment metadata
+            const oldMetadata = oldCompletedSegments.get(segNum);
+            if (oldMetadata) {
+              session.segmentStates.set(segNum, oldMetadata);
+            }
           }
         } catch (err) {
           logger.warn("Failed to restore segment during seek", {
@@ -475,7 +500,7 @@ export class TranscodingManager {
 
       logger.info("Restored preserved segments", {
         sessionId,
-        restoredCount: session.completedSegments.size,
+        restoredCount: session.segmentStates.size,
       });
     } else {
       // No segments to preserve, just clear the directory
@@ -492,7 +517,7 @@ export class TranscodingManager {
         });
       }
 
-      session.completedSegments = new Set();
+      session.segmentStates = new Map();
     }
 
     logger.info("Session restarted from new position", {
@@ -595,16 +620,20 @@ ${session.quality}/stream.m3u8
         // Look for unrenamed segments (those that exist but aren't in completedSegments yet)
         // OPTIMIZATION: Only check a reasonable range of segments based on current progress
         // This prevents blocking the event loop with 1000+ fs calls every 500ms
+        const completedCount = this.getCompletedSegmentCount(session);
         const maxSegmentToCheck = Math.min(
-          session.completedSegments.size + 20, // Check 20 segments ahead of current progress
+          completedCount + 20, // Check 20 segments ahead of current progress
           session.totalSegments - startSegment // Don't check beyond total segments
         );
 
         for (let ffmpegSegNum = 0; ffmpegSegNum <= maxSegmentToCheck; ffmpegSegNum++) {
           const actualSegNum = startSegment + ffmpegSegNum;
 
-          // Skip if we've already processed this segment
-          if (session.completedSegments.has(actualSegNum)) {
+          // Get current segment state
+          const currentState = session.segmentStates.get(actualSegNum);
+
+          // Skip if segment is already completed
+          if (currentState?.state === SegmentState.COMPLETED) {
             continue;
           }
 
@@ -613,22 +642,87 @@ ${session.quality}/stream.m3u8
 
           // Check if FFmpeg's segment exists
           if (fs.existsSync(ffmpegPath)) {
+            // Mark segment as transcoding if not already tracked
+            if (!currentState) {
+              session.segmentStates.set(actualSegNum, {
+                state: SegmentState.TRANSCODING,
+                startTime: Date.now(),
+                retryCount: 0,
+              });
+            }
+
             // If startSegment is 0, no renaming needed - segment numbers already match timeline
             if (startSegment === 0) {
-              session.completedSegments.add(actualSegNum);
+              session.segmentStates.set(actualSegNum, {
+                state: SegmentState.COMPLETED,
+                startTime: currentState?.startTime || Date.now(),
+                completedTime: Date.now(),
+                retryCount: currentState?.retryCount || 0,
+              });
             } else if (!fs.existsSync(actualPath)) {
               // Need to rename: segment_000 → segment_263, etc.
               try {
                 fs.renameSync(ffmpegPath, actualPath);
-                session.completedSegments.add(actualSegNum);
+                session.segmentStates.set(actualSegNum, {
+                  state: SegmentState.COMPLETED,
+                  startTime: currentState?.startTime || Date.now(),
+                  completedTime: Date.now(),
+                  retryCount: currentState?.retryCount || 0,
+                });
                 logger.verbose("Renamed segment", {
                   sessionId: session.sessionId,
                   from: `segment_${ffmpegSegNum.toString().padStart(3, '0')}.ts`,
                   to: `segment_${actualSegNum.toString().padStart(3, '0')}.ts`,
-                  progress: `${session.completedSegments.size}/${session.totalSegments}`,
+                  progress: `${this.getCompletedSegmentCount(session)}/${session.totalSegments}`,
                 });
-              } catch {
+              } catch (err) {
                 // Segment might be in use by FFmpeg, will catch it next iteration
+                // Don't mark as failed yet - this is expected during active transcoding
+                logger.verbose("Segment rename failed, will retry", {
+                  sessionId: session.sessionId,
+                  segmentNum: actualSegNum,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }
+            }
+          } else if (currentState?.state === SegmentState.TRANSCODING) {
+            // Segment was marked as transcoding but file doesn't exist
+            // This might indicate a problem - check if it's been too long
+            const elapsedTime = Date.now() - (currentState.startTime || 0);
+            const SEGMENT_TIMEOUT = 60000; // 60 seconds per segment is very generous
+
+            if (elapsedTime > SEGMENT_TIMEOUT) {
+              const retryCount = currentState.retryCount || 0;
+
+              if (retryCount < MAX_SEGMENT_RETRIES) {
+                // Retry the segment
+                logger.warn("Segment transcoding timeout, retrying", {
+                  sessionId: session.sessionId,
+                  segmentNum: actualSegNum,
+                  retryCount: retryCount + 1,
+                  elapsedTime,
+                });
+
+                session.segmentStates.set(actualSegNum, {
+                  state: SegmentState.TRANSCODING,
+                  startTime: Date.now(),
+                  retryCount: retryCount + 1,
+                  lastError: `Timeout after ${elapsedTime}ms`,
+                });
+              } else {
+                // Max retries exceeded, mark as failed
+                logger.error("Segment transcoding failed after max retries", {
+                  sessionId: session.sessionId,
+                  segmentNum: actualSegNum,
+                  retryCount,
+                });
+
+                session.segmentStates.set(actualSegNum, {
+                  state: SegmentState.FAILED,
+                  startTime: currentState.startTime,
+                  retryCount: retryCount + 1,
+                  lastError: `Max retries (${MAX_SEGMENT_RETRIES}) exceeded`,
+                });
               }
             }
           } else {
@@ -639,7 +733,7 @@ ${session.quality}/stream.m3u8
 
         // Check if transcoding is complete
         const expectedSegmentCount = session.totalSegments; // Total segments for the full video
-        const transcodedCount = session.completedSegments.size;
+        const transcodedCount = this.getCompletedSegmentCount(session);
         const isComplete = transcodedCount >= expectedSegmentCount ||
                           session.status === "completed";
 
@@ -890,6 +984,27 @@ ${session.quality}/stream.m3u8
     } catch {
       // Best effort - if we can't delete everything, that's ok
     }
+  }
+
+  /**
+   * Get count of completed segments for a session
+   */
+  private getCompletedSegmentCount(session: TranscodingSession): number {
+    let count = 0;
+    for (const [, metadata] of session.segmentStates) {
+      if (metadata.state === SegmentState.COMPLETED) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Get segment state information for a session
+   */
+  getSegmentStates(sessionId: string): Map<number, SegmentMetadata> | undefined {
+    const session = this.sessions.get(sessionId);
+    return session?.segmentStates;
   }
 }
 

@@ -152,22 +152,29 @@ _No items currently at critical priority._
 
 ## Segment State Tracking Enhancement
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: Medium
 - **Description**: Implement granular segment state tracking with status enum
-- **Current State**: Segments tracked as completed (Set) but no intermediate states
-- **Needed Work**:
-  - Define segment state enum: `waiting`, `transcoding`, `completed`, `failed`
-  - Change `completedSegments` from `Set<number>` to `Map<number, SegmentState>`
-  - Track segment state transitions in TranscodingManager
-  - Add retry logic for failed segments
-  - Expose segment state via API for debugging/monitoring
-  - Update playlist monitor to handle new states
-- **Technical Notes**:
-  - File: `server/services/TranscodingManager.ts`
-  - Consider adding `lastError` field for failed segments
-  - May want segment timestamps (startTime, completedTime)
-- **Benefit**: Better debugging, progress tracking, ability to retry failed segments
+- **Current State**: Complete segment state tracking with retry logic and API exposure
+- **Completed Work**:
+  - Defined `SegmentState` enum with values: `waiting`, `transcoding`, `completed`, `failed`
+  - Changed `completedSegments` from `Set<number>` to `segmentStates: Map<number, SegmentMetadata>`
+  - Implemented state transition tracking in playlist monitor
+  - Added automatic retry logic with max 3 attempts for failed segments
+  - Added timeout detection (60s per segment) with retry
+  - Exposed segment state via new API endpoint `/api/video/session/:sessionId/segments`
+  - Updated session status endpoint to include progress summary (completed/transcoding/failed counts)
+  - Track segment timestamps (startTime, completedTime)
+  - Track retry count and last error message for failed segments
+- **Technical Implementation**:
+  - Files: `server/services/TranscodingManager.ts`, `server/controllers/video.ts`, `server/api.ts`
+  - New interface: `SegmentMetadata` with fields: state, startTime, completedTime, lastError, retryCount
+  - Helper methods: `getCompletedSegmentCount()`, `getSegmentStates()`
+  - API endpoint returns detailed segment information with summary stats
+  - Session status now includes progress object with percentages
+  - Retry logic checks elapsed time and retry count before marking as failed
+  - Max retries constant: `MAX_SEGMENT_RETRIES = 3`
+- **Benefit**: Much better debugging, real-time progress tracking, automatic recovery from transient failures, detailed monitoring via API
 
 ## Playlist Status Card on Scene Page
 
