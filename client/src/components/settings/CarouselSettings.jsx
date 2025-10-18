@@ -22,6 +22,7 @@ const CAROUSEL_METADATA = {
 const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   const [preferences, setPreferences] = useState([]);
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [touchStartY, setTouchStartY] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -59,6 +60,58 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
+  };
+
+  // Touch event handlers for mobile support
+  const handleTouchStart = (e, index) => {
+    setDraggedIndex(index);
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e, index) => {
+    if (draggedIndex === null || touchStartY === null) {
+      return;
+    }
+
+    e.preventDefault();
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY;
+
+    // Determine if we should swap with the item above or below
+    if (Math.abs(deltaY) < 50) {
+      return; // Minimum threshold to trigger reorder
+    }
+
+    const targetIndex = deltaY < 0 ? draggedIndex - 1 : draggedIndex + 1;
+
+    // Ensure target index is within bounds
+    if (targetIndex < 0 || targetIndex >= preferences.length) {
+      return;
+    }
+
+    if (targetIndex === index) {
+      return; // Already at target position
+    }
+
+    const newPreferences = [...preferences];
+    const [draggedItem] = newPreferences.splice(draggedIndex, 1);
+    newPreferences.splice(targetIndex, 0, draggedItem);
+
+    // Update order values
+    const reordered = newPreferences.map((pref, idx) => ({
+      ...pref,
+      order: idx,
+    }));
+
+    setPreferences(reordered);
+    setDraggedIndex(targetIndex);
+    setTouchStartY(currentY);
+    setHasChanges(true);
+  };
+
+  const handleTouchEnd = () => {
+    setDraggedIndex(null);
+    setTouchStartY(null);
   };
 
   const toggleEnabled = (id) => {
@@ -102,6 +155,9 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
+              onTouchStart={(e) => handleTouchStart(e, index)}
+              onTouchMove={(e) => handleTouchMove(e, index)}
+              onTouchEnd={handleTouchEnd}
               className={`
                 flex items-center justify-between p-4 rounded-lg border
                 transition-all duration-200 cursor-move
