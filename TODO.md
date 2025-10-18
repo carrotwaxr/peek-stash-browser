@@ -84,23 +84,58 @@ _No items currently at high priority._
 
 ## Scene Browsing: Sort and Filter Enhancements
 
-- **Status**: Blocked
+- **Status**: Pending
 - **Priority**: Low
-- **Description**: Improve sort and filter options on scene browsing pages
-- **Current State**: ⚠️ **BLOCKED - Needs manual inspection to document current state**
+- **Description**: Implement comprehensive sort and filter options for all browsing pages
+- **Current State**: Basic pagination exists, but no sorting or filtering UI
+- **Available Sort Fields** (from Stash GraphQL API):
+  - **Scenes**: bitrate, created_at, date, duration, filesize, framerate, last_o_at, last_played_at, path, performer_count, play_count, play_duration, random, rating, tag_count, title, updated_at
+  - **Performers**: birthdate, career_length, created_at, height, last_o_at, last_played_at, measurements, name, o_counter, penis_length, play_count, random, rating, scenes_count, updated_at, weight
+  - **Studios**: created_at, name, random, rating, scenes_count, updated_at
+  - **Tags**: created_at, name, random, scenes_count, updated_at
+- **Available Filters** (from Stash GraphQL API):
+  - **Scene Filters**:
+    - Date fields (date, created_at, last_played_at, updated_at) - modifiers: GREATER_THAN, LESS_THAN, BETWEEN, NOT_BETWEEN
+    - Duration fields (duration, play_duration) - format: hh:mm:ss.ms
+    - Text search (audio_codec, details, director, title) - modifier: INCLUDES
+    - Boolean (favorite, organized, performer_favorite) - true/false
+    - Numeric (bitrate, framerate, play_count, o_counter, rating100, performer_age, performer_count, tag_count) - modifiers: EQUALS, GREATER_THAN, LESS_THAN
+    - Resolution (360p, 480p, 540p, 720p, 1080p, 1440p, 4k) - modifiers: EQUALS, GREATER_THAN, LESS_THAN
+    - Relations (performers, tags, studios) - modifier: INCLUDES, INCLUDES_ALL with depth
+  - **Performer Filters**: birthdate, death_date, created_at, updated_at (dates), details/name/ethnicity/etc (text search), favorite (boolean), age/height/rating/etc (numeric), gender (MALE/FEMALE)
+  - **Studio Filters**: created_at, updated_at (dates), details/name (text search), favorite (boolean), rating100/scene_count (numeric)
+  - **Tag Filters**: created_at, updated_at (dates), description/name (text search), favorite (boolean), scene_count (numeric)
 - **Needed Work**:
-  - ⚠️ **TODO**: Document existing sort options
-  - ⚠️ **TODO**: Document existing filter options and their current state
-  - Fix any broken sort options
-  - Add missing sort options (date added, rating, duration, etc.)
-  - Complete filter implementation
-  - Add more filter types (performer, studio, tags, date range)
-  - Persist sort/filter preferences per user in database
+  - **Phase 1: Basic Sorting**
+    - Add sort dropdown to Scenes, Performers, Studios, Tags pages
+    - Implement common sorts: Name, Date Added, Rating, Random
+    - Support ascending/descending toggle
+    - Persist sort preference in URL query params
+  - **Phase 2: Basic Filters**
+    - Add favorite filter toggle (all pages)
+    - Add rating filter (min rating slider)
+    - Add date range filter (created_at)
+  - **Phase 3: Advanced Filters**
+    - Scene-specific: Duration range, resolution, performer count, tag count
+    - Performer-specific: Gender, age range, height/weight ranges
+    - Relation filters: Filter by specific performers/studios/tags (searchable multi-select)
+  - **Phase 4: Filter UI/UX**
+    - Collapsible filter panel
+    - Clear all filters button
+    - Active filter chips/badges
+    - Filter presets (e.g., "Recently Added High-Rated")
+  - **Phase 5: Persistence**
+    - Save sort/filter state to URL query params (shareable links)
+    - Optional: Save user preferences to database
 - **Technical Notes**:
-  - Files: `client/src/components/pages/Scenes.jsx`, `SceneSearch` component
-  - Filter state management needs review
-  - Consider using URL query params for shareable filtered views
-- **Benefit**: Better content discovery, easier navigation
+  - Files: `client/src/components/scene-search/SceneSearch.jsx`, `client/src/components/pages/{Scenes,Performers,Studios,Tags}.jsx`
+  - Backend already supports all filters via GraphQL passthrough
+  - Use existing `libraryApi.findScenes()` with filter parameters
+  - Consider creating reusable `FilterPanel` component
+  - Date format: YYYY-MM-DD HH:MM (Stash GraphQL format)
+  - Duration format: hh:mm:ss.ms
+  - URL query params for shareability: `?sort=rating&dir=desc&favorite=true`
+- **Benefit**: Powerful content discovery, easier navigation, shareable filtered views
 
 ## Homepage Carousel Customization
 

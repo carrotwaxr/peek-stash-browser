@@ -56,6 +56,26 @@ export const FilterControl = ({
 
   const renderInput = () => {
     switch (type) {
+      case "checkbox":
+        return (
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={value === true || value === "TRUE"}
+              onChange={(e) => onChange(e.target.checked)}
+              className="w-4 h-4 rounded border cursor-pointer"
+              style={{
+                accentColor: "var(--accent-primary)",
+              }}
+            />
+            <span
+              className="ml-2 text-sm"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {placeholder || "Enable"}
+            </span>
+          </label>
+        );
       case "select":
         return (
           <select
@@ -126,6 +146,47 @@ export const FilterControl = ({
               placeholder="Max"
               min={min}
               max={max}
+              className="px-3 py-2 border rounded-md text-sm w-full"
+              style={baseInputStyle}
+            />
+          </div>
+        );
+      case "date-range":
+        return (
+          <div className="flex space-x-2">
+            <input
+              type="date"
+              value={value?.start || ""}
+              onChange={(e) => onChange({ ...value, start: e.target.value })}
+              className="px-3 py-2 border rounded-md text-sm w-full"
+              style={baseInputStyle}
+            />
+            <span className="self-center text-sm" style={{ color: "var(--text-secondary)" }}>to</span>
+            <input
+              type="date"
+              value={value?.end || ""}
+              onChange={(e) => onChange({ ...value, end: e.target.value })}
+              className="px-3 py-2 border rounded-md text-sm w-full"
+              style={baseInputStyle}
+            />
+          </div>
+        );
+      case "time-range":
+        return (
+          <div className="flex space-x-2">
+            <input
+              type="time"
+              value={value?.start || ""}
+              onChange={(e) => onChange({ ...value, start: e.target.value })}
+              placeholder="Start"
+              className="px-3 py-2 border rounded-md text-sm w-full"
+              style={baseInputStyle}
+            />
+            <input
+              type="time"
+              value={value?.end || ""}
+              onChange={(e) => onChange({ ...value, end: e.target.value })}
+              placeholder="End"
               className="px-3 py-2 border rounded-md text-sm w-full"
               style={baseInputStyle}
             />

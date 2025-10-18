@@ -109,7 +109,7 @@ const SearchControls = ({
         q: searchText,
         sort: sortField,
       },
-      ...buildFilter(artifactType, { ...permanentFilters }),
+      ...buildFilter(artifactType, filters),
     };
 
     onQueryChange(query);
