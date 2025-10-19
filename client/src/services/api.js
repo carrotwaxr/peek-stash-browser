@@ -45,6 +45,18 @@ async function apiPost(endpoint, data) {
   });
 }
 
+/**
+ * DELETE request wrapper
+ */
+async function apiDelete(endpoint) {
+  return apiFetch(endpoint, {
+    method: "DELETE",
+  });
+}
+
+// Export API helper functions
+export { apiGet, apiPost, apiDelete };
+
 // New filtered search API endpoints
 export const libraryApi = {
   /**

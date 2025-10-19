@@ -1,7 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { LucideArrowDown, LucideArrowUp } from "lucide-react";
 import Pagination from "./Pagination.jsx";
 import SearchInput from "./SearchInput.jsx";
+import ActiveFilterChips from "./ActiveFilterChips.jsx";
+import FilterPresets from "./FilterPresets.jsx";
 import {
   SortControl,
   FilterPanel,
@@ -24,6 +27,7 @@ import {
   buildStudioFilter,
   buildTagFilter,
 } from "../../utils/filterConfig";
+import { parseSearchParams, buildSearchParams } from "../../utils/urlParams";
 
 const buildFilter = (artifactType, filters) => {
   switch (artifactType) {
@@ -60,12 +64,76 @@ const SearchControls = ({
   permanentFilters = {},
   totalPages,
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(24);
-  const [filters, setFilters] = useState({ ...permanentFilters });
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
-  const [searchText, setSearchText] = useState("");
-  const [[sortField, sortDirection], setSort] = useState([initialSort, "DESC"]);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Get filter options for this artifact type
+  const filterOptions = useMemo(() => {
+    switch (artifactType) {
+      case "performer":
+        return [...PERFORMER_FILTER_OPTIONS];
+      case "studio":
+        return [...STUDIO_FILTER_OPTIONS];
+      case "tag":
+        return [...TAG_FILTER_OPTIONS];
+      case "scene":
+      default:
+        return [...SCENE_FILTER_OPTIONS];
+    }
+  }, [artifactType]);
+
+  // Parse URL params to get initial state
+  const initialState = useMemo(() => {
+    return parseSearchParams(searchParams, filterOptions, {
+      sortField: initialSort,
+      sortDirection: "DESC",
+      searchText: "",
+      filters: { ...permanentFilters },
+    });
+  }, []); // Only run on mount
+
+  const [currentPage, setCurrentPage] = useState(initialState.currentPage);
+  const [perPage, setPerPage] = useState(initialState.perPage);
+  const [filters, setFilters] = useState(initialState.filters);
+  const [searchText, setSearchText] = useState(initialState.searchText);
+  const [[sortField, sortDirection], setSort] = useState([
+    initialState.sortField,
+    initialState.sortDirection,
+  ]);
+
+  // Update URL params whenever state changes
+  useEffect(() => {
+    const params = buildSearchParams({
+      searchText,
+      sortField,
+      sortDirection,
+      currentPage,
+      perPage,
+      filters,
+      filterOptions,
+    });
+
+    setSearchParams(params, { replace: true });
+  }, [searchText, sortField, sortDirection, currentPage, perPage, filters, filterOptions, setSearchParams]);
+
+  // Trigger initial query from URL params
+  useEffect(() => {
+    if (!isInitialized) {
+      setIsInitialized(true);
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page: currentPage,
+          per_page: perPage,
+          q: searchText,
+          sort: sortField,
+        },
+        ...buildFilter(artifactType, filters),
+      };
+      onQueryChange(query);
+    }
+  }, [isInitialized]);
 
   // Clear all filters
   const clearFilters = () => {
@@ -114,6 +182,54 @@ const SearchControls = ({
 
     onQueryChange(query);
   };
+
+  // Handle removing a single filter chip
+  const handleRemoveFilter = useCallback((filterKey) => {
+    setCurrentPage(1); // Reset to first page
+
+    // Remove the filter by resetting it to default value
+    const newFilters = { ...filters };
+    delete newFilters[filterKey];
+
+    // Re-apply permanent filters
+    const updatedFilters = { ...newFilters, ...permanentFilters };
+    setFilters(updatedFilters);
+
+    // Trigger search with updated filters
+    const query = {
+      filter: {
+        direction: sortDirection,
+        page: 1,
+        per_page: perPage,
+        q: searchText,
+        sort: sortField,
+      },
+      ...buildFilter(artifactType, updatedFilters),
+    };
+
+    onQueryChange(query);
+  }, [filters, permanentFilters, sortDirection, perPage, searchText, sortField, artifactType, onQueryChange]);
+
+  // Handle loading a saved preset
+  const handleLoadPreset = useCallback((preset) => {
+    setCurrentPage(1); // Reset to first page
+    setFilters({ ...permanentFilters, ...preset.filters });
+    setSort([preset.sort, preset.direction]);
+
+    // Trigger search with preset values
+    const query = {
+      filter: {
+        direction: preset.direction,
+        page: 1,
+        per_page: perPage,
+        q: searchText,
+        sort: preset.sort,
+      },
+      ...buildFilter(artifactType, { ...permanentFilters, ...preset.filters }),
+    };
+
+    onQueryChange(query);
+  }, [permanentFilters, perPage, searchText, artifactType, onQueryChange]);
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -221,20 +337,6 @@ const SearchControls = ({
     [artifactType]
   );
 
-  const filterOptions = useMemo(() => {
-    switch (artifactType) {
-      case "performer":
-        return [...PERFORMER_FILTER_OPTIONS];
-      case "studio":
-        return [...STUDIO_FILTER_OPTIONS];
-      case "tag":
-        return [...TAG_FILTER_OPTIONS];
-      case "scene":
-      default:
-        return [...SCENE_FILTER_OPTIONS];
-    }
-  }, [artifactType]);
-
   return (
     <div className="mb-6">
       <div className="flex items-center justify-center gap-6 mb-4">
@@ -307,7 +409,24 @@ const SearchControls = ({
             </span>
           )}
         </button>
+
+        {/* Filter Presets */}
+        <FilterPresets
+          artifactType={artifactType}
+          currentFilters={filters}
+          currentSort={sortField}
+          currentDirection={sortDirection}
+          onLoadPreset={handleLoadPreset}
+        />
       </div>
+
+      {/* Active Filter Chips */}
+      <ActiveFilterChips
+        filters={filters}
+        filterOptions={filterOptions}
+        onRemoveFilter={handleRemoveFilter}
+        permanentFilters={permanentFilters}
+      />
 
       {/* Filter Panel */}
       <FilterPanel
