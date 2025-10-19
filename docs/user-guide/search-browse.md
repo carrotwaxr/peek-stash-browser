@@ -18,10 +18,14 @@ Access different content types from the main navigation:
 The scenes page displays content in a responsive grid layout:
 
 - **Thumbnails**: Preview images for each scene
+- **Animated Previews**: Hover over any scene card to see a cycling preview of 10 thumbnails from the video
 - **Duration**: Video length displayed on thumbnail
 - **Rating**: Star rating (if set)
 - **Title**: Scene title
 - **Performers**: Quick performer links
+
+!!! tip "Scene Card Previews"
+    Just like Netflix, hovering over scene cards shows an animated preview cycling through the video. This helps you quickly identify content without opening the detail page.
 
 ## Sorting
 

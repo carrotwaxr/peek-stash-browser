@@ -3,6 +3,7 @@ import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
 import VideoPoster from "./VideoPoster.jsx";
+import SeekPreview from "./SeekPreview.jsx";
 import { useVideoPlayer } from "./useVideoPlayer.js";
 import { usePlaylistNavigation } from "./usePlaylistNavigation.js";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
@@ -301,7 +302,7 @@ const VideoPlayer = ({
 
   return (
     <section className="py-6">
-      <div className="video-container">
+      <div className="video-container" style={{ position: 'relative' }}>
         {showPoster ? (
           <VideoPoster
             scene={scene}
@@ -311,8 +312,9 @@ const VideoPlayer = ({
             onPlay={handlePlay}
           />
         ) : (
-          <div data-vjs-player>
+          <div data-vjs-player style={{ position: 'relative' }}>
             <video ref={videoRef} className="video-js vjs-big-play-centered" />
+            <SeekPreview scene={scene} playerRef={playerRef} />
           </div>
         )}
       </div>

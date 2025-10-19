@@ -7,6 +7,7 @@ import {
 import { formatRelativeTime } from "../../utils/date.js";
 import Tooltip from "../ui/Tooltip.jsx";
 import SceneContextMenu from "../ui/SceneContextMenu.jsx";
+import SceneCardPreview from "../ui/SceneCardPreview.jsx";
 
 /**
  * Enhanced scene card component with keyboard navigation support
@@ -142,12 +143,7 @@ const SceneCard = forwardRef(
           )}
 
           {scene.paths?.screenshot ? (
-            <img
-              src={scene.paths.screenshot}
-              alt={title}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
+            <SceneCardPreview scene={scene} cycleInterval={600} spriteCount={10} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <svg
@@ -165,10 +161,10 @@ const SceneCard = forwardRef(
           )}
 
           {/* Overlay with duration and studio */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none">
             {/* Studio in top-right */}
             {scene.studio && (
-              <div className="absolute top-2 right-2">
+              <div className="absolute top-2 right-2 pointer-events-auto">
                 <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
                   {scene.studio.name}
                 </span>
@@ -176,7 +172,7 @@ const SceneCard = forwardRef(
             )}
 
             {/* Duration in bottom-right */}
-            <div className="absolute bottom-2 right-2">
+            <div className="absolute bottom-2 right-2 pointer-events-auto">
               {scene.files?.[0]?.duration && (
                 <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
                   {Math.floor(scene.files[0].duration / 60)}m

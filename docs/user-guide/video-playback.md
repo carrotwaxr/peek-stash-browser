@@ -81,8 +81,11 @@ Adjust playback speed for faster or slower viewing:
 ### Timeline Seeking
 
 - **Click** on the progress bar to jump to that position
-- **Hover** over the progress bar to see a preview thumbnail (if available)
+- **Hover** over the progress bar to see a live preview thumbnail with timestamp
 - **Drag** the playhead to scrub through the video
+
+!!! tip "Sprite Sheet Previews"
+    Peek uses Stash's sprite sheet thumbnails to show you exactly what's at each position in the video as you hover. This makes finding specific scenes much faster!
 
 ### Smart Seeking
 
