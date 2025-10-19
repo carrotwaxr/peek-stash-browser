@@ -276,23 +276,53 @@ code, pre, .font-mono {
 
 /* Enhanced responsive grid for different screen sizes including 10ft mode */
 
+/* Base grid for mobile and small screens */
+.scene-grid-responsive {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Tablet and up */
+@media (min-width: 640px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .scene-grid-responsive {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
 /* Enhanced breakpoints for ultra-wide screens and 10ft viewing */
 @media (min-width: 1600px) {
   .scene-grid-responsive {
-    grid-template-columns: repeat(7, 1fr) !important;
+    grid-template-columns: repeat(7, 1fr);
   }
 }
 
 @media (min-width: 1920px) {
   .scene-grid-responsive {
-    grid-template-columns: repeat(8, 1fr) !important;
+    grid-template-columns: repeat(8, 1fr);
     gap: 2rem;
   }
 }
 
 @media (min-width: 2560px) {
   .scene-grid-responsive {
-    grid-template-columns: repeat(10, 1fr) !important;
+    grid-template-columns: repeat(10, 1fr);
     gap: 2.5rem;
   }
 }
@@ -300,7 +330,7 @@ code, pre, .font-mono {
 /* 4K and 8K display support */
 @media (min-width: 3840px) {
   .scene-grid-responsive {
-    grid-template-columns: repeat(12, 1fr) !important;
+    grid-template-columns: repeat(12, 1fr);
     gap: 3rem;
   }
 

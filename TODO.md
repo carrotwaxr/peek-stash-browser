@@ -197,23 +197,38 @@ _No items currently at high priority._
 
 ## Keyboard Shortcuts
 
-- **Status**: Idea
-- **Priority**: Low
-- **Description**: Add comprehensive keyboard shortcuts for video player
-- **Current State**: Basic Video.js shortcuts work (space, arrows)
-- **Needed Work**:
-  - Previous/Next video in playlist (Shift+N, Shift+P)
-  - Quality selection menu (Q key)
-  - Speed controls (< and > or [ and ])
-  - Jump to percentage (0-9 keys for 0%-90%)
-  - Create keyboard shortcut handler component
-  - Show keyboard shortcut help overlay (? key)
-- **Technical Notes**:
-  - Files: `client/src/components/video-player/VideoPlayer.jsx`
-  - Use `useEffect` with keyboard event listeners
-  - Prevent conflicts with Video.js default shortcuts
-  - Only active when video player is focused/visible
-- **Benefit**: Power users can navigate more efficiently
+- **Status**: Fixed
+- **Priority**: Low (originally), upgraded during implementation
+- **Description**: Comprehensive keyboard navigation for entire app including TV remote support
+- **Completed Work**:
+  - **Spatial Grid Navigation**: 2D arrow key navigation for scene grids (Netflix-style)
+  - **Media Key Support**: Play/pause, next/prev track, seek, volume control
+  - **Focus Management**: Auto-focus on page load, focus trapping in modals
+  - **Visual Indicators**: Prominent blue glow with pulsing animation for focused elements
+  - **Complete Coverage**: Works on Scenes page, Scene detail page, and all grids
+  - Created reusable hooks: `useSpatialNavigation`, `useMediaKeys`, `useFocusTrap`, `useInitialFocus`
+  - Added comprehensive keyboard navigation documentation
+- **Implemented Features**:
+  - Scene grid: Arrow keys (2D spatial), Enter/Space (select), PageUp/Down (pagination), Home/End
+  - Video player: Space (play/pause), M (mute), F (fullscreen), Ctrl+arrows (seek/volume)
+  - Playlist: Media next/prev keys for playlist navigation
+  - Modals: Tab cycling, Escape to close, focus trapping
+  - Auto-focus: First meaningful element focused on page load
+- **Technical Implementation**:
+  - **Hooks**: `client/src/hooks/useSpatialNavigation.js` - Reusable 2D grid navigation
+  - **Hooks**: `client/src/hooks/useMediaKeys.js` - Media key handling with playlist support
+  - **Hooks**: `client/src/hooks/useFocusTrap.js` - Modal focus trapping and initial focus
+  - **Styling**: `client/src/index.css` - TV-friendly focus indicators with glow effect
+  - **Updated Components**: SceneGrid.jsx, VideoPlayer.jsx, Scene.jsx, Scenes.jsx, ConfirmDialog.jsx
+  - Works with keyboards, media remotes, Bluetooth controllers, and TV remotes
+  - Respects text input fields (arrow keys work normally in search boxes)
+  - Smooth scrolling to keep focused items visible
+  - Accessibility-friendly with ARIA labels
+- **Documentation**:
+  - Created comprehensive keyboard navigation guide: `docs/user-guide/keyboard-navigation.md`
+  - Updated README.md with keyboard navigation feature
+  - Includes quick reference table and troubleshooting section
+- **Benefit**: Full TV remote control support, power user efficiency, accessibility improvements, 10-foot UI experience
 
 ## Download Content for Offline Viewing
 

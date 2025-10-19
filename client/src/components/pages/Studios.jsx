@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, useRef, forwardRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
@@ -7,10 +7,16 @@ import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useInitialFocus } from "../../hooks/useFocusTrap.js";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 
 const Studios = () => {
   usePageTitle("Studios");
+  const navigate = useNavigate();
+  const pageRef = useRef(null);
+  const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const [columns, setColumns] = useState(3);
 
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +85,20 @@ const Studios = () => {
   const totalCount = data?.count || 0;
   const perPage = lastQuery?.filter?.per_page || 24;
   const totalPages = Math.ceil(totalCount / perPage);
+  const currentPage = lastQuery?.filter?.page || 1;
+
+  // Spatial navigation
+  const { setItemRef, isFocused } = useSpatialNavigation({
+    items: currentStudios,
+    columns,
+    enabled: !isLoading,
+    onSelect: (studio) => navigate(`/studio/${studio.id}`),
+    onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
+    onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
+  });
+
+  // Initial focus
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentStudios.length > 0);
 
   if (error) {
     return (
@@ -90,7 +110,7 @@ const Studios = () => {
   }
 
   return (
-    <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+    <div ref={pageRef} className="w-full py-8 px-4 lg:px-6 xl:px-8">
       <PageHeader
         title="Studios"
         subtitle="Browse studios and production companies"
@@ -108,9 +128,15 @@ const Studios = () => {
         <LoadingSpinner />
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentStudios.map((studio) => (
-              <StudioCard key={studio.id} studio={studio} />
+          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {currentStudios.map((studio, index) => (
+              <StudioCard
+                key={studio.id}
+                ref={(el) => setItemRef(index, el)}
+                studio={studio}
+                tabIndex={isFocused(index) ? 0 : -1}
+                className={isFocused(index) ? "keyboard-focus" : ""}
+              />
             ))}
           </div>
         </>
@@ -119,15 +145,19 @@ const Studios = () => {
   );
 };
 
-const StudioCard = ({ studio }) => {
+const StudioCard = forwardRef(({ studio, tabIndex, className = "" }, ref) => {
   return (
     <Link
+      ref={ref}
       to={`/studio/${studio.id}`}
-      className="block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer"
+      tabIndex={tabIndex}
+      className={`block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",
       }}
+      role="button"
+      aria-label={`Studio: ${studio.name}`}
     >
       <div className="flex items-start space-x-4">
         {studio.image_path ? (
@@ -178,7 +208,9 @@ const StudioCard = ({ studio }) => {
       </div>
     </Link>
   );
-};
+});
+
+StudioCard.displayName = "StudioCard";
 
 const getStudios = async (query) => {
   const response = await libraryApi.findStudios(query);

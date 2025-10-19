@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, useRef, forwardRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { formatRating, getInitials, truncateText } from "../../utils/format.js";
@@ -7,10 +7,17 @@ import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useInitialFocus } from "../../hooks/useFocusTrap.js";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
+import { useGridColumns } from "../../hooks/useGridColumns.js";
 
 const Performers = () => {
   usePageTitle("Performers");
+  const navigate = useNavigate();
+  const pageRef = useRef(null);
+  const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const columns = useGridColumns('performers');
 
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +88,20 @@ const Performers = () => {
 
   const perPage = lastQuery?.filter?.per_page || 24;
   const totalPages = Math.ceil(totalCount / perPage);
+  const currentPage = lastQuery?.filter?.page || 1;
+
+  // Spatial navigation
+  const { setItemRef, isFocused } = useSpatialNavigation({
+    items: currentPerformers,
+    columns,
+    enabled: !isLoading,
+    onSelect: (performer) => navigate(`/performer/${performer.id}`),
+    onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
+    onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
+  });
+
+  // Initial focus
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentPerformers.length > 0);
 
   if (error) {
     return (
@@ -92,7 +113,7 @@ const Performers = () => {
   }
 
   return (
-    <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+    <div ref={pageRef} className="w-full py-8 px-4 lg:px-6 xl:px-8">
       <PageHeader
         title="Performers"
         subtitle="Browse and manage performers in your library"
@@ -110,9 +131,15 @@ const Performers = () => {
         <LoadingSpinner />
       ) : (
         <>
-          <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-            {currentPerformers.map((performer) => (
-              <PerformerCard key={performer.id} performer={performer} />
+          <div ref={gridRef} className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            {currentPerformers.map((performer, index) => (
+              <PerformerCard
+                key={performer.id}
+                ref={(el) => setItemRef(index, el)}
+                performer={performer}
+                tabIndex={isFocused(index) ? 0 : -1}
+                className={isFocused(index) ? "keyboard-focus" : ""}
+              />
             ))}
           </div>
         </>
@@ -121,15 +148,19 @@ const Performers = () => {
   );
 };
 
-const PerformerCard = ({ performer }) => {
+const PerformerCard = forwardRef(({ performer, tabIndex, className = "" }, ref) => {
   return (
     <Link
+      ref={ref}
       to={`/performer/${performer.id}`}
-      className="block rounded-lg border p-4 hover:shadow-lg transition-shadow cursor-pointer"
+      tabIndex={tabIndex}
+      className={`block rounded-lg border p-4 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",
       }}
+      role="button"
+      aria-label={`Performer: ${performer.name}`}
     >
       <div className="text-center">
         <div className="w-full aspect-[2/3] rounded mb-3 overflow-hidden">
@@ -181,7 +212,9 @@ const PerformerCard = ({ performer }) => {
       </div>
     </Link>
   );
-};
+});
+
+PerformerCard.displayName = "PerformerCard";
 
 const getPerformers = async (query) => {
   const response = await libraryApi.findPerformers(query);
