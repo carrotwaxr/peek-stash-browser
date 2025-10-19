@@ -1,0 +1,256 @@
+import { useState, useEffect } from 'react';
+import { History } from 'lucide-react';
+import { useAllWatchHistory } from '../../hooks/useWatchHistory.js';
+import { libraryApi } from '../../services/api.js';
+import { PageHeader } from '../ui/index.js';
+import SceneListItem from '../ui/SceneListItem.jsx';
+import LoadingSpinner from '../ui/LoadingSpinner.jsx';
+import { usePageTitle } from '../../hooks/usePageTitle.js';
+
+const WatchHistory = () => {
+  usePageTitle('Watch History');
+
+  const [sortBy, setSortBy] = useState('recent'); // recent, most_watched, longest_duration
+  const [filterBy, setFilterBy] = useState('all'); // all, in_progress, completed
+  const [scenes, setScenes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch all watch history (not limited)
+  const {
+    data: watchHistoryList,
+    loading: loadingHistory,
+    error
+  } = useAllWatchHistory({
+    inProgress: filterBy === 'in_progress',
+    limit: 100
+  });
+
+  // Fetch full scene data for watch history
+  useEffect(() => {
+    const fetchScenes = async () => {
+      if (!watchHistoryList || watchHistoryList.length === 0) {
+        setScenes([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // Extract scene IDs from watch history
+        const sceneIds = watchHistoryList.map(wh => wh.sceneId);
+
+        // Fetch scenes in bulk
+        const response = await libraryApi.findScenes({ ids: sceneIds });
+        const fetchedScenes = response?.findScenes?.scenes || [];
+
+        // Match scenes with watch history data
+        const scenesWithHistory = fetchedScenes.map(scene => {
+          const watchHistory = watchHistoryList.find(wh => wh.sceneId === scene.id);
+          const duration = scene.files?.[0]?.duration || 0;
+          const resumeTime = watchHistory?.resumeTime || 0;
+          const isCompleted = duration > 0 && resumeTime > 0 && (resumeTime / duration) > 0.9;
+
+          return {
+            ...scene,
+            watchHistory: watchHistory || null,
+            resumeTime: resumeTime,
+            playCount: watchHistory?.playCount || 0,
+            playDuration: watchHistory?.playDuration || 0,
+            lastPlayedAt: watchHistory?.lastPlayedAt || null,
+            oCount: watchHistory?.oCount || 0,
+            isCompleted: isCompleted,
+          };
+        });
+
+        // Apply filtering
+        let filtered = scenesWithHistory;
+        if (filterBy === 'in_progress') {
+          filtered = scenesWithHistory.filter(s => !s.isCompleted && s.resumeTime > 0);
+        } else if (filterBy === 'completed') {
+          filtered = scenesWithHistory.filter(s => s.isCompleted);
+        }
+
+        // Apply sorting
+        let sorted = [...filtered];
+        if (sortBy === 'recent') {
+          sorted.sort((a, b) => {
+            const dateA = a.lastPlayedAt ? new Date(a.lastPlayedAt) : new Date(0);
+            const dateB = b.lastPlayedAt ? new Date(b.lastPlayedAt) : new Date(0);
+            return dateB - dateA;
+          });
+        } else if (sortBy === 'most_watched') {
+          sorted.sort((a, b) => b.playCount - a.playCount);
+        } else if (sortBy === 'longest_duration') {
+          sorted.sort((a, b) => b.playDuration - a.playDuration);
+        }
+
+        setScenes(sorted);
+      } catch (err) {
+        console.error('Error fetching watch history scenes:', err);
+        setScenes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!loadingHistory) {
+      fetchScenes();
+    }
+  }, [watchHistoryList, loadingHistory, sortBy, filterBy]);
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0m';
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+  return (
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <PageHeader
+        title="Watch History"
+        subtitle="View your viewing history and continue watching"
+        icon={<History className="w-8 h-8" />}
+      />
+
+      {/* Controls */}
+      <div className="container-fluid px-4 mb-6">
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Sort By */}
+          <div className="flex items-center gap-2">
+            <label
+              className="text-sm font-medium"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Sort by:
+            </label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 rounded-lg border text-sm"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <option value="recent">Recently Watched</option>
+              <option value="most_watched">Most Watched</option>
+              <option value="longest_duration">Longest Duration</option>
+            </select>
+          </div>
+
+          {/* Filter By */}
+          <div className="flex items-center gap-2">
+            <label
+              className="text-sm font-medium"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Filter:
+            </label>
+            <select
+              value={filterBy}
+              onChange={(e) => setFilterBy(e.target.value)}
+              className="px-3 py-2 rounded-lg border text-sm"
+              style={{
+                backgroundColor: 'var(--bg-card)',
+                borderColor: 'var(--border-color)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <option value="all">All</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+
+          {/* Stats */}
+          <div className="ml-auto flex items-center gap-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <span>{scenes.length} scenes</span>
+            {scenes.length > 0 && (
+              <span>
+                Total watch time: {formatDuration(scenes.reduce((sum, s) => sum + s.playDuration, 0))}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Scene List */}
+      <div className="container-fluid px-4 pb-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <LoadingSpinner />
+          </div>
+        ) : error ? (
+          <div
+            className="flex items-center justify-center py-16 rounded-lg"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <p style={{ color: 'var(--accent-error)' }}>
+              Error loading watch history: {error}
+            </p>
+          </div>
+        ) : scenes.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-16 rounded-lg"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            <History className="w-16 h-16 mb-4" style={{ color: 'var(--text-muted)' }} />
+            <p className="text-lg mb-2" style={{ color: 'var(--text-primary)' }}>
+              No watch history yet
+            </p>
+            <p style={{ color: 'var(--text-muted)' }}>
+              Start watching some scenes to see them here
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {scenes.map((scene, index) => (
+              <SceneListItem
+                key={scene.id}
+                scene={scene}
+                watchHistory={{
+                  resumeTime: scene.resumeTime,
+                  playCount: scene.playCount,
+                  playDuration: scene.playDuration,
+                  lastPlayedAt: scene.lastPlayedAt,
+                  oCount: scene.oCount,
+                }}
+                linkState={{
+                  scene,
+                  playlist: {
+                    id: 'virtual-history',
+                    name: 'Watch History',
+                    shuffle: false,
+                    repeat: 'none',
+                    scenes: scenes.map((s, idx) => ({
+                      sceneId: s.id,
+                      scene: s,
+                      position: idx,
+                    })),
+                    currentIndex: index,
+                  },
+                }}
+                exists={true}
+                sceneId={scene.id}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default WatchHistory;

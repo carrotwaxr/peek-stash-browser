@@ -12,6 +12,7 @@ import {
   Tag,
 } from "lucide-react";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
+import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
 import { PageHeader } from "../ui/index.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";
@@ -99,6 +100,9 @@ const Home = () => {
         title="Welcome Home"
         subtitle="Discover your favorite content and explore new scenes"
       />
+
+      {/* Continue Watching Carousel - Always at the top */}
+      <ContinueWatchingCarousel />
 
       {activeCarousels.map(({ title, icon, fetchKey }) => (
         <HomeCarousel

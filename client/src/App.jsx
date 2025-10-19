@@ -26,6 +26,7 @@ const Settings = lazy(() => import("./components/pages/Settings.jsx"));
 const Playlists = lazy(() => import("./components/pages/Playlists.jsx"));
 const PlaylistDetail = lazy(() => import("./components/pages/PlaylistDetail.jsx"));
 const ServerSettings = lazy(() => import("./components/pages/ServerSettings.jsx"));
+const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
 
 // Loading fallback component
 const PageLoader = () => (
@@ -123,6 +124,14 @@ const AppContent = () => {
             element={
               <Layout>
                 <Settings />
+              </Layout>
+            }
+          />
+          <Route
+            path="/watch-history"
+            element={
+              <Layout>
+                <WatchHistory />
               </Layout>
             }
           />

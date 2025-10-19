@@ -101,11 +101,28 @@ const UserMenu = () => {
             </div>
           </div>
 
-          {/* My Settings Link */}
+          {/* Menu Links */}
           <div
             className="px-4 py-3 border-b"
             style={{ borderColor: "var(--border-color)" }}
           >
+            <Link
+              to="/watch-history"
+              onClick={() => setIsOpen(false)}
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1"
+              style={{
+                color: "var(--text-primary)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              <ThemedIcon name="history" size={16} />
+              <span>Watch History</span>
+            </Link>
             <Link
               to="/my-settings"
               onClick={() => setIsOpen(false)}
