@@ -16,12 +16,13 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
   const position = currentIndex + 1;
   const hasPrevious = currentIndex > 0;
   const hasNext = currentIndex < totalScenes - 1;
+  const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
 
   const navigateToScene = (index) => {
     if (index < 0 || index >= totalScenes) return;
 
     const targetScene = playlist.scenes[index];
-    navigate(`/scene/${targetScene.sceneId}`, {
+    navigate(`/video/${targetScene.sceneId}`, {
       state: {
         scene: targetScene.scene,
         playlist: {
@@ -65,15 +66,21 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
               className="font-semibold text-sm"
               style={{ color: "var(--text-primary)" }}
             >
-              Playing from Playlist
+              {isVirtualPlaylist ? "Browsing" : "Playing from Playlist"}
             </h3>
-            <button
-              onClick={goToPlaylist}
-              className="text-sm hover:underline"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {playlist.name}
-            </button>
+            {isVirtualPlaylist ? (
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                {playlist.name}
+              </p>
+            ) : (
+              <button
+                onClick={goToPlaylist}
+                className="text-sm hover:underline"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {playlist.name}
+              </button>
+            )}
           </div>
         </div>
         <div
@@ -104,18 +111,20 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
           Previous
         </button>
 
-        <button
-          onClick={goToPlaylist}
-          className="px-4 py-2 rounded-lg flex items-center gap-2 transition-colors flex-1"
-          style={{
-            backgroundColor: "var(--bg-secondary)",
-            border: "1px solid var(--border-color)",
-            color: "var(--text-primary)",
-          }}
-        >
-          <List size={16} />
-          View Full Playlist
-        </button>
+        {!isVirtualPlaylist && (
+          <button
+            onClick={goToPlaylist}
+            className="px-4 py-2 rounded-lg flex items-center gap-2 transition-colors flex-1"
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              border: "1px solid var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          >
+            <List size={16} />
+            View Full Playlist
+          </button>
+        )}
 
         <button
           onClick={handleNext}

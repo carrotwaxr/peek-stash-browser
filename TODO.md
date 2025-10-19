@@ -575,6 +575,88 @@ These items need more planning/discussion before moving to actionable status.
   - Navigation preserves playlist context across scenes
 - **Benefit**: Excellent binge-watching UX, clear playlist context, easy navigation within playlist
 
+### Multiselect Mode for Scene Grids
+
+- **Priority**: Medium
+- **Description**: Select multiple scenes from grids for bulk actions, starting with bulk playlist additions
+- **Status**: Fixed
+- **Completed Work**:
+  - Toggle button to enter/exit multiselect mode on all scene grids
+  - Checkbox overlays on scene cards in multiselect mode
+  - "Select All" button to select all scenes on current page
+  - Visual selection feedback (blue ring border on selected cards)
+  - Bottom-fixed bulk action bar showing selection count and actions
+  - Bulk "Add to Playlist" with aggregate feedback (added count, skipped count)
+  - Keyboard navigation works in multiselect (Space/Enter toggles selection)
+  - Selections automatically clear when changing pages or exiting mode
+  - Works across all scene grids (Scenes page, Home carousels, Performer/Studio/Tag detail)
+- **Technical Implementation**:
+  - **New Components**:
+    - `client/src/components/ui/BulkActionBar.jsx` - Fixed bottom bar with selection info and actions
+  - **Modified Components**:
+    - `client/src/components/scene-search/SceneGrid.jsx` - Multiselect state management, toggle button, select all
+    - `client/src/components/ui/SceneCard.jsx` - Checkbox overlay, selection visual feedback, mode-aware handlers
+    - `client/src/components/ui/AddToPlaylistButton.jsx` - Support for multiple scenes via sceneIds array, configurable dropdown position (above/below)
+  - **State Management**: React useState for multiselect mode flag and selected scenes array
+  - **Keyboard Support**: Modified spatial navigation hook callback to respect multiselect mode
+  - **Dropdown Position**: Added `dropdownPosition="above"` prop for bottom-fixed buttons (prevents off-screen menus)
+- **Benefit**: Efficient bulk operations, especially for adding multiple scenes to playlists, reduces repetitive clicking
+
+### Virtual Playlist Navigation for Grids and Carousels
+
+- **Priority**: Medium
+- **Description**: Treat scene grids and carousels as navigable playlists when viewing scenes
+- **Status**: Fixed
+- **Completed Work**:
+  - Click any scene from search results → navigate through all search results using next/prev
+  - Click any scene from carousel → navigate through all carousel scenes
+  - Click from performer/studio/tag page → navigate through all filtered scenes
+  - Virtual playlist preserves original grid/carousel order
+  - Playlist controls work identically to real playlists
+  - Contextual naming ("Scene Grid", "High Rated", "Performer: Jane Doe", etc.)
+  - Automatic playlist context creation on scene click
+- **Technical Implementation**:
+  - **Modified Components**:
+    - `client/src/components/scene-search/SceneSearch.jsx` - Creates virtual playlist on handleSceneClick
+    - `client/src/components/pages/Home.jsx` - Creates per-carousel virtual playlists
+  - **Virtual Playlist Structure**:
+    - id: "virtual-grid" or "virtual-carousel" (distinguishes from real playlists)
+    - name: Descriptive name based on source (page title or carousel title)
+    - shuffle: false (preserves grid order)
+    - repeat: "none" (default behavior)
+    - scenes: Full array with position metadata
+    - currentIndex: Position of clicked scene
+  - **Integration**: Reuses existing playlist navigation infrastructure (PlaylistStatusCard, next/prev controls)
+  - **Coverage**: All pages using SceneSearch automatically benefit (Scenes, Performer, Studio, Tag detail)
+- **Benefit**: Seamless browsing through search results and carousels without creating real playlists, maintains context and order
+
+### Playlist Navigation Fixes
+
+- **Priority**: High
+- **Description**: Fix broken playlist navigation controls and improve virtual playlist UX
+- **Status**: Fixed
+- **Completed Work**:
+  - Fixed Next/Previous buttons (were navigating to wrong route `/scene/` instead of `/video/`)
+  - Fixed thumbnail navigation (click any thumbnail to jump to that scene)
+  - Hidden "View Full Playlist" button for virtual playlists (prevents dead link)
+  - Updated header text for virtual playlists ("Browsing" instead of "Playing from Playlist")
+  - Made playlist name non-clickable for virtual playlists
+  - Fixed Scene component to update when navigating between scenes (watches location.state changes)
+  - Added useEffect to detect location.state changes and update scene/playlist state
+- **Technical Implementation**:
+  - **Modified Components**:
+    - `client/src/components/playlist/PlaylistStatusCard.jsx`:
+      - Changed navigation route from `/scene/${id}` to `/video/${id}` (line 24)
+      - Added `isVirtualPlaylist` check (playlist.id?.startsWith?.("virtual-"))
+      - Conditionally hide "View Full Playlist" button for virtual playlists
+      - Conditional header text and playlist name rendering
+    - `client/src/components/pages/Scene.jsx`:
+      - Added useEffect watching location.state for navigation updates
+      - Made playlist state settable (changed from const to useState)
+      - Updates scene, playlist, loading, and error state on location.state changes
+      - Fixed fetch effect to check location.state instead of removed variable
+- **Benefit**: Fully functional playlist navigation for both real and virtual playlists, no dead links, clear UX distinction
+
 ### Convenience API Methods
 
 - **Priority**: Medium
