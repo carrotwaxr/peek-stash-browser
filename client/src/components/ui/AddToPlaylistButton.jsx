@@ -7,11 +7,22 @@ const api = axios.create({
   withCredentials: true,
 });
 
-const AddToPlaylistButton = ({ sceneId, compact = false }) => {
+const AddToPlaylistButton = ({
+  sceneId,
+  sceneIds,
+  compact = false,
+  buttonText,
+  icon,
+  dropdownPosition = "below" // "below" or "above"
+}) => {
   const [showMenu, setShowMenu] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(false);
   const menuRef = useRef(null);
+
+  // Support both single sceneId and multiple sceneIds
+  const scenesToAdd = sceneIds || (sceneId ? [sceneId] : []);
+  const isMultiple = scenesToAdd.length > 1;
 
   useEffect(() => {
     if (showMenu && playlists.length === 0) {
@@ -47,15 +58,45 @@ const AddToPlaylistButton = ({ sceneId, compact = false }) => {
 
   const addToPlaylist = async (playlistId) => {
     try {
-      await api.post(`/playlists/${playlistId}/items`, { sceneId });
-      showSuccess("Added to playlist!");
+      // Add scenes one by one (could be optimized with a batch endpoint later)
+      let addedCount = 0;
+      let skippedCount = 0;
+
+      for (const sceneId of scenesToAdd) {
+        try {
+          await api.post(`/playlists/${playlistId}/items`, { sceneId });
+          addedCount++;
+        } catch (err) {
+          if (err.response?.status === 400) {
+            skippedCount++; // Already in playlist
+          } else {
+            throw err; // Re-throw for outer catch
+          }
+        }
+      }
+
+      // Show appropriate message
+      if (addedCount > 0 && skippedCount === 0) {
+        showSuccess(
+          isMultiple
+            ? `Added ${addedCount} scenes to playlist!`
+            : "Added to playlist!"
+        );
+      } else if (addedCount > 0 && skippedCount > 0) {
+        showWarning(
+          `Added ${addedCount} scenes, ${skippedCount} already in playlist`
+        );
+      } else if (skippedCount > 0) {
+        showWarning(
+          isMultiple
+            ? "All scenes already in playlist"
+            : "Scene already in playlist"
+        );
+      }
+
       setShowMenu(false);
     } catch (err) {
-      if (err.response?.status === 400) {
-        showWarning("Scene already in playlist");
-      } else {
-        showError("Failed to add to playlist");
-      }
+      showError("Failed to add to playlist");
     }
   };
 
@@ -66,20 +107,22 @@ const AddToPlaylistButton = ({ sceneId, compact = false }) => {
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
-        className={compact ? "p-2 rounded hover:bg-opacity-80" : "px-4 py-2 rounded-lg"}
+        className={`flex items-center gap-2 ${compact ? "p-2 rounded hover:bg-opacity-80" : "px-4 py-2 rounded-lg"}`}
         style={{
-          backgroundColor: "var(--bg-card)",
-          border: "1px solid var(--border-color)",
-          color: "var(--text-primary)",
+          backgroundColor: "var(--accent-primary)",
+          color: "white",
         }}
         title="Add to playlist"
       >
-        {compact ? "+" : "+ Playlist"}
+        {icon || null}
+        {buttonText || (compact ? "+" : "+ Playlist")}
       </button>
 
       {showMenu && (
         <div
-          className="absolute right-0 mt-2 w-64 rounded-lg shadow-lg z-50"
+          className={`absolute right-0 w-64 rounded-lg shadow-lg z-50 ${
+            dropdownPosition === "above" ? "bottom-full mb-2" : "mt-2"
+          }`}
           style={{
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-color)",
@@ -94,7 +137,9 @@ const AddToPlaylistButton = ({ sceneId, compact = false }) => {
               className="font-semibold text-sm"
               style={{ color: "var(--text-primary)" }}
             >
-              Add to Playlist
+              {isMultiple
+                ? `Add ${scenesToAdd.length} Scenes to Playlist`
+                : "Add to Playlist"}
             </h3>
           </div>
 
