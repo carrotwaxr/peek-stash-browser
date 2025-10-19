@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, useRef, forwardRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
@@ -7,10 +7,17 @@ import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useInitialFocus } from "../../hooks/useFocusTrap.js";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
+import { useGridColumns } from "../../hooks/useGridColumns.js";
 
 const Tags = () => {
   usePageTitle("Tags");
+  const navigate = useNavigate();
+  const pageRef = useRef(null);
+  const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const columns = useGridColumns('tags');
 
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +86,20 @@ const Tags = () => {
   const totalCount = data?.count || 0;
   const perPage = lastQuery?.filter?.per_page || 24;
   const totalPages = Math.ceil(totalCount / perPage);
+  const currentPage = lastQuery?.filter?.page || 1;
+
+  // Spatial navigation
+  const { setItemRef, isFocused } = useSpatialNavigation({
+    items: currentTags,
+    columns,
+    enabled: !isLoading,
+    onSelect: (tag) => navigate(`/tag/${tag.id}`),
+    onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
+    onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
+  });
+
+  // Initial focus
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentTags.length > 0);
 
   if (error) {
     return (
@@ -90,7 +111,7 @@ const Tags = () => {
   }
 
   return (
-    <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+    <div ref={pageRef} className="w-full py-8 px-4 lg:px-6 xl:px-8">
       <PageHeader
         title="Tags"
         subtitle="Browse and manage tags in your library"
@@ -108,9 +129,15 @@ const Tags = () => {
         <LoadingSpinner />
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {currentTags.map((tag) => (
-              <TagCard key={tag.id} tag={tag} />
+          <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {currentTags.map((tag, index) => (
+              <TagCard
+                key={tag.id}
+                ref={(el) => setItemRef(index, el)}
+                tag={tag}
+                tabIndex={isFocused(index) ? 0 : -1}
+                className={isFocused(index) ? "keyboard-focus" : ""}
+              />
             ))}
           </div>
         </>
@@ -119,7 +146,7 @@ const Tags = () => {
   );
 };
 
-const TagCard = ({ tag }) => {
+const TagCard = forwardRef(({ tag, tabIndex, className = "" }, ref) => {
   const getTagColor = (name) => {
     // Generate a consistent color based on the tag name
     const colors = [
@@ -142,12 +169,16 @@ const TagCard = ({ tag }) => {
 
   return (
     <Link
+      ref={ref}
       to={`/tag/${tag.id}`}
-      className="block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer"
+      tabIndex={tabIndex}
+      className={`block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",
       }}
+      role="button"
+      aria-label={`Tag: ${tag.name}`}
     >
       <div className="flex items-start space-x-4">
         {tag.image_path ? (
@@ -190,7 +221,9 @@ const TagCard = ({ tag }) => {
       </div>
     </Link>
   );
-};
+});
+
+TagCard.displayName = "TagCard";
 
 const getTags = async (query) => {
   const response = await libraryApi.findTags(query);

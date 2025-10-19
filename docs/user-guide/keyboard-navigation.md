@@ -12,9 +12,9 @@ The keyboard navigation system provides:
 - **Tab trapping** - Keep focus within modals and dialogs
 - **Auto-focus** - Pages automatically focus the first meaningful element
 
-## Scene Grid Navigation
+## Grid Navigation
 
-When browsing scenes, performers, studios, or tags:
+When browsing any list page (Scenes, Performers, Studios, or Tags):
 
 ### Arrow Keys
 
