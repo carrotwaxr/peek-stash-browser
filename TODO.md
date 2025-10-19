@@ -286,23 +286,45 @@ _No items currently at high priority._
 
 ## Docker Image Optimization
 
-- **Status**: Idea
+- **Status**: Fixed
 - **Priority**: Low
 - **Description**: Reduce Docker image size and build time
-- **Current State**: Current image size not optimized
-- **Needed Work**:
-  - Optimize multi-stage build process
-  - Remove unnecessary dependencies from final image
-  - Use `.dockerignore` to exclude dev files
-  - Improve layer caching (order of operations in Dockerfile)
-  - Consider Alpine base image (if compatible with dependencies)
-  - Run security scan on final image
-  - Document image size before/after
-- **Technical Notes**:
-  - Files: `Dockerfile.production`, `.dockerignore`
-  - Be careful with Alpine - some npm packages need glibc
-  - Test thoroughly after changes
-- **Benefit**: Faster deployments, less disk usage, faster pulls
+- **Completed Work**:
+  - Upgraded Node version from 18-slim to 22-slim (latest LTS)
+  - Changed from `npm install` to `npm ci` for reproducible builds
+  - Added `--omit=dev` in production stage to exclude dev dependencies
+  - Improved layer caching by copying package files before source
+  - Extracted nginx config and startup script to separate files
+  - Enhanced `.dockerignore` with comprehensive exclusions
+  - Added healthcheck for container monitoring
+  - Optimized apt-get with `--no-install-recommends`
+  - Combined RUN commands to reduce layers
+  - Created external config files (`docker/nginx.conf`, `docker/start.sh`)
+  - Added runtime optimizations (NODE_OPTIONS, curl for healthcheck)
+- **Final Image Size**: 1.57GB (reasonable for full-stack app with FFmpeg)
+- **Technical Implementation**:
+  - Files updated: `Dockerfile.production`, `.dockerignore`
+  - Files created: `docker/nginx.conf`, `docker/start.sh`, `DOCKER_OPTIMIZATION.md`
+  - Three-stage build: frontend-build, backend-build, production
+  - Frontend stage: npm ci, build optimized React app
+  - Backend stage: includes build tools (python3, make, g++), compiles TypeScript
+  - Production stage: only runtime deps (ffmpeg, nginx, sqlite3, curl)
+  - Build command: `docker build -f Dockerfile.production -t peek-stash-browser:optimized .`
+- **Benefits Achieved**:
+  - Latest Node LTS with security patches and performance improvements
+  - Reproducible builds with npm ci
+  - Smaller runtime image (no dev dependencies)
+  - Better build caching (faster rebuilds when only code changes)
+  - More maintainable (config files separate from Dockerfile)
+  - Container health monitoring via healthcheck
+  - Improved startup logging
+- **Documentation**: See `DOCKER_OPTIMIZATION.md` for detailed summary
+- **Future Considerations** (optional):
+  - Consider Alpine base image (requires testing with native npm modules)
+  - Multi-architecture builds for ARM support
+  - Security scanning with `docker scan`
+  - Analyze FFmpeg codecs to potentially reduce size
+- **Benefit**: Faster deployments, better security, easier maintenance, reproducible builds
 
 ## Testing Infrastructure
 
