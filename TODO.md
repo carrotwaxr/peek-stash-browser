@@ -38,26 +38,6 @@ _No items currently at high priority._
 
 # MEDIUM PRIORITY
 
-## Scene Preview/Thumbnails (Seek Hover)
-
-- **Status**: Pending
-- **Priority**: Medium
-- **Description**: Display thumbnails on seek bar hover using Stash's existing sprite sheets
-- **Current State**: Stash generates sprite sheets but Peek doesn't use them
-- **Needed Work**:
-  - Query Stash GraphQL API for sprite sheet data (URL, dimensions, grid layout)
-  - Implement seek bar hover handler
-  - Calculate which sprite to show based on hover position
-  - Display sprite in tooltip above seek bar
-  - Handle cases where sprite sheets don't exist
-  - Test with various video lengths and sprite sheet configurations
-- **Technical Notes**:
-  - Stash sprite sheet data available in Scene query
-  - Video.js may have plugins for this functionality
-  - Files: `client/src/components/video-player/VideoPlayer.jsx`, `videoPlayerUtils.js`
-  - CSS for tooltip positioning and sprite clipping
-- **Benefit**: Easier navigation, visual feedback when seeking (standard video player feature)
-
 ## Error Recovery for Transcoding
 
 - **Status**: Pending
@@ -753,6 +733,57 @@ These items need more planning/discussion before moving to actionable status.
   - Documentation: Added comprehensive build optimization section to DEVELOPERS.md
 - **Benefit**: 90% smaller initial bundle, faster time-to-interactive, better browser caching, pages load on-demand
 
+### Sprite Sheet Thumbnail Previews
+
+- **Priority**: Medium
+- **Description**: YouTube-style seek bar previews and Netflix-style scene card previews using Stash's sprite sheets
+- **Status**: Fixed
+- **Completed Work**:
+  - Created sprite sheet parsing utilities for VTT files and position calculations
+  - Implemented SeekPreview component for video player seek bar hover tooltips
+  - Implemented SceneCardPreview component for animated scene card previews
+  - Both components gracefully fall back to static screenshots when sprite data unavailable
+  - Seek bar shows live thumbnail + timestamp tooltip on hover
+  - Scene cards cycle through 10 evenly-spaced thumbnails on hover (600ms interval)
+  - Proper sprite scaling with CSS transforms for responsive containers
+  - Published stashapp-api v0.2.11 with VTT field support
+  - Fixed pointer-events blocking on scene card overlays
+  - Simplified scene grid to 320px minimum width with auto-fill responsive layout
+  - Updated user documentation with preview feature descriptions
+- **Technical Implementation**:
+  - **New Components**:
+    - `client/src/utils/spriteSheet.js` - VTT parsing and sprite position utilities
+    - `client/src/components/ui/SpritePreview.jsx` - Reusable sprite display component
+    - `client/src/components/video-player/SeekPreview.jsx` - Seek bar hover tooltip
+    - `client/src/components/ui/SceneCardPreview.jsx` - Animated scene card preview with cycling
+  - **Modified Components**:
+    - `client/src/components/video-player/VideoPlayer.jsx` - Integrated SeekPreview
+    - `client/src/components/ui/SceneCard.jsx` - Integrated SceneCardPreview, fixed pointer-events on gradient overlay
+    - `client/src/themes/base.css` - Changed grid from fixed columns to `repeat(auto-fill, minmax(320px, 1fr))`
+  - **Library Updates**:
+    - `stashapp-api` v0.2.11 - Added `vtt` field to Scene paths query
+    - `server/package.json` - Updated dependency to stashapp-api@0.2.11
+  - **Sprite Sheet Parsing**:
+    - `parseVTT()` - Parses WebVTT format with xywh coordinates
+    - `getSpritePositionForTime()` - Binary search for sprite at specific timestamp
+    - `getEvenlySpacedSprites()` - Extracts evenly distributed sprites for cycling
+    - `extractSpritePosition()` - DRY helper for position extraction
+  - **Sprite Display Techniques**:
+    - SeekPreview: Uses SpritePreview component with fixed 160px width
+    - SceneCardPreview: Measures container width dynamically, scales sprite with CSS transform
+    - Container with overflow hidden clips sprite sheet to show only one thumbnail
+    - Positioning: `left: -${x * scale}px, top: -${y * scale}px` with `transform: scale(${scale})`
+  - **Performance**:
+    - Sprite sheet image preloaded once per component
+    - ResizeObserver tracks container width changes
+    - Cycle interval optimized at 600ms for smooth browsing
+    - Loading states with spinner during image load
+  - **Documentation**:
+    - `docs/user-guide/video-playback.md` - Added sprite preview section for seek bar
+    - `docs/user-guide/search-browse.md` - Added scene card preview description
+    - `README.md` - Added "Visual Previews" to features list
+- **Benefit**: Professional streaming UX matching YouTube/Netflix, faster content discovery, precise seeking with visual feedback, no additional media generation required
+
 ---
 
 ## How to Use This Document
@@ -772,4 +803,4 @@ These items need more planning/discussion before moving to actionable status.
 
 ---
 
-**Last Updated**: 2025-10-17
+**Last Updated**: 2025-10-19
