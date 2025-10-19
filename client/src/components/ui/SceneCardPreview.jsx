@@ -1,0 +1,153 @@
+import { useState, useEffect, useRef } from 'react';
+import { fetchAndParseVTT, getEvenlySpacedSprites } from '../../utils/spriteSheet.js';
+
+/**
+ * Animated sprite preview for scene cards
+ * Cycles through evenly spaced sprite thumbnails on hover
+ *
+ * @param {Object} scene - Scene object with paths.sprite and paths.vtt
+ * @param {number} cycleInterval - Milliseconds between sprite changes (default: 800ms)
+ * @param {number} spriteCount - Number of sprites to cycle through (default: 5)
+ */
+const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
+  const [cues, setCues] = useState([]);
+  const [sprites, setSprites] = useState([]);
+  const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const intervalRef = useRef(null);
+  const containerRef = useRef(null);
+
+  // Load and parse VTT file
+  useEffect(() => {
+    if (!scene?.paths?.vtt) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    fetchAndParseVTT(scene.paths.vtt)
+      .then(parsedCues => {
+        setCues(parsedCues);
+        if (parsedCues.length > 0) {
+          const evenlySpaced = getEvenlySpacedSprites(parsedCues, spriteCount);
+          setSprites(evenlySpaced);
+        }
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error('[SceneCardPreview] Error loading VTT:', err);
+        setIsLoading(false);
+        setCues([]);
+      });
+  }, [scene?.paths?.vtt, spriteCount]);
+
+  // Measure container width on mount and when hovering
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.offsetWidth);
+      }
+    };
+
+    // Set initial width
+    updateWidth();
+
+    // Update on resize
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Update width when starting to hover
+  useEffect(() => {
+    if (isHovering && containerRef.current && containerWidth === 0) {
+      setContainerWidth(containerRef.current.offsetWidth);
+    }
+  }, [isHovering, containerWidth]);
+
+  // Cycle through sprites on hover
+  useEffect(() => {
+    if (!isHovering || sprites.length === 0) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      setCurrentSpriteIndex(0);
+      return;
+    }
+
+    // Start cycling
+    intervalRef.current = setInterval(() => {
+      setCurrentSpriteIndex(prev => (prev + 1) % sprites.length);
+    }, cycleInterval);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isHovering, sprites.length, cycleInterval]);
+
+  // Don't render anything if no sprite data
+  if (!scene?.paths?.sprite || !scene?.paths?.vtt || sprites.length === 0 || isLoading) {
+    return (
+      <img
+        src={scene?.paths?.screenshot}
+        alt={scene?.title || 'Scene'}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      />
+    );
+  }
+
+  // Calculate scale factor based on container width vs sprite thumbnail width
+  const currentSprite = sprites[currentSpriteIndex];
+  const scale = currentSprite && containerWidth > 0 ? containerWidth / currentSprite.width : 1;
+
+  return (
+    <div
+      ref={containerRef}
+      className="w-full h-full relative overflow-hidden"
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      {/* Show screenshot when not hovering */}
+      {!isHovering && scene?.paths?.screenshot && (
+        <img
+          src={scene.paths.screenshot}
+          alt={scene?.title || 'Scene'}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      )}
+
+      {/* Show animated sprite preview when hovering */}
+      {isHovering && currentSprite && (
+        <div className="w-full h-full relative overflow-hidden">
+          <img
+            src={scene.paths.sprite}
+            alt={scene?.title || 'Scene preview'}
+            style={{
+              position: 'absolute',
+              left: `-${currentSprite.x * scale}px`,
+              top: `-${currentSprite.y * scale}px`,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              maxWidth: 'none',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SceneCardPreview;

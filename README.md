@@ -9,6 +9,7 @@ A modern, responsive web application for browsing and managing your [Stash](http
 ## Features
 
 - **Adaptive Video Streaming** - Real-time HLS transcoding with multiple quality options
+- **Visual Previews** - Sprite sheet thumbnails on seek bar hover and animated scene card previews
 - **Playlist Management** - Create, organize, and play playlists with shuffle/repeat modes
 - **Advanced Filtering** - Comprehensive search and filtering across all content types
 - **Full Keyboard Navigation** - Complete keyboard/remote control support for TV and desktop use

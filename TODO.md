@@ -40,23 +40,43 @@ _No items currently at high priority._
 
 ## Scene Preview/Thumbnails (Seek Hover)
 
-- **Status**: Pending
+- **Status**: Fixed
 - **Priority**: Medium
 - **Description**: Display thumbnails on seek bar hover using Stash's existing sprite sheets
-- **Current State**: Stash generates sprite sheets but Peek doesn't use them
-- **Needed Work**:
-  - Query Stash GraphQL API for sprite sheet data (URL, dimensions, grid layout)
-  - Implement seek bar hover handler
-  - Calculate which sprite to show based on hover position
-  - Display sprite in tooltip above seek bar
-  - Handle cases where sprite sheets don't exist
-  - Test with various video lengths and sprite sheet configurations
-- **Technical Notes**:
-  - Stash sprite sheet data available in Scene query
-  - Video.js may have plugins for this functionality
-  - Files: `client/src/components/video-player/VideoPlayer.jsx`, `videoPlayerUtils.js`
-  - CSS for tooltip positioning and sprite clipping
-- **Benefit**: Easier navigation, visual feedback when seeking (standard video player feature)
+- **Completed Work**:
+  - Created sprite sheet utility functions for parsing VTT files and calculating positions
+  - Implemented SeekPreview component for video player seek bar hover
+  - Implemented SceneCardPreview component for animated scene card previews
+  - Both components automatically fall back to static screenshots when sprite data unavailable
+  - Seek preview shows thumbnail + timestamp on hover over progress bar
+  - Scene card preview cycles through 5 evenly-spaced thumbnails on hover (800ms interval)
+  - Fully integrated into VideoPlayer and SceneCard components
+  - Published stashapp-api v0.2.11 with VTT field support
+- **Technical Implementation**:
+  - **New Utilities**: `client/src/utils/spriteSheet.js` - VTT parsing, time-to-sprite mapping
+    - `fetchAndParseVTT()` - Fetch and parse WebVTT files with sprite position data
+    - `parseVTT()` - Parse WebVTT format (timestamp ranges + xywh coordinates)
+    - `getSpritePositionForTime()` - Find sprite for specific timestamp using binary search
+    - `getEvenlySpacedSprites()` - Get evenly distributed sprites for preview cycling
+  - **New Components**:
+    - `client/src/components/ui/SpritePreview.jsx` - Reusable sprite display component using absolute positioning with overflow clipping
+    - `client/src/components/video-player/SeekPreview.jsx` - Seek bar hover tooltip with mouse tracking and positioning
+    - `client/src/components/ui/SceneCardPreview.jsx` - Scene card hover preview with cycling using background-image approach
+  - **Modified Components**:
+    - `client/src/components/video-player/VideoPlayer.jsx` - Integrated SeekPreview
+    - `client/src/components/ui/SceneCard.jsx` - Replaced static image with SceneCardPreview
+  - **Modified Library**: `stashapp-api` v0.2.11 - Added `vtt` field to Scene paths query
+  - **Data Sources**: Uses `scene.paths.sprite` (sprite sheet JPEG) and `scene.paths.vtt` (WebVTT timing file)
+  - **Sprite Positioning Technique**:
+    - SeekPreview: Uses SpritePreview component with `<img>` tag positioned absolutely with negative left/top offsets
+    - SceneCardPreview: Uses CSS `background-image` with `backgroundPosition` for direct clipping
+    - Container with `overflow: hidden` clips sprite sheet to show only desired thumbnail
+    - Example: For sprite at (800, 0) with size 160x90, position image at `left: -800px, top: 0px`
+  - **Performance**: Preloads sprite sheet image once, reuses for all thumbnails, no re-rendering overhead
+  - **Mouse Tracking**: Attaches to `.vjs-progress-control` element, calculates time from mouse position
+  - **Tooltip Positioning**: Positioned relative to video player container, stays within bounds horizontally
+  - **Graceful Degradation**: Falls back to static screenshot if sprite/VTT unavailable or parsing fails
+- **Benefit**: Professional video player UX matching YouTube/Netflix, visual content preview before playback, easier navigation, enhanced scene browsing experience
 
 ## Error Recovery for Transcoding
 
