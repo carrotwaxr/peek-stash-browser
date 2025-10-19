@@ -1,3 +1,5 @@
+import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+
 /**
  * Reusable confirmation dialog component
  * HTML-based modal, no browser native dialogs
@@ -12,6 +14,9 @@ const ConfirmDialog = ({
   cancelText = "Cancel",
   confirmStyle = "danger", // "danger" or "primary"
 }) => {
+  // Focus trap to keep keyboard navigation within modal
+  const dialogRef = useFocusTrap(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const handleConfirm = () => {
@@ -35,12 +40,16 @@ const ConfirmDialog = ({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="rounded-lg shadow-lg max-w-md w-full m-4"
         style={{
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-color)",
         }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
       >
         {/* Header */}
         <div
@@ -48,6 +57,7 @@ const ConfirmDialog = ({
           style={{ borderColor: "var(--border-color)" }}
         >
           <h3
+            id="dialog-title"
             className="text-lg font-semibold"
             style={{ color: "var(--text-primary)" }}
           >

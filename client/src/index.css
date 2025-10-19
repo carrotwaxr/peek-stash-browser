@@ -4,3 +4,56 @@
 
 /* Import the main theming system after Tailwind to ensure proper precedence */
 @import "./themes/base.css";
+
+/* Keyboard Navigation Focus Styles - TV-friendly indicators */
+.keyboard-focus {
+  outline: none !important;
+  box-shadow:
+    0 0 0 4px rgba(59, 130, 246, 0.5),
+    0 0 0 8px rgba(59, 130, 246, 0.2),
+    0 0 20px rgba(59, 130, 246, 0.4),
+    0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  transform: scale(1.05) !important;
+  z-index: 10 !important;
+  transition: all 0.2s ease-in-out !important;
+  border: 3px solid rgba(59, 130, 246, 0.8) !important;
+}
+
+.keyboard-focus::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+  pointer-events: none;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+/* Focus indicator for buttons and interactive elements */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.8);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+}
+
+/* Skip navigation on mouse interaction */
+.keyboard-focus:hover {
+  box-shadow:
+    0 0 0 4px rgba(59, 130, 246, 0.5),
+    0 0 0 8px rgba(59, 130, 246, 0.2),
+    0 0 20px rgba(59, 130, 246, 0.4),
+    0 12px 32px rgba(0, 0, 0, 0.5) !important;
+}

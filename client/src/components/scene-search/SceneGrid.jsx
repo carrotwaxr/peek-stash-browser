@@ -4,6 +4,7 @@ import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import ErrorMessage from "../ui/ErrorMessage.jsx";
 import EmptyState from "../ui/EmptyState.jsx";
 import Pagination from "../ui/Pagination.jsx";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 
 const SceneGrid = ({
   scenes,
@@ -18,21 +19,35 @@ const SceneGrid = ({
   enableKeyboard = true,
 }) => {
   const gridRef = useRef();
-  const sceneRefs = useRef([]);
-  const [focusedIndex, setFocusedIndex] = useState(0);
   const [columns, setColumns] = useState(4);
 
   // Calculate grid columns based on screen width
+  // Must match CSS breakpoints in base.css (.scene-grid-responsive)
   const getColumns = () => {
     if (typeof window === "undefined") return 4;
     const width = window.innerWidth;
-    if (width >= 1536) return 6; // 2xl
-    if (width >= 1280) return 5; // xl
-    if (width >= 1024) return 4; // lg
-    if (width >= 768) return 3; // md
-    if (width >= 640) return 2; // sm
-    return 1; // xs
+    // CSS breakpoints (these use !important so they override inline styles)
+    if (width >= 3840) return 12; // 4K
+    if (width >= 2560) return 10; // 2K
+    if (width >= 1920) return 8;  // 1080p
+    if (width >= 1600) return 7;  // Large desktop
+    // Below 1600px, inline styles work (CSS doesn't override)
+    if (width >= 1280) return 6;  // xl
+    if (width >= 1024) return 5;  // lg
+    if (width >= 768) return 4;   // md
+    if (width >= 640) return 3;   // sm
+    return 2; // xs
   };
+
+  // Spatial navigation hook
+  const { focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
+    items: scenes,
+    columns,
+    enabled: enableKeyboard,
+    onSelect: onSceneClick,
+    onPageUp: () => onPageChange && currentPage > 1 && onPageChange(currentPage - 1),
+    onPageDown: () => onPageChange && currentPage < totalPages && onPageChange(currentPage + 1),
+  });
 
   // Update columns on resize
   useEffect(() => {
@@ -45,68 +60,16 @@ const SceneGrid = ({
     return () => window.removeEventListener("resize", updateColumns);
   }, []);
 
-  // Handle keyboard navigation
+  // Set initial focus when grid loads
   useEffect(() => {
-    if (!enableKeyboard || !scenes?.length) return;
-
-    const handleKeyDown = (e) => {
-      const totalItems = scenes.length;
-
-      switch (e.key) {
-        case "ArrowLeft":
-          e.preventDefault();
-          setFocusedIndex((prev) => Math.max(0, prev - 1));
-          break;
-        case "ArrowRight":
-          e.preventDefault();
-          setFocusedIndex((prev) => Math.min(totalItems - 1, prev + 1));
-          break;
-        case "ArrowUp":
-          e.preventDefault();
-          setFocusedIndex((prev) => Math.max(0, prev - columns));
-          break;
-        case "ArrowDown":
-          e.preventDefault();
-          setFocusedIndex((prev) => Math.min(totalItems - 1, prev + columns));
-          break;
-        case "Enter":
-        case " ":
-          e.preventDefault();
-          if (scenes[focusedIndex] && onSceneClick) {
-            onSceneClick(scenes[focusedIndex]);
-          }
-          break;
-        case "PageUp":
-          e.preventDefault();
-          if (onPageChange && currentPage > 1) {
-            onPageChange(currentPage - 1);
-          }
-          break;
-        case "PageDown":
-          e.preventDefault();
-          if (onPageChange && currentPage < totalPages) {
-            onPageChange(currentPage + 1);
-          }
-          break;
+    if (enableKeyboard && scenes?.length > 0 && gridRef.current) {
+      // Focus the grid container to enable keyboard navigation
+      const firstFocusable = gridRef.current.querySelector('[tabindex="0"]');
+      if (firstFocusable) {
+        firstFocusable.focus();
       }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
-    enableKeyboard,
-    scenes,
-    focusedIndex,
-    onSceneClick,
-    onPageChange,
-    currentPage,
-    totalPages,
-    columns,
-  ]);
-
-  useEffect(() => {
-    sceneRefs.current = sceneRefs.current.slice(0, scenes?.length || 0);
-  }, [scenes]);
+    }
+  }, [enableKeyboard, scenes]);
 
   if (loading) {
     return <LoadingSpinner />;
@@ -141,22 +104,17 @@ const SceneGrid = ({
       <div
         ref={gridRef}
         className="grid gap-6 scene-grid-responsive"
-        style={{
-          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-        }}
       >
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}
-            ref={(el) => {
-              sceneRefs.current[index] = el;
-            }}
+            ref={(el) => setItemRef(index, el)}
             scene={scene}
             onClick={onSceneClick}
-            tabIndex={enableKeyboard ? (focusedIndex === index ? 0 : -1) : -1}
+            tabIndex={enableKeyboard ? (isFocused(index) ? 0 : -1) : -1}
             className={
-              enableKeyboard && focusedIndex === index
-                ? "ring-2 ring-blue-500"
+              isFocused(index)
+                ? "keyboard-focus"
                 : ""
             }
           />

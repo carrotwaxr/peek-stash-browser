@@ -5,6 +5,7 @@ import "./VideoPlayer.css";
 import VideoPoster from "./VideoPoster.jsx";
 import { useVideoPlayer } from "./useVideoPlayer.js";
 import { usePlaylistNavigation } from "./usePlaylistNavigation.js";
+import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import {
   setupHLSforVOD,
   setupLoadingBuffer,
@@ -64,6 +65,15 @@ const VideoPlayer = ({
     currentPlaylistIndex,
     navigate
   );
+
+  // Media key support (play/pause, next/prev track)
+  usePlaylistMediaKeys({
+    playerRef,
+    playlist,
+    playNext: playNextInPlaylist,
+    playPrevious: playPreviousInPlaylist,
+    enabled: !showPoster, // Only enable when video is playing
+  });
 
   // Handle quality changes
   useEffect(() => {

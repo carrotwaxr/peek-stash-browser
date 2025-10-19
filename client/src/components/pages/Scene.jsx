@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { canDirectPlayVideo } from "../../utils/videoFormat.js";
 import Navigation from "../ui/Navigation.jsx";
@@ -7,6 +7,7 @@ import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import SceneDetails from "./SceneDetails.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 
@@ -14,6 +15,7 @@ const Scene = () => {
   const { sceneId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const pageRef = useRef(null);
 
   // Get scene and playlist from navigation state (preferred for performance)
   const sceneFromState = location.state?.scene;
@@ -27,6 +29,9 @@ const Scene = () => {
 
   // Set page title to scene title
   usePageTitle(scene?.title || "Scene");
+
+  // Set initial focus to video player when page loads
+  useInitialFocus(pageRef, '.vjs-big-play-button, button', !isLoading);
 
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
@@ -103,7 +108,7 @@ const Scene = () => {
   const compatibility = firstFile ? canDirectPlayVideo(firstFile) : null;
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
+    <div ref={pageRef} className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
       {/* Full Navigation Header */}
       <Navigation />
 

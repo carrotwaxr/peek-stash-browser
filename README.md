@@ -11,6 +11,7 @@ A modern, responsive web application for browsing and managing your [Stash](http
 - **Adaptive Video Streaming** - Real-time HLS transcoding with multiple quality options
 - **Playlist Management** - Create, organize, and play playlists with shuffle/repeat modes
 - **Advanced Filtering** - Comprehensive search and filtering across all content types
+- **Full Keyboard Navigation** - Complete keyboard/remote control support for TV and desktop use
 - **Secure Authentication** - JWT-based auth with role management
 - **Modern Interface** - Beautiful, responsive React UI with theme support
 - **Mobile Ready** - Fully optimized for all devices
@@ -45,6 +46,7 @@ docker run -d \
 - **[Installation Guide](https://carrotwaxr.github.io/peek-stash-browser/getting-started/installation/)** - Docker, unRAID, and development setup
 - **[Configuration](https://carrotwaxr.github.io/peek-stash-browser/getting-started/configuration/)** - Environment variables and settings
 - **[User Guide](https://carrotwaxr.github.io/peek-stash-browser/user-guide/video-playback/)** - Using Peek effectively
+- **[Keyboard Navigation](https://carrotwaxr.github.io/peek-stash-browser/user-guide/keyboard-navigation/)** - TV remote and keyboard controls
 - **[Development](https://carrotwaxr.github.io/peek-stash-browser/development/setup/)** - Contributing to Peek
 - **[API Reference](https://carrotwaxr.github.io/peek-stash-browser/development/api-reference/)** - REST API documentation
 - **[Troubleshooting](https://carrotwaxr.github.io/peek-stash-browser/reference/troubleshooting/)** - Common issues and solutions
