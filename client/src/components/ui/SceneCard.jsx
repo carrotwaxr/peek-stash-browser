@@ -8,6 +8,7 @@ import { formatRelativeTime } from "../../utils/date.js";
 import Tooltip from "../ui/Tooltip.jsx";
 import SceneContextMenu from "../ui/SceneContextMenu.jsx";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
+import OCounterButton from "../ui/OCounterButton.jsx";
 
 /**
  * Enhanced scene card component with keyboard navigation support
@@ -180,6 +181,19 @@ const SceneCard = forwardRef(
               )}
             </div>
           </div>
+
+          {/* Watch Progress Bar */}
+          {scene.resumeTime && scene.files?.[0]?.duration && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+              <div
+                className="h-full bg-green-500 transition-all"
+                style={{
+                  width: `${Math.min(100, (scene.resumeTime / scene.files[0].duration) * 100)}%`
+                }}
+                title={`Resume from ${Math.floor(scene.resumeTime / 60)}:${String(Math.floor(scene.resumeTime % 60)).padStart(2, '0')}`}
+              />
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -230,11 +244,10 @@ const SceneCard = forwardRef(
               <span className="flex items-center italic">⭐ No rating</span>
             )}
 
-            {scene.o_counter > 0 ? (
-              <span className="flex items-center">💦 {scene.o_counter}</span>
-            ) : (
-              <span className="flex items-center italic">💦 0</span>
-            )}
+            <OCounterButton
+              sceneId={scene.id}
+              initialCount={scene.o_counter || 0}
+            />
 
             {scene.play_count > 0 ? (
               <span className="flex items-center">▶ {scene.play_count}</span>

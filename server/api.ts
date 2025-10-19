@@ -22,6 +22,7 @@ import {
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import playlistRoutes from "./routes/playlist.js";
+import watchHistoryRoutes from "./routes/watchHistory.js";
 import { authenticateToken } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
 
@@ -53,6 +54,9 @@ export const setupAPI = () => {
 
   // Playlist routes (protected)
   app.use("/api/playlists", playlistRoutes);
+
+  // Watch history routes (protected)
+  app.use("/api/watch-history", watchHistoryRoutes);
 
   // New filtered search endpoints (protected)
   app.post("/api/library/scenes", authenticateToken, findScenes);

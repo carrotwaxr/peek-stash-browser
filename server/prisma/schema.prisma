@@ -29,17 +29,35 @@ model User {
 }
 
 model WatchHistory {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    sceneId     String      // Stash scene ID
-    watchedAt   DateTime    @default(now())
-    position    Int         @default(0) // Playback position in seconds
-    duration    Int?        // Total scene duration
-    completed   Boolean     @default(false)
-    
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-    
+    id              Int         @id @default(autoincrement())
+    userId          Int
+    sceneId         String      // Stash scene ID
+
+    // Playback tracking (syncs with Stash)
+    playCount       Int         @default(0)      // Number of 5+ minute sessions
+    playDuration    Float       @default(0)      // Total seconds watched (cumulative across all sessions)
+    resumeTime      Float?                       // Last playback position in seconds
+    lastPlayedAt    DateTime?                    // Last time this scene was played
+
+    // O Counter tracking (syncs with Stash)
+    oCount          Int         @default(0)      // Total O counter increments
+    oHistory        Json        @default("[]")   // Array of timestamp strings when O was incremented
+
+    // Detailed play session history for analytics
+    playHistory     Json        @default("[]")   // Array of {startTime, endTime, quality, duration, seekEvents: [{time, from, to}]}
+
+    // Legacy fields (deprecated, use fields above)
+    watchedAt       DateTime    @default(now())
+    position        Int         @default(0)
+    duration        Int?
+    completed       Boolean     @default(false)
+
+    user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
     @@unique([userId, sceneId])
+    @@index([userId])
+    @@index([sceneId])
+    @@index([lastPlayedAt])
 }
 
 model Playlist {

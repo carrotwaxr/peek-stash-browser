@@ -2,13 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { Shuffle, Repeat, Repeat1 } from "lucide-react";
-import {
-  getSceneTitle,
-  getSceneDescription,
-  formatFileSize,
-} from "../../utils/format.js";
-import { formatRelativeTime } from "../../utils/date.js";
-import Tooltip from "../ui/Tooltip.jsx";
+import { getSceneTitle } from "../../utils/format.js";
+import SceneListItem from "../ui/SceneListItem.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
@@ -470,224 +465,65 @@ const PlaylistDetail = () => {
                 Drag and drop scenes to reorder them. Click "Save Order" when done.
               </div>
             )}
-            {scenes.map((item, index) => {
-              const scene = item.scene;
-              const title = scene ? getSceneTitle(scene) : null;
-              const description = scene ? getSceneDescription(scene) : null;
-
-              return (
-                <div
-                  key={item.sceneId}
-                  draggable={reorderMode}
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                  className="rounded-lg border transition-all hover:shadow-lg"
-                  style={{
-                    backgroundColor: "var(--bg-card)",
-                    border: "1px solid var(--border-color)",
-                    opacity: item.exists ? 1 : 0.6,
-                    cursor: reorderMode ? "move" : "default",
-                  }}
-                >
-                  <div className="p-4">
-                    <div className="flex gap-4">
-                      {/* Drag Handle (only in reorder mode) */}
-                      {reorderMode && (
-                        <div
-                          className="flex-shrink-0 flex flex-col items-center justify-center"
-                          style={{
-                            width: "24px",
-                            color: "var(--text-muted)",
-                            cursor: "move",
-                          }}
-                        >
-                          <div className="text-xs font-mono">⋮⋮</div>
-                          <div className="text-xs mt-1">{index + 1}</div>
-                        </div>
-                      )}
-                      {/* Thumbnail */}
-                      <div className="flex-shrink-0 relative">
-                        {item.exists && scene?.paths?.screenshot ? (
-                          <div className="relative w-64 h-36 rounded overflow-hidden">
-                            <img
-                              src={scene.paths.screenshot}
-                              alt={title || "Scene"}
-                              className="w-full h-full object-cover"
-                            />
-                            {/* Overlay with duration and studio */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent">
-                              {scene.studio && (
-                                <div className="absolute top-2 right-2">
-                                  <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                                    {scene.studio.name}
-                                  </span>
-                                </div>
-                              )}
-                              {scene.files?.[0]?.duration && (
-                                <div className="absolute bottom-2 right-2">
-                                  <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                                    {Math.floor(scene.files[0].duration / 60)}m
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            className="w-64 h-36 rounded flex items-center justify-center"
-                            style={{
-                              backgroundColor: item.exists ? "var(--bg-secondary)" : "rgba(239, 68, 68, 0.1)",
-                              border: item.exists ? "none" : "2px dashed rgba(239, 68, 68, 0.5)",
-                            }}
-                          >
-                            <span
-                              className="text-3xl"
-                              style={{ color: item.exists ? "var(--text-muted)" : "rgb(239, 68, 68)" }}
-                            >
-                              {item.exists ? "📹" : "⚠️"}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex-1 min-w-0 pr-4">
-                            {item.exists && scene ? (
-                              <>
-                                {/* Title */}
-                                <Link
-                                  to={`/scene/${item.sceneId}`}
-                                  state={{
-                                    scene: scene,
-                                    playlist: {
-                                      id: playlistId,
-                                      name: playlist.name,
-                                      shuffle,
-                                      repeat,
-                                      scenes: scenes.filter(s => s.exists && s.scene).map((s, idx) => ({
-                                        sceneId: s.sceneId,
-                                        scene: s.scene,
-                                        position: idx
-                                      })),
-                                      currentIndex: scenes.filter(s => s.exists && s.scene).findIndex(s => s.sceneId === item.sceneId)
-                                    }
-                                  }}
-                                  className="font-semibold text-lg hover:underline block mb-1"
-                                  style={{ color: "var(--text-primary)" }}
-                                >
-                                  {title}
-                                </Link>
-
-                                {/* Date */}
-                                <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-                                  {scene.date ? formatRelativeTime(scene.date) : "No date"}
-                                </div>
-
-                                {/* Stats Row */}
-                                <div className="flex items-center gap-4 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-                                  <span>⭐ {scene.rating100 ? `${Math.round(scene.rating100 / 20)}/5` : "No rating"}</span>
-                                  <span>💦 {scene.o_counter || 0}</span>
-                                  <span>▶ {scene.play_count || 0}</span>
-                                  {scene.files?.[0]?.width && scene.files?.[0]?.height && (
-                                    <span>{scene.files[0].width}×{scene.files[0].height}</span>
-                                  )}
-                                  {scene.files?.[0]?.size && (
-                                    <span>{formatFileSize(scene.files[0].size)}</span>
-                                  )}
-                                </div>
-
-                                {/* Description */}
-                                {description && (
-                                  <Tooltip content={description} disabled={description.length <= 150}>
-                                    <p
-                                      className="text-sm mb-2 leading-relaxed"
-                                      style={{
-                                        color: "var(--text-secondary)",
-                                        display: "-webkit-box",
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: "vertical",
-                                        overflow: "hidden",
-                                      }}
-                                    >
-                                      {description}
-                                    </p>
-                                  </Tooltip>
-                                )}
-
-                                {/* Performers & Tags */}
-                                <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-muted)" }}>
-                                  {scene.performers && scene.performers.length > 0 && (
-                                    <Tooltip content={
-                                      <div>
-                                        <div className="font-semibold mb-1">Performers:</div>
-                                        {scene.performers.map((p) => p.name).join(", ")}
-                                      </div>
-                                    }>
-                                      <span className="flex items-center gap-1">
-                                        👥 {scene.performers.length}
-                                      </span>
-                                    </Tooltip>
-                                  )}
-                                  {scene.tags && scene.tags.length > 0 && (
-                                    <Tooltip content={
-                                      <div>
-                                        <div className="font-semibold mb-1">Tags:</div>
-                                        {scene.tags.map((t) => t.name).join(", ")}
-                                      </div>
-                                    }>
-                                      <span className="flex items-center gap-1">
-                                        🏷️ {scene.tags.length}
-                                      </span>
-                                    </Tooltip>
-                                  )}
-                                  {scene.organized && (
-                                    <span className="text-green-500">✓ Organized</span>
-                                  )}
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <h3
-                                  className="text-lg font-semibold mb-2"
-                                  style={{ color: "rgb(239, 68, 68)" }}
-                                >
-                                  ⚠️ Scene Deleted or Not Found
-                                </h3>
-                                <p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>
-                                  Scene ID: {item.sceneId} • This scene was removed from Stash
-                                </p>
-                                <p className="text-xs px-2 py-1 rounded inline-block" style={{
-                                  backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                  color: "rgb(239, 68, 68)",
-                                }}>
-                                  Click "Remove" to clean up this playlist
-                                </p>
-                              </>
-                            )}
-                          </div>
-
-                          {/* Remove Button */}
-                          <button
-                            onClick={() => handleRemoveClick(item)}
-                            className="px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors flex-shrink-0"
-                            style={{
-                              backgroundColor: "rgba(239, 68, 68, 0.1)",
-                              color: "rgb(239, 68, 68)",
-                              height: "fit-content",
-                            }}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
+            {scenes.map((item, index) => (
+              <SceneListItem
+                key={item.sceneId}
+                scene={item.scene}
+                exists={item.exists}
+                sceneId={item.sceneId}
+                draggable={reorderMode}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                linkState={{
+                  scene: item.scene,
+                  playlist: {
+                    id: playlistId,
+                    name: playlist.name,
+                    shuffle,
+                    repeat,
+                    scenes: scenes
+                      .filter((s) => s.exists && s.scene)
+                      .map((s, idx) => ({
+                        sceneId: s.sceneId,
+                        scene: s.scene,
+                        position: idx,
+                      })),
+                    currentIndex: scenes
+                      .filter((s) => s.exists && s.scene)
+                      .findIndex((s) => s.sceneId === item.sceneId),
+                  },
+                }}
+                dragHandle={
+                  reorderMode && (
+                    <div
+                      className="flex-shrink-0 flex flex-col items-center justify-center"
+                      style={{
+                        width: "24px",
+                        color: "var(--text-muted)",
+                        cursor: "move",
+                      }}
+                    >
+                      <div className="text-xs font-mono">⋮⋮</div>
+                      <div className="text-xs mt-1">{index + 1}</div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
+                  )
+                }
+                actionButtons={
+                  <button
+                    onClick={() => handleRemoveClick(item)}
+                    className="px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors flex-shrink-0"
+                    style={{
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      color: "rgb(239, 68, 68)",
+                      height: "fit-content",
+                    }}
+                  >
+                    Remove
+                  </button>
+                }
+              />
+            ))}
           </div>
         )}
       </div>
