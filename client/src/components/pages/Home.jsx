@@ -62,8 +62,26 @@ const Home = () => {
     loadPreferences();
   }, []);
 
-  const handleSceneClick = (scene) => {
-    navigate(`/video/${scene.id}`, { state: { scene } });
+  const createSceneClickHandler = (scenes, carouselTitle) => (scene) => {
+    const currentIndex = scenes.findIndex(s => s.id === scene.id);
+
+    navigate(`/video/${scene.id}`, {
+      state: {
+        scene,
+        playlist: {
+          id: "virtual-carousel",
+          name: carouselTitle,
+          shuffle: false,
+          repeat: "none",
+          scenes: scenes.map((s, idx) => ({
+            sceneId: s.id,
+            scene: s,
+            position: idx
+          })),
+          currentIndex: currentIndex >= 0 ? currentIndex : 0
+        }
+      }
+    });
   };
 
   // Filter and sort carousels based on user preferences
@@ -88,7 +106,7 @@ const Home = () => {
           title={title}
           icon={icon}
           fetchKey={fetchKey}
-          onSceneClick={handleSceneClick}
+          createSceneClickHandler={createSceneClickHandler}
           carouselQueries={carouselQueries}
         />
       ))}
@@ -96,7 +114,7 @@ const Home = () => {
   );
 };
 
-const HomeCarousel = ({ title, icon, fetchKey, onSceneClick, carouselQueries }) => {
+const HomeCarousel = ({ title, icon, fetchKey, createSceneClickHandler, carouselQueries }) => {
   const fetchFunction = carouselQueries[fetchKey];
   const { data: scenes, loading, error } = useAsyncData(fetchFunction, [fetchKey]);
 
@@ -111,7 +129,7 @@ const HomeCarousel = ({ title, icon, fetchKey, onSceneClick, carouselQueries }) 
       title={title}
       titleIcon={icon}
       scenes={scenes || []}
-      onSceneClick={onSceneClick}
+      onSceneClick={createSceneClickHandler(scenes || [], title)}
     />
   );
 };
