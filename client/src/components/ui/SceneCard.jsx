@@ -12,7 +12,19 @@ import SceneContextMenu from "../ui/SceneContextMenu.jsx";
  * Enhanced scene card component with keyboard navigation support
  */
 const SceneCard = forwardRef(
-  ({ scene, onClick, onFocus, tabIndex = -1, className = "" }, ref) => {
+  (
+    {
+      scene,
+      onClick,
+      onFocus,
+      tabIndex = -1,
+      className = "",
+      isMultiselectMode = false,
+      isSelected = false,
+      onToggleSelect,
+    },
+    ref
+  ) => {
     const title = getSceneTitle(scene);
     const description = getSceneDescription(scene);
 
@@ -36,31 +48,55 @@ const SceneCard = forwardRef(
 
     const handleClick = (e) => {
       e.preventDefault();
-      onClick?.(scene);
+      if (isMultiselectMode) {
+        onToggleSelect?.(scene);
+      } else {
+        onClick?.(scene);
+      }
     };
 
     const handleKeyDown = (e) => {
-      if (e.key === "Enter" || e.key === " ") {
+      if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
+        if (isMultiselectMode) {
+          onToggleSelect?.(scene);
+        } else {
+          onClick?.(scene);
+        }
+      } else if (e.key === " " && isMultiselectMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleSelect?.(scene);
+      } else if (e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
         onClick?.(scene);
       }
+    };
+
+    const handleCheckboxClick = (e) => {
+      e.stopPropagation();
+      onToggleSelect?.(scene);
     };
 
     return (
       <div
         ref={ref}
         className={`
-        relative bg-card rounded-lg border border-border overflow-hidden
+        relative bg-card rounded-lg border overflow-hidden
         transition-all duration-300 cursor-pointer
         hover:shadow-2xl hover:scale-[1.03] hover:z-10
         hover:border-opacity-80
         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
         keyboard-focused:ring-2 keyboard-focused:ring-yellow-400 keyboard-focused:ring-offset-2
+        ${isSelected ? "ring-4 ring-blue-500 ring-offset-2" : ""}
         ${className}
       `}
         style={{
           backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
+          borderColor: isSelected ? "rgb(59, 130, 246)" : "var(--border-color)",
+          borderWidth: isSelected ? "2px" : "1px",
         }}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
@@ -72,7 +108,38 @@ const SceneCard = forwardRef(
         {/* Thumbnail */}
         <div className="relative aspect-video bg-gray-800 overflow-hidden">
           {/* Context Menu */}
-          <SceneContextMenu sceneId={scene.id} />
+          {!isMultiselectMode && <SceneContextMenu sceneId={scene.id} />}
+
+          {/* Multiselect Checkbox Overlay */}
+          {isMultiselectMode && (
+            <div className="absolute top-2 left-2 z-20">
+              <button
+                onClick={handleCheckboxClick}
+                className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                  isSelected
+                    ? "bg-blue-500 border-blue-500"
+                    : "bg-black/50 border-white/70 hover:border-white"
+                }`}
+                aria-label={isSelected ? "Deselect scene" : "Select scene"}
+              >
+                {isSelected && (
+                  <svg
+                    className="w-4 h-4 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={3}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
+          )}
 
           {scene.paths?.screenshot ? (
             <img

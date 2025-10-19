@@ -69,8 +69,27 @@ const SceneSearch = ({
   }, [isAuthLoading, isAuthenticated]);
 
   const handleSceneClick = (scene) => {
-    // Navigate to video player page with scene data
-    navigate(`/video/${scene.id}`, { state: { scene } });
+    // Navigate to video player page with scene data and virtual playlist context
+    const currentScenes = data?.scenes || [];
+    const currentIndex = currentScenes.findIndex(s => s.id === scene.id);
+
+    navigate(`/video/${scene.id}`, {
+      state: {
+        scene,
+        playlist: {
+          id: "virtual-grid",
+          name: title || "Scene Grid",
+          shuffle: false,
+          repeat: "none",
+          scenes: currentScenes.map((s, idx) => ({
+            sceneId: s.id,
+            scene: s,
+            position: idx
+          })),
+          currentIndex: currentIndex >= 0 ? currentIndex : 0
+        }
+      }
+    });
   };
 
   const handleQueryChange = async (newQuery) => {

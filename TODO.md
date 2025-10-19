@@ -84,10 +84,10 @@ _No items currently at high priority._
 
 ## Scene Browsing: Sort and Filter Enhancements
 
-- **Status**: Pending
-- **Priority**: Low
-- **Description**: Implement comprehensive sort and filter options for all browsing pages
-- **Current State**: Basic pagination exists, but no sorting or filtering UI
+- **Status**: Fixed
+- **Priority**: Low (completed)
+- **Description**: Comprehensive sort and filter system for all browsing pages
+- **Completed Work**:
 - **Available Sort Fields** (from Stash GraphQL API):
   - **Scenes**: bitrate, created_at, date, duration, filesize, framerate, last_o_at, last_played_at, path, performer_count, play_count, play_duration, random, rating, tag_count, title, updated_at
   - **Performers**: birthdate, career_length, created_at, height, last_o_at, last_played_at, measurements, name, o_counter, penis_length, play_count, random, rating, scenes_count, updated_at, weight
@@ -105,37 +105,45 @@ _No items currently at high priority._
   - **Performer Filters**: birthdate, death_date, created_at, updated_at (dates), details/name/ethnicity/etc (text search), favorite (boolean), age/height/rating/etc (numeric), gender (MALE/FEMALE)
   - **Studio Filters**: created_at, updated_at (dates), details/name (text search), favorite (boolean), rating100/scene_count (numeric)
   - **Tag Filters**: created_at, updated_at (dates), description/name (text search), favorite (boolean), scene_count (numeric)
-- **Needed Work**:
-  - **Phase 1: Basic Sorting**
-    - Add sort dropdown to Scenes, Performers, Studios, Tags pages
-    - Implement common sorts: Name, Date Added, Rating, Random
-    - Support ascending/descending toggle
-    - Persist sort preference in URL query params
-  - **Phase 2: Basic Filters**
-    - Add favorite filter toggle (all pages)
-    - Add rating filter (min rating slider)
-    - Add date range filter (created_at)
-  - **Phase 3: Advanced Filters**
-    - Scene-specific: Duration range, resolution, performer count, tag count
-    - Performer-specific: Gender, age range, height/weight ranges
-    - Relation filters: Filter by specific performers/studios/tags (searchable multi-select)
-  - **Phase 4: Filter UI/UX**
-    - Collapsible filter panel
-    - Clear all filters button
-    - Active filter chips/badges
-    - Filter presets (e.g., "Recently Added High-Rated")
-  - **Phase 5: Persistence**
-    - Save sort/filter state to URL query params (shareable links)
-    - Optional: Save user preferences to database
-- **Technical Notes**:
-  - Files: `client/src/components/scene-search/SceneSearch.jsx`, `client/src/components/pages/{Scenes,Performers,Studios,Tags}.jsx`
-  - Backend already supports all filters via GraphQL passthrough
-  - Use existing `libraryApi.findScenes()` with filter parameters
-  - Consider creating reusable `FilterPanel` component
-  - Date format: YYYY-MM-DD HH:MM (Stash GraphQL format)
-  - Duration format: hh:mm:ss.ms
-  - URL query params for shareability: `?sort=rating&dir=desc&favorite=true`
-- **Benefit**: Powerful content discovery, easier navigation, shareable filtered views
+  - **Complete sort system** with 18+ sort options per artifact type
+  - **Ascending/descending toggle** with visual indicator
+  - **Comprehensive filter panel** with 20+ filter types for scenes
+  - **Filter types supported**: checkbox, select, text, range, date-range
+  - **Active filter chips** showing currently applied filters with one-click removal
+  - **URL persistence** - all sort/filter state saved to URL query params for bookmarking and sharing
+  - **Saved filter presets** - users can save, load, and delete custom filter configurations
+  - **Per-artifact presets** - separate saved presets for scenes, performers, studios, and tags
+  - **Manual apply** - filters only apply when user clicks "Apply Filters" button
+  - **Works on all pages**: Scenes, Performers, Studios, Tags
+- **Completed Features**:
+  - Sort dropdown with all available GraphQL fields per entity type
+  - Collapsible filter panel with grid layout
+  - Clear All Filters button
+  - Active filter count badge on Filters button
+  - Active filter chips with remove buttons
+  - URL query parameter persistence (shareable links)
+  - Save Preset dialog with name input
+  - Load Preset dropdown with delete buttons
+  - Filter presets stored per user in database
+  - Presets sync across all devices for the user
+- **Technical Implementation**:
+  - **Components Created**:
+    - `client/src/components/ui/ActiveFilterChips.jsx` - Removable filter badges
+    - `client/src/components/ui/FilterPresets.jsx` - Save/load preset UI
+    - `client/src/utils/urlParams.js` - URL serialization/deserialization utilities
+  - **Components Modified**:
+    - `client/src/components/ui/SearchControls.jsx` - Integrated all features
+    - `client/src/components/ui/FilterControls.jsx` - Filter panel components
+    - `client/src/utils/filterConfig.js` - Already had comprehensive filter definitions
+  - **Backend**:
+    - `server/prisma/schema.prisma` - Added `filterPresets Json?` field to User model
+    - `server/prisma/migrations/20250119000000_add_filter_presets/migration.sql` - Database migration
+    - `server/controllers/user.ts` - Added `getFilterPresets`, `saveFilterPreset`, `deleteFilterPreset` endpoints
+    - `server/routes/user.ts` - Added routes for filter preset management
+  - **Database**: Filter presets stored as JSON: `{scene: [{id, name, filters, sort, direction, createdAt}], performer: [...], studio: [...], tag: [...]}`
+  - **URL Format**: `?sort=rating&dir=DESC&page=2&q=search&favorite=true&duration_min=10&duration_max=30`
+  - **React Router**: Uses `useSearchParams` hook for URL state management
+- **Benefit**: Powerful content discovery, shareable filtered views, personalized saved searches, professional filtering UX
 
 ## Homepage Carousel Customization
 
@@ -566,6 +574,88 @@ These items need more planning/discussion before moving to actionable status.
   - Shows up to 7 thumbnails with smart selection (nearby + endpoints)
   - Navigation preserves playlist context across scenes
 - **Benefit**: Excellent binge-watching UX, clear playlist context, easy navigation within playlist
+
+### Multiselect Mode for Scene Grids
+
+- **Priority**: Medium
+- **Description**: Select multiple scenes from grids for bulk actions, starting with bulk playlist additions
+- **Status**: Fixed
+- **Completed Work**:
+  - Toggle button to enter/exit multiselect mode on all scene grids
+  - Checkbox overlays on scene cards in multiselect mode
+  - "Select All" button to select all scenes on current page
+  - Visual selection feedback (blue ring border on selected cards)
+  - Bottom-fixed bulk action bar showing selection count and actions
+  - Bulk "Add to Playlist" with aggregate feedback (added count, skipped count)
+  - Keyboard navigation works in multiselect (Space/Enter toggles selection)
+  - Selections automatically clear when changing pages or exiting mode
+  - Works across all scene grids (Scenes page, Home carousels, Performer/Studio/Tag detail)
+- **Technical Implementation**:
+  - **New Components**:
+    - `client/src/components/ui/BulkActionBar.jsx` - Fixed bottom bar with selection info and actions
+  - **Modified Components**:
+    - `client/src/components/scene-search/SceneGrid.jsx` - Multiselect state management, toggle button, select all
+    - `client/src/components/ui/SceneCard.jsx` - Checkbox overlay, selection visual feedback, mode-aware handlers
+    - `client/src/components/ui/AddToPlaylistButton.jsx` - Support for multiple scenes via sceneIds array, configurable dropdown position (above/below)
+  - **State Management**: React useState for multiselect mode flag and selected scenes array
+  - **Keyboard Support**: Modified spatial navigation hook callback to respect multiselect mode
+  - **Dropdown Position**: Added `dropdownPosition="above"` prop for bottom-fixed buttons (prevents off-screen menus)
+- **Benefit**: Efficient bulk operations, especially for adding multiple scenes to playlists, reduces repetitive clicking
+
+### Virtual Playlist Navigation for Grids and Carousels
+
+- **Priority**: Medium
+- **Description**: Treat scene grids and carousels as navigable playlists when viewing scenes
+- **Status**: Fixed
+- **Completed Work**:
+  - Click any scene from search results → navigate through all search results using next/prev
+  - Click any scene from carousel → navigate through all carousel scenes
+  - Click from performer/studio/tag page → navigate through all filtered scenes
+  - Virtual playlist preserves original grid/carousel order
+  - Playlist controls work identically to real playlists
+  - Contextual naming ("Scene Grid", "High Rated", "Performer: Jane Doe", etc.)
+  - Automatic playlist context creation on scene click
+- **Technical Implementation**:
+  - **Modified Components**:
+    - `client/src/components/scene-search/SceneSearch.jsx` - Creates virtual playlist on handleSceneClick
+    - `client/src/components/pages/Home.jsx` - Creates per-carousel virtual playlists
+  - **Virtual Playlist Structure**:
+    - id: "virtual-grid" or "virtual-carousel" (distinguishes from real playlists)
+    - name: Descriptive name based on source (page title or carousel title)
+    - shuffle: false (preserves grid order)
+    - repeat: "none" (default behavior)
+    - scenes: Full array with position metadata
+    - currentIndex: Position of clicked scene
+  - **Integration**: Reuses existing playlist navigation infrastructure (PlaylistStatusCard, next/prev controls)
+  - **Coverage**: All pages using SceneSearch automatically benefit (Scenes, Performer, Studio, Tag detail)
+- **Benefit**: Seamless browsing through search results and carousels without creating real playlists, maintains context and order
+
+### Playlist Navigation Fixes
+
+- **Priority**: High
+- **Description**: Fix broken playlist navigation controls and improve virtual playlist UX
+- **Status**: Fixed
+- **Completed Work**:
+  - Fixed Next/Previous buttons (were navigating to wrong route `/scene/` instead of `/video/`)
+  - Fixed thumbnail navigation (click any thumbnail to jump to that scene)
+  - Hidden "View Full Playlist" button for virtual playlists (prevents dead link)
+  - Updated header text for virtual playlists ("Browsing" instead of "Playing from Playlist")
+  - Made playlist name non-clickable for virtual playlists
+  - Fixed Scene component to update when navigating between scenes (watches location.state changes)
+  - Added useEffect to detect location.state changes and update scene/playlist state
+- **Technical Implementation**:
+  - **Modified Components**:
+    - `client/src/components/playlist/PlaylistStatusCard.jsx`:
+      - Changed navigation route from `/scene/${id}` to `/video/${id}` (line 24)
+      - Added `isVirtualPlaylist` check (playlist.id?.startsWith?.("virtual-"))
+      - Conditionally hide "View Full Playlist" button for virtual playlists
+      - Conditional header text and playlist name rendering
+    - `client/src/components/pages/Scene.jsx`:
+      - Added useEffect watching location.state for navigation updates
+      - Made playlist state settable (changed from const to useState)
+      - Updates scene, playlist, loading, and error state on location.state changes
+      - Fixed fetch effect to check location.state instead of removed variable
+- **Benefit**: Fully functional playlist navigation for both real and virtual playlists, no dead links, clear UX distinction
 
 ### Convenience API Methods
 

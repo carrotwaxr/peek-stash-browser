@@ -17,15 +17,21 @@ const Scene = () => {
   const navigate = useNavigate();
   const pageRef = useRef(null);
 
-  // Get scene and playlist from navigation state (preferred for performance)
-  const sceneFromState = location.state?.scene;
-  const playlistFromState = location.state?.playlist;
-
   // Local state for fetched data
-  const [scene, setScene] = useState(sceneFromState);
-  const [playlist] = useState(playlistFromState);
-  const [isLoading, setIsLoading] = useState(!sceneFromState);
+  const [scene, setScene] = useState(location.state?.scene);
+  const [playlist, setPlaylist] = useState(location.state?.playlist);
+  const [isLoading, setIsLoading] = useState(!location.state?.scene);
   const [fetchError, setFetchError] = useState(null);
+
+  // Update scene and playlist when location state changes (playlist navigation)
+  useEffect(() => {
+    if (location.state?.scene) {
+      setScene(location.state.scene);
+      setPlaylist(location.state.playlist);
+      setIsLoading(false);
+      setFetchError(null);
+    }
+  }, [location.state]);
 
   // Set page title to scene title
   usePageTitle(scene?.title || "Scene");
@@ -40,8 +46,8 @@ const Scene = () => {
   // Fetch scene data if not provided via navigation state
   useEffect(() => {
     const fetchScene = async () => {
-      // If we already have scene data from navigation, skip fetching
-      if (sceneFromState) {
+      // If we already have scene data from navigation state, skip fetching
+      if (location.state?.scene && location.state.scene.id === sceneId) {
         return;
       }
 
@@ -63,7 +69,7 @@ const Scene = () => {
     };
 
     fetchScene();
-  }, [sceneId, sceneFromState]);
+  }, [sceneId, location.state]);
 
   // Loading state
   if (isLoading) {

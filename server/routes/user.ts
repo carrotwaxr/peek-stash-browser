@@ -7,7 +7,10 @@ import {
   getAllUsers,
   createUser,
   deleteUser,
-  updateUserRole
+  updateUserRole,
+  getFilterPresets,
+  saveFilterPreset,
+  deleteFilterPreset
 } from "../controllers/user.js";
 
 const router = express.Router();
@@ -19,6 +22,11 @@ router.use(authenticateToken);
 router.get("/settings", getUserSettings);
 router.put("/settings", updateUserSettings);
 router.post("/change-password", changePassword);
+
+// Filter preset routes
+router.get("/filter-presets", getFilterPresets);
+router.post("/filter-presets", saveFilterPreset);
+router.delete("/filter-presets/:artifactType/:presetId", deleteFilterPreset);
 
 // Admin-only user management routes
 router.get("/all", getAllUsers);

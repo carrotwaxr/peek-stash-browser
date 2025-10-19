@@ -20,6 +20,7 @@ model User {
     preferredPlaybackMode String?   @default("auto")    // "auto", "direct", "transcode"
     theme              String?     @default("dark")    // "dark", "light", "purple", etc.
     carouselPreferences Json?       // Array of {id, enabled, order} for homepage carousels
+    filterPresets      Json?       // Object with keys: scene, performer, studio, tag - each containing array of saved presets
 
     // Future features
     watchHistory WatchHistory[]
