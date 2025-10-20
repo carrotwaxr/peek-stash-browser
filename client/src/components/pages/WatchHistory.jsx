@@ -119,57 +119,60 @@ const WatchHistory = () => {
 
       {/* Controls */}
       <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Sort By */}
-          <div className="flex items-center gap-2">
-            <label
-              className="text-sm font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Sort by:
-            </label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 rounded-lg border text-sm"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value="recent">Recently Watched</option>
-              <option value="most_watched">Most Watched</option>
-              <option value="longest_duration">Longest Duration</option>
-            </select>
-          </div>
+        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+          {/* Sort and Filter - grouped on mobile */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Sort */}
+            <div className="flex items-center gap-2">
+              <label
+                className="text-sm font-medium whitespace-nowrap"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Sort:
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <option value="recent">Recently Watched</option>
+                <option value="most_watched">Most Watched</option>
+                <option value="longest_duration">Longest Duration</option>
+              </select>
+            </div>
 
-          {/* Filter By */}
-          <div className="flex items-center gap-2">
-            <label
-              className="text-sm font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Filter:
-            </label>
-            <select
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value)}
-              className="px-3 py-2 rounded-lg border text-sm"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value="all">All</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </select>
+            {/* Filter */}
+            <div className="flex items-center gap-2">
+              <label
+                className="text-sm font-medium whitespace-nowrap"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Filter:
+              </label>
+              <select
+                value={filterBy}
+                onChange={(e) => setFilterBy(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <option value="all">All</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
           </div>
 
           {/* Stats */}
-          <div className="ml-auto flex items-center gap-4 text-sm" style={{ color: 'var(--text-muted)' }}>
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm md:ml-auto" style={{ color: 'var(--text-muted)' }}>
             <span>{scenes.length} scenes</span>
             {scenes.length > 0 && (
               <span>
