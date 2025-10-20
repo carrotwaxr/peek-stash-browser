@@ -1,9 +1,9 @@
+/* Import the main theming system first */
+@import "./themes/base.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import the main theming system after Tailwind to ensure proper precedence */
-@import "./themes/base.css";
 
 /* Keyboard Navigation Focus Styles - TV-friendly indicators */
 .keyboard-focus {

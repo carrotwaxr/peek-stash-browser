@@ -184,6 +184,11 @@ const VideoPlayer = ({
       playerRef.current = videojs(videoElement, videoJsOptions, () => {
         const player = playerRef.current;
 
+        // Check if player was disposed during async initialization
+        if (!player || player.isDisposed()) {
+          return;
+        }
+
         if (!isDirectPlay && player.liveTracker) {
           disableLiveTracker(player);
         }
@@ -191,6 +196,10 @@ const VideoPlayer = ({
         setIsInitializing(false);
 
         player.ready(() => {
+          // Check again if player still exists and is not disposed
+          if (!playerRef.current || playerRef.current.isDisposed()) {
+            return;
+          }
           player.play().catch(() => {
             // Autoplay failed, user interaction required
           });
@@ -201,6 +210,11 @@ const VideoPlayer = ({
           let hasTriggeredFallback = false;
 
           player.on("error", () => {
+            // Check if player still exists and is not disposed
+            if (!playerRef.current || playerRef.current.isDisposed()) {
+              return;
+            }
+
             if (hasTriggeredFallback) return;
 
             const error = player.error();
@@ -217,6 +231,11 @@ const VideoPlayer = ({
                     `/video/play?sceneId=${scene.id}&quality=480p`
                   )
                   .then((response) => {
+                    // Check again if player still exists before applying changes
+                    if (!playerRef.current || playerRef.current.isDisposed()) {
+                      return;
+                    }
+
                     setVideo(response.data.scene);
                     setSessionId(response.data.sessionId);
 
@@ -233,6 +252,9 @@ const VideoPlayer = ({
                     disableLiveTracker(player, "after fallback");
 
                     player.one("loadedmetadata", () => {
+                      if (!playerRef.current || playerRef.current.isDisposed()) {
+                        return;
+                      }
                       player.currentTime(0);
                     });
 
@@ -386,7 +408,7 @@ const VideoPlayer = ({
   return (
     <section className="py-6">
       <div className="video-container" style={{ position: 'relative' }}>
-        {showPoster ? (
+        {showPoster && (
           <VideoPoster
             scene={scene}
             isInitializing={isInitializing}
@@ -394,12 +416,12 @@ const VideoPlayer = ({
             isAutoFallback={isAutoFallback}
             onPlay={handlePlay}
           />
-        ) : (
-          <div data-vjs-player style={{ position: 'relative' }}>
-            <video ref={videoRef} className="video-js vjs-big-play-centered" />
-            <SeekPreview scene={scene} playerRef={playerRef} />
-          </div>
         )}
+
+        <div key={scene.id} data-vjs-player style={{ position: 'relative', display: showPoster ? 'none' : 'block' }}>
+          <video ref={videoRef} className="video-js vjs-big-play-centered" />
+          {!showPoster && <SeekPreview scene={scene} playerRef={playerRef} />}
+        </div>
 
         {/* Resume watch dialog */}
         {watchHistory && watchHistory.resumeTime > 0 && (
