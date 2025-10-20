@@ -214,6 +214,21 @@ const transformScene = (scene: Scene) => {
       }, {} as { [key: string]: string }),
     };
 
+    // Transform performers to add API key to image_path
+    if (scene.performers && Array.isArray(scene.performers)) {
+      mutated.performers = scene.performers.map((p: any) => transformPerformer(p));
+    }
+
+    // Transform tags to add API key to image_path
+    if (scene.tags && Array.isArray(scene.tags)) {
+      mutated.tags = scene.tags.map((t: any) => transformTag(t));
+    }
+
+    // Transform studio to add API key to image_path
+    if (scene.studio) {
+      mutated.studio = transformStudio(scene.studio);
+    }
+
     return mutated;
   } catch (error) {
     console.error("Error transforming scene:", error);
