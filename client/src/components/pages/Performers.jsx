@@ -192,7 +192,7 @@ const PerformerCard = forwardRef(({ performer, tabIndex, className = "", isTVMod
       ref={ref}
       to={`/performer/${performer.id}`}
       tabIndex={isTVMode ? tabIndex : -1}
-      className={`block rounded-lg border p-4 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
+      className={`performer-card block rounded-lg border p-4 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",

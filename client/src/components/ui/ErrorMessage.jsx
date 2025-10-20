@@ -18,10 +18,10 @@ const ErrorMessage = ({
 
   const containerStyle = mode === "toast"
     ? {
-        backgroundColor: "#dc2626",
-        border: "2px solid #f87171",
+        backgroundColor: "var(--toast-error-bg)",
+        border: "2px solid var(--toast-error-border)",
         color: "white",
-        boxShadow: "0 10px 25px -5px rgba(220, 38, 38, 0.4), 0 8px 10px -6px rgba(220, 38, 38, 0.3)",
+        boxShadow: `0 10px 25px -5px var(--toast-error-shadow), 0 8px 10px -6px var(--toast-error-shadow)`,
       }
     : {
         backgroundColor: "var(--bg-card)",

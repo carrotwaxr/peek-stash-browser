@@ -124,11 +124,11 @@ const SceneListItem = ({
               <div
                 className="w-full md:w-64 aspect-video md:aspect-auto md:h-36 rounded flex items-center justify-center"
                 style={{
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  border: '2px dashed rgba(239, 68, 68, 0.5)',
+                  backgroundColor: 'var(--status-error-bg)',
+                  border: '2px dashed var(--status-error-border)',
                 }}
               >
-                <span className="text-3xl" style={{ color: 'rgb(239, 68, 68)' }}>
+                <span className="text-3xl" style={{ color: 'var(--status-error-text)' }}>
                   ⚠️
                 </span>
               </div>
@@ -154,9 +154,9 @@ const SceneListItem = ({
                     {/* Watch History Stats (if provided) */}
                     {watchHistory && (
                       <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs mb-2 p-2 rounded" style={{
-                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                        backgroundColor: 'var(--status-info-bg)',
                         color: 'var(--text-muted)',
-                        border: '1px solid rgba(59, 130, 246, 0.1)'
+                        border: '1px solid var(--status-info-bg)'
                       }}>
                         {watchHistory.lastPlayedAt && (
                           <span>
@@ -211,7 +211,7 @@ const SceneListItem = ({
                   <>
                     <h3
                       className="text-lg font-semibold mb-2"
-                      style={{ color: 'rgb(239, 68, 68)' }}
+                      style={{ color: 'var(--status-error-text)' }}
                     >
                       ⚠️ Scene Deleted or Not Found
                     </h3>
@@ -221,8 +221,8 @@ const SceneListItem = ({
                     <p
                       className="text-xs px-2 py-1 rounded inline-block"
                       style={{
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        color: 'rgb(239, 68, 68)',
+                        backgroundColor: 'var(--status-error-bg)',
+                        color: 'var(--status-error-text)',
                       }}
                     >
                       Click "Remove" to clean up this playlist

@@ -189,7 +189,7 @@ const StudioCard = forwardRef(({ studio, tabIndex, className = "", isTVMode = fa
       ref={ref}
       to={`/studio/${studio.id}`}
       tabIndex={isTVMode ? tabIndex : -1}
-      className={`block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
+      className={`studio-card block rounded-lg border p-6 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",

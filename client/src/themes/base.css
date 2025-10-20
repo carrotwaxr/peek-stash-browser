@@ -192,7 +192,7 @@ code, pre, .font-mono {
 .form-input:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: var(--focus-ring-shadow);
 }
 
 /* Video player specific styles */
@@ -332,17 +332,17 @@ code, pre, .font-mono {
 /* Keyboard Navigation Styles */
 .keyboard-focused {
   /* Enhanced focus ring for keyboard navigation */
-  outline: 3px solid #fbbf24 !important;
+  outline: 3px solid var(--focus-ring-color) !important;
   outline-offset: 2px !important;
-  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.2) !important;
+  box-shadow: var(--focus-ring-shadow) !important;
   transform: scale(1.02) !important;
   z-index: 10 !important;
 }
 
 .keyboard-focused:focus {
   /* Override default focus styles when keyboard focused */
-  outline: 3px solid #fbbf24 !important;
-  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.2) !important;
+  outline: 3px solid var(--focus-ring-color) !important;
+  box-shadow: var(--focus-ring-shadow) !important;
 }
 
 /* Hide focus indicators when not using keyboard */

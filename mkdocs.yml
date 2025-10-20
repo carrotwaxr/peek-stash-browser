@@ -107,32 +107,14 @@ extra_javascript:
 # Page tree navigation
 nav:
   - Home: index.md
+  - Beta Testing: beta-testing.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
-  - User Guide:
-      - Video Playback: user-guide/video-playback.md
-      - Watch History: user-guide/watch-history.md
-      - Playlists: user-guide/playlists.md
-      - Search & Browse: user-guide/search-browse.md
-      - Settings: user-guide/settings.md
-  - Development:
-      - Setup: development/setup.md
-      - Architecture: development/architecture.md
-      - Video System: development/video-system.md
-      - API Reference: development/api-reference.md
-      - Testing: development/testing.md
-      - Contributing: development/contributing.md
-  - Deployment:
-      - Docker: deployment/docker.md
-      - unRAID: deployment/unraid.md
-      - Environment Variables: deployment/environment.md
-      - Build Checklist: deployment/build-checklist.md
   - Reference:
+      - Theming Guide: reference/theming.md
       - Troubleshooting: reference/troubleshooting.md
-      - Performance Tips: reference/performance.md
-      - Security: reference/security.md
       - FAQ: reference/faq.md
 
 # Social links

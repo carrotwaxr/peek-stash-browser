@@ -133,21 +133,6 @@ const Login = ({ onLoginSuccess }) => {
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
           </div>
-
-          <div
-            className="text-center text-sm"
-            style={{
-              color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-            }}
-          >
-            <p>Default credentials:</p>
-            <p>
-              <strong>Username:</strong> admin
-            </p>
-            <p>
-              <strong>Password:</strong> admin
-            </p>
-          </div>
         </form>
       </div>
     </div>

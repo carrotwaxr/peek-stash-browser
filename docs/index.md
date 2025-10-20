@@ -1,159 +1,130 @@
 # Welcome to Peek Stash Browser
 
-A modern, responsive web application for browsing and managing your [Stash](https://github.com/stashapp/stash) media library with advanced filtering, authentication, and adaptive video streaming.
+**⚠️ BETA SOFTWARE** - Currently in beta testing. [Help us test!](beta-testing.md)
+
+A modern web application for browsing and streaming your [Stash](https://github.com/stashapp/stash) adult content library with adaptive video streaming, playlists, and watch history tracking.
 
 <div class="grid cards" markdown>
 
--   :material-rocket-launch:{ .lg .middle } **Quick Start**
+-   :material-test-tube:{ .lg .middle } **Beta Testing**
+
+    ---
+
+    Help shape Peek by testing and providing feedback
+
+    [:octicons-arrow-right-24: Testing Guide](beta-testing.md)
+
+-   :material-download:{ .lg .middle } **Quick Start**
 
     ---
 
     Get up and running in minutes with Docker or unRAID
 
-    [:octicons-arrow-right-24: Installation Guide](getting-started/installation.md)
+    [:octicons-arrow-right-24: Installation](getting-started/installation.md)
 
--   :material-video:{ .lg .middle } **Video Streaming**
-
-    ---
-
-    Real-time HLS transcoding with multiple quality options
-
-    [:octicons-arrow-right-24: Video Playback](user-guide/video-playback.md)
-
--   :material-playlist-play:{ .lg .middle } **Playlists**
+-   :material-cog:{ .lg .middle } **Configuration**
 
     ---
 
-    Create, manage, and play playlists with shuffle and repeat modes
+    Set up Peek to connect with your Stash server
 
-    [:octicons-arrow-right-24: Playlist Guide](user-guide/playlists.md)
+    [:octicons-arrow-right-24: Setup Guide](getting-started/configuration.md)
 
--   :material-code-braces:{ .lg .middle } **Developer Docs**
+-   :material-help-circle:{ .lg .middle } **Troubleshooting**
 
     ---
 
-    Comprehensive development documentation and API reference
+    Common issues and solutions
 
-    [:octicons-arrow-right-24: Development Setup](development/setup.md)
+    [:octicons-arrow-right-24: Get Help](reference/troubleshooting.md)
 
 </div>
 
-## Features
+## What is Peek?
 
-### Core Functionality
+Peek is a web-based browser for your Stash library, offering a sleek modern interface for browsing your "documentary" collection.
 
-- **Secure Authentication** - JWT-based authentication with role management (admin/user)
-- **Modern Interface** - Beautiful, responsive React UI with theme support
-- **Advanced Search & Filtering** - Comprehensive filtering across performers, scenes, studios, and tags
-- **Intelligent Sorting** - Multiple sorting options for all content types
-- **Mobile Ready** - Fully responsive design optimized for all devices
+### Key Features
 
-### Video Streaming
+- **Adaptive Video Streaming** - Real-time HLS transcoding with multiple quality options (720p/480p/360p)
+- **Watch History Tracking** - Automatic progress tracking and resume playback
+- **Playlist Management** - Create, organize, and play custom playlists
+- **Modern Interface** - Responsive React UI with theme support
+- **Full Keyboard Navigation** - Complete TV remote and keyboard control support
+- **Mobile Ready** - Optimized for all devices
 
-- **Adaptive Transcoding** - Real-time HLS transcoding with multiple quality options (720p/480p/360p)
-- **Smart Playback** - Direct play when possible, seamless fallback to transcoding
-- **Quality Controls** - Automatic and manual quality selection
-- **Session Management** - Intelligent cleanup of transcoding resources
+## Quick Start
 
-### Content Management
+### Installation
 
-- **Detailed Views** - Enhanced detail pages for performers, studios, and tags
-- **Rich Metadata** - Display ratings, statistics, and comprehensive information
-- **CRUD Operations** - Full create, read, update, delete capabilities
-- **Theme Integration** - Consistent theming across all components
+=== "Docker"
 
-### Playlist Features
+    ```bash
+    docker run -d \
+      --name peek-stash-browser \
+      -p 6969:80 \
+      -v /path/to/stash/media:/app/media:ro \
+      -v /path/to/peek/data:/app/data \
+      -e STASH_URL="http://your-stash:9999/graphql" \
+      -e STASH_API_KEY="your_api_key" \
+      carrotwaxr/peek-stash-browser:latest
+    ```
 
-- **Create & Organize** - Build custom playlists of your favorite scenes
-- **Shuffle Mode** - Randomize playback order with Fisher-Yates algorithm
-- **Repeat Modes** - None, Repeat All, or Repeat One
-- **Drag & Drop** - Intuitive reordering with HTML5 drag-and-drop
-- **Status Cards** - See playlist context when viewing scenes
+=== "unRAID"
+
+    1. Open Community Applications
+    2. Search for "Peek Stash Browser"
+    3. Click Install and configure
+    4. Access at `http://your-unraid-ip:6969`
+
+### First Login
+
+**Default Credentials:**
+
+- **Username:** `admin`
+- **Password:** `admin`
+
+!!! warning "Change Default Password"
+    **Immediately change your password** after first login via Settings > User Management
+
+## Beta Testing
+
+This is beta software. We need your help to make it great!
+
+**How to help:**
+
+1. **Install and test** - Follow the [Installation Guide](getting-started/installation.md)
+2. **Test core features** - See [Beta Testing Guide](beta-testing.md) for test scenarios
+3. **Report bugs** - [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
+4. **Request features** - Open an issue with the "enhancement" label
+5. **Provide feedback** - What works? What's confusing?
+
+## Requirements
+
+- Stash server with GraphQL API enabled
+- Docker (or unRAID)
+- Network access between Peek and Stash
+- Shared media storage accessible to both containers
 
 ## Architecture
 
-Peek uses a modern **single-container architecture** for production deployments:
+Peek uses a **single-container architecture**:
 
-- **Frontend**: React 19 app served by nginx on port 80
-- **Backend**: Node.js/Express API server on port 8000 (proxied through nginx)
-- **Database**: SQLite for user data and preferences (lightweight, no separate container needed)
+- **Frontend**: React 19 app served by nginx
+- **Backend**: Node.js/Express API server (proxied through nginx)
+- **Database**: SQLite (embedded, no separate container)
 - **Transcoding**: FFmpeg for real-time video conversion
-
-**Development** uses Docker Compose with hot reloading for both frontend and backend.
-
-## Technology Stack
-
-**Frontend**:
-
-- React 19 with Babel React Compiler
-- Tailwind CSS for styling
-- Video.js 8 for media playback
-- React Router for navigation
-- Custom theming system
-
-**Backend**:
-
-- Node.js + Express
-- TypeScript (strict mode, ES2020)
-- Prisma ORM + SQLite
-- JWT authentication
-- FFmpeg integration
-- stashapp-api GraphQL client
-
-## Quick Links
-
-<div class="grid cards" markdown>
-
--   :material-download:{ .lg .middle } **Install Now**
-
-    ---
-
-    Choose your deployment method
-
-    [:octicons-arrow-right-24: Installation Options](getting-started/installation.md)
-
--   :material-book-open-variant:{ .lg .middle } **User Guide**
-
-    ---
-
-    Learn how to use Peek effectively
-
-    [:octicons-arrow-right-24: User Documentation](user-guide/video-playback.md)
-
--   :material-hammer-wrench:{ .lg .middle } **Development**
-
-    ---
-
-    Contribute to Peek development
-
-    [:octicons-arrow-right-24: Developer Guide](development/setup.md)
-
--   :material-help-circle:{ .lg .middle } **Get Help**
-
-    ---
-
-    Troubleshooting and support
-
-    [:octicons-arrow-right-24: Troubleshooting](reference/troubleshooting.md)
-
-</div>
 
 ## Community & Support
 
-- **GitHub Repository**: [carrotwaxr/peek-stash-browser](https://github.com/carrotwaxr/peek-stash-browser)
-- **Issues & Support**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- **Docker Images**: [Docker Hub](https://hub.docker.com/r/carrotwaxr/peek-stash-browser)
-- **Stash Community**: [Discord](https://discord.gg/2TsNFKt) - Ask in #third-party-integrations channel
+- **Bug Reports**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
+- **Feature Requests**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
+- **Stash Community**: [Discord](https://discord.gg/2TsNFKt) - #third-party-integrations channel
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/carrotwaxr/peek-stash-browser/blob/master/LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ## Acknowledgments
 
-- **[Stash](https://github.com/stashapp/stash)** - The amazing media organizer this builds upon
-- **[React](https://reactjs.org/)** - Frontend framework
-- **[Express](https://expressjs.com/)** - Backend framework
-- **[Prisma](https://prisma.io/)** - Database ORM
-- **[Video.js](https://videojs.com/)** - Video player
-- **[FFmpeg](https://ffmpeg.org/)** - Video transcoding
+Built with [Stash](https://github.com/stashapp/stash), React, Express, FFmpeg, and other amazing open source projects.
