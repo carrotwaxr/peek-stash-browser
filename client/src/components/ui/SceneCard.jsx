@@ -152,21 +152,21 @@ const SceneCard = forwardRef(
     };
 
     return (
+      <>
       <div
         ref={ref}
         className={`
+        scene-card
         relative bg-card rounded-lg border overflow-hidden
         transition-all duration-300 cursor-pointer
         hover:shadow-2xl hover:scale-[1.03] hover:z-10
         hover:border-opacity-80
-        ${isTVMode ? "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" : ""}
-        ${!isTVMode ? "hover:ring-2 hover:ring-blue-500 hover:ring-offset-2" : ""}
-        ${isSelected ? "ring-4 ring-blue-500 ring-offset-2" : ""}
+        ${isSelected ? 'scene-card-selected' : ''}
         ${className}
       `}
         style={{
           backgroundColor: "var(--bg-card)",
-          borderColor: isSelected ? "rgb(59, 130, 246)" : "var(--border-color)",
+          borderColor: isSelected ? "var(--selection-color)" : "var(--border-color)",
           borderWidth: isSelected ? "2px" : "1px",
         }}
         onClick={handleClick}
@@ -182,16 +182,26 @@ const SceneCard = forwardRef(
         aria-label={`Scene ${scene.id}`}
       >
         {/* Thumbnail */}
-        <div className="relative aspect-video bg-gray-800 overflow-hidden">
+        <div className="relative aspect-video overflow-hidden" style={{backgroundColor: "var(--bg-secondary)"}}>
           {/* Selection Checkbox - Always shown */}
           <div className="absolute top-2 left-2 z-20">
             <button
               onClick={handleCheckboxClick}
-              className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
-                isSelected
-                  ? "bg-blue-500 border-blue-500"
-                  : "bg-black/50 border-white/70 hover:border-white"
-              }`}
+              className="w-6 h-6 rounded border-2 flex items-center justify-center transition-all"
+              style={{
+                backgroundColor: isSelected ? "var(--selection-color)" : "rgba(0, 0, 0, 0.5)",
+                borderColor: isSelected ? "var(--selection-color)" : "rgba(255, 255, 255, 0.7)",
+              }}
+              onMouseEnter={(e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 1)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSelected) {
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.7)";
+                }
+              }}
               aria-label={isSelected ? "Deselect scene" : "Select scene"}
             >
               {isSelected && (
@@ -259,9 +269,10 @@ const SceneCard = forwardRef(
           {scene.resumeTime && scene.files?.[0]?.duration && (
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 pointer-events-none">
               <div
-                className="h-full bg-green-500 transition-all pointer-events-none"
+                className="h-full transition-all pointer-events-none"
                 style={{
-                  width: `${Math.min(100, (scene.resumeTime / scene.files[0].duration) * 100)}%`
+                  width: `${Math.min(100, (scene.resumeTime / scene.files[0].duration) * 100)}%`,
+                  backgroundColor: "var(--accent-success)"
                 }}
                 title={`Resume from ${Math.floor(scene.resumeTime / 60)}:${String(Math.floor(scene.resumeTime % 60)).padStart(2, '0')}`}
               />
@@ -324,6 +335,7 @@ const SceneCard = forwardRef(
 
         </div>
       </div>
+    </>
     );
   }
 );

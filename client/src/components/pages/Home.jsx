@@ -25,14 +25,14 @@ const api = axios.create({
 });
 
 const CAROUSEL_DEFINITIONS = [
-  { title: "High Rated", icon: <Star className="w-6 h-6" color="#fbbf24" />, fetchKey: "highRatedScenes" },
-  { title: "Recently Added", icon: <Clock className="w-6 h-6" color="#60a5fa" />, fetchKey: "recentlyAddedScenes" },
-  { title: "Feature Length", icon: <Film className="w-6 h-6" color="#a78bfa" />, fetchKey: "longScenes" },
-  { title: "High Bitrate", icon: <Zap className="w-6 h-6" color="#34d399" />, fetchKey: "highBitrateScenes" },
-  { title: "Barely Legal", icon: <Calendar className="w-6 h-6" color="#fb923c" />, fetchKey: "barelyLegalScenes" },
-  { title: "Favorite Performers", icon: <Heart className="w-6 h-6" color="#f87171" />, fetchKey: "favoritePerformerScenes" },
-  { title: "Favorite Studios", icon: <Building2 className="w-6 h-6" color="#94a3b8" />, fetchKey: "favoriteStudioScenes" },
-  { title: "Favorite Tags", icon: <Tag className="w-6 h-6" color="#c084fc" />, fetchKey: "favoriteTagScenes" },
+  { title: "High Rated", icon: <Star className="w-6 h-6" style={{color: "var(--icon-rating)"}} />, fetchKey: "highRatedScenes" },
+  { title: "Recently Added", icon: <Clock className="w-6 h-6" style={{color: "var(--accent-info)"}} />, fetchKey: "recentlyAddedScenes" },
+  { title: "Feature Length", icon: <Film className="w-6 h-6" style={{color: "var(--accent-secondary)"}} />, fetchKey: "longScenes" },
+  { title: "High Bitrate", icon: <Zap className="w-6 h-6" style={{color: "var(--accent-success)"}} />, fetchKey: "highBitrateScenes" },
+  { title: "Barely Legal", icon: <Calendar className="w-6 h-6" style={{color: "var(--accent-warning)"}} />, fetchKey: "barelyLegalScenes" },
+  { title: "Favorite Performers", icon: <Heart className="w-6 h-6" style={{color: "var(--accent-error)"}} />, fetchKey: "favoritePerformerScenes" },
+  { title: "Favorite Studios", icon: <Building2 className="w-6 h-6" style={{color: "var(--text-muted)"}} />, fetchKey: "favoriteStudioScenes" },
+  { title: "Favorite Tags", icon: <Tag className="w-6 h-6" style={{color: "var(--accent-primary)"}} />, fetchKey: "favoriteTagScenes" },
 ];
 
 const SCENES_PER_CAROUSEL = 12;

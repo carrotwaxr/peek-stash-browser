@@ -282,12 +282,12 @@ const Users = () => {
                             style={{
                               backgroundColor:
                                 user.role === "ADMIN"
-                                  ? "rgba(168, 85, 247, 0.1)"
-                                  : "rgba(100, 116, 139, 0.1)",
+                                  ? "var(--role-admin-bg)"
+                                  : "var(--role-user-bg)",
                               color:
                                 user.role === "ADMIN"
-                                  ? "rgb(168, 85, 247)"
-                                  : "rgb(100, 116, 139)",
+                                  ? "var(--role-admin-text)"
+                                  : "var(--role-user-text)",
                             }}
                           >
                             {user.role}

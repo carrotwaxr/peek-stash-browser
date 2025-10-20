@@ -53,6 +53,61 @@ export const themes = {
       "--btn-secondary-hover": "#fc4f6f",
       "--btn-tertiary-bg": "#FA8C2A",
       "--btn-tertiary-hover": "#f77b0a",
+
+      // Focus and selection states
+      "--focus-ring-color": "#6D2CE3",
+      "--focus-ring-shadow": "0 0 0 3px rgba(109, 44, 227, 0.3)",
+      "--selection-color": "#6D2CE3",
+      "--selection-bg": "rgba(109, 44, 227, 0.1)",
+
+      // Rating gradient (0-100 scale)
+      "--rating-excellent": "#22c55e", // 80-100: Green
+      "--rating-good": "#84cc16", // 60-79: Lime
+      "--rating-average": "#eab308", // 40-59: Yellow
+      "--rating-poor": "#f97316", // 20-39: Orange
+      "--rating-bad": "#ef4444", // 0-19: Red
+
+      // Role badges
+      "--role-admin-bg": "rgba(168, 85, 247, 0.1)",
+      "--role-admin-border": "rgba(168, 85, 247, 0.3)",
+      "--role-admin-text": "#a855f7",
+      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
+      "--role-user-border": "rgba(100, 116, 139, 0.3)",
+      "--role-user-text": "#64748b",
+
+      // Status states
+      "--status-success-bg": "rgba(34, 197, 94, 0.1)",
+      "--status-success-border": "rgba(34, 197, 94, 0.3)",
+      "--status-success-text": "#22c55e",
+      "--status-error-bg": "rgba(239, 68, 68, 0.1)",
+      "--status-error-border": "rgba(239, 68, 68, 0.3)",
+      "--status-error-text": "#ef4444",
+      "--status-info-bg": "rgba(59, 130, 246, 0.1)",
+      "--status-info-border": "rgba(59, 130, 246, 0.3)",
+      "--status-info-text": "#3b82f6",
+      "--status-warning-bg": "rgba(251, 146, 60, 0.1)",
+      "--status-warning-border": "rgba(251, 146, 60, 0.3)",
+      "--status-warning-text": "#fb923c",
+
+      // Toast notifications
+      "--toast-error-bg": "#dc2626",
+      "--toast-error-border": "#f87171",
+      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
+      "--toast-info-bg": "#1d4ed8",
+      "--toast-info-border": "#60a5fa",
+      "--toast-info-shadow": "rgba(29, 78, 216, 0.4)",
+      "--toast-success-bg": "#059669",
+      "--toast-success-border": "#34d399",
+      "--toast-success-shadow": "rgba(5, 150, 105, 0.4)",
+      "--toast-warning-bg": "#d97706",
+      "--toast-warning-border": "#fbbf24",
+      "--toast-warning-shadow": "rgba(217, 119, 6, 0.4)",
+
+      // Icon colors (for stats and indicators)
+      "--icon-o-counter": "#FD6B86", // Pink - matches accent-secondary
+      "--icon-play-count": "#0F7173", // Teal - matches accent-success
+      "--icon-rating": "#FA8C2A", // Orange - matches accent-tertiary
+      "--icon-organized": "#22c55e", // Green
     },
   },
 
@@ -98,6 +153,61 @@ export const themes = {
       "--controls-bg": "rgba(0, 0, 0, 0.7)",
       "--progress-bg": "#e5e7eb",
       "--progress-fill": "#2563eb",
+
+      // Focus and selection states
+      "--focus-ring-color": "#2563eb",
+      "--focus-ring-shadow": "0 0 0 3px rgba(37, 99, 235, 0.3)",
+      "--selection-color": "#2563eb",
+      "--selection-bg": "rgba(37, 99, 235, 0.1)",
+
+      // Rating gradient (0-100 scale)
+      "--rating-excellent": "#059669", // 80-100: Green
+      "--rating-good": "#65a30d", // 60-79: Lime
+      "--rating-average": "#ca8a04", // 40-59: Yellow
+      "--rating-poor": "#ea580c", // 20-39: Orange
+      "--rating-bad": "#dc2626", // 0-19: Red
+
+      // Role badges
+      "--role-admin-bg": "rgba(124, 58, 237, 0.1)",
+      "--role-admin-border": "rgba(124, 58, 237, 0.3)",
+      "--role-admin-text": "#7c3aed",
+      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
+      "--role-user-border": "rgba(100, 116, 139, 0.3)",
+      "--role-user-text": "#64748b",
+
+      // Status states
+      "--status-success-bg": "rgba(5, 150, 105, 0.1)",
+      "--status-success-border": "rgba(5, 150, 105, 0.3)",
+      "--status-success-text": "#059669",
+      "--status-error-bg": "rgba(220, 38, 38, 0.1)",
+      "--status-error-border": "rgba(220, 38, 38, 0.3)",
+      "--status-error-text": "#dc2626",
+      "--status-info-bg": "rgba(37, 99, 235, 0.1)",
+      "--status-info-border": "rgba(37, 99, 235, 0.3)",
+      "--status-info-text": "#2563eb",
+      "--status-warning-bg": "rgba(217, 119, 6, 0.1)",
+      "--status-warning-border": "rgba(217, 119, 6, 0.3)",
+      "--status-warning-text": "#d97706",
+
+      // Toast notifications
+      "--toast-error-bg": "#dc2626",
+      "--toast-error-border": "#f87171",
+      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
+      "--toast-info-bg": "#1d4ed8",
+      "--toast-info-border": "#60a5fa",
+      "--toast-info-shadow": "rgba(29, 78, 216, 0.4)",
+      "--toast-success-bg": "#059669",
+      "--toast-success-border": "#34d399",
+      "--toast-success-shadow": "rgba(5, 150, 105, 0.4)",
+      "--toast-warning-bg": "#d97706",
+      "--toast-warning-border": "#fbbf24",
+      "--toast-warning-shadow": "rgba(217, 119, 6, 0.4)",
+
+      // Icon colors (for stats and indicators)
+      "--icon-o-counter": "#7c3aed", // Purple - matches accent-secondary
+      "--icon-play-count": "#059669", // Green - matches accent-success
+      "--icon-rating": "#d97706", // Orange - matches accent-warning
+      "--icon-organized": "#22c55e", // Green
     },
   },
 
@@ -143,6 +253,61 @@ export const themes = {
       "--controls-bg": "rgba(30, 41, 59, 0.8)",
       "--progress-bg": "#475569",
       "--progress-fill": "#0ea5e9",
+
+      // Focus and selection states
+      "--focus-ring-color": "#0ea5e9",
+      "--focus-ring-shadow": "0 0 0 3px rgba(14, 165, 233, 0.3)",
+      "--selection-color": "#0ea5e9",
+      "--selection-bg": "rgba(14, 165, 233, 0.1)",
+
+      // Rating gradient (0-100 scale)
+      "--rating-excellent": "#22c55e", // 80-100: Green
+      "--rating-good": "#84cc16", // 60-79: Lime
+      "--rating-average": "#eab308", // 40-59: Yellow
+      "--rating-poor": "#f97316", // 20-39: Orange
+      "--rating-bad": "#ef4444", // 0-19: Red
+
+      // Role badges
+      "--role-admin-bg": "rgba(139, 92, 246, 0.1)",
+      "--role-admin-border": "rgba(139, 92, 246, 0.3)",
+      "--role-admin-text": "#8b5cf6",
+      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
+      "--role-user-border": "rgba(100, 116, 139, 0.3)",
+      "--role-user-text": "#64748b",
+
+      // Status states
+      "--status-success-bg": "rgba(34, 197, 94, 0.1)",
+      "--status-success-border": "rgba(34, 197, 94, 0.3)",
+      "--status-success-text": "#22c55e",
+      "--status-error-bg": "rgba(239, 68, 68, 0.1)",
+      "--status-error-border": "rgba(239, 68, 68, 0.3)",
+      "--status-error-text": "#ef4444",
+      "--status-info-bg": "rgba(14, 165, 233, 0.1)",
+      "--status-info-border": "rgba(14, 165, 233, 0.3)",
+      "--status-info-text": "#0ea5e9",
+      "--status-warning-bg": "rgba(245, 158, 11, 0.1)",
+      "--status-warning-border": "rgba(245, 158, 11, 0.3)",
+      "--status-warning-text": "#f59e0b",
+
+      // Toast notifications
+      "--toast-error-bg": "#dc2626",
+      "--toast-error-border": "#f87171",
+      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
+      "--toast-info-bg": "#0369a1",
+      "--toast-info-border": "#38bdf8",
+      "--toast-info-shadow": "rgba(3, 105, 161, 0.4)",
+      "--toast-success-bg": "#059669",
+      "--toast-success-border": "#34d399",
+      "--toast-success-shadow": "rgba(5, 150, 105, 0.4)",
+      "--toast-warning-bg": "#d97706",
+      "--toast-warning-border": "#fbbf24",
+      "--toast-warning-shadow": "rgba(217, 119, 6, 0.4)",
+
+      // Icon colors (for stats and indicators)
+      "--icon-o-counter": "#8b5cf6", // Purple - matches accent-secondary
+      "--icon-play-count": "#22c55e", // Green - matches accent-success
+      "--icon-rating": "#f59e0b", // Orange - matches accent-warning
+      "--icon-organized": "#22c55e", // Green
     },
   },
 };

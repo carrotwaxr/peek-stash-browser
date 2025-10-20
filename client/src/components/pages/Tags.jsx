@@ -210,7 +210,7 @@ const TagCard = forwardRef(({ tag, tabIndex, className = "", isTVMode = false },
       ref={ref}
       to={`/tag/${tag.id}`}
       tabIndex={isTVMode ? tabIndex : -1}
-      className={`block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
+      className={`tag-card block rounded-lg border p-6 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",

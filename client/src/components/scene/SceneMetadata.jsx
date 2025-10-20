@@ -27,7 +27,7 @@ const SceneMetadata = ({
                 className="w-10 h-10 rounded-full object-cover flex-shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{backgroundColor: "var(--bg-tertiary)"}}>
                 <span className="text-lg">👤</span>
               </div>
             )}
@@ -36,7 +36,7 @@ const SceneMetadata = ({
         ))}
       </div>
       {scene.performers.length > 8 && (
-        <div className="text-xs text-gray-400 mt-2">
+        <div className="text-xs mt-2" style={{color: "var(--text-muted)"}}>
           +{scene.performers.length - 8} more
         </div>
       )}
@@ -62,7 +62,7 @@ const SceneMetadata = ({
                 className="w-10 h-10 rounded object-cover flex-shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded bg-gray-700 flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style={{backgroundColor: "var(--bg-tertiary)"}}>
                 <span className="text-lg">🏷️</span>
               </div>
             )}
@@ -71,7 +71,7 @@ const SceneMetadata = ({
         ))}
       </div>
       {scene.tags.length > 8 && (
-        <div className="text-xs text-gray-400 mt-2">
+        <div className="text-xs mt-2" style={{color: "var(--text-muted)"}}>
           +{scene.tags.length - 8} more
         </div>
       )}
@@ -88,12 +88,12 @@ const SceneMetadata = ({
         >
           <div className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
             style={{
-              backgroundColor: 'rgba(59, 130, 246, 0.1)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
+              backgroundColor: 'var(--status-info-bg)',
+              border: '1px solid var(--status-info-border)',
             }}
           >
             <span className="text-xl">👥</span>
-            <span className="text-sm font-medium" style={{ color: 'rgb(59, 130, 246)' }}>
+            <span className="text-sm font-medium" style={{ color: 'var(--status-info-text)' }}>
               {scene.performers.length}
             </span>
           </div>
@@ -107,12 +107,12 @@ const SceneMetadata = ({
         >
           <div className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
             style={{
-              backgroundColor: 'rgba(168, 85, 247, 0.1)',
-              border: '1px solid rgba(168, 85, 247, 0.3)',
+              backgroundColor: 'var(--selection-bg)',
+              border: '1px solid var(--accent-secondary)',
             }}
           >
             <span className="text-xl">🏷️</span>
-            <span className="text-sm font-medium" style={{ color: 'rgb(168, 85, 247)' }}>
+            <span className="text-sm font-medium" style={{ color: 'var(--accent-secondary)' }}>
               {scene.tags.length}
             </span>
           </div>

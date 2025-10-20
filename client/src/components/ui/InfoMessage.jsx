@@ -17,10 +17,10 @@ const InfoMessage = ({
 
   const containerStyle = mode === "toast"
     ? {
-        backgroundColor: "#1d4ed8",
-        border: "2px solid #60a5fa",
+        backgroundColor: "var(--toast-info-bg)",
+        border: "2px solid var(--toast-info-border)",
         color: "white",
-        boxShadow: "0 10px 25px -5px rgba(29, 78, 216, 0.4), 0 8px 10px -6px rgba(29, 78, 216, 0.3)",
+        boxShadow: "0 10px 25px -5px var(--toast-info-shadow), 0 8px 10px -6px rgba(29, 78, 216, 0.3)",
       }
     : {
         backgroundColor: "var(--bg-card)",

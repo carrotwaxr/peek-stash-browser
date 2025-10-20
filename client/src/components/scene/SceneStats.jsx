@@ -18,20 +18,15 @@ const SceneStats = ({
     if (!rating) return 'var(--text-muted)';
 
     if (rating >= 80) {
-      // Green range (80-100)
-      return '#22c55e'; // green-500
+      return 'var(--rating-excellent)';
     } else if (rating >= 60) {
-      // Yellow-green range (60-79)
-      return '#84cc16'; // lime-500
+      return 'var(--rating-good)';
     } else if (rating >= 40) {
-      // Yellow range (40-59)
-      return '#eab308'; // yellow-500
+      return 'var(--rating-average)';
     } else if (rating >= 20) {
-      // Orange range (20-39)
-      return '#f97316'; // orange-500
+      return 'var(--rating-poor)';
     } else {
-      // Red range (0-19)
-      return '#ef4444'; // red-500
+      return 'var(--rating-bad)';
     }
   };
 
@@ -46,11 +41,11 @@ const SceneStats = ({
         className="text-xs"
       />
       <span>
-        <span style={{ color: 'rgb(34, 197, 94)' }}>▶</span> {watchHistory?.playCount ?? scene.play_count ?? 0}
+        <span style={{ color: 'var(--icon-play-count)' }}>▶</span> {watchHistory?.playCount ?? scene.play_count ?? 0}
       </span>
       {scene.organized && (
         <Tooltip content="Organized">
-          <span className="text-green-500">✓</span>
+          <span style={{ color: 'var(--icon-organized)' }}>✓</span>
         </Tooltip>
       )}
       {!hideFileInfo && scene.files?.[0]?.width && scene.files?.[0]?.height && (
