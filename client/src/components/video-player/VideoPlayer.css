@@ -125,13 +125,35 @@
   border-radius: 0 0 6px 6px;
 }
 
+/*
+ * IMPORTANT: Video.js applies highly-specific default styles.
+ * We need !important to override Video.js's built-in styles for better UX.
+ */
+
+/* Control bar - compact height */
+.video-js .vjs-control-bar {
+  height: auto !important;
+  min-height: 2.75rem !important;
+  padding: 0.25rem 0 !important;
+}
+
+/* All buttons - consistent sizing */
+.video-js .vjs-control-bar button.vjs-control {
+  width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+}
+
+/* Icon placeholders - larger and clearer */
+.video-js .vjs-control-bar .vjs-icon-placeholder::before {
+  font-size: 1.5rem !important;
+  line-height: 2.75rem !important;
+}
+
 /* Playlist navigation buttons */
 .vjs-playlist-prev,
 .vjs-playlist-next {
   cursor: pointer;
-  font-size: 1.5em;
-  width: 3em;
-  height: 100%;
   background: none;
   border: none;
   color: #fff;
@@ -153,96 +175,40 @@
   cursor: not-allowed;
 }
 
-.vjs-playlist-prev .vjs-icon-placeholder,
-.vjs-playlist-next .vjs-icon-placeholder {
-  font-size: 1em;
-  line-height: 1;
-  display: block;
+/* Playlist buttons - text characters instead of icons */
+.video-js .vjs-control-bar .vjs-playlist-prev .vjs-icon-placeholder,
+.video-js .vjs-control-bar .vjs-playlist-next .vjs-icon-placeholder {
+  font-size: 1.5rem !important;
+  line-height: 2.75rem !important;
+  font-weight: bold !important;
 }
 
-/* Mobile-optimized controls - larger touch targets */
+/* Time displays - readable size */
+.video-js .vjs-control-bar .vjs-time-control {
+  font-size: 0.875rem !important;
+  padding: 0 0.5rem !important;
+  min-width: auto !important;
+}
+
+/* Progress control - vertically centered */
+.video-js .vjs-control-bar .vjs-progress-control {
+  align-self: center !important;
+}
+
+/* Progress bar - thicker and easier to click */
+.video-js .vjs-control-bar .vjs-progress-holder {
+  height: 0.5rem !important;
+}
+
+/* Mobile-specific adjustments */
 @media (max-width: 768px) {
-  /* Slightly larger control bar with proper alignment */
-  .video-js .vjs-control-bar {
-    height: 3rem;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-  }
-
-  /* Larger buttons with better touch targets */
-  .video-js .vjs-control {
-    width: 2.75rem;
-    height: 2.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* Larger icons with proper centering */
-  .video-js .vjs-icon-placeholder::before {
-    font-size: 1.5rem;
-    line-height: 1;
-  }
-
-  /* Larger playlist navigation buttons */
-  .vjs-playlist-prev,
-  .vjs-playlist-next {
-    font-size: 1.75em;
-    width: 3rem;
-    min-width: 3rem;
-    height: 2.75rem;
-  }
-
-  .vjs-playlist-prev .vjs-icon-placeholder::before,
-  .vjs-playlist-next .vjs-icon-placeholder::before {
-    font-size: 1.5rem;
-  }
-
-  /* Larger play/pause button */
-  .video-js .vjs-play-control {
-    width: 3rem;
-  }
-
-  /* Larger big play button */
+  /* Big play button (center of video) - larger on mobile */
   .video-js .vjs-big-play-button {
     font-size: 3.5rem;
     width: 2em;
     height: 2em;
     line-height: 2em;
     border-width: 3px;
-  }
-
-  /* Progress bar touch target */
-  .video-js .vjs-progress-control {
-    padding-top: 0.25rem;
-    padding-bottom: 0.25rem;
-    flex: 1;
-  }
-
-  .video-js .vjs-progress-holder {
-    height: 0.4rem;
-  }
-
-  /* Time display */
-  .video-js .vjs-time-control {
-    font-size: 0.875rem;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-  }
-
-  /* Larger fullscreen button */
-  .video-js .vjs-fullscreen-control {
-    width: 2.75rem;
-  }
-
-  /* Ensure all controls are vertically centered */
-  .video-js .vjs-control-bar > * {
-    display: flex;
-    align-items: center;
   }
 }
 
