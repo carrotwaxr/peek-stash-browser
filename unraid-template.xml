@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>Peek-Stash-Browser</Name>
+  <Name>Peek</Name>
   <Repository>carrotwaxr/peek-stash-browser:latest</Repository>
   <Registry>https://hub.docker.com/r/carrotwaxr/peek-stash-browser/</Registry>
   <Network>bridge</Network>
