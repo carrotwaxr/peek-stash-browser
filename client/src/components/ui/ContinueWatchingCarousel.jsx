@@ -9,7 +9,7 @@ import { libraryApi } from '../../services/api.js';
  * Continue Watching carousel component
  * Shows scenes that have been partially watched with resume times
  */
-const ContinueWatchingCarousel = () => {
+const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
   const navigate = useNavigate();
   const { data: watchHistoryList, loading: loadingHistory, error } = useAllWatchHistory({
     inProgress: true,
@@ -107,6 +107,8 @@ const ContinueWatchingCarousel = () => {
       scenes={scenes}
       onSceneClick={handleSceneClick}
       showProgress={true}
+      selectedScenes={selectedScenes}
+      onToggleSelect={onToggleSelect}
     />
   );
 };

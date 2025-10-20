@@ -1,8 +1,7 @@
-import { forwardRef } from "react";
+import { forwardRef, useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { formatFileSize } from "../../utils/format.js";
-import SceneContextMenu from "../ui/SceneContextMenu.jsx";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
 import {
   SceneTitle,
@@ -22,13 +21,14 @@ const SceneCard = forwardRef(
       onFocus,
       tabIndex = -1,
       className = "",
-      isMultiselectMode = false,
       isSelected = false,
       onToggleSelect,
     },
     ref
   ) => {
     const { isTVMode } = useTVMode();
+    const longPressTimerRef = useRef(null);
+    const [isLongPressing, setIsLongPressing] = useState(false);
 
     const handleClick = (e) => {
       // Don't interfere with clicks on interactive elements
@@ -42,13 +42,74 @@ const SceneCard = forwardRef(
         return; // Let the interactive element handle the click
       }
 
+      // If long press was triggered, don't navigate
+      if (isLongPressing) {
+        setIsLongPressing(false);
+        return;
+      }
+
       e.preventDefault();
-      if (isMultiselectMode) {
+      onClick?.(scene);
+    };
+
+    const handleMouseDown = (e) => {
+      // Don't start long press on interactive elements
+      const target = e.target;
+      const isInteractive =
+        target.closest('button') ||
+        target.closest('a') ||
+        target.closest('[role="button"]');
+
+      if (isInteractive) {
+        return;
+      }
+
+      longPressTimerRef.current = setTimeout(() => {
+        setIsLongPressing(true);
         onToggleSelect?.(scene);
-      } else {
-        onClick?.(scene);
+      }, 500); // 500ms for long press
+    };
+
+    const handleMouseUp = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
       }
     };
+
+    const handleTouchStart = (e) => {
+      // Don't start long press on interactive elements
+      const target = e.target;
+      const isInteractive =
+        target.closest('button') ||
+        target.closest('a') ||
+        target.closest('[role="button"]');
+
+      if (isInteractive) {
+        return;
+      }
+
+      longPressTimerRef.current = setTimeout(() => {
+        setIsLongPressing(true);
+        onToggleSelect?.(scene);
+      }, 500); // 500ms for long press
+    };
+
+    const handleTouchEnd = () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+    };
+
+    // Cleanup on unmount
+    useEffect(() => {
+      return () => {
+        if (longPressTimerRef.current) {
+          clearTimeout(longPressTimerRef.current);
+        }
+      };
+    }, []);
 
     const handleKeyDown = (e) => {
       // Prevent card navigation when typing in input fields
@@ -63,19 +124,7 @@ const SceneCard = forwardRef(
         return; // Don't handle keyboard events from input fields
       }
 
-      if (e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
-        if (isMultiselectMode) {
-          onToggleSelect?.(scene);
-        } else {
-          onClick?.(scene);
-        }
-      } else if (e.key === " " && isMultiselectMode) {
-        e.preventDefault();
-        e.stopPropagation();
-        onToggleSelect?.(scene);
-      } else if (e.key === " ") {
+      if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         e.stopPropagation();
         onClick?.(scene);
@@ -106,6 +155,11 @@ const SceneCard = forwardRef(
           borderWidth: isSelected ? "2px" : "1px",
         }}
         onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
         tabIndex={isTVMode ? tabIndex : -1}
@@ -114,39 +168,34 @@ const SceneCard = forwardRef(
       >
         {/* Thumbnail */}
         <div className="relative aspect-video bg-gray-800 overflow-hidden">
-          {/* Context Menu */}
-          {!isMultiselectMode && <SceneContextMenu sceneId={scene.id} />}
-
-          {/* Multiselect Checkbox Overlay */}
-          {isMultiselectMode && (
-            <div className="absolute top-2 left-2 z-20">
-              <button
-                onClick={handleCheckboxClick}
-                className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
-                  isSelected
-                    ? "bg-blue-500 border-blue-500"
-                    : "bg-black/50 border-white/70 hover:border-white"
-                }`}
-                aria-label={isSelected ? "Deselect scene" : "Select scene"}
-              >
-                {isSelected && (
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={3}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                )}
-              </button>
-            </div>
-          )}
+          {/* Selection Checkbox - Always shown */}
+          <div className="absolute top-2 left-2 z-20">
+            <button
+              onClick={handleCheckboxClick}
+              className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all ${
+                isSelected
+                  ? "bg-blue-500 border-blue-500"
+                  : "bg-black/50 border-white/70 hover:border-white"
+              }`}
+              aria-label={isSelected ? "Deselect scene" : "Select scene"}
+            >
+              {isSelected && (
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={3}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
 
           {scene.paths?.screenshot ? (
             <SceneCardPreview scene={scene} cycleInterval={600} spriteCount={10} />
