@@ -245,7 +245,7 @@ const SceneCard = forwardRef(
             )}
           </div>
 
-          {/* Rating, O-Count, Play Count - Fixed height container */}
+          {/* Rating, O-Count, Play Count, Organized - Fixed height container */}
           <div
             className="flex items-center space-x-3 mb-3 text-xs"
             style={{ color: "var(--text-muted)", minHeight: "1.125rem" }}
@@ -267,6 +267,12 @@ const SceneCard = forwardRef(
               <span className="flex items-center">▶ {scene.play_count}</span>
             ) : (
               <span className="flex items-center italic">▶ 0</span>
+            )}
+
+            {scene.organized && (
+              <span className="flex items-center text-green-500" title="Organized">
+                ✓
+              </span>
             )}
           </div>
 
@@ -410,12 +416,6 @@ const SceneCard = forwardRef(
             </div>
           </div>
 
-          {/* Organization indicator - Fixed height */}
-          <div className="flex justify-end" style={{ minHeight: "1rem" }}>
-            {scene.organized && (
-              <div className="text-green-500 text-xs">✓ Organized</div>
-            )}
-          </div>
         </div>
       </div>
     );
