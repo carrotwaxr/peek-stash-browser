@@ -20,7 +20,7 @@ const Pagination = ({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${className}`}
+      className={`flex flex-col sm:flex-row items-center justify-center gap-4 mt-4 w-full ${className}`}
     >
       {showInfo && (
         <div style={{ color: "var(--text-muted)" }} className="text-sm">
@@ -28,13 +28,13 @@ const Pagination = ({
         </div>
       )}
 
-      <nav className="flex items-center gap-2">
+      <nav className="flex items-center gap-2 w-full sm:w-auto justify-center">
         {/* First Page Button */}
         <button
           onClick={() => onPageChange?.(1)}
           disabled={currentPage <= 1}
           className={`
-            px-2 py-1 rounded text-sm font-medium transition-colors
+            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
             ${
               currentPage <= 1
                 ? "opacity-50 cursor-not-allowed"
@@ -56,7 +56,7 @@ const Pagination = ({
           onClick={() => onPageChange?.(currentPage - 1)}
           disabled={currentPage <= 1}
           className={`
-            px-2 py-1 rounded text-sm font-medium transition-colors
+            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
             ${
               currentPage <= 1
                 ? "opacity-50 cursor-not-allowed"
@@ -77,7 +77,7 @@ const Pagination = ({
         <select
           value={currentPage}
           onChange={(e) => onPageChange?.(parseInt(e.target.value))}
-          className="px-3 py-1 rounded text-sm font-medium transition-colors"
+          className="px-4 py-3 sm:px-3 sm:py-1 rounded text-sm font-medium transition-colors flex-grow sm:flex-grow-0"
           style={{
             backgroundColor: "var(--bg-card)",
             color: "var(--text-primary)",
@@ -96,7 +96,7 @@ const Pagination = ({
           onClick={() => onPageChange?.(currentPage + 1)}
           disabled={currentPage >= totalPages}
           className={`
-            px-2 py-1 rounded text-sm font-medium transition-colors
+            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
             ${
               currentPage >= totalPages
                 ? "opacity-50 cursor-not-allowed"
@@ -118,7 +118,7 @@ const Pagination = ({
           onClick={() => onPageChange?.(totalPages)}
           disabled={currentPage >= totalPages}
           className={`
-            px-2 py-1 rounded text-sm font-medium transition-colors
+            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
             ${
               currentPage >= totalPages
                 ? "opacity-50 cursor-not-allowed"
@@ -137,7 +137,7 @@ const Pagination = ({
       </nav>
 
       {showPerPageSelector && onPerPageChange && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
           <label
             htmlFor="perPage"
             className="text-sm whitespace-nowrap"
@@ -149,7 +149,7 @@ const Pagination = ({
             id="perPage"
             value={perPage}
             onChange={(e) => onPerPageChange(parseInt(e.target.value))}
-            className="px-3 py-1 rounded text-sm font-medium transition-colors"
+            className="px-4 py-3 sm:px-3 sm:py-1 rounded text-sm font-medium transition-colors"
             style={{
               backgroundColor: "var(--bg-card)",
               color: "var(--text-primary)",

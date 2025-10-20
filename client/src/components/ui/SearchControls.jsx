@@ -114,6 +114,40 @@ const SearchControls = ({
     initialState.sortDirection,
   ]);
 
+  // Sync internal state from URL params (for external changes like bottom pagination)
+  useEffect(() => {
+    if (!isInitialized) return; // Don't sync before initial load
+
+    const urlPage = parseInt(searchParams.get('page')) || 1;
+    const urlPerPage = parseInt(searchParams.get('perPage')) || 24;
+
+    let shouldTriggerQuery = false;
+
+    if (urlPage !== currentPage) {
+      setCurrentPage(urlPage);
+      shouldTriggerQuery = true;
+    }
+    if (urlPerPage !== perPage) {
+      setPerPage(urlPerPage);
+      shouldTriggerQuery = true;
+    }
+
+    // Trigger query with new pagination values
+    if (shouldTriggerQuery) {
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page: urlPage,
+          per_page: urlPerPage,
+          q: searchText,
+          sort: sortField,
+        },
+        ...buildFilter(artifactType, filters),
+      };
+      onQueryChange(query);
+    }
+  }, [searchParams]); // Watch URL params for external changes
+
   // Update URL params whenever state changes
   useEffect(() => {
     const params = buildSearchParams({
@@ -351,85 +385,92 @@ const SearchControls = ({
 
   return (
     <div className="mb-6">
-      <div className="flex items-center justify-center gap-6 mb-4">
+      {/* Mobile-responsive controls - wrap on small screens */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 mb-4">
+        {/* Search Input - Full width on mobile */}
         <SearchInput
           placeholder="Search..."
           onSearch={handleChangeSearchText}
-          className="w-80"
+          className="w-full sm:w-80"
         />
-        {/* Sort Control */}
-        <div className="flex items-center space-x-1">
-          <SortControl
-            options={sortOptions}
-            value={sortField}
-            onChange={handleSortChange}
-          />
-          <button
-            onClick={() => handleSortChange(sortField)} // This will toggle direction for same field
-            className="py-1 border rounded-md text-sm"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
-          >
-            {sortDirection === "ASC" ? <LucideArrowUp /> : <LucideArrowDown />}
-          </button>
-        </div>
 
-        {/* Filters Toggle Button */}
-        <button
-          onClick={handleToggleFilterPanel}
-          className="px-4 py-2 border rounded-md text-sm font-medium transition-colors hover:bg-opacity-80 flex items-center space-x-2"
-          style={{
-            backgroundColor: isFilterPanelOpen
-              ? "var(--accent-primary)"
-              : "var(--bg-card)",
-            borderColor: isFilterPanelOpen
-              ? "var(--accent-primary)"
-              : "var(--border-color)",
-            color: isFilterPanelOpen ? "white" : "var(--text-primary)",
-          }}
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-              clipRule="evenodd"
+        {/* Sort, Filter, Presets - Wrap on mobile */}
+        <div className="flex items-center justify-center gap-6 flex-wrap">
+          {/* Sort Control */}
+          <div className="flex items-center space-x-1">
+            <SortControl
+              options={sortOptions}
+              value={sortField}
+              onChange={handleSortChange}
+              label="Sort"
             />
-          </svg>
-          <span>Filters</span>
-          {hasActiveFilters && !isFilterPanelOpen && (
-            <span
-              className="text-xs px-2 py-0.5 rounded-full ml-1"
+            <button
+              onClick={() => handleSortChange(sortField)} // This will toggle direction for same field
+              className="py-1 border rounded-md text-sm"
               style={{
-                backgroundColor: "var(--accent-secondary)",
-                color: "white",
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+                color: "var(--text-primary)",
               }}
             >
-              {
-                Object.keys(filters).filter(
-                  (key) =>
-                    filters[key] !== undefined &&
-                    filters[key] !== "" &&
-                    (typeof filters[key] !== "object" ||
-                      Object.values(filters[key]).some(
-                        (v) => v !== "" && v !== undefined
-                      ))
-                ).length
-              }
-            </span>
-          )}
-        </button>
+              {sortDirection === "ASC" ? <LucideArrowUp /> : <LucideArrowDown />}
+            </button>
+          </div>
 
-        {/* Filter Presets */}
-        <FilterPresets
-          artifactType={artifactType}
-          currentFilters={filters}
-          currentSort={sortField}
-          currentDirection={sortDirection}
-          onLoadPreset={handleLoadPreset}
-        />
+          {/* Filters Toggle Button */}
+          <button
+            onClick={handleToggleFilterPanel}
+            className="px-4 py-2 border rounded-md text-sm font-medium transition-colors hover:bg-opacity-80 flex items-center space-x-2"
+            style={{
+              backgroundColor: isFilterPanelOpen
+                ? "var(--accent-primary)"
+                : "var(--bg-card)",
+              borderColor: isFilterPanelOpen
+                ? "var(--accent-primary)"
+                : "var(--border-color)",
+              color: isFilterPanelOpen ? "white" : "var(--text-primary)",
+            }}
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>Filters</span>
+            {hasActiveFilters && !isFilterPanelOpen && (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full ml-1"
+                style={{
+                  backgroundColor: "var(--accent-secondary)",
+                  color: "white",
+                }}
+              >
+                {
+                  Object.keys(filters).filter(
+                    (key) =>
+                      filters[key] !== undefined &&
+                      filters[key] !== "" &&
+                      (typeof filters[key] !== "object" ||
+                        Object.values(filters[key]).some(
+                          (v) => v !== "" && v !== undefined
+                        ))
+                  ).length
+                }
+              </span>
+            )}
+          </button>
+
+          {/* Filter Presets */}
+          <FilterPresets
+            artifactType={artifactType}
+            currentFilters={filters}
+            currentSort={sortField}
+            currentDirection={sortDirection}
+            onLoadPreset={handleLoadPreset}
+          />
+        </div>
       </div>
 
       {/* Active Filter Chips */}
@@ -440,6 +481,18 @@ const SearchControls = ({
         permanentFilters={permanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
       />
+
+      {/* Top Pagination */}
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+          perPage={perPage}
+          onPerPageChange={handlePerPageChange}
+          showInfo={false}
+          totalPages={totalPages}
+        />
+      )}
 
       {/* Filter Panel */}
       <FilterPanel
@@ -532,17 +585,6 @@ const SearchControls = ({
         })}
       </FilterPanel>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-          perPage={perPage}
-          onPerPageChange={handlePerPageChange}
-          showInfo={false}
-          totalPages={totalPages}
-        />
-      )}
     </div>
   );
 };

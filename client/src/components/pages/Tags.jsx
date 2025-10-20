@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, forwardRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
+import Pagination from "../ui/Pagination.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -14,6 +15,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 const Tags = () => {
   usePageTitle("Tags");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -88,6 +90,24 @@ const Tags = () => {
   const totalPages = Math.ceil(totalCount / perPage);
   const currentPage = lastQuery?.filter?.page || 1;
 
+  // Get current pagination state from URL params for bottom pagination
+  const urlPage = parseInt(searchParams.get('page')) || 1;
+  const urlPerPage = parseInt(searchParams.get('perPage')) || 24;
+
+  // Pagination handlers that update URL params (SearchControls will react to these changes)
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    setSearchParams(params, { replace: true });
+  };
+
+  const handlePerPageChange = (newPerPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('perPage', newPerPage.toString());
+    params.set('page', '1'); // Reset to first page when changing perPage
+    setSearchParams(params, { replace: true });
+  };
+
   // Spatial navigation
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentTags,
@@ -141,6 +161,19 @@ const Tags = () => {
               />
             ))}
           </div>
+
+          {/* Bottom Pagination */}
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={urlPage}
+              onPageChange={handlePageChange}
+              perPage={urlPerPage}
+              onPerPageChange={handlePerPageChange}
+              showInfo={false}
+              showPerPageSelector={false}
+              totalPages={totalPages}
+            />
+          )}
         </>
       )}
       </div>
