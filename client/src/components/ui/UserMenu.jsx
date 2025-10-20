@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useTheme } from "../../themes/useTheme.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { ThemedIcon } from "../icons/index.js";
 
@@ -9,7 +8,6 @@ const UserMenu = () => {
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
 
-  const { changeTheme, availableThemes, currentTheme } = useTheme();
   const { logout, user } = useAuth();
 
   // Close menu when clicking outside
@@ -36,11 +34,6 @@ const UserMenu = () => {
   const handleLogout = () => {
     logout();
     setIsOpen(false);
-  };
-
-  const handleThemeChange = (themeKey) => {
-    changeTheme(themeKey);
-    // Don't close menu on theme change, let user try different themes
   };
 
   return (
@@ -140,53 +133,6 @@ const UserMenu = () => {
               <ThemedIcon name="settings" size={16} />
               <span>My Settings</span>
             </Link>
-          </div>
-
-          {/* Theme Selector */}
-          <div
-            className="px-4 py-3 border-b"
-            style={{ borderColor: "var(--border-color)" }}
-          >
-            <div
-              className="text-sm font-medium mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Theme
-            </div>
-            <div className="space-y-1">
-              {availableThemes.map((theme) => (
-                <button
-                  key={theme.key}
-                  onClick={() => handleThemeChange(theme.key)}
-                  className={`w-full text-left px-3 py-2 rounded text-sm transition-colors duration-200 flex items-center justify-between`}
-                  style={{
-                    backgroundColor:
-                      currentTheme === theme.key
-                        ? "var(--accent-primary)"
-                        : "transparent",
-                    color:
-                      currentTheme === theme.key
-                        ? "white"
-                        : "var(--text-secondary)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentTheme !== theme.key) {
-                      e.target.style.backgroundColor = "var(--bg-secondary)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentTheme !== theme.key) {
-                      e.target.style.backgroundColor = "transparent";
-                    }
-                  }}
-                >
-                  <span>{theme.name}</span>
-                  {currentTheme === theme.key && (
-                    <ThemedIcon name="check" size={14} color="white" />
-                  )}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Logout */}
