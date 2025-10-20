@@ -175,7 +175,7 @@ const SceneListItem = ({
 
                     {/* Stats Row */}
                     <div className="flex items-center gap-4 text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
-                      <span>⭐ {scene.rating100 ? `${Math.round(scene.rating100 / 20)}/5` : 'No rating'}</span>
+                      <span>⭐ {scene.rating100 || '—'}</span>
                       <OCounterButton
                         sceneId={scene.id}
                         initialCount={watchHistory?.oCount ?? scene.o_counter ?? 0}

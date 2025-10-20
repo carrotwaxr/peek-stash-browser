@@ -252,10 +252,10 @@ const SceneCard = forwardRef(
           >
             {scene.rating100 ? (
               <span className="flex items-center">
-                ⭐ {Math.round(scene.rating100 / 20)}/5
+                ⭐ {scene.rating100}
               </span>
             ) : (
-              <span className="flex items-center italic">⭐ No rating</span>
+              <span className="flex items-center">⭐ —</span>
             )}
 
             <OCounterButton

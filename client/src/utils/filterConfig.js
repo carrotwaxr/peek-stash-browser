@@ -166,11 +166,11 @@ export const SCENE_FILTER_OPTIONS = [
   },
   {
     key: "rating",
-    label: "Rating",
-    type: "select",
-    defaultValue: "",
-    options: RATING_OPTIONS,
-    placeholder: "Any rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
   },
   {
     key: "favorite",
@@ -343,11 +343,11 @@ export const PERFORMER_FILTER_OPTIONS = [
   },
   {
     key: "rating",
-    label: "Rating",
-    type: "select",
-    defaultValue: "",
-    options: RATING_OPTIONS,
-    placeholder: "Any rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
   },
   {
     key: "ethnicity",
@@ -531,11 +531,11 @@ export const STUDIO_FILTER_OPTIONS = [
   },
   {
     key: "rating",
-    label: "Rating",
-    type: "select",
-    defaultValue: "",
-    options: RATING_OPTIONS,
-    placeholder: "Any rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
   },
   {
     key: "sceneCount",
@@ -680,12 +680,12 @@ export const buildSceneFilter = (filters) => {
     sceneFilter.organized = filters.organized === "TRUE";
   }
 
-  // Rating filter (1-5 stars to 20-100 scale)
-  if (filters.rating) {
-    sceneFilter.rating100 = {
-      value: parseInt(filters.rating) * 20,
-      modifier: "GREATER_THAN",
-    };
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min || filters.rating?.max) {
+    sceneFilter.rating100 = {};
+    if (filters.rating.min) sceneFilter.rating100.value = parseInt(filters.rating.min);
+    sceneFilter.rating100.modifier = filters.rating.max ? "BETWEEN" : "GREATER_THAN";
+    if (filters.rating.max) sceneFilter.rating100.value2 = parseInt(filters.rating.max);
   }
 
   // Resolution filter
@@ -838,11 +838,12 @@ export const buildPerformerFilter = (filters) => {
     };
   }
 
-  if (filters.rating) {
-    performerFilter.rating100 = {
-      value: parseInt(filters.rating) * 20,
-      modifier: "GREATER_THAN",
-    };
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min || filters.rating?.max) {
+    performerFilter.rating100 = {};
+    if (filters.rating.min) performerFilter.rating100.value = parseInt(filters.rating.min);
+    performerFilter.rating100.modifier = filters.rating.max ? "BETWEEN" : "GREATER_THAN";
+    if (filters.rating.max) performerFilter.rating100.value2 = parseInt(filters.rating.max);
   }
 
   if (filters.ethnicity) {
@@ -1020,12 +1021,12 @@ export const buildStudioFilter = (filters) => {
     studioFilter.favorite = true;
   }
 
-  // Rating filter
-  if (filters.rating) {
-    studioFilter.rating100 = {
-      value: parseInt(filters.rating) * 20,
-      modifier: "GREATER_THAN",
-    };
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min || filters.rating?.max) {
+    studioFilter.rating100 = {};
+    if (filters.rating.min) studioFilter.rating100.value = parseInt(filters.rating.min);
+    studioFilter.rating100.modifier = filters.rating.max ? "BETWEEN" : "GREATER_THAN";
+    if (filters.rating.max) studioFilter.rating100.value2 = parseInt(filters.rating.max);
   }
 
   // Range filter

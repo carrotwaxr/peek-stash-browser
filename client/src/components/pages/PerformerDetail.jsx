@@ -283,9 +283,7 @@ const PerformerStats = ({ performer }) => {
         />
         <StatField
           label="Rating:"
-          value={
-            performer?.rating100 && `${(performer.rating100 / 20).toFixed(1)}/5`
-          }
+          value={performer?.rating100}
           valueColor="var(--accent-primary)"
         />
         <StatField

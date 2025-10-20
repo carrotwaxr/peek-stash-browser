@@ -175,7 +175,7 @@ const StudioStats = ({ studio }) => {
         {studio?.rating100 && (
           <StatField
             label="Rating:"
-            value={`${(studio.rating100 / 20).toFixed(1)}/5`}
+            value={studio.rating100}
             valueColor="var(--accent-primary)"
           />
         )}
