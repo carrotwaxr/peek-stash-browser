@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { ErrorMessage, LoadingSpinner, PageHeader } from "../ui";
+import { ErrorMessage, LoadingSpinner, PageHeader, PageLayout } from "../ui";
 import SceneGrid from "./SceneGrid.jsx";
 import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -125,15 +125,15 @@ const SceneSearch = ({
 
   if (error) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <PageHeader title={title} subtitle={subtitle} />
         <ErrorMessage error={error} />
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+    <PageLayout>
       <PageHeader title={title} subtitle={subtitle} />
 
       <SearchControls
@@ -156,7 +156,7 @@ const SceneSearch = ({
           enableKeyboard={true}
         />
       )}
-    </div>
+    </PageLayout>
   );
 };
 

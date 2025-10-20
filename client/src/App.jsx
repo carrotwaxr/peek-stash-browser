@@ -5,7 +5,7 @@ import {
   Route,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import Layout from "./components/ui/Layout.jsx";
+import GlobalLayout from "./components/ui/GlobalLayout.jsx";
 import Login from "./components/pages/Login.jsx";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
@@ -58,105 +58,105 @@ const AppContent = () => {
           <Route
             path="/"
             element={
-              <Layout>
+              <GlobalLayout>
                 <Home />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/scenes"
             element={
-              <Layout>
+              <GlobalLayout>
                 <Scenes />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/performers"
             element={
-              <Layout>
+              <GlobalLayout>
                 <Performers />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/studios"
             element={
-              <Layout>
+              <GlobalLayout>
                 <Studios />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/tags"
             element={
-              <Layout>
+              <GlobalLayout>
                 <Tags />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/performer/:performerId"
             element={
-              <Layout>
+              <GlobalLayout>
                 <PerformerDetail />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/studio/:studioId"
             element={
-              <Layout>
+              <GlobalLayout>
                 <StudioDetail />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/tag/:tagId"
             element={
-              <Layout>
+              <GlobalLayout>
                 <TagDetail />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/my-settings"
             element={
-              <Layout>
+              <GlobalLayout>
                 <Settings />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/watch-history"
             element={
-              <Layout>
+              <GlobalLayout>
                 <WatchHistory />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/server-settings"
             element={
-              <Layout>
+              <GlobalLayout>
                 <ServerSettings />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/playlists"
             element={
-              <Layout>
+              <GlobalLayout>
                 <Playlists />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route
             path="/playlist/:playlistId"
             element={
-              <Layout>
+              <GlobalLayout>
                 <PlaylistDetail />
-              </Layout>
+              </GlobalLayout>
             }
           />
           <Route path="/scene/:sceneId" element={<Scene />} />

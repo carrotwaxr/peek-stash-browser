@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, forwardRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { formatRating, getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -105,19 +105,20 @@ const Performers = () => {
 
   if (error) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <PageHeader title="Performers" />
         <ErrorMessage error={error} />
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div ref={pageRef} className="w-full py-8 px-4 lg:px-6 xl:px-8">
-      <PageHeader
-        title="Performers"
-        subtitle="Browse and manage performers in your library"
-      />
+    <PageLayout>
+      <div ref={pageRef}>
+        <PageHeader
+          title="Performers"
+          subtitle="Browse and manage performers in your library"
+        />
 
       {/* Controls Section */}
       <SearchControls
@@ -144,7 +145,8 @@ const Performers = () => {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 

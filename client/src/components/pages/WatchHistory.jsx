@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { History } from 'lucide-react';
 import { useAllWatchHistory } from '../../hooks/useWatchHistory.js';
 import { libraryApi } from '../../services/api.js';
-import { PageHeader } from '../ui/index.js';
+import { PageHeader, PageLayout } from '../ui/index.js';
 import SceneListItem from '../ui/SceneListItem.jsx';
 import LoadingSpinner from '../ui/LoadingSpinner.jsx';
 import { usePageTitle } from '../../hooks/usePageTitle.js';
@@ -110,7 +110,7 @@ const WatchHistory = () => {
   };
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <PageLayout fullHeight style={{ backgroundColor: 'var(--bg-primary)' }}>
       <PageHeader
         title="Watch History"
         subtitle="View your viewing history and continue watching"
@@ -118,7 +118,7 @@ const WatchHistory = () => {
       />
 
       {/* Controls */}
-      <div className="container-fluid px-4 mb-6">
+      <div className="mb-6">
         <div className="flex flex-wrap items-center gap-4">
           {/* Sort By */}
           <div className="flex items-center gap-2">
@@ -181,7 +181,7 @@ const WatchHistory = () => {
       </div>
 
       {/* Scene List */}
-      <div className="container-fluid px-4 pb-8">
+      <div>
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <LoadingSpinner />
@@ -249,7 +249,7 @@ const WatchHistory = () => {
           </div>
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 };
 
