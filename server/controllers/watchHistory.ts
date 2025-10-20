@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/singleton.js';
 import { logger } from '../utils/logger.js';
+import getStash from '../stash.js';
 
 const MINIMUM_WATCH_DURATION = 300; // 5 minutes in seconds
 
@@ -152,6 +153,23 @@ export async function incrementOCounter(req: Request, res: Response) {
           oCount: watchHistory.oCount + 1,
           oHistory: JSON.stringify([...oHistory, now.toISOString()]),
         },
+      });
+    }
+
+    // Also increment O counter in Stash
+    try {
+      logger.info('Attempting to increment O counter in Stash', { sceneId });
+      const stash = getStash();
+      logger.info('Got Stash instance', { stashUrl: process.env.STASH_URL });
+      const result = await stash.sceneIncrementO({ id: sceneId });
+      logger.info('Successfully incremented O counter in Stash', { sceneId, result });
+    } catch (stashError) {
+      // Don't fail the request if Stash is unavailable
+      logger.error('Failed to increment O counter in Stash', {
+        sceneId,
+        error: stashError,
+        errorMessage: (stashError as Error).message,
+        errorStack: (stashError as Error).stack
       });
     }
 
