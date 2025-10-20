@@ -9,6 +9,7 @@ import { useVideoPlayer } from "./useVideoPlayer.js";
 import { usePlaylistNavigation } from "./usePlaylistNavigation.js";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
+import { useOrientationFullscreen } from "../../hooks/useOrientationFullscreen.js";
 import {
   setupHLSforVOD,
   setupLoadingBuffer,
@@ -91,6 +92,9 @@ const VideoPlayer = ({
     playPrevious: playPreviousInPlaylist,
     enabled: !showPoster, // Only enable when video is playing
   });
+
+  // Auto-fullscreen on landscape orientation (mobile)
+  useOrientationFullscreen(playerRef, !showPoster);
 
   // Handle quality changes
   useEffect(() => {

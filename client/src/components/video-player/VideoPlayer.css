@@ -160,6 +160,75 @@
   display: block;
 }
 
+/* Mobile-optimized controls - larger touch targets */
+@media (max-width: 768px) {
+  /* Larger control bar */
+  .video-js .vjs-control-bar {
+    height: 3.5rem;
+    font-size: 16px;
+  }
+
+  /* Larger buttons with better touch targets */
+  .video-js .vjs-control {
+    min-width: 3rem;
+    min-height: 3rem;
+  }
+
+  /* Larger icons */
+  .video-js .vjs-icon-placeholder::before {
+    font-size: 1.75rem;
+    line-height: 3rem;
+  }
+
+  /* Larger playlist navigation buttons */
+  .vjs-playlist-prev,
+  .vjs-playlist-next {
+    font-size: 2em;
+    width: 3.5rem;
+    min-width: 3.5rem;
+  }
+
+  .vjs-playlist-prev .vjs-icon-placeholder,
+  .vjs-playlist-next .vjs-icon-placeholder {
+    font-size: 1.25em;
+  }
+
+  /* Larger play/pause button */
+  .video-js .vjs-play-control {
+    min-width: 3.5rem;
+  }
+
+  /* Larger big play button */
+  .video-js .vjs-big-play-button {
+    font-size: 4rem;
+    width: 2em;
+    height: 2em;
+    line-height: 2em;
+    border-width: 3px;
+  }
+
+  /* Progress bar touch target */
+  .video-js .vjs-progress-control {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .video-js .vjs-progress-holder {
+    height: 0.5rem;
+  }
+
+  /* Larger time display */
+  .video-js .vjs-time-control {
+    font-size: 1rem;
+    min-width: 3rem;
+  }
+
+  /* Larger fullscreen button */
+  .video-js .vjs-fullscreen-control {
+    min-width: 3.5rem;
+  }
+}
+
 /* Responsive video container */
 @media (max-width: 768px) {
   .video-container {
