@@ -1,8 +1,12 @@
-import { Link } from 'react-router-dom';
-import { getSceneTitle, getSceneDescription, formatFileSize } from '../../utils/format.js';
+import { useNavigate } from 'react-router-dom';
 import { formatRelativeTime } from '../../utils/date.js';
-import Tooltip from './Tooltip.jsx';
-import OCounterButton from './OCounterButton.jsx';
+import {
+  SceneThumbnail,
+  SceneTitle,
+  SceneStats,
+  SceneMetadata,
+  SceneDescription
+} from '../scene/index.js';
 
 /**
  * Shared row-based scene list item component
@@ -28,9 +32,35 @@ const SceneListItem = ({
   onDragStart,
   onDragOver,
   onDragEnd,
+  showSessionOIndicator = false, // Show if O was clicked in the last session
 }) => {
-  const title = scene ? getSceneTitle(scene) : null;
-  const description = scene ? getSceneDescription(scene) : null;
+  const navigate = useNavigate();
+
+  // Check if an O was clicked during the last viewing session
+  const hadOInLastSession = () => {
+    if (!watchHistory?.oHistory || !watchHistory?.lastPlayedAt) return false;
+
+    try {
+      const oHistory = Array.isArray(watchHistory.oHistory)
+        ? watchHistory.oHistory
+        : JSON.parse(watchHistory.oHistory);
+
+      if (oHistory.length === 0) return false;
+
+      // Get the most recent O timestamp
+      const lastOTimestamp = new Date(oHistory[oHistory.length - 1]);
+      const lastPlayedAt = new Date(watchHistory.lastPlayedAt);
+
+      // Check if the last O was within 5 minutes of the last play session
+      const timeDiff = Math.abs(lastOTimestamp - lastPlayedAt);
+      const fiveMinutes = 5 * 60 * 1000;
+
+      return timeDiff < fiveMinutes;
+    } catch (error) {
+      console.error('Error checking O history:', error);
+      return false;
+    }
+  };
 
   const formatDuration = (seconds) => {
     if (!seconds || seconds < 1) return '0m';
@@ -49,78 +79,57 @@ const SceneListItem = ({
     return `${mins}:${String(secs).padStart(2, '0')}`;
   };
 
+  const handleClick = (e) => {
+    // Don't navigate if clicking on interactive elements
+    const target = e.target;
+    const isInteractive =
+      target.closest('button') ||
+      target.closest('a') ||
+      target.closest('[role="button"]');
+
+    if (!isInteractive && exists && scene) {
+      navigate(`/scene/${scene.id}`, { state: linkState });
+    }
+  };
+
   return (
     <div
       draggable={draggable}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
+      onClick={handleClick}
       className="rounded-lg border transition-all hover:shadow-lg"
       style={{
         backgroundColor: 'var(--bg-card)',
         border: '1px solid var(--border-color)',
         opacity: exists ? 1 : 0.6,
-        cursor: draggable ? 'move' : 'default',
+        cursor: draggable ? 'move' : exists ? 'pointer' : 'default',
       }}
     >
-      <div className="p-4">
-        <div className="flex gap-4">
+      <div className="pt-2 px-2 pb-1 md:pt-4 md:px-4 md:pb-2">
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4">
           {/* Optional Drag Handle */}
           {dragHandle}
 
           {/* Thumbnail */}
           <div className="flex-shrink-0 relative">
-            {exists && scene?.paths?.screenshot ? (
-              <div className="relative w-64 h-36 rounded overflow-hidden">
-                <img
-                  src={scene.paths.screenshot}
-                  alt={title || 'Scene'}
-                  className="w-full h-full object-cover"
-                />
-                {/* Overlay with duration and studio */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent">
-                  {scene.studio && (
-                    <div className="absolute top-2 right-2">
-                      <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                        {scene.studio.name}
-                      </span>
-                    </div>
-                  )}
-                  {scene.files?.[0]?.duration && (
-                    <div className="absolute bottom-2 right-2">
-                      <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                        {Math.floor(scene.files[0].duration / 60)}m
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Watch Progress Bar */}
-                {watchHistory?.resumeTime && scene.files?.[0]?.duration && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
-                    <div
-                      className="h-full bg-green-500 transition-all"
-                      style={{
-                        width: `${Math.min(100, (watchHistory.resumeTime / scene.files[0].duration) * 100)}%`,
-                      }}
-                      title={`Resume from ${formatResumeTime(watchHistory.resumeTime)}`}
-                    />
-                  </div>
-                )}
-              </div>
+            {exists ? (
+              <SceneThumbnail
+                scene={scene}
+                watchHistory={watchHistory}
+                className="w-full md:w-64 aspect-video md:aspect-auto md:h-36"
+              />
             ) : (
               <div
-                className="w-64 h-36 rounded flex items-center justify-center"
+                className="w-full md:w-64 aspect-video md:aspect-auto md:h-36 rounded flex items-center justify-center"
                 style={{
-                  backgroundColor: exists ? 'var(--bg-secondary)' : 'rgba(239, 68, 68, 0.1)',
-                  border: exists ? 'none' : '2px dashed rgba(239, 68, 68, 0.5)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '2px dashed rgba(239, 68, 68, 0.5)',
                 }}
               >
-                <span
-                  className="text-3xl"
-                  style={{ color: exists ? 'var(--text-muted)' : 'rgb(239, 68, 68)' }}
-                >
-                  {exists ? '📹' : '⚠️'}
+                <span className="text-3xl" style={{ color: 'rgb(239, 68, 68)' }}>
+                  ⚠️
                 </span>
               </div>
             )}
@@ -132,24 +141,19 @@ const SceneListItem = ({
               <div className="flex-1 min-w-0 pr-4">
                 {exists && scene ? (
                   <>
-                    {/* Title */}
-                    <Link
-                      to={`/scene/${scene.id}`}
-                      state={linkState}
-                      className="font-semibold text-lg hover:underline block mb-1"
-                      style={{ color: 'var(--text-primary)' }}
-                    >
-                      {title}
-                    </Link>
-
-                    {/* Date */}
-                    <div className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
-                      {scene.date ? formatRelativeTime(scene.date) : 'No date'}
+                    {/* Title and Date */}
+                    <div className="mb-2">
+                      <SceneTitle
+                        scene={scene}
+                        linkState={linkState}
+                        titleClassName="text-lg"
+                        dateClassName="mt-1"
+                      />
                     </div>
 
                     {/* Watch History Stats (if provided) */}
                     {watchHistory && (
-                      <div className="flex items-center gap-4 text-xs mb-2 p-2 rounded" style={{
+                      <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs mb-2 p-2 rounded" style={{
                         backgroundColor: 'rgba(59, 130, 246, 0.05)',
                         color: 'var(--text-muted)',
                         border: '1px solid rgba(59, 130, 246, 0.1)'
@@ -174,74 +178,34 @@ const SceneListItem = ({
                     )}
 
                     {/* Stats Row */}
-                    <div className="flex items-center gap-4 text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
-                      <span>⭐ {scene.rating100 ? `${Math.round(scene.rating100 / 20)}/5` : 'No rating'}</span>
-                      <OCounterButton
-                        sceneId={scene.id}
-                        initialCount={watchHistory?.oCount ?? scene.o_counter ?? 0}
-                        className="text-xs"
+                    <div className="flex items-center gap-2 mb-2">
+                      <SceneStats
+                        scene={scene}
+                        watchHistory={watchHistory}
                       />
-                      <span>▶ {watchHistory?.playCount ?? scene.play_count ?? 0}</span>
-                      {scene.files?.[0]?.width && scene.files?.[0]?.height && (
-                        <span>{scene.files[0].width}×{scene.files[0].height}</span>
-                      )}
-                      {scene.files?.[0]?.size && (
-                        <span>{formatFileSize(scene.files[0].size)}</span>
+                      {showSessionOIndicator && hadOInLastSession() && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            color: 'rgb(34, 197, 94)',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                          }}
+                          title="O clicked during this session"
+                        >
+                          💦
+                        </span>
                       )}
                     </div>
 
                     {/* Description */}
-                    {description && (
-                      <Tooltip content={description} disabled={description.length <= 150}>
-                        <p
-                          className="text-sm mb-2 leading-relaxed"
-                          style={{
-                            color: 'var(--text-secondary)',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {description}
-                        </p>
-                      </Tooltip>
-                    )}
+                    <SceneDescription
+                      scene={scene}
+                      className="mb-2"
+                    />
 
                     {/* Performers & Tags */}
-                    <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {scene.performers && scene.performers.length > 0 && (
-                        <Tooltip
-                          content={
-                            <div>
-                              <div className="font-semibold mb-1">Performers:</div>
-                              {scene.performers.map((p) => p.name).join(', ')}
-                            </div>
-                          }
-                        >
-                          <span className="flex items-center gap-1">
-                            👥 {scene.performers.length}
-                          </span>
-                        </Tooltip>
-                      )}
-                      {scene.tags && scene.tags.length > 0 && (
-                        <Tooltip
-                          content={
-                            <div>
-                              <div className="font-semibold mb-1">Tags:</div>
-                              {scene.tags.map((t) => t.name).join(', ')}
-                            </div>
-                          }
-                        >
-                          <span className="flex items-center gap-1">
-                            🏷️ {scene.tags.length}
-                          </span>
-                        </Tooltip>
-                      )}
-                      {scene.organized && (
-                        <span className="text-green-500">✓ Organized</span>
-                      )}
-                    </div>
+                    <SceneMetadata scene={scene} />
                   </>
                 ) : (
                   <>

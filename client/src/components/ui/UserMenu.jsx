@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { useTheme } from "../../themes/useTheme.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 import { ThemedIcon } from "../icons/index.js";
 
 const UserMenu = () => {
@@ -9,8 +9,8 @@ const UserMenu = () => {
   const menuRef = useRef(null);
   const buttonRef = useRef(null);
 
-  const { changeTheme, availableThemes, currentTheme } = useTheme();
   const { logout, user } = useAuth();
+  const { isTVMode, toggleTVMode } = useTVMode();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -36,11 +36,6 @@ const UserMenu = () => {
   const handleLogout = () => {
     logout();
     setIsOpen(false);
-  };
-
-  const handleThemeChange = (themeKey) => {
-    changeTheme(themeKey);
-    // Don't close menu on theme change, let user try different themes
   };
 
   return (
@@ -142,51 +137,40 @@ const UserMenu = () => {
             </Link>
           </div>
 
-          {/* Theme Selector */}
+          {/* TV Mode Toggle */}
           <div
             className="px-4 py-3 border-b"
             style={{ borderColor: "var(--border-color)" }}
           >
-            <div
-              className="text-sm font-medium mb-2"
-              style={{ color: "var(--text-primary)" }}
+            <button
+              onClick={() => {
+                toggleTVMode();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200"
+              style={{
+                backgroundColor: isTVMode
+                  ? "var(--accent-primary)"
+                  : "transparent",
+                color: isTVMode ? "white" : "var(--text-primary)",
+              }}
+              onMouseEnter={(e) => {
+                if (!isTVMode) {
+                  e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isTVMode) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }
+              }}
             >
-              Theme
-            </div>
-            <div className="space-y-1">
-              {availableThemes.map((theme) => (
-                <button
-                  key={theme.key}
-                  onClick={() => handleThemeChange(theme.key)}
-                  className={`w-full text-left px-3 py-2 rounded text-sm transition-colors duration-200 flex items-center justify-between`}
-                  style={{
-                    backgroundColor:
-                      currentTheme === theme.key
-                        ? "var(--accent-primary)"
-                        : "transparent",
-                    color:
-                      currentTheme === theme.key
-                        ? "white"
-                        : "var(--text-secondary)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentTheme !== theme.key) {
-                      e.target.style.backgroundColor = "var(--bg-secondary)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentTheme !== theme.key) {
-                      e.target.style.backgroundColor = "transparent";
-                    }
-                  }}
-                >
-                  <span>{theme.name}</span>
-                  {currentTheme === theme.key && (
-                    <ThemedIcon name="check" size={14} color="white" />
-                  )}
-                </button>
-              ))}
-            </div>
+              <div className="flex items-center gap-3">
+                <ThemedIcon name="tv" size={16} color={isTVMode ? "white" : "currentColor"} />
+                <span>TV Mode</span>
+              </div>
+              {isTVMode && <span className="text-sm">✓</span>}
+            </button>
           </div>
 
           {/* Logout */}

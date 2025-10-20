@@ -137,57 +137,62 @@ export const RESOLUTION_OPTIONS = [
 ];
 
 export const SCENE_FILTER_OPTIONS = [
+  // Common Filters
+  {
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
+  },
+  {
+    key: "title",
+    label: "Title Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search title...",
+  },
+  {
+    key: "details",
+    label: "Details Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search details...",
+  },
+  {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select performers...",
+  },
+  {
+    key: "studioId",
+    label: "Studio",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select studio...",
+  },
+  {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
+  },
   {
     key: "rating",
-    label: "Rating",
-    type: "select",
-    defaultValue: "",
-    options: RATING_OPTIONS,
-    placeholder: "Any rating",
-  },
-  {
-    key: "favorite",
-    label: "Favorites Only",
-    type: "checkbox",
-    defaultValue: false,
-  },
-  {
-    key: "performerFavorite",
-    label: "Favorite Performers Only",
-    type: "checkbox",
-    defaultValue: false,
-  },
-  {
-    key: "organized",
-    label: "Organized",
-    type: "select",
-    defaultValue: "",
-    options: ORGANIZED_OPTIONS,
-    placeholder: "Any",
-  },
-  {
-    key: "resolution",
-    label: "Resolution",
-    type: "select",
-    defaultValue: "",
-    options: RESOLUTION_OPTIONS,
-    placeholder: "Any resolution",
-  },
-  {
-    key: "duration",
-    label: "Duration (minutes)",
+    label: "Rating (0-100)",
     type: "range",
     defaultValue: {},
-    min: 1,
-    max: 300,
-  },
-  {
-    key: "playDuration",
-    label: "Play Duration (minutes)",
-    type: "range",
-    defaultValue: {},
-    min: 1,
-    max: 300,
+    min: 0,
+    max: 100,
   },
   {
     key: "oCount",
@@ -198,12 +203,76 @@ export const SCENE_FILTER_OPTIONS = [
     max: 300,
   },
   {
-    key: "playCount",
-    label: "Play Count",
+    key: "duration",
+    label: "Duration (minutes)",
     type: "range",
     defaultValue: {},
-    min: 0,
-    max: 1000,
+    min: 1,
+    max: 300,
+  },
+  {
+    key: "favorite",
+    label: "Favorite Scenes",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
+  },
+  {
+    key: "performerFavorite",
+    label: "Favorite Performers",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorite Performers Only",
+  },
+
+  // Date Ranges
+  {
+    type: "section-header",
+    label: "Date Ranges",
+    key: "section-dates",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "date",
+    label: "Scene Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+  {
+    key: "createdAt",
+    label: "Created Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+  {
+    key: "updatedAt",
+    label: "Updated Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+  {
+    key: "lastPlayedAt",
+    label: "Last Played Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+
+  // Video Properties
+  {
+    type: "section-header",
+    label: "Video Properties",
+    key: "section-video",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "resolution",
+    label: "Resolution",
+    type: "select",
+    defaultValue: "",
+    options: RESOLUTION_OPTIONS,
+    placeholder: "Any resolution",
   },
   {
     key: "bitrate",
@@ -220,6 +289,45 @@ export const SCENE_FILTER_OPTIONS = [
     defaultValue: {},
     min: 0,
     max: 120,
+  },
+  {
+    key: "audioCodec",
+    label: "Audio Codec",
+    type: "text",
+    defaultValue: "",
+    placeholder: "e.g. aac, mp3",
+  },
+
+  // Other Filters
+  {
+    type: "section-header",
+    label: "Other Filters",
+    key: "section-other",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "director",
+    label: "Director Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search director...",
+  },
+  {
+    key: "playDuration",
+    label: "Play Duration (minutes)",
+    type: "range",
+    defaultValue: {},
+    min: 1,
+    max: 300,
+  },
+  {
+    key: "playCount",
+    label: "Play Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
   },
   {
     key: "performerCount",
@@ -246,65 +354,30 @@ export const SCENE_FILTER_OPTIONS = [
     max: 50,
   },
   {
-    key: "date",
-    label: "Scene Date",
-    type: "date-range",
-    defaultValue: {},
-  },
-  {
-    key: "createdAt",
-    label: "Created Date",
-    type: "date-range",
-    defaultValue: {},
-  },
-  {
-    key: "updatedAt",
-    label: "Updated Date",
-    type: "date-range",
-    defaultValue: {},
-  },
-  {
-    key: "lastPlayedAt",
-    label: "Last Played Date",
-    type: "date-range",
-    defaultValue: {},
-  },
-  {
-    key: "title",
-    label: "Title Search",
-    type: "text",
+    key: "organized",
+    label: "Organized",
+    type: "select",
     defaultValue: "",
-    placeholder: "Search title...",
-  },
-  {
-    key: "details",
-    label: "Details Search",
-    type: "text",
-    defaultValue: "",
-    placeholder: "Search details...",
-  },
-  {
-    key: "director",
-    label: "Director Search",
-    type: "text",
-    defaultValue: "",
-    placeholder: "Search director...",
-  },
-  {
-    key: "audioCodec",
-    label: "Audio Codec",
-    type: "text",
-    defaultValue: "",
-    placeholder: "e.g. aac, mp3",
+    options: ORGANIZED_OPTIONS,
+    placeholder: "Any",
   },
 ];
 
 export const PERFORMER_FILTER_OPTIONS = [
+  // Common Filters
   {
-    key: "favorite",
-    label: "Favorites Only",
-    type: "checkbox",
-    defaultValue: false,
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
+  },
+  {
+    key: "name",
+    label: "Name Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search name...",
   },
   {
     key: "gender",
@@ -316,43 +389,43 @@ export const PERFORMER_FILTER_OPTIONS = [
   },
   {
     key: "rating",
-    label: "Rating",
-    type: "select",
-    defaultValue: "",
-    options: RATING_OPTIONS,
-    placeholder: "Any rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
   },
   {
-    key: "ethnicity",
-    label: "Ethnicity",
-    type: "select",
-    defaultValue: "",
-    options: ETHNICITY_OPTIONS,
-    placeholder: "Any ethnicity",
+    key: "oCounter",
+    label: "O Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
   },
   {
-    key: "hairColor",
-    label: "Hair Color",
-    type: "select",
-    defaultValue: "",
-    options: HAIR_COLOR_OPTIONS,
-    placeholder: "Any hair color",
+    key: "sceneCount",
+    label: "Scene Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
   },
   {
-    key: "eyeColor",
-    label: "Eye Color",
-    type: "select",
-    defaultValue: "",
-    options: EYE_COLOR_OPTIONS,
-    placeholder: "Any eye color",
+    key: "favorite",
+    label: "Favorite Performers",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
   },
+
+  // Date Ranges
   {
-    key: "fakeTits",
-    label: "Breast Type",
-    type: "select",
-    defaultValue: "",
-    options: FAKE_TITS_OPTIONS,
-    placeholder: "Any",
+    type: "section-header",
+    label: "Date Ranges",
+    key: "section-dates",
+    collapsible: true,
+    defaultOpen: false,
   },
   {
     key: "age",
@@ -387,54 +460,6 @@ export const PERFORMER_FILTER_OPTIONS = [
     max: 50,
   },
   {
-    key: "height",
-    label: "Height (cm)",
-    type: "range",
-    defaultValue: {},
-    min: 100,
-    max: 250,
-  },
-  {
-    key: "weight",
-    label: "Weight (kg)",
-    type: "range",
-    defaultValue: {},
-    min: 30,
-    max: 200,
-  },
-  {
-    key: "penisLength",
-    label: "Penis Length (cm)",
-    type: "range",
-    defaultValue: {},
-    min: 0,
-    max: 40,
-  },
-  {
-    key: "oCounter",
-    label: "O Count",
-    type: "range",
-    defaultValue: {},
-    min: 0,
-    max: 1000,
-  },
-  {
-    key: "playCount",
-    label: "Play Count",
-    type: "range",
-    defaultValue: {},
-    min: 0,
-    max: 1000,
-  },
-  {
-    key: "sceneCount",
-    label: "Scene Count",
-    type: "range",
-    defaultValue: {},
-    min: 0,
-    max: 1000,
-  },
-  {
     key: "birthdate",
     label: "Birth Date",
     type: "date-range",
@@ -458,19 +483,46 @@ export const PERFORMER_FILTER_OPTIONS = [
     type: "date-range",
     defaultValue: {},
   },
+
+  // Performer Attributes
   {
-    key: "name",
-    label: "Name Search",
-    type: "text",
-    defaultValue: "",
-    placeholder: "Search name...",
+    type: "section-header",
+    label: "Performer Attributes",
+    key: "section-attributes",
+    collapsible: true,
+    defaultOpen: false,
   },
   {
-    key: "details",
-    label: "Details Search",
-    type: "text",
+    key: "hairColor",
+    label: "Hair Color",
+    type: "select",
     defaultValue: "",
-    placeholder: "Search details...",
+    options: HAIR_COLOR_OPTIONS,
+    placeholder: "Any hair color",
+  },
+  {
+    key: "eyeColor",
+    label: "Eye Color",
+    type: "select",
+    defaultValue: "",
+    options: EYE_COLOR_OPTIONS,
+    placeholder: "Any eye color",
+  },
+  {
+    key: "ethnicity",
+    label: "Ethnicity",
+    type: "select",
+    defaultValue: "",
+    options: ETHNICITY_OPTIONS,
+    placeholder: "Any ethnicity",
+  },
+  {
+    key: "fakeTits",
+    label: "Breast Type",
+    type: "select",
+    defaultValue: "",
+    options: FAKE_TITS_OPTIONS,
+    placeholder: "Any",
   },
   {
     key: "measurements",
@@ -493,42 +545,64 @@ export const PERFORMER_FILTER_OPTIONS = [
     defaultValue: "",
     placeholder: "Search piercings...",
   },
-];
+  {
+    key: "height",
+    label: "Height (cm)",
+    type: "range",
+    defaultValue: {},
+    min: 100,
+    max: 250,
+  },
+  {
+    key: "weight",
+    label: "Weight (kg)",
+    type: "range",
+    defaultValue: {},
+    min: 30,
+    max: 200,
+  },
+  {
+    key: "penisLength",
+    label: "Penis Length (cm)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 40,
+  },
 
-export const STUDIO_FILTER_OPTIONS = [
+  // Other Filters
   {
-    key: "favorite",
-    label: "Favorites Only",
-    type: "checkbox",
-    defaultValue: false,
+    type: "section-header",
+    label: "Other Filters",
+    key: "section-other",
+    collapsible: true,
+    defaultOpen: false,
   },
   {
-    key: "rating",
-    label: "Rating",
-    type: "select",
-    defaultValue: "",
-    options: RATING_OPTIONS,
-    placeholder: "Any rating",
-  },
-  {
-    key: "sceneCount",
-    label: "Scene Count",
+    key: "playCount",
+    label: "Play Count",
     type: "range",
     defaultValue: {},
     min: 0,
     max: 1000,
   },
   {
-    key: "createdAt",
-    label: "Created Date",
-    type: "date-range",
-    defaultValue: {},
+    key: "details",
+    label: "Details Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search details...",
   },
+];
+
+export const STUDIO_FILTER_OPTIONS = [
+  // Common Filters
   {
-    key: "updatedAt",
-    label: "Updated Date",
-    type: "date-range",
-    defaultValue: {},
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
   },
   {
     key: "name",
@@ -544,14 +618,13 @@ export const STUDIO_FILTER_OPTIONS = [
     defaultValue: "",
     placeholder: "Search details...",
   },
-];
-
-export const TAG_FILTER_OPTIONS = [
   {
-    key: "favorite",
-    label: "Favorites Only",
-    type: "checkbox",
-    defaultValue: false,
+    key: "rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
   },
   {
     key: "sceneCount",
@@ -560,6 +633,22 @@ export const TAG_FILTER_OPTIONS = [
     defaultValue: {},
     min: 0,
     max: 1000,
+  },
+  {
+    key: "favorite",
+    label: "Favorite Studios",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
+  },
+
+  // Date Ranges
+  {
+    type: "section-header",
+    label: "Date Ranges",
+    key: "section-dates",
+    collapsible: true,
+    defaultOpen: false,
   },
   {
     key: "createdAt",
@@ -572,6 +661,17 @@ export const TAG_FILTER_OPTIONS = [
     label: "Updated Date",
     type: "date-range",
     defaultValue: {},
+  },
+];
+
+export const TAG_FILTER_OPTIONS = [
+  // Common Filters
+  {
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
   },
   {
     key: "name",
@@ -587,6 +687,42 @@ export const TAG_FILTER_OPTIONS = [
     defaultValue: "",
     placeholder: "Search description...",
   },
+  {
+    key: "sceneCount",
+    label: "Scene Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+  {
+    key: "favorite",
+    label: "Favorite Tags",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
+  },
+
+  // Date Ranges
+  {
+    type: "section-header",
+    label: "Date Ranges",
+    key: "section-dates",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "createdAt",
+    label: "Created Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+  {
+    key: "updatedAt",
+    label: "Updated Date",
+    type: "date-range",
+    defaultValue: {},
+  },
 ];
 
 /**
@@ -595,6 +731,52 @@ export const TAG_FILTER_OPTIONS = [
 
 export const buildSceneFilter = (filters) => {
   const sceneFilter = {};
+
+  // ID-based filters - merge permanent filters with UI filters
+  // Performers: Merge permanent + UI filters
+  const performerIds = [];
+  if (filters.performers?.value) {
+    performerIds.push(...filters.performers.value);
+  }
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    performerIds.push(...filters.performerIds);
+  }
+  if (performerIds.length > 0) {
+    sceneFilter.performers = {
+      value: [...new Set(performerIds)], // Remove duplicates
+      modifier: "INCLUDES_ALL",
+    };
+  }
+
+  // Studios: Merge permanent + UI filters
+  const studioIds = [];
+  if (filters.studios?.value) {
+    studioIds.push(...filters.studios.value);
+  }
+  if (filters.studioId && filters.studioId !== "") {
+    studioIds.push(filters.studioId);
+  }
+  if (studioIds.length > 0) {
+    sceneFilter.studios = {
+      value: [...new Set(studioIds)], // Remove duplicates
+      modifier: "INCLUDES",
+    };
+  }
+
+  // Tags: Merge permanent + UI filters
+  const tagIds = [];
+  if (filters.tags?.value) {
+    tagIds.push(...filters.tags.value);
+  }
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    tagIds.push(...filters.tagIds);
+  }
+  if (tagIds.length > 0) {
+    sceneFilter.tags = {
+      value: [...new Set(tagIds)], // Remove duplicates
+      modifier: "INCLUDES_ALL",
+    };
+  }
 
   // Boolean filters
   if (filters.favorite === true || filters.favorite === "TRUE") {
@@ -607,12 +789,12 @@ export const buildSceneFilter = (filters) => {
     sceneFilter.organized = filters.organized === "TRUE";
   }
 
-  // Rating filter (1-5 stars to 20-100 scale)
-  if (filters.rating) {
-    sceneFilter.rating100 = {
-      value: parseInt(filters.rating) * 20,
-      modifier: "GREATER_THAN",
-    };
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min || filters.rating?.max) {
+    sceneFilter.rating100 = {};
+    if (filters.rating.min) sceneFilter.rating100.value = parseInt(filters.rating.min);
+    sceneFilter.rating100.modifier = filters.rating.max ? "BETWEEN" : "GREATER_THAN";
+    if (filters.rating.max) sceneFilter.rating100.value2 = parseInt(filters.rating.max);
   }
 
   // Resolution filter
@@ -765,11 +947,12 @@ export const buildPerformerFilter = (filters) => {
     };
   }
 
-  if (filters.rating) {
-    performerFilter.rating100 = {
-      value: parseInt(filters.rating) * 20,
-      modifier: "GREATER_THAN",
-    };
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min || filters.rating?.max) {
+    performerFilter.rating100 = {};
+    if (filters.rating.min) performerFilter.rating100.value = parseInt(filters.rating.min);
+    performerFilter.rating100.modifier = filters.rating.max ? "BETWEEN" : "GREATER_THAN";
+    if (filters.rating.max) performerFilter.rating100.value2 = parseInt(filters.rating.max);
   }
 
   if (filters.ethnicity) {
@@ -947,12 +1130,12 @@ export const buildStudioFilter = (filters) => {
     studioFilter.favorite = true;
   }
 
-  // Rating filter
-  if (filters.rating) {
-    studioFilter.rating100 = {
-      value: parseInt(filters.rating) * 20,
-      modifier: "GREATER_THAN",
-    };
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min || filters.rating?.max) {
+    studioFilter.rating100 = {};
+    if (filters.rating.min) studioFilter.rating100.value = parseInt(filters.rating.min);
+    studioFilter.rating100.modifier = filters.rating.max ? "BETWEEN" : "GREATER_THAN";
+    if (filters.rating.max) studioFilter.rating100.value2 = parseInt(filters.rating.max);
   }
 
   // Range filter

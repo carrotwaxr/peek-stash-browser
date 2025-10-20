@@ -62,108 +62,6 @@ _No items currently at high priority._
 
 # LOW PRIORITY
 
-## Scene Browsing: Sort and Filter Enhancements
-
-- **Status**: Fixed
-- **Priority**: Low (completed)
-- **Description**: Comprehensive sort and filter system for all browsing pages
-- **Completed Work**:
-- **Available Sort Fields** (from Stash GraphQL API):
-  - **Scenes**: bitrate, created_at, date, duration, filesize, framerate, last_o_at, last_played_at, path, performer_count, play_count, play_duration, random, rating, tag_count, title, updated_at
-  - **Performers**: birthdate, career_length, created_at, height, last_o_at, last_played_at, measurements, name, o_counter, penis_length, play_count, random, rating, scenes_count, updated_at, weight
-  - **Studios**: created_at, name, random, rating, scenes_count, updated_at
-  - **Tags**: created_at, name, random, scenes_count, updated_at
-- **Available Filters** (from Stash GraphQL API):
-  - **Scene Filters**:
-    - Date fields (date, created_at, last_played_at, updated_at) - modifiers: GREATER_THAN, LESS_THAN, BETWEEN, NOT_BETWEEN
-    - Duration fields (duration, play_duration) - format: hh:mm:ss.ms
-    - Text search (audio_codec, details, director, title) - modifier: INCLUDES
-    - Boolean (favorite, organized, performer_favorite) - true/false
-    - Numeric (bitrate, framerate, play_count, o_counter, rating100, performer_age, performer_count, tag_count) - modifiers: EQUALS, GREATER_THAN, LESS_THAN
-    - Resolution (360p, 480p, 540p, 720p, 1080p, 1440p, 4k) - modifiers: EQUALS, GREATER_THAN, LESS_THAN
-    - Relations (performers, tags, studios) - modifier: INCLUDES, INCLUDES_ALL with depth
-  - **Performer Filters**: birthdate, death_date, created_at, updated_at (dates), details/name/ethnicity/etc (text search), favorite (boolean), age/height/rating/etc (numeric), gender (MALE/FEMALE)
-  - **Studio Filters**: created_at, updated_at (dates), details/name (text search), favorite (boolean), rating100/scene_count (numeric)
-  - **Tag Filters**: created_at, updated_at (dates), description/name (text search), favorite (boolean), scene_count (numeric)
-  - **Complete sort system** with 18+ sort options per artifact type
-  - **Ascending/descending toggle** with visual indicator
-  - **Comprehensive filter panel** with 20+ filter types for scenes
-  - **Filter types supported**: checkbox, select, text, range, date-range
-  - **Active filter chips** showing currently applied filters with one-click removal
-  - **URL persistence** - all sort/filter state saved to URL query params for bookmarking and sharing
-  - **Saved filter presets** - users can save, load, and delete custom filter configurations
-  - **Per-artifact presets** - separate saved presets for scenes, performers, studios, and tags
-  - **Manual apply** - filters only apply when user clicks "Apply Filters" button
-  - **Works on all pages**: Scenes, Performers, Studios, Tags
-- **Completed Features**:
-  - Sort dropdown with all available GraphQL fields per entity type
-  - Collapsible filter panel with grid layout
-  - Clear All Filters button
-  - Active filter count badge on Filters button
-  - Active filter chips with remove buttons
-  - URL query parameter persistence (shareable links)
-  - Save Preset dialog with name input
-  - Load Preset dropdown with delete buttons
-  - Filter presets stored per user in database
-  - Presets sync across all devices for the user
-- **Technical Implementation**:
-  - **Components Created**:
-    - `client/src/components/ui/ActiveFilterChips.jsx` - Removable filter badges
-    - `client/src/components/ui/FilterPresets.jsx` - Save/load preset UI
-    - `client/src/utils/urlParams.js` - URL serialization/deserialization utilities
-  - **Components Modified**:
-    - `client/src/components/ui/SearchControls.jsx` - Integrated all features
-    - `client/src/components/ui/FilterControls.jsx` - Filter panel components
-    - `client/src/utils/filterConfig.js` - Already had comprehensive filter definitions
-  - **Backend**:
-    - `server/prisma/schema.prisma` - Added `filterPresets Json?` field to User model
-    - `server/prisma/migrations/20250119000000_add_filter_presets/migration.sql` - Database migration
-    - `server/controllers/user.ts` - Added `getFilterPresets`, `saveFilterPreset`, `deleteFilterPreset` endpoints
-    - `server/routes/user.ts` - Added routes for filter preset management
-  - **Database**: Filter presets stored as JSON: `{scene: [{id, name, filters, sort, direction, createdAt}], performer: [...], studio: [...], tag: [...]}`
-  - **URL Format**: `?sort=rating&dir=DESC&page=2&q=search&favorite=true&duration_min=10&duration_max=30`
-  - **React Router**: Uses `useSearchParams` hook for URL state management
-- **Benefit**: Powerful content discovery, shareable filtered views, personalized saved searches, professional filtering UX
-
-## Homepage Carousel Customization
-
-- **Status**: Fixed
-- **Priority**: Low
-- **Description**: Allow user customization of homepage carousels
-- **Completed Work**:
-  - Added `carouselPreferences` JSON field to User database schema
-  - Created database migration for the new field
-  - Set default carousel preferences on user creation (8 carousels, all enabled)
-  - Updated getUserSettings and updateUserSettings API endpoints to handle carousel preferences
-  - Added comprehensive validation for carousel preference format (id/enabled/order)
-  - Created CarouselSettings component with HTML5 drag-and-drop for reordering
-  - Toggle carousel visibility with eye icon button
-  - Save/Cancel buttons appear only when changes are made
-  - Homepage fetches user preferences and filters/sorts carousels accordingly
-  - Integrated carousel settings into user settings page
-  - All 8 existing carousel types are customizable
-- **Current Carousels**:
-  - High Rated - Top rated scenes
-  - Recently Added - Newly added content
-  - Feature Length - Longer duration scenes
-  - High Bitrate - Highest quality videos
-  - Barely Legal - 18 year old performers
-  - Favorite Performers - Scenes with favorite performers
-  - Favorite Studios - Content from favorite studios
-  - Favorite Tags - Scenes with favorite tags
-- **Technical Implementation**:
-  - Database: `server/prisma/schema.prisma` - added carouselPreferences JSON field
-  - Migration: `server/prisma/migrations/20250118000000_add_carousel_preferences/migration.sql`
-  - Backend: `server/controllers/user.ts` - carousel preference handling with validation
-  - Component: `client/src/components/settings/CarouselSettings.jsx` - drag-and-drop UI
-  - Updated: `client/src/components/pages/Home.jsx` - fetches and applies user preferences
-  - Updated: `client/src/components/pages/Settings.jsx` - integrated carousel settings section
-  - Carousel preferences stored as JSON array: `[{id: string, enabled: boolean, order: number}]`
-  - Default preferences inlined in user.ts to avoid ESM loading issues
-  - Homepage filters disabled carousels and sorts by user's preferred order
-  - Drag-and-drop uses native HTML5 events with visual feedback (opacity changes)
-- **Benefit**: Personalized homepage, users control which carousels they see and in what order
-
 ## Loading State Improvements
 
 - **Status**: Idea
@@ -182,41 +80,6 @@ _No items currently at high priority._
   - May need to poll API for transcode progress
   - Use Video.js buffer events for buffer status
 - **Benefit**: Less user confusion during waits, better perceived performance
-
-## Keyboard Shortcuts
-
-- **Status**: Fixed
-- **Priority**: Low (originally), upgraded during implementation
-- **Description**: Comprehensive keyboard navigation for entire app including TV remote support
-- **Completed Work**:
-  - **Spatial Grid Navigation**: 2D arrow key navigation for scene grids (Netflix-style)
-  - **Media Key Support**: Play/pause, next/prev track, seek, volume control
-  - **Focus Management**: Auto-focus on page load, focus trapping in modals
-  - **Visual Indicators**: Prominent blue glow with pulsing animation for focused elements
-  - **Complete Coverage**: Works on Scenes page, Scene detail page, and all grids
-  - Created reusable hooks: `useSpatialNavigation`, `useMediaKeys`, `useFocusTrap`, `useInitialFocus`
-  - Added comprehensive keyboard navigation documentation
-- **Implemented Features**:
-  - Scene grid: Arrow keys (2D spatial), Enter/Space (select), PageUp/Down (pagination), Home/End
-  - Video player: Space (play/pause), M (mute), F (fullscreen), Ctrl+arrows (seek/volume)
-  - Playlist: Media next/prev keys for playlist navigation
-  - Modals: Tab cycling, Escape to close, focus trapping
-  - Auto-focus: First meaningful element focused on page load
-- **Technical Implementation**:
-  - **Hooks**: `client/src/hooks/useSpatialNavigation.js` - Reusable 2D grid navigation
-  - **Hooks**: `client/src/hooks/useMediaKeys.js` - Media key handling with playlist support
-  - **Hooks**: `client/src/hooks/useFocusTrap.js` - Modal focus trapping and initial focus
-  - **Styling**: `client/src/index.css` - TV-friendly focus indicators with glow effect
-  - **Updated Components**: SceneGrid.jsx, VideoPlayer.jsx, Scene.jsx, Scenes.jsx, ConfirmDialog.jsx
-  - Works with keyboards, media remotes, Bluetooth controllers, and TV remotes
-  - Respects text input fields (arrow keys work normally in search boxes)
-  - Smooth scrolling to keep focused items visible
-  - Accessibility-friendly with ARIA labels
-- **Documentation**:
-  - Created comprehensive keyboard navigation guide: `docs/user-guide/keyboard-navigation.md`
-  - Updated README.md with keyboard navigation feature
-  - Includes quick reference table and troubleshooting section
-- **Benefit**: Full TV remote control support, power user efficiency, accessibility improvements, 10-foot UI experience
 
 ## Download Content for Offline Viewing
 
@@ -263,48 +126,6 @@ _No items currently at high priority._
   - Files: `server/prisma/schema.prisma`, `server/prisma/migrations/`
   - Add migration commands to deployment documentation
 - **Benefit**: Easier upgrades, less risk of data loss, safer schema changes
-
-## Docker Image Optimization
-
-- **Status**: Fixed
-- **Priority**: Low
-- **Description**: Reduce Docker image size and build time
-- **Completed Work**:
-  - Upgraded Node version from 18-slim to 22-slim (latest LTS)
-  - Changed from `npm install` to `npm ci` for reproducible builds
-  - Added `--omit=dev` in production stage to exclude dev dependencies
-  - Improved layer caching by copying package files before source
-  - Extracted nginx config and startup script to separate files
-  - Enhanced `.dockerignore` with comprehensive exclusions
-  - Added healthcheck for container monitoring
-  - Optimized apt-get with `--no-install-recommends`
-  - Combined RUN commands to reduce layers
-  - Created external config files (`docker/nginx.conf`, `docker/start.sh`)
-  - Added runtime optimizations (NODE_OPTIONS, curl for healthcheck)
-- **Final Image Size**: 1.57GB (reasonable for full-stack app with FFmpeg)
-- **Technical Implementation**:
-  - Files updated: `Dockerfile.production`, `.dockerignore`
-  - Files created: `docker/nginx.conf`, `docker/start.sh`, `DOCKER_OPTIMIZATION.md`
-  - Three-stage build: frontend-build, backend-build, production
-  - Frontend stage: npm ci, build optimized React app
-  - Backend stage: includes build tools (python3, make, g++), compiles TypeScript
-  - Production stage: only runtime deps (ffmpeg, nginx, sqlite3, curl)
-  - Build command: `docker build -f Dockerfile.production -t peek-stash-browser:optimized .`
-- **Benefits Achieved**:
-  - Latest Node LTS with security patches and performance improvements
-  - Reproducible builds with npm ci
-  - Smaller runtime image (no dev dependencies)
-  - Better build caching (faster rebuilds when only code changes)
-  - More maintainable (config files separate from Dockerfile)
-  - Container health monitoring via healthcheck
-  - Improved startup logging
-- **Documentation**: See `DOCKER_OPTIMIZATION.md` for detailed summary
-- **Future Considerations** (optional):
-  - Consider Alpine base image (requires testing with native npm modules)
-  - Multi-architecture builds for ARM support
-  - Security scanning with `docker scan`
-  - Analyze FFmpeg codecs to potentially reduce size
-- **Benefit**: Faster deployments, better security, easier maintenance, reproducible builds
 
 ## Testing Infrastructure
 
@@ -783,6 +604,185 @@ These items need more planning/discussion before moving to actionable status.
     - `docs/user-guide/search-browse.md` - Added scene card preview description
     - `README.md` - Added "Visual Previews" to features list
 - **Benefit**: Professional streaming UX matching YouTube/Netflix, faster content discovery, precise seeking with visual feedback, no additional media generation required
+
+## Docker Image Optimization
+
+- **Status**: Fixed
+- **Priority**: Low
+- **Description**: Reduce Docker image size and build time
+- **Completed Work**:
+  - Upgraded Node version from 18-slim to 22-slim (latest LTS)
+  - Changed from `npm install` to `npm ci` for reproducible builds
+  - Added `--omit=dev` in production stage to exclude dev dependencies
+  - Improved layer caching by copying package files before source
+  - Extracted nginx config and startup script to separate files
+  - Enhanced `.dockerignore` with comprehensive exclusions
+  - Added healthcheck for container monitoring
+  - Optimized apt-get with `--no-install-recommends`
+  - Combined RUN commands to reduce layers
+  - Created external config files (`docker/nginx.conf`, `docker/start.sh`)
+  - Added runtime optimizations (NODE_OPTIONS, curl for healthcheck)
+- **Final Image Size**: 1.57GB (reasonable for full-stack app with FFmpeg)
+- **Technical Implementation**:
+  - Files updated: `Dockerfile.production`, `.dockerignore`
+  - Files created: `docker/nginx.conf`, `docker/start.sh`, `DOCKER_OPTIMIZATION.md`
+  - Three-stage build: frontend-build, backend-build, production
+  - Frontend stage: npm ci, build optimized React app
+  - Backend stage: includes build tools (python3, make, g++), compiles TypeScript
+  - Production stage: only runtime deps (ffmpeg, nginx, sqlite3, curl)
+  - Build command: `docker build -f Dockerfile.production -t peek-stash-browser:optimized .`
+- **Benefits Achieved**:
+  - Latest Node LTS with security patches and performance improvements
+  - Reproducible builds with npm ci
+  - Smaller runtime image (no dev dependencies)
+  - Better build caching (faster rebuilds when only code changes)
+  - More maintainable (config files separate from Dockerfile)
+  - Container health monitoring via healthcheck
+  - Improved startup logging
+- **Documentation**: See `DOCKER_OPTIMIZATION.md` for detailed summary
+- **Future Considerations** (optional):
+  - Consider Alpine base image (requires testing with native npm modules)
+  - Multi-architecture builds for ARM support
+  - Security scanning with `docker scan`
+  - Analyze FFmpeg codecs to potentially reduce size
+- **Benefit**: Faster deployments, better security, easier maintenance, reproducible builds
+
+## Scene Browsing: Sort and Filter Enhancements
+
+- **Status**: Fixed
+- **Priority**: Low (completed)
+- **Description**: Comprehensive sort and filter system for all browsing pages
+- **Completed Work**:
+- **Available Sort Fields** (from Stash GraphQL API):
+  - **Scenes**: bitrate, created_at, date, duration, filesize, framerate, last_o_at, last_played_at, path, performer_count, play_count, play_duration, random, rating, tag_count, title, updated_at
+  - **Performers**: birthdate, career_length, created_at, height, last_o_at, last_played_at, measurements, name, o_counter, penis_length, play_count, random, rating, scenes_count, updated_at, weight
+  - **Studios**: created_at, name, random, rating, scenes_count, updated_at
+  - **Tags**: created_at, name, random, scenes_count, updated_at
+- **Available Filters** (from Stash GraphQL API):
+  - **Scene Filters**:
+    - Date fields (date, created_at, last_played_at, updated_at) - modifiers: GREATER_THAN, LESS_THAN, BETWEEN, NOT_BETWEEN
+    - Duration fields (duration, play_duration) - format: hh:mm:ss.ms
+    - Text search (audio_codec, details, director, title) - modifier: INCLUDES
+    - Boolean (favorite, organized, performer_favorite) - true/false
+    - Numeric (bitrate, framerate, play_count, o_counter, rating100, performer_age, performer_count, tag_count) - modifiers: EQUALS, GREATER_THAN, LESS_THAN
+    - Resolution (360p, 480p, 540p, 720p, 1080p, 1440p, 4k) - modifiers: EQUALS, GREATER_THAN, LESS_THAN
+    - Relations (performers, tags, studios) - modifier: INCLUDES, INCLUDES_ALL with depth
+  - **Performer Filters**: birthdate, death_date, created_at, updated_at (dates), details/name/ethnicity/etc (text search), favorite (boolean), age/height/rating/etc (numeric), gender (MALE/FEMALE)
+  - **Studio Filters**: created_at, updated_at (dates), details/name (text search), favorite (boolean), rating100/scene_count (numeric)
+  - **Tag Filters**: created_at, updated_at (dates), description/name (text search), favorite (boolean), scene_count (numeric)
+  - **Complete sort system** with 18+ sort options per artifact type
+  - **Ascending/descending toggle** with visual indicator
+  - **Comprehensive filter panel** with 20+ filter types for scenes
+  - **Filter types supported**: checkbox, select, text, range, date-range
+  - **Active filter chips** showing currently applied filters with one-click removal
+  - **URL persistence** - all sort/filter state saved to URL query params for bookmarking and sharing
+  - **Saved filter presets** - users can save, load, and delete custom filter configurations
+  - **Per-artifact presets** - separate saved presets for scenes, performers, studios, and tags
+  - **Manual apply** - filters only apply when user clicks "Apply Filters" button
+  - **Works on all pages**: Scenes, Performers, Studios, Tags
+- **Completed Features**:
+  - Sort dropdown with all available GraphQL fields per entity type
+  - Collapsible filter panel with grid layout
+  - Clear All Filters button
+  - Active filter count badge on Filters button
+  - Active filter chips with remove buttons
+  - URL query parameter persistence (shareable links)
+  - Save Preset dialog with name input
+  - Load Preset dropdown with delete buttons
+  - Filter presets stored per user in database
+  - Presets sync across all devices for the user
+- **Technical Implementation**:
+  - **Components Created**:
+    - `client/src/components/ui/ActiveFilterChips.jsx` - Removable filter badges
+    - `client/src/components/ui/FilterPresets.jsx` - Save/load preset UI
+    - `client/src/utils/urlParams.js` - URL serialization/deserialization utilities
+  - **Components Modified**:
+    - `client/src/components/ui/SearchControls.jsx` - Integrated all features
+    - `client/src/components/ui/FilterControls.jsx` - Filter panel components
+    - `client/src/utils/filterConfig.js` - Already had comprehensive filter definitions
+  - **Backend**:
+    - `server/prisma/schema.prisma` - Added `filterPresets Json?` field to User model
+    - `server/prisma/migrations/20250119000000_add_filter_presets/migration.sql` - Database migration
+    - `server/controllers/user.ts` - Added `getFilterPresets`, `saveFilterPreset`, `deleteFilterPreset` endpoints
+    - `server/routes/user.ts` - Added routes for filter preset management
+  - **Database**: Filter presets stored as JSON: `{scene: [{id, name, filters, sort, direction, createdAt}], performer: [...], studio: [...], tag: [...]}`
+  - **URL Format**: `?sort=rating&dir=DESC&page=2&q=search&favorite=true&duration_min=10&duration_max=30`
+  - **React Router**: Uses `useSearchParams` hook for URL state management
+- **Benefit**: Powerful content discovery, shareable filtered views, personalized saved searches, professional filtering UX
+
+## Homepage Carousel Customization
+
+- **Status**: Fixed
+- **Priority**: Low
+- **Description**: Allow user customization of homepage carousels
+- **Completed Work**:
+  - Added `carouselPreferences` JSON field to User database schema
+  - Created database migration for the new field
+  - Set default carousel preferences on user creation (8 carousels, all enabled)
+  - Updated getUserSettings and updateUserSettings API endpoints to handle carousel preferences
+  - Added comprehensive validation for carousel preference format (id/enabled/order)
+  - Created CarouselSettings component with HTML5 drag-and-drop for reordering
+  - Toggle carousel visibility with eye icon button
+  - Save/Cancel buttons appear only when changes are made
+  - Homepage fetches user preferences and filters/sorts carousels accordingly
+  - Integrated carousel settings into user settings page
+  - All 8 existing carousel types are customizable
+- **Current Carousels**:
+  - High Rated - Top rated scenes
+  - Recently Added - Newly added content
+  - Feature Length - Longer duration scenes
+  - High Bitrate - Highest quality videos
+  - Barely Legal - 18 year old performers
+  - Favorite Performers - Scenes with favorite performers
+  - Favorite Studios - Content from favorite studios
+  - Favorite Tags - Scenes with favorite tags
+- **Technical Implementation**:
+  - Database: `server/prisma/schema.prisma` - added carouselPreferences JSON field
+  - Migration: `server/prisma/migrations/20250118000000_add_carousel_preferences/migration.sql`
+  - Backend: `server/controllers/user.ts` - carousel preference handling with validation
+  - Component: `client/src/components/settings/CarouselSettings.jsx` - drag-and-drop UI
+  - Updated: `client/src/components/pages/Home.jsx` - fetches and applies user preferences
+  - Updated: `client/src/components/pages/Settings.jsx` - integrated carousel settings section
+  - Carousel preferences stored as JSON array: `[{id: string, enabled: boolean, order: number}]`
+  - Default preferences inlined in user.ts to avoid ESM loading issues
+  - Homepage filters disabled carousels and sorts by user's preferred order
+  - Drag-and-drop uses native HTML5 events with visual feedback (opacity changes)
+- **Benefit**: Personalized homepage, users control which carousels they see and in what order
+
+## Keyboard Shortcuts
+
+- **Status**: Fixed
+- **Priority**: Low (originally), upgraded during implementation
+- **Description**: Comprehensive keyboard navigation for entire app including TV remote support
+- **Completed Work**:
+  - **Spatial Grid Navigation**: 2D arrow key navigation for scene grids (Netflix-style)
+  - **Media Key Support**: Play/pause, next/prev track, seek, volume control
+  - **Focus Management**: Auto-focus on page load, focus trapping in modals
+  - **Visual Indicators**: Prominent blue glow with pulsing animation for focused elements
+  - **Complete Coverage**: Works on Scenes page, Scene detail page, and all grids
+  - Created reusable hooks: `useSpatialNavigation`, `useMediaKeys`, `useFocusTrap`, `useInitialFocus`
+  - Added comprehensive keyboard navigation documentation
+- **Implemented Features**:
+  - Scene grid: Arrow keys (2D spatial), Enter/Space (select), PageUp/Down (pagination), Home/End
+  - Video player: Space (play/pause), M (mute), F (fullscreen), Ctrl+arrows (seek/volume)
+  - Playlist: Media next/prev keys for playlist navigation
+  - Modals: Tab cycling, Escape to close, focus trapping
+  - Auto-focus: First meaningful element focused on page load
+- **Technical Implementation**:
+  - **Hooks**: `client/src/hooks/useSpatialNavigation.js` - Reusable 2D grid navigation
+  - **Hooks**: `client/src/hooks/useMediaKeys.js` - Media key handling with playlist support
+  - **Hooks**: `client/src/hooks/useFocusTrap.js` - Modal focus trapping and initial focus
+  - **Styling**: `client/src/index.css` - TV-friendly focus indicators with glow effect
+  - **Updated Components**: SceneGrid.jsx, VideoPlayer.jsx, Scene.jsx, Scenes.jsx, ConfirmDialog.jsx
+  - Works with keyboards, media remotes, Bluetooth controllers, and TV remotes
+  - Respects text input fields (arrow keys work normally in search boxes)
+  - Smooth scrolling to keep focused items visible
+  - Accessibility-friendly with ARIA labels
+- **Documentation**:
+  - Created comprehensive keyboard navigation guide: `docs/user-guide/keyboard-navigation.md`
+  - Updated README.md with keyboard navigation feature
+  - Includes quick reference table and troubleshooting section
+- **Benefit**: Full TV remote control support, power user efficiency, accessibility improvements, 10-foot UI experience
 
 ---
 

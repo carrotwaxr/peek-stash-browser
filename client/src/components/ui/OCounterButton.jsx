@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { apiPost } from '../../services/api.js';
 
 /**
@@ -22,6 +22,11 @@ const OCounterButton = ({
   const [isIncrementing, setIsIncrementing] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [error, setError] = useState(null);
+
+  // Sync count when initialCount changes (e.g., from parent callback)
+  useEffect(() => {
+    setCount(initialCount);
+  }, [initialCount]);
 
   const handleClick = async (e) => {
     // Stop propagation to prevent triggering parent click handlers (like navigating to scene)

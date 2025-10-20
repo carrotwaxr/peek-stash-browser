@@ -1,3 +1,5 @@
+import SearchableSelect from "./SearchableSelect.jsx";
+
 /**
  * Reusable Sort Control Component
  */
@@ -47,6 +49,8 @@ export const FilterControl = ({
   placeholder = "",
   min,
   max,
+  entityType, // for searchable-select
+  multi, // for searchable-select
 }) => {
   const baseInputStyle = {
     backgroundColor: "var(--bg-card)",
@@ -91,6 +95,16 @@ export const FilterControl = ({
               </option>
             ))}
           </select>
+        );
+      case "searchable-select":
+        return (
+          <SearchableSelect
+            entityType={entityType}
+            value={value}
+            onChange={onChange}
+            multi={multi}
+            placeholder={placeholder || `Select ${label}...`}
+          />
         );
       case "number":
         return (
@@ -153,22 +167,31 @@ export const FilterControl = ({
         );
       case "date-range":
         return (
-          <div className="flex space-x-2">
-            <input
-              type="date"
-              value={value?.start || ""}
-              onChange={(e) => onChange({ ...value, start: e.target.value })}
-              className="px-3 py-2 border rounded-md text-sm w-full"
-              style={baseInputStyle}
-            />
-            <span className="self-center text-sm" style={{ color: "var(--text-secondary)" }}>to</span>
-            <input
-              type="date"
-              value={value?.end || ""}
-              onChange={(e) => onChange({ ...value, end: e.target.value })}
-              className="px-3 py-2 border rounded-md text-sm w-full"
-              style={baseInputStyle}
-            />
+          <div className="flex flex-col space-y-2">
+            <div>
+              <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+                From:
+              </div>
+              <input
+                type="date"
+                value={value?.start || ""}
+                onChange={(e) => onChange({ ...value, start: e.target.value })}
+                className="px-3 py-2 border rounded-md text-sm w-full"
+                style={baseInputStyle}
+              />
+            </div>
+            <div>
+              <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+                To:
+              </div>
+              <input
+                type="date"
+                value={value?.end || ""}
+                onChange={(e) => onChange({ ...value, end: e.target.value })}
+                className="px-3 py-2 border rounded-md text-sm w-full"
+                style={baseInputStyle}
+              />
+            </div>
           </div>
         );
       case "time-range":

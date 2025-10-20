@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
 import VideoPoster from "./VideoPoster.jsx";
 import SeekPreview from "./SeekPreview.jsx";
-import ResumeWatchDialog from "./ResumeWatchDialog.jsx";
 import { useVideoPlayer } from "./useVideoPlayer.js";
 import { usePlaylistNavigation } from "./usePlaylistNavigation.js";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
+import { useOrientationFullscreen } from "../../hooks/useOrientationFullscreen.js";
 import {
   setupHLSforVOD,
   setupLoadingBuffer,
@@ -28,6 +29,9 @@ const VideoPlayer = ({
   externalQuality,
   externalSetQuality,
 }) => {
+  const location = useLocation();
+  const hasResumedRef = useRef(false); // Track if we've already resumed
+  const initialResumeTimeRef = useRef(null); // Store initial resume time
   const {
     videoRef,
     playerRef,
@@ -66,9 +70,6 @@ const VideoPlayer = ({
     updateQuality,
   } = useWatchHistory(scene?.id, playerRef);
 
-  // Resume dialog state
-  const [showResumeDialog, setShowResumeDialog] = useState(false);
-  const [hasHandledResume, setHasHandledResume] = useState(false);
 
   // Sync internal quality with external when external changes
   useEffect(() => {
@@ -83,6 +84,23 @@ const VideoPlayer = ({
     navigate
   );
 
+  // Reset resume flag and initial resume time when scene changes
+  useEffect(() => {
+    hasResumedRef.current = false;
+    initialResumeTimeRef.current = null;
+  }, [scene.id]);
+
+  // Capture initial resume time when watch history loads (before tracking starts and resets it)
+  useEffect(() => {
+    const shouldResume = location.state?.shouldResume;
+
+    if (shouldResume && initialResumeTimeRef.current === null && !loadingWatchHistory && watchHistory?.resumeTime > 0) {
+      console.log('[Resume Debug] Captured initial resume time:', watchHistory.resumeTime);
+      initialResumeTimeRef.current = watchHistory.resumeTime;
+    }
+  }, [loadingWatchHistory, watchHistory, location.state]);
+
+
   // Media key support (play/pause, next/prev track)
   usePlaylistMediaKeys({
     playerRef,
@@ -91,6 +109,9 @@ const VideoPlayer = ({
     playPrevious: playPreviousInPlaylist,
     enabled: !showPoster, // Only enable when video is playing
   });
+
+  // Auto-fullscreen on landscape orientation (mobile)
+  useOrientationFullscreen(playerRef, !showPoster);
 
   // Handle quality changes
   useEffect(() => {
@@ -184,6 +205,11 @@ const VideoPlayer = ({
       playerRef.current = videojs(videoElement, videoJsOptions, () => {
         const player = playerRef.current;
 
+        // Check if player was disposed during async initialization
+        if (!player || player.isDisposed()) {
+          return;
+        }
+
         if (!isDirectPlay && player.liveTracker) {
           disableLiveTracker(player);
         }
@@ -191,9 +217,32 @@ const VideoPlayer = ({
         setIsInitializing(false);
 
         player.ready(() => {
-          player.play().catch(() => {
-            // Autoplay failed, user interaction required
-          });
+          // Check again if player still exists and is not disposed
+          if (!playerRef.current || playerRef.current.isDisposed()) {
+            return;
+          }
+
+          // Handle resume or normal play
+          const shouldResume = location.state?.shouldResume;
+          const resumeTime = initialResumeTimeRef.current;
+
+          if (shouldResume && !hasResumedRef.current && resumeTime > 0) {
+            // Resume from saved position
+            console.log('[Resume Debug] Player ready, resuming to:', resumeTime);
+            hasResumedRef.current = true;
+
+            player.currentTime(resumeTime);
+            player.play().then(() => {
+              console.log('[Resume Debug] Playing from resume time:', player.currentTime());
+            }).catch((err) => {
+              console.log('[Resume Debug] Autoplay failed:', err.message);
+            });
+          } else {
+            // Normal play from beginning
+            player.play().catch(() => {
+              // Autoplay failed, user interaction required
+            });
+          }
         });
 
         // Add error handler for direct play failures
@@ -201,6 +250,11 @@ const VideoPlayer = ({
           let hasTriggeredFallback = false;
 
           player.on("error", () => {
+            // Check if player still exists and is not disposed
+            if (!playerRef.current || playerRef.current.isDisposed()) {
+              return;
+            }
+
             if (hasTriggeredFallback) return;
 
             const error = player.error();
@@ -217,6 +271,11 @@ const VideoPlayer = ({
                     `/video/play?sceneId=${scene.id}&quality=480p`
                   )
                   .then((response) => {
+                    // Check again if player still exists before applying changes
+                    if (!playerRef.current || playerRef.current.isDisposed()) {
+                      return;
+                    }
+
                     setVideo(response.data.scene);
                     setSessionId(response.data.sessionId);
 
@@ -233,6 +292,9 @@ const VideoPlayer = ({
                     disableLiveTracker(player, "after fallback");
 
                     player.one("loadedmetadata", () => {
+                      if (!playerRef.current || playerRef.current.isDisposed()) {
+                        return;
+                      }
                       player.currentTime(0);
                     });
 
@@ -278,12 +340,10 @@ const VideoPlayer = ({
 
         // Setup watch history event listeners
         const handlePlay = () => {
-          console.log('Watch history tracking started for scene:', scene.id);
           startTracking();
         };
 
         const handlePause = () => {
-          console.log('Watch history tracking paused for scene:', scene.id);
           stopTracking();
         };
 
@@ -293,7 +353,6 @@ const VideoPlayer = ({
         };
 
         const handleEnded = () => {
-          console.log('Watch history tracking ended for scene:', scene.id);
           stopTracking();
         };
 
@@ -340,12 +399,6 @@ const VideoPlayer = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show resume dialog when watch history loads with resume time
-  useEffect(() => {
-    if (!loadingWatchHistory && watchHistory && watchHistory.exists && watchHistory.resumeTime > 0 && !hasHandledResume && !showPoster) {
-      setShowResumeDialog(true);
-    }
-  }, [loadingWatchHistory, watchHistory, hasHandledResume, showPoster]);
 
   // Track quality changes for watch history
   useEffect(() => {
@@ -354,39 +407,15 @@ const VideoPlayer = ({
     }
   }, [quality, updateQuality]);
 
-  const handleResumeWatch = () => {
-    const player = playerRef.current;
-    if (player && watchHistory?.resumeTime) {
-      player.currentTime(watchHistory.resumeTime);
-      player.play().catch(() => {
-        // Autoplay failed
-      });
-    }
-    setShowResumeDialog(false);
-    setHasHandledResume(true);
-  };
-
-  const handleStartFromBeginning = () => {
-    const player = playerRef.current;
-    if (player) {
-      player.currentTime(0);
-      player.play().catch(() => {
-        // Autoplay failed
-      });
-    }
-    setShowResumeDialog(false);
-    setHasHandledResume(true);
-  };
-
   const handlePlay = () => {
     setIsInitializing(true);
     fetchVideoData();
   };
 
   return (
-    <section className="py-6">
+    <section>
       <div className="video-container" style={{ position: 'relative' }}>
-        {showPoster ? (
+        {showPoster && (
           <VideoPoster
             scene={scene}
             isInitializing={isInitializing}
@@ -394,22 +423,12 @@ const VideoPlayer = ({
             isAutoFallback={isAutoFallback}
             onPlay={handlePlay}
           />
-        ) : (
-          <div data-vjs-player style={{ position: 'relative' }}>
-            <video ref={videoRef} className="video-js vjs-big-play-centered" />
-            <SeekPreview scene={scene} playerRef={playerRef} />
-          </div>
         )}
 
-        {/* Resume watch dialog */}
-        {watchHistory && watchHistory.resumeTime > 0 && (
-          <ResumeWatchDialog
-            isOpen={showResumeDialog}
-            onResume={handleResumeWatch}
-            onStartFromBeginning={handleStartFromBeginning}
-            resumeTime={watchHistory.resumeTime}
-          />
-        )}
+        <div key={scene.id} data-vjs-player style={{ position: 'relative', display: showPoster ? 'none' : 'block' }}>
+          <video ref={videoRef} className="video-js vjs-big-play-centered" />
+          {!showPoster && <SeekPreview scene={scene} playerRef={playerRef} />}
+        </div>
       </div>
     </section>
   );

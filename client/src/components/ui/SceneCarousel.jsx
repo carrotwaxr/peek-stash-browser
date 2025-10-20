@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import SceneCard from "./SceneCard.jsx";
 
-const SceneCarousel = ({ title, titleIcon, scenes, loading = false, onSceneClick }) => {
+const SceneCarousel = ({
+  title,
+  titleIcon,
+  scenes,
+  loading = false,
+  onSceneClick,
+  selectedScenes = [],
+  onToggleSelect
+}) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef(null);
@@ -167,6 +175,8 @@ const SceneCarousel = ({ title, titleIcon, scenes, loading = false, onSceneClick
                 scene={scene}
                 onClick={onSceneClick}
                 enableKeyboard={false}
+                isSelected={selectedScenes.some(s => s.id === scene.id)}
+                onToggleSelect={onToggleSelect}
               />
             </div>
           ))}

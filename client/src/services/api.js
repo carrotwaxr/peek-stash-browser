@@ -139,6 +139,39 @@ export const libraryApi = {
     const result = await apiPost("/library/tags", { ids: [id] });
     return result?.findTags?.tags?.[0] || null;
   },
+
+  /**
+   * Find performers with minimal data (id + name only)
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @returns {Promise<Array>} Array of {id, name} objects
+   */
+  findPerformersMinimal: async (params = {}) => {
+    const result = await apiPost("/library/performers/minimal", params);
+    return result?.performers || [];
+  },
+
+  /**
+   * Find studios with minimal data (id + name only)
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @returns {Promise<Array>} Array of {id, name} objects
+   */
+  findStudiosMinimal: async (params = {}) => {
+    const result = await apiPost("/library/studios/minimal", params);
+    return result?.studios || [];
+  },
+
+  /**
+   * Find tags with minimal data (id + name only)
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @returns {Promise<Array>} Array of {id, name} objects
+   */
+  findTagsMinimal: async (params = {}) => {
+    const result = await apiPost("/library/tags/minimal", params);
+    return result?.tags || [];
+  },
 };
 
 // Valid sort field mappings for Stash GraphQL API

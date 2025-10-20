@@ -8,6 +8,7 @@ import Pagination from "../ui/Pagination.jsx";
 import BulkActionBar from "../ui/BulkActionBar.jsx";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 
 const SceneGrid = ({
   scenes,
@@ -23,17 +24,12 @@ const SceneGrid = ({
 }) => {
   const gridRef = useRef();
   const columns = useGridColumns('scenes');
+  const { isTVMode } = useTVMode();
 
-  // Multiselect state
-  const [isMultiselectMode, setIsMultiselectMode] = useState(false);
+  // Selection state (always enabled, no mode toggle)
   const [selectedScenes, setSelectedScenes] = useState([]);
 
-  // Multiselect handlers
-  const handleToggleMultiselect = () => {
-    setIsMultiselectMode(!isMultiselectMode);
-    setSelectedScenes([]);
-  };
-
+  // Selection handlers
   const handleToggleSelect = (scene) => {
     setSelectedScenes(prev => {
       const isSelected = prev.some(s => s.id === scene.id);
@@ -49,18 +45,17 @@ const SceneGrid = ({
     setSelectedScenes(scenes || []);
   };
 
-  const handleClearSelection = () => {
+  const handleDeselectAll = () => {
     setSelectedScenes([]);
   };
 
-  const handleExitMultiselect = () => {
-    setIsMultiselectMode(false);
+  const handleClearSelection = () => {
     setSelectedScenes([]);
   };
 
   // Handle selection with keyboard (Enter/Space)
   const handleKeyboardSelect = (scene) => {
-    if (isMultiselectMode) {
+    if (selectedScenes.length > 0) {
       handleToggleSelect(scene);
     } else {
       onSceneClick?.(scene);
@@ -71,22 +66,22 @@ const SceneGrid = ({
   const { focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
     items: scenes,
     columns,
-    enabled: enableKeyboard,
+    enabled: isTVMode && enableKeyboard,
     onSelect: handleKeyboardSelect,
     onPageUp: () => onPageChange && currentPage > 1 && onPageChange(currentPage - 1),
     onPageDown: () => onPageChange && currentPage < totalPages && onPageChange(currentPage + 1),
   });
 
-  // Set initial focus when grid loads
+  // Set initial focus when grid loads (only in TV mode)
   useEffect(() => {
-    if (enableKeyboard && scenes?.length > 0 && gridRef.current) {
+    if (isTVMode && enableKeyboard && scenes?.length > 0 && gridRef.current) {
       // Focus the grid container to enable keyboard navigation
       const firstFocusable = gridRef.current.querySelector('[tabindex="0"]');
       if (firstFocusable) {
         firstFocusable.focus();
       }
     }
-  }, [enableKeyboard, scenes]);
+  }, [isTVMode, enableKeyboard, scenes]);
 
   // Clear selections when page changes
   useEffect(() => {
@@ -122,32 +117,9 @@ const SceneGrid = ({
 
   return (
     <div className="space-y-6">
-      {/* Multiselect Controls */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={handleToggleMultiselect}
-          className="px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2"
-          style={{
-            backgroundColor: isMultiselectMode ? "var(--accent-primary)" : "var(--bg-card)",
-            borderColor: "var(--border-color)",
-            border: "1px solid",
-            color: isMultiselectMode ? "white" : "var(--text-primary)",
-          }}
-        >
-          {isMultiselectMode ? (
-            <>
-              <LucideCheckSquare className="w-4 h-4" />
-              <span>Exit Multiselect</span>
-            </>
-          ) : (
-            <>
-              <LucideSquare className="w-4 h-4" />
-              <span>Select Multiple</span>
-            </>
-          )}
-        </button>
-
-        {isMultiselectMode && (
+      {/* Selection Controls - Only shown when items are selected */}
+      {selectedScenes.length > 0 && (
+        <div className="flex items-center justify-end gap-3">
           <button
             onClick={handleSelectAll}
             className="px-4 py-2 rounded-md text-sm font-medium transition-colors border"
@@ -159,8 +131,19 @@ const SceneGrid = ({
           >
             Select All ({scenes?.length || 0})
           </button>
-        )}
-      </div>
+          <button
+            onClick={handleDeselectAll}
+            className="px-4 py-2 rounded-md text-sm font-medium transition-colors border"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              borderColor: "var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          >
+            Deselect All
+          </button>
+        </div>
+      )}
 
       {/* Grid */}
       <div
@@ -173,13 +156,12 @@ const SceneGrid = ({
             ref={(el) => setItemRef(index, el)}
             scene={scene}
             onClick={onSceneClick}
-            tabIndex={enableKeyboard ? (isFocused(index) ? 0 : -1) : -1}
+            tabIndex={isFocused(index) ? 0 : -1}
             className={
               isFocused(index)
                 ? "keyboard-focus"
                 : ""
             }
-            isMultiselectMode={isMultiselectMode}
             isSelected={selectedScenes.some(s => s.id === scene.id)}
             onToggleSelect={handleToggleSelect}
           />
@@ -196,11 +178,10 @@ const SceneGrid = ({
       )}
 
       {/* Bulk Action Bar */}
-      {isMultiselectMode && selectedScenes.length > 0 && (
+      {selectedScenes.length > 0 && (
         <BulkActionBar
           selectedScenes={selectedScenes}
           onClearSelection={handleClearSelection}
-          onExitMultiselect={handleExitMultiselect}
         />
       )}
     </div>

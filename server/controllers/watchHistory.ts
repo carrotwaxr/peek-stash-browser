@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/singleton.js';
 import { logger } from '../utils/logger.js';
+import getStash from '../stash.js';
 
 const MINIMUM_WATCH_DURATION = 300; // 5 minutes in seconds
 
@@ -54,16 +55,45 @@ export async function pingWatchHistory(req: Request, res: Response) {
       ? watchHistory.playHistory
       : JSON.parse(watchHistory.playHistory as string || '[]');
 
-    // Calculate session duration
-    let sessionDuration = 0;
+    // Calculate actual playback duration delta
+    let playbackDelta = 0;
+    let totalSessionDuration = 0;
+
     if (sessionStart) {
       const sessionStartTime = new Date(sessionStart);
-      sessionDuration = (now.getTime() - sessionStartTime.getTime()) / 1000;
+      totalSessionDuration = (now.getTime() - sessionStartTime.getTime()) / 1000;
+
+      // Calculate delta since last ping (use lastPlayedAt as reference)
+      const lastPingTime = watchHistory.lastPlayedAt || sessionStartTime;
+      const timeSinceLastPing = (now.getTime() - lastPingTime.getTime()) / 1000;
+
+      // Start with the time delta
+      playbackDelta = timeSinceLastPing;
+
+      // Subtract seek distances from the delta
+      if (seekEvents && Array.isArray(seekEvents) && seekEvents.length > 0) {
+        let totalSeekDistance = 0;
+        for (const seek of seekEvents) {
+          const distance = Math.abs(seek.to - seek.from);
+          totalSeekDistance += distance;
+        }
+
+        // Don't let seek distance exceed the time delta (prevent negative values)
+        playbackDelta = Math.max(0, timeSinceLastPing - totalSeekDistance);
+
+        logger.info('Adjusted playback delta for seeks', {
+          userId,
+          sceneId,
+          timeSinceLastPing: timeSinceLastPing.toFixed(2),
+          totalSeekDistance: totalSeekDistance.toFixed(2),
+          playbackDelta: playbackDelta.toFixed(2),
+        });
+      }
     }
 
     // Increment play count if this session has reached 5 minutes
     let newPlayCount = watchHistory.playCount;
-    if (sessionDuration >= MINIMUM_WATCH_DURATION && isNewSession) {
+    if (totalSessionDuration >= MINIMUM_WATCH_DURATION && isNewSession) {
       newPlayCount++;
       logger.info('Play count incremented', { userId, sceneId, newPlayCount });
     }
@@ -75,14 +105,15 @@ export async function pingWatchHistory(req: Request, res: Response) {
         resumeTime: currentTime,
         lastPlayedAt: now,
         playCount: newPlayCount,
-        playDuration: watchHistory.playDuration + (sessionDuration > 0 ? sessionDuration : 0),
+        playDuration: watchHistory.playDuration + playbackDelta,
         playHistory: JSON.stringify([
           ...playHistory,
           {
             startTime: sessionStart || now.toISOString(),
             endTime: now.toISOString(),
             quality: quality || 'unknown',
-            duration: sessionDuration,
+            duration: playbackDelta,
+            totalSessionDuration,
             seekEvents: seekEvents || [],
           },
         ]),
@@ -155,9 +186,30 @@ export async function incrementOCounter(req: Request, res: Response) {
       });
     }
 
+    // Also increment O counter in Stash and get the new global count
+    let stashOCount = watchHistory.oCount; // Fallback to Peek count if Stash fails
+    try {
+      logger.info('Attempting to increment O counter in Stash', { sceneId });
+      const stash = getStash();
+      logger.info('Got Stash instance', { stashUrl: process.env.STASH_URL });
+      const result = await stash.sceneIncrementO({ id: sceneId });
+      logger.info('Successfully incremented O counter in Stash', { sceneId, result });
+
+      // Use the Stash global count (result.sceneIncrementO is the new count)
+      stashOCount = result.sceneIncrementO || watchHistory.oCount;
+    } catch (stashError) {
+      // Don't fail the request if Stash is unavailable
+      logger.error('Failed to increment O counter in Stash', {
+        sceneId,
+        error: stashError,
+        errorMessage: (stashError as Error).message,
+        errorStack: (stashError as Error).stack
+      });
+    }
+
     res.json({
       success: true,
-      oCount: watchHistory.oCount,
+      oCount: stashOCount, // Return the Stash global count
       timestamp: now.toISOString(),
     });
   } catch (error) {
@@ -258,5 +310,35 @@ export async function getAllWatchHistory(req: Request, res: Response) {
   } catch (error) {
     logger.error('Error getting all watch history', { error });
     res.status(500).json({ error: 'Failed to get watch history' });
+  }
+}
+
+/**
+ * Clear all watch history for current user
+ */
+export async function clearAllWatchHistory(req: Request, res: Response) {
+  try {
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    logger.info('Clearing all watch history', { userId });
+
+    const result = await prisma.watchHistory.deleteMany({
+      where: { userId },
+    });
+
+    logger.info('Watch history cleared', { userId, deletedCount: result.count });
+
+    res.json({
+      success: true,
+      deletedCount: result.count,
+      message: `Cleared ${result.count} watch history records`,
+    });
+  } catch (error) {
+    logger.error('Error clearing watch history', { error });
+    res.status(500).json({ error: 'Failed to clear watch history' });
   }
 }

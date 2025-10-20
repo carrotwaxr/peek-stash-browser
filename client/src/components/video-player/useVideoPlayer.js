@@ -46,13 +46,18 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
     setIsSwitchingMode(false);
 
     if (playerRef.current) {
-      try {
-        playerRef.current.dispose();
-        playerRef.current = null;
-        console.log("[SCENE CHANGE] Player disposed");
-      } catch (e) {
-        console.warn("[SCENE CHANGE] Error disposing player:", e);
-      }
+      const player = playerRef.current;
+      playerRef.current = null;
+      console.log("[SCENE CHANGE] Player disposed");
+
+      // Dispose asynchronously to avoid DOM conflicts with React
+      setTimeout(() => {
+        try {
+          player.dispose();
+        } catch (e) {
+          console.warn("[SCENE CHANGE] Error disposing player:", e);
+        }
+      }, 0);
     }
   }, [scene.id]);
 

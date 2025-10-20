@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const TagDetail = () => {
@@ -42,10 +43,10 @@ const TagDetail = () => {
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
       <div className="max-w-none">
         {/* Back Button */}
-        <div className="mb-6">
+        <div className="mt-6 mb-6">
           <Link
             to="/tags"
-            className="inline-flex items-center px-3 py-2 rounded-md text-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
             style={{
               color: "var(--accent-primary)",
               backgroundColor: "var(--bg-card)",
@@ -53,24 +54,37 @@ const TagDetail = () => {
               border: "1px solid",
             }}
           >
-            ← Back to Tags
+            <span>←</span>
+            <span>Back to Tags</span>
           </Link>
         </div>
 
-        {/* Tag Header - Name (always at top) */}
-        <div className="mb-6">
-          <h1
-            className="text-4xl font-bold mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {tag?.name || `Tag ${tagId}`}
-          </h1>
+        {/* Tag Header - Hero Treatment */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-3">
+            <h1
+              className="text-5xl font-bold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {tag?.name || `Tag ${tagId}`}
+            </h1>
+            {tag?.favorite && <LucideStar size={32} color="#efdd03" fill="#efdd03" />}
+          </div>
+
+          {tag?.aliases && tag.aliases.length > 0 && (
+            <p
+              className="text-xl"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Also known as: {tag.aliases.join(", ")}
+            </p>
+          )}
         </div>
 
-        {/* Two Column Layout - Image on left, content on right (md+) */}
-        <div className="flex flex-col md:flex-row gap-6 mb-8">
+        {/* Two Column Layout - Image on left, content on right (lg+) */}
+        <div className="flex flex-col lg:flex-row gap-6 mb-8">
           {/* Left Column: Tag Image */}
-          <div className="w-full md:w-80 flex-shrink-0">
+          <div className="w-full lg:w-2/5 flex-shrink-0">
             <TagImage tag={tag} />
           </div>
 
@@ -86,6 +100,9 @@ const TagDetail = () => {
           <SceneSearch
             permanentFilters={{
               tags: { value: [tagId], modifier: "INCLUDES" },
+            }}
+            permanentFiltersMetadata={{
+              tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
             }}
             title={`Scenes tagged with ${tag?.name || "this tag"}`}
           />
@@ -122,11 +139,9 @@ const Card = ({ title, children }) => {
 const TagImage = ({ tag }) => {
   return (
     <div
-      className="rounded-lg w-full md:w-80 aspect-square rounded-xl overflow-hidden shadow-lg p-0"
+      className="rounded-lg w-full aspect-video overflow-hidden shadow-lg"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-        border: "1px solid",
       }}
     >
       {tag?.image_path ? (
@@ -153,12 +168,12 @@ const TagImage = ({ tag }) => {
 
 // Tag Stats Component
 const TagStats = ({ tag }) => {
-  const StatField = ({ label, value }) => {
+  const StatField = ({ label, value, valueColor = "var(--text-primary)" }) => {
     if (!value && value !== 0) return null;
     return (
       <div className="flex justify-between">
         <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-        <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+        <span className="font-medium" style={{ color: valueColor }}>
           {value}
         </span>
       </div>
@@ -167,15 +182,15 @@ const TagStats = ({ tag }) => {
 
   return (
     <Card title="Statistics">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatField label="Scenes:" value={tag?.scene_count} />
-        <StatField label="Scene Markers:" value={tag?.scene_marker_count} />
-        <StatField label="Images:" value={tag?.image_count} />
-        <StatField label="Galleries:" value={tag?.gallery_count} />
-        <StatField label="Performers:" value={tag?.performer_count} />
-        <StatField label="Studios:" value={tag?.studio_count} />
-        <StatField label="Movies:" value={tag?.movie_count} />
-        <StatField label="Groups:" value={tag?.group_count} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatField label="Scenes:" value={tag?.scene_count} valueColor="var(--accent-primary)" />
+        <StatField label="Markers:" value={tag?.scene_marker_count} valueColor="var(--accent-primary)" />
+        <StatField label="Images:" value={tag?.image_count} valueColor="var(--accent-primary)" />
+        <StatField label="Galleries:" value={tag?.gallery_count} valueColor="var(--accent-primary)" />
+        <StatField label="Performers:" value={tag?.performer_count} valueColor="var(--accent-primary)" />
+        <StatField label="Studios:" value={tag?.studio_count} valueColor="var(--accent-primary)" />
+        <StatField label="Movies:" value={tag?.movie_count} valueColor="var(--accent-primary)" />
+        <StatField label="Groups:" value={tag?.group_count} valueColor="var(--accent-primary)" />
       </div>
     </Card>
   );
@@ -196,41 +211,26 @@ const TagDetails = ({ tag }) => {
         </Card>
       )}
 
-      {tag?.aliases && tag.aliases.length > 0 && (
-        <Card title="Aliases">
-          <div className="flex flex-wrap gap-2">
-            {tag.aliases.map((alias, index) => (
-              <span
-                key={index}
-                className="px-3 py-1 rounded-full text-sm font-medium"
-                style={{
-                  backgroundColor: "var(--bg-hover)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {alias}
-              </span>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {tag?.parents && tag.parents.length > 0 && (
         <Card title="Parent Tags">
           <div className="flex flex-wrap gap-2">
-            {tag.parents.map((parent) => (
-              <Link
-                key={parent.id}
-                to={`/tags/${parent.id}`}
-                className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                style={{
-                  backgroundColor: "var(--accent-primary)",
-                  color: "white",
-                }}
-              >
-                {parent.name}
-              </Link>
-            ))}
+            {tag.parents.map((parent) => {
+              // Generate a color based on tag ID for consistency
+              const hue = (parseInt(parent.id, 10) * 137.5) % 360;
+              return (
+                <Link
+                  key={parent.id}
+                  to={`/tag/${parent.id}`}
+                  className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                  style={{
+                    backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                    color: "white",
+                  }}
+                >
+                  {parent.name}
+                </Link>
+              );
+            })}
           </div>
         </Card>
       )}
@@ -238,19 +238,23 @@ const TagDetails = ({ tag }) => {
       {tag?.children && tag.children.length > 0 && (
         <Card title="Child Tags">
           <div className="flex flex-wrap gap-2">
-            {tag.children.map((child) => (
-              <Link
-                key={child.id}
-                to={`/tags/${child.id}`}
-                className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                style={{
-                  backgroundColor: "var(--bg-hover)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {child.name}
-              </Link>
-            ))}
+            {tag.children.map((child) => {
+              // Generate a color based on tag ID for consistency
+              const hue = (parseInt(child.id, 10) * 137.5) % 360;
+              return (
+                <Link
+                  key={child.id}
+                  to={`/tag/${child.id}`}
+                  className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                  style={{
+                    backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                    color: "white",
+                  }}
+                >
+                  {child.name}
+                </Link>
+              );
+            })}
           </div>
         </Card>
       )}

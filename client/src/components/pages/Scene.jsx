@@ -33,15 +33,24 @@ const Scene = () => {
     }
   }, [location.state]);
 
-  // Set page title to scene title
-  usePageTitle(scene?.title || "Scene");
+  // Set page title to scene title (with fallback to filename)
+  const displayTitle = scene?.title || scene?.files?.[0]?.basename || "Scene";
+  usePageTitle(displayTitle);
 
   // Set initial focus to video player when page loads
-  useInitialFocus(pageRef, '.vjs-big-play-button, button', !isLoading);
+  useInitialFocus(pageRef, ".vjs-big-play-button, button", !isLoading);
 
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [quality, setQuality] = useState("direct");
+
+  // Callback to update scene's o_counter when incremented
+  const handleOCounterIncrement = (newCount) => {
+    setScene((prevScene) => ({
+      ...prevScene,
+      o_counter: newCount,
+    }));
+  };
 
   // Fetch scene data if not provided via navigation state
   useEffect(() => {
@@ -74,7 +83,10 @@ const Scene = () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
+      <div
+        className="min-h-screen"
+        style={{ backgroundColor: "var(--bg-primary)" }}
+      >
         <Navigation />
         <div className="flex items-center justify-center min-h-screen">
           <LoadingSpinner />
@@ -86,14 +98,22 @@ const Scene = () => {
   // Error or scene not found
   if (fetchError || !scene) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
+      <div
+        className="min-h-screen"
+        style={{ backgroundColor: "var(--bg-primary)" }}
+      >
         <Navigation />
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <h2 className="text-xl mb-2" style={{ color: "var(--text-primary)" }}>
+            <h2
+              className="text-xl mb-2"
+              style={{ color: "var(--text-primary)" }}
+            >
               {fetchError || "Scene not found"}
             </h2>
-            <p style={{ color: "var(--text-secondary)" }}>Scene ID: {sceneId}</p>
+            <p style={{ color: "var(--text-secondary)" }}>
+              Scene ID: {sceneId}
+            </p>
             <button
               onClick={() => navigate("/scenes")}
               className="mt-4 px-4 py-2 rounded-lg"
@@ -114,42 +134,41 @@ const Scene = () => {
   const compatibility = firstFile ? canDirectPlayVideo(firstFile) : null;
 
   return (
-    <div ref={pageRef} className="min-h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
+    <div
+      ref={pageRef}
+      className="min-h-screen"
+      style={{ backgroundColor: "var(--bg-primary)" }}
+    >
       {/* Full Navigation Header */}
       <Navigation />
 
       {/* Video Player Header */}
-      <header
-        className="container-fluid py-3"
-        style={{
-          backgroundColor: "var(--bg-secondary)",
-          borderBottom: "1px solid var(--border-color)",
-        }}
-      >
-        <div className="flex items-center justify-between">
+      <header className="container-fluid py-3 mt-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="btn"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors flex-shrink-0 self-start"
             style={{
+              color: "var(--accent-primary)",
               backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-              padding: "8px 16px",
+              borderColor: "var(--border-color)",
+              border: "1px solid",
             }}
           >
-            ← Back
+            <span>←</span>
+            <span className="whitespace-nowrap">Back to Scenes</span>
           </button>
           <h1
-            className="text-2xl font-bold"
+            className="text-2xl font-bold line-clamp-2"
             style={{ color: "var(--text-primary)" }}
           >
-            {scene.title}
+            {displayTitle}
           </h1>
-          <div></div>
         </div>
       </header>
 
       {/* Main content area */}
-      <main className="container-fluid">
+      <main className="container-fluid" style={{ marginTop: 0, paddingTop: 0 }}>
         {/* Video player section */}
         <VideoPlayer
           scene={scene}
@@ -167,7 +186,7 @@ const Scene = () => {
           currentPlaylistIndex={playlist?.currentIndex || 0}
           quality={quality}
           setQuality={setQuality}
-          onReset={() => window.location.reload()}
+          onOCounterIncrement={handleOCounterIncrement}
         />
 
         {/* Playlist Status Card */}

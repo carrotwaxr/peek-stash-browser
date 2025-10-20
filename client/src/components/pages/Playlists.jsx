@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
+import { PageLayout } from "../ui/index.js";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 
 const api = axios.create({
@@ -82,18 +83,16 @@ const Playlists = () => {
 
   if (loading) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <div className="flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <>
-
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+    <PageLayout>
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
@@ -200,7 +199,6 @@ const Playlists = () => {
             ))}
           </div>
         )}
-      </div>
 
       {/* Create Playlist Modal */}
       {showCreateModal && (
@@ -318,7 +316,7 @@ const Playlists = () => {
         cancelText="Cancel"
         confirmStyle="danger"
       />
-    </>
+    </PageLayout>
   );
 };
 

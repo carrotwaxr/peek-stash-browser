@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useTheme } from "../../themes/useTheme.js";
+import { PageLayout } from "../ui/index.js";
 import CarouselSettings from "../settings/CarouselSettings.jsx";
 
 const api = axios.create({
@@ -10,6 +12,7 @@ const api = axios.create({
 
 const Settings = () => {
   usePageTitle("My Settings");
+  const { changeTheme, availableThemes, currentTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
@@ -18,7 +21,6 @@ const Settings = () => {
   // Settings state
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
-  const [theme, setTheme] = useState("dark");
   const [carouselPreferences, setCarouselPreferences] = useState([]);
 
   // Password change state
@@ -40,7 +42,6 @@ const Settings = () => {
 
       setPreferredQuality(settings.preferredQuality || "auto");
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
-      setTheme(settings.theme || "dark");
       setCarouselPreferences(settings.carouselPreferences || []);
     } catch {
       setError("Failed to load settings");
@@ -76,7 +77,6 @@ const Settings = () => {
       await api.put("/user/settings", {
         preferredQuality,
         preferredPlaybackMode,
-        theme,
       });
 
       setMessage("Settings saved successfully!");
@@ -125,19 +125,17 @@ const Settings = () => {
 
   if (loading) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <div className="flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <>
-
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
-        <div className="max-w-3xl mx-auto">
+    <PageLayout>
+      <div className="max-w-3xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <h1
@@ -265,32 +263,42 @@ const Settings = () => {
                 {/* Theme */}
                 <div>
                   <label
-                    htmlFor="theme"
                     className="block text-sm font-medium mb-2"
                     style={{ color: "var(--text-secondary)" }}
                   >
                     Theme
                   </label>
-                  <select
-                    id="theme"
-                    value={theme}
-                    onChange={(e) => setTheme(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    <option value="dark">Dark</option>
-                    <option value="light">Light</option>
-                    <option value="purple">Purple</option>
-                  </select>
+                  <div className="space-y-2">
+                    {availableThemes.map((theme) => (
+                      <button
+                        key={theme.key}
+                        type="button"
+                        onClick={() => changeTheme(theme.key)}
+                        className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors duration-200 flex items-center justify-between"
+                        style={{
+                          backgroundColor:
+                            currentTheme === theme.key
+                              ? "var(--accent-primary)"
+                              : "var(--bg-secondary)",
+                          border: "1px solid var(--border-color)",
+                          color:
+                            currentTheme === theme.key
+                              ? "white"
+                              : "var(--text-primary)",
+                        }}
+                      >
+                        <span>{theme.name}</span>
+                        {currentTheme === theme.key && (
+                          <span className="text-sm">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                   <p
-                    className="text-sm mt-1"
+                    className="text-sm mt-2"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Choose your preferred color theme
+                    Choose your preferred color theme (changes apply immediately)
                   </p>
                 </div>
 
@@ -436,8 +444,7 @@ const Settings = () => {
             </form>
           </div>
         </div>
-      </div>
-    </>
+      </PageLayout>
   );
 };
 

@@ -14,6 +14,13 @@ import {
   FindTagsQuery,
   FindFilterType,
 } from "stashapp-api/dist/generated/graphql.js";
+import {
+  transformScene,
+  transformPerformer,
+  transformStudio,
+  transformTag,
+  appendApiKeyToUrl
+} from "../utils/pathMapping.js";
 
 // New POST endpoints for filtered searching
 
@@ -181,85 +188,109 @@ export const findTags = async (req: Request, res: Response) => {
   }
 };
 
-const appendApiKeyToUrl = (url: string): string => {
-  try {
-    // Skip null, undefined, or empty values
-    if (!url || typeof url !== "string" || url.trim() === "") {
-      return url;
-    }
+// Transform functions now imported from pathMapping utility
 
-    const urlObj = new URL(url);
-    if (!urlObj.searchParams.has("apikey")) {
-      const apiKey = process.env.STASH_API_KEY;
-      if (!apiKey) {
-        console.error("STASH_API_KEY not found in environment variables");
-        return url; // Return original if no API key
-      }
-      urlObj.searchParams.append("apikey", apiKey);
-    }
-    return urlObj.toString();
-  } catch (urlError) {
-    console.error(`Error processing URL: ${url}`, urlError);
-    return url; // Return original URL if parsing fails
+// Minimal data endpoints for filter dropdowns (id + name only)
+
+export const findPerformersMinimal = async (req: Request, res: Response) => {
+  try {
+    const stash = getStash();
+    const { filter } = req.body;
+
+    // Always filter to only show performers with scenes
+    const enhancedFilter = {
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
+    };
+
+    const performers: FindPerformersQuery = await stash.findPerformers({
+      filter: filter as FindFilterType,
+      performer_filter: enhancedFilter as PerformerFilterType,
+    });
+
+    // Return only id and name
+    const minimalPerformers = performers.findPerformers.performers.map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
+
+    res.json({ performers: minimalPerformers });
+  } catch (error) {
+    console.error("Error in findPerformersMinimal:", error);
+    res.status(500).json({
+      error: "Failed to find performers",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 };
 
-const transformScene = (scene: Scene) => {
+export const findStudiosMinimal = async (req: Request, res: Response) => {
   try {
-    const mutated: Record<string, any> = {
-      ...scene,
-      paths: Object.entries(scene.paths).reduce((acc, [key, val]) => {
-        acc[key] = appendApiKeyToUrl(val as string);
-        return acc;
-      }, {} as { [key: string]: string }),
+    const stash = getStash();
+    const { filter } = req.body;
+
+    // Always filter to only show studios with scenes
+    const enhancedFilter = {
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
     };
 
-    return mutated;
+    const studios: FindStudiosQuery = await stash.findStudios({
+      filter: filter as FindFilterType,
+      studio_filter: enhancedFilter as StudioFilterType,
+    });
+
+    // Return only id and name
+    const minimalStudios = studios.findStudios.studios.map((s) => ({
+      id: s.id,
+      name: s.name,
+    }));
+
+    res.json({ studios: minimalStudios });
   } catch (error) {
-    console.error("Error transforming scene:", error);
-    return scene; // Return original scene if transformation fails
+    console.error("Error in findStudiosMinimal:", error);
+    res.status(500).json({
+      error: "Failed to find studios",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 };
 
-const transformPerformer = (performer: any) => {
+export const findTagsMinimal = async (req: Request, res: Response) => {
   try {
-    return {
-      ...performer,
-      image_path: performer.image_path
-        ? appendApiKeyToUrl(performer.image_path)
-        : performer.image_path,
-    };
-  } catch (error) {
-    console.error("Error transforming performer:", error);
-    return performer;
-  }
-};
+    const stash = getStash();
+    const { filter } = req.body;
 
-const transformStudio = (studio: any) => {
-  try {
-    return {
-      ...studio,
-      image_path: studio.image_path
-        ? appendApiKeyToUrl(studio.image_path)
-        : studio.image_path,
+    // Always filter to only show tags with scenes
+    const enhancedFilter = {
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
     };
-  } catch (error) {
-    console.error("Error transforming studio:", error);
-    return studio;
-  }
-};
 
-const transformTag = (tag: any) => {
-  try {
-    return {
-      ...tag,
-      image_path: tag.image_path
-        ? appendApiKeyToUrl(tag.image_path)
-        : tag.image_path,
-    };
+    const tags: FindTagsQuery = await stash.findTags({
+      filter: filter as FindFilterType,
+      tag_filter: enhancedFilter as TagFilterType,
+    });
+
+    // Return only id and name
+    const minimalTags = tags.findTags.tags.map((t) => ({
+      id: t.id,
+      name: t.name,
+    }));
+
+    res.json({ tags: minimalTags });
   } catch (error) {
-    console.error("Error transforming tag:", error);
-    return tag;
+    console.error("Error in findTagsMinimal:", error);
+    res.status(500).json({
+      error: "Failed to find tags",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 };
 

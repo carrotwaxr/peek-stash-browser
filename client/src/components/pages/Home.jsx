@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
-import { PageHeader } from "../ui/index.js";
+import BulkActionBar from "../ui/BulkActionBar.jsx";
+import { PageHeader, PageLayout } from "../ui/index.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
@@ -42,6 +43,7 @@ const Home = () => {
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
   const [carouselPreferences, setCarouselPreferences] = useState([]);
   const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const [selectedScenes, setSelectedScenes] = useState([]);
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -85,6 +87,21 @@ const Home = () => {
     });
   };
 
+  const handleToggleSelect = (scene) => {
+    setSelectedScenes(prev => {
+      const isSelected = prev.some(s => s.id === scene.id);
+      if (isSelected) {
+        return prev.filter(s => s.id !== scene.id);
+      } else {
+        return [...prev, scene];
+      }
+    });
+  };
+
+  const handleClearSelection = () => {
+    setSelectedScenes([]);
+  };
+
   // Filter and sort carousels based on user preferences
   const activeCarousels = CAROUSEL_DEFINITIONS
     .map((def) => {
@@ -95,14 +112,17 @@ const Home = () => {
     .sort((a, b) => (a.preference?.order || 0) - (b.preference?.order || 0));
 
   return (
-    <div className="w-full py-8 px-4 lg:px-6 xl:px-8 max-w-none">
+    <PageLayout className="max-w-none">
       <PageHeader
-        title="Welcome Home"
+        title="Welcome"
         subtitle="Discover your favorite content and explore new scenes"
       />
 
       {/* Continue Watching Carousel - Always at the top */}
-      <ContinueWatchingCarousel />
+      <ContinueWatchingCarousel
+        selectedScenes={selectedScenes}
+        onToggleSelect={handleToggleSelect}
+      />
 
       {activeCarousels.map(({ title, icon, fetchKey }) => (
         <HomeCarousel
@@ -112,13 +132,23 @@ const Home = () => {
           fetchKey={fetchKey}
           createSceneClickHandler={createSceneClickHandler}
           carouselQueries={carouselQueries}
+          selectedScenes={selectedScenes}
+          onToggleSelect={handleToggleSelect}
         />
       ))}
-    </div>
+
+      {/* Bulk Action Bar */}
+      {selectedScenes.length > 0 && (
+        <BulkActionBar
+          selectedScenes={selectedScenes}
+          onClearSelection={handleClearSelection}
+        />
+      )}
+    </PageLayout>
   );
 };
 
-const HomeCarousel = ({ title, icon, fetchKey, createSceneClickHandler, carouselQueries }) => {
+const HomeCarousel = ({ title, icon, fetchKey, createSceneClickHandler, carouselQueries, selectedScenes, onToggleSelect }) => {
   const fetchFunction = carouselQueries[fetchKey];
   const { data: scenes, loading, error } = useAsyncData(fetchFunction, [fetchKey]);
 
@@ -134,6 +164,8 @@ const HomeCarousel = ({ title, icon, fetchKey, createSceneClickHandler, carousel
       titleIcon={icon}
       scenes={scenes || []}
       onSceneClick={createSceneClickHandler(scenes || [], title)}
+      selectedScenes={selectedScenes}
+      onToggleSelect={onToggleSelect}
     />
   );
 };

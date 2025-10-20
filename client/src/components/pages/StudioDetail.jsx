@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const StudioDetail = () => {
@@ -42,10 +43,10 @@ const StudioDetail = () => {
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
       <div className="max-w-none">
         {/* Back Button */}
-        <div className="mb-6">
+        <div className="mt-6 mb-6">
           <Link
             to="/studios"
-            className="inline-flex items-center px-3 py-2 rounded-md text-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
             style={{
               color: "var(--accent-primary)",
               backgroundColor: "var(--bg-card)",
@@ -53,32 +54,46 @@ const StudioDetail = () => {
               border: "1px solid",
             }}
           >
-            ← Back to Studios
+            <span>←</span>
+            <span>Back to Studios</span>
           </Link>
         </div>
 
-        {/* Studio Header - Name (always at top) */}
-        <div className="mb-6">
-          <h1
-            className="text-4xl font-bold mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {studio?.name || `Studio ${studioId}`}
-          </h1>
-        </div>
+        {/* Studio Header with Logo Floating Right on Large Screens */}
+        <div className="mb-8 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          {/* Studio Name and Aliases */}
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-3">
+              <h1
+                className="text-5xl font-bold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {studio?.name || `Studio ${studioId}`}
+              </h1>
+              {studio?.favorite && <LucideStar size={32} color="#efdd03" fill="#efdd03" />}
+            </div>
 
-        {/* Two Column Layout - Image on left, content on right (md+) */}
-        <div className="flex flex-col md:flex-row gap-6 mb-8">
-          {/* Left Column: Studio Image */}
-          <div className="w-full md:w-80 flex-shrink-0">
+            {/* Aliases */}
+            {studio?.aliases && studio.aliases.length > 0 && (
+              <p
+                className="text-xl"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Also known as: {studio.aliases.join(", ")}
+              </p>
+            )}
+          </div>
+
+          {/* Studio Logo - Below name on mobile, floats right on large screens */}
+          <div className="w-full lg:w-48 flex-shrink-0">
             <StudioImage studio={studio} />
           </div>
+        </div>
 
-          {/* Right Column: Stats and Details */}
-          <div className="flex-1 space-y-6">
-            <StudioStats studio={studio} />
-            <StudioDetails studio={studio} />
-          </div>
+        {/* Content Section */}
+        <div className="space-y-6 mb-8">
+          <StudioStats studio={studio} />
+          <StudioDetails studio={studio} />
         </div>
 
         {/* Scenes Section */}
@@ -86,6 +101,9 @@ const StudioDetail = () => {
           <SceneSearch
             permanentFilters={{
               studios: { value: [studioId], modifier: "INCLUDES" },
+            }}
+            permanentFiltersMetadata={{
+              studios: [{ id: studioId, name: studio?.name || "Unknown Studio" }],
             }}
             title={`Scenes from ${studio?.name || "this studio"}`}
           />
@@ -118,27 +136,21 @@ const Card = ({ title, children }) => {
   );
 };
 
-// Studio Image Component
+// Studio Image Component (Logo)
 const StudioImage = ({ studio }) => {
   return (
-    <div
-      className="rounded-lg w-full md:w-80 aspect-square rounded-xl overflow-hidden shadow-lg p-0"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-        border: "1px solid",
-      }}
-    >
+    <div className="w-full" style={{ maxHeight: "200px" }}>
       {studio?.image_path ? (
         <img
           src={studio.image_path}
           alt={studio.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
+          style={{ maxHeight: "200px" }}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
+        <div className="w-full flex items-center justify-center" style={{ height: "150px" }}>
           <svg
-            className="w-24 h-24"
+            className="w-16 h-16"
             style={{ color: "var(--text-muted)" }}
             fill="currentColor"
             viewBox="0 0 24 24"
@@ -167,20 +179,37 @@ const StudioStats = ({ studio }) => {
 
   return (
     <Card title="Statistics">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatField label="Scenes:" value={studio?.scene_count} />
-        {studio?.rating100 && (
-          <StatField
-            label="Rating:"
-            value={`${(studio.rating100 / 20).toFixed(1)}/5`}
-            valueColor="var(--accent-primary)"
-          />
-        )}
-        <StatField label="Images:" value={studio?.image_count} />
-        <StatField label="Galleries:" value={studio?.gallery_count} />
-        <StatField label="Performers:" value={studio?.performer_count} />
-        <StatField label="Movies:" value={studio?.movie_count} />
-        <StatField label="Groups:" value={studio?.group_count} />
+      {/* Visual Rating Display */}
+      {studio?.rating100 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+              Rating
+            </span>
+            <span className="text-2xl font-bold" style={{ color: "var(--accent-primary)" }}>
+              {studio.rating100}/100
+            </span>
+          </div>
+          <div className="w-full h-3 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-secondary)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${studio.rating100}%`,
+                backgroundColor: "var(--accent-primary)",
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Other Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatField label="Scenes:" value={studio?.scene_count} valueColor="var(--accent-primary)" />
+        <StatField label="Performers:" value={studio?.performer_count} valueColor="var(--accent-primary)" />
+        <StatField label="Images:" value={studio?.image_count} valueColor="var(--accent-primary)" />
+        <StatField label="Galleries:" value={studio?.gallery_count} valueColor="var(--accent-primary)" />
+        <StatField label="Movies:" value={studio?.movie_count} valueColor="var(--accent-primary)" />
+        <StatField label="Groups:" value={studio?.group_count} valueColor="var(--accent-primary)" />
       </div>
     </Card>
   );
@@ -228,25 +257,6 @@ const StudioDetails = ({ studio }) => {
         </Card>
       )}
 
-      {studio?.aliases && studio.aliases.length > 0 && (
-        <Card title="Aliases">
-          <div className="flex flex-wrap gap-2">
-            {studio.aliases.map((alias, index) => (
-              <span
-                key={index}
-                className="px-3 py-1 rounded-full text-sm font-medium"
-                style={{
-                  backgroundColor: "var(--bg-hover)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {alias}
-              </span>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {studio?.parent_studio && (
         <Card title="Parent Studio">
           <Link
@@ -285,19 +295,23 @@ const StudioDetails = ({ studio }) => {
       {studio?.tags && studio.tags.length > 0 && (
         <Card title="Tags">
           <div className="flex flex-wrap gap-2">
-            {studio.tags.map((tag) => (
-              <Link
-                key={tag.id}
-                to={`/tags/${tag.id}`}
-                className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                style={{
-                  backgroundColor: "var(--bg-hover)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {tag.name}
-              </Link>
-            ))}
+            {studio.tags.map((tag) => {
+              // Generate a color based on tag ID for consistency
+              const hue = (parseInt(tag.id, 10) * 137.5) % 360;
+              return (
+                <Link
+                  key={tag.id}
+                  to={`/tags/${tag.id}`}
+                  className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                  style={{
+                    backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                    color: "white",
+                  }}
+                >
+                  {tag.name}
+                </Link>
+              );
+            })}
           </div>
         </Card>
       )}

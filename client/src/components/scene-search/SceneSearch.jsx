@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { ErrorMessage, LoadingSpinner, PageHeader } from "../ui";
+import { ErrorMessage, LoadingSpinner, PageHeader, PageLayout } from "../ui";
 import SceneGrid from "./SceneGrid.jsx";
 import SearchControls from "../ui/SearchControls.jsx";
+import Pagination from "../ui/Pagination.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { buildSceneFilter } from "../../utils/filterConfig.js";
@@ -19,10 +20,12 @@ import { buildSceneFilter } from "../../utils/filterConfig.js";
 const SceneSearch = ({
   initialSort = "o_counter",
   permanentFilters = {},
+  permanentFiltersMetadata = {},
   subtitle,
   title,
 }) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
@@ -123,40 +126,74 @@ const SceneSearch = ({
   const perPage = lastQuery?.filter?.per_page || 24;
   const totalPages = Math.ceil(totalCount / perPage);
 
+  // Get current pagination state from URL params for bottom pagination
+  const currentPage = parseInt(searchParams.get('page')) || 1;
+  const currentPerPage = parseInt(searchParams.get('perPage')) || 24;
+
+  // Pagination handlers that update URL params (SearchControls will react to these changes)
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    setSearchParams(params, { replace: true });
+  };
+
+  const handlePerPageChange = (newPerPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('perPage', newPerPage.toString());
+    params.set('page', '1'); // Reset to first page when changing perPage
+    setSearchParams(params, { replace: true });
+  };
+
   if (error) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <PageHeader title={title} subtitle={subtitle} />
         <ErrorMessage error={error} />
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+    <PageLayout>
       <PageHeader title={title} subtitle={subtitle} />
 
       <SearchControls
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
         permanentFilters={permanentFilters}
+        permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}
       />
 
       {isLoading ? (
         <LoadingSpinner />
       ) : (
-        <SceneGrid
-          scenes={currentScenes || []}
-          loading={isLoading}
-          error={error}
-          onSceneClick={handleSceneClick}
-          emptyMessage="No scenes found"
-          emptyDescription="Try adjusting your search filters"
-          enableKeyboard={true}
-        />
+        <>
+          <SceneGrid
+            scenes={currentScenes || []}
+            loading={isLoading}
+            error={error}
+            onSceneClick={handleSceneClick}
+            emptyMessage="No scenes found"
+            emptyDescription="Try adjusting your search filters"
+            enableKeyboard={true}
+          />
+
+          {/* Bottom Pagination */}
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              onPageChange={handlePageChange}
+              perPage={currentPerPage}
+              onPerPageChange={handlePerPageChange}
+              showInfo={false}
+              showPerPageSelector={false}
+              totalPages={totalPages}
+            />
+          )}
+        </>
       )}
-    </div>
+    </PageLayout>
   );
 };
 

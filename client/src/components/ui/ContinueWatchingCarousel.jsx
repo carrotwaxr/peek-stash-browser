@@ -9,7 +9,7 @@ import { libraryApi } from '../../services/api.js';
  * Continue Watching carousel component
  * Shows scenes that have been partially watched with resume times
  */
-const ContinueWatchingCarousel = () => {
+const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
   const navigate = useNavigate();
   const { data: watchHistoryList, loading: loadingHistory, error } = useAllWatchHistory({
     inProgress: true,
@@ -77,6 +77,7 @@ const ContinueWatchingCarousel = () => {
     navigate(`/video/${scene.id}`, {
       state: {
         scene,
+        shouldResume: true, // Auto-resume from continue watching
         playlist: {
           id: "virtual-carousel",
           name: "Continue Watching",
@@ -106,6 +107,8 @@ const ContinueWatchingCarousel = () => {
       scenes={scenes}
       onSceneClick={handleSceneClick}
       showProgress={true}
+      selectedScenes={selectedScenes}
+      onToggleSelect={onToggleSelect}
     />
   );
 };

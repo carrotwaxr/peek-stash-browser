@@ -1,22 +1,26 @@
 import { useEffect, useState, useRef, forwardRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { formatRating, getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
+import Pagination from "../ui/Pagination.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 
 const Performers = () => {
   usePageTitle("Performers");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isTVMode } = useTVMode();
   const columns = useGridColumns('performers');
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -90,34 +94,53 @@ const Performers = () => {
   const totalPages = Math.ceil(totalCount / perPage);
   const currentPage = lastQuery?.filter?.page || 1;
 
+  // Get current pagination state from URL params for bottom pagination
+  const urlPage = parseInt(searchParams.get('page')) || 1;
+  const urlPerPage = parseInt(searchParams.get('perPage')) || 24;
+
+  // Pagination handlers that update URL params (SearchControls will react to these changes)
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    setSearchParams(params, { replace: true });
+  };
+
+  const handlePerPageChange = (newPerPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('perPage', newPerPage.toString());
+    params.set('page', '1'); // Reset to first page when changing perPage
+    setSearchParams(params, { replace: true });
+  };
+
   // Spatial navigation
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentPerformers,
     columns,
-    enabled: !isLoading,
+    enabled: !isLoading && isTVMode,
     onSelect: (performer) => navigate(`/performer/${performer.id}`),
     onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
     onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
   });
 
   // Initial focus
-  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentPerformers.length > 0);
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentPerformers.length > 0 && isTVMode);
 
   if (error) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <PageHeader title="Performers" />
         <ErrorMessage error={error} />
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div ref={pageRef} className="w-full py-8 px-4 lg:px-6 xl:px-8">
-      <PageHeader
-        title="Performers"
-        subtitle="Browse and manage performers in your library"
-      />
+    <PageLayout>
+      <div ref={pageRef}>
+        <PageHeader
+          title="Performers"
+          subtitle="Browse and manage performers in your library"
+        />
 
       {/* Controls Section */}
       <SearchControls
@@ -139,21 +162,36 @@ const Performers = () => {
                 performer={performer}
                 tabIndex={isFocused(index) ? 0 : -1}
                 className={isFocused(index) ? "keyboard-focus" : ""}
+                isTVMode={isTVMode}
               />
             ))}
           </div>
+
+          {/* Bottom Pagination */}
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={urlPage}
+              onPageChange={handlePageChange}
+              perPage={urlPerPage}
+              onPerPageChange={handlePerPageChange}
+              showInfo={false}
+              showPerPageSelector={false}
+              totalPages={totalPages}
+            />
+          )}
         </>
       )}
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 
-const PerformerCard = forwardRef(({ performer, tabIndex, className = "" }, ref) => {
+const PerformerCard = forwardRef(({ performer, tabIndex, className = "", isTVMode = false }, ref) => {
   return (
     <Link
       ref={ref}
       to={`/performer/${performer.id}`}
-      tabIndex={tabIndex}
+      tabIndex={isTVMode ? tabIndex : -1}
       className={`block rounded-lg border p-4 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",

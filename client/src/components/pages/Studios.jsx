@@ -1,21 +1,25 @@
 import { useEffect, useState, useRef, forwardRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
+import Pagination from "../ui/Pagination.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 
 const Studios = () => {
   usePageTitle("Studios");
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isTVMode } = useTVMode();
   const [columns, setColumns] = useState(3);
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -87,34 +91,53 @@ const Studios = () => {
   const totalPages = Math.ceil(totalCount / perPage);
   const currentPage = lastQuery?.filter?.page || 1;
 
+  // Get current pagination state from URL params for bottom pagination
+  const urlPage = parseInt(searchParams.get('page')) || 1;
+  const urlPerPage = parseInt(searchParams.get('perPage')) || 24;
+
+  // Pagination handlers that update URL params (SearchControls will react to these changes)
+  const handlePageChange = (newPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('page', newPage.toString());
+    setSearchParams(params, { replace: true });
+  };
+
+  const handlePerPageChange = (newPerPage) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('perPage', newPerPage.toString());
+    params.set('page', '1'); // Reset to first page when changing perPage
+    setSearchParams(params, { replace: true });
+  };
+
   // Spatial navigation
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentStudios,
     columns,
-    enabled: !isLoading,
+    enabled: !isLoading && isTVMode,
     onSelect: (studio) => navigate(`/studio/${studio.id}`),
     onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
     onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
   });
 
   // Initial focus
-  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentStudios.length > 0);
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentStudios.length > 0 && isTVMode);
 
   if (error) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <PageHeader title="Studios" />
         <ErrorMessage error={error} />
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div ref={pageRef} className="w-full py-8 px-4 lg:px-6 xl:px-8">
-      <PageHeader
-        title="Studios"
-        subtitle="Browse studios and production companies"
-      />
+    <PageLayout>
+      <div ref={pageRef}>
+        <PageHeader
+          title="Studios"
+          subtitle="Browse studios and production companies"
+        />
 
       {/* Controls Section */}
       <SearchControls
@@ -136,21 +159,36 @@ const Studios = () => {
                 studio={studio}
                 tabIndex={isFocused(index) ? 0 : -1}
                 className={isFocused(index) ? "keyboard-focus" : ""}
+                isTVMode={isTVMode}
               />
             ))}
           </div>
+
+          {/* Bottom Pagination */}
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={urlPage}
+              onPageChange={handlePageChange}
+              perPage={urlPerPage}
+              onPerPageChange={handlePerPageChange}
+              showInfo={false}
+              showPerPageSelector={false}
+              totalPages={totalPages}
+            />
+          )}
         </>
       )}
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 
-const StudioCard = forwardRef(({ studio, tabIndex, className = "" }, ref) => {
+const StudioCard = forwardRef(({ studio, tabIndex, className = "", isTVMode = false }, ref) => {
   return (
     <Link
       ref={ref}
       to={`/studio/${studio.id}`}
-      tabIndex={tabIndex}
+      tabIndex={isTVMode ? tabIndex : -1}
       className={`block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
@@ -161,14 +199,16 @@ const StudioCard = forwardRef(({ studio, tabIndex, className = "" }, ref) => {
     >
       <div className="flex items-start space-x-4">
         {studio.image_path ? (
-          <img
-            src={studio.image_path}
-            alt={studio.name}
-            className="w-16 h-16 rounded object-cover flex-shrink-0"
-          />
+          <div className="w-24 h-16 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--bg-secondary)" }}>
+            <img
+              src={studio.image_path}
+              alt={studio.name}
+              className="max-w-full max-h-full object-contain p-1"
+            />
+          </div>
         ) : (
           <div
-            className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
+            className="w-24 h-16 rounded flex items-center justify-center flex-shrink-0"
             style={{
               backgroundColor: "var(--bg-secondary)",
               color: "var(--text-primary)",

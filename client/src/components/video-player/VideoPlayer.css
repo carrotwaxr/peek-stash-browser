@@ -125,13 +125,35 @@
   border-radius: 0 0 6px 6px;
 }
 
+/*
+ * IMPORTANT: Video.js applies highly-specific default styles.
+ * We need !important to override Video.js's built-in styles for better UX.
+ */
+
+/* Control bar - compact height */
+.video-js .vjs-control-bar {
+  height: auto !important;
+  min-height: 2.75rem !important;
+  padding: 0.25rem 0 !important;
+}
+
+/* All buttons - consistent sizing */
+.video-js .vjs-control-bar button.vjs-control {
+  width: 2.75rem !important;
+  height: 2.75rem !important;
+  min-height: 2.75rem !important;
+}
+
+/* Icon placeholders - larger and clearer */
+.video-js .vjs-control-bar .vjs-icon-placeholder::before {
+  font-size: 1.5rem !important;
+  line-height: 2.75rem !important;
+}
+
 /* Playlist navigation buttons */
 .vjs-playlist-prev,
 .vjs-playlist-next {
   cursor: pointer;
-  font-size: 1.5em;
-  width: 3em;
-  height: 100%;
   background: none;
   border: none;
   color: #fff;
@@ -153,19 +175,49 @@
   cursor: not-allowed;
 }
 
-.vjs-playlist-prev .vjs-icon-placeholder,
-.vjs-playlist-next .vjs-icon-placeholder {
-  font-size: 1em;
-  line-height: 1;
-  display: block;
+/* Playlist buttons - text characters instead of icons */
+.video-js .vjs-control-bar .vjs-playlist-prev .vjs-icon-placeholder,
+.video-js .vjs-control-bar .vjs-playlist-next .vjs-icon-placeholder {
+  font-size: 1.5rem !important;
+  line-height: 2.75rem !important;
+  font-weight: bold !important;
+}
+
+/* Time displays - readable size */
+.video-js .vjs-control-bar .vjs-time-control {
+  font-size: 0.875rem !important;
+  padding: 0 0.5rem !important;
+  min-width: auto !important;
+}
+
+/* Progress control - vertically centered */
+.video-js .vjs-control-bar .vjs-progress-control {
+  align-self: center !important;
+}
+
+/* Progress bar - thicker and easier to click */
+.video-js .vjs-control-bar .vjs-progress-holder {
+  height: 0.5rem !important;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  /* Big play button (center of video) - larger on mobile */
+  .video-js .vjs-big-play-button {
+    font-size: 3.5rem;
+    width: 2em;
+    height: 2em;
+    line-height: 2em;
+    border-width: 3px;
+  }
 }
 
 /* Responsive video container */
 @media (max-width: 768px) {
   .video-container {
     aspect-ratio: 16 / 9;
-    margin: 0 -1rem; /* Extend to edge on mobile */
-    border-radius: 0;
+    margin: 0; /* Respect container padding for centered video */
+    border-radius: 8px; /* Keep rounded corners on mobile */
   }
 }
 

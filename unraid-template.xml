@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>Peek-Stash-Browser</Name>
+  <Name>Peek</Name>
   <Repository>carrotwaxr/peek-stash-browser:latest</Repository>
   <Registry>https://hub.docker.com/r/carrotwaxr/peek-stash-browser/</Registry>
   <Network>bridge</Network>
@@ -32,9 +32,9 @@
     - At least 2GB RAM recommended for transcoding
   </Overview>
   <Category>MediaApp:Video MediaServer:Video</Category>
-  <WebUI>http://[IP]:[PORT:6969]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/docs/icon.png</Icon>
+  <WebUI>http://[IP]:[PORT:80]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/client/public/branding/logos/peek-logo.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>

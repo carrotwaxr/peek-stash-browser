@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { History } from 'lucide-react';
+import { History, Trash2 } from 'lucide-react';
 import { useAllWatchHistory } from '../../hooks/useWatchHistory.js';
-import { libraryApi } from '../../services/api.js';
-import { PageHeader } from '../ui/index.js';
+import { libraryApi, apiDelete } from '../../services/api.js';
+import { PageHeader, PageLayout } from '../ui/index.js';
 import SceneListItem from '../ui/SceneListItem.jsx';
 import LoadingSpinner from '../ui/LoadingSpinner.jsx';
 import { usePageTitle } from '../../hooks/usePageTitle.js';
@@ -14,6 +14,8 @@ const WatchHistory = () => {
   const [filterBy, setFilterBy] = useState('all'); // all, in_progress, completed
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   // Fetch all watch history (not limited)
   const {
@@ -59,6 +61,7 @@ const WatchHistory = () => {
             playDuration: watchHistory?.playDuration || 0,
             lastPlayedAt: watchHistory?.lastPlayedAt || null,
             oCount: watchHistory?.oCount || 0,
+            oHistory: watchHistory?.oHistory || [],
             isCompleted: isCompleted,
           };
         });
@@ -109,8 +112,27 @@ const WatchHistory = () => {
     return `${minutes}m`;
   };
 
+  const handleClearHistory = async () => {
+    try {
+      setIsClearing(true);
+      await apiDelete('/watch-history');
+
+      // Reset state
+      setScenes([]);
+      setShowConfirmDialog(false);
+
+      // Refetch watch history to update the UI
+      window.location.reload();
+    } catch (err) {
+      console.error('Error clearing watch history:', err);
+      alert('Failed to clear watch history. Please try again.');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <PageLayout fullHeight style={{ backgroundColor: 'var(--bg-primary)' }}>
       <PageHeader
         title="Watch History"
         subtitle="View your viewing history and continue watching"
@@ -118,70 +140,94 @@ const WatchHistory = () => {
       />
 
       {/* Controls */}
-      <div className="container-fluid px-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Sort By */}
-          <div className="flex items-center gap-2">
-            <label
-              className="text-sm font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Sort by:
-            </label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-2 rounded-lg border text-sm"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value="recent">Recently Watched</option>
-              <option value="most_watched">Most Watched</option>
-              <option value="longest_duration">Longest Duration</option>
-            </select>
+      <div className="mb-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
+          {/* Sort and Filter - grouped on mobile */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Sort */}
+            <div className="flex items-center gap-2">
+              <label
+                className="text-sm font-medium whitespace-nowrap"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Sort:
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <option value="recent">Recently Watched</option>
+                <option value="most_watched">Most Watched</option>
+                <option value="longest_duration">Longest Duration</option>
+              </select>
+            </div>
+
+            {/* Filter */}
+            <div className="flex items-center gap-2">
+              <label
+                className="text-sm font-medium whitespace-nowrap"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Filter:
+              </label>
+              <select
+                value={filterBy}
+                onChange={(e) => setFilterBy(e.target.value)}
+                className="px-3 py-2 rounded-lg border text-sm"
+                style={{
+                  backgroundColor: 'var(--bg-card)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <option value="all">All</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
           </div>
 
-          {/* Filter By */}
-          <div className="flex items-center gap-2">
-            <label
-              className="text-sm font-medium"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              Filter:
-            </label>
-            <select
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value)}
-              className="px-3 py-2 rounded-lg border text-sm"
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              <option value="all">All</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-            </select>
-          </div>
+          {/* Stats and Actions */}
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm md:ml-auto">
+            <div className="flex items-center gap-3 md:gap-4" style={{ color: 'var(--text-muted)' }}>
+              <span>{scenes.length} scenes</span>
+              {scenes.length > 0 && (
+                <span>
+                  Total watch time: {formatDuration(scenes.reduce((sum, s) => sum + s.playDuration, 0))}
+                </span>
+              )}
+            </div>
 
-          {/* Stats */}
-          <div className="ml-auto flex items-center gap-4 text-sm" style={{ color: 'var(--text-muted)' }}>
-            <span>{scenes.length} scenes</span>
+            {/* Clear History Button */}
             {scenes.length > 0 && (
-              <span>
-                Total watch time: {formatDuration(scenes.reduce((sum, s) => sum + s.playDuration, 0))}
-              </span>
+              <button
+                onClick={() => setShowConfirmDialog(true)}
+                disabled={isClearing}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: 'var(--accent-error)',
+                  color: 'white',
+                  opacity: isClearing ? 0.5 : 1,
+                  cursor: isClearing ? 'not-allowed' : 'pointer',
+                }}
+                title="Clear all watch history"
+              >
+                <Trash2 size={14} />
+                <span className="hidden sm:inline">Clear History</span>
+              </button>
             )}
           </div>
         </div>
       </div>
 
       {/* Scene List */}
-      <div className="container-fluid px-4 pb-8">
+      <div>
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <LoadingSpinner />
@@ -226,9 +272,12 @@ const WatchHistory = () => {
                   playDuration: scene.playDuration,
                   lastPlayedAt: scene.lastPlayedAt,
                   oCount: scene.oCount,
+                  oHistory: scene.oHistory,
                 }}
+                showSessionOIndicator={true}
                 linkState={{
                   scene,
+                  shouldResume: true, // Auto-resume from watch history
                   playlist: {
                     id: 'virtual-history',
                     name: 'Watch History',
@@ -249,7 +298,62 @@ const WatchHistory = () => {
           </div>
         )}
       </div>
-    </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          onClick={() => setShowConfirmDialog(false)}
+        >
+          <div
+            className="p-6 rounded-lg max-w-md mx-4"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              className="text-xl font-bold mb-4"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Clear Watch History?
+            </h3>
+            <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
+              This will permanently delete all watch history records including resume times, play counts, and viewing statistics. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                disabled={isClearing}
+                className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearHistory}
+                disabled={isClearing}
+                className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: 'var(--accent-error)',
+                  color: 'white',
+                  opacity: isClearing ? 0.5 : 1,
+                  cursor: isClearing ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isClearing ? 'Clearing...' : 'Clear History'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </PageLayout>
   );
 };
 
