@@ -8,7 +8,10 @@ import Tooltip from '../ui/Tooltip.jsx';
 const SceneStats = ({
   scene,
   watchHistory,
-  className = ""
+  className = "",
+  noWrap = false, // Prevent wrapping for fixed-height card layouts
+  hideFileInfo = false, // Hide resolution and filesize (for when they're shown elsewhere)
+  centered = false // Center the stats
 }) => {
   // Calculate color based on rating (gradient from red to yellow to green)
   const getRatingColor = (rating) => {
@@ -33,7 +36,7 @@ const SceneStats = ({
   };
 
   return (
-    <div className={`flex flex-wrap items-center gap-2 md:gap-4 text-xs ${className}`} style={{ color: 'var(--text-muted)' }}>
+    <div className={`flex ${noWrap ? 'flex-nowrap' : 'flex-wrap'} items-center ${centered ? 'justify-center' : ''} gap-2 md:gap-4 text-xs ${className}`} style={{ color: 'var(--text-muted)' }}>
       <span style={{ color: getRatingColor(scene.rating100), fontWeight: scene.rating100 ? '600' : '400' }}>
         {scene.rating100 ? `${scene.rating100}/100` : '—'}
       </span>
@@ -50,10 +53,10 @@ const SceneStats = ({
           <span className="text-green-500">✓</span>
         </Tooltip>
       )}
-      {scene.files?.[0]?.width && scene.files?.[0]?.height && (
+      {!hideFileInfo && scene.files?.[0]?.width && scene.files?.[0]?.height && (
         <span>{scene.files[0].width}×{scene.files[0].height}</span>
       )}
-      {scene.files?.[0]?.size && (
+      {!hideFileInfo && scene.files?.[0]?.size && (
         <span>{formatFileSize(scene.files[0].size)}</span>
       )}
     </div>

@@ -191,7 +191,7 @@ const Tooltip = ({
     <>
       <div
         ref={triggerRef}
-        className={`inline-block ${className}`}
+        className={`inline-block align-middle ${className}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}

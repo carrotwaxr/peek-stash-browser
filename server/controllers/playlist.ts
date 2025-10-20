@@ -2,51 +2,7 @@ import { Response } from "express";
 import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Scene } from "stashapp-api";
-
-/**
- * Helper function to append API key to Stash URLs
- */
-const appendApiKeyToUrl = (url: string): string => {
-  try {
-    if (!url || typeof url !== "string" || url.trim() === "") {
-      return url;
-    }
-
-    const urlObj = new URL(url);
-    if (!urlObj.searchParams.has("apikey")) {
-      const apiKey = process.env.STASH_API_KEY;
-      if (!apiKey) {
-        console.error("STASH_API_KEY not found in environment variables");
-        return url;
-      }
-      urlObj.searchParams.append("apikey", apiKey);
-    }
-    return urlObj.toString();
-  } catch (urlError) {
-    console.error(`Error processing URL: ${url}`, urlError);
-    return url;
-  }
-};
-
-/**
- * Transform scene to add API key to image paths
- */
-const transformScene = (scene: Scene) => {
-  try {
-    const mutated: Record<string, any> = {
-      ...scene,
-      paths: Object.entries(scene.paths).reduce((acc, [key, val]) => {
-        acc[key] = appendApiKeyToUrl(val as string);
-        return acc;
-      }, {} as { [key: string]: string }),
-    };
-
-    return mutated;
-  } catch (error) {
-    console.error("Error transforming scene:", error);
-    return scene;
-  }
-};
+import { transformScene } from "../utils/pathMapping.js";
 
 /**
  * Get all playlists for current user

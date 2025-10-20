@@ -80,7 +80,7 @@ const SceneListItem = ({
         cursor: draggable ? 'move' : exists ? 'pointer' : 'default',
       }}
     >
-      <div className="p-2 md:p-4">
+      <div className="pt-2 px-2 pb-1 md:pt-4 md:px-4 md:pb-2">
         <div className="flex flex-col md:flex-row gap-3 md:gap-4">
           {/* Optional Drag Handle */}
           {dragHandle}

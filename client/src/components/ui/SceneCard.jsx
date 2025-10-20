@@ -1,6 +1,7 @@
 import { forwardRef } from "react";
 import { Link } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import { formatFileSize } from "../../utils/format.js";
 import SceneContextMenu from "../ui/SceneContextMenu.jsx";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
 import {
@@ -204,34 +205,57 @@ const SceneCard = forwardRef(
         </div>
 
         {/* Content */}
-        <div className="p-4">
-          {/* Title and Date */}
-          <div className="mb-3">
+        <div className="pt-4 px-4 pb-2">
+          {/* Title and Date - Fixed height for carousel consistency */}
+          <div className="flex flex-col" style={{ minHeight: "4rem", maxHeight: "4rem" }}>
             <SceneTitle
               scene={scene}
               titleClassName="font-semibold mb-1 leading-tight"
               dateClassName="text-xs mt-1"
+              maxLines={2}
             />
           </div>
 
-          {/* Stats */}
-          <SceneStats
-            scene={scene}
-            className="mb-3"
-          />
+          {/* Stats - Fixed height row, no wrapping, centered */}
+          <div style={{ minHeight: "1.5rem", maxHeight: "1.5rem", overflow: "hidden" }}>
+            <SceneStats
+              scene={scene}
+              noWrap={true}
+              hideFileInfo={true}
+              centered={true}
+            />
+          </div>
 
-          {/* Description */}
-          <SceneDescription
-            scene={scene}
-            lineClamp={3}
-            className="mb-3"
-          />
+          {/* Description - Fixed height for carousel consistency */}
+          <div style={{ minHeight: "3.75rem", maxHeight: "3.75rem", overflow: "hidden" }}>
+            <SceneDescription
+              scene={scene}
+              lineClamp={3}
+            />
+          </div>
 
-          {/* Performers, Tags, Organized */}
-          <SceneMetadata
-            scene={scene}
-            className="mb-2"
-          />
+          {/* Performers, Tags - More space, less cramped */}
+          <div className="py-2" style={{ minHeight: "3.5rem", maxHeight: "3.5rem" }}>
+            <SceneMetadata
+              scene={scene}
+            />
+          </div>
+
+          {/* Resolution and File Size - Bottom row */}
+          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)', minHeight: "1rem" }}>
+            <span>
+              {scene.files?.[0]?.width && scene.files?.[0]?.height ? (
+                `${scene.files[0].width}×${scene.files[0].height}`
+              ) : (
+                '—'
+              )}
+            </span>
+            <span>
+              {scene.files?.[0]?.size && (
+                formatFileSize(scene.files[0].size)
+              )}
+            </span>
+          </div>
 
         </div>
       </div>

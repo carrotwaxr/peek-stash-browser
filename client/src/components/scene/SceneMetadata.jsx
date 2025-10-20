@@ -12,7 +12,7 @@ const SceneMetadata = ({
   const performersContent = scene.performers && scene.performers.length > 0 && (
     <div>
       <div className="font-semibold mb-3 text-base">Performers</div>
-      <div className="grid grid-cols-2 gap-3 max-w-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
         {scene.performers.slice(0, 8).map((performer) => (
           <Link
             key={performer.id}
@@ -47,7 +47,7 @@ const SceneMetadata = ({
   const tagsContent = scene.tags && scene.tags.length > 0 && (
     <div>
       <div className="font-semibold mb-3 text-base">Tags</div>
-      <div className="grid grid-cols-2 gap-3 max-w-md">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
         {scene.tags.slice(0, 8).map((tag) => (
           <Link
             key={tag.id}
@@ -79,20 +79,20 @@ const SceneMetadata = ({
   );
 
   return (
-    <div className={`flex flex-wrap items-center justify-center gap-3 md:gap-4 ${className}`}>
+    <div className={`flex items-center justify-center gap-3 md:gap-4 ${className}`}>
       {scene.performers && scene.performers.length > 0 && (
         <Tooltip
           content={performersContent}
           clickable={true}
           position="bottom"
         >
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+          <div className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
             style={{
               backgroundColor: 'rgba(59, 130, 246, 0.1)',
               border: '1px solid rgba(59, 130, 246, 0.3)',
             }}
           >
-            <span className="text-base">👥</span>
+            <span className="text-xl">👥</span>
             <span className="text-sm font-medium" style={{ color: 'rgb(59, 130, 246)' }}>
               {scene.performers.length}
             </span>
@@ -105,13 +105,13 @@ const SceneMetadata = ({
           clickable={true}
           position="bottom"
         >
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full cursor-pointer transition-colors"
+          <div className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
             style={{
               backgroundColor: 'rgba(168, 85, 247, 0.1)',
               border: '1px solid rgba(168, 85, 247, 0.3)',
             }}
           >
-            <span className="text-base">🏷️</span>
+            <span className="text-xl">🏷️</span>
             <span className="text-sm font-medium" style={{ color: 'rgb(168, 85, 247)' }}>
               {scene.tags.length}
             </span>

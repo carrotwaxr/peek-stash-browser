@@ -10,9 +10,22 @@ const SceneTitle = ({
   linkState,
   showDate = true,
   titleClassName = "",
-  dateClassName = ""
+  dateClassName = "",
+  maxLines = null // Optional: limit title to specific number of lines
 }) => {
   const title = getSceneTitle(scene);
+
+  const titleStyle = maxLines ? {
+    color: 'var(--text-primary)',
+    display: '-webkit-box',
+    WebkitLineClamp: maxLines,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+    minHeight: maxLines === 2 ? '2.5rem' : undefined, // Fixed height for 2-line titles
+    maxHeight: maxLines === 2 ? '2.5rem' : undefined
+  } : {
+    color: 'var(--text-primary)'
+  };
 
   return (
     <div>
@@ -20,7 +33,7 @@ const SceneTitle = ({
         to={`/scene/${scene.id}`}
         state={linkState}
         className={`font-semibold hover:underline block ${titleClassName}`}
-        style={{ color: 'var(--text-primary)' }}
+        style={titleStyle}
       >
         {title}
       </Link>
