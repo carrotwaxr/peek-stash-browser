@@ -6,7 +6,6 @@ const PlaybackControls = ({
   currentPlaylistIndex,
   quality,
   setQuality,
-  onReset,
 }) => {
   return (
     <section className="container-fluid py-4 mt-6">
@@ -61,20 +60,6 @@ const PlaybackControls = ({
 
         {/* Actions */}
         <div className="flex items-center gap-4">
-          {/* Reset Button */}
-          <button
-            onClick={onReset}
-            className="btn text-sm"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-primary)",
-              padding: "8px 12px",
-            }}
-          >
-            🔄 Reset
-          </button>
-
           {/* Add to Playlist Button */}
           <AddToPlaylistButton sceneId={scene.id} />
         </div>

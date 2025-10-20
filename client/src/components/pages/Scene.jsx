@@ -178,7 +178,6 @@ const Scene = () => {
           currentPlaylistIndex={playlist?.currentIndex || 0}
           quality={quality}
           setQuality={setQuality}
-          onReset={() => window.location.reload()}
         />
 
         {/* Playlist Status Card */}
