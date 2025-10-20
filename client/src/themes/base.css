@@ -57,19 +57,37 @@ code, pre, .font-mono {
 .container {
   width: 100%;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 0.5rem; /* Reduced padding on mobile */
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: 0 1rem; /* Original padding on desktop */
+  }
 }
 
 .container-fluid {
   width: 100%;
-  padding: 0 1rem;
+  padding: 0 0.5rem; /* Reduced padding on mobile */
+}
+
+@media (min-width: 768px) {
+  .container-fluid {
+    padding: 0 1rem; /* Original padding on desktop */
+  }
 }
 
 /* Container with max-width for specific use cases where needed */
 .container-constrained {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 0.5rem; /* Reduced padding on mobile */
+}
+
+@media (min-width: 768px) {
+  .container-constrained {
+    padding: 0 1rem; /* Original padding on desktop */
+  }
 }
 
 /* Full-width no padding for video and media content */
