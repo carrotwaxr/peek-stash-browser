@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 import { ThemedIcon } from "../icons/index.js";
 
 const UserMenu = () => {
@@ -9,6 +10,7 @@ const UserMenu = () => {
   const buttonRef = useRef(null);
 
   const { logout, user } = useAuth();
+  const { isTVMode, toggleTVMode } = useTVMode();
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -133,6 +135,42 @@ const UserMenu = () => {
               <ThemedIcon name="settings" size={16} />
               <span>My Settings</span>
             </Link>
+          </div>
+
+          {/* TV Mode Toggle */}
+          <div
+            className="px-4 py-3 border-b"
+            style={{ borderColor: "var(--border-color)" }}
+          >
+            <button
+              onClick={() => {
+                toggleTVMode();
+                setIsOpen(false);
+              }}
+              className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200"
+              style={{
+                backgroundColor: isTVMode
+                  ? "var(--accent-primary)"
+                  : "transparent",
+                color: isTVMode ? "white" : "var(--text-primary)",
+              }}
+              onMouseEnter={(e) => {
+                if (!isTVMode) {
+                  e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isTVMode) {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <ThemedIcon name="tv" size={16} color={isTVMode ? "white" : "currentColor"} />
+                <span>TV Mode</span>
+              </div>
+              {isTVMode && <span className="text-sm">✓</span>}
+            </button>
           </div>
 
           {/* Logout */}

@@ -9,6 +9,7 @@ import GlobalLayout from "./components/ui/GlobalLayout.jsx";
 import Login from "./components/pages/Login.jsx";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
+import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import "./themes/base.css";
 
@@ -173,16 +174,18 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
-        <Toaster
-          position="bottom-center"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              padding: '0',
-            },
-          }}
-        />
+        <TVModeProvider>
+          <AppContent />
+          <Toaster
+            position="bottom-center"
+            toastOptions={{
+              duration: 3000,
+              style: {
+                padding: '0',
+              },
+            }}
+          />
+        </TVModeProvider>
       </AuthProvider>
     </ThemeProvider>
   );

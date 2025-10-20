@@ -8,6 +8,7 @@ import Pagination from "../ui/Pagination.jsx";
 import BulkActionBar from "../ui/BulkActionBar.jsx";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 
 const SceneGrid = ({
   scenes,
@@ -23,6 +24,7 @@ const SceneGrid = ({
 }) => {
   const gridRef = useRef();
   const columns = useGridColumns('scenes');
+  const { isTVMode } = useTVMode();
 
   // Multiselect state
   const [isMultiselectMode, setIsMultiselectMode] = useState(false);
@@ -71,22 +73,22 @@ const SceneGrid = ({
   const { focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
     items: scenes,
     columns,
-    enabled: enableKeyboard,
+    enabled: isTVMode && enableKeyboard,
     onSelect: handleKeyboardSelect,
     onPageUp: () => onPageChange && currentPage > 1 && onPageChange(currentPage - 1),
     onPageDown: () => onPageChange && currentPage < totalPages && onPageChange(currentPage + 1),
   });
 
-  // Set initial focus when grid loads
+  // Set initial focus when grid loads (only in TV mode)
   useEffect(() => {
-    if (enableKeyboard && scenes?.length > 0 && gridRef.current) {
+    if (isTVMode && enableKeyboard && scenes?.length > 0 && gridRef.current) {
       // Focus the grid container to enable keyboard navigation
       const firstFocusable = gridRef.current.querySelector('[tabindex="0"]');
       if (firstFocusable) {
         firstFocusable.focus();
       }
     }
-  }, [enableKeyboard, scenes]);
+  }, [isTVMode, enableKeyboard, scenes]);
 
   // Clear selections when page changes
   useEffect(() => {
@@ -173,7 +175,7 @@ const SceneGrid = ({
             ref={(el) => setItemRef(index, el)}
             scene={scene}
             onClick={onSceneClick}
-            tabIndex={enableKeyboard ? (isFocused(index) ? 0 : -1) : -1}
+            tabIndex={isFocused(index) ? 0 : -1}
             className={
               isFocused(index)
                 ? "keyboard-focus"

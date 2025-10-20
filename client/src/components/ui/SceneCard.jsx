@@ -5,6 +5,7 @@ import {
   formatFileSize,
 } from "../../utils/format.js";
 import { formatRelativeTime } from "../../utils/date.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 import Tooltip from "../ui/Tooltip.jsx";
 import SceneContextMenu from "../ui/SceneContextMenu.jsx";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
@@ -27,6 +28,7 @@ const SceneCard = forwardRef(
     },
     ref
   ) => {
+    const { isTVMode } = useTVMode();
     const title = getSceneTitle(scene);
     const description = getSceneDescription(scene);
 
@@ -58,6 +60,18 @@ const SceneCard = forwardRef(
     };
 
     const handleKeyDown = (e) => {
+      // Prevent card navigation when typing in input fields
+      const target = e.target;
+      const isInputField =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable;
+
+      if (isInputField) {
+        return; // Don't handle keyboard events from input fields
+      }
+
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
@@ -90,8 +104,8 @@ const SceneCard = forwardRef(
         transition-all duration-300 cursor-pointer
         hover:shadow-2xl hover:scale-[1.03] hover:z-10
         hover:border-opacity-80
-        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-        keyboard-focused:ring-2 keyboard-focused:ring-yellow-400 keyboard-focused:ring-offset-2
+        ${isTVMode ? "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" : ""}
+        ${!isTVMode ? "hover:ring-2 hover:ring-blue-500 hover:ring-offset-2" : ""}
         ${isSelected ? "ring-4 ring-blue-500 ring-offset-2" : ""}
         ${className}
       `}
@@ -103,7 +117,7 @@ const SceneCard = forwardRef(
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
-        tabIndex={tabIndex}
+        tabIndex={isTVMode ? tabIndex : -1}
         role="button"
         aria-label={`Scene: ${title}`}
       >
