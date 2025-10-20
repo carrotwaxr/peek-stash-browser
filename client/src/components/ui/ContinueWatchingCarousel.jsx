@@ -77,6 +77,7 @@ const ContinueWatchingCarousel = () => {
     navigate(`/video/${scene.id}`, {
       state: {
         scene,
+        shouldResume: true, // Auto-resume from continue watching
         playlist: {
           id: "virtual-carousel",
           name: "Continue Watching",

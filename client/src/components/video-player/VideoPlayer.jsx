@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
@@ -28,6 +29,7 @@ const VideoPlayer = ({
   externalQuality,
   externalSetQuality,
 }) => {
+  const location = useLocation();
   const {
     videoRef,
     playerRef,
@@ -79,6 +81,21 @@ const VideoPlayer = ({
     currentPlaylistIndex,
     navigate
   );
+
+  // Auto-resume from Continue Watching or Watch History
+  useEffect(() => {
+    const shouldResume = location.state?.shouldResume;
+
+    if (shouldResume && watchHistory && watchHistory.resumeTime > 0 && playerRef.current && !showPoster) {
+      const player = playerRef.current;
+      // Wait a bit for player to be ready
+      setTimeout(() => {
+        if (player && !player.isDisposed()) {
+          player.currentTime(watchHistory.resumeTime);
+        }
+      }, 500);
+    }
+  }, [watchHistory, showPoster, location.state]);
 
   // Media key support (play/pause, next/prev track)
   usePlaylistMediaKeys({

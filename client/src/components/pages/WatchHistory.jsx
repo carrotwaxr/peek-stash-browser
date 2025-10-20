@@ -229,6 +229,7 @@ const WatchHistory = () => {
                 }}
                 linkState={{
                   scene,
+                  shouldResume: true, // Auto-resume from watch history
                   playlist: {
                     id: 'virtual-history',
                     name: 'Watch History',
