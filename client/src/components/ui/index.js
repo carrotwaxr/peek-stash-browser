@@ -5,6 +5,7 @@ export { default as WarningMessage } from "./WarningMessage.jsx";
 export { default as InfoMessage } from "./InfoMessage.jsx";
 export { default as ConfirmDialog } from "./ConfirmDialog.jsx";
 export { default as SearchInput } from "./SearchInput.jsx";
+export { default as SearchableSelect } from "./SearchableSelect.jsx";
 export { default as Pagination } from "./Pagination.jsx";
 export { default as PageHeader } from "./PageHeader.jsx";
 export { default as PageLayout } from "./PageLayout.jsx";

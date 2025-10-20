@@ -138,6 +138,33 @@ export const RESOLUTION_OPTIONS = [
 
 export const SCENE_FILTER_OPTIONS = [
   {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select performers...",
+  },
+  {
+    key: "studioId",
+    label: "Studio",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select studio...",
+  },
+  {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
+  },
+  {
     key: "rating",
     label: "Rating",
     type: "select",
@@ -596,7 +623,7 @@ export const TAG_FILTER_OPTIONS = [
 export const buildSceneFilter = (filters) => {
   const sceneFilter = {};
 
-  // ID-based filters (performers, studios, tags) - pass through directly
+  // ID-based filters from permanentFilters (already in GraphQL format)
   if (filters.performers) {
     sceneFilter.performers = filters.performers;
   }
@@ -605,6 +632,26 @@ export const buildSceneFilter = (filters) => {
   }
   if (filters.tags) {
     sceneFilter.tags = filters.tags;
+  }
+
+  // ID-based filters from UI (need to convert to GraphQL format)
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    sceneFilter.performers = {
+      value: filters.performerIds,
+      modifier: "INCLUDES",
+    };
+  }
+  if (filters.studioId && filters.studioId !== "") {
+    sceneFilter.studios = {
+      value: [filters.studioId],
+      modifier: "INCLUDES",
+    };
+  }
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    sceneFilter.tags = {
+      value: filters.tagIds,
+      modifier: "INCLUDES",
+    };
   }
 
   // Boolean filters

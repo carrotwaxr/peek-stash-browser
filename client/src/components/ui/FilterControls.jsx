@@ -1,3 +1,5 @@
+import SearchableSelect from "./SearchableSelect.jsx";
+
 /**
  * Reusable Sort Control Component
  */
@@ -47,6 +49,8 @@ export const FilterControl = ({
   placeholder = "",
   min,
   max,
+  entityType, // for searchable-select
+  multi, // for searchable-select
 }) => {
   const baseInputStyle = {
     backgroundColor: "var(--bg-card)",
@@ -91,6 +95,16 @@ export const FilterControl = ({
               </option>
             ))}
           </select>
+        );
+      case "searchable-select":
+        return (
+          <SearchableSelect
+            entityType={entityType}
+            value={value}
+            onChange={onChange}
+            multi={multi}
+            placeholder={placeholder || `Select ${label}...`}
+          />
         );
       case "number":
         return (

@@ -14,6 +14,9 @@ import {
   findPerformers,
   findStudios,
   findTags,
+  findPerformersMinimal,
+  findStudiosMinimal,
+  findTagsMinimal,
   updateScene,
   updatePerformer,
   updateStudio,
@@ -63,6 +66,11 @@ export const setupAPI = () => {
   app.post("/api/library/performers", authenticateToken, findPerformers);
   app.post("/api/library/studios", authenticateToken, findStudios);
   app.post("/api/library/tags", authenticateToken, findTags);
+
+  // Minimal data endpoints for filter dropdowns (id + name only)
+  app.post("/api/library/performers/minimal", authenticateToken, findPerformersMinimal);
+  app.post("/api/library/studios/minimal", authenticateToken, findStudiosMinimal);
+  app.post("/api/library/tags/minimal", authenticateToken, findTagsMinimal);
 
   // Update endpoints for CRUD operations
   app.put("/api/library/scenes/:id", authenticateToken, updateScene);

@@ -263,6 +263,110 @@ const transformTag = (tag: any) => {
   }
 };
 
+// Minimal data endpoints for filter dropdowns (id + name only)
+
+export const findPerformersMinimal = async (req: Request, res: Response) => {
+  try {
+    const stash = getStash();
+    const { filter } = req.body;
+
+    // Always filter to only show performers with scenes
+    const enhancedFilter = {
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
+    };
+
+    const performers: FindPerformersQuery = await stash.findPerformers({
+      filter: filter as FindFilterType,
+      performer_filter: enhancedFilter as PerformerFilterType,
+    });
+
+    // Return only id and name
+    const minimalPerformers = performers.findPerformers.performers.map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
+
+    res.json({ performers: minimalPerformers });
+  } catch (error) {
+    console.error("Error in findPerformersMinimal:", error);
+    res.status(500).json({
+      error: "Failed to find performers",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+export const findStudiosMinimal = async (req: Request, res: Response) => {
+  try {
+    const stash = getStash();
+    const { filter } = req.body;
+
+    // Always filter to only show studios with scenes
+    const enhancedFilter = {
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
+    };
+
+    const studios: FindStudiosQuery = await stash.findStudios({
+      filter: filter as FindFilterType,
+      studio_filter: enhancedFilter as StudioFilterType,
+    });
+
+    // Return only id and name
+    const minimalStudios = studios.findStudios.studios.map((s) => ({
+      id: s.id,
+      name: s.name,
+    }));
+
+    res.json({ studios: minimalStudios });
+  } catch (error) {
+    console.error("Error in findStudiosMinimal:", error);
+    res.status(500).json({
+      error: "Failed to find studios",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+export const findTagsMinimal = async (req: Request, res: Response) => {
+  try {
+    const stash = getStash();
+    const { filter } = req.body;
+
+    // Always filter to only show tags with scenes
+    const enhancedFilter = {
+      scene_count: {
+        modifier: "GREATER_THAN" as any,
+        value: 0,
+      },
+    };
+
+    const tags: FindTagsQuery = await stash.findTags({
+      filter: filter as FindFilterType,
+      tag_filter: enhancedFilter as TagFilterType,
+    });
+
+    // Return only id and name
+    const minimalTags = tags.findTags.tags.map((t) => ({
+      id: t.id,
+      name: t.name,
+    }));
+
+    res.json({ tags: minimalTags });
+  } catch (error) {
+    console.error("Error in findTagsMinimal:", error);
+    res.status(500).json({
+      error: "Failed to find tags",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
 // Update endpoints using stashapp-api mutations
 
 export const updateScene = async (req: Request, res: Response) => {
