@@ -271,7 +271,7 @@ const PerformerStats = ({ performer }) => {
   return (
     <Card title="Statistics">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatField label="Scenes:" value={performer.scenes?.length || 0} />
+        <StatField label="Scenes:" value={performer?.scene_count || 0} />
         <StatField
           label="Rating:"
           value={
