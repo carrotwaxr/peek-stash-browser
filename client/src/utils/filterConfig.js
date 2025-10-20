@@ -623,34 +623,49 @@ export const TAG_FILTER_OPTIONS = [
 export const buildSceneFilter = (filters) => {
   const sceneFilter = {};
 
-  // ID-based filters from permanentFilters (already in GraphQL format)
-  if (filters.performers) {
-    sceneFilter.performers = filters.performers;
+  // ID-based filters - merge permanent filters with UI filters
+  // Performers: Merge permanent + UI filters
+  const performerIds = [];
+  if (filters.performers?.value) {
+    performerIds.push(...filters.performers.value);
   }
-  if (filters.studios) {
-    sceneFilter.studios = filters.studios;
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    performerIds.push(...filters.performerIds);
   }
-  if (filters.tags) {
-    sceneFilter.tags = filters.tags;
+  if (performerIds.length > 0) {
+    sceneFilter.performers = {
+      value: [...new Set(performerIds)], // Remove duplicates
+      modifier: "INCLUDES_ALL",
+    };
   }
 
-  // ID-based filters from UI (need to convert to GraphQL format)
-  if (filters.performerIds && filters.performerIds.length > 0) {
-    sceneFilter.performers = {
-      value: filters.performerIds,
-      modifier: "INCLUDES",
-    };
+  // Studios: Merge permanent + UI filters
+  const studioIds = [];
+  if (filters.studios?.value) {
+    studioIds.push(...filters.studios.value);
   }
   if (filters.studioId && filters.studioId !== "") {
+    studioIds.push(filters.studioId);
+  }
+  if (studioIds.length > 0) {
     sceneFilter.studios = {
-      value: [filters.studioId],
+      value: [...new Set(studioIds)], // Remove duplicates
       modifier: "INCLUDES",
     };
   }
+
+  // Tags: Merge permanent + UI filters
+  const tagIds = [];
+  if (filters.tags?.value) {
+    tagIds.push(...filters.tags.value);
+  }
   if (filters.tagIds && filters.tagIds.length > 0) {
+    tagIds.push(...filters.tagIds);
+  }
+  if (tagIds.length > 0) {
     sceneFilter.tags = {
-      value: filters.tagIds,
-      modifier: "INCLUDES",
+      value: [...new Set(tagIds)], // Remove duplicates
+      modifier: "INCLUDES_ALL",
     };
   }
 
