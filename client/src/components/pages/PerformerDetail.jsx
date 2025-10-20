@@ -268,6 +268,11 @@ const PerformerDetails = ({ performer }) => {
 };
 
 const PerformerStats = ({ performer }) => {
+  // Calculate O-Count percentage
+  const oCountPercentage = performer?.scene_count && performer?.o_counter
+    ? ((performer.o_counter / performer.scene_count) * 100).toFixed(1)
+    : null;
+
   return (
     <Card title="Statistics">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -280,6 +285,11 @@ const PerformerStats = ({ performer }) => {
           valueColor="var(--accent-primary)"
         />
         <StatField label="O Count:" value={performer?.o_counter} />
+        <StatField
+          label="O-Count %:"
+          value={oCountPercentage && `${oCountPercentage}%`}
+          valueColor="var(--accent-primary)"
+        />
         <StatField label="Play Count:" value={performer?.play_count} />
       </div>
     </Card>
