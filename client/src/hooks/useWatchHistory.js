@@ -107,8 +107,6 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
     pingIntervalRef.current = setInterval(() => {
       sendPing();
     }, 30000); // 30 seconds
-
-    console.log('Watch history tracking started for scene:', sceneId);
   }, [playerRef, sceneId, isAuthenticated, sendPing]);
 
   /**
@@ -123,8 +121,6 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
       clearInterval(pingIntervalRef.current);
       pingIntervalRef.current = null;
     }
-
-    console.log('Watch history tracking stopped for scene:', sceneId);
   }, [sendPing, sceneId]);
 
   /**

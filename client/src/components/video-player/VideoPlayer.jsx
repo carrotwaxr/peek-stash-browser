@@ -340,12 +340,10 @@ const VideoPlayer = ({
 
         // Setup watch history event listeners
         const handlePlay = () => {
-          console.log('Watch history tracking started for scene:', scene.id);
           startTracking();
         };
 
         const handlePause = () => {
-          console.log('Watch history tracking paused for scene:', scene.id);
           stopTracking();
         };
 
@@ -355,7 +353,6 @@ const VideoPlayer = ({
         };
 
         const handleEnded = () => {
-          console.log('Watch history tracking ended for scene:', scene.id);
           stopTracking();
         };
 
