@@ -42,10 +42,10 @@ const TagDetail = () => {
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
       <div className="max-w-none">
         {/* Back Button */}
-        <div className="mb-6">
+        <div className="mt-6 mb-6">
           <Link
             to="/tags"
-            className="inline-flex items-center px-3 py-2 rounded-md text-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
             style={{
               color: "var(--accent-primary)",
               backgroundColor: "var(--bg-card)",
@@ -53,7 +53,8 @@ const TagDetail = () => {
               border: "1px solid",
             }}
           >
-            ← Back to Tags
+            <span>←</span>
+            <span>Back to Tags</span>
           </Link>
         </div>
 
