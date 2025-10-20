@@ -50,13 +50,14 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
   };
 
   return (
-    <div
-      className="rounded-lg border p-4 mb-6"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-      }}
-    >
+    <div className="px-4 mt-6 mb-6">
+      <div
+        className="rounded-lg border p-4"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+        }}
+      >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -209,6 +210,7 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
             );
           })}
         </div>
+      </div>
       </div>
     </div>
   );

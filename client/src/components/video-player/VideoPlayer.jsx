@@ -406,7 +406,7 @@ const VideoPlayer = ({
   };
 
   return (
-    <section className="py-6">
+    <section>
       <div className="video-container" style={{ position: 'relative' }}>
         {showPoster && (
           <VideoPoster
