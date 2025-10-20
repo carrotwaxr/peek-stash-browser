@@ -4,7 +4,6 @@ import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
 import VideoPoster from "./VideoPoster.jsx";
 import SeekPreview from "./SeekPreview.jsx";
-import ResumeWatchDialog from "./ResumeWatchDialog.jsx";
 import { useVideoPlayer } from "./useVideoPlayer.js";
 import { usePlaylistNavigation } from "./usePlaylistNavigation.js";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
@@ -67,9 +66,6 @@ const VideoPlayer = ({
     updateQuality,
   } = useWatchHistory(scene?.id, playerRef);
 
-  // Resume dialog state
-  const [showResumeDialog, setShowResumeDialog] = useState(false);
-  const [hasHandledResume, setHasHandledResume] = useState(false);
 
   // Sync internal quality with external when external changes
   useEffect(() => {
@@ -366,12 +362,6 @@ const VideoPlayer = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show resume dialog when watch history loads with resume time
-  useEffect(() => {
-    if (!loadingWatchHistory && watchHistory && watchHistory.exists && watchHistory.resumeTime > 0 && !hasHandledResume && !showPoster) {
-      setShowResumeDialog(true);
-    }
-  }, [loadingWatchHistory, watchHistory, hasHandledResume, showPoster]);
 
   // Track quality changes for watch history
   useEffect(() => {
@@ -379,30 +369,6 @@ const VideoPlayer = ({
       updateQuality(quality);
     }
   }, [quality, updateQuality]);
-
-  const handleResumeWatch = () => {
-    const player = playerRef.current;
-    if (player && watchHistory?.resumeTime) {
-      player.currentTime(watchHistory.resumeTime);
-      player.play().catch(() => {
-        // Autoplay failed
-      });
-    }
-    setShowResumeDialog(false);
-    setHasHandledResume(true);
-  };
-
-  const handleStartFromBeginning = () => {
-    const player = playerRef.current;
-    if (player) {
-      player.currentTime(0);
-      player.play().catch(() => {
-        // Autoplay failed
-      });
-    }
-    setShowResumeDialog(false);
-    setHasHandledResume(true);
-  };
 
   const handlePlay = () => {
     setIsInitializing(true);
@@ -426,16 +392,6 @@ const VideoPlayer = ({
           <video ref={videoRef} className="video-js vjs-big-play-centered" />
           {!showPoster && <SeekPreview scene={scene} playerRef={playerRef} />}
         </div>
-
-        {/* Resume watch dialog */}
-        {watchHistory && watchHistory.resumeTime > 0 && (
-          <ResumeWatchDialog
-            isOpen={showResumeDialog}
-            onResume={handleResumeWatch}
-            onStartFromBeginning={handleStartFromBeginning}
-            resumeTime={watchHistory.resumeTime}
-          />
-        )}
       </div>
     </section>
   );
