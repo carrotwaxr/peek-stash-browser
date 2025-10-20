@@ -5,6 +5,7 @@ import {
   incrementOCounter,
   getWatchHistory,
   getAllWatchHistory,
+  clearAllWatchHistory,
 } from "../controllers/watchHistory.js";
 
 const router = express.Router();
@@ -18,10 +19,13 @@ router.post("/ping", pingWatchHistory);
 // Increment O counter
 router.post("/increment-o", incrementOCounter);
 
-// Get watch history for specific scene
-router.get("/:sceneId", getWatchHistory);
-
 // Get all watch history for current user (Continue Watching carousel)
 router.get("/", getAllWatchHistory);
+
+// Clear all watch history for current user
+router.delete("/", clearAllWatchHistory);
+
+// Get watch history for specific scene
+router.get("/:sceneId", getWatchHistory);
 
 export default router;

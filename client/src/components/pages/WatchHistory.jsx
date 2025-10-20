@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { History } from 'lucide-react';
+import { History, Trash2 } from 'lucide-react';
 import { useAllWatchHistory } from '../../hooks/useWatchHistory.js';
-import { libraryApi } from '../../services/api.js';
+import { libraryApi, apiDelete } from '../../services/api.js';
 import { PageHeader, PageLayout } from '../ui/index.js';
 import SceneListItem from '../ui/SceneListItem.jsx';
 import LoadingSpinner from '../ui/LoadingSpinner.jsx';
@@ -14,6 +14,8 @@ const WatchHistory = () => {
   const [filterBy, setFilterBy] = useState('all'); // all, in_progress, completed
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   // Fetch all watch history (not limited)
   const {
@@ -110,6 +112,25 @@ const WatchHistory = () => {
     return `${minutes}m`;
   };
 
+  const handleClearHistory = async () => {
+    try {
+      setIsClearing(true);
+      await apiDelete('/watch-history');
+
+      // Reset state
+      setScenes([]);
+      setShowConfirmDialog(false);
+
+      // Refetch watch history to update the UI
+      window.location.reload();
+    } catch (err) {
+      console.error('Error clearing watch history:', err);
+      alert('Failed to clear watch history. Please try again.');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   return (
     <PageLayout fullHeight style={{ backgroundColor: 'var(--bg-primary)' }}>
       <PageHeader
@@ -172,13 +193,34 @@ const WatchHistory = () => {
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm md:ml-auto" style={{ color: 'var(--text-muted)' }}>
-            <span>{scenes.length} scenes</span>
+          {/* Stats and Actions */}
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-sm md:ml-auto">
+            <div className="flex items-center gap-3 md:gap-4" style={{ color: 'var(--text-muted)' }}>
+              <span>{scenes.length} scenes</span>
+              {scenes.length > 0 && (
+                <span>
+                  Total watch time: {formatDuration(scenes.reduce((sum, s) => sum + s.playDuration, 0))}
+                </span>
+              )}
+            </div>
+
+            {/* Clear History Button */}
             {scenes.length > 0 && (
-              <span>
-                Total watch time: {formatDuration(scenes.reduce((sum, s) => sum + s.playDuration, 0))}
-              </span>
+              <button
+                onClick={() => setShowConfirmDialog(true)}
+                disabled={isClearing}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: 'var(--accent-error)',
+                  color: 'white',
+                  opacity: isClearing ? 0.5 : 1,
+                  cursor: isClearing ? 'not-allowed' : 'pointer',
+                }}
+                title="Clear all watch history"
+              >
+                <Trash2 size={14} />
+                <span className="hidden sm:inline">Clear History</span>
+              </button>
             )}
           </div>
         </div>
@@ -256,6 +298,61 @@ const WatchHistory = () => {
           </div>
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.7)' }}
+          onClick={() => setShowConfirmDialog(false)}
+        >
+          <div
+            className="p-6 rounded-lg max-w-md mx-4"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              className="text-xl font-bold mb-4"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Clear Watch History?
+            </h3>
+            <p className="mb-6" style={{ color: 'var(--text-secondary)' }}>
+              This will permanently delete all watch history records including resume times, play counts, and viewing statistics. This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmDialog(false)}
+                disabled={isClearing}
+                className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleClearHistory}
+                disabled={isClearing}
+                className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
+                style={{
+                  backgroundColor: 'var(--accent-error)',
+                  color: 'white',
+                  opacity: isClearing ? 0.5 : 1,
+                  cursor: isClearing ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {isClearing ? 'Clearing...' : 'Clear History'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageLayout>
   );
 };
