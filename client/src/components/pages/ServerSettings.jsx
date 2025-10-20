@@ -143,17 +143,16 @@ const ServerSettings = () => {
 
   if (loading) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <div className="flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <>
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="mb-8">
@@ -365,7 +364,7 @@ const ServerSettings = () => {
           {/* Future sections can be added here */}
           {/* Example: Server Configuration, Database Settings, etc. */}
         </div>
-      </div>
+      </PageLayout>
 
       {/* Create User Modal */}
       {showCreateModal && (
@@ -514,7 +513,6 @@ const ServerSettings = () => {
           </div>
         </div>
       )}
-    </>
   );
 };
 

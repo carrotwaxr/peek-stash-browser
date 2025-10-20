@@ -201,17 +201,17 @@ const PlaylistDetail = () => {
 
   if (loading) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <div className="flex items-center justify-center">
           <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   if (error || !playlist) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <div className="text-center">
           <h2 className="text-2xl mb-4" style={{ color: "var(--text-primary)" }}>
             Playlist not found
@@ -220,14 +220,13 @@ const PlaylistDetail = () => {
             Back to Playlists
           </Link>
         </div>
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <>
 
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
@@ -526,7 +525,7 @@ const PlaylistDetail = () => {
             ))}
           </div>
         )}
-      </div>
+      </PageLayout>
 
       {/* Remove Scene Confirmation Dialog */}
       <ConfirmDialog
@@ -542,7 +541,6 @@ const PlaylistDetail = () => {
         cancelText="Cancel"
         confirmStyle="danger"
       />
-    </>
   );
 };
 

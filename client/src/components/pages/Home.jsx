@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
-import { PageHeader } from "../ui/index.js";
+import { PageHeader, PageLayout } from "../ui/index.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
@@ -95,7 +95,7 @@ const Home = () => {
     .sort((a, b) => (a.preference?.order || 0) - (b.preference?.order || 0));
 
   return (
-    <div className="w-full py-8 px-4 lg:px-6 xl:px-8 max-w-none">
+    <PageLayout className="max-w-none">
       <PageHeader
         title="Welcome Home"
         subtitle="Discover your favorite content and explore new scenes"
@@ -114,7 +114,7 @@ const Home = () => {
           carouselQueries={carouselQueries}
         />
       ))}
-    </div>
+    </PageLayout>
   );
 };
 

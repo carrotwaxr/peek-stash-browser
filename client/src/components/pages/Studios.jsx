@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, forwardRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, ErrorMessage, LoadingSpinner } from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -102,19 +102,20 @@ const Studios = () => {
 
   if (error) {
     return (
-      <div className="w-full py-8 px-4 lg:px-6 xl:px-8">
+      <PageLayout>
         <PageHeader title="Studios" />
         <ErrorMessage error={error} />
-      </div>
+      </PageLayout>
     );
   }
 
   return (
-    <div ref={pageRef} className="w-full py-8 px-4 lg:px-6 xl:px-8">
-      <PageHeader
-        title="Studios"
-        subtitle="Browse studios and production companies"
-      />
+    <PageLayout>
+      <div ref={pageRef}>
+        <PageHeader
+          title="Studios"
+          subtitle="Browse studios and production companies"
+        />
 
       {/* Controls Section */}
       <SearchControls
@@ -141,7 +142,8 @@ const Studios = () => {
           </div>
         </>
       )}
-    </div>
+      </div>
+    </PageLayout>
   );
 };
 
