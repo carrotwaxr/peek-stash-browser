@@ -57,7 +57,7 @@ code, pre, .font-mono {
 .container {
   width: 100%;
   margin: 0 auto;
-  padding: 0 0.5rem; /* Reduced padding on mobile */
+  padding: 0 0.25rem; /* Minimal padding on mobile */
 }
 
 @media (min-width: 768px) {
@@ -68,7 +68,7 @@ code, pre, .font-mono {
 
 .container-fluid {
   width: 100%;
-  padding: 0 0.5rem; /* Reduced padding on mobile */
+  padding: 0 0.25rem; /* Minimal padding on mobile */
 }
 
 @media (min-width: 768px) {
@@ -81,7 +81,7 @@ code, pre, .font-mono {
 .container-constrained {
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 0.5rem; /* Reduced padding on mobile */
+  padding: 0 0.25rem; /* Minimal padding on mobile */
 }
 
 @media (min-width: 768px) {

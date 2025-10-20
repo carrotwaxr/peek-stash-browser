@@ -9,7 +9,7 @@ const PlaybackControls = ({
   onReset,
 }) => {
   return (
-    <section className="container-fluid px-4 py-4 mt-6">
+    <section className="container-fluid py-4 mt-6">
       <div
         className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-lg"
         style={{

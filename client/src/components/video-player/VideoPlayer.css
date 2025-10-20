@@ -164,7 +164,7 @@
 @media (max-width: 768px) {
   .video-container {
     aspect-ratio: 16 / 9;
-    margin: 0 -1rem; /* Extend to edge on mobile */
+    margin: 0 -0.25rem; /* Extend to edge on mobile - matches container padding */
     border-radius: 0;
   }
 }

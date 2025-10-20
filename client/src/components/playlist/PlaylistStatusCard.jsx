@@ -144,7 +144,7 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
 
   return (
     <>
-    <div className="px-4 mt-6 mb-6">
+    <div className="px-1 md:px-4 mt-6 mb-6">
       <div
         className="rounded-lg border p-4"
         style={{

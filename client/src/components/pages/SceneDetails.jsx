@@ -32,7 +32,7 @@ const SceneDetails = ({
   };
 
   return (
-    <section className="container-fluid px-4 mt-6">
+    <section className="container-fluid mt-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-8">
         {/* Primary details */}
         <div className="lg:col-span-2">
