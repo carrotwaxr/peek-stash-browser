@@ -276,7 +276,11 @@ const PerformerStats = ({ performer }) => {
   return (
     <Card title="Statistics">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatField label="Scenes:" value={performer?.scene_count || 0} />
+        <StatField
+          label="Scenes:"
+          value={performer?.scene_count || 0}
+          valueColor="var(--accent-primary)"
+        />
         <StatField
           label="Rating:"
           value={
@@ -284,13 +288,21 @@ const PerformerStats = ({ performer }) => {
           }
           valueColor="var(--accent-primary)"
         />
-        <StatField label="O Count:" value={performer?.o_counter} />
+        <StatField
+          label="O Count:"
+          value={performer?.o_counter}
+          valueColor="var(--accent-primary)"
+        />
         <StatField
           label="O-Count %:"
           value={oCountPercentage && `${oCountPercentage}%`}
           valueColor="var(--accent-primary)"
         />
-        <StatField label="Play Count:" value={performer?.play_count} />
+        <StatField
+          label="Play Count:"
+          value={performer?.play_count}
+          valueColor="var(--accent-primary)"
+        />
       </div>
     </Card>
   );
