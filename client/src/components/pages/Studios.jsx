@@ -199,14 +199,16 @@ const StudioCard = forwardRef(({ studio, tabIndex, className = "", isTVMode = fa
     >
       <div className="flex items-start space-x-4">
         {studio.image_path ? (
-          <img
-            src={studio.image_path}
-            alt={studio.name}
-            className="w-16 h-16 rounded object-cover flex-shrink-0"
-          />
+          <div className="w-24 h-16 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--bg-secondary)" }}>
+            <img
+              src={studio.image_path}
+              alt={studio.name}
+              className="max-w-full max-h-full object-contain p-1"
+            />
+          </div>
         ) : (
           <div
-            className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
+            className="w-24 h-16 rounded flex items-center justify-center flex-shrink-0"
             style={{
               backgroundColor: "var(--bg-secondary)",
               color: "var(--text-primary)",
