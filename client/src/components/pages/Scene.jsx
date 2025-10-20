@@ -136,10 +136,10 @@ const Scene = () => {
 
       {/* Video Player Header */}
       <header className="container-fluid py-3 mt-6 mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors flex-shrink-0 self-start"
             style={{
               color: "var(--accent-primary)",
               backgroundColor: "var(--bg-card)",
@@ -148,15 +148,14 @@ const Scene = () => {
             }}
           >
             <span>←</span>
-            <span>Back to Scenes</span>
+            <span className="whitespace-nowrap">Back to Scenes</span>
           </button>
           <h1
-            className="text-2xl font-bold"
+            className="text-2xl font-bold line-clamp-2"
             style={{ color: "var(--text-primary)" }}
           >
             {displayTitle}
           </h1>
-          <div></div>
         </div>
       </header>
 
