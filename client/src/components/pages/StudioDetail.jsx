@@ -206,10 +206,10 @@ const StudioStats = ({ studio }) => {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatField label="Scenes:" value={studio?.scene_count} valueColor="var(--accent-primary)" />
         <StatField label="Performers:" value={studio?.performer_count} valueColor="var(--accent-primary)" />
-        <StatField label="Images:" value={studio?.image_count} />
-        <StatField label="Galleries:" value={studio?.gallery_count} />
-        <StatField label="Movies:" value={studio?.movie_count} />
-        <StatField label="Groups:" value={studio?.group_count} />
+        <StatField label="Images:" value={studio?.image_count} valueColor="var(--accent-primary)" />
+        <StatField label="Galleries:" value={studio?.gallery_count} valueColor="var(--accent-primary)" />
+        <StatField label="Movies:" value={studio?.movie_count} valueColor="var(--accent-primary)" />
+        <StatField label="Groups:" value={studio?.group_count} valueColor="var(--accent-primary)" />
       </div>
     </Card>
   );

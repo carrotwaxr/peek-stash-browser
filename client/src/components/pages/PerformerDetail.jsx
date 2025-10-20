@@ -236,8 +236,6 @@ const Card = ({ children, title }) => {
       className="p-4 rounded-lg p-6 mb-6"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-        border: "1px solid",
       }}
     >
       {title && (
@@ -479,8 +477,6 @@ const PerformerImage = ({ performer }) => {
       className="rounded-lg w-full aspect-[2/3] rounded-xl overflow-hidden shadow-lg p-0"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-        border: "1px solid",
       }}
     >
       {performer?.image_path ? (
