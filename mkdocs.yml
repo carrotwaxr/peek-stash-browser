@@ -113,6 +113,7 @@ nav:
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
   - Reference:
+      - Theming Guide: reference/theming.md
       - Troubleshooting: reference/troubleshooting.md
       - FAQ: reference/faq.md
 
