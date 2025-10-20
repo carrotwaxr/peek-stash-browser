@@ -84,6 +84,17 @@ const SearchControls = ({
     }
   }, [artifactType]);
 
+  // Track collapsed state for each filter section
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    const initial = {};
+    filterOptions.forEach((opt) => {
+      if (opt.type === "section-header" && opt.collapsible) {
+        initial[opt.key] = !opt.defaultOpen;
+      }
+    });
+    return initial;
+  });
+
   // Parse URL params to get initial state
   const initialState = useMemo(() => {
     return parseSearchParams(searchParams, filterOptions, {
@@ -438,13 +449,83 @@ const SearchControls = ({
         onSubmit={handleFilterSubmit}
         hasActiveFilters={hasActiveFilters}
       >
-        {filterOptions.map((opt) => {
-          const { defaultValue, key, ...rest } = opt;
+        {filterOptions.map((opt, index) => {
+          const { defaultValue, key, type, ...rest } = opt;
+
+          // Render section header
+          if (type === "section-header") {
+            const isCollapsed = collapsedSections[key] || false;
+            const toggleSection = () => {
+              setCollapsedSections((prev) => ({
+                ...prev,
+                [key]: !prev[key],
+              }));
+            };
+
+            return (
+              <div
+                key={`section-${key}`}
+                className="col-span-full"
+                style={{ gridColumn: "1 / -1" }}
+              >
+                <div
+                  className="flex items-center justify-between py-2 px-3 mb-3 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{
+                    backgroundColor: "var(--bg-secondary)",
+                    borderBottom: isCollapsed ? "none" : "2px solid var(--accent-primary)",
+                  }}
+                  onClick={opt.collapsible ? toggleSection : undefined}
+                >
+                  <h3
+                    className="font-semibold text-sm uppercase tracking-wide"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {opt.label}
+                  </h3>
+                  {opt.collapsible && (
+                    <svg
+                      className={`w-4 h-4 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
+                      style={{ color: "var(--text-muted)" }}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          // Check if this filter should be hidden (if in a collapsed section)
+          let currentSectionKey = null;
+          for (let i = index - 1; i >= 0; i--) {
+            if (filterOptions[i].type === "section-header") {
+              currentSectionKey = filterOptions[i].key;
+              break;
+            }
+          }
+
+          const isInCollapsedSection =
+            currentSectionKey && collapsedSections[currentSectionKey];
+
+          if (isInCollapsedSection) {
+            return null;
+          }
+
+          // Render regular filter control
           return (
             <FilterControl
               key={`FilterControl-${key}`}
               onChange={(value) => handleFilterChange(key, value)}
               value={filters[key] || defaultValue}
+              type={type}
               {...rest}
             />
           );
