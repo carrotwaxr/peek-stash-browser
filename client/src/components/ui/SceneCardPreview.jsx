@@ -138,7 +138,7 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
       <img
         src={scene?.paths?.screenshot}
         alt={scene?.title || 'Scene'}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover pointer-events-none"
         loading="lazy"
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
@@ -164,17 +164,18 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
         <img
           src={scene.paths.screenshot}
           alt={scene?.title || 'Scene'}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover pointer-events-none"
           loading="lazy"
         />
       )}
 
       {/* Show animated sprite preview when hovering (desktop) or in view (mobile) */}
       {shouldShowAnimation && currentSprite && (
-        <div className="w-full h-full relative overflow-hidden">
+        <div className="w-full h-full relative overflow-hidden pointer-events-none">
           <img
             src={scene.paths.sprite}
             alt={scene?.title || 'Scene preview'}
+            className="pointer-events-none"
             style={{
               position: 'absolute',
               left: `-${currentSprite.x * scale}px`,

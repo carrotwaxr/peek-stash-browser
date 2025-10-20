@@ -1,4 +1,5 @@
 import AddToPlaylistButton from "../ui/AddToPlaylistButton.jsx";
+import OCounterButton from "../ui/OCounterButton.jsx";
 
 const PlaybackControls = ({
   scene,
@@ -6,6 +7,7 @@ const PlaybackControls = ({
   currentPlaylistIndex,
   quality,
   setQuality,
+  onOCounterIncrement,
 }) => {
   return (
     <section className="container-fluid py-4 mt-6">
@@ -60,6 +62,14 @@ const PlaybackControls = ({
 
         {/* Actions */}
         <div className="flex items-center gap-4">
+          {/* O Counter Button */}
+          <OCounterButton
+            sceneId={scene.id}
+            initialCount={scene.o_counter ?? 0}
+            onIncrement={onOCounterIncrement}
+            className="text-base"
+          />
+
           {/* Add to Playlist Button */}
           <AddToPlaylistButton sceneId={scene.id} />
         </div>

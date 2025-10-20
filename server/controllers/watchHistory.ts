@@ -156,13 +156,17 @@ export async function incrementOCounter(req: Request, res: Response) {
       });
     }
 
-    // Also increment O counter in Stash
+    // Also increment O counter in Stash and get the new global count
+    let stashOCount = watchHistory.oCount; // Fallback to Peek count if Stash fails
     try {
       logger.info('Attempting to increment O counter in Stash', { sceneId });
       const stash = getStash();
       logger.info('Got Stash instance', { stashUrl: process.env.STASH_URL });
       const result = await stash.sceneIncrementO({ id: sceneId });
       logger.info('Successfully incremented O counter in Stash', { sceneId, result });
+
+      // Use the Stash global count (result.sceneIncrementO is the new count)
+      stashOCount = result.sceneIncrementO || watchHistory.oCount;
     } catch (stashError) {
       // Don't fail the request if Stash is unavailable
       logger.error('Failed to increment O counter in Stash', {
@@ -175,7 +179,7 @@ export async function incrementOCounter(req: Request, res: Response) {
 
     res.json({
       success: true,
-      oCount: watchHistory.oCount,
+      oCount: stashOCount, // Return the Stash global count
       timestamp: now.toISOString(),
     });
   } catch (error) {

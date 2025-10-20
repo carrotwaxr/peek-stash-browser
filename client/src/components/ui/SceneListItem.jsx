@@ -32,8 +32,35 @@ const SceneListItem = ({
   onDragStart,
   onDragOver,
   onDragEnd,
+  showSessionOIndicator = false, // Show if O was clicked in the last session
 }) => {
   const navigate = useNavigate();
+
+  // Check if an O was clicked during the last viewing session
+  const hadOInLastSession = () => {
+    if (!watchHistory?.oHistory || !watchHistory?.lastPlayedAt) return false;
+
+    try {
+      const oHistory = Array.isArray(watchHistory.oHistory)
+        ? watchHistory.oHistory
+        : JSON.parse(watchHistory.oHistory);
+
+      if (oHistory.length === 0) return false;
+
+      // Get the most recent O timestamp
+      const lastOTimestamp = new Date(oHistory[oHistory.length - 1]);
+      const lastPlayedAt = new Date(watchHistory.lastPlayedAt);
+
+      // Check if the last O was within 5 minutes of the last play session
+      const timeDiff = Math.abs(lastOTimestamp - lastPlayedAt);
+      const fiveMinutes = 5 * 60 * 1000;
+
+      return timeDiff < fiveMinutes;
+    } catch (error) {
+      console.error('Error checking O history:', error);
+      return false;
+    }
+  };
 
   const formatDuration = (seconds) => {
     if (!seconds || seconds < 1) return '0m';
@@ -151,11 +178,25 @@ const SceneListItem = ({
                     )}
 
                     {/* Stats Row */}
-                    <SceneStats
-                      scene={scene}
-                      watchHistory={watchHistory}
-                      className="mb-2"
-                    />
+                    <div className="flex items-center gap-2 mb-2">
+                      <SceneStats
+                        scene={scene}
+                        watchHistory={watchHistory}
+                      />
+                      {showSessionOIndicator && hadOInLastSession() && (
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            color: 'rgb(34, 197, 94)',
+                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                          }}
+                          title="O clicked during this session"
+                        >
+                          💦
+                        </span>
+                      )}
+                    </div>
 
                     {/* Description */}
                     <SceneDescription

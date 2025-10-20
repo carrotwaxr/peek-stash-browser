@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, List } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, List, Shuffle, Repeat, Repeat1 } from "lucide-react";
+import { usePlaylistNavigation } from "../video-player/usePlaylistNavigation.js";
 
 /**
  * PlaylistStatusCard - Shows playlist context when viewing a scene from a playlist
@@ -16,6 +17,17 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
   const scrollLeft = useRef(0);
   const scrollContainer = useRef(null); // Which container is being dragged
   const hasDragged = useRef(false);
+
+  // Shuffle and repeat state (initialize from playlist)
+  const [shuffle, setShuffle] = useState(playlist?.shuffle || false);
+  const [repeat, setRepeat] = useState(playlist?.repeat || "none");
+
+  // Use playlist navigation hook for smart next/previous
+  const { playNextInPlaylist, playPreviousInPlaylist } = usePlaylistNavigation(
+    { ...playlist, shuffle, repeat },
+    currentIndex,
+    navigate
+  );
 
   if (!playlist || !playlist.scenes || playlist.scenes.length === 0) {
     return null;
@@ -127,19 +139,67 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
   };
 
   const handlePrevious = () => {
-    if (hasPrevious) {
+    if (shuffle || repeat !== "none") {
+      // Use smart navigation with shuffle/repeat support
+      playPreviousInPlaylist?.();
+    } else if (hasPrevious) {
+      // Simple navigation for non-shuffle, non-repeat
       navigateToScene(currentIndex - 1);
     }
   };
 
   const handleNext = () => {
-    if (hasNext) {
+    if (shuffle || repeat !== "none") {
+      // Use smart navigation with shuffle/repeat support
+      playNextInPlaylist?.();
+    } else if (hasNext) {
+      // Simple navigation for non-shuffle, non-repeat
       navigateToScene(currentIndex + 1);
     }
   };
 
   const goToPlaylist = () => {
     navigate(`/playlist/${playlist.id}`);
+  };
+
+  const toggleShuffle = () => {
+    const newShuffle = !shuffle;
+    setShuffle(newShuffle);
+
+    // Update playlist state with new shuffle setting
+    navigate(window.location.pathname, {
+      state: {
+        scene: playlist.scenes[currentIndex]?.scene,
+        playlist: {
+          ...playlist,
+          shuffle: newShuffle,
+          repeat: repeat,
+          currentIndex: currentIndex,
+        },
+      },
+      replace: true,
+    });
+  };
+
+  const toggleRepeat = () => {
+    const repeatModes = ["none", "all", "one"];
+    const currentIdx = repeatModes.indexOf(repeat);
+    const newRepeat = repeatModes[(currentIdx + 1) % repeatModes.length];
+    setRepeat(newRepeat);
+
+    // Update playlist state with new repeat setting
+    navigate(window.location.pathname, {
+      state: {
+        scene: playlist.scenes[currentIndex]?.scene,
+        playlist: {
+          ...playlist,
+          shuffle: shuffle,
+          repeat: newRepeat,
+          currentIndex: currentIndex,
+        },
+      },
+      replace: true,
+    });
   };
 
   return (
@@ -178,17 +238,56 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div
             className="text-sm font-medium"
             style={{ color: "var(--text-muted)" }}
           >
             {position} of {totalScenes}
           </div>
+
+          {/* Shuffle Toggle */}
+          <button
+            onClick={toggleShuffle}
+            className="p-1.5 sm:p-2 rounded-lg transition-all"
+            style={{
+              backgroundColor: shuffle ? "var(--accent-warning)" : "transparent",
+              border: shuffle ? "2px solid var(--accent-warning)" : "1px solid var(--border-color)",
+              color: shuffle ? "white" : "var(--text-muted)",
+            }}
+            title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
+            aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
+          >
+            <Shuffle size={16} />
+          </button>
+
+          {/* Repeat Toggle */}
+          <button
+            onClick={toggleRepeat}
+            className="p-1.5 sm:p-2 rounded-lg transition-all"
+            style={{
+              backgroundColor: repeat !== "none" ? "var(--accent-info)" : "transparent",
+              border: repeat !== "none" ? "2px solid var(--accent-info)" : "1px solid var(--border-color)",
+              color: repeat !== "none" ? "white" : "var(--text-muted)",
+            }}
+            title={
+              repeat === "one" ? "Repeat: One" :
+              repeat === "all" ? "Repeat: All" :
+              "Repeat: Off"
+            }
+            aria-label={
+              repeat === "one" ? "Disable repeat one" :
+              repeat === "all" ? "Switch to repeat one" :
+              "Enable repeat all"
+            }
+          >
+            {repeat === "one" ? <Repeat1 size={16} /> : <Repeat size={16} />}
+          </button>
+
           {!isVirtualPlaylist && (
             <button
               onClick={goToPlaylist}
-              className="px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors text-sm"
+              className="px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
               style={{
                 backgroundColor: "var(--bg-secondary)",
                 border: "1px solid var(--border-color)",
@@ -196,7 +295,7 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
               }}
             >
               <List size={14} />
-              View All
+              <span className="hidden sm:inline">View All</span>
             </button>
           )}
         </div>

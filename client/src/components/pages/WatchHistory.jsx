@@ -59,6 +59,7 @@ const WatchHistory = () => {
             playDuration: watchHistory?.playDuration || 0,
             lastPlayedAt: watchHistory?.lastPlayedAt || null,
             oCount: watchHistory?.oCount || 0,
+            oHistory: watchHistory?.oHistory || [],
             isCompleted: isCompleted,
           };
         });
@@ -229,7 +230,9 @@ const WatchHistory = () => {
                   playDuration: scene.playDuration,
                   lastPlayedAt: scene.lastPlayedAt,
                   oCount: scene.oCount,
+                  oHistory: scene.oHistory,
                 }}
+                showSessionOIndicator={true}
                 linkState={{
                   scene,
                   shouldResume: true, // Auto-resume from watch history

@@ -42,7 +42,7 @@ const SceneStats = ({
       </span>
       <OCounterButton
         sceneId={scene.id}
-        initialCount={watchHistory?.oCount ?? scene.o_counter ?? 0}
+        initialCount={scene.o_counter ?? 0}
         className="text-xs"
       />
       <span>

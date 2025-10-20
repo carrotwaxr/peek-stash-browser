@@ -44,6 +44,14 @@ const Scene = () => {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [quality, setQuality] = useState("direct");
 
+  // Callback to update scene's o_counter when incremented
+  const handleOCounterIncrement = (newCount) => {
+    setScene((prevScene) => ({
+      ...prevScene,
+      o_counter: newCount,
+    }));
+  };
+
   // Fetch scene data if not provided via navigation state
   useEffect(() => {
     const fetchScene = async () => {
@@ -178,6 +186,7 @@ const Scene = () => {
           currentPlaylistIndex={playlist?.currentIndex || 0}
           quality={quality}
           setQuality={setQuality}
+          onOCounterIncrement={handleOCounterIncrement}
         />
 
         {/* Playlist Status Card */}

@@ -33,10 +33,15 @@ const SceneCard = forwardRef(
     const handleClick = (e) => {
       // Don't interfere with clicks on interactive elements
       const target = e.target;
-      const isInteractive =
-        target.closest('button') ||
-        target.closest('a') ||
-        target.closest('[role="button"]');
+
+      // Find the closest button element (but not the card itself)
+      const closestButton = target.closest('button');
+      const isButton = closestButton && closestButton !== e.currentTarget;
+
+      // Check for links
+      const isLink = target.closest('a');
+
+      const isInteractive = isButton || isLink;
 
       if (isInteractive) {
         return; // Let the interactive element handle the click
@@ -55,10 +60,15 @@ const SceneCard = forwardRef(
     const handleMouseDown = (e) => {
       // Don't start long press on interactive elements
       const target = e.target;
-      const isInteractive =
-        target.closest('button') ||
-        target.closest('a') ||
-        target.closest('[role="button"]');
+
+      // Find the closest button element (but not the card itself)
+      const closestButton = target.closest('button');
+      const isButton = closestButton && closestButton !== e.currentTarget;
+
+      // Check for links
+      const isLink = target.closest('a');
+
+      const isInteractive = isButton || isLink;
 
       if (isInteractive) {
         return;
@@ -80,10 +90,15 @@ const SceneCard = forwardRef(
     const handleTouchStart = (e) => {
       // Don't start long press on interactive elements
       const target = e.target;
-      const isInteractive =
-        target.closest('button') ||
-        target.closest('a') ||
-        target.closest('[role="button"]');
+
+      // Find the closest button element (but not the card itself)
+      const closestButton = target.closest('button');
+      const isButton = closestButton && closestButton !== e.currentTarget;
+
+      // Check for links
+      const isLink = target.closest('a');
+
+      const isInteractive = isButton || isLink;
 
       if (isInteractive) {
         return;
@@ -215,35 +230,36 @@ const SceneCard = forwardRef(
             </div>
           )}
 
-          {/* Overlay with duration and studio */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none">
-            {/* Studio in top-right */}
-            {scene.studio && (
-              <div className="absolute top-2 right-2 pointer-events-auto">
-                <Link
-                  to={`/studio/${scene.studio.id}`}
-                  className="px-2 py-1 bg-black/70 text-white text-xs rounded inline-block hover:bg-black/90 transition-colors"
-                >
-                  {scene.studio.name}
-                </Link>
-              </div>
-            )}
+          {/* Overlay gradient - non-interactive */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
 
-            {/* Duration in bottom-right */}
-            <div className="absolute bottom-2 right-2 pointer-events-auto">
-              {scene.files?.[0]?.duration && (
-                <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                  {Math.floor(scene.files[0].duration / 60)}m
-                </span>
-              )}
+          {/* Studio in top-right */}
+          {scene.studio && (
+            <div className="absolute top-2 right-2 z-10">
+              <Link
+                to={`/studio/${scene.studio.id}`}
+                className="px-2 py-1 bg-black/70 text-white text-xs rounded inline-block hover:bg-black/90 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {scene.studio.name}
+              </Link>
             </div>
+          )}
+
+          {/* Duration in bottom-right - non-interactive */}
+          <div className="absolute bottom-2 right-2 pointer-events-none z-10">
+            {scene.files?.[0]?.duration && (
+              <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
+                {Math.floor(scene.files[0].duration / 60)}m
+              </span>
+            )}
           </div>
 
           {/* Watch Progress Bar */}
           {scene.resumeTime && scene.files?.[0]?.duration && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 pointer-events-none">
               <div
-                className="h-full bg-green-500 transition-all"
+                className="h-full bg-green-500 transition-all pointer-events-none"
                 style={{
                   width: `${Math.min(100, (scene.resumeTime / scene.files[0].duration) * 100)}%`
                 }}
