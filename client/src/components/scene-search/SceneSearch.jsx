@@ -19,6 +19,7 @@ import { buildSceneFilter } from "../../utils/filterConfig.js";
 const SceneSearch = ({
   initialSort = "o_counter",
   permanentFilters = {},
+  permanentFiltersMetadata = {},
   subtitle,
   title,
 }) => {
@@ -140,6 +141,7 @@ const SceneSearch = ({
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
         permanentFilters={permanentFilters}
+        permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}
       />
 

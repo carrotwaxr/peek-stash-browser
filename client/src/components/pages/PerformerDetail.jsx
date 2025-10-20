@@ -101,6 +101,9 @@ const PerformerDetail = () => {
             permanentFilters={{
               performers: { value: [performerId], modifier: "INCLUDES" },
             }}
+            permanentFiltersMetadata={{
+              performers: [{ id: performerId, name: performer.name }],
+            }}
             title={`Scenes featuring ${performer.name}`}
           />
         </div>

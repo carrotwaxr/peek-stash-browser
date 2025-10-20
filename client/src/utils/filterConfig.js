@@ -596,6 +596,17 @@ export const TAG_FILTER_OPTIONS = [
 export const buildSceneFilter = (filters) => {
   const sceneFilter = {};
 
+  // ID-based filters (performers, studios, tags) - pass through directly
+  if (filters.performers) {
+    sceneFilter.performers = filters.performers;
+  }
+  if (filters.studios) {
+    sceneFilter.studios = filters.studios;
+  }
+  if (filters.tags) {
+    sceneFilter.tags = filters.tags;
+  }
+
   // Boolean filters
   if (filters.favorite === true || filters.favorite === "TRUE") {
     sceneFilter.favorite = true;

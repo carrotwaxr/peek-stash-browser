@@ -87,6 +87,9 @@ const TagDetail = () => {
             permanentFilters={{
               tags: { value: [tagId], modifier: "INCLUDES" },
             }}
+            permanentFiltersMetadata={{
+              tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
+            }}
             title={`Scenes tagged with ${tag?.name || "this tag"}`}
           />
         </div>

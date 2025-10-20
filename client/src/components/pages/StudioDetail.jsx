@@ -87,6 +87,9 @@ const StudioDetail = () => {
             permanentFilters={{
               studios: { value: [studioId], modifier: "INCLUDES" },
             }}
+            permanentFiltersMetadata={{
+              studios: [{ id: studioId, name: studio?.name || "Unknown Studio" }],
+            }}
             title={`Scenes from ${studio?.name || "this studio"}`}
           />
         </div>

@@ -62,6 +62,7 @@ const SearchControls = ({
   initialSort = "o_counter",
   onQueryChange,
   permanentFilters = {},
+  permanentFiltersMetadata = {},
   totalPages,
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -426,6 +427,7 @@ const SearchControls = ({
         filterOptions={filterOptions}
         onRemoveFilter={handleRemoveFilter}
         permanentFilters={permanentFilters}
+        permanentFiltersMetadata={permanentFiltersMetadata}
       />
 
       {/* Filter Panel */}
