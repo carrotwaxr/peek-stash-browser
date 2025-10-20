@@ -11,6 +11,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 
 const Performers = () => {
   usePageTitle("Performers");
@@ -19,6 +20,7 @@ const Performers = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isTVMode } = useTVMode();
   const columns = useGridColumns('performers');
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -114,14 +116,14 @@ const Performers = () => {
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentPerformers,
     columns,
-    enabled: !isLoading,
+    enabled: !isLoading && isTVMode,
     onSelect: (performer) => navigate(`/performer/${performer.id}`),
     onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
     onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
   });
 
   // Initial focus
-  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentPerformers.length > 0);
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentPerformers.length > 0 && isTVMode);
 
   if (error) {
     return (
@@ -160,6 +162,7 @@ const Performers = () => {
                 performer={performer}
                 tabIndex={isFocused(index) ? 0 : -1}
                 className={isFocused(index) ? "keyboard-focus" : ""}
+                isTVMode={isTVMode}
               />
             ))}
           </div>
@@ -183,12 +186,12 @@ const Performers = () => {
   );
 };
 
-const PerformerCard = forwardRef(({ performer, tabIndex, className = "" }, ref) => {
+const PerformerCard = forwardRef(({ performer, tabIndex, className = "", isTVMode = false }, ref) => {
   return (
     <Link
       ref={ref}
       to={`/performer/${performer.id}`}
-      tabIndex={tabIndex}
+      tabIndex={isTVMode ? tabIndex : -1}
       className={`block rounded-lg border p-4 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",

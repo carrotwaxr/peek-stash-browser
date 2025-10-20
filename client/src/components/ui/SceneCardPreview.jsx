@@ -3,7 +3,7 @@ import { fetchAndParseVTT, getEvenlySpacedSprites } from '../../utils/spriteShee
 
 /**
  * Animated sprite preview for scene cards
- * Cycles through evenly spaced sprite thumbnails on hover
+ * Cycles through evenly spaced sprite thumbnails on hover (desktop) or when in view (mobile)
  *
  * @param {Object} scene - Scene object with paths.sprite and paths.vtt
  * @param {number} cycleInterval - Milliseconds between sprite changes (default: 800ms)
@@ -14,10 +14,46 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
   const [sprites, setSprites] = useState([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
+  const [isInView, setIsInView] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
   const intervalRef = useRef(null);
   const containerRef = useRef(null);
+
+  // Detect touch device
+  useEffect(() => {
+    const checkTouchDevice = () => {
+      return (
+        'ontouchstart' in window ||
+        navigator.maxTouchPoints > 0 ||
+        navigator.msMaxTouchPoints > 0
+      );
+    };
+    setIsTouchDevice(checkTouchDevice());
+  }, []);
+
+  // Intersection Observer for mobile auto-play
+  useEffect(() => {
+    if (!isTouchDevice || !containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsInView(entry.isIntersecting);
+        });
+      },
+      {
+        threshold: 0.5, // Trigger when 50% visible
+      }
+    );
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isTouchDevice]);
 
   // Load and parse VTT file
   useEffect(() => {
@@ -70,9 +106,11 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
     }
   }, [isHovering, containerWidth]);
 
-  // Cycle through sprites on hover
+  // Cycle through sprites on hover (desktop) or in view (mobile)
   useEffect(() => {
-    if (!isHovering || sprites.length === 0) {
+    const shouldAnimate = isTouchDevice ? isInView : isHovering;
+
+    if (!shouldAnimate || sprites.length === 0) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -92,7 +130,7 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
         intervalRef.current = null;
       }
     };
-  }, [isHovering, sprites.length, cycleInterval]);
+  }, [isHovering, isInView, isTouchDevice, sprites.length, cycleInterval]);
 
   // Don't render anything if no sprite data
   if (!scene?.paths?.sprite || !scene?.paths?.vtt || sprites.length === 0 || isLoading) {
@@ -112,15 +150,17 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
   const currentSprite = sprites[currentSpriteIndex];
   const scale = currentSprite && containerWidth > 0 ? containerWidth / currentSprite.width : 1;
 
+  const shouldShowAnimation = isTouchDevice ? isInView : isHovering;
+
   return (
     <div
       ref={containerRef}
       className="w-full h-full relative overflow-hidden"
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onMouseEnter={() => !isTouchDevice && setIsHovering(true)}
+      onMouseLeave={() => !isTouchDevice && setIsHovering(false)}
     >
-      {/* Show screenshot when not hovering */}
-      {!isHovering && scene?.paths?.screenshot && (
+      {/* Show screenshot when not animating */}
+      {!shouldShowAnimation && scene?.paths?.screenshot && (
         <img
           src={scene.paths.screenshot}
           alt={scene?.title || 'Scene'}
@@ -129,8 +169,8 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
         />
       )}
 
-      {/* Show animated sprite preview when hovering */}
-      {isHovering && currentSprite && (
+      {/* Show animated sprite preview when hovering (desktop) or in view (mobile) */}
+      {shouldShowAnimation && currentSprite && (
         <div className="w-full h-full relative overflow-hidden">
           <img
             src={scene.paths.sprite}

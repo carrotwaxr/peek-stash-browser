@@ -11,6 +11,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 
 const Tags = () => {
   usePageTitle("Tags");
@@ -19,6 +20,7 @@ const Tags = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isTVMode } = useTVMode();
   const columns = useGridColumns('tags');
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -112,14 +114,14 @@ const Tags = () => {
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentTags,
     columns,
-    enabled: !isLoading,
+    enabled: !isLoading && isTVMode,
     onSelect: (tag) => navigate(`/tag/${tag.id}`),
     onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
     onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
   });
 
   // Initial focus
-  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentTags.length > 0);
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentTags.length > 0 && isTVMode);
 
   if (error) {
     return (
@@ -158,6 +160,7 @@ const Tags = () => {
                 tag={tag}
                 tabIndex={isFocused(index) ? 0 : -1}
                 className={isFocused(index) ? "keyboard-focus" : ""}
+                isTVMode={isTVMode}
               />
             ))}
           </div>
@@ -181,7 +184,7 @@ const Tags = () => {
   );
 };
 
-const TagCard = forwardRef(({ tag, tabIndex, className = "" }, ref) => {
+const TagCard = forwardRef(({ tag, tabIndex, className = "", isTVMode = false }, ref) => {
   const getTagColor = (name) => {
     // Generate a consistent color based on the tag name
     const colors = [
@@ -206,7 +209,7 @@ const TagCard = forwardRef(({ tag, tabIndex, className = "" }, ref) => {
     <Link
       ref={ref}
       to={`/tag/${tag.id}`}
-      tabIndex={tabIndex}
+      tabIndex={isTVMode ? tabIndex : -1}
       className={`block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",

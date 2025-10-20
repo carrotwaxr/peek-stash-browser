@@ -10,6 +10,7 @@ import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
 
 const Studios = () => {
   usePageTitle("Studios");
@@ -18,6 +19,7 @@ const Studios = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { isTVMode } = useTVMode();
   const [columns, setColumns] = useState(3);
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -111,14 +113,14 @@ const Studios = () => {
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentStudios,
     columns,
-    enabled: !isLoading,
+    enabled: !isLoading && isTVMode,
     onSelect: (studio) => navigate(`/studio/${studio.id}`),
     onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
     onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
   });
 
   // Initial focus
-  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentStudios.length > 0);
+  useInitialFocus(pageRef, '[tabindex="0"]', !isLoading && currentStudios.length > 0 && isTVMode);
 
   if (error) {
     return (
@@ -157,6 +159,7 @@ const Studios = () => {
                 studio={studio}
                 tabIndex={isFocused(index) ? 0 : -1}
                 className={isFocused(index) ? "keyboard-focus" : ""}
+                isTVMode={isTVMode}
               />
             ))}
           </div>
@@ -180,12 +183,12 @@ const Studios = () => {
   );
 };
 
-const StudioCard = forwardRef(({ studio, tabIndex, className = "" }, ref) => {
+const StudioCard = forwardRef(({ studio, tabIndex, className = "", isTVMode = false }, ref) => {
   return (
     <Link
       ref={ref}
       to={`/studio/${studio.id}`}
-      tabIndex={tabIndex}
+      tabIndex={isTVMode ? tabIndex : -1}
       className={`block rounded-lg border p-6 hover:shadow-lg transition-shadow cursor-pointer focus:outline-none ${className}`}
       style={{
         backgroundColor: "var(--bg-card)",
