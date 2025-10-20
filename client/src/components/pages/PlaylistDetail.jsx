@@ -7,6 +7,7 @@ import SceneListItem from "../ui/SceneListItem.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
+import { PageLayout } from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -225,7 +226,7 @@ const PlaylistDetail = () => {
   }
 
   return (
-
+    <>
       <PageLayout>
         {/* Header */}
         <div className="mb-8">
@@ -541,6 +542,7 @@ const PlaylistDetail = () => {
         cancelText="Cancel"
         confirmStyle="danger"
       />
+    </>
   );
 };
 

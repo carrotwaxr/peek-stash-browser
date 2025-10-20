@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { PageLayout } from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -152,6 +153,7 @@ const ServerSettings = () => {
   }
 
   return (
+    <>
       <PageLayout>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -513,6 +515,7 @@ const ServerSettings = () => {
           </div>
         </div>
       )}
+    </>
   );
 };
 

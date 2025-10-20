@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
+import { PageLayout } from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -150,6 +151,7 @@ const Users = () => {
   }
 
   return (
+    <>
       <PageLayout>
         <div className="max-w-4xl mx-auto">
           {/* Header */}
@@ -492,6 +494,7 @@ const Users = () => {
           </div>
         </div>
       )}
+    </>
   );
 };
 
