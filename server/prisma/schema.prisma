@@ -87,6 +87,16 @@ model PlaylistItem {
     @@unique([playlistId, sceneId])
 }
 
+model PathMapping {
+    id          Int         @id @default(autoincrement())
+    stashPath   String      // Path as reported by Stash (e.g., "/data", "C:\Videos")
+    peekPath    String      // Path where Peek accesses the files (e.g., "/app/media")
+    createdAt   DateTime    @default(now())
+    updatedAt   DateTime    @updatedAt
+
+    @@unique([stashPath])
+}
+
 enum UserRole {
     ADMIN
     USER

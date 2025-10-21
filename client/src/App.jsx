@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,10 +7,12 @@ import {
 import { Toaster } from "react-hot-toast";
 import GlobalLayout from "./components/ui/GlobalLayout.jsx";
 import Login from "./components/pages/Login.jsx";
+import SetupWizard from "./components/pages/SetupWizard.jsx";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
 import { useAuth } from "./hooks/useAuth.js";
+import { setupApi } from "./services/api.js";
 import "./themes/base.css";
 
 // Lazy load page components for code splitting
@@ -39,12 +41,42 @@ const PageLoader = () => (
 // Main app component with authentication
 const AppContent = () => {
   const { isAuthenticated, isLoading } = useAuth();
+  const [setupStatus, setSetupStatus] = useState(null);
+  const [checkingSetup, setCheckingSetup] = useState(true);
 
-  if (isLoading) {
+  useEffect(() => {
+    const checkSetup = async () => {
+      try {
+        const status = await setupApi.getSetupStatus();
+        setSetupStatus(status);
+      } catch (error) {
+        console.error("Failed to check setup status:", error);
+        // If check fails, assume setup is not complete
+        setSetupStatus({ setupComplete: false });
+      } finally {
+        setCheckingSetup(false);
+      }
+    };
+
+    checkSetup();
+  }, []);
+
+  if (isLoading || checkingSetup) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-xl">Loading...</div>
       </div>
+    );
+  }
+
+  // Show setup wizard if setup is not complete
+  if (!setupStatus?.setupComplete) {
+    return (
+      <SetupWizard
+        onSetupComplete={() => {
+          setSetupStatus({ setupComplete: true });
+        }}
+      />
     );
   }
 

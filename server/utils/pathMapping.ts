@@ -4,104 +4,260 @@
  * Handles cross-platform path translation between Stash's internal paths
  * and Peek's perspective of those same files.
  *
+ * Configuration Sources (in order of preference):
+ * 1. Database (PathMapping table) - primary source
+ * 2. Environment variables (STASH_INTERNAL_PATH / STASH_MEDIA_PATH) - legacy fallback & auto-migration
+ *
  * Use Cases:
- * 1. Development: Stash on unRAID reports /data/videos/file.mp4
- *    - Peek accesses via SMB/CIFS: //10.0.0.4/share/videos/file.mp4
- *
- * 2. Production (same host as Stash): /data → /mnt/user/videos
- *
- * 3. Production (different host): /data → network mount or local path
+ * 1. Stash Docker + Peek Docker: /data → /app/media
+ * 2. Stash Windows + Peek Docker: C:\Videos → /app/media
+ * 3. Stash native + Peek Docker: /home/user/videos → /mnt/nfs/videos
+ * 4. Multiple libraries: /data, /data2, /images → separate Peek mounts
  */
 
 import path from "path";
+import { PrismaClient } from "@prisma/client";
 import { logger } from "./logger.js";
 
-interface PathMappingConfig {
-  stashInternalPath: string;  // Path prefix Stash uses internally (e.g., "/data")
-  peekMediaPath: string;      // Where Peek accesses those files (e.g., "/mnt/user/videos")
+const prisma = new PrismaClient();
+
+interface PathMapping {
+  id: number;
+  stashPath: string;
+  peekPath: string;
+}
+
+interface PathMappingInput {
+  stashPath: string;
+  peekPath: string;
 }
 
 class PathMapper {
-  private config: PathMappingConfig;
+  private mappings: PathMapping[] = [];
+  private initialized: boolean = false;
 
-  constructor() {
-    this.config = {
-      stashInternalPath: process.env.STASH_INTERNAL_PATH || "/data",
-      peekMediaPath: process.env.STASH_MEDIA_PATH || "/app/media",
+  /**
+   * Initialize path mapper by loading mappings from database
+   * Falls back to environment variables if database is empty (legacy support)
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    try {
+      // Load mappings from database
+      const dbMappings = await prisma.pathMapping.findMany();
+
+      if (dbMappings.length > 0) {
+        // Use database mappings
+        this.mappings = dbMappings.map(m => ({
+          id: m.id,
+          stashPath: m.stashPath,
+          peekPath: m.peekPath,
+        }));
+
+        logger.info("PathMapper loaded from database", {
+          count: this.mappings.length,
+          mappings: this.mappings.map(m => ({ stash: m.stashPath, peek: m.peekPath })),
+        });
+      } else {
+        // No database mappings - check for legacy env vars
+        const envStashPath = process.env.STASH_INTERNAL_PATH;
+        const envPeekPath = process.env.STASH_MEDIA_PATH;
+
+        if (envStashPath && envPeekPath) {
+          // Auto-migrate from env vars
+          logger.info("No database mappings found, migrating from environment variables", {
+            stashPath: envStashPath,
+            peekPath: envPeekPath,
+          });
+
+          const migrated = await this.addMapping({
+            stashPath: envStashPath,
+            peekPath: envPeekPath,
+          });
+
+          this.mappings = [migrated];
+
+          logger.info("Successfully migrated path mapping from environment variables to database");
+        } else {
+          // No mappings anywhere - setup wizard required
+          logger.warn("No path mappings configured - setup wizard required");
+          this.mappings = [];
+        }
+      }
+
+      // Sort by path length descending (longest match first)
+      this.mappings.sort((a, b) => b.stashPath.length - a.stashPath.length);
+
+      this.initialized = true;
+    } catch (error) {
+      logger.error("Failed to initialize PathMapper", { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Check if path mappings are configured
+   */
+  hasMapping(): boolean {
+    return this.mappings.length > 0;
+  }
+
+  /**
+   * Get all configured path mappings
+   */
+  getMappings(): PathMapping[] {
+    return [...this.mappings];
+  }
+
+  /**
+   * Add a new path mapping
+   */
+  async addMapping(input: PathMappingInput): Promise<PathMapping> {
+    const created = await prisma.pathMapping.create({
+      data: {
+        stashPath: input.stashPath,
+        peekPath: input.peekPath,
+      },
+    });
+
+    const mapping: PathMapping = {
+      id: created.id,
+      stashPath: created.stashPath,
+      peekPath: created.peekPath,
     };
 
-    logger.info("PathMapper initialized", {
-      stashInternalPath: this.config.stashInternalPath,
-      peekMediaPath: this.config.peekMediaPath,
+    // Add to in-memory cache and re-sort
+    this.mappings.push(mapping);
+    this.mappings.sort((a, b) => b.stashPath.length - a.stashPath.length);
+
+    logger.info("Added new path mapping", mapping);
+
+    return mapping;
+  }
+
+  /**
+   * Update an existing path mapping
+   */
+  async updateMapping(id: number, input: PathMappingInput): Promise<PathMapping> {
+    const updated = await prisma.pathMapping.update({
+      where: { id },
+      data: {
+        stashPath: input.stashPath,
+        peekPath: input.peekPath,
+      },
     });
+
+    const mapping: PathMapping = {
+      id: updated.id,
+      stashPath: updated.stashPath,
+      peekPath: updated.peekPath,
+    };
+
+    // Update in-memory cache and re-sort
+    const index = this.mappings.findIndex(m => m.id === id);
+    if (index >= 0) {
+      this.mappings[index] = mapping;
+      this.mappings.sort((a, b) => b.stashPath.length - a.stashPath.length);
+    }
+
+    logger.info("Updated path mapping", mapping);
+
+    return mapping;
+  }
+
+  /**
+   * Delete a path mapping
+   */
+  async deleteMapping(id: number): Promise<void> {
+    await prisma.pathMapping.delete({ where: { id } });
+
+    // Remove from in-memory cache
+    this.mappings = this.mappings.filter(m => m.id !== id);
+
+    logger.info("Deleted path mapping", { id });
   }
 
   /**
    * Translate a Stash-reported path to Peek's perspective
    *
+   * Algorithm:
+   * 1. Normalize path separators (backslash → forward slash)
+   * 2. Find longest matching prefix in configured mappings
+   * 3. Replace Stash prefix with Peek prefix
+   * 4. Return translated path
+   *
    * Example:
    *   Stash reports: /data/scenes/video.mp4
-   *   Peek translates to: /mnt/user/videos/scenes/video.mp4
+   *   Mapping: /data → /app/media
+   *   Peek translates to: /app/media/scenes/video.mp4
+   *
+   * Example (Windows):
+   *   Stash reports: C:\Videos\scene.mp4
+   *   Mapping: C:\Videos → /app/media
+   *   Peek translates to: /app/media/scene.mp4
    */
   translateStashPath(stashPath: string): string {
     if (!stashPath) {
       throw new Error("Path cannot be empty");
     }
 
+    if (!this.initialized) {
+      throw new Error("PathMapper not initialized - call initialize() first");
+    }
+
+    if (this.mappings.length === 0) {
+      throw new Error(
+        "No path mappings configured. " +
+        "Complete setup wizard or configure path mappings in Settings."
+      );
+    }
+
     // Normalize path separators to forward slashes
     const normalizedPath = stashPath.replace(/\\/g, "/");
 
-    // Check if path starts with Stash's internal path
-    if (!normalizedPath.startsWith(this.config.stashInternalPath)) {
-      logger.warn("Path does not start with expected Stash internal path", {
-        stashPath,
-        expectedPrefix: this.config.stashInternalPath,
-        actualPath: normalizedPath,
-      });
-      // Return as-is if it doesn't match the expected pattern
-      return stashPath;
+    // Find longest matching mapping (already sorted by length)
+    for (const mapping of this.mappings) {
+      const normalizedStashPath = mapping.stashPath.replace(/\\/g, "/");
+
+      if (normalizedPath.startsWith(normalizedStashPath)) {
+        // Extract relative path
+        let relativePath = normalizedPath.substring(normalizedStashPath.length);
+
+        // Ensure relative path starts with /
+        if (!relativePath.startsWith("/")) {
+          relativePath = "/" + relativePath;
+        }
+
+        // Combine with Peek path
+        const translatedPath = path.posix.join(mapping.peekPath, relativePath);
+
+        logger.verbose("Path translation", {
+          from: stashPath,
+          to: translatedPath,
+          mapping: { stash: mapping.stashPath, peek: mapping.peekPath },
+        });
+
+        return translatedPath;
+      }
     }
 
-    // Remove Stash's internal prefix
-    const relativePath = normalizedPath.substring(
-      this.config.stashInternalPath.length
+    // No mapping found
+    const error = new Error(
+      `No path mapping found for: ${stashPath}\n` +
+      `Configured mappings:\n` +
+      this.mappings.map(m => `  ${m.stashPath} → ${m.peekPath}`).join("\n") +
+      `\n\nConfigure path mappings in Settings > Path Mappings`
     );
 
-    // Ensure relative path starts with /
-    const cleanRelativePath = relativePath.startsWith("/")
-      ? relativePath
-      : `/${relativePath}`;
-
-    // Combine with Peek's media path
-    const translatedPath = path.posix.join(
-      this.config.peekMediaPath,
-      cleanRelativePath
-    );
-
-    logger.verbose("Path translation", {
-      from: stashPath,
-      to: translatedPath,
+    logger.error("Path translation failed", {
+      stashPath,
+      configuredMappings: this.mappings,
     });
 
-    return translatedPath;
-  }
-
-  /**
-   * Get the current configuration
-   */
-  getConfig(): PathMappingConfig {
-    return { ...this.config };
-  }
-
-  /**
-   * Update configuration (useful for testing or runtime reconfiguration)
-   */
-  updateConfig(newConfig: Partial<PathMappingConfig>): void {
-    this.config = { ...this.config, ...newConfig };
-    logger.info("PathMapper configuration updated", {
-      stashInternalPath: this.config.stashInternalPath,
-      peekMediaPath: this.config.peekMediaPath,
-    });
+    throw error;
   }
 }
 
@@ -110,6 +266,7 @@ export const pathMapper = new PathMapper();
 
 /**
  * Convenience function for path translation
+ * Note: PathMapper must be initialized before use
  */
 export function translateStashPath(stashPath: string): string {
   return pathMapper.translateStashPath(stashPath);

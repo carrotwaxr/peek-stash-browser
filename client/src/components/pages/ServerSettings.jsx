@@ -4,6 +4,7 @@ import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { PageLayout } from "../ui/index.js";
+import { setupApi } from "../../services/api.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -26,6 +27,15 @@ const ServerSettings = () => {
   const [newRole, setNewRole] = useState("USER");
   const [creating, setCreating] = useState(false);
 
+  // Path mappings state
+  const [pathMappings, setPathMappings] = useState([]);
+  const [showAddMappingModal, setShowAddMappingModal] = useState(false);
+  const [newStashPath, setNewStashPath] = useState("");
+  const [newPeekPath, setNewPeekPath] = useState("");
+  const [addingMapping, setAddingMapping] = useState(false);
+  const [pathTestResult, setPathTestResult] = useState(null);
+  const [testingPath, setTestingPath] = useState(false);
+
   useEffect(() => {
     // Redirect if not admin
     if (currentUser && currentUser.role !== "ADMIN") {
@@ -34,6 +44,7 @@ const ServerSettings = () => {
     }
 
     loadUsers();
+    loadPathMappings();
   }, [currentUser, navigate]);
 
   const loadUsers = async () => {
@@ -140,6 +151,107 @@ const ServerSettings = () => {
       month: "short",
       day: "numeric",
     });
+  };
+
+  // Path mapping functions
+  const loadPathMappings = async () => {
+    try {
+      const response = await setupApi.getPathMappings();
+      setPathMappings(response.mappings || []);
+    } catch (err) {
+      console.error("Failed to load path mappings:", err);
+    }
+  };
+
+  const testPath = async () => {
+    if (!newPeekPath.trim()) return;
+
+    setTestingPath(true);
+    setPathTestResult(null);
+
+    try {
+      const result = await setupApi.testPath(newPeekPath.trim());
+      setPathTestResult(result);
+    } catch (err) {
+      setPathTestResult({
+        success: false,
+        message: "Failed to test path: " + (err.message || "Unknown error"),
+      });
+    } finally {
+      setTestingPath(false);
+    }
+  };
+
+  const addPathMapping = async (e) => {
+    e.preventDefault();
+
+    if (!newStashPath.trim() || !newPeekPath.trim()) {
+      setError("Both Stash path and Peek path are required");
+      return;
+    }
+
+    try {
+      setAddingMapping(true);
+      setError(null);
+      setMessage(null);
+
+      await setupApi.addPathMapping(newStashPath.trim(), newPeekPath.trim());
+
+      setMessage("Path mapping added successfully!");
+      setShowAddMappingModal(false);
+      setNewStashPath("");
+      setNewPeekPath("");
+      setPathTestResult(null);
+      loadPathMappings();
+
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to add path mapping");
+    } finally {
+      setAddingMapping(false);
+    }
+  };
+
+  const deletePathMapping = async (mappingId, stashPath) => {
+    if (!confirm(`Delete path mapping for "${stashPath}"?`)) {
+      return;
+    }
+
+    try {
+      setError(null);
+      setMessage(null);
+
+      await setupApi.deletePathMapping(mappingId);
+
+      setMessage("Path mapping deleted successfully!");
+      loadPathMappings();
+
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to delete path mapping");
+    }
+  };
+
+  const discoverLibraries = async () => {
+    try {
+      setError(null);
+      setMessage(null);
+
+      const response = await setupApi.discoverStashLibraries();
+
+      if (response.success && response.paths.length > 0) {
+        setNewStashPath(response.paths[0]); // Pre-fill with first discovered path
+        setShowAddMappingModal(true);
+        setMessage(
+          `Discovered ${response.paths.length} library path(s) from Stash`
+        );
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        setError("No library paths found in Stash configuration");
+      }
+    } catch (err) {
+      setError("Failed to discover Stash libraries: " + (err.message || "Unknown error"));
+    }
   };
 
   if (loading) {
@@ -363,8 +475,137 @@ const ServerSettings = () => {
             </div>
           </div>
 
-          {/* Future sections can be added here */}
-          {/* Example: Server Configuration, Database Settings, etc. */}
+          {/* Path Mappings Section */}
+          <div
+            className="card mb-6"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+            }}
+          >
+            <div className="card-header">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2
+                    className="text-xl font-semibold"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Path Mappings
+                  </h2>
+                  <p
+                    className="text-sm mt-1"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Configure path translations between Stash and Peek
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={discoverLibraries}
+                    className="px-4 py-2 rounded-lg font-medium"
+                    style={{
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "1px solid var(--border-color)",
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    Discover Libraries
+                  </button>
+                  <button
+                    onClick={() => setShowAddMappingModal(true)}
+                    className="px-4 py-2 rounded-lg font-medium"
+                    style={{
+                      backgroundColor: "var(--accent-color)",
+                      color: "white",
+                    }}
+                  >
+                    + Add Mapping
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div className="card-body p-0">
+              {pathMappings.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p
+                    className="text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    No path mappings configured. Add a mapping to enable video
+                    playback.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr
+                        style={{
+                          borderBottom: "1px solid var(--border-color)",
+                        }}
+                      >
+                        <th
+                          className="text-left px-6 py-4 font-medium"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          Stash Path
+                        </th>
+                        <th
+                          className="text-left px-6 py-4 font-medium"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          Peek Path
+                        </th>
+                        <th
+                          className="text-right px-6 py-4 font-medium"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pathMappings.map((mapping) => (
+                        <tr
+                          key={mapping.id}
+                          style={{
+                            borderBottom: "1px solid var(--border-color)",
+                          }}
+                        >
+                          <td
+                            className="px-6 py-4 font-mono text-sm"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {mapping.stashPath}
+                          </td>
+                          <td
+                            className="px-6 py-4 font-mono text-sm"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {mapping.peekPath}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              onClick={() =>
+                                deletePathMapping(mapping.id, mapping.stashPath)
+                              }
+                              className="px-3 py-1 text-sm rounded hover:bg-red-500 hover:text-white transition-colors"
+                              style={{
+                                backgroundColor: "rgba(239, 68, 68, 0.1)",
+                                color: "rgb(239, 68, 68)",
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </PageLayout>
 
@@ -505,6 +746,173 @@ const ServerSettings = () => {
                       border: "1px solid var(--border-color)",
                       color: "var(--text-primary)",
                       opacity: creating ? 0.6 : 1,
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Path Mapping Modal */}
+      {showAddMappingModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => !addingMapping && setShowAddMappingModal(false)}
+        >
+          <div
+            className="card max-w-lg w-full mx-4"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="card-header">
+              <h2
+                className="text-xl font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Add Path Mapping
+              </h2>
+              <p
+                className="text-sm mt-1"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Map a Stash library path to where Peek can access it
+              </p>
+            </div>
+            <form onSubmit={addPathMapping} className="card-body">
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="stashPath"
+                    className="block text-sm font-medium mb-2"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Stash Path
+                  </label>
+                  <input
+                    type="text"
+                    id="stashPath"
+                    value={newStashPath}
+                    onChange={(e) => setNewStashPath(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg font-mono text-sm"
+                    style={{
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "1px solid var(--border-color)",
+                      color: "var(--text-primary)",
+                    }}
+                    placeholder="/data or C:\Videos"
+                    required
+                    autoFocus
+                  />
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Path as reported by Stash (use "Discover Libraries" to auto-fill)
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="peekPath"
+                    className="block text-sm font-medium mb-2"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Peek Path
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="peekPath"
+                      value={newPeekPath}
+                      onChange={(e) => {
+                        setNewPeekPath(e.target.value);
+                        setPathTestResult(null);
+                      }}
+                      className="flex-1 px-4 py-2 rounded-lg font-mono text-sm"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      placeholder="/app/media"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={testPath}
+                      disabled={!newPeekPath.trim() || testingPath}
+                      className="px-4 py-2 rounded-lg font-medium"
+                      style={{
+                        backgroundColor: "var(--accent-color)",
+                        color: "white",
+                        opacity:
+                          !newPeekPath.trim() || testingPath ? 0.6 : 1,
+                      }}
+                    >
+                      {testingPath ? "Testing..." : "Test"}
+                    </button>
+                  </div>
+                  <p
+                    className="text-xs mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Docker mount point where Peek accesses these files
+                  </p>
+                  {pathTestResult && (
+                    <div
+                      className="text-sm mt-2 p-2 rounded"
+                      style={{
+                        backgroundColor:
+                          pathTestResult.exists && pathTestResult.readable
+                            ? "rgba(34, 197, 94, 0.1)"
+                            : "rgba(239, 68, 68, 0.1)",
+                        color:
+                          pathTestResult.exists && pathTestResult.readable
+                            ? "rgb(34, 197, 94)"
+                            : "rgb(239, 68, 68)",
+                      }}
+                    >
+                      {pathTestResult.message}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="submit"
+                    disabled={addingMapping}
+                    className="flex-1 px-4 py-2 rounded-lg font-medium"
+                    style={{
+                      backgroundColor: "var(--accent-color)",
+                      color: "white",
+                      opacity: addingMapping ? 0.6 : 1,
+                    }}
+                  >
+                    {addingMapping ? "Adding..." : "Add Mapping"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddMappingModal(false);
+                      setNewStashPath("");
+                      setNewPeekPath("");
+                      setPathTestResult(null);
+                      setError(null);
+                    }}
+                    disabled={addingMapping}
+                    className="px-4 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "1px solid var(--border-color)",
+                      color: "var(--text-primary)",
+                      opacity: addingMapping ? 0.6 : 1,
                     }}
                   >
                     Cancel
