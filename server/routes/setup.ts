@@ -8,6 +8,7 @@ import {
   updatePathMapping,
   deletePathMapping,
   testPath,
+  createFirstAdmin,
 } from "../controllers/setup.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.get("/discover-libraries", discoverStashLibraries);
 router.post("/test-path", testPath);
 router.get("/path-mappings", getPathMappings);
 router.post("/path-mappings", addPathMapping);
+router.post("/create-admin", createFirstAdmin);
 
 // Protected routes (auth required - for Settings page path management)
 router.put("/path-mappings/:id", authenticateToken, updatePathMapping);
