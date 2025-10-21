@@ -21,6 +21,7 @@ Think of it as a sleek, modern interface for browsing your "documentary" collect
 ### Prerequisites
 
 Before installing Peek:
+
 1. **Stash Server** running with GraphQL API enabled
 2. **Stash API Key** generated in Stash Settings → Security
 3. **Docker** installed on your system
@@ -139,6 +140,7 @@ If Peek isn't available in Community Applications yet, or if you want to install
 **Step 1: Download the template file**
 
 Get the template from GitHub:
+
 ```
 https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-template.xml
 ```
@@ -146,18 +148,20 @@ https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-te
 **Step 2: Install the template**
 
 **Method A - If your USB/boot share is exported (easier):**
+
 1. Copy `unraid-template.xml` to your network share at:
    ```
-   \\your.server.ip.address\flash\config\plugins\dockerMan\templates
+   \\your.server.ip.address\flash\config\plugins\dockerMan\templates-user
    ```
 2. The template will be available immediately in Docker tab → Add Container → User Templates
 
 **Method B - If USB/boot share is NOT exported:**
+
 1. Copy `unraid-template.xml` to any accessible share (e.g., `\\your.server.ip.address\downloads`)
 2. SSH into your unRAID server
 3. Move the template file:
    ```bash
-   cp /mnt/user/downloads/unraid-template.xml /boot/config/plugins/dockerMan/templates/
+   cp /mnt/user/downloads/unraid-template.xml /boot/config/plugins/dockerMan/templates-user/
    ```
 4. The template will be available immediately in Docker tab → Add Container → User Templates
 
@@ -192,17 +196,17 @@ The wizard automatically discovers your Stash libraries and helps you configure 
 
 ### Required Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `STASH_URL` | Your Stash server's GraphQL endpoint | `http://192.168.1.100:9999/graphql` |
-| `STASH_API_KEY` | API key from Stash Settings > Security | `eyJhbGciOiJIUzI1Ni...` |
+| Variable        | Description                            | Example                             |
+| --------------- | -------------------------------------- | ----------------------------------- |
+| `STASH_URL`     | Your Stash server's GraphQL endpoint   | `http://192.168.1.100:9999/graphql` |
+| `STASH_API_KEY` | API key from Stash Settings > Security | `eyJhbGciOiJIUzI1Ni...`             |
 
 ### Optional Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable     | Default        | Description                                         |
+| ------------ | -------------- | --------------------------------------------------- |
 | `JWT_SECRET` | Auto-generated | Secret for JWT tokens (recommended to set manually) |
-| `CONFIG_DIR` | `/app/data` | Directory for database and transcoding cache |
+| `CONFIG_DIR` | `/app/data`    | Directory for database and transcoding cache        |
 
 ### Path Mapping (Configured via Setup Wizard)
 

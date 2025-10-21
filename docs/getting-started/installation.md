@@ -56,6 +56,7 @@ See [Windows Installation Examples](#windows-examples) below for complete exampl
 **Example**: Stash has separate folders for videos and images
 
 The setup wizard will auto-discover all your Stash libraries and help you map each one:
+
 - `/data` (videos) → `/app/media`
 - `/images` (images) → `/app/images`
 
@@ -66,7 +67,7 @@ The setup wizard will auto-discover all your Stash libraries and help you map ea
 #### Community Applications (Recommended)
 
 !!! tip "Easiest Installation Method"
-    This is the recommended method for unRAID users - everything is pre-configured!
+This is the recommended method for unRAID users - everything is pre-configured!
 
 1. **Install from Community Applications**:
    - Search for "Peek Stash Browser" in unRAID's Community Applications
@@ -82,30 +83,24 @@ If Peek isn't available in Community Applications yet, or if you want to install
 **Step 1: Download the template file**
 
 Get the template from GitHub:
+
 ```
 https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-template.xml
 ```
 
 **Step 2: Install the template**
 
-=== "USB/Boot Share Exported (Easier)"
-    1. Copy `unraid-template.xml` to your network share at:
-       ```
-       \\your.server.ip.address\flash\config\plugins\dockerMan\templates
-       ```
-    2. The template will be available immediately in Docker tab → Add Container → User Templates
+=== "USB/Boot Share Exported (Easier)" 1. Copy `unraid-template.xml` to your network share at:
+`       \\your.server.ip.address\flash\config\plugins\dockerMan\templates-user
+      ` 2. The template will be available immediately in Docker tab → Add Container → User Templates
 
-=== "USB/Boot Share NOT Exported"
-    1. Copy `unraid-template.xml` to any accessible share (e.g., `\\your.server.ip.address\downloads`)
-    2. SSH into your unRAID server
-    3. Move the template file:
-       ```bash
-       cp /mnt/user/downloads/unraid-template.xml /boot/config/plugins/dockerMan/templates/
-       ```
-    4. The template will be available immediately in Docker tab → Add Container → User Templates
+=== "USB/Boot Share NOT Exported" 1. Copy `unraid-template.xml` to any accessible share (e.g., `\\your.server.ip.address\downloads`) 2. SSH into your unRAID server 3. Move the template file:
+`bash
+       cp /mnt/user/downloads/unraid-template.xml /boot/config/plugins/dockerMan/templates-user/
+       ` 4. The template will be available immediately in Docker tab → Add Container → User Templates
 
 !!! info "No Restart Required"
-    You do NOT need to restart Docker or unRAID - the template is picked up automatically.
+You do NOT need to restart Docker or unRAID - the template is picked up automatically.
 
 **Step 3: Configure the container**
 
@@ -123,7 +118,7 @@ https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-te
 ### Option 2: Docker (Single Container)
 
 !!! success "Recommended for Production"
-    Single container includes everything - frontend, backend, and database
+Single container includes everything - frontend, backend, and database
 
 ```bash
 # Pull the latest image
@@ -163,7 +158,7 @@ docker run -d \
 - `peek-data` - Database and app data (Docker named volume)
 
 !!! tip "Multiple Libraries"
-    If Stash has multiple library paths, mount each one separately. The setup wizard will auto-discover them and help you configure the mappings.
+If Stash has multiple library paths, mount each one separately. The setup wizard will auto-discover them and help you configure the mappings.
 
 **Required Environment Variables**:
 
@@ -178,8 +173,8 @@ See [Configuration Guide](configuration.md) for all environment variables.
 Windows users with network shares (SMB/CIFS) need special configuration for password-protected shares.
 
 !!! warning "Windows Network Shares"
-    Docker Desktop on Windows cannot directly mount password-protected network shares using drive letters (Z:, X:, etc.).
-    Use Docker volumes with CIFS credentials instead.
+Docker Desktop on Windows cannot directly mount password-protected network shares using drive letters (Z:, X:, etc.).
+Use Docker volumes with CIFS credentials instead.
 
 **Step 1: Find your UNC path**
 
@@ -228,7 +223,7 @@ docker volume create peek-data
 ```
 
 !!! tip "Volumes persist across reboots!"
-    These volumes are created once and survive container restarts, system reboots, and Docker Desktop restarts.
+These volumes are created once and survive container restarts, system reboots, and Docker Desktop restarts.
 
 **Step 3: Run Peek container**
 
@@ -258,7 +253,7 @@ docker run -d `
 ```
 
 !!! tip "Multiple Libraries"
-    Create one Docker volume for each Stash library path. The setup wizard will auto-discover all libraries and help you map them.
+Create one Docker volume for each Stash library path. The setup wizard will auto-discover all libraries and help you map them.
 
 **Managing the container:**
 
@@ -283,7 +278,7 @@ docker pull carrotwaxr/peek-stash-browser:latest
 ```
 
 !!! success "Volumes are preserved!"
-    Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
+Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
 
 #### Linux/macOS Examples
 
@@ -328,10 +323,10 @@ docker run -d \
 ```
 
 !!! tip "Read-only mounts recommended"
-    Use `:ro` flag on media mounts to prevent accidental modifications to your Stash library
+Use `:ro` flag on media mounts to prevent accidental modifications to your Stash library
 
 !!! tip "Multiple Libraries"
-    Mount each Stash library path separately. The setup wizard will auto-discover all libraries and help you map them.
+Mount each Stash library path separately. The setup wizard will auto-discover all libraries and help you map them.
 
 **Managing the container:**
 
@@ -359,12 +354,12 @@ docker pull carrotwaxr/peek-stash-browser:latest
 ```
 
 !!! success "Data persists across updates!"
-    Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
+Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
 
 ### Option 3: Docker Compose (Development)
 
 !!! info "For Development Only"
-    This method is for development with hot reloading enabled
+This method is for development with hot reloading enabled
 
 1. **Clone and setup**:
 
@@ -407,7 +402,7 @@ After installation, access Peek in your browser for the first-time setup:
 3. **Login** with your newly created admin credentials
 
 !!! tip "Path Mapping Made Easy"
-    The wizard auto-discovers your Stash library paths and helps you map them correctly!
+The wizard auto-discovers your Stash library paths and helps you map them correctly!
 
 ## Port Configuration
 
@@ -418,16 +413,16 @@ After installation, access Peek in your browser for the first-time setup:
 | **Development** | `8000` | Backend API  | Express server (internal Docker network) |
 
 !!! success "Production uses only one port!"
-    Production deployment exposes only port `6969` - nginx handles everything internally
+Production deployment exposes only port `6969` - nginx handles everything internally
 
 ## Hardware Recommendations
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **CPU** | 2 cores | 4+ cores (for multiple transcoding streams) |
-| **RAM** | 2GB | 4GB+ |
+| Component   | Minimum          | Recommended                                 |
+| ----------- | ---------------- | ------------------------------------------- |
+| **CPU**     | 2 cores          | 4+ cores (for multiple transcoding streams) |
+| **RAM**     | 2GB              | 4GB+                                        |
 | **Storage** | SSD for database | SSD for database, network storage for media |
-| **Network** | 100 Mbps | Gigabit (for 4K content) |
+| **Network** | 100 Mbps         | Gigabit (for 4K content)                    |
 
 ## Next Steps
 
