@@ -52,53 +52,14 @@ const initializeDatabase = async () => {
     logger.info("Initializing database schema");
     await execAsync("npx prisma db push --accept-data-loss");
 
-    // Create admin user directly
-    logger.info("Creating admin user");
-    await createAdminUser();
-
     logger.info("Database initialization complete");
   } catch (error) {
     logger.error("Database initialization failed", {
       error: error instanceof Error ? error.message : String(error),
     });
-
-    // If it's a seeding error (admin already exists), continue anyway
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (
-      errorMessage.includes("Unique constraint") ||
-      errorMessage.includes("admin user already exists")
-    ) {
-      logger.info("Admin user already exists, continuing");
-    } else {
-      logger.warn(
-        "Database initialization failed, but continuing with server startup"
-      );
-    }
-  }
-};
-
-const createAdminUser = async () => {
-  try {
-    const hashedPassword = await bcrypt.hash("admin", 10);
-
-    await prisma.user.upsert({
-      where: { username: "admin" },
-      update: {},
-      create: {
-        username: "admin",
-        password: hashedPassword,
-        role: "ADMIN",
-      },
-    });
-
-    logger.info("Admin user created/updated successfully");
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    if (errorMessage.includes("Unique constraint")) {
-      logger.info("Admin user already exists");
-    } else {
-      throw new Error(`Failed to create admin user: ${errorMessage}`);
-    }
+    logger.warn(
+      "Database initialization failed, but continuing with server startup"
+    );
   }
 };
 

@@ -61,35 +61,14 @@ class PathMapper {
           count: this.mappings.length,
           mappings: this.mappings.map(m => ({ stash: m.stashPath, peek: m.peekPath })),
         });
+
+        // Sort by path length descending (longest match first)
+        this.mappings.sort((a, b) => b.stashPath.length - a.stashPath.length);
       } else {
-        // No database mappings - check for legacy env vars
-        const envStashPath = process.env.STASH_INTERNAL_PATH;
-        const envPeekPath = process.env.STASH_MEDIA_PATH;
-
-        if (envStashPath && envPeekPath) {
-          // Auto-migrate from env vars
-          logger.info("No database mappings found, migrating from environment variables", {
-            stashPath: envStashPath,
-            peekPath: envPeekPath,
-          });
-
-          const migrated = await this.addMapping({
-            stashPath: envStashPath,
-            peekPath: envPeekPath,
-          });
-
-          this.mappings = [migrated];
-
-          logger.info("Successfully migrated path mapping from environment variables to database");
-        } else {
-          // No mappings anywhere - setup wizard required
-          logger.warn("No path mappings configured - setup wizard required");
-          this.mappings = [];
-        }
+        // No mappings configured - setup wizard required
+        logger.warn("No path mappings configured - setup wizard required");
+        this.mappings = [];
       }
-
-      // Sort by path length descending (longest match first)
-      this.mappings.sort((a, b) => b.stashPath.length - a.stashPath.length);
 
       this.initialized = true;
     } catch (error) {

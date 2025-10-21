@@ -102,16 +102,6 @@
       <Mode/>
     </Variable>
     <Variable>
-      <Value>/data</Value>
-      <Name>STASH_INTERNAL_PATH</Name>
-      <Mode/>
-    </Variable>
-    <Variable>
-      <Value>/app/media</Value>
-      <Name>STASH_MEDIA_PATH</Name>
-      <Mode/>
-    </Variable>
-    <Variable>
       <Value>production</Value>
       <Name>NODE_ENV</Name>
       <Mode/>
@@ -124,15 +114,13 @@
   </Environment>
   <Labels/>
   <Config Name="Web UI Port" Target="80" Default="6969" Mode="tcp" Description="Web interface port - access Peek at http://[IP]:6969" Type="Port" Display="always" Required="true" Mask="false">6969</Config>
-  <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/videos" Mode="ro" Description="Path to your media files - MUST be the same path Stash uses (read-only). Example: /mnt/user/videos" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/videos</Config>
+  <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/videos" Mode="ro" Description="Path to your media files - MUST be the same path Stash uses (read-only). Example: /mnt/user/videos. Path mapping configured via setup wizard." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/videos</Config>
   <Config Name="App Data Directory" Target="/app/data" Default="/mnt/user/appdata/peek-stash-browser" Mode="rw" Description="Peek configuration, database, and HLS transcoding cache. Requires read/write access." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser</Config>
   <Config Name="Stash GraphQL URL" Target="STASH_URL" Default="http://10.0.0.4:9999/graphql" Mode="" Description="Your Stash server's GraphQL endpoint. Use the unRAID server IP or hostname. Example: http://10.0.0.4:9999/graphql" Type="Variable" Display="always" Required="true" Mask="false">http://10.0.0.4:9999/graphql</Config>
   <Config Name="Stash API Key" Target="STASH_API_KEY" Default="" Mode="" Description="Your Stash API key from Settings &gt; Security &gt; API Key. REQUIRED for authentication." Type="Variable" Display="always" Required="true" Mask="true"></Config>
   <Config Name="JWT Secret Key" Target="JWT_SECRET" Default="" Mode="" Description="Secure random string for JWT authentication. Generate a strong random string (e.g., openssl rand -hex 32). CHANGE THIS!" Type="Variable" Display="always" Required="true" Mask="true"></Config>
   <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-db.db" Mode="" Description="SQLite database file path. Leave as default unless you know what you're doing." Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-db.db</Config>
   <Config Name="Config Directory" Target="CONFIG_DIR" Default="/app/data" Mode="" Description="Directory for config and HLS cache. Should match App Data Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/data</Config>
-  <Config Name="Stash Internal Path" Target="STASH_INTERNAL_PATH" Default="/data" Mode="" Description="OPTIONAL - Legacy path mapping. The setup wizard now handles path mapping via database. Only needed for advanced migration scenarios." Type="Variable" Display="advanced" Required="false" Mask="false">/data</Config>
-  <Config Name="Peek Media Path" Target="STASH_MEDIA_PATH" Default="/app/media" Mode="" Description="OPTIONAL - Legacy path mapping. The setup wizard now handles path mapping via database. Only needed for advanced migration scenarios." Type="Variable" Display="advanced" Required="false" Mask="false">/app/media</Config>
   <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment mode. Leave as 'production' for normal use." Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
   <Config Name="Secure Cookies" Target="SECURE_COOKIES" Default="false" Mode="" Description="Enable secure cookies (HTTPS only). Set to 'true' only if you use HTTPS with a reverse proxy." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
 </Container>

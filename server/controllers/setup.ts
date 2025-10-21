@@ -3,6 +3,9 @@ import { pathMapper } from "../utils/pathMapping.js";
 import getStash from "../stash.js";
 import fs from "fs";
 import { logger } from "../utils/logger.js";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 /**
  * Get all configured path mappings
@@ -211,9 +214,19 @@ export const getSetupStatus = async (req: Request, res: Response) => {
     const hasMapping = pathMapper.hasMapping();
     const mappings = pathMapper.getMappings();
 
+    // Check if at least one user exists
+    const userCount = await prisma.user.count();
+    const hasUser = userCount > 0;
+
+    // Setup is complete only if BOTH path mappings AND users exist
+    const setupComplete = hasMapping && hasUser;
+
     res.json({
-      setupComplete: hasMapping,
+      setupComplete,
+      hasPathMappings: hasMapping,
+      hasUsers: hasUser,
       mappingCount: mappings.length,
+      userCount,
       mappings,
     });
   } catch (error) {
