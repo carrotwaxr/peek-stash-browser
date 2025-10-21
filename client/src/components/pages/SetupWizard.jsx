@@ -264,14 +264,13 @@ const SetupWizard = ({ onSetupComplete }) => {
     setError("");
 
     try {
-      // The admin user with default password "admin" is created by server on startup
-      // We'll change the password via auth API
-      const response = await fetch("/api/auth/first-time-password", {
+      // Create first admin user via setup API
+      const response = await fetch("/api/setup/create-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: "admin",
-          newPassword: adminPassword,
+          password: adminPassword,
         }),
       });
 
@@ -279,10 +278,10 @@ const SetupWizard = ({ onSetupComplete }) => {
         setCurrentStep(4);
       } else {
         const data = await response.json();
-        setError(data.error || "Failed to set password");
+        setError(data.error || "Failed to create admin user");
       }
     } catch (err) {
-      setError("Failed to set admin password: " + (err.message || "Unknown error"));
+      setError("Failed to create admin user: " + (err.message || "Unknown error"));
     } finally {
       setLoading(false);
     }
