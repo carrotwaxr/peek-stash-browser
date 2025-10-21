@@ -78,4 +78,47 @@ router.get("/check", authenticateToken, (req: AuthenticatedRequest, res) => {
   res.json({ authenticated: true, user: req.user });
 });
 
+// First-time password setup (for setup wizard)
+router.post("/first-time-password", async (req, res) => {
+  try {
+    const { username, newPassword } = req.body;
+
+    if (!username || !newPassword) {
+      return res
+        .status(400)
+        .json({ error: "Username and new password are required" });
+    }
+
+    // Only allow changing admin password during initial setup
+    if (username !== "admin") {
+      return res
+        .status(403)
+        .json({ error: "This endpoint is only for admin password setup" });
+    }
+
+    // Find admin user
+    const user = await prisma.user.findUnique({
+      where: { username: "admin" },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "Admin user not found" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ success: true, message: "Password updated successfully" });
+  } catch (error) {
+    console.error("First-time password error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 export default router;

@@ -61,6 +61,7 @@ RUN apt-get update && \
         sqlite3 \
         ca-certificates \
         curl \
+        cifs-utils \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /etc/nginx/sites-enabled/default
 

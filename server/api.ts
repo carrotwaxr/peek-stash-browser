@@ -26,6 +26,7 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import playlistRoutes from "./routes/playlist.js";
 import watchHistoryRoutes from "./routes/watchHistory.js";
+import setupRoutes from "./routes/setup.js";
 import { authenticateToken } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
 
@@ -51,6 +52,9 @@ export const setupAPI = () => {
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
+
+  // Setup wizard routes (mixed - some public for initial setup, some protected for settings)
+  app.use("/api/setup", setupRoutes);
 
   // User settings routes (protected)
   app.use("/api/user", userRoutes);

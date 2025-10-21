@@ -24,6 +24,7 @@ const envPath =
 dotenv.config({ path: envPath });
 import { setupAPI } from "./api.js";
 import { logger } from "./utils/logger.js";
+import { pathMapper } from "./utils/pathMapping.js";
 
 const main = async () => {
   logger.info("Starting Peek server");
@@ -32,6 +33,9 @@ const main = async () => {
 
   // Run database migrations and seeding
   await initializeDatabase();
+
+  // Initialize path mapper (loads from database or migrates from env vars)
+  await pathMapper.initialize();
 
   setupAPI();
 };

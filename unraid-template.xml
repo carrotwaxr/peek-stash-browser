@@ -19,12 +19,21 @@
     - JWT-based authentication with admin/user roles
     - Advanced filtering and search
     - Full VOD controls with seeking support
+    - 5-step setup wizard for easy first-time configuration
 
     This is a single-container solution that includes:
     - Frontend web interface (React + Vite)
     - Backend API server (Node.js/Express + TypeScript)
     - SQLite database for user data
     - HLS transcoding with on-demand segment generation
+
+    First-Time Setup:
+    After installation, access http://[IP]:6969 and complete the 5-step setup wizard:
+    1. Welcome screen
+    2. Auto-discover Stash libraries via GraphQL
+    3. Configure path mappings (Stash paths to Peek container paths)
+    4. Create admin account (username + password)
+    5. Setup complete!
 
     Requirements:
     - Existing Stash server with GraphQL API enabled
@@ -122,8 +131,8 @@
   <Config Name="JWT Secret Key" Target="JWT_SECRET" Default="" Mode="" Description="Secure random string for JWT authentication. Generate a strong random string (e.g., openssl rand -hex 32). CHANGE THIS!" Type="Variable" Display="always" Required="true" Mask="true"></Config>
   <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-db.db" Mode="" Description="SQLite database file path. Leave as default unless you know what you're doing." Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-db.db</Config>
   <Config Name="Config Directory" Target="CONFIG_DIR" Default="/app/data" Mode="" Description="Directory for config and HLS cache. Should match App Data Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/data</Config>
-  <Config Name="Stash Internal Path" Target="STASH_INTERNAL_PATH" Default="/data" Mode="" Description="The path prefix Stash uses internally for media files. Usually '/data' if Stash runs in Docker." Type="Variable" Display="advanced" Required="false" Mask="false">/data</Config>
-  <Config Name="Peek Media Path" Target="STASH_MEDIA_PATH" Default="/app/media" Mode="" Description="Where Peek accesses media inside its container. Should match Media Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/media</Config>
+  <Config Name="Stash Internal Path" Target="STASH_INTERNAL_PATH" Default="/data" Mode="" Description="OPTIONAL - Legacy path mapping. The setup wizard now handles path mapping via database. Only needed for advanced migration scenarios." Type="Variable" Display="advanced" Required="false" Mask="false">/data</Config>
+  <Config Name="Peek Media Path" Target="STASH_MEDIA_PATH" Default="/app/media" Mode="" Description="OPTIONAL - Legacy path mapping. The setup wizard now handles path mapping via database. Only needed for advanced migration scenarios." Type="Variable" Display="advanced" Required="false" Mask="false">/app/media</Config>
   <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment mode. Leave as 'production' for normal use." Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
   <Config Name="Secure Cookies" Target="SECURE_COOKIES" Default="false" Mode="" Description="Enable secure cookies (HTTPS only). Set to 'true' only if you use HTTPS with a reverse proxy." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
 </Container>

@@ -333,3 +333,60 @@ export const commonFilters = {
     tag_filter: { favorite: true },
   }),
 };
+
+// Setup wizard API endpoints
+export const setupApi = {
+  /**
+   * Get setup status
+   * @returns {Promise<{setupComplete: boolean, mappingCount: number, mappings: Array}>}
+   */
+  getSetupStatus: () => apiGet("/setup/status"),
+
+  /**
+   * Discover Stash library paths via GraphQL
+   * @returns {Promise<{success: boolean, libraries: Array, paths: Array<string>}>}
+   */
+  discoverStashLibraries: () => apiGet("/setup/discover-libraries"),
+
+  /**
+   * Test if a path exists and is readable
+   * @param {string} path - Path to test
+   * @returns {Promise<{success: boolean, exists: boolean, readable: boolean, isDirectory: boolean, fileCount: number|null, message: string}>}
+   */
+  testPath: (path) => apiPost("/setup/test-path", { path }),
+
+  /**
+   * Get all configured path mappings
+   * @returns {Promise<{mappings: Array}>}
+   */
+  getPathMappings: () => apiGet("/setup/path-mappings"),
+
+  /**
+   * Add a new path mapping
+   * @param {string} stashPath - Path as reported by Stash
+   * @param {string} peekPath - Path where Peek accesses the files
+   * @returns {Promise<{success: boolean, mapping: Object}>}
+   */
+  addPathMapping: (stashPath, peekPath) =>
+    apiPost("/setup/path-mappings", { stashPath, peekPath }),
+
+  /**
+   * Update an existing path mapping
+   * @param {number} id - Mapping ID
+   * @param {string} stashPath - Path as reported by Stash
+   * @param {string} peekPath - Path where Peek accesses the files
+   * @returns {Promise<{success: boolean, mapping: Object}>}
+   */
+  updatePathMapping: (id, stashPath, peekPath) =>
+    apiFetch(`/setup/path-mappings/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ stashPath, peekPath }),
+    }),
+
+  /**
+   * Delete a path mapping
+   * @param {number} id - Mapping ID
+   * @returns {Promise<{success: boolean}>}
+   */
+  deletePathMapping: (id) => apiDelete(`/setup/path-mappings/${id}`),
+};
