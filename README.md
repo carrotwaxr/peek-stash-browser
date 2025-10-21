@@ -102,7 +102,7 @@ docker volume create peek-images `
 docker run -d `
   --name peek-stash-browser `
   -p 6969:80 `
-  -v peek-media:/app/media `
+  -v peek-media:/app/media:ro `
   -v peek-data:/app/data `
   -e STASH_URL=http://192.168.1.100:9999/graphql `
   -e STASH_API_KEY=your_api_key `
@@ -113,8 +113,8 @@ docker run -d `
 docker run -d `
   --name peek-stash-browser `
   -p 6969:80 `
-  -v peek-videos:/app/media `
-  -v peek-images:/app/images `
+  -v peek-videos:/app/media:ro `
+  -v peek-images:/app/images:ro `
   -v peek-data:/app/data `
   -e STASH_URL=http://192.168.1.100:9999/graphql `
   -e STASH_API_KEY=your_api_key `
@@ -122,7 +122,7 @@ docker run -d `
   carrotwaxr/peek-stash-browser:latest
 ```
 
-**Note**: Create one Docker volume for each Stash library. The setup wizard will help you map them correctly.
+**Note**: Create one Docker volume for each Stash library. Media volumes are mounted read-only (`:ro`) to prevent accidental modifications.
 
 ### unRAID Installation
 
@@ -219,7 +219,7 @@ Peek needs access to the same media files that Stash manages. The **Setup Wizard
 **Example Scenarios:**
 
 - **Stash reports:** `/data/videos/scene.mp4`
-- **You mounted:** `-v /mnt/media:/app/media`
+- **You mounted:** `-v /mnt/media:/app/media:ro`
 - **Mapping:** Stash Path `/data` → Peek Path `/app/media`
 - **Result:** Peek accesses `/app/media/videos/scene.mp4`
 

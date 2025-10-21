@@ -27,8 +27,8 @@ Peek needs to access the same media files that Stash manages. How you configure 
 **Example**: Both running in Docker on the same host
 
 ```bash
-# Simple - just mount the same directory both containers use
--v /mnt/media:/app/media
+# Simple - just mount the same directory both containers use (read-only recommended)
+-v /mnt/media:/app/media:ro
 ```
 
 ### Scenario 2: Peek on Windows, Stash on Network Server
@@ -45,8 +45,8 @@ docker volume create peek-media `
   --opt device=//192.168.1.100/media `
   --opt o=username=youruser,password=yourpass
 
-# Then use the volume in docker run
--v peek-media:/app/media
+# Then use the volume in docker run (read-only recommended)
+-v peek-media:/app/media:ro
 ```
 
 See [Windows Installation Examples](#windows-examples) below for complete examples.
@@ -232,7 +232,7 @@ These volumes are created once and survive container restarts, system reboots, a
 docker run -d `
     --name peek-stash-browser `
     -p 6969:80 `
-    -v peek-media:/app/media `
+    -v peek-media:/app/media:ro `
     -v peek-data:/app/data `
     -e STASH_URL=http://192.168.1.100:9999/graphql `
     -e STASH_API_KEY=your_api_key_here `
@@ -243,8 +243,8 @@ docker run -d `
 docker run -d `
     --name peek-stash-browser `
     -p 6969:80 `
-    -v peek-videos:/app/media `
-    -v peek-images:/app/images `
+    -v peek-videos:/app/media:ro `
+    -v peek-images:/app/images:ro `
     -v peek-data:/app/data `
     -e STASH_URL=http://192.168.1.100:9999/graphql `
     -e STASH_API_KEY=your_api_key_here `
@@ -253,7 +253,7 @@ docker run -d `
 ```
 
 !!! tip "Multiple Libraries"
-Create one Docker volume for each Stash library path. The setup wizard will auto-discover all libraries and help you map them.
+    Create one Docker volume for each Stash library path. Media volumes are mounted read-only (`:ro`) to prevent accidental modifications. The setup wizard will auto-discover all libraries and help you map them.
 
 **Managing the container:**
 
