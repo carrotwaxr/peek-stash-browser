@@ -64,17 +64,18 @@ The **5-step setup wizard** is the recommended way to configure path mappings fo
 - First-time installations show the wizard automatically at `http://your-server:6969`
 - Existing installations can manage mappings in Settings → Path Mappings
 
-### Environment Variables (Legacy)
+### Upgrading from Environment Variables
 
-For backward compatibility and advanced scenarios, you can use environment variables:
+If you have an existing installation using `STASH_INTERNAL_PATH` and `STASH_MEDIA_PATH` environment variables:
 
-| Variable             | Description                    | Default                        | Notes               |
-| -------------------- | ------------------------------ | ------------------------------ | ------------------- |
-| `STASH_INTERNAL_PATH` | Path prefix Stash uses internally | `/data`                     | Optional - migrates to database on first startup |
-| `STASH_MEDIA_PATH`    | Where Peek accesses Stash's media | `/app/media`                | Optional - migrates to database on first startup |
+1. **Access Peek** in your browser
+2. **Complete the setup wizard** - it will guide you through path mapping
+3. **Remove old environment variables** from your container configuration:
+   - `STASH_INTERNAL_PATH`
+   - `STASH_MEDIA_PATH`
+4. **Restart container**
 
-!!! info "Automatic Migration"
-    If you have existing installations using `STASH_INTERNAL_PATH` and `STASH_MEDIA_PATH`, they will automatically migrate to the database on first startup. The environment variables can be removed after migration.
+The setup wizard replaces these environment variables with database-stored mappings that support multiple libraries.
 
 ### Path Mapping Example
 
@@ -174,22 +175,6 @@ NODE_ENV=development
 # Path mappings configured via setup wizard
 ```
 
-### Legacy Configuration (Auto-Migrates)
-
-If you have existing installations using environment variable path mapping:
-
-```bash
-# Required
-STASH_URL=http://192.168.1.100:9999/graphql
-STASH_API_KEY=your_api_key_here
-JWT_SECRET=your_secret_here
-
-# Legacy path mapping (auto-migrates to database on first startup)
-STASH_INTERNAL_PATH=/data
-STASH_MEDIA_PATH=/app/media
-```
-
-After migration, these environment variables can be removed.
 
 ## Docker Compose Example
 
