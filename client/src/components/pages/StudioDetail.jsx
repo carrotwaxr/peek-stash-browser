@@ -17,7 +17,6 @@ const StudioDetail = () => {
   // Set page title to studio name
   usePageTitle(studio?.name || "Studio");
 
-
   useEffect(() => {
     const fetchStudio = async () => {
       try {
@@ -53,7 +52,7 @@ const StudioDetail = () => {
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
             title="Back to Studios"
           >
-            <span className="hidden sm:inline">Back</span>
+            <span className="hidden sm:inline">Back to Studios</span>
           </Button>
         </div>
 
@@ -68,15 +67,14 @@ const StudioDetail = () => {
               >
                 {studio?.name || `Studio ${studioId}`}
               </h1>
-              {studio?.favorite && <LucideStar size={32} color="#efdd03" fill="#efdd03" />}
+              {studio?.favorite && (
+                <LucideStar size={32} color="#efdd03" fill="#efdd03" />
+              )}
             </div>
 
             {/* Aliases */}
             {studio?.aliases && studio.aliases.length > 0 && (
-              <p
-                className="text-xl"
-                style={{ color: "var(--text-secondary)" }}
-              >
+              <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
                 Also known as: {studio.aliases.join(", ")}
               </p>
             )}
@@ -101,7 +99,9 @@ const StudioDetail = () => {
               studios: { value: [studioId], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
-              studios: [{ id: studioId, name: studio?.name || "Unknown Studio" }],
+              studios: [
+                { id: studioId, name: studio?.name || "Unknown Studio" },
+              ],
             }}
             title={`Scenes from ${studio?.name || "this studio"}`}
             captureReferrer={false}
@@ -147,7 +147,10 @@ const StudioImage = ({ studio }) => {
           style={{ maxHeight: "200px" }}
         />
       ) : (
-        <div className="w-full flex items-center justify-center" style={{ height: "150px" }}>
+        <div
+          className="w-full flex items-center justify-center"
+          style={{ height: "150px" }}
+        >
           <svg
             className="w-16 h-16"
             style={{ color: "var(--text-muted)" }}
@@ -182,14 +185,23 @@ const StudioStats = ({ studio }) => {
       {studio?.rating100 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            <span
+              className="text-sm font-medium"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Rating
             </span>
-            <span className="text-2xl font-bold" style={{ color: "var(--accent-primary)" }}>
+            <span
+              className="text-2xl font-bold"
+              style={{ color: "var(--accent-primary)" }}
+            >
               {studio.rating100}/100
             </span>
           </div>
-          <div className="w-full h-3 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-secondary)" }}>
+          <div
+            className="w-full h-3 rounded-full overflow-hidden"
+            style={{ backgroundColor: "var(--bg-secondary)" }}
+          >
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
@@ -203,12 +215,36 @@ const StudioStats = ({ studio }) => {
 
       {/* Other Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatField label="Scenes:" value={studio?.scene_count} valueColor="var(--accent-primary)" />
-        <StatField label="Performers:" value={studio?.performer_count} valueColor="var(--accent-primary)" />
-        <StatField label="Images:" value={studio?.image_count} valueColor="var(--accent-primary)" />
-        <StatField label="Galleries:" value={studio?.gallery_count} valueColor="var(--accent-primary)" />
-        <StatField label="Movies:" value={studio?.movie_count} valueColor="var(--accent-primary)" />
-        <StatField label="Groups:" value={studio?.group_count} valueColor="var(--accent-primary)" />
+        <StatField
+          label="Scenes:"
+          value={studio?.scene_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Performers:"
+          value={studio?.performer_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Images:"
+          value={studio?.image_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Galleries:"
+          value={studio?.gallery_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Movies:"
+          value={studio?.movie_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Groups:"
+          value={studio?.group_count}
+          valueColor="var(--accent-primary)"
+        />
       </div>
     </Card>
   );

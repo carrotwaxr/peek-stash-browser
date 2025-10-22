@@ -305,7 +305,7 @@ const PlaylistDetail = () => {
               icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
               title="Back to Playlists"
             >
-              <span className="hidden sm:inline">Back</span>
+              <span className="hidden sm:inline">Back to Playlists</span>
             </Button>
 
             {!isEditing && !reorderMode && (

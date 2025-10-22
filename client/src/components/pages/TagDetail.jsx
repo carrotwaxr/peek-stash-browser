@@ -17,7 +17,6 @@ const TagDetail = () => {
   // Set page title to tag name
   usePageTitle(tag?.name || "Tag");
 
-
   useEffect(() => {
     const fetchTag = async () => {
       try {
@@ -53,7 +52,7 @@ const TagDetail = () => {
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
             title="Back to Tags"
           >
-            <span className="hidden sm:inline">Back</span>
+            <span className="hidden sm:inline">Back to Tags</span>
           </Button>
         </div>
 
@@ -66,14 +65,13 @@ const TagDetail = () => {
             >
               {tag?.name || `Tag ${tagId}`}
             </h1>
-            {tag?.favorite && <LucideStar size={32} color="#efdd03" fill="#efdd03" />}
+            {tag?.favorite && (
+              <LucideStar size={32} color="#efdd03" fill="#efdd03" />
+            )}
           </div>
 
           {tag?.aliases && tag.aliases.length > 0 && (
-            <p
-              className="text-xl"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
               Also known as: {tag.aliases.join(", ")}
             </p>
           )}
@@ -182,14 +180,46 @@ const TagStats = ({ tag }) => {
   return (
     <Card title="Statistics">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatField label="Scenes:" value={tag?.scene_count} valueColor="var(--accent-primary)" />
-        <StatField label="Markers:" value={tag?.scene_marker_count} valueColor="var(--accent-primary)" />
-        <StatField label="Images:" value={tag?.image_count} valueColor="var(--accent-primary)" />
-        <StatField label="Galleries:" value={tag?.gallery_count} valueColor="var(--accent-primary)" />
-        <StatField label="Performers:" value={tag?.performer_count} valueColor="var(--accent-primary)" />
-        <StatField label="Studios:" value={tag?.studio_count} valueColor="var(--accent-primary)" />
-        <StatField label="Movies:" value={tag?.movie_count} valueColor="var(--accent-primary)" />
-        <StatField label="Groups:" value={tag?.group_count} valueColor="var(--accent-primary)" />
+        <StatField
+          label="Scenes:"
+          value={tag?.scene_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Markers:"
+          value={tag?.scene_marker_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Images:"
+          value={tag?.image_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Galleries:"
+          value={tag?.gallery_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Performers:"
+          value={tag?.performer_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Studios:"
+          value={tag?.studio_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Movies:"
+          value={tag?.movie_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Groups:"
+          value={tag?.group_count}
+          valueColor="var(--accent-primary)"
+        />
       </div>
     </Card>
   );

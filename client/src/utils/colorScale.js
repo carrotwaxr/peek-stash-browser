@@ -121,10 +121,10 @@ export function generateBackgroundScale(baseColor, mode = "dark") {
     // Light mode: start light, go darker
     return {
       "--bg-primary": baseColor, // Lightest
-      "--bg-secondary": adjustLightness(baseColor, -6), // -6% darker
-      "--bg-card": adjustLightness(baseColor, -3), // -3% darker
-      "--bg-tertiary": adjustLightness(baseColor, -8), // -8% darker
-      "--bg-hover": adjustLightness(baseColor, -5), // -5% darker
+      "--bg-secondary": adjustLightness(baseColor, -8), // -6% darker
+      "--bg-card": adjustLightness(baseColor, -6), // -4% darker
+      "--bg-tertiary": adjustLightness(baseColor, -12), // -10% darker
+      "--bg-hover": adjustLightness(baseColor, -14), // -12% darker
       "--bg-overlay": "rgba(255, 255, 255, 0.9)", // Fixed light overlay
     };
   }
