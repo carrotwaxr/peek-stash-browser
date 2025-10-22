@@ -81,7 +81,7 @@ export default function Button({
       case "secondary":
         return "var(--text-primary)";
       case "tertiary":
-        return "var(--text-primary)";
+        return "var(--accent-primary)";
       default:
         return "var(--text-primary)";
     }
@@ -95,7 +95,7 @@ export default function Button({
       case "secondary":
         return "var(--border-color)";
       case "tertiary":
-        return "var(--border-color)";
+        return "transparent";
       case "destructive":
         return "var(--accent-error)";
       default:

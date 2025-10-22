@@ -115,11 +115,7 @@ const Scene = () => {
             <p style={{ color: "var(--text-secondary)" }}>
               Scene ID: {sceneId}
             </p>
-            <Button
-              onClick={() => navigate("/scenes")}
-              variant="primary"
-              className="mt-4"
-            >
+            <Button onClick={() => navigate("/scenes")} variant="primary">
               Browse Scenes
             </Button>
           </div>
@@ -154,11 +150,7 @@ const Scene = () => {
               }
             }}
             variant="secondary"
-            size="sm"
             className="inline-flex items-center gap-2 flex-shrink-0 self-start"
-            style={{
-              color: "var(--accent-primary)",
-            }}
           >
             <span>←</span>
             <span className="whitespace-nowrap">Back to Scenes</span>

@@ -11,12 +11,22 @@ import Button from "./Button.jsx";
  * @param {Object} props.permanentFilters - Filters that can't be removed
  * @param {Object} props.permanentFiltersMetadata - Display names for permanent filters
  */
-const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFilters = {}, permanentFiltersMetadata = {} }) => {
+const ActiveFilterChips = ({
+  filters,
+  filterOptions,
+  onRemoveFilter,
+  permanentFilters = {},
+  permanentFiltersMetadata = {},
+}) => {
   const getFilterLabel = (filterKey, filterValue, filterConfig) => {
     const { label, type, options } = filterConfig;
 
     // Skip undefined or empty values
-    if (filterValue === undefined || filterValue === "" || filterValue === false) {
+    if (
+      filterValue === undefined ||
+      filterValue === "" ||
+      filterValue === false
+    ) {
       return null;
     }
 
@@ -25,8 +35,12 @@ const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFi
         return filterValue === true ? label : null;
 
       case "select":
-        const selectedOption = options?.find(opt => opt.value === filterValue);
-        return selectedOption ? `${label}: ${selectedOption.label}` : `${label}: ${filterValue}`;
+        const selectedOption = options?.find(
+          (opt) => opt.value === filterValue
+        );
+        return selectedOption
+          ? `${label}: ${selectedOption.label}`
+          : `${label}: ${filterValue}`;
 
       case "text":
         return `${label}: "${filterValue}"`;
@@ -61,7 +75,7 @@ const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFi
 
   // Check for performer permanent filters
   if (permanentFiltersMetadata.performers?.length > 0) {
-    permanentFiltersMetadata.performers.forEach(performer => {
+    permanentFiltersMetadata.performers.forEach((performer) => {
       permanentChips.push({
         key: `permanent-performer-${performer.id}`,
         label: `Performer: ${performer.name}`,
@@ -72,7 +86,7 @@ const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFi
 
   // Check for studio permanent filters
   if (permanentFiltersMetadata.studios?.length > 0) {
-    permanentFiltersMetadata.studios.forEach(studio => {
+    permanentFiltersMetadata.studios.forEach((studio) => {
       permanentChips.push({
         key: `permanent-studio-${studio.id}`,
         label: `Studio: ${studio.name}`,
@@ -83,7 +97,7 @@ const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFi
 
   // Check for tag permanent filters
   if (permanentFiltersMetadata.tags?.length > 0) {
-    permanentFiltersMetadata.tags.forEach(tag => {
+    permanentFiltersMetadata.tags.forEach((tag) => {
       permanentChips.push({
         key: `permanent-tag-${tag.id}`,
         label: `Tag: ${tag.name}`,
@@ -95,14 +109,18 @@ const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFi
   // Build array of regular active filter chips (exclude permanent filters)
   const activeChips = [];
 
-  filterOptions.forEach(filterConfig => {
+  filterOptions.forEach((filterConfig) => {
     // Skip if this is a permanent filter
     if (permanentFilters[filterConfig.key] !== undefined) {
       return;
     }
 
     const filterValue = filters[filterConfig.key];
-    const chipLabel = getFilterLabel(filterConfig.key, filterValue, filterConfig);
+    const chipLabel = getFilterLabel(
+      filterConfig.key,
+      filterValue,
+      filterConfig
+    );
 
     if (chipLabel) {
       activeChips.push({
@@ -122,14 +140,20 @@ const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFi
 
   return (
     <div className="flex flex-wrap gap-2 mb-4">
-      {allChips.map(chip => (
+      {allChips.map((chip) => (
         <div
           key={chip.key}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-colors"
           style={{
-            backgroundColor: chip.isPermanent ? "var(--bg-tertiary)" : "var(--bg-secondary)",
-            borderColor: chip.isPermanent ? "var(--border-color)" : "var(--accent-primary)",
-            color: chip.isPermanent ? "var(--text-secondary)" : "var(--text-primary)",
+            backgroundColor: chip.isPermanent
+              ? "var(--bg-tertiary)"
+              : "var(--bg-secondary)",
+            borderColor: chip.isPermanent
+              ? "var(--border-color)"
+              : "var(--accent-primary)",
+            color: chip.isPermanent
+              ? "var(--text-secondary)"
+              : "var(--text-primary)",
             opacity: chip.isPermanent ? 0.7 : 1,
           }}
         >

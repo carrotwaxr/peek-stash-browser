@@ -124,11 +124,7 @@ const ServerSettings = () => {
   const changeUserRole = async (userId, username, currentRole) => {
     const newRole = currentRole === "ADMIN" ? "USER" : "ADMIN";
 
-    if (
-      !confirm(
-        `Change "${username}" from ${currentRole} to ${newRole}?`
-      )
-    ) {
+    if (!confirm(`Change "${username}" from ${currentRole} to ${newRole}?`)) {
       return;
     }
 
@@ -252,7 +248,10 @@ const ServerSettings = () => {
         setError("No library paths found in Stash configuration");
       }
     } catch (err) {
-      setError("Failed to discover Stash libraries: " + (err.message || "Unknown error"));
+      setError(
+        "Failed to discover Stash libraries: " +
+          (err.message || "Unknown error")
+      );
     }
   };
 
@@ -417,16 +416,16 @@ const ServerSettings = () => {
                           <div className="flex justify-end gap-2">
                             <Button
                               onClick={() =>
-                                changeUserRole(user.id, user.username, user.role)
+                                changeUserRole(
+                                  user.id,
+                                  user.username,
+                                  user.role
+                                )
                               }
                               disabled={user.id === currentUser?.id}
                               variant="secondary"
                               size="sm"
                               className="px-3 py-1 text-sm"
-                              style={{
-                                backgroundColor: "rgba(59, 130, 246, 0.1)",
-                                color: "rgb(59, 130, 246)",
-                              }}
                             >
                               Change Role
                             </Button>
@@ -436,10 +435,6 @@ const ServerSettings = () => {
                               variant="destructive"
                               size="sm"
                               className="px-3 py-1 text-sm"
-                              style={{
-                                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                color: "rgb(239, 68, 68)",
-                              }}
                             >
                               Delete
                             </Button>
@@ -464,10 +459,7 @@ const ServerSettings = () => {
                   </Paper.Subtitle>
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    onClick={discoverLibraries}
-                    variant="secondary"
-                  >
+                  <Button onClick={discoverLibraries} variant="secondary">
                     Discover Libraries
                   </Button>
                   <Button
@@ -547,10 +539,6 @@ const ServerSettings = () => {
                               variant="destructive"
                               size="sm"
                               className="px-3 py-1 text-sm"
-                              style={{
-                                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                color: "rgb(239, 68, 68)",
-                              }}
                             >
                               Delete
                             </Button>
@@ -572,121 +560,124 @@ const ServerSettings = () => {
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => !creating && setShowCreateModal(false)}
         >
-          <Paper className="max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <Paper
+            className="max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Paper.Header title="Create New User" />
             <form onSubmit={createUser}>
               <Paper.Body>
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="newUsername"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    id="newUsername"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    required
-                    autoFocus
-                  />
-                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="newUsername"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      id="newUsername"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      required
+                      autoFocus
+                    />
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor="newPassword"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    required
-                    minLength={6}
-                  />
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Must be at least 6 characters
-                  </p>
-                </div>
+                  <div>
+                    <label
+                      htmlFor="newPassword"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      required
+                      minLength={6}
+                    />
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Must be at least 6 characters
+                    </p>
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor="newRole"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Role
-                  </label>
-                  <select
-                    id="newRole"
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    <option value="USER">User</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Admins can manage users and server settings
-                  </p>
-                </div>
+                  <div>
+                    <label
+                      htmlFor="newRole"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Role
+                    </label>
+                    <select
+                      id="newRole"
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      <option value="USER">User</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Admins can manage users and server settings
+                    </p>
+                  </div>
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={creating}
-                    variant="primary"
-                    fullWidth
-                    loading={creating}
-                  >
-                    Create User
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      setNewUsername("");
-                      setNewPassword("");
-                      setNewRole("USER");
-                      setError(null);
-                    }}
-                    disabled={creating}
-                    variant="secondary"
-                  >
-                    Cancel
-                  </Button>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="submit"
+                      disabled={creating}
+                      variant="primary"
+                      fullWidth
+                      loading={creating}
+                    >
+                      Create User
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateModal(false);
+                        setNewUsername("");
+                        setNewPassword("");
+                        setNewRole("USER");
+                        setError(null);
+                      }}
+                      disabled={creating}
+                      variant="secondary"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
               </Paper.Body>
             </form>
           </Paper>
@@ -699,132 +690,136 @@ const ServerSettings = () => {
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => !addingMapping && setShowAddMappingModal(false)}
         >
-          <Paper className="max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <Paper
+            className="max-w-lg w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Paper.Header
               title="Add Path Mapping"
               subtitle="Map a Stash library path to where Peek can access it"
             />
             <form onSubmit={addPathMapping}>
               <Paper.Body>
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="stashPath"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Stash Path
-                  </label>
-                  <input
-                    type="text"
-                    id="stashPath"
-                    value={newStashPath}
-                    onChange={(e) => setNewStashPath(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg font-mono text-sm"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    placeholder="/data or C:\Videos"
-                    required
-                    autoFocus
-                  />
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Path as reported by Stash (use "Discover Libraries" to auto-fill)
-                  </p>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="peekPath"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Peek Path
-                  </label>
-                  <div className="flex gap-2">
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="stashPath"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Stash Path
+                    </label>
                     <input
                       type="text"
-                      id="peekPath"
-                      value={newPeekPath}
-                      onChange={(e) => {
-                        setNewPeekPath(e.target.value);
-                        setPathTestResult(null);
-                      }}
-                      className="flex-1 px-4 py-2 rounded-lg font-mono text-sm"
+                      id="stashPath"
+                      value={newStashPath}
+                      onChange={(e) => setNewStashPath(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg font-mono text-sm"
                       style={{
                         backgroundColor: "var(--bg-secondary)",
                         border: "1px solid var(--border-color)",
                         color: "var(--text-primary)",
                       }}
-                      placeholder="/app/media"
+                      placeholder="/data or C:\Videos"
                       required
+                      autoFocus
                     />
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Path as reported by Stash (use "Discover Libraries" to
+                      auto-fill)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="peekPath"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Peek Path
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        id="peekPath"
+                        value={newPeekPath}
+                        onChange={(e) => {
+                          setNewPeekPath(e.target.value);
+                          setPathTestResult(null);
+                        }}
+                        className="flex-1 px-4 py-2 rounded-lg font-mono text-sm"
+                        style={{
+                          backgroundColor: "var(--bg-secondary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                        placeholder="/app/media"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        onClick={testPath}
+                        disabled={!newPeekPath.trim() || testingPath}
+                        variant="primary"
+                        loading={testingPath}
+                      >
+                        Test
+                      </Button>
+                    </div>
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Docker mount point where Peek accesses these files
+                    </p>
+                    {pathTestResult && (
+                      <div
+                        className="text-sm mt-2 p-2 rounded"
+                        style={{
+                          backgroundColor:
+                            pathTestResult.exists && pathTestResult.readable
+                              ? "rgba(34, 197, 94, 0.1)"
+                              : "rgba(239, 68, 68, 0.1)",
+                          color:
+                            pathTestResult.exists && pathTestResult.readable
+                              ? "rgb(34, 197, 94)"
+                              : "rgb(239, 68, 68)",
+                        }}
+                      >
+                        {pathTestResult.message}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="submit"
+                      disabled={addingMapping}
+                      variant="primary"
+                      fullWidth
+                      loading={addingMapping}
+                    >
+                      Add Mapping
+                    </Button>
                     <Button
                       type="button"
-                      onClick={testPath}
-                      disabled={!newPeekPath.trim() || testingPath}
-                      variant="primary"
-                      loading={testingPath}
+                      onClick={() => {
+                        setShowAddMappingModal(false);
+                        setNewStashPath("");
+                        setNewPeekPath("");
+                        setPathTestResult(null);
+                        setError(null);
+                      }}
+                      disabled={addingMapping}
+                      variant="secondary"
                     >
-                      Test
+                      Cancel
                     </Button>
                   </div>
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Docker mount point where Peek accesses these files
-                  </p>
-                  {pathTestResult && (
-                    <div
-                      className="text-sm mt-2 p-2 rounded"
-                      style={{
-                        backgroundColor:
-                          pathTestResult.exists && pathTestResult.readable
-                            ? "rgba(34, 197, 94, 0.1)"
-                            : "rgba(239, 68, 68, 0.1)",
-                        color:
-                          pathTestResult.exists && pathTestResult.readable
-                            ? "rgb(34, 197, 94)"
-                            : "rgb(239, 68, 68)",
-                      }}
-                    >
-                      {pathTestResult.message}
-                    </div>
-                  )}
                 </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={addingMapping}
-                    variant="primary"
-                    fullWidth
-                    loading={addingMapping}
-                  >
-                    Add Mapping
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setShowAddMappingModal(false);
-                      setNewStashPath("");
-                      setNewPeekPath("");
-                      setPathTestResult(null);
-                      setError(null);
-                    }}
-                    disabled={addingMapping}
-                    variant="secondary"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
               </Paper.Body>
             </form>
           </Paper>

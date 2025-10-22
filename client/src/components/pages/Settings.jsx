@@ -6,6 +6,10 @@ import { PageLayout } from "../ui/index.js";
 import CarouselSettings from "../settings/CarouselSettings.jsx";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
+import SuccessMessage from "../ui/SuccessMessage.jsx";
+import WarningMessage from "../ui/WarningMessage.jsx";
+import ErrorMessage from "../ui/ErrorMessage.jsx";
+import InfoMessage from "../ui/InfoMessage.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -19,6 +23,16 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+
+  // Get rating color based on value
+  const getRatingColor = (rating) => {
+    if (!rating) return 'var(--text-muted)';
+    if (rating >= 80) return 'var(--rating-excellent)';
+    if (rating >= 60) return 'var(--rating-good)';
+    if (rating >= 40) return 'var(--rating-average)';
+    if (rating >= 20) return 'var(--rating-poor)';
+    return 'var(--rating-bad)';
+  };
 
   // Settings state
   const [preferredQuality, setPreferredQuality] = useState("auto");
@@ -138,51 +152,135 @@ const Settings = () => {
   return (
     <PageLayout>
       <div className="max-w-3xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <h1
-              className="text-3xl font-bold mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
-              My Settings
-            </h1>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Manage your personal preferences and account settings
-            </p>
+        {/* Header */}
+        <div className="mb-8">
+          <h1
+            className="text-3xl font-bold mb-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            My Settings
+          </h1>
+          <p style={{ color: "var(--text-secondary)" }}>
+            Manage your personal preferences and account settings
+          </p>
+        </div>
+
+        {/* Messages */}
+        {message && (
+          <div
+            className="mb-6 p-4 rounded-lg"
+            style={{
+              backgroundColor: "rgba(34, 197, 94, 0.1)",
+              border: "1px solid rgba(34, 197, 94, 0.3)",
+              color: "rgb(34, 197, 94)",
+            }}
+          >
+            {message}
           </div>
+        )}
 
-          {/* Messages */}
-          {message && (
-            <div
-              className="mb-6 p-4 rounded-lg"
-              style={{
-                backgroundColor: "rgba(34, 197, 94, 0.1)",
-                border: "1px solid rgba(34, 197, 94, 0.3)",
-                color: "rgb(34, 197, 94)",
-              }}
-            >
-              {message}
+        {error && (
+          <div
+            className="mb-6 p-4 rounded-lg"
+            style={{
+              backgroundColor: "rgba(239, 68, 68, 0.1)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              color: "rgb(239, 68, 68)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* Theme */}
+        <Paper className="mb-6">
+          <Paper.Header title="Theme" />
+          <Paper.Body>
+            <div className="space-y-2">
+              {availableThemes.map((theme) => (
+                <Button
+                  key={theme.key}
+                  type="button"
+                  onClick={() => changeTheme(theme.key)}
+                  variant={currentTheme === theme.key ? "primary" : "secondary"}
+                  fullWidth
+                  className="text-left px-4 py-3 text-sm flex items-center justify-between"
+                >
+                  <span>{theme.name}</span>
+                  {currentTheme === theme.key && (
+                    <span className="text-sm">✓</span>
+                  )}
+                </Button>
+              ))}
             </div>
-          )}
+            <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
+              Choose your preferred color theme (changes apply immediately)
+            </p>
+            <div className="mt-8 pt-6 border-t" style={{ borderColor: "var(--border-color)" }}>
+              <h3 className="text-lg font-semibold mb-6" style={{ color: "var(--text-primary)" }}>UI Examples</h3>
 
-          {error && (
-            <div
-              className="mb-6 p-4 rounded-lg"
-              style={{
-                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-                color: "rgb(239, 68, 68)",
-              }}
-            >
-              {error}
+              {/* Buttons */}
+              <div className="mb-8">
+                <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Buttons</h4>
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="primary">Primary</Button>
+                  <Button variant="secondary">Secondary</Button>
+                  <Button variant="tertiary">Tertiary</Button>
+                  <Button variant="destructive">Destructive</Button>
+                </div>
+              </div>
+
+              {/* Status Messages */}
+              <div className="mb-8">
+                <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Status Messages</h4>
+                <div className="space-y-3">
+                  <SuccessMessage message="Operation completed successfully!" />
+                  <InfoMessage message="Here's some helpful information." />
+                  <WarningMessage message="Please review this warning." />
+                  <ErrorMessage message="An error occurred during processing." />
+                </div>
+              </div>
+
+              {/* Rating Gradient */}
+              <div>
+                <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Rating Colors (0-100)</h4>
+                <div className="space-y-2">
+                  {[
+                    { rating: 0, label: "No rating" },
+                    { rating: 10, label: "0-19: Bad" },
+                    { rating: 20, label: "20-39: Poor" },
+                    { rating: 30, label: "20-39: Poor" },
+                    { rating: 40, label: "40-59: Average" },
+                    { rating: 50, label: "40-59: Average" },
+                    { rating: 60, label: "60-79: Good" },
+                    { rating: 70, label: "60-79: Good" },
+                    { rating: 80, label: "80-100: Excellent" },
+                    { rating: 90, label: "80-100: Excellent" },
+                    { rating: 100, label: "80-100: Excellent" },
+                  ].map((item) => (
+                    <div key={item.rating} className="flex items-center gap-3">
+                      <div
+                        className="w-16 h-8 rounded flex items-center justify-center text-white text-sm font-semibold"
+                        style={{ backgroundColor: getRatingColor(item.rating) }}
+                      >
+                        {item.rating}
+                      </div>
+                      <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          )}
+          </Paper.Body>
+        </Paper>
 
-          {/* Playback Settings */}
-          <Paper className="mb-6">
-            <Paper.Header title="Playback Preferences" />
-            <form onSubmit={saveSettings}>
-              <Paper.Body>
+        {/* Playback Settings */}
+        <Paper className="mb-6">
+          <Paper.Header title="Playback Preferences" />
+          <form onSubmit={saveSettings}>
+            <Paper.Body>
               <div className="space-y-6">
                 {/* Preferred Quality */}
                 <div>
@@ -214,7 +312,8 @@ const Settings = () => {
                     className="text-sm mt-1"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Default quality for video playback. Auto selects the best quality based on your connection.
+                    Default quality for video playback. Auto selects the best
+                    quality based on your connection.
                   </p>
                 </div>
 
@@ -246,40 +345,8 @@ const Settings = () => {
                     className="text-sm mt-1"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Auto uses direct play when supported, otherwise transcodes. Direct play offers best quality but limited codec support.
-                  </p>
-                </div>
-
-                {/* Theme */}
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Theme
-                  </label>
-                  <div className="space-y-2">
-                    {availableThemes.map((theme) => (
-                      <Button
-                        key={theme.key}
-                        type="button"
-                        onClick={() => changeTheme(theme.key)}
-                        variant={currentTheme === theme.key ? "primary" : "secondary"}
-                        fullWidth
-                        className="text-left px-4 py-3 text-sm flex items-center justify-between"
-                      >
-                        <span>{theme.name}</span>
-                        {currentTheme === theme.key && (
-                          <span className="text-sm">✓</span>
-                        )}
-                      </Button>
-                    ))}
-                  </div>
-                  <p
-                    className="text-sm mt-2"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Choose your preferred color theme (changes apply immediately)
+                    Auto uses direct play when supported, otherwise transcodes.
+                    Direct play offers best quality but limited codec support.
                   </p>
                 </div>
 
@@ -295,25 +362,25 @@ const Settings = () => {
                   </Button>
                 </div>
               </div>
-              </Paper.Body>
-            </form>
-          </Paper>
-
-          {/* Carousel Settings */}
-          <Paper className="mb-6">
-            <Paper.Body>
-              <CarouselSettings
-                carouselPreferences={carouselPreferences}
-                onSave={saveCarouselPreferences}
-              />
             </Paper.Body>
-          </Paper>
+          </form>
+        </Paper>
 
-          {/* Password Change */}
-          <Paper>
-            <Paper.Header title="Change Password" />
-            <form onSubmit={changePassword}>
-              <Paper.Body>
+        {/* Carousel Settings */}
+        <Paper className="mb-6">
+          <Paper.Body>
+            <CarouselSettings
+              carouselPreferences={carouselPreferences}
+              onSave={saveCarouselPreferences}
+            />
+          </Paper.Body>
+        </Paper>
+
+        {/* Password Change */}
+        <Paper>
+          <Paper.Header title="Change Password" />
+          <form onSubmit={changePassword}>
+            <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -397,11 +464,11 @@ const Settings = () => {
                   </Button>
                 </div>
               </div>
-              </Paper.Body>
-            </form>
-          </Paper>
-        </div>
-      </PageLayout>
+            </Paper.Body>
+          </form>
+        </Paper>
+      </div>
+    </PageLayout>
   );
 };
 

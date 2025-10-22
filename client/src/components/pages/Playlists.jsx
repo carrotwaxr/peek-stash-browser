@@ -95,104 +95,96 @@ const Playlists = () => {
 
   return (
     <PageLayout>
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1
-              className="text-3xl font-bold mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
-              My Playlists
-            </h1>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Create and manage your video playlists
-            </p>
-          </div>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            variant="primary"
-            size="lg"
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1
+            className="text-3xl font-bold mb-2"
+            style={{ color: "var(--text-primary)" }}
           >
-            + New Playlist
-          </Button>
+            My Playlists
+          </h1>
+          <p style={{ color: "var(--text-secondary)" }}>
+            Create and manage your video playlists
+          </p>
         </div>
+        <Button onClick={() => setShowCreateModal(true)} variant="primary">
+          + New Playlist
+        </Button>
+      </div>
 
-        {error && (
-          <div
-            className="mb-6 p-4 rounded-lg"
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "rgb(239, 68, 68)",
-            }}
+      {error && (
+        <div
+          className="mb-6 p-4 rounded-lg"
+          style={{
+            backgroundColor: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            color: "rgb(239, 68, 68)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Playlists Grid */}
+      {playlists.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
+            📝
+          </div>
+          <h3
+            className="text-xl font-medium mb-2"
+            style={{ color: "var(--text-primary)" }}
           >
-            {error}
-          </div>
-        )}
-
-        {/* Playlists Grid */}
-        {playlists.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
-              📝
-            </div>
-            <h3
-              className="text-xl font-medium mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
-              No playlists yet
-            </h3>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Create your first playlist to get started
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {playlists.map((playlist) => (
-              <Paper key={playlist.id}>
-                <Paper.Body>
-                  <Link to={`/playlist/${playlist.id}`}>
-                    <h3
-                      className="text-lg font-semibold mb-2 hover:underline"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {playlist.name}
-                    </h3>
-                  </Link>
-                  {playlist.description && (
-                    <p
-                      className="text-sm mb-4 line-clamp-2"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      {playlist.description}
-                    </p>
-                  )}
-                  <div
-                    className="flex items-center justify-between text-sm"
-                    style={{ color: "var(--text-muted)" }}
+            No playlists yet
+          </h3>
+          <p style={{ color: "var(--text-secondary)" }}>
+            Create your first playlist to get started
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {playlists.map((playlist) => (
+            <Paper key={playlist.id}>
+              <Paper.Body>
+                <Link to={`/playlist/${playlist.id}`}>
+                  <h3
+                    className="text-lg font-semibold mb-2 hover:underline"
+                    style={{ color: "var(--text-primary)" }}
                   >
-                    <span>
-                      {playlist._count.items}{" "}
-                      {playlist._count.items === 1 ? "video" : "videos"}
-                    </span>
-                    <Button
-                      onClick={() => handleDeleteClick(playlist)}
-                      variant="destructive"
-                      size="sm"
-                      className="px-3 py-1"
-                      style={{
-                        backgroundColor: "rgba(239, 68, 68, 0.1)",
-                        color: "rgb(239, 68, 68)",
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </Paper.Body>
-              </Paper>
-            ))}
-          </div>
-        )}
+                    {playlist.name}
+                  </h3>
+                </Link>
+                {playlist.description && (
+                  <p
+                    className="text-sm mb-4 line-clamp-2"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {playlist.description}
+                  </p>
+                )}
+                <div
+                  className="flex items-center justify-between text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  <span>
+                    {playlist._count.items}{" "}
+                    {playlist._count.items === 1 ? "video" : "videos"}
+                  </span>
+                  <Button
+                    onClick={() => handleDeleteClick(playlist)}
+                    variant="destructive"
+                    size="sm"
+                    className="px-3 py-1"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </Paper.Body>
+            </Paper>
+          ))}
+        </div>
+      )}
 
       {/* Create Playlist Modal */}
       {showCreateModal && (
@@ -200,75 +192,80 @@ const Playlists = () => {
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowCreateModal(false)}
         >
-          <Paper className="max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
+          <Paper
+            className="max-w-md w-full m-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Paper.Header title="Create New Playlist" />
             <form onSubmit={createPlaylist}>
               <Paper.Body>
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="playlistName"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Playlist Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="playlistName"
-                    value={newPlaylistName}
-                    onChange={(e) => setNewPlaylistName(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    placeholder="Enter playlist name"
-                    required
-                    autoFocus
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="playlistName"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Playlist Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="playlistName"
+                      value={newPlaylistName}
+                      onChange={(e) => setNewPlaylistName(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      placeholder="Enter playlist name"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="playlistDescription"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      id="playlistDescription"
+                      value={newPlaylistDescription}
+                      onChange={(e) =>
+                        setNewPlaylistDescription(e.target.value)
+                      }
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      placeholder="Enter description (optional)"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => setShowCreateModal(false)}
+                      variant="secondary"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={creating || !newPlaylistName.trim()}
+                      variant="primary"
+                      loading={creating}
+                    >
+                      Create
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <label
-                    htmlFor="playlistDescription"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    id="playlistDescription"
-                    value={newPlaylistDescription}
-                    onChange={(e) => setNewPlaylistDescription(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    placeholder="Enter description (optional)"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex gap-3 justify-end">
-                  <Button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    variant="secondary"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={creating || !newPlaylistName.trim()}
-                    variant="primary"
-                    loading={creating}
-                  >
-                    Create
-                  </Button>
-                </div>
-              </div>
               </Paper.Body>
             </form>
           </Paper>
