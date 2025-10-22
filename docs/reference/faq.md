@@ -172,8 +172,6 @@ Peek includes:
 
 **Important**: Change the default admin password immediately!
 
-See: [Security Best Practices](security.md)
-
 ### Should I expose Peek to the internet?
 
 No. Peek is designed for local network use. For remote access:
@@ -196,7 +194,7 @@ No. Peek is designed for local network use. For remote access:
 3. Create detailed issue on GitHub
 4. Include: version, platform, steps to reproduce
 
-See: [Contributing Guide](../development/contributing.md)
+See: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
 
 ### Can I contribute?
 
@@ -206,10 +204,9 @@ Yes! Contributions are welcome:
 - Documentation
 - Translations (future)
 
-See: [Contributing Guide](../development/contributing.md)
+See: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
 
 ## Next Steps
 
 - [Installation](../getting-started/installation.md) - Install Peek
 - [Troubleshooting](troubleshooting.md) - Fix common issues
-- [Performance Tips](performance.md) - Optimize performance

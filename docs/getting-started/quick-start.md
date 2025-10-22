@@ -149,8 +149,6 @@ Get Peek up and running in 5 minutes!
 ## Next Steps
 
 - [Full Configuration Guide](configuration.md)
-- [Video Playback Details](../user-guide/video-playback.md)
-- [Playlist Features](../user-guide/playlists.md)
 - [Complete Troubleshooting](../reference/troubleshooting.md)
 
 ## Need Help?

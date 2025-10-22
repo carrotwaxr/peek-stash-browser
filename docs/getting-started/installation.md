@@ -74,8 +74,6 @@ This is the recommended method for unRAID users - everything is pre-configured!
    - Click install and configure your settings
    - Access at `http://your-unraid-ip:6969`
 
-For detailed unRAID setup instructions, see the [unRAID Deployment Guide](../deployment/unraid.md).
-
 #### Manual Template Installation
 
 If Peek isn't available in Community Applications yet, or if you want to install the latest template manually:
@@ -386,8 +384,6 @@ This method is for development with hot reloading enabled
 
 4. **Access the app**: Open `http://localhost:6969`
 
-For development setup details, see the [Development Setup Guide](../development/setup.md).
-
 ## First Access & Setup Wizard
 
 After installation, access Peek in your browser for the first-time setup:
@@ -504,5 +500,4 @@ Production deployment exposes only port `6969` - nginx handles everything intern
 
 - [Configure environment variables](configuration.md)
 - [Quick Start Guide](quick-start.md)
-- [Video Playback Guide](../user-guide/video-playback.md)
 - [Troubleshooting](../reference/troubleshooting.md)

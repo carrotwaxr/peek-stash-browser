@@ -253,5 +253,4 @@ Check:
 ## Next Steps
 
 - [Quick Start Guide](quick-start.md)
-- [Environment Variables Reference](../deployment/environment.md)
 - [Troubleshooting](../reference/troubleshooting.md)

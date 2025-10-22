@@ -44,8 +44,6 @@ docker exec peek-stash-browser curl http://your-stash-ip:9999/graphql
 
 ## Video Playback
 
-See also: [Video Playback Guide](../user-guide/video-playback.md#troubleshooting)
-
 ### Videos Won't Play
 
 1. **Check FFmpeg**: `docker exec peek-stash-browser ffmpeg -version`
@@ -205,5 +203,3 @@ Include:
 ## Next Steps
 
 - [FAQ](faq.md) - Frequently asked questions
-- [Performance Tips](performance.md) - Optimize performance
-- [Security](security.md) - Security best practices
