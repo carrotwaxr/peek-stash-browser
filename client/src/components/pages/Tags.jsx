@@ -88,13 +88,13 @@ const Tags = () => {
 
   const currentTags = data?.tags || [];
   const totalCount = data?.count || 0;
-  const perPage = lastQuery?.filter?.per_page || 24;
-  const totalPages = Math.ceil(totalCount / perPage);
-  const currentPage = lastQuery?.filter?.page || 1;
 
   // Get current pagination state from URL params for bottom pagination
   const urlPage = parseInt(searchParams.get('page')) || 1;
-  const urlPerPage = parseInt(searchParams.get('perPage')) || 24;
+  const urlPerPage = parseInt(searchParams.get('per_page')) || 24;  // Fixed: 'per_page' not 'perPage'
+
+  // Calculate totalPages based on urlPerPage (from URL params), not lastQuery
+  const totalPages = Math.ceil(totalCount / urlPerPage);
 
   // Pagination handlers that update URL params (SearchControls will react to these changes)
   const handlePageChange = (newPage) => {
@@ -116,8 +116,8 @@ const Tags = () => {
     columns,
     enabled: !isLoading && isTVMode,
     onSelect: (tag) => navigate(`/tag/${tag.id}`),
-    onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
-    onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
+    onPageUp: () => urlPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: urlPage - 1 } }),
+    onPageDown: () => urlPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: urlPage + 1 } }),
   });
 
   // Initial focus
@@ -146,6 +146,7 @@ const Tags = () => {
         initialSort="scenes_count"
         onQueryChange={handleQueryChange}
         totalPages={totalPages}
+        totalCount={totalCount}
       />
 
       {isLoading ? (

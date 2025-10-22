@@ -64,6 +64,7 @@ const SearchControls = ({
   permanentFilters = {},
   permanentFiltersMetadata = {},
   totalPages,
+  totalCount,
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
@@ -119,7 +120,7 @@ const SearchControls = ({
     if (!isInitialized) return; // Don't sync before initial load
 
     const urlPage = parseInt(searchParams.get('page')) || 1;
-    const urlPerPage = parseInt(searchParams.get('perPage')) || 24;
+    const urlPerPage = parseInt(searchParams.get('per_page')) || 24;
 
     let shouldTriggerQuery = false;
 
@@ -484,14 +485,17 @@ const SearchControls = ({
 
       {/* Top Pagination */}
       {totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-          perPage={perPage}
-          onPerPageChange={handlePerPageChange}
-          showInfo={false}
-          totalPages={totalPages}
-        />
+        <div className="mt-4">
+          <Pagination
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+            perPage={perPage}
+            onPerPageChange={handlePerPageChange}
+            totalCount={totalCount}
+            showInfo={true}
+            totalPages={totalPages}
+          />
+        </div>
       )}
 
       {/* Filter Panel */}

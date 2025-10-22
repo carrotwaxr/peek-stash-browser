@@ -7,6 +7,7 @@ const Pagination = ({
   onPageChange,
   perPage = 24,
   onPerPageChange,
+  totalCount,
   showInfo = true,
   showPerPageSelector = true,
   className = "",
@@ -18,13 +19,17 @@ const Pagination = ({
   // Generate array of all page numbers for dropdown
   const allPages = Array.from({ length: totalPages }, (_, i) => i + 1);
 
+  // Calculate record range for current page
+  const startRecord = (currentPage - 1) * perPage + 1;
+  const endRecord = Math.min(currentPage * perPage, totalCount || 0);
+
   return (
     <div
       className={`flex flex-col sm:flex-row items-center justify-center gap-4 mt-4 w-full ${className}`}
     >
-      {showInfo && (
+      {showInfo && totalCount && (
         <div style={{ color: "var(--text-muted)" }} className="text-sm">
-          Page {currentPage} of {totalPages}
+          Showing {startRecord}-{endRecord} of {totalCount} records
         </div>
       )}
 

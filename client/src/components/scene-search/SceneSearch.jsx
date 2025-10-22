@@ -123,14 +123,14 @@ const SceneSearch = ({
 
   const totalCount = data?.count || 0;
 
-  const perPage = lastQuery?.filter?.per_page || 24;
-  const totalPages = Math.ceil(totalCount / perPage);
+  // Read pagination state from lastQuery (SearchControls manages URL params)
+  const currentPage = lastQuery?.filter?.page || 1;
+  const currentPerPage = lastQuery?.filter?.per_page || 24;
 
-  // Get current pagination state from URL params for bottom pagination
-  const currentPage = parseInt(searchParams.get('page')) || 1;
-  const currentPerPage = parseInt(searchParams.get('perPage')) || 24;
+  // Calculate totalPages based on currentPerPage from query
+  const totalPages = Math.ceil(totalCount / currentPerPage);
 
-  // Pagination handlers that update URL params (SearchControls will react to these changes)
+  // Bottom pagination handlers - these update URL params which SearchControls will detect
   const handlePageChange = (newPage) => {
     const params = new URLSearchParams(searchParams);
     params.set('page', newPage.toString());
@@ -139,7 +139,7 @@ const SceneSearch = ({
 
   const handlePerPageChange = (newPerPage) => {
     const params = new URLSearchParams(searchParams);
-    params.set('perPage', newPerPage.toString());
+    params.set('per_page', newPerPage.toString());
     params.set('page', '1'); // Reset to first page when changing perPage
     setSearchParams(params, { replace: true });
   };
@@ -163,6 +163,7 @@ const SceneSearch = ({
         permanentFilters={permanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}
+        totalCount={totalCount}
       />
 
       {isLoading ? (
@@ -186,7 +187,8 @@ const SceneSearch = ({
               onPageChange={handlePageChange}
               perPage={currentPerPage}
               onPerPageChange={handlePerPageChange}
-              showInfo={false}
+              totalCount={totalCount}
+              showInfo={true}
               showPerPageSelector={false}
               totalPages={totalPages}
             />
