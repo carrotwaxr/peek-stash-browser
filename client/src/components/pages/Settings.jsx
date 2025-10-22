@@ -5,6 +5,7 @@ import { useTheme } from "../../themes/useTheme.js";
 import { PageLayout } from "../ui/index.js";
 import CarouselSettings from "../settings/CarouselSettings.jsx";
 import Button from "../ui/Button.jsx";
+import Paper from "../ui/Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -178,22 +179,10 @@ const Settings = () => {
           )}
 
           {/* Playback Settings */}
-          <div
-            className="card mb-6"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Playback Preferences
-              </h2>
-            </div>
-            <form onSubmit={saveSettings} className="card-body">
+          <Paper className="mb-6">
+            <Paper.Header title="Playback Preferences" />
+            <form onSubmit={saveSettings}>
+              <Paper.Body>
               <div className="space-y-6">
                 {/* Preferred Quality */}
                 <div>
@@ -306,42 +295,25 @@ const Settings = () => {
                   </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
 
           {/* Carousel Settings */}
-          <div
-            className="card mb-6"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-body">
+          <Paper className="mb-6">
+            <Paper.Body>
               <CarouselSettings
                 carouselPreferences={carouselPreferences}
                 onSave={saveCarouselPreferences}
               />
-            </div>
-          </div>
+            </Paper.Body>
+          </Paper>
 
           {/* Password Change */}
-          <div
-            className="card"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Change Password
-              </h2>
-            </div>
-            <form onSubmit={changePassword} className="card-body">
+          <Paper>
+            <Paper.Header title="Change Password" />
+            <form onSubmit={changePassword}>
+              <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -425,8 +397,9 @@ const Settings = () => {
                   </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       </PageLayout>
   );

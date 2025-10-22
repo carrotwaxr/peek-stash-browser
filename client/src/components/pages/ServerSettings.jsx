@@ -6,6 +6,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { PageLayout } from "../ui/index.js";
 import { setupApi } from "../../services/api.js";
 import Button from "../ui/Button.jsx";
+import Paper from "../ui/Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -310,28 +311,14 @@ const ServerSettings = () => {
           )}
 
           {/* User Management Section */}
-          <div
-            className="card mb-6"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-header">
+          <Paper className="mb-6">
+            <Paper.Header>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2
-                    className="text-xl font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    User Management
-                  </h2>
-                  <p
-                    className="text-sm mt-1"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <Paper.Title>User Management</Paper.Title>
+                  <Paper.Subtitle className="mt-1">
                     Manage user accounts and permissions
-                  </p>
+                  </Paper.Subtitle>
                 </div>
                 <Button
                   onClick={() => setShowCreateModal(true)}
@@ -340,8 +327,8 @@ const ServerSettings = () => {
                   + Create User
                 </Button>
               </div>
-            </div>
-            <div className="card-body p-0">
+            </Paper.Header>
+            <Paper.Body padding="none">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -463,32 +450,18 @@ const ServerSettings = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
+            </Paper.Body>
+          </Paper>
 
           {/* Path Mappings Section */}
-          <div
-            className="card mb-6"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-header">
+          <Paper className="mb-6">
+            <Paper.Header>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2
-                    className="text-xl font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Path Mappings
-                  </h2>
-                  <p
-                    className="text-sm mt-1"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <Paper.Title>Path Mappings</Paper.Title>
+                  <Paper.Subtitle className="mt-1">
                     Configure path translations between Stash and Peek
-                  </p>
+                  </Paper.Subtitle>
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -505,8 +478,8 @@ const ServerSettings = () => {
                   </Button>
                 </div>
               </div>
-            </div>
-            <div className="card-body p-0">
+            </Paper.Header>
+            <Paper.Body padding="none">
               {pathMappings.length === 0 ? (
                 <div className="p-8 text-center">
                   <p
@@ -588,8 +561,8 @@ const ServerSettings = () => {
                   </table>
                 </div>
               )}
-            </div>
-          </div>
+            </Paper.Body>
+          </Paper>
         </div>
       </PageLayout>
 
@@ -599,23 +572,10 @@ const ServerSettings = () => {
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => !creating && setShowCreateModal(false)}
         >
-          <div
-            className="card max-w-md w-full mx-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Create New User
-              </h2>
-            </div>
-            <form onSubmit={createUser} className="card-body">
+          <Paper className="max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <Paper.Header title="Create New User" />
+            <form onSubmit={createUser}>
+              <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -727,8 +687,9 @@ const ServerSettings = () => {
                   </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
 
@@ -738,29 +699,13 @@ const ServerSettings = () => {
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => !addingMapping && setShowAddMappingModal(false)}
         >
-          <div
-            className="card max-w-lg w-full mx-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Add Path Mapping
-              </h2>
-              <p
-                className="text-sm mt-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Map a Stash library path to where Peek can access it
-              </p>
-            </div>
-            <form onSubmit={addPathMapping} className="card-body">
+          <Paper className="max-w-lg w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <Paper.Header
+              title="Add Path Mapping"
+              subtitle="Map a Stash library path to where Peek can access it"
+            />
+            <form onSubmit={addPathMapping}>
+              <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -880,8 +825,9 @@ const ServerSettings = () => {
                   </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
     </>

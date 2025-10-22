@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import Paper from "../ui/Paper.jsx";
 
 const SceneDetails = ({
   scene,
@@ -36,25 +37,20 @@ const SceneDetails = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-8">
         {/* Primary details */}
         <div className="lg:col-span-2">
-          <div className="card">
-            <div
-              className="card-header cursor-pointer"
+          <Paper>
+            <Paper.Header
+              className="cursor-pointer"
               onClick={() => setShowDetails(!showDetails)}
             >
               <div className="flex items-center justify-between">
-                <h2
-                  className="text-lg font-semibold"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  Details
-                </h2>
+                <Paper.Title>Details</Paper.Title>
                 <span style={{ color: "var(--text-secondary)" }}>
                   {showDetails ? "▼" : "▶"}
                 </span>
               </div>
-            </div>
+            </Paper.Header>
             {showDetails && (
-              <div className="card-body">
+              <Paper.Body>
                 {/* Studio and Release Date Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                   {scene.studio && (
@@ -213,34 +209,29 @@ const SceneDetails = ({
                     </div>
                   </div>
                 )}
-              </div>
+              </Paper.Body>
             )}
-          </div>
+          </Paper>
         </div>
 
         {/* Technical details sidebar */}
         <div>
-          <div className="card">
-            <div
-              className="card-header cursor-pointer"
+          <Paper>
+            <Paper.Header
+              className="cursor-pointer"
               onClick={() =>
                 setShowTechnicalDetails(!showTechnicalDetails)
               }
             >
               <div className="flex items-center justify-between">
-                <h2
-                  className="text-lg font-semibold"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  Technical Details
-                </h2>
+                <Paper.Title>Technical Details</Paper.Title>
                 <span style={{ color: "var(--text-secondary)" }}>
                   {showTechnicalDetails ? "▼" : "▶"}
                 </span>
               </div>
-            </div>
+            </Paper.Header>
             {showTechnicalDetails && (
-              <div className="card-body">
+              <Paper.Body>
                 {firstFile && (
                   <>
                     {/* Video Section */}
@@ -347,9 +338,9 @@ const SceneDetails = ({
                     </p>
                   </div>
                 )}
-              </div>
+              </Paper.Body>
             )}
-          </div>
+          </Paper>
         </div>
       </div>
     </section>

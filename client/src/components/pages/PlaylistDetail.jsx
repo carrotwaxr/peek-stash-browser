@@ -9,6 +9,7 @@ import { showSuccess, showError } from "../../utils/toast.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import Button from "../ui/Button.jsx";
 import { PageLayout } from "../ui/index.js";
+import Paper from "../ui/Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -401,11 +402,9 @@ const PlaylistDetail = () => {
           </div>
 
           {isEditing ? (
-            <form onSubmit={updatePlaylist} className="card max-w-2xl" style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}>
-              <div className="card-body space-y-4">
+            <form onSubmit={updatePlaylist}>
+              <Paper className="max-w-2xl">
+                <Paper.Body className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
                     Playlist Name
@@ -460,7 +459,8 @@ const PlaylistDetail = () => {
                     Cancel
                   </Button>
                 </div>
-              </div>
+                </Paper.Body>
+              </Paper>
             </form>
           ) : (
             <>

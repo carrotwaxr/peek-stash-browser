@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { showSuccess, showWarning, showError } from "../../utils/toast.jsx";
 import Button from "./Button.jsx";
+import Paper from "./Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -273,23 +274,10 @@ const AddToPlaylistButton = ({
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowCreateModal(false)}
         >
-          <div
-            className="card max-w-md w-full m-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Create New Playlist
-              </h2>
-            </div>
-            <form onSubmit={createPlaylistAndAdd} className="card-body">
+          <Paper className="max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
+            <Paper.Header title="Create New Playlist" />
+            <form onSubmit={createPlaylistAndAdd}>
+              <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -355,8 +343,9 @@ const AddToPlaylistButton = ({
                   </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
 import { PageLayout } from "../ui/index.js";
 import Button from "../ui/Button.jsx";
+import Paper from "../ui/Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -204,14 +205,8 @@ const Users = () => {
           )}
 
           {/* Users Table */}
-          <div
-            className="card"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-body p-0">
+          <Paper>
+            <Paper.Body padding="none">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -333,8 +328,8 @@ const Users = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
+            </Paper.Body>
+          </Paper>
         </div>
       </PageLayout>
 
@@ -344,23 +339,10 @@ const Users = () => {
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => !creating && setShowCreateModal(false)}
         >
-          <div
-            className="card max-w-md w-full mx-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Create New User
-              </h2>
-            </div>
-            <form onSubmit={createUser} className="card-body">
+          <Paper className="max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <Paper.Header title="Create New User" />
+            <form onSubmit={createUser}>
+              <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -472,8 +454,9 @@ const Users = () => {
                   </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
     </>

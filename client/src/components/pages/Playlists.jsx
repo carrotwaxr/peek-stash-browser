@@ -6,6 +6,7 @@ import { showSuccess, showError } from "../../utils/toast.jsx";
 import { PageLayout } from "../ui/index.js";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import Button from "../ui/Button.jsx";
+import Paper from "../ui/Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -148,15 +149,8 @@ const Playlists = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {playlists.map((playlist) => (
-              <div
-                key={playlist.id}
-                className="card"
-                style={{
-                  backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                <div className="card-body">
+              <Paper key={playlist.id}>
+                <Paper.Body>
                   <Link to={`/playlist/${playlist.id}`}>
                     <h3
                       className="text-lg font-semibold mb-2 hover:underline"
@@ -194,8 +188,8 @@ const Playlists = () => {
                       Delete
                     </Button>
                   </div>
-                </div>
-              </div>
+                </Paper.Body>
+              </Paper>
             ))}
           </div>
         )}
@@ -206,23 +200,10 @@ const Playlists = () => {
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowCreateModal(false)}
         >
-          <div
-            className="card max-w-md w-full m-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Create New Playlist
-              </h2>
-            </div>
-            <form onSubmit={createPlaylist} className="card-body">
+          <Paper className="max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
+            <Paper.Header title="Create New Playlist" />
+            <form onSubmit={createPlaylist}>
+              <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -288,8 +269,9 @@ const Playlists = () => {
                   </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
 
