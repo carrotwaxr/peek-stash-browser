@@ -252,7 +252,7 @@ export const themes = {
       // Media specific
       "--player-bg": "#000000",
       "--controls-bg": "rgba(0, 0, 0, 0.7)",
-      "--progress-bg": "#FFB647",
+      "--progress-bg": "#4F1B74",
 
       // Rating gradient (0-100 scale)
       "--rating-excellent": "#4ade80", // 80-100: Bright green
@@ -323,7 +323,7 @@ export const themes = {
       // Media specific
       "--player-bg": "#000000",
       "--controls-bg": "rgba(0, 0, 0, 0.7)",
-      "--progress-bg": "#FFB647",
+      "--progress-bg": "#2a2a32",
 
       // Rating gradient (0-100 scale)
       "--rating-excellent": "#22c55e", // 80-100: Green
