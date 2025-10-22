@@ -37,16 +37,6 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
     navigate
   );
 
-  if (!playlist || !playlist.scenes || playlist.scenes.length === 0) {
-    return null;
-  }
-
-  const totalScenes = playlist.scenes.length;
-  const position = currentIndex + 1;
-  const hasPrevious = currentIndex > 0;
-  const hasNext = currentIndex < totalScenes - 1;
-  const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
-
   // Scroll current thumbnail into view when currentIndex changes
   useEffect(() => {
     if (currentThumbnailRef.current) {
@@ -124,6 +114,16 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, []);
+
+  if (!playlist || !playlist.scenes || playlist.scenes.length === 0) {
+    return null;
+  }
+
+  const totalScenes = playlist.scenes.length;
+  const position = currentIndex + 1;
+  const hasPrevious = currentIndex > 0;
+  const hasNext = currentIndex < totalScenes - 1;
+  const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
 
   const navigateToScene = (index) => {
     // Prevent navigation if we just dragged

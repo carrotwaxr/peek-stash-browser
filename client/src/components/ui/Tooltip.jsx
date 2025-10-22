@@ -75,6 +75,15 @@ const Tooltip = ({
     };
   }, [clickable, isVisible]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current);
+      }
+    };
+  }, []);
+
   if (disabled || !content) {
     return children;
   }
@@ -114,15 +123,6 @@ const Tooltip = ({
       setIsVisible(!isVisible);
     }
   };
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hideTimeoutRef.current) {
-        clearTimeout(hideTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const tooltipContent = isVisible && (
     <div

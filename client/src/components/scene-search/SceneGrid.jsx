@@ -64,7 +64,7 @@ const SceneGrid = ({
   };
 
   // Spatial navigation hook
-  const { focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
+  const { focusedIndex: _focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
     items: scenes,
     columns,
     enabled: isTVMode && enableKeyboard,

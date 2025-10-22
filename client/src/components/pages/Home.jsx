@@ -42,7 +42,7 @@ const Home = () => {
   const navigate = useNavigate();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
   const [carouselPreferences, setCarouselPreferences] = useState([]);
-  const [loadingPreferences, setLoadingPreferences] = useState(true);
+  const [_loadingPreferences, setLoadingPreferences] = useState(true);
   const [selectedScenes, setSelectedScenes] = useState([]);
 
   useEffect(() => {

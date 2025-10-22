@@ -1,5 +1,4 @@
-import { LucideX, LucidePlus } from "lucide-react";
-import { useState } from "react";
+import { LucidePlus } from "lucide-react";
 import AddToPlaylistButton from "./AddToPlaylistButton.jsx";
 import Button from "./Button.jsx";
 

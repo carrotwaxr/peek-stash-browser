@@ -34,13 +34,14 @@ const ActiveFilterChips = ({
       case "checkbox":
         return filterValue === true ? label : null;
 
-      case "select":
+      case "select": {
         const selectedOption = options?.find(
           (opt) => opt.value === filterValue
         );
         return selectedOption
           ? `${label}: ${selectedOption.label}`
           : `${label}: ${filterValue}`;
+      }
 
       case "text":
         return `${label}: "${filterValue}"`;

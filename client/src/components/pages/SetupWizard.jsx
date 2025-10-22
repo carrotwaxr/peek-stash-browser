@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useTheme } from "../../themes/useTheme.js";
 import { setupApi } from "../../services/api.js";
 import Button from "../ui/Button.jsx";
@@ -10,7 +10,7 @@ const SetupWizard = ({ onSetupComplete }) => {
   const [error, setError] = useState("");
 
   // Step 2: Discovered libraries
-  const [stashLibraries, setStashLibraries] = useState([]);
+  const [_stashLibraries, setStashLibraries] = useState([]);
 
   // Step 3: Path mappings
   const [pathMappings, setPathMappings] = useState([]);
@@ -132,7 +132,7 @@ const SetupWizard = ({ onSetupComplete }) => {
       } else {
         setError("Failed to discover libraries");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to connect to Stash server. Check STASH_URL and STASH_API_KEY.");
     } finally {
       setLoading(false);
@@ -202,7 +202,7 @@ const SetupWizard = ({ onSetupComplete }) => {
         ...validationResults,
         [index]: result,
       });
-    } catch (err) {
+    } catch {
       setValidationResults({
         ...validationResults,
         [index]: { success: false, message: "Failed to test path" },

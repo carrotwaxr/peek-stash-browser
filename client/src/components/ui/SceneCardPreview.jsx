@@ -10,7 +10,7 @@ import { fetchAndParseVTT, getEvenlySpacedSprites } from '../../utils/spriteShee
  * @param {number} spriteCount - Number of sprites to cycle through (default: 5)
  */
 const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
-  const [cues, setCues] = useState([]);
+  const [_cues, setCues] = useState([]);
   const [sprites, setSprites] = useState([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);

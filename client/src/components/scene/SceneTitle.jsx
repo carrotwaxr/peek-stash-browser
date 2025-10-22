@@ -16,7 +16,7 @@ const SceneTitle = ({
   const title = getSceneTitle(scene);
 
   // Handle click to set autoplay flag if video is playing
-  const handleClick = (e) => {
+  const handleClick = () => {
     // Check if there's a video player currently playing and we're in a playlist
     if (linkState?.playlist) {
       const videoElements = document.querySelectorAll('video');
