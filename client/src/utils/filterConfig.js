@@ -936,7 +936,7 @@ export const buildPerformerFilter = (filters) => {
 
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
-    performerFilter.favorite = true;
+    performerFilter.filter_favorites = true;
   }
 
   // Select filters with EQUALS modifier
