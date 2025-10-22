@@ -178,6 +178,7 @@ const SceneCarousel = ({
                 enableKeyboard={false}
                 isSelected={selectedScenes.some(s => s.id === scene.id)}
                 onToggleSelect={onToggleSelect}
+                selectionMode={selectedScenes.length > 0}
               />
             </div>
           ))}

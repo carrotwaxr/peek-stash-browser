@@ -23,6 +23,7 @@ const SceneCard = forwardRef(
       className = "",
       isSelected = false,
       onToggleSelect,
+      selectionMode = false,
     },
     ref
   ) => {
@@ -54,7 +55,13 @@ const SceneCard = forwardRef(
       }
 
       e.preventDefault();
-      onClick?.(scene);
+
+      // When in selection mode (at least one card selected), toggle selection on click
+      if (selectionMode) {
+        onToggleSelect?.(scene);
+      } else {
+        onClick?.(scene);
+      }
     };
 
     const handleMouseDown = (e) => {
@@ -183,11 +190,11 @@ const SceneCard = forwardRef(
       >
         {/* Thumbnail */}
         <div className="relative aspect-video overflow-hidden" style={{backgroundColor: "var(--bg-secondary)"}}>
-          {/* Selection Checkbox - Always shown */}
+          {/* Selection Checkbox - Always shown, larger touchpoint on mobile */}
           <div className="absolute top-2 left-2 z-20">
             <button
               onClick={handleCheckboxClick}
-              className="w-6 h-6 rounded border-2 flex items-center justify-center transition-all"
+              className="w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
               style={{
                 backgroundColor: isSelected ? "var(--selection-color)" : "rgba(0, 0, 0, 0.5)",
                 borderColor: isSelected ? "var(--selection-color)" : "rgba(255, 255, 255, 0.7)",
@@ -206,7 +213,7 @@ const SceneCard = forwardRef(
             >
               {isSelected && (
                 <svg
-                  className="w-4 h-4 text-white"
+                  className="w-5 h-5 sm:w-4 sm:h-4 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
