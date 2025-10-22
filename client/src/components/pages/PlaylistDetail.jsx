@@ -27,6 +27,7 @@ const PlaylistDetail = () => {
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [sceneToRemove, setSceneToRemove] = useState(null);
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [touchStartY, setTouchStartY] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
@@ -122,6 +123,55 @@ const PlaylistDetail = () => {
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
+  };
+
+  // Touch event handlers for mobile support
+  const handleTouchStart = (e, index) => {
+    e.preventDefault(); // Prevent scrolling during drag
+    setDraggedIndex(index);
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchMove = (e, index) => {
+    e.preventDefault(); // Prevent scrolling - must be first
+
+    if (draggedIndex === null || touchStartY === null) {
+      return;
+    }
+
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY;
+
+    // Minimum threshold to trigger reorder
+    if (Math.abs(deltaY) < 50) {
+      return;
+    }
+
+    const targetIndex = deltaY < 0 ? draggedIndex - 1 : draggedIndex + 1;
+
+    // Ensure target index is within bounds
+    if (targetIndex < 0 || targetIndex >= scenes.length) {
+      return;
+    }
+
+    if (targetIndex === index) {
+      return; // Already at target position
+    }
+
+    // Reorder the scenes array
+    const newScenes = [...scenes];
+    const draggedItem = newScenes[draggedIndex];
+    newScenes.splice(draggedIndex, 1);
+    newScenes.splice(targetIndex, 0, draggedItem);
+
+    setScenes(newScenes);
+    setDraggedIndex(targetIndex);
+    setTouchStartY(currentY);
+  };
+
+  const handleTouchEnd = () => {
+    setDraggedIndex(null);
+    setTouchStartY(null);
   };
 
   const saveReorder = async () => {
@@ -499,6 +549,9 @@ const PlaylistDetail = () => {
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
+                onTouchStart={(e) => handleTouchStart(e, index)}
+                onTouchMove={(e) => handleTouchMove(e, index)}
+                onTouchEnd={handleTouchEnd}
                 linkState={{
                   scene: item.scene,
                   playlist: {
