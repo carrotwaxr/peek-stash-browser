@@ -141,34 +141,28 @@ const SceneSearch = ({
         syncToUrl={captureReferrer}
       />
 
-      {isLoading ? (
-        <LoadingSpinner />
-      ) : (
-        <>
-          <SceneGrid
-            scenes={currentScenes || []}
-            loading={isLoading}
-            error={error}
-            onSceneClick={handleSceneClick}
-            emptyMessage="No scenes found"
-            emptyDescription="Try adjusting your search filters"
-            enableKeyboard={true}
-          />
+      <SceneGrid
+        scenes={currentScenes || []}
+        loading={isLoading}
+        error={error}
+        onSceneClick={handleSceneClick}
+        emptyMessage="No scenes found"
+        emptyDescription="Try adjusting your search filters"
+        enableKeyboard={true}
+      />
 
-          {/* Bottom Pagination */}
-          {totalPages > 1 && (
-            <Pagination
-              currentPage={currentPage}
-              onPageChange={handlePageChange}
-              perPage={currentPerPage}
-              onPerPageChange={handlePerPageChange}
-              totalCount={totalCount}
-              showInfo={true}
-              showPerPageSelector={false}
-              totalPages={totalPages}
-            />
-          )}
-        </>
+      {/* Bottom Pagination */}
+      {!isLoading && totalPages > 1 && (
+        <Pagination
+          currentPage={currentPage}
+          onPageChange={handlePageChange}
+          perPage={currentPerPage}
+          onPerPageChange={handlePerPageChange}
+          totalCount={totalCount}
+          showInfo={true}
+          showPerPageSelector={false}
+          totalPages={totalPages}
+        />
       )}
     </PageLayout>
   );

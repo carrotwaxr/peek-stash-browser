@@ -90,7 +90,20 @@ const SceneGrid = ({
   }, [currentPage]);
 
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="grid gap-6 scene-grid-responsive">
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="rounded-lg animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              height: "25rem"
+            }}
+          />
+        ))}
+      </div>
+    );
   }
 
   if (error) {

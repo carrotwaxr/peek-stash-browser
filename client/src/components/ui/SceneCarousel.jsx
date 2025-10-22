@@ -62,12 +62,16 @@ const SceneCarousel = ({
         >
           {title}
         </h2>
-        <div className="flex gap-4 overflow-hidden">
+        <div className="flex gap-4 overflow-hidden py-4">
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className="flex-shrink-0 w-64 h-36 rounded-lg animate-pulse"
-              style={{ backgroundColor: "var(--bg-tertiary)" }}
+              className="flex-shrink-0 rounded-lg animate-pulse"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+                width: "17.5rem",
+                height: "25rem"
+              }}
             />
           ))}
         </div>
