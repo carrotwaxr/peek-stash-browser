@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { LucideX, LucideSearch, LucideChevronDown } from "lucide-react";
 import { libraryApi } from "../../services/api.js";
 import { getCache, setCache } from "../../utils/filterCache.js";
+import Button from "./Button.jsx";
 
 /**
  * Searchable select component with caching and debounced search
@@ -219,25 +220,25 @@ const SearchableSelect = ({
                 }}
               >
                 {item.name}
-                <button
+                <Button
                   onClick={(e) => handleRemove(item.id, e)}
-                  className="hover:opacity-70"
+                  variant="tertiary"
+                  className="hover:opacity-70 !p-0 !border-0"
                   aria-label={`Remove ${item.name}`}
-                >
-                  <LucideX size={14} />
-                </button>
+                  icon={<LucideX size={14} />}
+                />
               </span>
             ))
           ) : (
             <div className="flex items-center justify-between w-full">
               <span>{selectedItems[0]?.name}</span>
-              <button
+              <Button
                 onClick={(e) => handleRemove(selectedItems[0]?.id, e)}
-                className="hover:opacity-70 p-1"
+                variant="tertiary"
+                className="hover:opacity-70 !p-1 !border-0"
                 aria-label={`Remove ${selectedItems[0]?.name}`}
-              >
-                <LucideX size={16} />
-              </button>
+                icon={<LucideX size={16} />}
+              />
             </div>
           )}
         </div>
@@ -299,10 +300,12 @@ const SearchableSelect = ({
               </div>
             ) : (
               options.map((option) => (
-                <button
+                <Button
                   key={option.id}
                   onClick={() => handleSelect(option)}
-                  className="w-full text-left px-4 py-2 hover:opacity-80 transition-colors flex items-center justify-between"
+                  variant="tertiary"
+                  fullWidth
+                  className="text-left px-4 py-2 flex items-center justify-between"
                   style={{
                     backgroundColor: isSelected(option.id)
                       ? "var(--accent-primary)"
@@ -312,7 +315,7 @@ const SearchableSelect = ({
                 >
                   <span>{option.name}</span>
                   {isSelected(option.id) && <span className="text-sm">✓</span>}
-                </button>
+                </Button>
               ))
             )}
           </div>

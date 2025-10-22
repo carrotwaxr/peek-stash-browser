@@ -7,6 +7,7 @@ import SceneListItem from "../ui/SceneListItem.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
+import Button from "../ui/Button.jsx";
 import { PageLayout } from "../ui/index.js";
 
 const api = axios.create({
@@ -282,50 +283,40 @@ const PlaylistDetail = () => {
         <div className="mb-8">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             {/* Back button */}
-            <button
+            <Button
               onClick={() => navigate("/playlists")}
-              className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-              }}
+              variant="secondary"
+              size="sm"
+              icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
               title="Back to Playlists"
             >
-              <ArrowLeft size={16} className="sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">Back</span>
-            </button>
+            </Button>
 
             {!isEditing && !reorderMode && (
               <>
                 {/* Edit button */}
-                <button
+                <Button
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--accent-secondary)",
-                    color: "white",
-                  }}
+                  variant="primary"
+                  size="sm"
+                  icon={<Edit2 size={16} className="sm:w-4 sm:h-4" />}
                   title="Edit Playlist"
                 >
-                  <Edit2 size={16} className="sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Edit</span>
-                </button>
+                </Button>
 
                 {/* Reorder button */}
                 {scenes.length > 1 && (
-                  <button
+                  <Button
                     onClick={() => setReorderMode(true)}
-                    className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-                    style={{
-                      backgroundColor: "var(--accent-info)",
-                      color: "white",
-                    }}
+                    variant="primary"
+                    size="sm"
+                    icon={<ArrowUpDown size={16} className="sm:w-4 sm:h-4" />}
                     title="Reorder Scenes"
                   >
-                    <ArrowUpDown size={16} className="sm:w-4 sm:h-4" />
                     <span className="hidden sm:inline">Reorder</span>
-                  </button>
+                  </Button>
                 )}
               </>
             )}
@@ -333,60 +324,58 @@ const PlaylistDetail = () => {
             {reorderMode && (
               <>
                 {/* Save Order button */}
-                <button
+                <Button
                   onClick={saveReorder}
-                  className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium whitespace-nowrap hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--accent-success)",
-                    color: "white",
-                  }}
+                  variant="primary"
+                  size="sm"
+                  icon={<Save size={16} className="sm:w-4 sm:h-4" />}
                   title="Save Order"
                 >
-                  <Save size={16} className="sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Save Order</span>
-                </button>
+                </Button>
 
                 {/* Cancel button */}
-                <button
+                <Button
                   onClick={cancelReorder}
-                  className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--accent-error)",
-                    color: "white",
-                  }}
+                  variant="destructive"
+                  size="sm"
+                  icon={<X size={16} className="sm:w-4 sm:h-4" />}
                   title="Cancel"
                 >
-                  <X size={16} className="sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Cancel</span>
-                </button>
+                </Button>
               </>
             )}
 
             {scenes.length > 0 && !reorderMode && !isEditing && (
               <>
                 {/* Shuffle button */}
-                <button
+                <Button
                   onClick={toggleShuffle}
-                  className="p-1.5 sm:p-2 rounded-lg transition-all hover:opacity-70"
+                  variant="tertiary"
+                  size="sm"
+                  className="p-1.5 sm:p-2"
                   style={{
                     backgroundColor: "transparent",
                     border: shuffle ? "2px solid var(--accent-warning)" : "1px solid var(--border-color)",
                     color: shuffle ? "var(--accent-warning)" : "var(--text-primary)",
                   }}
+                  icon={<Shuffle size={16} className="sm:w-5 sm:h-5" />}
                   title={shuffle ? "Shuffle enabled" : "Shuffle disabled"}
-                >
-                  <Shuffle size={16} className="sm:w-5 sm:h-5" />
-                </button>
+                />
 
                 {/* Repeat button */}
-                <button
+                <Button
                   onClick={cycleRepeat}
-                  className="p-1.5 sm:p-2 rounded-lg transition-all hover:opacity-70"
+                  variant="tertiary"
+                  size="sm"
+                  className="p-1.5 sm:p-2"
                   style={{
                     backgroundColor: "transparent",
                     border: repeat !== "none" ? "2px solid var(--accent-info)" : "1px solid var(--border-color)",
                     color: repeat !== "none" ? "var(--accent-info)" : "var(--text-primary)",
                   }}
+                  icon={repeat === "one" ? <Repeat1 size={16} className="sm:w-5 sm:h-5" /> : <Repeat size={16} className="sm:w-5 sm:h-5" />}
                   title={
                     repeat === "all"
                       ? "Repeat all"
@@ -394,24 +383,19 @@ const PlaylistDetail = () => {
                       ? "Repeat one"
                       : "Repeat off"
                   }
-                >
-                  {repeat === "one" ? <Repeat1 size={16} className="sm:w-5 sm:h-5" /> : <Repeat size={16} className="sm:w-5 sm:h-5" />}
-                </button>
+                />
 
                 {/* Play button */}
-                <button
+                <Button
                   onClick={playPlaylist}
-                  className="flex items-center gap-1.5 px-3 py-1.5 sm:px-6 sm:py-2 rounded-lg text-sm sm:text-base font-medium whitespace-nowrap hover:opacity-80 transition-opacity ml-auto"
-                  style={{
-                    backgroundColor: "var(--accent-primary)",
-                    color: "white",
-                  }}
+                  variant="primary"
+                  className="ml-auto"
+                  icon={<Play size={16} className="sm:w-4 sm:h-4" fill="white" />}
                   title="Play Playlist"
                 >
-                  <Play size={16} className="sm:w-4 sm:h-4" fill="white" />
                   <span className="hidden sm:inline">Play Playlist</span>
                   <span className="sm:hidden">Play</span>
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -456,34 +440,25 @@ const PlaylistDetail = () => {
                   />
                 </div>
                 <div className="flex gap-2 sm:gap-3">
-                  <button
+                  <Button
                     type="submit"
-                    className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium hover:opacity-80 transition-opacity"
-                    style={{
-                      backgroundColor: "var(--accent-success)",
-                      color: "white",
-                    }}
+                    variant="primary"
+                    icon={<Save size={16} className="sm:w-4 sm:h-4" />}
                   >
-                    <Save size={16} className="sm:w-4 sm:h-4" />
                     Save
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => {
                       setIsEditing(false);
                       setEditName(playlist.name);
                       setEditDescription(playlist.description || "");
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base hover:opacity-80 transition-opacity"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
+                    variant="secondary"
+                    icon={<X size={16} className="sm:w-4 sm:h-4" />}
                   >
-                    <X size={16} className="sm:w-4 sm:h-4" />
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>
@@ -587,9 +562,11 @@ const PlaylistDetail = () => {
                   )
                 }
                 actionButtons={
-                  <button
+                  <Button
                     onClick={() => handleRemoveClick(item)}
-                    className="px-2 py-1 sm:px-3 sm:py-1.5 rounded text-xs sm:text-sm hover:bg-red-500 hover:text-white transition-colors flex-shrink-0 whitespace-nowrap"
+                    variant="destructive"
+                    size="sm"
+                    className="px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm flex-shrink-0"
                     style={{
                       backgroundColor: "rgba(239, 68, 68, 0.1)",
                       color: "rgb(239, 68, 68)",
@@ -597,7 +574,7 @@ const PlaylistDetail = () => {
                     }}
                   >
                     Remove
-                  </button>
+                  </Button>
                 }
               />
             ))}

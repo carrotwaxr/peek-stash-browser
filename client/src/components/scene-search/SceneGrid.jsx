@@ -9,6 +9,7 @@ import BulkActionBar from "../ui/BulkActionBar.jsx";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import Button from "../ui/Button.jsx";
 
 const SceneGrid = ({
   scenes,
@@ -120,28 +121,22 @@ const SceneGrid = ({
       {/* Selection Controls - Only shown when items are selected */}
       {selectedScenes.length > 0 && (
         <div className="flex items-center justify-end gap-3">
-          <button
+          <Button
             onClick={handleSelectAll}
-            className="px-4 py-2 rounded-md text-sm font-medium transition-colors border"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
+            variant="secondary"
+            size="sm"
+            className="font-medium"
           >
             Select All ({scenes?.length || 0})
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleDeselectAll}
-            className="px-4 py-2 rounded-md text-sm font-medium transition-colors border"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
+            variant="secondary"
+            size="sm"
+            className="font-medium"
           >
             Deselect All
-          </button>
+          </Button>
         </div>
       )}
 

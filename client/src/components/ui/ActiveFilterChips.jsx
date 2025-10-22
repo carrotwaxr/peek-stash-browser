@@ -1,4 +1,5 @@
 import { LucideX } from "lucide-react";
+import Button from "./Button.jsx";
 
 /**
  * Display active filters as removable chips/badges
@@ -134,14 +135,14 @@ const ActiveFilterChips = ({ filters, filterOptions, onRemoveFilter, permanentFi
         >
           <span>{chip.label}</span>
           {!chip.isPermanent && (
-            <button
+            <Button
               onClick={() => onRemoveFilter(chip.key)}
-              className="hover:opacity-70 transition-opacity focus:outline-none"
+              variant="tertiary"
+              className="hover:opacity-70 !p-0 !border-0"
               aria-label={`Remove filter: ${chip.label}`}
               title={`Remove filter: ${chip.label}`}
-            >
-              <LucideX className="w-3.5 h-3.5" />
-            </button>
+              icon={<LucideX className="w-3.5 h-3.5" />}
+            />
           )}
         </div>
       ))}

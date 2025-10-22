@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { formatFileSize } from "../../utils/format.js";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
+import Button from "./Button.jsx";
 import {
   SceneTitle,
   SceneStats,
@@ -222,9 +223,10 @@ const SceneCard = forwardRef(
         <div className="relative aspect-video overflow-hidden" style={{backgroundColor: "var(--bg-secondary)"}}>
           {/* Selection Checkbox - Always shown, larger touchpoint on mobile */}
           <div className="absolute top-2 left-2 z-20">
-            <button
+            <Button
               onClick={handleCheckboxClick}
-              className="w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
+              variant="tertiary"
+              className="w-8 h-8 sm:w-6 sm:h-6 rounded !border-2 flex items-center justify-center"
               style={{
                 backgroundColor: isSelected ? "var(--selection-color)" : "rgba(0, 0, 0, 0.5)",
                 borderColor: isSelected ? "var(--selection-color)" : "rgba(255, 255, 255, 0.7)",
@@ -240,8 +242,7 @@ const SceneCard = forwardRef(
                 }
               }}
               aria-label={isSelected ? "Deselect scene" : "Select scene"}
-            >
-              {isSelected && (
+              icon={isSelected && (
                 <svg
                   className="w-5 h-5 sm:w-4 sm:h-4 text-white"
                   fill="none"
@@ -256,7 +257,7 @@ const SceneCard = forwardRef(
                   />
                 </svg>
               )}
-            </button>
+            />
           </div>
 
           {scene.paths?.screenshot ? (

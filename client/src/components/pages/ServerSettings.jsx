@@ -5,6 +5,7 @@ import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { PageLayout } from "../ui/index.js";
 import { setupApi } from "../../services/api.js";
+import Button from "../ui/Button.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -332,16 +333,12 @@ const ServerSettings = () => {
                     Manage user accounts and permissions
                   </p>
                 </div>
-                <button
+                <Button
                   onClick={() => setShowCreateModal(true)}
-                  className="px-4 py-2 rounded-lg font-medium"
-                  style={{
-                    backgroundColor: "var(--accent-color)",
-                    color: "white",
-                  }}
+                  variant="primary"
                 >
                   + Create User
-                </button>
+                </Button>
               </div>
             </div>
             <div className="card-body p-0">
@@ -431,40 +428,34 @@ const ServerSettings = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
-                            <button
+                            <Button
                               onClick={() =>
                                 changeUserRole(user.id, user.username, user.role)
                               }
                               disabled={user.id === currentUser?.id}
-                              className="px-3 py-1 text-sm rounded"
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
                               style={{
                                 backgroundColor: "rgba(59, 130, 246, 0.1)",
                                 color: "rgb(59, 130, 246)",
-                                opacity: user.id === currentUser?.id ? 0.5 : 1,
-                                cursor:
-                                  user.id === currentUser?.id
-                                    ? "not-allowed"
-                                    : "pointer",
                               }}
                             >
                               Change Role
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => deleteUser(user.id, user.username)}
                               disabled={user.id === currentUser?.id}
-                              className="px-3 py-1 text-sm rounded hover:bg-red-500 hover:text-white transition-colors"
+                              variant="destructive"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
                               style={{
                                 backgroundColor: "rgba(239, 68, 68, 0.1)",
                                 color: "rgb(239, 68, 68)",
-                                opacity: user.id === currentUser?.id ? 0.5 : 1,
-                                cursor:
-                                  user.id === currentUser?.id
-                                    ? "not-allowed"
-                                    : "pointer",
                               }}
                             >
                               Delete
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -500,27 +491,18 @@ const ServerSettings = () => {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <Button
                     onClick={discoverLibraries}
-                    className="px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
+                    variant="secondary"
                   >
                     Discover Libraries
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => setShowAddMappingModal(true)}
-                    className="px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                    }}
+                    variant="primary"
                   >
                     + Add Mapping
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -585,18 +567,20 @@ const ServerSettings = () => {
                             {mapping.peekPath}
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <button
+                            <Button
                               onClick={() =>
                                 deletePathMapping(mapping.id, mapping.stashPath)
                               }
-                              className="px-3 py-1 text-sm rounded hover:bg-red-500 hover:text-white transition-colors"
+                              variant="destructive"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
                               style={{
                                 backgroundColor: "rgba(239, 68, 68, 0.1)",
                                 color: "rgb(239, 68, 68)",
                               }}
                             >
                               Delete
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -718,19 +702,16 @@ const ServerSettings = () => {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button
+                  <Button
                     type="submit"
                     disabled={creating}
-                    className="flex-1 px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: creating ? 0.6 : 1,
-                    }}
+                    variant="primary"
+                    fullWidth
+                    loading={creating}
                   >
-                    {creating ? "Creating..." : "Create User"}
-                  </button>
-                  <button
+                    Create User
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => {
                       setShowCreateModal(false);
@@ -740,16 +721,10 @@ const ServerSettings = () => {
                       setError(null);
                     }}
                     disabled={creating}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                      opacity: creating ? 0.6 : 1,
-                    }}
+                    variant="secondary"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>
@@ -844,20 +819,15 @@ const ServerSettings = () => {
                       placeholder="/app/media"
                       required
                     />
-                    <button
+                    <Button
                       type="button"
                       onClick={testPath}
                       disabled={!newPeekPath.trim() || testingPath}
-                      className="px-4 py-2 rounded-lg font-medium"
-                      style={{
-                        backgroundColor: "var(--accent-color)",
-                        color: "white",
-                        opacity:
-                          !newPeekPath.trim() || testingPath ? 0.6 : 1,
-                      }}
+                      variant="primary"
+                      loading={testingPath}
                     >
-                      {testingPath ? "Testing..." : "Test"}
-                    </button>
+                      Test
+                    </Button>
                   </div>
                   <p
                     className="text-xs mt-1"
@@ -885,19 +855,16 @@ const ServerSettings = () => {
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button
+                  <Button
                     type="submit"
                     disabled={addingMapping}
-                    className="flex-1 px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: addingMapping ? 0.6 : 1,
-                    }}
+                    variant="primary"
+                    fullWidth
+                    loading={addingMapping}
                   >
-                    {addingMapping ? "Adding..." : "Add Mapping"}
-                  </button>
-                  <button
+                    Add Mapping
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => {
                       setShowAddMappingModal(false);
@@ -907,16 +874,10 @@ const ServerSettings = () => {
                       setError(null);
                     }}
                     disabled={addingMapping}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                      opacity: addingMapping ? 0.6 : 1,
-                    }}
+                    variant="secondary"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>

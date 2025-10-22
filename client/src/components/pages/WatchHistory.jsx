@@ -6,6 +6,7 @@ import { PageHeader, PageLayout } from '../ui/index.js';
 import SceneListItem from '../ui/SceneListItem.jsx';
 import LoadingSpinner from '../ui/LoadingSpinner.jsx';
 import { usePageTitle } from '../../hooks/usePageTitle.js';
+import Button from '../ui/Button.jsx';
 
 const WatchHistory = () => {
   usePageTitle('Watch History');
@@ -206,21 +207,17 @@ const WatchHistory = () => {
 
             {/* Clear History Button */}
             {scenes.length > 0 && (
-              <button
+              <Button
                 onClick={() => setShowConfirmDialog(true)}
                 disabled={isClearing}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-opacity hover:opacity-80"
-                style={{
-                  backgroundColor: 'var(--accent-error)',
-                  color: 'white',
-                  opacity: isClearing ? 0.5 : 1,
-                  cursor: isClearing ? 'not-allowed' : 'pointer',
-                }}
+                variant="destructive"
+                size="sm"
+                className="flex items-center gap-1.5"
+                icon={<Trash2 size={14} />}
                 title="Clear all watch history"
               >
-                <Trash2 size={14} />
                 <span className="hidden sm:inline">Clear History</span>
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -324,31 +321,21 @@ const WatchHistory = () => {
               This will permanently delete all watch history records including resume times, play counts, and viewing statistics. This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
-              <button
+              <Button
                 onClick={() => setShowConfirmDialog(false)}
                 disabled={isClearing}
-                className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
-                style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-color)',
-                }}
+                variant="secondary"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleClearHistory}
                 disabled={isClearing}
-                className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
-                style={{
-                  backgroundColor: 'var(--accent-error)',
-                  color: 'white',
-                  opacity: isClearing ? 0.5 : 1,
-                  cursor: isClearing ? 'not-allowed' : 'pointer',
-                }}
+                variant="destructive"
+                loading={isClearing}
               >
-                {isClearing ? 'Clearing...' : 'Clear History'}
-              </button>
+                Clear History
+              </Button>
             </div>
           </div>
         </div>

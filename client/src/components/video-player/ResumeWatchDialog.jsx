@@ -1,4 +1,5 @@
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+import Button from "../ui/Button.jsx";
 
 /**
  * Format seconds to HH:MM:SS or MM:SS
@@ -74,28 +75,19 @@ const ResumeWatchDialog = ({ isOpen, onResume, onStartFromBeginning, resumeTime 
           className="px-6 py-4 border-t flex justify-end gap-3"
           style={{ borderColor: "var(--border-color)" }}
         >
-          <button
+          <Button
             onClick={onStartFromBeginning}
-            className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-primary)",
-            }}
+            variant="secondary"
           >
             Start from Beginning
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onResume}
-            className="px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
-            style={{
-              backgroundColor: "var(--accent-primary)",
-              color: "white",
-            }}
+            variant="primary"
             autoFocus
           >
             Resume
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -4,7 +4,7 @@ import {
   generateTextScale,
   generateShadows,
   generateFocusRing,
-} from '../utils/colorScale.js';
+} from "../utils/colorScale.js";
 
 export const themes = {
   peek: {
@@ -12,8 +12,10 @@ export const themes = {
     properties: {
       // Typography
       "--font-brand": "'Lilita One', cursive",
-      "--font-heading": "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-heading":
+        "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body":
+        "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       "--font-mono": "'JetBrains Mono', 'Courier New', monospace",
 
       // Background colors - Generated from base color
@@ -81,12 +83,14 @@ export const themes = {
     properties: {
       // Typography
       "--font-brand": "'Lilita One', cursive",
-      "--font-heading": "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body": "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-heading":
+        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body":
+        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       "--font-mono": "'Fira Code', 'Courier New', monospace",
 
-      // Background colors - Generated from base color
-      ...generateBackgroundScale("#ffffff", "light"),
+      // Background colors - Generated from base color (off white)
+      ...generateBackgroundScale("#f1f5f9", "light"),
 
       // Text colors - Generated from base color
       ...generateTextScale("#1f2937", "light"),
@@ -144,13 +148,295 @@ export const themes = {
     },
   },
 
+  mint: {
+    name: "Mint",
+    properties: {
+      // Typography
+      "--font-brand": "'Lilita One', cursive",
+      "--font-heading":
+        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body":
+        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-mono": "'Fira Code', 'Courier New', monospace",
+
+      // Background colors - Generated from base color (soft mint)
+      ...generateBackgroundScale("#d1fae5", "light"),
+
+      // Text colors - Generated from base color
+      ...generateTextScale("#1f2937", "light"),
+
+      // Accent colors
+      "--accent-primary": "#059669",
+      "--accent-secondary": "#7c3aed",
+      "--accent-success": "#059669",
+      "--accent-warning": "#d97706",
+      "--accent-error": "#dc2626",
+
+      // Interactive states - Generated from accent color
+      "--border-color": "#a7f3d0",
+      ...generateShadows("#059669", "light"),
+      ...generateFocusRing("#059669"),
+
+      // Media specific
+      "--player-bg": "#000000",
+      "--controls-bg": "rgba(0, 0, 0, 0.7)",
+      "--progress-bg": "#a7f3d0",
+
+      // Rating gradient (0-100 scale)
+      "--rating-excellent": "#059669",
+      "--rating-good": "#65a30d",
+      "--rating-average": "#ca8a04",
+      "--rating-poor": "#ea580c",
+      "--rating-bad": "#dc2626",
+
+      // Role badges
+      "--role-admin-bg": "rgba(124, 58, 237, 0.1)",
+      "--role-admin-text": "#7c3aed",
+      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
+      "--role-user-text": "#64748b",
+
+      // Status states
+      "--status-error-bg": "rgba(220, 38, 38, 0.1)",
+      "--status-error-border": "rgba(220, 38, 38, 0.3)",
+      "--status-error-text": "#dc2626",
+      "--status-info-bg": "rgba(37, 99, 235, 0.1)",
+      "--status-info-border": "rgba(37, 99, 235, 0.3)",
+      "--status-info-text": "#2563eb",
+
+      // Toast notifications
+      "--toast-error-bg": "#dc2626",
+      "--toast-error-border": "#f87171",
+      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
+      "--toast-info-bg": "#1d4ed8",
+      "--toast-info-border": "#60a5fa",
+      "--toast-info-shadow": "rgba(29, 78, 216, 0.4)",
+
+      // Icon colors (for stats and indicators)
+      "--icon-play-count": "#059669",
+      "--icon-rating": "#d97706",
+      "--icon-organized": "#22c55e",
+    },
+  },
+
+  lavender: {
+    name: "Lavender",
+    properties: {
+      // Typography
+      "--font-brand": "'Lilita One', cursive",
+      "--font-heading":
+        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body":
+        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-mono": "'Fira Code', 'Courier New', monospace",
+
+      // Background colors - Generated from base color (soft lavender)
+      ...generateBackgroundScale("#f3e8ff", "light"),
+
+      // Text colors - Generated from base color
+      ...generateTextScale("#1f2937", "light"),
+
+      // Accent colors
+      "--accent-primary": "#7c3aed",
+      "--accent-secondary": "#ec4899",
+      "--accent-success": "#059669",
+      "--accent-warning": "#d97706",
+      "--accent-error": "#dc2626",
+
+      // Interactive states - Generated from accent color
+      "--border-color": "#e9d5ff",
+      ...generateShadows("#7c3aed", "light"),
+      ...generateFocusRing("#7c3aed"),
+
+      // Media specific
+      "--player-bg": "#000000",
+      "--controls-bg": "rgba(0, 0, 0, 0.7)",
+      "--progress-bg": "#e9d5ff",
+
+      // Rating gradient (0-100 scale)
+      "--rating-excellent": "#059669",
+      "--rating-good": "#65a30d",
+      "--rating-average": "#ca8a04",
+      "--rating-poor": "#ea580c",
+      "--rating-bad": "#dc2626",
+
+      // Role badges
+      "--role-admin-bg": "rgba(124, 58, 237, 0.1)",
+      "--role-admin-text": "#7c3aed",
+      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
+      "--role-user-text": "#64748b",
+
+      // Status states
+      "--status-error-bg": "rgba(220, 38, 38, 0.1)",
+      "--status-error-border": "rgba(220, 38, 38, 0.3)",
+      "--status-error-text": "#dc2626",
+      "--status-info-bg": "rgba(37, 99, 235, 0.1)",
+      "--status-info-border": "rgba(37, 99, 235, 0.3)",
+      "--status-info-text": "#2563eb",
+
+      // Toast notifications
+      "--toast-error-bg": "#dc2626",
+      "--toast-error-border": "#f87171",
+      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
+      "--toast-info-bg": "#1d4ed8",
+      "--toast-info-border": "#60a5fa",
+      "--toast-info-shadow": "rgba(29, 78, 216, 0.4)",
+
+      // Icon colors (for stats and indicators)
+      "--icon-play-count": "#059669",
+      "--icon-rating": "#d97706",
+      "--icon-organized": "#22c55e",
+    },
+  },
+
+  rose: {
+    name: "Rose",
+    properties: {
+      // Typography
+      "--font-brand": "'Lilita One', cursive",
+      "--font-heading":
+        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body":
+        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-mono": "'Fira Code', 'Courier New', monospace",
+
+      // Background colors - Generated from base color (soft pink)
+      ...generateBackgroundScale("#fce7f3", "light"),
+
+      // Text colors - Generated from base color
+      ...generateTextScale("#1f2937", "light"),
+
+      // Accent colors
+      "--accent-primary": "#ec4899",
+      "--accent-secondary": "#7c3aed",
+      "--accent-success": "#059669",
+      "--accent-warning": "#d97706",
+      "--accent-error": "#dc2626",
+
+      // Interactive states - Generated from accent color
+      "--border-color": "#fbcfe8",
+      ...generateShadows("#ec4899", "light"),
+      ...generateFocusRing("#ec4899"),
+
+      // Media specific
+      "--player-bg": "#000000",
+      "--controls-bg": "rgba(0, 0, 0, 0.7)",
+      "--progress-bg": "#fbcfe8",
+
+      // Rating gradient (0-100 scale)
+      "--rating-excellent": "#059669",
+      "--rating-good": "#65a30d",
+      "--rating-average": "#ca8a04",
+      "--rating-poor": "#ea580c",
+      "--rating-bad": "#dc2626",
+
+      // Role badges
+      "--role-admin-bg": "rgba(124, 58, 237, 0.1)",
+      "--role-admin-text": "#7c3aed",
+      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
+      "--role-user-text": "#64748b",
+
+      // Status states
+      "--status-error-bg": "rgba(220, 38, 38, 0.1)",
+      "--status-error-border": "rgba(220, 38, 38, 0.3)",
+      "--status-error-text": "#dc2626",
+      "--status-info-bg": "rgba(37, 99, 235, 0.1)",
+      "--status-info-border": "rgba(37, 99, 235, 0.3)",
+      "--status-info-text": "#2563eb",
+
+      // Toast notifications
+      "--toast-error-bg": "#dc2626",
+      "--toast-error-border": "#f87171",
+      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
+      "--toast-info-bg": "#1d4ed8",
+      "--toast-info-border": "#60a5fa",
+      "--toast-info-shadow": "rgba(29, 78, 216, 0.4)",
+
+      // Icon colors (for stats and indicators)
+      "--icon-play-count": "#059669",
+      "--icon-rating": "#d97706",
+      "--icon-organized": "#22c55e",
+    },
+  },
+
+  peach: {
+    name: "Peach",
+    properties: {
+      // Typography
+      "--font-brand": "'Lilita One', cursive",
+      "--font-heading":
+        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body":
+        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-mono": "'Fira Code', 'Courier New', monospace",
+
+      // Background colors - Generated from base color (soft peach)
+      ...generateBackgroundScale("#ffedd5", "light"),
+
+      // Text colors - Generated from base color
+      ...generateTextScale("#1f2937", "light"),
+
+      // Accent colors
+      "--accent-primary": "#ea580c",
+      "--accent-secondary": "#ec4899",
+      "--accent-success": "#059669",
+      "--accent-warning": "#d97706",
+      "--accent-error": "#dc2626",
+
+      // Interactive states - Generated from accent color
+      "--border-color": "#fed7aa",
+      ...generateShadows("#ea580c", "light"),
+      ...generateFocusRing("#ea580c"),
+
+      // Media specific
+      "--player-bg": "#000000",
+      "--controls-bg": "rgba(0, 0, 0, 0.7)",
+      "--progress-bg": "#fed7aa",
+
+      // Rating gradient (0-100 scale)
+      "--rating-excellent": "#059669",
+      "--rating-good": "#65a30d",
+      "--rating-average": "#ca8a04",
+      "--rating-poor": "#ea580c",
+      "--rating-bad": "#dc2626",
+
+      // Role badges
+      "--role-admin-bg": "rgba(124, 58, 237, 0.1)",
+      "--role-admin-text": "#7c3aed",
+      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
+      "--role-user-text": "#64748b",
+
+      // Status states
+      "--status-error-bg": "rgba(220, 38, 38, 0.1)",
+      "--status-error-border": "rgba(220, 38, 38, 0.3)",
+      "--status-error-text": "#dc2626",
+      "--status-info-bg": "rgba(37, 99, 235, 0.1)",
+      "--status-info-border": "rgba(37, 99, 235, 0.3)",
+      "--status-info-text": "#2563eb",
+
+      // Toast notifications
+      "--toast-error-bg": "#dc2626",
+      "--toast-error-border": "#f87171",
+      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
+      "--toast-info-bg": "#1d4ed8",
+      "--toast-info-border": "#60a5fa",
+      "--toast-info-shadow": "rgba(29, 78, 216, 0.4)",
+
+      // Icon colors (for stats and indicators)
+      "--icon-play-count": "#059669",
+      "--icon-rating": "#d97706",
+      "--icon-organized": "#22c55e",
+    },
+  },
+
   midnight: {
     name: "Midnight Blue",
     properties: {
       // Typography
       "--font-brand": "'Lilita One', cursive",
-      "--font-heading": "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body": "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "--font-heading":
+        "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--font-body":
+        "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       "--font-mono": "'Space Mono', 'Courier New', monospace",
 
       // Background colors - Generated from base color
@@ -215,23 +501,52 @@ export const themes = {
 
 // Available font options for custom theme creation
 export const fontOptions = {
-  brand: [
-    { value: "'Lilita One', cursive", label: "Lilita One" },
-  ],
+  brand: [{ value: "'Lilita One', cursive", label: "Lilita One" }],
   heading: [
-    { value: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif", label: "Poppins" },
-    { value: "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif", label: "Outfit" },
-    { value: "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif", label: "Space Grotesk" },
-    { value: "'Manrope', -apple-system, BlinkMacSystemFont, sans-serif", label: "Manrope" },
+    {
+      value: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+      label: "Poppins",
+    },
+    {
+      value: "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
+      label: "Outfit",
+    },
+    {
+      value: "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
+      label: "Space Grotesk",
+    },
+    {
+      value: "'Manrope', -apple-system, BlinkMacSystemFont, sans-serif",
+      label: "Manrope",
+    },
   ],
   body: [
-    { value: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "Inter" },
-    { value: "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "Rubik" },
-    { value: "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "Work Sans" },
-    { value: "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", label: "DM Sans" },
+    {
+      value:
+        "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      label: "Inter",
+    },
+    {
+      value:
+        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      label: "Rubik",
+    },
+    {
+      value:
+        "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      label: "Work Sans",
+    },
+    {
+      value:
+        "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      label: "DM Sans",
+    },
   ],
   mono: [
-    { value: "'JetBrains Mono', 'Courier New', monospace", label: "JetBrains Mono" },
+    {
+      value: "'JetBrains Mono', 'Courier New', monospace",
+      label: "JetBrains Mono",
+    },
     { value: "'Fira Code', 'Courier New', monospace", label: "Fira Code" },
     { value: "'Space Mono', 'Courier New', monospace", label: "Space Mono" },
   ],

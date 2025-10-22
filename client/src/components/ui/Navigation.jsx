@@ -4,6 +4,7 @@ import { PeekLogo } from "../branding/PeekLogo.jsx";
 import UserMenu from "./UserMenu.jsx";
 import { ThemedIcon } from "../icons/index.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import Button from "./Button.jsx";
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -95,38 +96,36 @@ const Navigation = () => {
             <UserMenu />
 
             {/* Mobile menu button */}
-            <button
-              className="lg:hidden p-2 rounded-lg"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                color: "var(--text-primary)",
-              }}
+            <Button
+              className="lg:hidden p-2"
+              variant="secondary"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle mobile menu"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                {isMobileMenuOpen ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                )}
-              </svg>
-            </button>
+              icon={
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  {isMobileMenuOpen ? (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  ) : (
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 6h16M4 12h16M4 18h16"
+                    />
+                  )}
+                </svg>
+              }
+            />
           </div>
         </div>
 

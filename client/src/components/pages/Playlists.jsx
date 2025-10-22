@@ -5,6 +5,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 import { PageLayout } from "../ui/index.js";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
+import Button from "../ui/Button.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -106,16 +107,13 @@ const Playlists = () => {
               Create and manage your video playlists
             </p>
           </div>
-          <button
+          <Button
             onClick={() => setShowCreateModal(true)}
-            className="px-6 py-3 rounded-lg font-medium"
-            style={{
-              backgroundColor: "var(--accent-color)",
-              color: "white",
-            }}
+            variant="primary"
+            size="lg"
           >
             + New Playlist
-          </button>
+          </Button>
         </div>
 
         {error && (
@@ -183,16 +181,18 @@ const Playlists = () => {
                       {playlist._count.items}{" "}
                       {playlist._count.items === 1 ? "video" : "videos"}
                     </span>
-                    <button
+                    <Button
                       onClick={() => handleDeleteClick(playlist)}
-                      className="px-3 py-1 rounded hover:bg-red-500 hover:text-white transition-colors"
+                      variant="destructive"
+                      size="sm"
+                      className="px-3 py-1"
                       style={{
                         backgroundColor: "rgba(239, 68, 68, 0.1)",
                         color: "rgb(239, 68, 68)",
                       }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -271,30 +271,21 @@ const Playlists = () => {
                   />
                 </div>
                 <div className="flex gap-3 justify-end">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
+                    variant="secondary"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={creating || !newPlaylistName.trim()}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: creating || !newPlaylistName.trim() ? 0.6 : 1,
-                    }}
+                    variant="primary"
+                    loading={creating}
                   >
-                    {creating ? "Creating..." : "Create"}
-                  </button>
+                    Create
+                  </Button>
                 </div>
               </div>
             </form>

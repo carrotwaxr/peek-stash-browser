@@ -4,6 +4,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { PageLayout } from "../ui/index.js";
 import CarouselSettings from "../settings/CarouselSettings.jsx";
+import Button from "../ui/Button.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -270,28 +271,19 @@ const Settings = () => {
                   </label>
                   <div className="space-y-2">
                     {availableThemes.map((theme) => (
-                      <button
+                      <Button
                         key={theme.key}
                         type="button"
                         onClick={() => changeTheme(theme.key)}
-                        className="w-full text-left px-4 py-3 rounded-lg text-sm transition-colors duration-200 flex items-center justify-between"
-                        style={{
-                          backgroundColor:
-                            currentTheme === theme.key
-                              ? "var(--accent-primary)"
-                              : "var(--bg-secondary)",
-                          border: "1px solid var(--border-color)",
-                          color:
-                            currentTheme === theme.key
-                              ? "white"
-                              : "var(--text-primary)",
-                        }}
+                        variant={currentTheme === theme.key ? "primary" : "secondary"}
+                        fullWidth
+                        className="text-left px-4 py-3 text-sm flex items-center justify-between"
                       >
                         <span>{theme.name}</span>
                         {currentTheme === theme.key && (
                           <span className="text-sm">✓</span>
                         )}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                   <p
@@ -304,18 +296,14 @@ const Settings = () => {
 
                 {/* Save Button */}
                 <div className="flex justify-end">
-                  <button
+                  <Button
                     type="submit"
                     disabled={saving}
-                    className="px-6 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: saving ? 0.6 : 1,
-                    }}
+                    variant="primary"
+                    loading={saving}
                   >
-                    {saving ? "Saving..." : "Save Settings"}
-                  </button>
+                    Save Settings
+                  </Button>
                 </div>
               </div>
             </form>
@@ -427,18 +415,14 @@ const Settings = () => {
                 </div>
 
                 <div className="flex justify-end">
-                  <button
+                  <Button
                     type="submit"
                     disabled={passwordChanging}
-                    className="px-6 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: passwordChanging ? 0.6 : 1,
-                    }}
+                    variant="primary"
+                    loading={passwordChanging}
                   >
-                    {passwordChanging ? "Changing..." : "Change Password"}
-                  </button>
+                    Change Password
+                  </Button>
                 </div>
               </div>
             </form>

@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, List, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { usePlaylistNavigation } from "../video-player/usePlaylistNavigation.js";
+import Button from "../ui/Button.jsx";
 
 /**
  * PlaylistStatusCard - Shows playlist context when viewing a scene from a playlist
@@ -252,13 +253,15 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
                 {playlist.name}
               </p>
             ) : (
-              <button
+              <Button
                 onClick={goToPlaylist}
-                className="text-sm hover:underline"
+                variant="tertiary"
+                size="sm"
+                className="text-sm hover:underline !p-0"
                 style={{ color: "var(--text-secondary)" }}
               >
                 {playlist.name}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -271,29 +274,33 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
           </div>
 
           {/* Shuffle Toggle */}
-          <button
+          <Button
             onClick={toggleShuffle}
-            className="p-1.5 sm:p-2 rounded-lg transition-all"
+            variant="tertiary"
+            size="sm"
+            className="p-1.5 sm:p-2"
             style={{
               backgroundColor: shuffle ? "var(--accent-warning)" : "transparent",
               border: shuffle ? "2px solid var(--accent-warning)" : "1px solid var(--border-color)",
               color: shuffle ? "white" : "var(--text-muted)",
             }}
+            icon={<Shuffle size={16} />}
             title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
             aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
-          >
-            <Shuffle size={16} />
-          </button>
+          />
 
           {/* Repeat Toggle */}
-          <button
+          <Button
             onClick={toggleRepeat}
-            className="p-1.5 sm:p-2 rounded-lg transition-all"
+            variant="tertiary"
+            size="sm"
+            className="p-1.5 sm:p-2"
             style={{
               backgroundColor: repeat !== "none" ? "var(--accent-info)" : "transparent",
               border: repeat !== "none" ? "2px solid var(--accent-info)" : "1px solid var(--border-color)",
               color: repeat !== "none" ? "white" : "var(--text-muted)",
             }}
+            icon={repeat === "one" ? <Repeat1 size={16} /> : <Repeat size={16} />}
             title={
               repeat === "one" ? "Repeat: One" :
               repeat === "all" ? "Repeat: All" :
@@ -304,86 +311,58 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
               repeat === "all" ? "Switch to repeat one" :
               "Enable repeat all"
             }
-          >
-            {repeat === "one" ? <Repeat1 size={16} /> : <Repeat size={16} />}
-          </button>
+          />
 
           {!isVirtualPlaylist && (
-            <button
+            <Button
               onClick={goToPlaylist}
-              className="px-2 py-1.5 sm:px-3 sm:py-1.5 rounded-lg flex items-center gap-2 transition-colors text-sm whitespace-nowrap"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-              }}
+              variant="secondary"
+              size="sm"
+              className="px-2 py-1.5 sm:px-3 sm:py-1.5 text-sm"
+              icon={<List size={14} />}
             >
-              <List size={14} />
               <span className="hidden sm:inline">View All</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Navigation buttons on mobile (stacked above thumbnails) */}
       <div className="flex md:hidden items-center gap-2 mb-3">
-        <button
+        <Button
           onClick={handlePrevious}
           disabled={!hasPrevious}
-          className="flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
-          style={{
-            backgroundColor: hasPrevious
-              ? "var(--bg-secondary)"
-              : "var(--bg-primary)",
-            border: "1px solid var(--border-color)",
-            color: hasPrevious ? "var(--text-primary)" : "var(--text-muted)",
-            cursor: hasPrevious ? "pointer" : "not-allowed",
-            opacity: hasPrevious ? 1 : 0.5,
-          }}
+          variant="secondary"
+          fullWidth
+          icon={<ChevronLeft size={20} />}
           aria-label="Previous scene"
         >
-          <ChevronLeft size={20} />
           Previous
-        </button>
+        </Button>
 
-        <button
+        <Button
           onClick={handleNext}
           disabled={!hasNext}
-          className="flex-1 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors"
-          style={{
-            backgroundColor: hasNext ? "var(--bg-secondary)" : "var(--bg-primary)",
-            border: "1px solid var(--border-color)",
-            color: hasNext ? "var(--text-primary)" : "var(--text-muted)",
-            cursor: hasNext ? "pointer" : "not-allowed",
-            opacity: hasNext ? 1 : 0.5,
-          }}
+          variant="secondary"
+          fullWidth
+          icon={<ChevronRight size={20} />}
+          iconPosition="right"
           aria-label="Next scene"
         >
           Next
-          <ChevronRight size={20} />
-        </button>
+        </Button>
       </div>
 
       {/* Desktop: Navigation buttons inline with thumbnails */}
       <div className="hidden md:flex items-center gap-2">
         {/* Previous Button */}
-        <button
+        <Button
           onClick={handlePrevious}
           disabled={!hasPrevious}
-          className="p-2 rounded-lg transition-colors flex-shrink-0"
-          style={{
-            backgroundColor: hasPrevious
-              ? "var(--bg-secondary)"
-              : "var(--bg-primary)",
-            border: "1px solid var(--border-color)",
-            color: hasPrevious ? "var(--text-primary)" : "var(--text-muted)",
-            cursor: hasPrevious ? "pointer" : "not-allowed",
-            opacity: hasPrevious ? 1 : 0.5,
-          }}
+          variant="secondary"
+          icon={<ChevronLeft size={24} />}
           aria-label="Previous scene"
-        >
-          <ChevronLeft size={24} />
-        </button>
+        />
 
         {/* Thumbnail Strip */}
         <div
@@ -396,11 +375,12 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
             const isCurrent = index === currentIndex;
 
             return (
-              <button
+              <Button
                 key={item.sceneId}
                 ref={isCurrent ? currentThumbnailRef : null}
                 onClick={() => navigateToScene(index)}
-                className="flex-shrink-0 rounded overflow-hidden transition-all"
+                variant="tertiary"
+                className="flex-shrink-0 overflow-hidden !p-0"
                 style={{
                   width: isCurrent ? "120px" : "80px",
                   height: isCurrent ? "68px" : "45px",
@@ -427,27 +407,19 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
                     </span>
                   </div>
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>
 
         {/* Next Button */}
-        <button
+        <Button
           onClick={handleNext}
           disabled={!hasNext}
-          className="p-2 rounded-lg transition-colors flex-shrink-0"
-          style={{
-            backgroundColor: hasNext ? "var(--bg-secondary)" : "var(--bg-primary)",
-            border: "1px solid var(--border-color)",
-            color: hasNext ? "var(--text-primary)" : "var(--text-muted)",
-            cursor: hasNext ? "pointer" : "not-allowed",
-            opacity: hasNext ? 1 : 0.5,
-          }}
+          variant="secondary"
+          icon={<ChevronRight size={24} />}
           aria-label="Next scene"
-        >
-          <ChevronRight size={24} />
-        </button>
+        />
       </div>
 
       {/* Mobile: Thumbnail strip only (buttons above) */}
@@ -462,11 +434,12 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
             const isCurrent = index === currentIndex;
 
             return (
-              <button
+              <Button
                 key={item.sceneId}
                 ref={isCurrent ? currentThumbnailRef : null}
                 onClick={() => navigateToScene(index)}
-                className="flex-shrink-0 rounded overflow-hidden transition-all"
+                variant="tertiary"
+                className="flex-shrink-0 overflow-hidden !p-0"
                 style={{
                   width: isCurrent ? "120px" : "80px",
                   height: isCurrent ? "68px" : "45px",
@@ -493,7 +466,7 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
                     </span>
                   </div>
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>

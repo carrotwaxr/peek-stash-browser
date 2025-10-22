@@ -1,6 +1,7 @@
 import { LucideX, LucidePlus } from "lucide-react";
 import { useState } from "react";
 import AddToPlaylistButton from "./AddToPlaylistButton.jsx";
+import Button from "./Button.jsx";
 
 /**
  * Bulk Action Bar for multiselect
@@ -33,13 +34,15 @@ const BulkActionBar = ({ selectedScenes, onClearSelection }) => {
             </div>
 
             {selectedCount > 0 && (
-              <button
+              <Button
                 onClick={onClearSelection}
-                className="text-xs sm:text-sm underline hover:no-underline transition-all whitespace-nowrap"
+                variant="tertiary"
+                size="sm"
+                className="text-xs sm:text-sm underline hover:no-underline !p-0 !border-0 whitespace-nowrap"
                 style={{ color: "var(--text-muted)" }}
               >
                 Clear
-              </button>
+              </Button>
             )}
           </div>
 

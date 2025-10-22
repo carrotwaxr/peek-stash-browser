@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useTheme } from "../../themes/useTheme.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import Button from "../ui/Button.jsx";
 
 const Login = ({ onLoginSuccess }) => {
   const { login } = useAuth();
@@ -119,19 +120,14 @@ const Login = ({ onLoginSuccess }) => {
           )}
 
           <div>
-            <button
+            <Button
               type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50"
-              style={{
-                backgroundColor:
-                  theme?.properties?.["--accent-primary"] || "#3b82f6",
-                borderColor:
-                  theme?.properties?.["--accent-primary"] || "#3b82f6",
-              }}
+              variant="primary"
+              fullWidth
+              loading={isLoading}
             >
-              {isLoading ? "Signing in..." : "Sign in"}
-            </button>
+              Sign in
+            </Button>
           </div>
         </form>
       </div>
