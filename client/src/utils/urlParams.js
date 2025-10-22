@@ -100,7 +100,7 @@ export const urlParamsToFilters = (searchParams, filterOptions) => {
         }
         break;
 
-      case "range":
+      case "range": {
         const min = searchParams.get(`${key}_min`);
         const max = searchParams.get(`${key}_max`);
         if (min || max) {
@@ -109,8 +109,9 @@ export const urlParamsToFilters = (searchParams, filterOptions) => {
           if (max) filters[key].max = max;
         }
         break;
+      }
 
-      case "date-range":
+      case "date-range": {
         const start = searchParams.get(`${key}_start`);
         const end = searchParams.get(`${key}_end`);
         if (start || end) {
@@ -119,6 +120,7 @@ export const urlParamsToFilters = (searchParams, filterOptions) => {
           if (end) filters[key].end = end;
         }
         break;
+      }
     }
   });
 
