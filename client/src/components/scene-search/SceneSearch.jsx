@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { ErrorMessage, LoadingSpinner, PageHeader, PageLayout } from "../ui";
@@ -7,7 +7,6 @@ import SearchControls from "../ui/SearchControls.jsx";
 import Pagination from "../ui/Pagination.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
-import { buildSceneFilter } from "../../utils/filterConfig.js";
 
 /**
  * SceneSearch is one of the more core Components of the app. It appears on most pages, and utilizes the

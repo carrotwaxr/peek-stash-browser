@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, forwardRef } from "react";
+import { useState, useRef, forwardRef } from "react";
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
@@ -21,7 +21,7 @@ const Studios = () => {
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { isTVMode } = useTVMode();
-  const [columns, setColumns] = useState(3);
+  const columns = 3;
 
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
