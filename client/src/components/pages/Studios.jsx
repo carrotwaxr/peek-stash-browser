@@ -5,6 +5,7 @@ import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/inde
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import Pagination from "../ui/Pagination.jsx";
+import EntityImage from "../ui/EntityImage.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -171,25 +172,11 @@ const StudioCard = forwardRef(({ studio, tabIndex, className = "", isTVMode = fa
       aria-label={`Studio: ${studio.name}`}
     >
       <div className="flex items-start space-x-4">
-        {studio.image_path ? (
-          <div className="w-24 h-16 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--bg-secondary)" }}>
-            <img
-              src={studio.image_path}
-              alt={studio.name}
-              className="max-w-full max-h-full object-contain p-1"
-            />
-          </div>
-        ) : (
-          <div
-            className="w-24 h-16 rounded flex items-center justify-center flex-shrink-0"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              color: "var(--text-primary)",
-            }}
-          >
-            🏢
-          </div>
-        )}
+        <EntityImage
+          imagePath={studio.image_path}
+          name={studio.name}
+          fallbackIcon="🏢"
+        />
 
         <div className="flex-1 min-w-0">
           <h3

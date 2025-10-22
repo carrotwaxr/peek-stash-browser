@@ -5,6 +5,7 @@ import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/inde
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import Pagination from "../ui/Pagination.jsx";
+import EntityImage from "../ui/EntityImage.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -157,26 +158,6 @@ const Tags = () => {
 };
 
 const TagCard = forwardRef(({ tag, tabIndex, className = "", isTVMode = false, referrerUrl }, ref) => {
-  const getTagColor = (name) => {
-    // Generate a consistent color based on the tag name
-    const colors = [
-      "bg-blue-500",
-      "bg-green-500",
-      "bg-yellow-500",
-      "bg-red-500",
-      "bg-purple-500",
-      "bg-pink-500",
-      "bg-indigo-500",
-    ];
-
-    const hash = name.split("").reduce((a, b) => {
-      a = (a << 5) - a + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-
-    return colors[Math.abs(hash) % colors.length];
-  };
-
   return (
     <Link
       ref={ref}
@@ -192,21 +173,11 @@ const TagCard = forwardRef(({ tag, tabIndex, className = "", isTVMode = false, r
       aria-label={`Tag: ${tag.name}`}
     >
       <div className="flex items-start space-x-4">
-        {tag.image_path ? (
-          <img
-            src={tag.image_path}
-            alt={tag.name}
-            className="w-16 h-16 rounded-full object-cover flex-shrink-0"
-          />
-        ) : (
-          <div
-            className={`w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 ${getTagColor(
-              tag.name
-            )} text-white text-2xl font-bold`}
-          >
-            #
-          </div>
-        )}
+        <EntityImage
+          imagePath={tag.image_path}
+          name={tag.name}
+          fallbackIcon="#"
+        />
 
         <div className="flex-1 min-w-0">
           <h3
