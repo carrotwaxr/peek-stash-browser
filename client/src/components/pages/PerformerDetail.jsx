@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
@@ -79,6 +79,7 @@ const getSiteInfo = (url) => {
 
 const PerformerDetail = () => {
   const { performerId } = useParams();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [performer, setPerformer] = useState(null);
 
@@ -115,7 +116,7 @@ const PerformerDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Link
-            to="/performers"
+            to={location.state?.referrerUrl || "/performers"}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
             style={{
               color: "var(--accent-primary)",
@@ -177,6 +178,7 @@ const PerformerDetail = () => {
               performers: [{ id: performerId, name: performer.name }],
             }}
             title={`Scenes featuring ${performer.name}`}
+            captureReferrer={false}
           />
         </div>
       </div>

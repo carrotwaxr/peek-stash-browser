@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, forwardRef } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { formatRating, getInitials, truncateText } from "../../utils/format.js";
@@ -16,6 +16,7 @@ import { useTVMode } from "../../hooks/useTVMode.js";
 const Performers = () => {
   usePageTitle("Performers");
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
@@ -28,39 +29,8 @@ const Performers = () => {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
 
-  useEffect(() => {
-    // Initial fetch with default parameters
-    const query = {
-      filter: {
-        direction: "DESC",
-        page: 1,
-        per_page: 24,
-        q: "",
-        sort: "o_counter",
-      },
-    };
-
-    const fetchInitialData = async () => {
-      // Don't make API calls if not authenticated or still checking auth
-      if (isAuthLoading || !isAuthenticated) {
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setLastQuery(query);
-        setError(null);
-        const result = await getPerformers(query);
-        setData(result);
-      } catch (err) {
-        setError(err.message || "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchInitialData();
-  }, [isAuthLoading, isAuthenticated]);
+  // Note: We don't fetch initial data here anymore.
+  // SearchControls will trigger the initial query via onQueryChange based on URL params.
 
   const handleQueryChange = async (newQuery) => {
     // Don't make API calls if not authenticated or still checking auth
@@ -163,6 +133,7 @@ const Performers = () => {
                 tabIndex={isFocused(index) ? 0 : -1}
                 className={isFocused(index) ? "keyboard-focus" : ""}
                 isTVMode={isTVMode}
+                referrerUrl={`${location.pathname}${location.search}`}
               />
             ))}
           </div>
@@ -186,10 +157,11 @@ const Performers = () => {
   );
 };
 
-const PerformerCard = forwardRef(({ performer, tabIndex, className = "", isTVMode = false }, ref) => {
+const PerformerCard = forwardRef(({ performer, tabIndex, className = "", isTVMode = false, referrerUrl }, ref) => {
   return (
     <Link
       ref={ref}
+      state={{ referrerUrl }}
       to={`/performer/${performer.id}`}
       tabIndex={isTVMode ? tabIndex : -1}
       className={`performer-card block rounded-lg border p-4 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}

@@ -23,6 +23,7 @@ const SceneSearch = ({
   permanentFiltersMetadata = {},
   subtitle,
   title,
+  captureReferrer = true,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -35,69 +36,37 @@ const SceneSearch = ({
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
 
-  useEffect(() => {
-    const sceneFilter = buildSceneFilter({ ...permanentFilters });
-    // Initial fetch with default parameters
-    const query = {
-      filter: {
-        direction: "DESC",
-        page: 1,
-        per_page: 24,
-        q: "",
-        sort: initialSort,
-      },
-      scene_filter: sceneFilter,
-    };
-
-    const fetchInitialData = async () => {
-      // Don't make API calls if not authenticated or still checking auth
-      if (isAuthLoading || !isAuthenticated) {
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setLastQuery(query);
-        setError(null);
-        const result = await getScenes(query);
-        setData(result);
-      } catch (err) {
-        setError(err.message || "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthLoading, isAuthenticated]);
+  // Note: We don't fetch initial data here anymore.
+  // SearchControls will trigger the initial query via onQueryChange based on URL params.
 
   const handleSceneClick = (scene) => {
     // Navigate to video player page with scene data and virtual playlist context
     const currentScenes = data?.scenes || [];
     const currentIndex = currentScenes.findIndex(s => s.id === scene.id);
 
-    // Capture current URL with search params for Back button
-    const referrerUrl = `${location.pathname}${location.search}`;
-
-    navigate(`/video/${scene.id}`, {
-      state: {
-        scene,
-        referrerUrl, // Store current URL to preserve filters when going back
-        playlist: {
-          id: "virtual-grid",
-          name: title || "Scene Grid",
-          shuffle: false,
-          repeat: "none",
-          scenes: currentScenes.map((s, idx) => ({
-            sceneId: s.id,
-            scene: s,
-            position: idx
-          })),
-          currentIndex: currentIndex >= 0 ? currentIndex : 0
-        }
+    // Build navigation state
+    const navigationState = {
+      scene,
+      playlist: {
+        id: "virtual-grid",
+        name: title || "Scene Grid",
+        shuffle: false,
+        repeat: "none",
+        scenes: currentScenes.map((s, idx) => ({
+          sceneId: s.id,
+          scene: s,
+          position: idx
+        })),
+        currentIndex: currentIndex >= 0 ? currentIndex : 0
       }
-    });
+    };
+
+    // Only capture referrerUrl if captureReferrer is true
+    if (captureReferrer) {
+      navigationState.referrerUrl = `${location.pathname}${location.search}`;
+    }
+
+    navigate(`/video/${scene.id}`, { state: navigationState });
   };
 
   const handleQueryChange = async (newQuery) => {
@@ -163,12 +132,14 @@ const SceneSearch = ({
       <PageHeader title={title} subtitle={subtitle} />
 
       <SearchControls
+        artifactType="scene"
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
         permanentFilters={permanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}
         totalCount={totalCount}
+        syncToUrl={captureReferrer}
       />
 
       {isLoading ? (

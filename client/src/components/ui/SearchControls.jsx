@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LucideArrowDown, LucideArrowUp } from "lucide-react";
 import Pagination from "./Pagination.jsx";
@@ -65,10 +65,12 @@ const SearchControls = ({
   permanentFiltersMetadata = {},
   totalPages,
   totalCount,
+  syncToUrl = true,
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const lastSyncedUrl = useRef(""); // Empty initially so first URL sync always runs
 
   // Get filter options for this artifact type
   const filterOptions = useMemo(() => {
@@ -96,61 +98,62 @@ const SearchControls = ({
     return initial;
   });
 
-  // Parse URL params to get initial state
-  const initialState = useMemo(() => {
+  // Parse URL params to get current state (updates when URL changes)
+  const urlState = useMemo(() => {
     return parseSearchParams(searchParams, filterOptions, {
       sortField: initialSort,
       sortDirection: "DESC",
       searchText: "",
       filters: { ...permanentFilters },
     });
-  }, []); // Only run on mount
+  }, [searchParams, filterOptions, initialSort, permanentFilters]); // Re-parse when URL changes
 
-  const [currentPage, setCurrentPage] = useState(initialState.currentPage);
-  const [perPage, setPerPage] = useState(initialState.perPage);
-  const [filters, setFilters] = useState(initialState.filters);
-  const [searchText, setSearchText] = useState(initialState.searchText);
+  const [currentPage, setCurrentPage] = useState(urlState.currentPage);
+  const [perPage, setPerPage] = useState(urlState.perPage);
+  const [filters, setFilters] = useState(urlState.filters);
+  const [searchText, setSearchText] = useState(urlState.searchText);
   const [[sortField, sortDirection], setSort] = useState([
-    initialState.sortField,
-    initialState.sortDirection,
+    urlState.sortField,
+    urlState.sortDirection,
   ]);
 
-  // Sync internal state from URL params (for external changes like bottom pagination)
+  // Sync state when URL changes externally (from navigation back with preserved filters)
   useEffect(() => {
-    if (!isInitialized) return; // Don't sync before initial load
+    if (!isInitialized) return;
 
-    const urlPage = parseInt(searchParams.get('page')) || 1;
-    const urlPerPage = parseInt(searchParams.get('per_page')) || 24;
+    const currentUrl = searchParams.toString();
+    // Only sync if URL actually changed (not our own update)
+    if (currentUrl === lastSyncedUrl.current) return;
 
-    let shouldTriggerQuery = false;
+    lastSyncedUrl.current = currentUrl;
 
-    if (urlPage !== currentPage) {
-      setCurrentPage(urlPage);
-      shouldTriggerQuery = true;
-    }
-    if (urlPerPage !== perPage) {
-      setPerPage(urlPerPage);
-      shouldTriggerQuery = true;
-    }
+    // Update state from URL
+    setCurrentPage(urlState.currentPage);
+    setPerPage(urlState.perPage);
+    setSearchText(urlState.searchText);
+    setSort([urlState.sortField, urlState.sortDirection]);
+    setFilters(urlState.filters);
 
-    // Trigger query with new pagination values
-    if (shouldTriggerQuery) {
-      const query = {
-        filter: {
-          direction: sortDirection,
-          page: urlPage,
-          per_page: urlPerPage,
-          q: searchText,
-          sort: sortField,
-        },
-        ...buildFilter(artifactType, filters),
-      };
-      onQueryChange(query);
-    }
-  }, [searchParams]); // Watch URL params for external changes
+    // Trigger query with new URL values
+    const query = {
+      filter: {
+        direction: urlState.sortDirection,
+        page: urlState.currentPage,
+        per_page: urlState.perPage,
+        q: urlState.searchText,
+        sort: urlState.sortField,
+      },
+      ...buildFilter(artifactType, urlState.filters),
+    };
+    onQueryChange(query);
+  }, [searchParams, isInitialized, urlState, artifactType, onQueryChange]);
 
-  // Update URL params whenever state changes
+  // Update URL params whenever state changes (only if syncToUrl is true)
   useEffect(() => {
+    if (!syncToUrl) {
+      return;
+    }
+
     const params = buildSearchParams({
       searchText,
       sortField,
@@ -161,8 +164,15 @@ const SearchControls = ({
       filterOptions,
     });
 
-    setSearchParams(params, { replace: true });
-  }, [searchText, sortField, sortDirection, currentPage, perPage, filters, filterOptions, setSearchParams]);
+    const newUrl = params.toString();
+    const currentUrl = searchParams.toString();
+
+    // Only update if URL would actually change
+    if (newUrl !== currentUrl) {
+      lastSyncedUrl.current = newUrl;
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchText, sortField, sortDirection, currentPage, perPage, filters, filterOptions, setSearchParams, syncToUrl, searchParams]);
 
   // Trigger initial query from URL params
   useEffect(() => {
@@ -391,6 +401,7 @@ const SearchControls = ({
         {/* Search Input - Full width on mobile */}
         <SearchInput
           placeholder="Search..."
+          value={searchText}
           onSearch={handleChangeSearchText}
           className="w-full sm:w-80"
         />
