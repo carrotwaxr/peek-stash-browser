@@ -12,7 +12,7 @@
 export const filtersToUrlParams = (filters, filterOptions) => {
   const params = new URLSearchParams();
 
-  filterOptions.forEach(({ key, type }) => {
+  filterOptions.forEach(({ key, type, multi }) => {
     const value = filters[key];
 
     if (value === undefined || value === "" || value === false) {
@@ -30,6 +30,20 @@ export const filtersToUrlParams = (filters, filterOptions) => {
       case "text":
         if (value) {
           params.set(key, value);
+        }
+        break;
+
+      case "searchable-select":
+        if (multi) {
+          // Multi-select: serialize array as comma-separated string
+          if (Array.isArray(value) && value.length > 0) {
+            params.set(key, value.join(","));
+          }
+        } else {
+          // Single select: just set the value
+          if (value) {
+            params.set(key, value);
+          }
         }
         break;
 
@@ -58,7 +72,7 @@ export const filtersToUrlParams = (filters, filterOptions) => {
 export const urlParamsToFilters = (searchParams, filterOptions) => {
   const filters = {};
 
-  filterOptions.forEach(({ key, type }) => {
+  filterOptions.forEach(({ key, type, multi }) => {
     switch (type) {
       case "checkbox":
         if (searchParams.has(key)) {
@@ -73,7 +87,20 @@ export const urlParamsToFilters = (searchParams, filterOptions) => {
         }
         break;
 
-      case "range":
+      case "searchable-select":
+        if (searchParams.has(key)) {
+          const value = searchParams.get(key);
+          if (multi) {
+            // Multi-select: deserialize comma-separated string to array
+            filters[key] = value.split(",").filter(Boolean);
+          } else {
+            // Single select: just set the value
+            filters[key] = value;
+          }
+        }
+        break;
+
+      case "range": {
         const min = searchParams.get(`${key}_min`);
         const max = searchParams.get(`${key}_max`);
         if (min || max) {
@@ -82,8 +109,9 @@ export const urlParamsToFilters = (searchParams, filterOptions) => {
           if (max) filters[key].max = max;
         }
         break;
+      }
 
-      case "date-range":
+      case "date-range": {
         const start = searchParams.get(`${key}_start`);
         const end = searchParams.get(`${key}_end`);
         if (start || end) {
@@ -92,6 +120,7 @@ export const urlParamsToFilters = (searchParams, filterOptions) => {
           if (end) filters[key].end = end;
         }
         break;
+      }
     }
   });
 

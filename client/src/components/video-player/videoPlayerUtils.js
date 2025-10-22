@@ -390,3 +390,41 @@ export const disableLiveTracker = (player) => {
     player.liveTracker = null;
   }
 };
+
+/**
+ * Setup double-tap to toggle fullscreen on mobile
+ */
+export const setupDoubleTapFullscreen = (player) => {
+  let lastTap = 0;
+  const doubleTapDelay = 300; // milliseconds
+
+  const videoElement = player.el().querySelector('video');
+  if (!videoElement) return;
+
+  const handleDoubleTap = (e) => {
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTap;
+
+    if (tapLength < doubleTapDelay && tapLength > 0) {
+      // Double tap detected
+      e.preventDefault();
+
+      if (player.isFullscreen && player.isFullscreen()) {
+        player.exitFullscreen();
+      } else if (player.requestFullscreen) {
+        player.requestFullscreen();
+      }
+
+      lastTap = 0; // Reset to prevent triple-tap
+    } else {
+      lastTap = currentTime;
+    }
+  };
+
+  videoElement.addEventListener('touchend', handleDoubleTap);
+
+  // Return cleanup function
+  return () => {
+    videoElement.removeEventListener('touchend', handleDoubleTap);
+  };
+};

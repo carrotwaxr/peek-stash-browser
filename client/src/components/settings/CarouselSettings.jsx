@@ -64,16 +64,18 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
 
   // Touch event handlers for mobile support
   const handleTouchStart = (e, index) => {
+    e.preventDefault(); // Prevent scrolling during drag
     setDraggedIndex(index);
     setTouchStartY(e.touches[0].clientY);
   };
 
   const handleTouchMove = (e, index) => {
+    e.preventDefault(); // Prevent scrolling - must be first
+
     if (draggedIndex === null || touchStartY === null) {
       return;
     }
 
-    e.preventDefault();
     const currentY = e.touches[0].clientY;
     const deltaY = currentY - touchStartY;
 

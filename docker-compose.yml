@@ -9,16 +9,15 @@ services:
     env_file:
       - .env
     environment:
-      # These are ALWAYS the same inside Docker - no need in .env file
+      # Config directory location inside container
       - CONFIG_DIR=/app/data
-      - STASH_MEDIA_PATH=/app/media
-      - STASH_INTERNAL_PATH=/data
     volumes:
       # Hot reloading - mount source code
       - ./server:/app
       - /app/node_modules
-      # Media access - configured via environment variables
-      - ${MEDIA_VOLUME_CONFIG}
+      # Media access - multiple volumes for multi-library support
+      - ${MEDIA_VOLUME_1:-peek-videos}:/app/media:ro
+      - ${MEDIA_VOLUME_2:-peek-images}:/app/images:ro
       # Peek config/data directory
       - ${PEEK_DATA_DIR:-./.peek-data}:/app/data
     networks:
@@ -45,10 +44,9 @@ networks:
     driver: bridge
 
 volumes:
-  # SMB/CIFS volume (only used if MEDIA_VOLUME_CONFIG=media-share:/app/media)
-  media-share:
-    driver: local
-    driver_opts:
-      type: cifs
-      device: "${SMB_SHARE}"
-      o: "username=${SMB_USERNAME},password=${SMB_PASSWORD},uid=1000,gid=1000,iocharset=utf8,file_mode=0644,dir_mode=0755"
+  # External Docker volumes (created separately, e.g., CIFS/SMB mounts)
+  # Create with: docker volume create peek-videos --driver local --opt type=cifs ...
+  peek-videos:
+    external: true
+  peek-images:
+    external: true

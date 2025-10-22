@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef, forwardRef } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useRef, forwardRef } from "react";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage, LoadingSpinner } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
@@ -16,6 +16,7 @@ import { useTVMode } from "../../hooks/useTVMode.js";
 const Tags = () => {
   usePageTitle("Tags");
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
@@ -28,39 +29,8 @@ const Tags = () => {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
 
-  useEffect(() => {
-    // Initial fetch with default parameters
-    const query = {
-      filter: {
-        direction: "DESC",
-        page: 1,
-        per_page: 24,
-        q: "",
-        sort: "scenes_count",
-      },
-    };
-
-    const fetchInitialData = async () => {
-      // Don't make API calls if not authenticated or still checking auth
-      if (isAuthLoading || !isAuthenticated) {
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setLastQuery(query);
-        setError(null);
-        const result = await getTags(query);
-        setData(result);
-      } catch (err) {
-        setError(err.message || "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchInitialData();
-  }, [isAuthLoading, isAuthenticated]);
+  // Note: We don't fetch initial data here anymore.
+  // SearchControls will trigger the initial query via onQueryChange based on URL params.
 
   const handleQueryChange = async (newQuery) => {
     // Don't make API calls if not authenticated or still checking auth
@@ -88,13 +58,13 @@ const Tags = () => {
 
   const currentTags = data?.tags || [];
   const totalCount = data?.count || 0;
-  const perPage = lastQuery?.filter?.per_page || 24;
-  const totalPages = Math.ceil(totalCount / perPage);
-  const currentPage = lastQuery?.filter?.page || 1;
 
   // Get current pagination state from URL params for bottom pagination
   const urlPage = parseInt(searchParams.get('page')) || 1;
-  const urlPerPage = parseInt(searchParams.get('perPage')) || 24;
+  const urlPerPage = parseInt(searchParams.get('per_page')) || 24;  // Fixed: 'per_page' not 'perPage'
+
+  // Calculate totalPages based on urlPerPage (from URL params), not lastQuery
+  const totalPages = Math.ceil(totalCount / urlPerPage);
 
   // Pagination handlers that update URL params (SearchControls will react to these changes)
   const handlePageChange = (newPage) => {
@@ -116,8 +86,8 @@ const Tags = () => {
     columns,
     enabled: !isLoading && isTVMode,
     onSelect: (tag) => navigate(`/tag/${tag.id}`),
-    onPageUp: () => currentPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage - 1 } }),
-    onPageDown: () => currentPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: currentPage + 1 } }),
+    onPageUp: () => urlPage > 1 && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: urlPage - 1 } }),
+    onPageDown: () => urlPage < totalPages && handleQueryChange({ ...lastQuery, filter: { ...lastQuery.filter, page: urlPage + 1 } }),
   });
 
   // Initial focus
@@ -146,6 +116,7 @@ const Tags = () => {
         initialSort="scenes_count"
         onQueryChange={handleQueryChange}
         totalPages={totalPages}
+        totalCount={totalCount}
       />
 
       {isLoading ? (
@@ -161,6 +132,7 @@ const Tags = () => {
                 tabIndex={isFocused(index) ? 0 : -1}
                 className={isFocused(index) ? "keyboard-focus" : ""}
                 isTVMode={isTVMode}
+                referrerUrl={`${location.pathname}${location.search}`}
               />
             ))}
           </div>
@@ -184,7 +156,7 @@ const Tags = () => {
   );
 };
 
-const TagCard = forwardRef(({ tag, tabIndex, className = "", isTVMode = false }, ref) => {
+const TagCard = forwardRef(({ tag, tabIndex, className = "", isTVMode = false, referrerUrl }, ref) => {
   const getTagColor = (name) => {
     // Generate a consistent color based on the tag name
     const colors = [
@@ -208,6 +180,7 @@ const TagCard = forwardRef(({ tag, tabIndex, className = "", isTVMode = false },
   return (
     <Link
       ref={ref}
+      state={{ referrerUrl }}
       to={`/tag/${tag.id}`}
       tabIndex={isTVMode ? tabIndex : -1}
       className={`tag-card block rounded-lg border p-6 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}

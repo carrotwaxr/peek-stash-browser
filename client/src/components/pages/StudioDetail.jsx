@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
@@ -8,6 +8,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const StudioDetail = () => {
   const { studioId } = useParams();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [studio, setStudio] = useState(null);
 
@@ -45,7 +46,7 @@ const StudioDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Link
-            to="/studios"
+            to={location.state?.referrerUrl || "/studios"}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
             style={{
               color: "var(--accent-primary)",
@@ -106,6 +107,7 @@ const StudioDetail = () => {
               studios: [{ id: studioId, name: studio?.name || "Unknown Studio" }],
             }}
             title={`Scenes from ${studio?.name || "this studio"}`}
+            captureReferrer={false}
           />
         </div>
       </div>

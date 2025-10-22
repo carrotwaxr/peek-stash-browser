@@ -32,7 +32,7 @@ export const useVideoPlayer = (scene, playlist, compatibility) => {
     if (playlist && playlist.currentIndex !== undefined) {
       setCurrentPlaylistIndex(playlist.currentIndex);
     }
-  }, [playlist]);
+  }, [playlist?.currentIndex, currentPlaylistIndex, playlist?.id]);
 
   // Reset player state when scene changes
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
@@ -8,6 +8,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const TagDetail = () => {
   const { tagId } = useParams();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [tag, setTag] = useState(null);
 
@@ -45,7 +46,7 @@ const TagDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Link
-            to="/tags"
+            to={location.state?.referrerUrl || "/tags"}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
             style={{
               color: "var(--accent-primary)",
@@ -105,6 +106,7 @@ const TagDetail = () => {
               tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
             }}
             title={`Scenes tagged with ${tag?.name || "this tag"}`}
+            captureReferrer={false}
           />
         </div>
       </div>

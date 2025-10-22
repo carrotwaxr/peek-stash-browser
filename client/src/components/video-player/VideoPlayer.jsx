@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
@@ -18,6 +18,7 @@ import {
   setupPlaylistControls,
   getVideoJsOptions,
   disableLiveTracker,
+  setupDoubleTapFullscreen,
 } from "./videoPlayerUtils.js";
 // Logging utilities removed - verbose logging disabled for production
 
@@ -78,11 +79,40 @@ const VideoPlayer = ({
     }
   }, [externalQuality, internalQuality, internalSetQuality]);
 
-  const { playPreviousInPlaylist, playNextInPlaylist } = usePlaylistNavigation(
+  const { playPreviousInPlaylist: originalPlayPrevious, playNextInPlaylist: originalPlayNext } = usePlaylistNavigation(
     playlist,
     currentPlaylistIndex,
     navigate
   );
+
+  // Wrap navigation functions to preserve fullscreen state and playing state
+  const playPreviousInPlaylist = useCallback(() => {
+    const player = playerRef.current;
+    if (player) {
+      if (player.isFullscreen && player.isFullscreen()) {
+        sessionStorage.setItem('videoPlayerFullscreen', 'true');
+      }
+      // Store playing state for autoplay
+      if (!player.paused()) {
+        sessionStorage.setItem('videoPlayerAutoplay', 'true');
+      }
+    }
+    originalPlayPrevious();
+  }, [originalPlayPrevious]);
+
+  const playNextInPlaylist = useCallback(() => {
+    const player = playerRef.current;
+    if (player) {
+      if (player.isFullscreen && player.isFullscreen()) {
+        sessionStorage.setItem('videoPlayerFullscreen', 'true');
+      }
+      // Store playing state for autoplay
+      if (!player.paused()) {
+        sessionStorage.setItem('videoPlayerAutoplay', 'true');
+      }
+    }
+    originalPlayNext();
+  }, [originalPlayNext]);
 
   // Reset resume flag and initial resume time when scene changes
   useEffect(() => {
@@ -226,20 +256,59 @@ const VideoPlayer = ({
           const shouldResume = location.state?.shouldResume;
           const resumeTime = initialResumeTimeRef.current;
 
+          // Check for playlist navigation flags
+          const wasFullscreen = sessionStorage.getItem('videoPlayerFullscreen');
+          const shouldAutoplay = sessionStorage.getItem('videoPlayerAutoplay');
+
+          if (wasFullscreen === 'true') {
+            sessionStorage.removeItem('videoPlayerFullscreen');
+          }
+          if (shouldAutoplay === 'true') {
+            sessionStorage.removeItem('videoPlayerAutoplay');
+          }
+
           if (shouldResume && !hasResumedRef.current && resumeTime > 0) {
             // Resume from saved position
             console.log('[Resume Debug] Player ready, resuming to:', resumeTime);
             hasResumedRef.current = true;
 
             player.currentTime(resumeTime);
+
             player.play().then(() => {
               console.log('[Resume Debug] Playing from resume time:', player.currentTime());
+              // Re-enter fullscreen if it was active before navigation
+              if (wasFullscreen === 'true') {
+                // Wait for player to be fully ready and playing
+                player.one('playing', () => {
+                  setTimeout(() => {
+                    if (player && !player.isDisposed() && player.requestFullscreen && !player.isFullscreen()) {
+                      player.requestFullscreen().catch(() => {
+                        // Fullscreen request failed - user may need to interact first
+                      });
+                    }
+                  }, 200);
+                });
+              }
             }).catch((err) => {
               console.log('[Resume Debug] Autoplay failed:', err.message);
             });
-          } else {
-            // Normal play from beginning
-            player.play().catch(() => {
+          } else if (shouldAutoplay === 'true') {
+            // Autoplay for playlist navigation (user was watching and navigated)
+            player.play().then(() => {
+              // Re-enter fullscreen if it was active before navigation
+              if (wasFullscreen === 'true') {
+                // Wait for player to be fully ready and playing
+                player.one('playing', () => {
+                  setTimeout(() => {
+                    if (player && !player.isDisposed() && player.requestFullscreen && !player.isFullscreen()) {
+                      player.requestFullscreen().catch(() => {
+                        // Fullscreen request failed - user may need to interact first
+                      });
+                    }
+                  }, 200);
+                });
+              }
+            }).catch(() => {
               // Autoplay failed, user interaction required
             });
           }
@@ -320,16 +389,12 @@ const VideoPlayer = ({
           setupTranscodedSeeking(player, sessionId, api);
         }
 
+        // Setup double-tap to toggle fullscreen on mobile
+        setupDoubleTapFullscreen(player);
+
         // Setup playlist navigation controls
-        if (playlist && playlist.scenes && playlist.scenes.length > 1) {
-          setupPlaylistControls(
-            player,
-            playlist,
-            currentPlaylistIndex,
-            playPreviousInPlaylist,
-            playNextInPlaylist
-          );
-        }
+        // Note: Don't set up here - will be set up by the useEffect that watches currentPlaylistIndex
+        // This avoids setting up with stale index values
 
         // Setup auto-play next scene in playlist when video ends
         if (playlist && playlist.scenes && playlist.scenes.length > 1) {
@@ -378,6 +443,21 @@ const VideoPlayer = ({
     playNextInPlaylist,
   ]);
 
+  // Update playlist buttons when currentPlaylistIndex changes or when player becomes ready
+  useEffect(() => {
+    const player = playerRef.current;
+    if (player && !player.isDisposed() && playlist && playlist.scenes && playlist.scenes.length > 1) {
+      setupPlaylistControls(
+        player,
+        playlist,
+        currentPlaylistIndex,
+        playPreviousInPlaylist,
+        playNextInPlaylist
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPlaylistIndex, showPoster]); // showPoster changes when player is ready
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -407,10 +487,26 @@ const VideoPlayer = ({
     }
   }, [quality, updateQuality]);
 
-  const handlePlay = () => {
+  const handlePlay = useCallback(() => {
     setIsInitializing(true);
     fetchVideoData();
-  };
+  }, [fetchVideoData]);
+
+  // Auto-start playback if navigating from a playing video in a playlist OR resuming from Continue Watching
+  useEffect(() => {
+    const shouldAutoplay = sessionStorage.getItem('videoPlayerAutoplay');
+    const shouldResume = location.state?.shouldResume;
+
+    // For shouldResume, wait until we've captured the resume time from watch history
+    // For shouldAutoplay, trigger immediately
+    const canAutoplay = shouldAutoplay === 'true' ||
+                       (shouldResume && initialResumeTimeRef.current !== null);
+
+    if (canAutoplay && showPoster && !isInitializing && !video) {
+      // Automatically start playing (skip poster)
+      handlePlay();
+    }
+  }, [scene.id, showPoster, isInitializing, video, handlePlay, location.state, watchHistory]);
 
   return (
     <section>

@@ -164,6 +164,7 @@ const SceneGrid = ({
             }
             isSelected={selectedScenes.some(s => s.id === scene.id)}
             onToggleSelect={handleToggleSelect}
+            selectionMode={selectedScenes.length > 0}
           />
         ))}
       </div>

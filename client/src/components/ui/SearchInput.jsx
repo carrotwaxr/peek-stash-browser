@@ -6,12 +6,20 @@ import { useState, useEffect } from "react";
 const SearchInput = ({
   placeholder = "Search...",
   onSearch,
+  value,
   debounceMs = 300,
   className = "",
   autoFocus = false,
   clearOnSearch = false,
 }) => {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(value || "");
+
+  // Sync internal state when external value changes
+  useEffect(() => {
+    if (value !== undefined && value !== query) {
+      setQuery(value);
+    }
+  }, [value]);
 
   useEffect(() => {
     if (!query.trim()) {

@@ -90,7 +90,7 @@ const UserMenu = () => {
                   {user?.username || "User"}
                 </div>
                 <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Administrator
+                  {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "User"}
                 </div>
               </div>
             </div>

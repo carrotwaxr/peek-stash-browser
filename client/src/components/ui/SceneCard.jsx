@@ -23,12 +23,15 @@ const SceneCard = forwardRef(
       className = "",
       isSelected = false,
       onToggleSelect,
+      selectionMode = false,
     },
     ref
   ) => {
     const { isTVMode } = useTVMode();
     const longPressTimerRef = useRef(null);
     const [isLongPressing, setIsLongPressing] = useState(false);
+    const startPosRef = useRef({ x: 0, y: 0 });
+    const hasMovedRef = useRef(false);
 
     const handleClick = (e) => {
       // Don't interfere with clicks on interactive elements
@@ -54,7 +57,13 @@ const SceneCard = forwardRef(
       }
 
       e.preventDefault();
-      onClick?.(scene);
+
+      // When in selection mode (at least one card selected), toggle selection on click
+      if (selectionMode) {
+        onToggleSelect?.(scene);
+      } else {
+        onClick?.(scene);
+      }
     };
 
     const handleMouseDown = (e) => {
@@ -104,10 +113,35 @@ const SceneCard = forwardRef(
         return;
       }
 
+      // Track starting position
+      const touch = e.touches[0];
+      startPosRef.current = { x: touch.clientX, y: touch.clientY };
+      hasMovedRef.current = false;
+
       longPressTimerRef.current = setTimeout(() => {
-        setIsLongPressing(true);
-        onToggleSelect?.(scene);
+        // Only trigger if hasn't moved (not dragging)
+        if (!hasMovedRef.current) {
+          setIsLongPressing(true);
+          onToggleSelect?.(scene);
+        }
       }, 500); // 500ms for long press
+    };
+
+    const handleTouchMove = (e) => {
+      // Check if user has moved beyond threshold (indicates scrolling/dragging)
+      if (longPressTimerRef.current && e.touches.length > 0) {
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
+        const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
+        const moveThreshold = 10; // pixels
+
+        if (deltaX > moveThreshold || deltaY > moveThreshold) {
+          // User is dragging/scrolling, cancel long press
+          hasMovedRef.current = true;
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+      }
     };
 
     const handleTouchEnd = () => {
@@ -115,6 +149,7 @@ const SceneCard = forwardRef(
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
+      hasMovedRef.current = false;
     };
 
     // Cleanup on unmount
@@ -174,7 +209,9 @@ const SceneCard = forwardRef(
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
         tabIndex={isTVMode ? tabIndex : -1}
@@ -183,11 +220,11 @@ const SceneCard = forwardRef(
       >
         {/* Thumbnail */}
         <div className="relative aspect-video overflow-hidden" style={{backgroundColor: "var(--bg-secondary)"}}>
-          {/* Selection Checkbox - Always shown */}
+          {/* Selection Checkbox - Always shown, larger touchpoint on mobile */}
           <div className="absolute top-2 left-2 z-20">
             <button
               onClick={handleCheckboxClick}
-              className="w-6 h-6 rounded border-2 flex items-center justify-center transition-all"
+              className="w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
               style={{
                 backgroundColor: isSelected ? "var(--selection-color)" : "rgba(0, 0, 0, 0.5)",
                 borderColor: isSelected ? "var(--selection-color)" : "rgba(255, 255, 255, 0.7)",
@@ -206,7 +243,7 @@ const SceneCard = forwardRef(
             >
               {isSelected && (
                 <svg
-                  className="w-4 h-4 text-white"
+                  className="w-5 h-5 sm:w-4 sm:h-4 text-white"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

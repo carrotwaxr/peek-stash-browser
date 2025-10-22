@@ -55,7 +55,7 @@ const Navigation = () => {
           <PeekLogo variant="auto" size="default" />
 
           {/* Desktop Navigation Links */}
-          <ul className="hidden md:flex items-center gap-6">
+          <ul className="hidden lg:flex items-center gap-6">
             {navItems.map((item) => (
               <li key={item.name}>
                 <Link
@@ -96,7 +96,7 @@ const Navigation = () => {
 
             {/* Mobile menu button */}
             <button
-              className="md:hidden p-2 rounded-lg"
+              className="lg:hidden p-2 rounded-lg"
               style={{
                 backgroundColor: "var(--bg-card)",
                 color: "var(--text-primary)",
@@ -132,7 +132,7 @@ const Navigation = () => {
 
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4">
+          <div className="lg:hidden mt-4 pb-4">
             <ul className="flex flex-col space-y-2">
               {navItems.map((item) => (
                 <li key={item.name}>
