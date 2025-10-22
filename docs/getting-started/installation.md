@@ -404,6 +404,82 @@ After installation, access Peek in your browser for the first-time setup:
 !!! tip "Path Mapping Made Easy"
 The wizard auto-discovers your Stash library paths and helps you map them correctly!
 
+## Updating Peek
+
+### Check for Updates
+
+Peek includes a built-in update checker:
+
+1. Navigate to **Settings → Server Settings**
+2. Scroll to the **Version Information** section
+3. Click **Check for Updates**
+
+The system will query GitHub for new releases and notify you if an update is available.
+
+### Update Procedure
+
+To update your Docker container to the latest version:
+
+=== "unRAID"
+    **Easiest method**: Click **Force Update** in the Docker tab to pull the latest image and restart.
+
+=== "Linux/macOS"
+    ```bash
+    # Stop and remove current container
+    docker stop peek-stash-browser
+    docker rm peek-stash-browser
+
+    # Pull latest image
+    docker pull carrotwaxr/peek-stash-browser:latest
+
+    # Restart with same docker run command you used for installation
+    docker run -d \
+      --name peek-stash-browser \
+      -p 6969:80 \
+      -v /path/to/stash/media:/app/media:ro \
+      -v peek-data:/app/data \
+      -e STASH_URL=http://192.168.1.100:9999/graphql \
+      -e STASH_API_KEY=your_api_key_here \
+      -e JWT_SECRET="${JWT_SECRET}" \
+      carrotwaxr/peek-stash-browser:latest
+    ```
+
+=== "Windows"
+    ```powershell
+    # Stop and remove current container
+    docker stop peek-stash-browser
+    docker rm peek-stash-browser
+
+    # Pull latest image
+    docker pull carrotwaxr/peek-stash-browser:latest
+
+    # Restart with same docker run command you used for installation
+    docker run -d `
+      --name peek-stash-browser `
+      -p 6969:80 `
+      -v peek-media:/app/media:ro `
+      -v peek-data:/app/data `
+      -e STASH_URL=http://192.168.1.100:9999/graphql `
+      -e STASH_API_KEY=your_api_key_here `
+      -e JWT_SECRET=$jwt `
+      carrotwaxr/peek-stash-browser:latest
+    ```
+
+!!! success "Your data persists across updates"
+    Database, user settings, path mappings, and playlists are stored in the `peek-data` volume and will not be lost.
+
+### Version Pinning
+
+To use a specific version instead of `:latest`:
+
+```bash
+# Pull and use specific version
+docker pull carrotwaxr/peek-stash-browser:1.0.0
+docker run ... carrotwaxr/peek-stash-browser:1.0.0
+```
+
+Available versions: [GitHub Releases](https://github.com/carrotwaxr/peek-stash-browser/releases)
+
 ## Port Configuration
 
 | Environment     | Port   | Service      | Description                              |

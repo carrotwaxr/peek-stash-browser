@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
@@ -277,18 +277,9 @@ const VideoPlayer = ({
             player.play().then(() => {
               console.log('[Resume Debug] Playing from resume time:', player.currentTime());
               // Re-enter fullscreen if it was active before navigation
-              if (wasFullscreen === 'true') {
-                // Wait for player to be fully ready and playing
-                player.one('playing', () => {
-                  setTimeout(() => {
-                    if (player && !player.isDisposed() && player.requestFullscreen && !player.isFullscreen()) {
-                      player.requestFullscreen().catch(() => {
-                        // Fullscreen request failed - user may need to interact first
-                      });
-                    }
-                  }, 200);
-                });
-              }
+              // Note: Browser auto-exits fullscreen when player element is removed during navigation
+              // We can't reliably re-enter without a user gesture, so skip this
+              // User can manually re-enter fullscreen if desired
             }).catch((err) => {
               console.log('[Resume Debug] Autoplay failed:', err.message);
             });
@@ -296,18 +287,9 @@ const VideoPlayer = ({
             // Autoplay for playlist navigation (user was watching and navigated)
             player.play().then(() => {
               // Re-enter fullscreen if it was active before navigation
-              if (wasFullscreen === 'true') {
-                // Wait for player to be fully ready and playing
-                player.one('playing', () => {
-                  setTimeout(() => {
-                    if (player && !player.isDisposed() && player.requestFullscreen && !player.isFullscreen()) {
-                      player.requestFullscreen().catch(() => {
-                        // Fullscreen request failed - user may need to interact first
-                      });
-                    }
-                  }, 200);
-                });
-              }
+              // Note: Browser auto-exits fullscreen when player element is removed during navigation
+              // We can't reliably re-enter without a user gesture, so skip this
+              // User can manually re-enter fullscreen if desired
             }).catch(() => {
               // Autoplay failed, user interaction required
             });

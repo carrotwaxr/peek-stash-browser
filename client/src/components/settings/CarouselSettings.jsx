@@ -1,18 +1,40 @@
 import { useState, useEffect } from "react";
 import { GripVertical, Eye, EyeOff } from "lucide-react";
+import Button from "../ui/Button.jsx";
 
 /**
  * Carousel metadata mapping fetchKey to display information
  */
 const CAROUSEL_METADATA = {
   highRatedScenes: { title: "High Rated", description: "Top rated scenes" },
-  recentlyAddedScenes: { title: "Recently Added", description: "Newly added content" },
-  longScenes: { title: "Feature Length", description: "Longer duration scenes" },
-  highBitrateScenes: { title: "High Bitrate", description: "Highest quality videos" },
-  barelyLegalScenes: { title: "Barely Legal", description: "18 year old performers" },
-  favoritePerformerScenes: { title: "Favorite Performers", description: "Scenes with your favorite performers" },
-  favoriteStudioScenes: { title: "Favorite Studios", description: "Content from your favorite studios" },
-  favoriteTagScenes: { title: "Favorite Tags", description: "Scenes with your favorite tags" },
+  recentlyAddedScenes: {
+    title: "Recently Added",
+    description: "Newly added content",
+  },
+  longScenes: {
+    title: "Feature Length",
+    description: "Longer duration scenes",
+  },
+  highBitrateScenes: {
+    title: "High Bitrate",
+    description: "Highest quality videos",
+  },
+  barelyLegalScenes: {
+    title: "Barely Legal",
+    description: "18 year old performers",
+  },
+  favoritePerformerScenes: {
+    title: "Favorite Performers",
+    description: "Scenes with your favorite performers",
+  },
+  favoriteStudioScenes: {
+    title: "Favorite Studios",
+    description: "Content from your favorite studios",
+  },
+  favoriteTagScenes: {
+    title: "Favorite Tags",
+    description: "Scenes with your favorite tags",
+  },
 };
 
 /**
@@ -138,7 +160,10 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+        <h3
+          className="text-lg font-semibold mb-2"
+          style={{ color: "var(--text-primary)" }}
+        >
           Homepage Carousels
         </h3>
         <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
@@ -148,7 +173,10 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
 
       <div className="space-y-2">
         {preferences.map((pref, index) => {
-          const metadata = CAROUSEL_METADATA[pref.id] || { title: pref.id, description: "" };
+          const metadata = CAROUSEL_METADATA[pref.id] || {
+            title: pref.id,
+            description: "",
+          };
 
           return (
             <div
@@ -178,60 +206,54 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
                 />
 
                 <div className="flex-1">
-                  <div className="font-medium" style={{ color: "var(--text-primary)" }}>
+                  <div
+                    className="font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     {metadata.title}
                   </div>
-                  <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                  <div
+                    className="text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {metadata.description}
                   </div>
                 </div>
               </div>
 
-              <button
+              <Button
                 onClick={() => toggleEnabled(pref.id)}
-                className="p-2 rounded-lg hover:bg-opacity-80 transition-colors"
-                style={{
-                  backgroundColor: pref.enabled ? "var(--accent-primary)" : "var(--bg-secondary)",
-                  color: pref.enabled ? "white" : "var(--text-secondary)",
-                }}
+                variant={pref.enabled ? "primary" : "secondary"}
+                className="p-2"
+                icon={
+                  pref.enabled ? (
+                    <Eye className="w-5 h-5" />
+                  ) : (
+                    <EyeOff className="w-5 h-5" />
+                  )
+                }
                 title={pref.enabled ? "Hide carousel" : "Show carousel"}
-              >
-                {pref.enabled ? (
-                  <Eye className="w-5 h-5" />
-                ) : (
-                  <EyeOff className="w-5 h-5" />
-                )}
-              </button>
+              />
             </div>
           );
         })}
       </div>
 
-      {hasChanges && (
-        <div className="flex items-center justify-end space-x-3 pt-4 border-t" style={{ borderColor: "var(--border-color)" }}>
-          <button
-            onClick={handleReset}
-            className="px-4 py-2 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-6 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90"
-            style={{
-              backgroundColor: "var(--accent-primary)",
-              color: "white",
-            }}
-          >
-            Save Changes
-          </button>
-        </div>
-      )}
+      <div
+        className="flex items-center justify-end space-x-3 pt-4 border-t"
+        style={{ borderColor: "var(--border-color)" }}
+      >
+        <Button
+          disabled={!hasChanges}
+          onClick={handleReset}
+          variant="secondary"
+        >
+          Cancel
+        </Button>
+        <Button disabled={!hasChanges} onClick={handleSave} variant="primary">
+          Save Changes
+        </Button>
+      </div>
     </div>
   );
 };

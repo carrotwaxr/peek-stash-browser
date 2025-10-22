@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useTheme } from "../../themes/useTheme.js";
 import { setupApi } from "../../services/api.js";
+import Button from "../ui/Button.jsx";
 
 const SetupWizard = ({ onSetupComplete }) => {
   const { theme } = useTheme();
@@ -9,7 +10,7 @@ const SetupWizard = ({ onSetupComplete }) => {
   const [error, setError] = useState("");
 
   // Step 2: Discovered libraries
-  const [stashLibraries, setStashLibraries] = useState([]);
+  const [_stashLibraries, setStashLibraries] = useState([]);
 
   // Step 3: Path mappings
   const [pathMappings, setPathMappings] = useState([]);
@@ -97,16 +98,14 @@ const SetupWizard = ({ onSetupComplete }) => {
         </div>
       </div>
 
-      <button
+      <Button
         onClick={() => setCurrentStep(1)}
-        className="w-full py-3 px-4 rounded-lg font-semibold transition-colors"
-        style={{
-          backgroundColor: theme?.properties?.["--accent-color"] || "#3b82f6",
-          color: "#ffffff",
-        }}
+        variant="primary"
+        fullWidth
+        size="lg"
       >
         Get Started
-      </button>
+      </Button>
     </div>
   );
 
@@ -133,7 +132,7 @@ const SetupWizard = ({ onSetupComplete }) => {
       } else {
         setError("Failed to discover libraries");
       }
-    } catch (err) {
+    } catch {
       setError("Failed to connect to Stash server. Check STASH_URL and STASH_API_KEY.");
     } finally {
       setLoading(false);
@@ -170,27 +169,24 @@ const SetupWizard = ({ onSetupComplete }) => {
         </div>
       )}
 
-      <button
+      <Button
         onClick={discoverLibraries}
         disabled={loading}
-        className="w-full py-3 px-4 rounded-lg font-semibold transition-colors disabled:opacity-50"
-        style={{
-          backgroundColor: theme?.properties?.["--accent-color"] || "#3b82f6",
-          color: "#ffffff",
-        }}
+        variant="primary"
+        fullWidth
+        size="lg"
+        loading={loading}
       >
-        {loading ? "Discovering..." : "Discover Stash Libraries"}
-      </button>
+        Discover Stash Libraries
+      </Button>
 
-      <button
+      <Button
         onClick={() => setCurrentStep(0)}
-        className="w-full py-2 px-4 rounded-lg transition-colors"
-        style={{
-          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-        }}
+        variant="tertiary"
+        fullWidth
       >
         Back
-      </button>
+      </Button>
     </div>
   );
 
@@ -206,7 +202,7 @@ const SetupWizard = ({ onSetupComplete }) => {
         ...validationResults,
         [index]: result,
       });
-    } catch (err) {
+    } catch {
       setValidationResults({
         ...validationResults,
         [index]: { success: false, message: "Failed to test path" },
@@ -311,16 +307,14 @@ const SetupWizard = ({ onSetupComplete }) => {
         Your Peek Stash Browser is now configured and ready to use
       </p>
 
-      <button
+      <Button
         onClick={onSetupComplete}
-        className="w-full py-3 px-4 rounded-lg font-semibold transition-colors"
-        style={{
-          backgroundColor: theme?.properties?.["--accent-color"] || "#3b82f6",
-          color: "#ffffff",
-        }}
+        variant="primary"
+        fullWidth
+        size="lg"
       >
         Go to Login
-      </button>
+      </Button>
     </div>
   );
 
@@ -444,26 +438,23 @@ const SetupWizard = ({ onSetupComplete }) => {
       </div>
 
       <div className="flex gap-4">
-        <button
+        <Button
           onClick={() => setCurrentStep(2)}
-          className="flex-1 py-2 px-4 rounded-lg transition-colors"
-          style={{
-            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-          }}
+          variant="tertiary"
+          fullWidth
         >
           Back
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={createAdminUser}
           disabled={loading || !adminPassword || !confirmPassword}
-          className="flex-1 py-3 px-4 rounded-lg font-semibold transition-colors disabled:opacity-50"
-          style={{
-            backgroundColor: theme?.properties?.["--accent-color"] || "#3b82f6",
-            color: "#ffffff",
-          }}
+          variant="primary"
+          fullWidth
+          size="lg"
+          loading={loading}
         >
-          {loading ? "Creating..." : "Create Admin User"}
-        </button>
+          Create Admin User
+        </Button>
       </div>
     </div>
   );
@@ -597,18 +588,13 @@ const SetupWizard = ({ onSetupComplete }) => {
                         color: theme?.properties?.["--text-primary"] || "#ffffff",
                       }}
                     />
-                    <button
+                    <Button
                       onClick={() => testPath(index)}
                       disabled={!mapping.peekPath || loading}
-                      className="px-4 py-2 rounded font-semibold transition-colors disabled:opacity-50"
-                      style={{
-                        backgroundColor:
-                          theme?.properties?.["--accent-color"] || "#3b82f6",
-                        color: "#ffffff",
-                      }}
+                      variant="primary"
                     >
                       Test
-                    </button>
+                    </Button>
                   </div>
 
                   {validation && (
@@ -632,29 +618,25 @@ const SetupWizard = ({ onSetupComplete }) => {
         </div>
 
         <div className="flex gap-4 mt-6">
-          <button
+          <Button
             onClick={() => setCurrentStep(1)}
             disabled={loading}
-            className="flex-1 py-3 px-4 rounded-lg font-semibold transition-colors"
-            style={{
-              backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-              color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-            }}
+            variant="tertiary"
+            fullWidth
+            size="lg"
           >
             Back
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={savePathMappings}
             disabled={loading || (!hasLibraries ? false : !allMapped)}
-            className="flex-1 py-3 px-4 rounded-lg font-semibold transition-colors disabled:opacity-50"
-            style={{
-              backgroundColor:
-                theme?.properties?.["--accent-color"] || "#3b82f6",
-              color: "#ffffff",
-            }}
+            variant="primary"
+            fullWidth
+            size="lg"
+            loading={loading}
           >
-            {loading ? "Saving..." : hasLibraries ? "Continue" : "Skip"}
-          </button>
+            {hasLibraries ? "Continue" : "Skip"}
+          </Button>
         </div>
       </div>
     );

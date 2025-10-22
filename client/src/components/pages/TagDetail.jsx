@@ -1,20 +1,21 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useLocation } from "react-router-dom";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
-import { LucideStar } from "lucide-react";
+import Button from "../ui/Button.jsx";
+import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const TagDetail = () => {
   const { tagId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [tag, setTag] = useState(null);
 
   // Set page title to tag name
   usePageTitle(tag?.name || "Tag");
-
 
   useEffect(() => {
     const fetchTag = async () => {
@@ -45,19 +46,14 @@ const TagDetail = () => {
       <div className="max-w-none">
         {/* Back Button */}
         <div className="mt-6 mb-6">
-          <Link
-            to={location.state?.referrerUrl || "/tags"}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
-            style={{
-              color: "var(--accent-primary)",
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              border: "1px solid",
-            }}
+          <Button
+            onClick={() => navigate(location.state?.referrerUrl || "/tags")}
+            variant="secondary"
+            icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
+            title="Back to Tags"
           >
-            <span>←</span>
-            <span>Back to Tags</span>
-          </Link>
+            <span className="hidden sm:inline">Back to Tags</span>
+          </Button>
         </div>
 
         {/* Tag Header - Hero Treatment */}
@@ -69,14 +65,13 @@ const TagDetail = () => {
             >
               {tag?.name || `Tag ${tagId}`}
             </h1>
-            {tag?.favorite && <LucideStar size={32} color="#efdd03" fill="#efdd03" />}
+            {tag?.favorite && (
+              <LucideStar size={32} color="#efdd03" fill="#efdd03" />
+            )}
           </div>
 
           {tag?.aliases && tag.aliases.length > 0 && (
-            <p
-              className="text-xl"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
               Also known as: {tag.aliases.join(", ")}
             </p>
           )}
@@ -185,14 +180,46 @@ const TagStats = ({ tag }) => {
   return (
     <Card title="Statistics">
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatField label="Scenes:" value={tag?.scene_count} valueColor="var(--accent-primary)" />
-        <StatField label="Markers:" value={tag?.scene_marker_count} valueColor="var(--accent-primary)" />
-        <StatField label="Images:" value={tag?.image_count} valueColor="var(--accent-primary)" />
-        <StatField label="Galleries:" value={tag?.gallery_count} valueColor="var(--accent-primary)" />
-        <StatField label="Performers:" value={tag?.performer_count} valueColor="var(--accent-primary)" />
-        <StatField label="Studios:" value={tag?.studio_count} valueColor="var(--accent-primary)" />
-        <StatField label="Movies:" value={tag?.movie_count} valueColor="var(--accent-primary)" />
-        <StatField label="Groups:" value={tag?.group_count} valueColor="var(--accent-primary)" />
+        <StatField
+          label="Scenes:"
+          value={tag?.scene_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Markers:"
+          value={tag?.scene_marker_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Images:"
+          value={tag?.image_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Galleries:"
+          value={tag?.gallery_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Performers:"
+          value={tag?.performer_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Studios:"
+          value={tag?.studio_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Movies:"
+          value={tag?.movie_count}
+          valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Groups:"
+          value={tag?.group_count}
+          valueColor="var(--accent-primary)"
+        />
       </div>
     </Card>
   );

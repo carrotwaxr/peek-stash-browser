@@ -10,6 +10,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import Button from "../ui/Button.jsx";
 
 const Scene = () => {
   const { sceneId } = useParams();
@@ -114,16 +115,9 @@ const Scene = () => {
             <p style={{ color: "var(--text-secondary)" }}>
               Scene ID: {sceneId}
             </p>
-            <button
-              onClick={() => navigate("/scenes")}
-              className="mt-4 px-4 py-2 rounded-lg"
-              style={{
-                backgroundColor: "var(--accent-color)",
-                color: "white",
-              }}
-            >
+            <Button onClick={() => navigate("/scenes")} variant="primary">
               Browse Scenes
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -145,7 +139,7 @@ const Scene = () => {
       {/* Video Player Header */}
       <header className="container-fluid py-3 mt-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <button
+          <Button
             onClick={() => {
               // If we have a referrer URL with filters, navigate to it
               // Otherwise use browser back
@@ -155,17 +149,12 @@ const Scene = () => {
                 navigate(-1);
               }
             }}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors flex-shrink-0 self-start"
-            style={{
-              color: "var(--accent-primary)",
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              border: "1px solid",
-            }}
+            variant="secondary"
+            className="inline-flex items-center gap-2 flex-shrink-0 self-start"
           >
             <span>←</span>
             <span className="whitespace-nowrap">Back to Scenes</span>
-          </button>
+          </Button>
           <h1
             className="text-2xl font-bold line-clamp-2"
             style={{ color: "var(--text-primary)" }}

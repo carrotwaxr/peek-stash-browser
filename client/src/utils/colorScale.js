@@ -12,7 +12,7 @@
  */
 function hexToHSL(hex) {
   // Remove # if present
-  hex = hex.replace(/^#/, '');
+  hex = hex.replace(/^#/, "");
 
   // Convert to RGB
   const r = parseInt(hex.substr(0, 2), 16) / 255;
@@ -31,9 +31,15 @@ function hexToHSL(hex) {
     s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
 
     switch (max) {
-      case r: h = ((g - b) / diff + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / diff + 2) / 6; break;
-      case b: h = ((r - g) / diff + 4) / 6; break;
+      case r:
+        h = ((g - b) / diff + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        h = ((b - r) / diff + 2) / 6;
+        break;
+      case b:
+        h = ((r - g) / diff + 4) / 6;
+        break;
     }
   }
 
@@ -60,23 +66,23 @@ function hslToHex(h, s, l) {
     const hue2rgb = (p, q, t) => {
       if (t < 0) t += 1;
       if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q - p) * 6 * t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
       return p;
     };
 
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
     const p = 2 * l - q;
 
-    r = hue2rgb(p, q, h + 1/3);
+    r = hue2rgb(p, q, h + 1 / 3);
     g = hue2rgb(p, q, h);
-    b = hue2rgb(p, q, h - 1/3);
+    b = hue2rgb(p, q, h - 1 / 3);
   }
 
-  const toHex = x => {
+  const toHex = (x) => {
     const hex = Math.round(x * 255).toString(16);
-    return hex.length === 1 ? '0' + hex : hex;
+    return hex.length === 1 ? "0" + hex : hex;
   };
 
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
@@ -100,26 +106,26 @@ function adjustLightness(hex, amount) {
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Background color scale
  */
-export function generateBackgroundScale(baseColor, mode = 'dark') {
-  if (mode === 'dark') {
+export function generateBackgroundScale(baseColor, mode = "dark") {
+  if (mode === "dark") {
     // Dark mode: start dark, go lighter
     return {
-      '--bg-primary': baseColor,                          // Darkest
-      '--bg-secondary': adjustLightness(baseColor, 8),    // +8% lighter
-      '--bg-card': adjustLightness(baseColor, 6),         // +6% lighter
-      '--bg-tertiary': adjustLightness(baseColor, 12),    // +12% lighter
-      '--bg-hover': adjustLightness(baseColor, 14),       // +14% lighter
-      '--bg-overlay': 'rgba(0, 0, 0, 0.85)',              // Fixed dark overlay
+      "--bg-primary": baseColor, // Darkest
+      "--bg-secondary": adjustLightness(baseColor, 8), // +8% lighter
+      "--bg-card": adjustLightness(baseColor, 6), // +6% lighter
+      "--bg-tertiary": adjustLightness(baseColor, 12), // +12% lighter
+      "--bg-hover": adjustLightness(baseColor, 14), // +14% lighter
+      "--bg-overlay": "rgba(0, 0, 0, 0.85)", // Fixed dark overlay
     };
   } else {
     // Light mode: start light, go darker
     return {
-      '--bg-primary': baseColor,                          // Lightest
-      '--bg-secondary': adjustLightness(baseColor, -3),   // -3% darker
-      '--bg-card': baseColor,                             // Same as primary
-      '--bg-tertiary': adjustLightness(baseColor, -8),    // -8% darker
-      '--bg-hover': adjustLightness(baseColor, -5),       // -5% darker
-      '--bg-overlay': 'rgba(255, 255, 255, 0.9)',         // Fixed light overlay
+      "--bg-primary": baseColor, // Lightest
+      "--bg-secondary": adjustLightness(baseColor, -8), // -6% darker
+      "--bg-card": adjustLightness(baseColor, -6), // -4% darker
+      "--bg-tertiary": adjustLightness(baseColor, -12), // -10% darker
+      "--bg-hover": adjustLightness(baseColor, -14), // -12% darker
+      "--bg-overlay": "rgba(255, 255, 255, 0.9)", // Fixed light overlay
     };
   }
 }
@@ -130,20 +136,20 @@ export function generateBackgroundScale(baseColor, mode = 'dark') {
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Text color scale
  */
-export function generateTextScale(baseColor, mode = 'dark') {
-  if (mode === 'dark') {
+export function generateTextScale(baseColor, mode = "dark") {
+  if (mode === "dark") {
     // Dark mode: start white, go darker
     return {
-      '--text-primary': baseColor,                        // Brightest
-      '--text-secondary': adjustLightness(baseColor, -15), // -15% darker
-      '--text-muted': adjustLightness(baseColor, -30),    // -30% darker
+      "--text-primary": baseColor, // Brightest
+      "--text-secondary": adjustLightness(baseColor, -15), // -15% darker
+      "--text-muted": adjustLightness(baseColor, -30), // -30% darker
     };
   } else {
     // Light mode: start dark, go lighter
     return {
-      '--text-primary': baseColor,                        // Darkest
-      '--text-secondary': adjustLightness(baseColor, 15), // +15% lighter
-      '--text-muted': adjustLightness(baseColor, 35),     // +35% lighter
+      "--text-primary": baseColor, // Darkest
+      "--text-secondary": adjustLightness(baseColor, 15), // +15% lighter
+      "--text-muted": adjustLightness(baseColor, 35), // +35% lighter
     };
   }
 }
@@ -156,9 +162,9 @@ export function generateTextScale(baseColor, mode = 'dark') {
 export function generateAccentShades(accentColor) {
   return {
     base: accentColor,
-    hover: adjustLightness(accentColor, -8),    // Slightly darker for hover
-    active: adjustLightness(accentColor, -12),  // Even darker for active
-    light: adjustLightness(accentColor, 10),    // Lighter variant
+    hover: adjustLightness(accentColor, -8), // Slightly darker for hover
+    active: adjustLightness(accentColor, -12), // Even darker for active
+    light: adjustLightness(accentColor, 10), // Lighter variant
   };
 }
 
@@ -168,19 +174,19 @@ export function generateAccentShades(accentColor) {
  * @param {'dark'|'light'} mode - Theme mode
  * @returns {Object} Shadow definitions
  */
-export function generateShadows(accentColor, mode = 'dark') {
+export function generateShadows(accentColor, mode = "dark") {
   // Extract RGB from hex for rgba shadows
-  const hex = accentColor.replace(/^#/, '');
+  const hex = accentColor.replace(/^#/, "");
   const r = parseInt(hex.substr(0, 2), 16);
   const g = parseInt(hex.substr(2, 2), 16);
   const b = parseInt(hex.substr(4, 2), 16);
 
-  const opacity = mode === 'dark' ? [0.05, 0.1, 0.15] : [0.1, 0.15, 0.2];
+  const opacity = mode === "dark" ? [0.05, 0.1, 0.15] : [0.1, 0.15, 0.2];
 
   return {
-    '--shadow-sm': `0 1px 2px 0 rgba(${r}, ${g}, ${b}, ${opacity[0]})`,
-    '--shadow-md': `0 4px 6px -1px rgba(${r}, ${g}, ${b}, ${opacity[1]})`,
-    '--shadow-lg': `0 10px 15px -3px rgba(${r}, ${g}, ${b}, ${opacity[2]})`,
+    "--shadow-sm": `0 1px 2px 0 rgba(${r}, ${g}, ${b}, ${opacity[0]})`,
+    "--shadow-md": `0 4px 6px -1px rgba(${r}, ${g}, ${b}, ${opacity[1]})`,
+    "--shadow-lg": `0 10px 15px -3px rgba(${r}, ${g}, ${b}, ${opacity[2]})`,
   };
 }
 
@@ -191,16 +197,16 @@ export function generateShadows(accentColor, mode = 'dark') {
  */
 export function generateFocusRing(accentColor) {
   // Extract RGB for rgba shadow
-  const hex = accentColor.replace(/^#/, '');
+  const hex = accentColor.replace(/^#/, "");
   const r = parseInt(hex.substr(0, 2), 16);
   const g = parseInt(hex.substr(2, 2), 16);
   const b = parseInt(hex.substr(4, 2), 16);
 
   return {
-    '--focus-ring-color': accentColor,
-    '--focus-ring-shadow': `0 0 0 3px rgba(${r}, ${g}, ${b}, 0.3)`,
-    '--selection-color': accentColor,
-    '--selection-bg': `rgba(${r}, ${g}, ${b}, 0.1)`,
-    '--border-focus': accentColor,
+    "--focus-ring-color": accentColor,
+    "--focus-ring-shadow": `0 0 0 3px rgba(${r}, ${g}, ${b}, 0.3)`,
+    "--selection-color": accentColor,
+    "--selection-bg": `rgba(${r}, ${g}, ${b}, 0.1)`,
+    "--border-focus": accentColor,
   };
 }

@@ -1,4 +1,5 @@
 import { useFocusTrap } from "../../hooks/useFocusTrap.js";
+import Button from "./Button.jsx";
 
 /**
  * Reusable confirmation dialog component
@@ -24,15 +25,7 @@ const ConfirmDialog = ({
     onClose();
   };
 
-  const confirmButtonStyle = confirmStyle === "danger"
-    ? {
-        backgroundColor: "var(--accent-error)",
-        color: "white",
-      }
-    : {
-        backgroundColor: "var(--accent-primary)",
-        color: "white",
-      };
+  const confirmVariant = confirmStyle === "danger" ? "destructive" : "primary";
 
   return (
     <div
@@ -75,24 +68,12 @@ const ConfirmDialog = ({
           className="px-6 py-4 border-t flex justify-end gap-3"
           style={{ borderColor: "var(--border-color)" }}
         >
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg transition-opacity hover:opacity-80"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-primary)",
-            }}
-          >
+          <Button onClick={onClose} variant="secondary">
             {cancelText}
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="px-4 py-2 rounded-lg transition-opacity hover:opacity-90"
-            style={confirmButtonStyle}
-          >
+          </Button>
+          <Button onClick={handleConfirm} variant={confirmVariant}>
             {confirmText}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

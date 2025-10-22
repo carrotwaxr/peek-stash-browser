@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useLocation } from "react-router-dom";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import Button from "../ui/Button.jsx";
 import {
   LucideMars,
   LucideStar,
@@ -15,7 +16,8 @@ import {
   LucideGlobe,
   LucideLink,
   LucideFacebook,
-  LucideVideo
+  LucideVideo,
+  ArrowLeft,
 } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 
@@ -24,62 +26,63 @@ const getSiteInfo = (url) => {
   const urlLower = url.toLowerCase();
 
   // Social Media
-  if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) {
-    return { name: 'Twitter', icon: LucideTwitter, color: '#1DA1F2' }; // Twitter blue
+  if (urlLower.includes("twitter.com") || urlLower.includes("x.com")) {
+    return { name: "Twitter", icon: LucideTwitter, color: "#1DA1F2" }; // Twitter blue
   }
-  if (urlLower.includes('instagram.com')) {
-    return { name: 'Instagram', icon: LucideInstagram, color: '#E4405F' }; // Instagram pink
+  if (urlLower.includes("instagram.com")) {
+    return { name: "Instagram", icon: LucideInstagram, color: "#E4405F" }; // Instagram pink
   }
-  if (urlLower.includes('facebook.com')) {
-    return { name: 'Facebook', icon: LucideFacebook, color: '#1877F2' }; // Facebook blue
+  if (urlLower.includes("facebook.com")) {
+    return { name: "Facebook", icon: LucideFacebook, color: "#1877F2" }; // Facebook blue
   }
-  if (urlLower.includes('onlyfans.com')) {
-    return { name: 'OnlyFans', icon: LucideVideo, color: '#00AFF0' }; // OnlyFans cyan
+  if (urlLower.includes("onlyfans.com")) {
+    return { name: "OnlyFans", icon: LucideVideo, color: "#00AFF0" }; // OnlyFans cyan
   }
 
   // Entertainment Databases
-  if (urlLower.includes('imdb.com')) {
-    return { name: 'IMDb', icon: LucideFilm, color: '#F5C518' }; // IMDb yellow
+  if (urlLower.includes("imdb.com")) {
+    return { name: "IMDb", icon: LucideFilm, color: "#F5C518" }; // IMDb yellow
   }
 
   // Adult Industry Databases
-  if (urlLower.includes('iafd.com')) {
-    return { name: 'IAFD', icon: LucideDatabase, color: '#9B59B6' }; // Purple
+  if (urlLower.includes("iafd.com")) {
+    return { name: "IAFD", icon: LucideDatabase, color: "#9B59B6" }; // Purple
   }
-  if (urlLower.includes('adultfilmdatabase.com')) {
-    return { name: 'AFDB', icon: LucideDatabase, color: '#16A085' }; // Teal
+  if (urlLower.includes("adultfilmdatabase.com")) {
+    return { name: "AFDB", icon: LucideDatabase, color: "#16A085" }; // Teal
   }
-  if (urlLower.includes('freeones.com')) {
-    return { name: 'FreeOnes', icon: LucideDatabase, color: '#E67E22' }; // Orange
+  if (urlLower.includes("freeones.com")) {
+    return { name: "FreeOnes", icon: LucideDatabase, color: "#E67E22" }; // Orange
   }
-  if (urlLower.includes('babepedia.com')) {
-    return { name: 'Babepedia', icon: LucideDatabase, color: '#E91E63' }; // Pink
+  if (urlLower.includes("babepedia.com")) {
+    return { name: "Babepedia", icon: LucideDatabase, color: "#E91E63" }; // Pink
   }
-  if (urlLower.includes('data18.com')) {
-    return { name: 'Data18', icon: LucideDatabase, color: '#27AE60' }; // Green
+  if (urlLower.includes("data18.com")) {
+    return { name: "Data18", icon: LucideDatabase, color: "#27AE60" }; // Green
   }
-  if (urlLower.includes('indexxx.com')) {
-    return { name: 'Indexxx', icon: LucideDatabase, color: '#8E44AD' }; // Violet
+  if (urlLower.includes("indexxx.com")) {
+    return { name: "Indexxx", icon: LucideDatabase, color: "#8E44AD" }; // Violet
   }
-  if (urlLower.includes('thenude.com')) {
-    return { name: 'The Nude', icon: LucideDatabase, color: '#1ABC9C' }; // Aqua
+  if (urlLower.includes("thenude.com")) {
+    return { name: "The Nude", icon: LucideDatabase, color: "#1ABC9C" }; // Aqua
   }
-  if (urlLower.includes('pornteengirl.com')) {
-    return { name: 'PornTeenGirl', icon: LucideGlobe, color: '#2ECC71' }; // Lime
+  if (urlLower.includes("pornteengirl.com")) {
+    return { name: "PornTeenGirl", icon: LucideGlobe, color: "#2ECC71" }; // Lime
   }
 
   // Unknown site - extract domain with neutral color
   try {
-    const domain = new URL(url).hostname.replace('www.', '');
-    return { name: domain, icon: LucideLink, color: '#95A5A6' }; // Gray
+    const domain = new URL(url).hostname.replace("www.", "");
+    return { name: domain, icon: LucideLink, color: "#95A5A6" }; // Gray
   } catch {
-    return { name: 'Link', icon: LucideLink, color: '#95A5A6' };
+    return { name: "Link", icon: LucideLink, color: "#95A5A6" };
   }
 };
 
 const PerformerDetail = () => {
   const { performerId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [performer, setPerformer] = useState(null);
 
@@ -115,19 +118,16 @@ const PerformerDetail = () => {
       <div className="max-w-none">
         {/* Back Button */}
         <div className="mt-6 mb-6">
-          <Link
-            to={location.state?.referrerUrl || "/performers"}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
-            style={{
-              color: "var(--accent-primary)",
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              border: "1px solid",
-            }}
+          <Button
+            onClick={() =>
+              navigate(location.state?.referrerUrl || "/performers")
+            }
+            variant="secondary"
+            icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
+            title="Back to Performers"
           >
-            <span>←</span>
-            <span>Back to Performers</span>
-          </Link>
+            <span className="hidden sm:inline">Back to Performers</span>
+          </Button>
         </div>
 
         {/* Performer Header - Hero Treatment */}
@@ -140,14 +140,13 @@ const PerformerDetail = () => {
               {performer.name}
             </h1>
             <PerformerGenderIcon gender={performer.gender} size={32} />
-            {performer.favorite && <LucideStar size={32} color="#efdd03" fill="#efdd03" />}
+            {performer.favorite && (
+              <LucideStar size={32} color="#efdd03" fill="#efdd03" />
+            )}
           </div>
 
           {performer?.alias_list?.length > 0 && (
-            <p
-              className="text-xl"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
               Also known as: {performer.alias_list.join(", ")}
             </p>
           )}
@@ -301,11 +300,13 @@ const PerformerDetails = ({ performer }) => {
     <Card title="Details">
       {/* Personal Information */}
       <div className="mb-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-            style={{
-              color: "var(--text-primary)",
-              borderBottom: "2px solid var(--accent-primary)"
-            }}>
+        <h3
+          className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+          style={{
+            color: "var(--text-primary)",
+            borderBottom: "2px solid var(--accent-primary)",
+          }}
+        >
           Personal Information
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -332,11 +333,13 @@ const PerformerDetails = ({ performer }) => {
 
       {/* Physical Attributes */}
       <div className="mb-6">
-        <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-            style={{
-              color: "var(--text-primary)",
-              borderBottom: "2px solid var(--accent-primary)"
-            }}>
+        <h3
+          className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+          style={{
+            color: "var(--text-primary)",
+            borderBottom: "2px solid var(--accent-primary)",
+          }}
+        >
           Physical Attributes
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -363,11 +366,13 @@ const PerformerDetails = ({ performer }) => {
       {/* Body Modifications */}
       {(performer?.tattoos || performer?.piercings) && (
         <div className="mb-6">
-          <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-              style={{
-                color: "var(--text-primary)",
-                borderBottom: "2px solid var(--accent-primary)"
-              }}>
+          <h3
+            className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+            style={{
+              color: "var(--text-primary)",
+              borderBottom: "2px solid var(--accent-primary)",
+            }}
+          >
             Body Modifications
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -380,15 +385,20 @@ const PerformerDetails = ({ performer }) => {
       {/* Other */}
       {performer?.disambiguation && (
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-              style={{
-                color: "var(--text-primary)",
-                borderBottom: "2px solid var(--accent-primary)"
-              }}>
+          <h3
+            className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+            style={{
+              color: "var(--text-primary)",
+              borderBottom: "2px solid var(--accent-primary)",
+            }}
+          >
             Other
           </h3>
           <div className="grid grid-cols-1 gap-4">
-            <DetailField label="Disambiguation" value={performer?.disambiguation} />
+            <DetailField
+              label="Disambiguation"
+              value={performer?.disambiguation}
+            />
           </div>
         </div>
       )}
@@ -398,12 +408,15 @@ const PerformerDetails = ({ performer }) => {
 
 const PerformerStats = ({ performer }) => {
   // Calculate O-Count percentage
-  const oCountPercentage = performer?.scene_count && performer?.o_counter
-    ? ((performer.o_counter / performer.scene_count) * 100).toFixed(1)
-    : null;
+  const oCountPercentage =
+    performer?.scene_count && performer?.o_counter
+      ? ((performer.o_counter / performer.scene_count) * 100).toFixed(1)
+      : null;
 
   // Cap the progress bar width at 100% but show actual percentage
-  const oCountBarWidth = oCountPercentage ? Math.min(parseFloat(oCountPercentage), 100) : 0;
+  const oCountBarWidth = oCountPercentage
+    ? Math.min(parseFloat(oCountPercentage), 100)
+    : 0;
 
   return (
     <Card title="Statistics">
@@ -425,14 +438,23 @@ const PerformerStats = ({ performer }) => {
       {performer?.rating100 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            <span
+              className="text-sm font-medium"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Rating
             </span>
-            <span className="text-2xl font-bold" style={{ color: "var(--accent-primary)" }}>
+            <span
+              className="text-2xl font-bold"
+              style={{ color: "var(--accent-primary)" }}
+            >
               {performer.rating100}/100
             </span>
           </div>
-          <div className="w-full h-3 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-secondary)" }}>
+          <div
+            className="w-full h-3 rounded-full overflow-hidden"
+            style={{ backgroundColor: "var(--bg-secondary)" }}
+          >
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
@@ -448,14 +470,23 @@ const PerformerStats = ({ performer }) => {
       {oCountPercentage && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+            <span
+              className="text-sm font-medium"
+              style={{ color: "var(--text-secondary)" }}
+            >
               O-Count Rate
             </span>
-            <span className="text-2xl font-bold" style={{ color: "var(--accent-primary)" }}>
+            <span
+              className="text-2xl font-bold"
+              style={{ color: "var(--accent-primary)" }}
+            >
               {oCountPercentage}%
             </span>
           </div>
-          <div className="w-full h-3 rounded-full overflow-hidden" style={{ backgroundColor: "var(--bg-secondary)" }}>
+          <div
+            className="w-full h-3 rounded-full overflow-hidden"
+            style={{ backgroundColor: "var(--bg-secondary)" }}
+          >
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{
@@ -523,14 +554,14 @@ const PerformerLinks = ({ performer }) => {
       {hasLinks && (
         <Card title="Links">
           <div className="flex flex-wrap gap-2">
-            {performer?.url && (
-              <SectionLink url={performer.url} />
-            )}
+            {performer?.url && <SectionLink url={performer.url} />}
             {performer?.twitter && (
               <SectionLink url={`https://twitter.com/${performer.twitter}`} />
             )}
             {performer?.instagram && (
-              <SectionLink url={`https://instagram.com/${performer.instagram}`} />
+              <SectionLink
+                url={`https://instagram.com/${performer.instagram}`}
+              />
             )}
             {performer?.urls?.map((url, idx) => (
               <SectionLink key={idx} url={url} />

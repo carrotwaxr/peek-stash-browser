@@ -5,6 +5,9 @@ import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { PageLayout } from "../ui/index.js";
 import { setupApi } from "../../services/api.js";
+import Button from "../ui/Button.jsx";
+import Paper from "../ui/Paper.jsx";
+import packageJson from "../../../package.json";
 
 const api = axios.create({
   baseURL: "/api",
@@ -36,6 +39,13 @@ const ServerSettings = () => {
   const [pathTestResult, setPathTestResult] = useState(null);
   const [testingPath, setTestingPath] = useState(false);
 
+  // Version state
+  const [serverVersion, setServerVersion] = useState(null);
+  const [latestVersion, setLatestVersion] = useState(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateError, setUpdateError] = useState(null);
+  const CLIENT_VERSION = packageJson.version;
+
   useEffect(() => {
     // Redirect if not admin
     if (currentUser && currentUser.role !== "ADMIN") {
@@ -45,6 +55,8 @@ const ServerSettings = () => {
 
     loadUsers();
     loadPathMappings();
+    loadServerVersion();
+    checkForUpdates();
   }, [currentUser, navigate]);
 
   const loadUsers = async () => {
@@ -122,11 +134,7 @@ const ServerSettings = () => {
   const changeUserRole = async (userId, username, currentRole) => {
     const newRole = currentRole === "ADMIN" ? "USER" : "ADMIN";
 
-    if (
-      !confirm(
-        `Change "${username}" from ${currentRole} to ${newRole}?`
-      )
-    ) {
+    if (!confirm(`Change "${username}" from ${currentRole} to ${newRole}?`)) {
       return;
     }
 
@@ -250,8 +258,62 @@ const ServerSettings = () => {
         setError("No library paths found in Stash configuration");
       }
     } catch (err) {
-      setError("Failed to discover Stash libraries: " + (err.message || "Unknown error"));
+      setError(
+        "Failed to discover Stash libraries: " +
+          (err.message || "Unknown error")
+      );
     }
+  };
+
+  // Version functions
+  const loadServerVersion = async () => {
+    try {
+      const response = await api.get("/version");
+      setServerVersion(response.data.server);
+    } catch (err) {
+      console.error("Failed to load server version:", err);
+    }
+  };
+
+  const checkForUpdates = async () => {
+    setCheckingUpdate(true);
+    setUpdateError(null);
+
+    try {
+      // Check GitHub API for latest release
+      const response = await fetch('https://api.github.com/repos/carrotwaxr/peek-stash-browser/releases/latest');
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setUpdateError("No releases available yet");
+        } else {
+          setUpdateError(`GitHub API error: ${response.status}`);
+        }
+        return;
+      }
+
+      const data = await response.json();
+      const latestTag = data.tag_name.replace('v', ''); // Remove 'v' prefix if present
+      setLatestVersion(latestTag);
+    } catch (err) {
+      console.error("Failed to check for updates:", err);
+      setUpdateError("Network error - could not reach GitHub");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const compareVersions = (current, latest) => {
+    if (!current || !latest) return false;
+
+    const currentParts = current.split('.').map(Number);
+    const latestParts = latest.split('.').map(Number);
+
+    for (let i = 0; i < 3; i++) {
+      if ((latestParts[i] || 0) > (currentParts[i] || 0)) return true;
+      if ((latestParts[i] || 0) < (currentParts[i] || 0)) return false;
+    }
+    return false;
   };
 
   if (loading) {
@@ -309,42 +371,24 @@ const ServerSettings = () => {
           )}
 
           {/* User Management Section */}
-          <div
-            className="card mb-6"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-header">
+          <Paper className="mb-6">
+            <Paper.Header>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2
-                    className="text-xl font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    User Management
-                  </h2>
-                  <p
-                    className="text-sm mt-1"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <Paper.Title>User Management</Paper.Title>
+                  <Paper.Subtitle className="mt-1">
                     Manage user accounts and permissions
-                  </p>
+                  </Paper.Subtitle>
                 </div>
-                <button
+                <Button
                   onClick={() => setShowCreateModal(true)}
-                  className="px-4 py-2 rounded-lg font-medium"
-                  style={{
-                    backgroundColor: "var(--accent-color)",
-                    color: "white",
-                  }}
+                  variant="primary"
                 >
                   + Create User
-                </button>
+                </Button>
               </div>
-            </div>
-            <div className="card-body p-0">
+            </Paper.Header>
+            <Paper.Body padding="none">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -431,40 +475,30 @@ const ServerSettings = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
-                            <button
+                            <Button
                               onClick={() =>
-                                changeUserRole(user.id, user.username, user.role)
+                                changeUserRole(
+                                  user.id,
+                                  user.username,
+                                  user.role
+                                )
                               }
                               disabled={user.id === currentUser?.id}
-                              className="px-3 py-1 text-sm rounded"
-                              style={{
-                                backgroundColor: "rgba(59, 130, 246, 0.1)",
-                                color: "rgb(59, 130, 246)",
-                                opacity: user.id === currentUser?.id ? 0.5 : 1,
-                                cursor:
-                                  user.id === currentUser?.id
-                                    ? "not-allowed"
-                                    : "pointer",
-                              }}
+                              variant="secondary"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
                             >
                               Change Role
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                               onClick={() => deleteUser(user.id, user.username)}
                               disabled={user.id === currentUser?.id}
-                              className="px-3 py-1 text-sm rounded hover:bg-red-500 hover:text-white transition-colors"
-                              style={{
-                                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                color: "rgb(239, 68, 68)",
-                                opacity: user.id === currentUser?.id ? 0.5 : 1,
-                                cursor:
-                                  user.id === currentUser?.id
-                                    ? "not-allowed"
-                                    : "pointer",
-                              }}
+                              variant="destructive"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
                             >
                               Delete
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -472,59 +506,33 @@ const ServerSettings = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
+            </Paper.Body>
+          </Paper>
 
           {/* Path Mappings Section */}
-          <div
-            className="card mb-6"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-          >
-            <div className="card-header">
+          <Paper className="mb-6">
+            <Paper.Header>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2
-                    className="text-xl font-semibold"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    Path Mappings
-                  </h2>
-                  <p
-                    className="text-sm mt-1"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                  <Paper.Title>Path Mappings</Paper.Title>
+                  <Paper.Subtitle className="mt-1">
                     Configure path translations between Stash and Peek
-                  </p>
+                  </Paper.Subtitle>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={discoverLibraries}
-                    className="px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
+                  <Button onClick={discoverLibraries} variant="secondary">
                     Discover Libraries
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => setShowAddMappingModal(true)}
-                    className="px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                    }}
+                    variant="primary"
                   >
                     + Add Mapping
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </div>
-            <div className="card-body p-0">
+            </Paper.Header>
+            <Paper.Body padding="none">
               {pathMappings.length === 0 ? (
                 <div className="p-8 text-center">
                   <p
@@ -585,18 +593,16 @@ const ServerSettings = () => {
                             {mapping.peekPath}
                           </td>
                           <td className="px-6 py-4 text-right">
-                            <button
+                            <Button
                               onClick={() =>
                                 deletePathMapping(mapping.id, mapping.stashPath)
                               }
-                              className="px-3 py-1 text-sm rounded hover:bg-red-500 hover:text-white transition-colors"
-                              style={{
-                                backgroundColor: "rgba(239, 68, 68, 0.1)",
-                                color: "rgb(239, 68, 68)",
-                              }}
+                              variant="destructive"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
                             >
                               Delete
-                            </button>
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -604,8 +610,153 @@ const ServerSettings = () => {
                   </table>
                 </div>
               )}
-            </div>
-          </div>
+            </Paper.Body>
+          </Paper>
+
+          {/* Version Information Section */}
+          <Paper className="mb-6">
+            <Paper.Header>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Paper.Title>Version Information</Paper.Title>
+                  <Paper.Subtitle className="mt-1">
+                    Current versions and update status
+                  </Paper.Subtitle>
+                </div>
+                <Button
+                  onClick={checkForUpdates}
+                  disabled={checkingUpdate}
+                  variant="secondary"
+                  loading={checkingUpdate}
+                >
+                  Check for Updates
+                </Button>
+              </div>
+            </Paper.Header>
+            <Paper.Body>
+              <div className="space-y-4">
+                {/* Version Display */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p
+                      className="text-sm font-medium mb-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Client Version
+                    </p>
+                    <p
+                      className="text-lg font-mono"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {CLIENT_VERSION}
+                    </p>
+                  </div>
+                  <div>
+                    <p
+                      className="text-sm font-medium mb-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Server Version
+                    </p>
+                    <p
+                      className="text-lg font-mono"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {serverVersion || "Loading..."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Update Notification */}
+                {latestVersion && compareVersions(CLIENT_VERSION, latestVersion) && (
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{
+                      backgroundColor: "rgba(59, 130, 246, 0.1)",
+                      border: "1px solid rgba(59, 130, 246, 0.3)",
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <svg
+                        className="w-5 h-5 flex-shrink-0 mt-0.5"
+                        style={{ color: "rgb(59, 130, 246)" }}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <div className="flex-1">
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "rgb(59, 130, 246)" }}
+                        >
+                          Update Available
+                        </p>
+                        <p
+                          className="text-sm mb-2"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          Version {latestVersion} is now available. You're running version {CLIENT_VERSION}.
+                        </p>
+                        <a
+                          href="https://github.com/carrotwaxr/peek-stash-browser/releases/latest"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium inline-flex items-center gap-1 hover:underline"
+                          style={{ color: "rgb(59, 130, 246)" }}
+                        >
+                          View Release Notes
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                            />
+                          </svg>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {updateError && (
+                  <div
+                    className="p-3 rounded-lg text-sm"
+                    style={{
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      color: "rgb(239, 68, 68)",
+                    }}
+                  >
+                    {updateError}
+                  </div>
+                )}
+
+                {/* Up to Date Message */}
+                {latestVersion && !compareVersions(CLIENT_VERSION, latestVersion) && (
+                  <div
+                    className="p-3 rounded-lg text-sm"
+                    style={{
+                      backgroundColor: "rgba(34, 197, 94, 0.1)",
+                      color: "rgb(34, 197, 94)",
+                    }}
+                  >
+                    ✓ You're running the latest version
+                  </div>
+                )}
+              </div>
+            </Paper.Body>
+          </Paper>
         </div>
       </PageLayout>
 
@@ -615,145 +766,127 @@ const ServerSettings = () => {
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => !creating && setShowCreateModal(false)}
         >
-          <div
-            className="card max-w-md w-full mx-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
+          <Paper
+            className="max-w-md w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Create New User
-              </h2>
-            </div>
-            <form onSubmit={createUser} className="card-body">
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="newUsername"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    id="newUsername"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    required
-                    autoFocus
-                  />
-                </div>
+            <Paper.Header title="Create New User" />
+            <form onSubmit={createUser}>
+              <Paper.Body>
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="newUsername"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      id="newUsername"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      required
+                      autoFocus
+                    />
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor="newPassword"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    id="newPassword"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    required
-                    minLength={6}
-                  />
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Must be at least 6 characters
-                  </p>
-                </div>
+                  <div>
+                    <label
+                      htmlFor="newPassword"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      required
+                      minLength={6}
+                    />
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Must be at least 6 characters
+                    </p>
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor="newRole"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Role
-                  </label>
-                  <select
-                    id="newRole"
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    <option value="USER">User</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Admins can manage users and server settings
-                  </p>
-                </div>
+                  <div>
+                    <label
+                      htmlFor="newRole"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Role
+                    </label>
+                    <select
+                      id="newRole"
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      <option value="USER">User</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Admins can manage users and server settings
+                    </p>
+                  </div>
 
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="submit"
-                    disabled={creating}
-                    className="flex-1 px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: creating ? 0.6 : 1,
-                    }}
-                  >
-                    {creating ? "Creating..." : "Create User"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      setNewUsername("");
-                      setNewPassword("");
-                      setNewRole("USER");
-                      setError(null);
-                    }}
-                    disabled={creating}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                      opacity: creating ? 0.6 : 1,
-                    }}
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="submit"
+                      disabled={creating}
+                      variant="primary"
+                      fullWidth
+                      loading={creating}
+                    >
+                      Create User
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateModal(false);
+                        setNewUsername("");
+                        setNewPassword("");
+                        setNewRole("USER");
+                        setError(null);
+                      }}
+                      disabled={creating}
+                      variant="secondary"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
 
@@ -763,164 +896,139 @@ const ServerSettings = () => {
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
           onClick={() => !addingMapping && setShowAddMappingModal(false)}
         >
-          <div
-            className="card max-w-lg w-full mx-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
+          <Paper
+            className="max-w-lg w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Add Path Mapping
-              </h2>
-              <p
-                className="text-sm mt-1"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Map a Stash library path to where Peek can access it
-              </p>
-            </div>
-            <form onSubmit={addPathMapping} className="card-body">
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="stashPath"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Stash Path
-                  </label>
-                  <input
-                    type="text"
-                    id="stashPath"
-                    value={newStashPath}
-                    onChange={(e) => setNewStashPath(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg font-mono text-sm"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    placeholder="/data or C:\Videos"
-                    required
-                    autoFocus
-                  />
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Path as reported by Stash (use "Discover Libraries" to auto-fill)
-                  </p>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="peekPath"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Peek Path
-                  </label>
-                  <div className="flex gap-2">
+            <Paper.Header
+              title="Add Path Mapping"
+              subtitle="Map a Stash library path to where Peek can access it"
+            />
+            <form onSubmit={addPathMapping}>
+              <Paper.Body>
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="stashPath"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Stash Path
+                    </label>
                     <input
                       type="text"
-                      id="peekPath"
-                      value={newPeekPath}
-                      onChange={(e) => {
-                        setNewPeekPath(e.target.value);
-                        setPathTestResult(null);
-                      }}
-                      className="flex-1 px-4 py-2 rounded-lg font-mono text-sm"
+                      id="stashPath"
+                      value={newStashPath}
+                      onChange={(e) => setNewStashPath(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg font-mono text-sm"
                       style={{
                         backgroundColor: "var(--bg-secondary)",
                         border: "1px solid var(--border-color)",
                         color: "var(--text-primary)",
                       }}
-                      placeholder="/app/media"
+                      placeholder="/data or C:\Videos"
                       required
+                      autoFocus
                     />
-                    <button
-                      type="button"
-                      onClick={testPath}
-                      disabled={!newPeekPath.trim() || testingPath}
-                      className="px-4 py-2 rounded-lg font-medium"
-                      style={{
-                        backgroundColor: "var(--accent-color)",
-                        color: "white",
-                        opacity:
-                          !newPeekPath.trim() || testingPath ? 0.6 : 1,
-                      }}
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
                     >
-                      {testingPath ? "Testing..." : "Test"}
-                    </button>
+                      Path as reported by Stash (use "Discover Libraries" to
+                      auto-fill)
+                    </p>
                   </div>
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "var(--text-muted)" }}
-                  >
-                    Docker mount point where Peek accesses these files
-                  </p>
-                  {pathTestResult && (
-                    <div
-                      className="text-sm mt-2 p-2 rounded"
-                      style={{
-                        backgroundColor:
-                          pathTestResult.exists && pathTestResult.readable
-                            ? "rgba(34, 197, 94, 0.1)"
-                            : "rgba(239, 68, 68, 0.1)",
-                        color:
-                          pathTestResult.exists && pathTestResult.readable
-                            ? "rgb(34, 197, 94)"
-                            : "rgb(239, 68, 68)",
-                      }}
-                    >
-                      {pathTestResult.message}
-                    </div>
-                  )}
-                </div>
 
-                <div className="flex gap-3 pt-4">
-                  <button
-                    type="submit"
-                    disabled={addingMapping}
-                    className="flex-1 px-4 py-2 rounded-lg font-medium"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: addingMapping ? 0.6 : 1,
-                    }}
-                  >
-                    {addingMapping ? "Adding..." : "Add Mapping"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddMappingModal(false);
-                      setNewStashPath("");
-                      setNewPeekPath("");
-                      setPathTestResult(null);
-                      setError(null);
-                    }}
-                    disabled={addingMapping}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                      opacity: addingMapping ? 0.6 : 1,
-                    }}
-                  >
-                    Cancel
-                  </button>
+                  <div>
+                    <label
+                      htmlFor="peekPath"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Peek Path
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        id="peekPath"
+                        value={newPeekPath}
+                        onChange={(e) => {
+                          setNewPeekPath(e.target.value);
+                          setPathTestResult(null);
+                        }}
+                        className="flex-1 px-4 py-2 rounded-lg font-mono text-sm"
+                        style={{
+                          backgroundColor: "var(--bg-secondary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                        placeholder="/app/media"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        onClick={testPath}
+                        disabled={!newPeekPath.trim() || testingPath}
+                        variant="primary"
+                        loading={testingPath}
+                      >
+                        Test
+                      </Button>
+                    </div>
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Docker mount point where Peek accesses these files
+                    </p>
+                    {pathTestResult && (
+                      <div
+                        className="text-sm mt-2 p-2 rounded"
+                        style={{
+                          backgroundColor:
+                            pathTestResult.exists && pathTestResult.readable
+                              ? "rgba(34, 197, 94, 0.1)"
+                              : "rgba(239, 68, 68, 0.1)",
+                          color:
+                            pathTestResult.exists && pathTestResult.readable
+                              ? "rgb(34, 197, 94)"
+                              : "rgb(239, 68, 68)",
+                        }}
+                      >
+                        {pathTestResult.message}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="submit"
+                      disabled={addingMapping}
+                      variant="primary"
+                      fullWidth
+                      loading={addingMapping}
+                    >
+                      Add Mapping
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowAddMappingModal(false);
+                        setNewStashPath("");
+                        setNewPeekPath("");
+                        setPathTestResult(null);
+                        setError(null);
+                      }}
+                      disabled={addingMapping}
+                      variant="secondary"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
     </>

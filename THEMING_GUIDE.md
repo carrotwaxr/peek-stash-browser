@@ -5,12 +5,14 @@ This guide explains how theming works in Peek and documents which CSS variables 
 ## Theme File Location
 
 **Main files**:
+
 - `client/src/themes/themes.js` - Theme definitions
 - `client/src/utils/colorScale.js` - Color generation utilities
 
 ## Theme Architecture
 
 Peek uses CSS custom properties (CSS variables) for theming with **automatic color scale generation**. Three themes are provided:
+
 - **`peek`** (default) - Purple/pink/orange brand colors with deep dark backgrounds
 - **`light`** - Light mode with blue accents
 - **`midnight`** - Midnight blue theme with cyan accents
@@ -18,6 +20,7 @@ Peek uses CSS custom properties (CSS variables) for theming with **automatic col
 ## ✨ Major Improvements!
 
 **Color Scale Generators** - Themes now use utility functions to auto-generate color scales:
+
 - **Background colors** (6 vars) → Generated from 1 base color + mode
 - **Text colors** (3 vars) → Generated from 1 base color + mode
 - **Shadows** (3 vars) → Generated from accent color with proper opacity
@@ -32,6 +35,7 @@ Peek uses CSS custom properties (CSS variables) for theming with **automatic col
 These variables are used extensively throughout the application. **Changing these will have immediate visible impact.**
 
 #### Typography
+
 ```css
 --font-brand: "'Lilita One', cursive"          /* Logo/branding text (2 uses) */
 --font-heading: "'Space Grotesk', sans-serif"  /* H1-H6 headings (1 use in base.css) */
@@ -42,10 +46,35 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: `base.css`, `PeekLogo.jsx`
 
 #### Backgrounds (Most Important)
+
 ```css
 --bg-primary: "#0a0a0b"       /* Main page background (12 uses) */
 --bg-secondary: "#141418"     /* Secondary areas, controls (68 uses) ⭐ */
+/*
+  1. All form inputs/buttons - base.css:119,129
+    - Text inputs, select dropdowns, buttons
+  2. Navigation bar - Navigation.jsx:48
+    - The top nav bar background
+  3. Progress bars background - PerformerDetail.jsx:435,458, StudioDetail.jsx:195
+    - The unfilled portion of progress bars
+  4. Thumbnail/image placeholders - SceneThumbnail.jsx:23, SceneCard.jsx:222, Studios.jsx:175
+    - Loading state background for images
+  5. Dropdown menus - SearchableSelect.jsx:202,282, AddToPlaylistButton.jsx:308,331
+    - Select dropdowns, context menus
+  6. Filter controls - FilterControls.jsx:295,318, SearchControls.jsx:542
+    - Filter input backgrounds
+  7. Dialog backgrounds - ConfirmDialog.jsx:82, ResumeWatchDialog.jsx:81
+    - Modal/dialog overlays
+*/
 --bg-tertiary: "#1e1e24"      /* Tertiary backgrounds (6 uses) */
+/*
+  1. Permanent filter chips - ActiveFilterChips.jsx:129
+    - Special chips that can't be removed (darker to distinguish them)
+  2. Icon backgrounds in metadata - SceneMetadata.jsx:30,65
+    - Small circular/square backgrounds behind performer/studio icons
+  3. Carousel nav buttons - SceneCarousel.jsx:69,119,140
+    - Previous/next arrow button backgrounds
+*/
 --bg-card: "#181820"          /* Card backgrounds (78 uses) ⭐ */
 --bg-hover: "#22222a"         /* Hover states (4 uses) */
 --bg-overlay: "rgba(0,0,0,0.85)" /* Modal overlays (1 use) */
@@ -55,6 +84,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Examples**: SceneCard, Performers, Studios, Tags, Pagination, SearchControls, etc.
 
 #### Text Colors (Critical)
+
 ```css
 --text-primary: "#ffffff"     /* Primary text (179 uses) ⭐⭐⭐ MOST USED */
 --text-secondary: "#c8c8cc"   /* Secondary text (98 uses) ⭐⭐ */
@@ -65,6 +95,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Examples**: All page components, card titles, metadata, timestamps
 
 #### Accent Colors
+
 ```css
 --accent-primary: "#6D2CE3"   /* Purple brand color (72 uses) ⭐⭐ */
 --accent-secondary: "#FD6B86" /* Pink for secondary actions (5 uses) */
@@ -75,12 +106,14 @@ These variables are used extensively throughout the application. **Changing thes
 ```
 
 **Where used**:
+
 - **accent-primary**: Buttons, links, focus states, progress bars
 - **accent-secondary**: Home.jsx icons, SceneMetadata
 - **accent-success**: OCounterButton, success states
 - **accent-error**: ErrorMessage, validation errors
 
 #### Borders (Critical)
+
 ```css
 --border-color: "#2a2a32"     /* Default borders (143 uses) ⭐⭐⭐ 2ND MOST USED */
 --border-focus: "#6D2CE3"     /* Focused element borders (3 uses) */
@@ -89,6 +122,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: All cards, inputs, panels, dividers
 
 #### Shadows
+
 ```css
 --shadow-sm: "0 1px 2px rgba(109,44,227,0.05)"     /* Small shadows (1 use) */
 --shadow-md: "0 4px 6px rgba(109,44,227,0.1)"      /* Medium shadows (2 uses) */
@@ -98,6 +132,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: `base.css`, `VideoPlayer.css`
 
 #### Focus & Selection
+
 ```css
 --focus-ring-color: "#6D2CE3"              /* Keyboard focus indicators (4 uses) */
 --focus-ring-shadow: "0 0 0 3px rgba(...)" /* Focus ring shadow (7 uses) */
@@ -110,6 +145,7 @@ These variables are used extensively throughout the application. **Changing thes
 ### ⚠️ MODERATELY USED (Specialized)
 
 #### Video Player
+
 ```css
 --player-bg: "#000000"                     /* Video background (3 uses) */
 --controls-bg: "rgba(10,10,11,0.8)"        /* Player controls overlay (1 use) */
@@ -119,6 +155,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: `VideoPlayer.css`, video player components
 
 #### Rating Colors (5 uses total)
+
 ```css
 --rating-excellent: "#22c55e"  /* 80-100: Green */
 --rating-good: "#84cc16"       /* 60-79: Lime */
@@ -130,6 +167,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: `SceneStats.jsx` - Color-coded rating display
 
 #### Icon Colors (Stat Icons)
+
 ```css
 --icon-play-count: "#0F7173"   /* Teal play icon (1 use) */
 --icon-rating: "#FA8C2A"       /* Orange rating icon (1 use) */
@@ -139,6 +177,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: `SceneStats.jsx`, `Home.jsx`
 
 #### Role Badges (4 uses total)
+
 ```css
 --role-admin-bg: "rgba(168,85,247,0.1)"    /* Admin background */
 --role-admin-text: "#a855f7"               /* Admin text */
@@ -149,6 +188,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: `Users.jsx` page for role display
 
 #### Status States (Partial Implementation)
+
 ```css
 /* IMPLEMENTED */
 --status-error-bg: "rgba(239,68,68,0.1)"    /* Error background (2 uses) */
@@ -162,6 +202,7 @@ These variables are used extensively throughout the application. **Changing thes
 **Where used**: `ErrorMessage.jsx`, `InfoMessage.jsx`, `SceneMetadata.jsx`
 
 #### Toast Notifications (Partial Implementation)
+
 ```css
 /* IMPLEMENTED */
 --toast-error-bg: "#dc2626"                /* Toast error BG (1 use) */
@@ -181,6 +222,7 @@ These variables are used extensively throughout the application. **Changing thes
 **All 26 unused variables have been cleaned up!** The themes now only contain actively used CSS variables, making customization simpler and more straightforward.
 
 #### What Was Removed:
+
 - ❌ `--text-accent` - Never used
 - ❌ `--accent-tertiary` (peek only) - Never used
 - ❌ `--border-hover` (peek only) - Never used
@@ -192,7 +234,9 @@ These variables are used extensively throughout the application. **Changing thes
 - ❌ All success/warning toast variables - Not implemented (only error/info exist)
 
 #### How Buttons Actually Work:
+
 Buttons use the generic color system, not dedicated button variables:
+
 - **Base buttons** → `--bg-card` + `--bg-hover` (neutral gray)
 - **Primary buttons** → `--accent-primary` + opacity on hover
 - **Most buttons** → Inline styles with direct CSS variable references
@@ -204,29 +248,33 @@ Buttons use the generic color system, not dedicated button variables:
 ### Current Button Implementation
 
 **Base button class** (`base.css`):
+
 ```css
 .btn {
-  background-color: var(--bg-card);    /* Uses neutral gray, not button colors */
+  background-color: var(--bg-card); /* Uses neutral gray, not button colors */
   border: 1px solid var(--border-color);
   color: var(--text-primary);
 }
 
 .btn:hover {
-  background-color: var(--bg-hover);   /* Generic hover, not --btn-*-hover */
+  background-color: var(--bg-hover); /* Generic hover, not --btn-*-hover */
   border-color: var(--border-focus);
 }
 
 .btn-primary {
-  background-color: var(--accent-primary);  /* Uses accent, not --btn-primary-bg */
+  background-color: var(
+    --accent-primary
+  ); /* Uses accent, not --btn-primary-bg */
   border-color: var(--accent-primary);
 }
 
 .btn-primary:hover {
-  opacity: 0.9;  /* Just reduces opacity, doesn't use --btn-primary-hover */
+  opacity: 0.9; /* Just reduces opacity, doesn't use --btn-primary-hover */
 }
 ```
 
 **Most buttons use inline styles**:
+
 ```jsx
 <button style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
 ```
@@ -250,6 +298,7 @@ The dedicated button color variables (`--btn-primary-bg`, `--btn-secondary-bg`, 
 ## Common Usage Patterns
 
 ### Inline Styles (Most Common)
+
 ```jsx
 style={{
   color: "var(--text-primary)",
@@ -259,6 +308,7 @@ style={{
 ```
 
 ### CSS Classes
+
 ```css
 .my-component {
   background-color: var(--bg-card);
@@ -268,8 +318,9 @@ style={{
 ```
 
 ### Conditional Styling
+
 ```jsx
-backgroundColor: isActive ? "var(--accent-primary)" : "var(--bg-secondary)"
+backgroundColor: isActive ? "var(--accent-primary)" : "var(--bg-secondary)";
 ```
 
 ---
@@ -281,6 +332,7 @@ backgroundColor: isActive ? "var(--accent-primary)" : "var(--bg-secondary)"
 To customize a theme, you only need to change **base colors** in `themes.js` - the rest is auto-generated:
 
 **Example: Customizing the Peek theme**
+
 ```javascript
 peek: {
   name: "Peek",
@@ -324,22 +376,25 @@ All with proper lightness adjustments for dark/light modes!
 ### Future: Theme Builder UI
 
 These generators are ready for a future theme builder form where users can:
+
 1. Pick base background color
 2. Choose dark/light mode
 3. Pick accent color
 4. Pick border color
-→ **Full theme generated automatically!**
+   → **Full theme generated automatically!**
 
 ---
 
 ## Files to Check When Styling
 
 ### Core Theme Files
+
 - `client/src/themes/themes.js` - Theme definitions
 - `client/src/themes/base.css` - Base styles using theme variables
 - `client/src/index.css` - Keyboard navigation styles
 
 ### Heavy CSS Variable Users
+
 - `client/src/components/playlist/PlaylistStatusCard.jsx` (50+ variables)
 - `client/src/components/video-player/VideoPlayer.css` (player theming)
 - `client/src/components/pages/*.jsx` (all page components)
@@ -373,6 +428,7 @@ These generators are ready for a future theme builder form where users can:
 5. **Theme Mode** → "dark" or "light" (affects how scales are generated)
 
 **Optional accent colors:**
+
 - accent-secondary, accent-success, accent-info, accent-warning, accent-error
 
 ### Before vs After

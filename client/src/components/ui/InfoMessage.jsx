@@ -1,3 +1,5 @@
+import Button from "./Button.jsx";
+
 /**
  * Reusable info display component
  * Supports both inline and toast display modes
@@ -59,20 +61,22 @@ const InfoMessage = ({
           </div>
         </div>
         {onClose && (
-          <button
+          <Button
             onClick={onClose}
-            className="ml-2 hover:opacity-70 focus:outline-none transition-opacity flex-shrink-0"
+            variant="tertiary"
+            className="ml-2 hover:opacity-70 !p-0 !border-0 flex-shrink-0"
             style={{ color: mode === "toast" ? "rgba(255, 255, 255, 0.8)" : "var(--text-muted)" }}
             aria-label="Close"
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+            icon={
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            }
+          />
         )}
       </div>
     </div>

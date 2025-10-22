@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { LucideBookmark, LucideSave, LucideTrash2, LucideChevronDown } from "lucide-react";
 import { apiGet, apiPost, apiDelete } from "../../services/api.js";
 import { InfoMessage, ErrorMessage, SuccessMessage } from "./index.js";
+import Button from "./Button.jsx";
 
 /**
  * Filter Presets Component
@@ -131,20 +132,17 @@ const FilterPresets = ({
       <div className="flex items-center gap-2">
         {/* Load Preset Dropdown */}
         <div className="relative">
-          <button
+          <Button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="px-4 py-2 border rounded-md text-sm font-medium transition-colors hover:bg-opacity-80 flex items-center space-x-2"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
+            variant="secondary"
+            size="sm"
+            className="text-sm"
             disabled={isLoading}
+            icon={<LucideBookmark className="w-4 h-4" />}
           >
-            <LucideBookmark className="w-4 h-4" />
             <span>Load Preset</span>
             <LucideChevronDown className="w-3 h-3" />
-          </button>
+          </Button>
 
           {/* Dropdown Menu */}
           {isDropdownOpen && (
@@ -178,20 +176,21 @@ const FilterPresets = ({
                         className="flex items-center justify-between px-4 py-2 hover:bg-opacity-80 transition-colors group"
                         style={{ backgroundColor: "var(--bg-secondary)" }}
                       >
-                        <button
+                        <Button
                           onClick={() => handleLoadPreset(preset)}
-                          className="flex-1 text-left text-sm"
+                          variant="tertiary"
+                          className="flex-1 text-left text-sm !p-0"
                           style={{ color: "var(--text-primary)" }}
                         >
                           {preset.name}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={() => handleDeletePreset(preset.id, preset.name)}
-                          className="ml-2 p-1 rounded hover:bg-red-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                          variant="tertiary"
+                          className="ml-2 p-1 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100"
+                          icon={<LucideTrash2 className="w-3.5 h-3.5" />}
                           title="Delete preset"
-                        >
-                          <LucideTrash2 className="w-3.5 h-3.5" />
-                        </button>
+                        />
                       </div>
                     ))}
                   </div>
@@ -202,19 +201,16 @@ const FilterPresets = ({
         </div>
 
         {/* Save Preset Button */}
-        <button
+        <Button
           onClick={() => setIsSaveDialogOpen(true)}
-          className="px-4 py-2 border rounded-md text-sm font-medium transition-colors hover:bg-opacity-80 flex items-center space-x-2"
-          style={{
-            backgroundColor: "var(--bg-card)",
-            borderColor: "var(--border-color)",
-            color: "var(--text-primary)",
-          }}
+          variant="secondary"
+          size="sm"
+          className="text-sm"
           disabled={isLoading}
+          icon={<LucideSave className="w-4 h-4" />}
         >
-          <LucideSave className="w-4 h-4" />
-          <span>Save Preset</span>
-        </button>
+          Save Preset
+        </Button>
       </div>
 
       {/* Save Preset Dialog */}
@@ -263,33 +259,27 @@ const FilterPresets = ({
                 />
 
                 <div className="flex justify-end gap-3">
-                  <button
+                  <Button
                     onClick={() => {
                       setIsSaveDialogOpen(false);
                       setPresetName("");
                       setError(null);
                     }}
-                    className="px-4 py-2 border rounded-md text-sm transition-colors hover:bg-opacity-80"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      borderColor: "var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
+                    variant="secondary"
+                    size="sm"
                     disabled={isLoading}
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={handleSavePreset}
-                    className="px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90"
-                    style={{
-                      backgroundColor: "var(--accent-primary)",
-                      color: "white",
-                    }}
+                    variant="primary"
+                    size="sm"
                     disabled={isLoading || !presetName.trim()}
+                    loading={isLoading}
                   >
-                    {isLoading ? "Saving..." : "Save"}
-                  </button>
+                    Save
+                  </Button>
                 </div>
               </div>
             </div>

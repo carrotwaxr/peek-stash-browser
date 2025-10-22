@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import SceneCard from "./SceneCard.jsx";
+import Button from "./Button.jsx";
 
 const SceneCarousel = ({
   title,
@@ -61,12 +62,16 @@ const SceneCarousel = ({
         >
           {title}
         </h2>
-        <div className="flex gap-4 overflow-hidden">
+        <div className="flex gap-4 overflow-hidden py-4">
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className="flex-shrink-0 w-64 h-36 rounded-lg animate-pulse"
-              style={{ backgroundColor: "var(--bg-tertiary)" }}
+              className="flex-shrink-0 rounded-lg animate-pulse"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+                width: "17.5rem",
+                height: "25rem"
+              }}
             />
           ))}
         </div>
@@ -109,48 +114,48 @@ const SceneCarousel = ({
         </h2>
         <div className="flex items-center gap-2">
           {/* Scroll buttons */}
-          <button
+          <Button
             onClick={scrollLeft}
             disabled={!canScrollLeft}
-            className="btn rounded-full w-10 h-10 p-0 flex items-center justify-center"
+            variant="secondary"
+            className="rounded-full w-10 h-10 !p-0 flex items-center justify-center"
             style={{
               backgroundColor: canScrollLeft
                 ? "var(--bg-card)"
                 : "var(--bg-tertiary)",
-              borderColor: "var(--border-color)",
               opacity: canScrollLeft ? 1 : 0.5,
-              cursor: canScrollLeft ? "pointer" : "not-allowed",
             }}
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-          <button
+            icon={
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            }
+          />
+          <Button
             onClick={scrollRight}
             disabled={!canScrollRight}
-            className="btn rounded-full w-10 h-10 p-0 flex items-center justify-center"
+            variant="secondary"
+            className="rounded-full w-10 h-10 !p-0 flex items-center justify-center"
             style={{
               backgroundColor: canScrollRight
                 ? "var(--bg-card)"
                 : "var(--bg-tertiary)",
-              borderColor: "var(--border-color)",
               opacity: canScrollRight ? 1 : 0.5,
-              cursor: canScrollRight ? "pointer" : "not-allowed",
             }}
-          >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+            icon={
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            }
+          />
         </div>
       </div>
 

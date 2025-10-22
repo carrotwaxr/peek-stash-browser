@@ -1,13 +1,25 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
-import { Shuffle, Repeat, Repeat1, ArrowLeft, Edit2, ArrowUpDown, Play, Save, X } from "lucide-react";
+import {
+  Shuffle,
+  Repeat,
+  Repeat1,
+  ArrowLeft,
+  Edit2,
+  ArrowUpDown,
+  Play,
+  Save,
+  X,
+} from "lucide-react";
 import { getSceneTitle } from "../../utils/format.js";
 import SceneListItem from "../ui/SceneListItem.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
+import Button from "../ui/Button.jsx";
 import { PageLayout } from "../ui/index.js";
+import Paper from "../ui/Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -52,7 +64,7 @@ const PlaylistDetail = () => {
 
       // Backend now returns items with scene data attached
       if (playlistData.items && playlistData.items.length > 0) {
-        const scenesWithDetails = playlistData.items.map(item => ({
+        const scenesWithDetails = playlistData.items.map((item) => ({
           ...item,
           exists: item.scene !== null && item.scene !== undefined,
         }));
@@ -91,7 +103,9 @@ const PlaylistDetail = () => {
     if (!sceneToRemove) return;
 
     try {
-      await api.delete(`/playlists/${playlistId}/items/${sceneToRemove.sceneId}`);
+      await api.delete(
+        `/playlists/${playlistId}/items/${sceneToRemove.sceneId}`
+      );
       showSuccess("Scene removed from playlist");
       loadPlaylist();
     } catch {
@@ -229,7 +243,7 @@ const PlaylistDetail = () => {
   const playPlaylist = () => {
     // Play first scene in playlist with playlist context
     if (scenes.length > 0 && scenes[0].exists && scenes[0].scene) {
-      const validScenes = scenes.filter(s => s.exists && s.scene);
+      const validScenes = scenes.filter((s) => s.exists && s.scene);
       navigate(`/scene/${scenes[0].sceneId}`, {
         state: {
           scene: scenes[0].scene,
@@ -241,11 +255,11 @@ const PlaylistDetail = () => {
             scenes: validScenes.map((s, idx) => ({
               sceneId: s.sceneId,
               scene: s.scene,
-              position: idx
+              position: idx,
             })),
-            currentIndex: 0
-          }
-        }
+            currentIndex: 0,
+          },
+        },
       });
     }
   };
@@ -264,7 +278,10 @@ const PlaylistDetail = () => {
     return (
       <PageLayout>
         <div className="text-center">
-          <h2 className="text-2xl mb-4" style={{ color: "var(--text-primary)" }}>
+          <h2
+            className="text-2xl mb-4"
+            style={{ color: "var(--text-primary)" }}
+          >
             Playlist not found
           </h2>
           <Link to="/playlists" className="text-blue-500 hover:underline">
@@ -282,50 +299,37 @@ const PlaylistDetail = () => {
         <div className="mb-8">
           <div className="flex flex-wrap items-center gap-2 mb-4">
             {/* Back button */}
-            <button
+            <Button
               onClick={() => navigate("/playlists")}
-              className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-              }}
+              variant="secondary"
+              icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
               title="Back to Playlists"
             >
-              <ArrowLeft size={16} className="sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Back</span>
-            </button>
+              <span className="hidden sm:inline">Back to Playlists</span>
+            </Button>
 
             {!isEditing && !reorderMode && (
               <>
                 {/* Edit button */}
-                <button
+                <Button
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--accent-secondary)",
-                    color: "white",
-                  }}
+                  variant="primary"
+                  icon={<Edit2 size={16} className="sm:w-4 sm:h-4" />}
                   title="Edit Playlist"
                 >
-                  <Edit2 size={16} className="sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Edit</span>
-                </button>
+                </Button>
 
                 {/* Reorder button */}
                 {scenes.length > 1 && (
-                  <button
+                  <Button
                     onClick={() => setReorderMode(true)}
-                    className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-                    style={{
-                      backgroundColor: "var(--accent-info)",
-                      color: "white",
-                    }}
+                    variant="secondary"
+                    icon={<ArrowUpDown size={16} className="sm:w-4 sm:h-4" />}
                     title="Reorder Scenes"
                   >
-                    <ArrowUpDown size={16} className="sm:w-4 sm:h-4" />
                     <span className="hidden sm:inline">Reorder</span>
-                  </button>
+                  </Button>
                 )}
               </>
             )}
@@ -333,60 +337,62 @@ const PlaylistDetail = () => {
             {reorderMode && (
               <>
                 {/* Save Order button */}
-                <button
+                <Button
                   onClick={saveReorder}
-                  className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium whitespace-nowrap hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--accent-success)",
-                    color: "white",
-                  }}
+                  variant="primary"
+                  icon={<Save size={16} className="sm:w-4 sm:h-4" />}
                   title="Save Order"
                 >
-                  <Save size={16} className="sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Save Order</span>
-                </button>
+                </Button>
 
                 {/* Cancel button */}
-                <button
+                <Button
                   onClick={cancelReorder}
-                  className="flex items-center gap-1.5 px-2 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base whitespace-nowrap hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--accent-error)",
-                    color: "white",
-                  }}
+                  variant="destructive"
+                  icon={<X size={16} className="sm:w-4 sm:h-4" />}
                   title="Cancel"
                 >
-                  <X size={16} className="sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Cancel</span>
-                </button>
+                </Button>
               </>
             )}
 
             {scenes.length > 0 && !reorderMode && !isEditing && (
               <>
                 {/* Shuffle button */}
-                <button
+                <Button
                   onClick={toggleShuffle}
-                  className="p-1.5 sm:p-2 rounded-lg transition-all hover:opacity-70"
-                  style={{
-                    backgroundColor: "transparent",
-                    border: shuffle ? "2px solid var(--accent-warning)" : "1px solid var(--border-color)",
-                    color: shuffle ? "var(--accent-warning)" : "var(--text-primary)",
-                  }}
+                  variant="secondary"
+                  className="p-1.5 sm:p-2"
+                  {...(shuffle && {
+                    style: {
+                      border: "2px solid var(--accent-info)",
+                      color: "var(--accent-info)",
+                    },
+                  })}
+                  icon={<Shuffle size={16} className="sm:w-5 sm:h-5" />}
                   title={shuffle ? "Shuffle enabled" : "Shuffle disabled"}
-                >
-                  <Shuffle size={16} className="sm:w-5 sm:h-5" />
-                </button>
+                />
 
                 {/* Repeat button */}
-                <button
+                <Button
                   onClick={cycleRepeat}
-                  className="p-1.5 sm:p-2 rounded-lg transition-all hover:opacity-70"
-                  style={{
-                    backgroundColor: "transparent",
-                    border: repeat !== "none" ? "2px solid var(--accent-info)" : "1px solid var(--border-color)",
-                    color: repeat !== "none" ? "var(--accent-info)" : "var(--text-primary)",
-                  }}
+                  variant="secondary"
+                  className="p-1.5 sm:p-2"
+                  {...(repeat !== "none" && {
+                    style: {
+                      border: "2px solid var(--accent-info)",
+                      color: "var(--accent-info)",
+                    },
+                  })}
+                  icon={
+                    repeat === "one" ? (
+                      <Repeat1 size={16} className="sm:w-5 sm:h-5" />
+                    ) : (
+                      <Repeat size={16} className="sm:w-5 sm:h-5" />
+                    )
+                  }
                   title={
                     repeat === "all"
                       ? "Repeat all"
@@ -394,108 +400,109 @@ const PlaylistDetail = () => {
                       ? "Repeat one"
                       : "Repeat off"
                   }
-                >
-                  {repeat === "one" ? <Repeat1 size={16} className="sm:w-5 sm:h-5" /> : <Repeat size={16} className="sm:w-5 sm:h-5" />}
-                </button>
+                />
 
                 {/* Play button */}
-                <button
+                <Button
                   onClick={playPlaylist}
-                  className="flex items-center gap-1.5 px-3 py-1.5 sm:px-6 sm:py-2 rounded-lg text-sm sm:text-base font-medium whitespace-nowrap hover:opacity-80 transition-opacity ml-auto"
-                  style={{
-                    backgroundColor: "var(--accent-primary)",
-                    color: "white",
-                  }}
+                  variant="primary"
+                  className="ml-auto"
+                  icon={
+                    <Play size={16} className="sm:w-4 sm:h-4" fill="white" />
+                  }
                   title="Play Playlist"
                 >
-                  <Play size={16} className="sm:w-4 sm:h-4" fill="white" />
                   <span className="hidden sm:inline">Play Playlist</span>
                   <span className="sm:hidden">Play</span>
-                </button>
+                </Button>
               </>
             )}
           </div>
 
           {isEditing ? (
-            <form onSubmit={updatePlaylist} className="card max-w-2xl" style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}>
-              <div className="card-body space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-                    Playlist Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-                    Description
-                  </label>
-                  <textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    rows={3}
-                  />
-                </div>
-                <div className="flex gap-2 sm:gap-3">
-                  <button
-                    type="submit"
-                    className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base font-medium hover:opacity-80 transition-opacity"
-                    style={{
-                      backgroundColor: "var(--accent-success)",
-                      color: "white",
-                    }}
-                  >
-                    <Save size={16} className="sm:w-4 sm:h-4" />
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditName(playlist.name);
-                      setEditDescription(playlist.description || "");
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base hover:opacity-80 transition-opacity"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    <X size={16} className="sm:w-4 sm:h-4" />
-                    Cancel
-                  </button>
-                </div>
-              </div>
+            <form onSubmit={updatePlaylist}>
+              <Paper className="max-w-2xl">
+                <Paper.Body className="space-y-4">
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Playlist Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Description
+                    </label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-2 sm:gap-3">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      icon={<Save size={16} className="sm:w-4 sm:h-4" />}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditName(playlist.name);
+                        setEditDescription(playlist.description || "");
+                      }}
+                      variant="secondary"
+                      icon={<X size={16} className="sm:w-4 sm:h-4" />}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Paper.Body>
+              </Paper>
             </form>
           ) : (
             <>
-              <h1 className="text-3xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+              <h1
+                className="text-3xl font-bold mb-2"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {playlist.name}
               </h1>
               {playlist.description && (
-                <p style={{ color: "var(--text-secondary)" }}>{playlist.description}</p>
+                <p style={{ color: "var(--text-secondary)" }}>
+                  {playlist.description}
+                </p>
               )}
-              <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
+              <p
+                className="text-sm mt-2"
+                style={{ color: "var(--text-muted)" }}
+              >
                 {scenes.length} {scenes.length === 1 ? "video" : "videos"}
               </p>
             </>
@@ -505,10 +512,16 @@ const PlaylistDetail = () => {
         {/* Scenes List */}
         {scenes.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
+            <div
+              className="text-6xl mb-4"
+              style={{ color: "var(--text-muted)" }}
+            >
               🎬
             </div>
-            <h3 className="text-xl font-medium mb-2" style={{ color: "var(--text-primary)" }}>
+            <h3
+              className="text-xl font-medium mb-2"
+              style={{ color: "var(--text-primary)" }}
+            >
               No scenes in this playlist yet
             </h3>
             <p style={{ color: "var(--text-secondary)" }}>
@@ -536,7 +549,8 @@ const PlaylistDetail = () => {
                   color: "rgb(59, 130, 246)",
                 }}
               >
-                Drag and drop scenes to reorder them. Click "Save Order" when done.
+                Drag and drop scenes to reorder them. Click "Save Order" when
+                done.
               </div>
             )}
             {scenes.map((item, index) => (
@@ -587,17 +601,14 @@ const PlaylistDetail = () => {
                   )
                 }
                 actionButtons={
-                  <button
+                  <Button
                     onClick={() => handleRemoveClick(item)}
-                    className="px-2 py-1 sm:px-3 sm:py-1.5 rounded text-xs sm:text-sm hover:bg-red-500 hover:text-white transition-colors flex-shrink-0 whitespace-nowrap"
-                    style={{
-                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                      color: "rgb(239, 68, 68)",
-                      height: "fit-content",
-                    }}
+                    variant="destructive"
+                    size="sm"
+                    className="px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm flex-shrink-0"
                   >
                     Remove
-                  </button>
+                  </Button>
                 }
               />
             ))}
@@ -614,7 +625,11 @@ const PlaylistDetail = () => {
         }}
         onConfirm={confirmRemove}
         title="Remove Scene"
-        message={`Remove "${sceneToRemove?.scene ? getSceneTitle(sceneToRemove.scene) : 'this scene'}" from the playlist?`}
+        message={`Remove "${
+          sceneToRemove?.scene
+            ? getSceneTitle(sceneToRemove.scene)
+            : "this scene"
+        }" from the playlist?`}
         confirmText="Remove"
         cancelText="Cancel"
         confirmStyle="danger"

@@ -9,6 +9,7 @@ import BulkActionBar from "../ui/BulkActionBar.jsx";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import Button from "../ui/Button.jsx";
 
 const SceneGrid = ({
   scenes,
@@ -63,7 +64,7 @@ const SceneGrid = ({
   };
 
   // Spatial navigation hook
-  const { focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
+  const { focusedIndex: _focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
     items: scenes,
     columns,
     enabled: isTVMode && enableKeyboard,
@@ -89,7 +90,20 @@ const SceneGrid = ({
   }, [currentPage]);
 
   if (loading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="grid gap-6 scene-grid-responsive">
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="rounded-lg animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              height: "25rem"
+            }}
+          />
+        ))}
+      </div>
+    );
   }
 
   if (error) {
@@ -120,28 +134,22 @@ const SceneGrid = ({
       {/* Selection Controls - Only shown when items are selected */}
       {selectedScenes.length > 0 && (
         <div className="flex items-center justify-end gap-3">
-          <button
+          <Button
             onClick={handleSelectAll}
-            className="px-4 py-2 rounded-md text-sm font-medium transition-colors border"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
+            variant="secondary"
+            size="sm"
+            className="font-medium"
           >
             Select All ({scenes?.length || 0})
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleDeselectAll}
-            className="px-4 py-2 rounded-md text-sm font-medium transition-colors border"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
+            variant="secondary"
+            size="sm"
+            className="font-medium"
           >
             Deselect All
-          </button>
+          </Button>
         </div>
       )}
 

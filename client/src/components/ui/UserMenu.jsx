@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { ThemedIcon } from "../icons/index.js";
+import Button from "./Button.jsx";
 
 const UserMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -41,21 +42,20 @@ const UserMenu = () => {
   return (
     <div className="relative">
       {/* User Menu Button */}
-      <button
+      <Button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-lg hover:bg-opacity-80 transition-colors duration-200"
+        variant="tertiary"
+        className="p-2"
         style={{
           backgroundColor: isOpen ? "var(--bg-card)" : "transparent",
-          color: "var(--text-primary)",
           border: isOpen
             ? "1px solid var(--border-color)"
             : "1px solid transparent",
         }}
+        icon={<ThemedIcon name="circle-user-round" size={20} />}
         aria-label="User menu"
-      >
-        <ThemedIcon name="circle-user-round" size={20} />
-      </button>
+      />
 
       {/* Popover Menu */}
       {isOpen && (
@@ -142,12 +142,14 @@ const UserMenu = () => {
             className="px-4 py-3 border-b"
             style={{ borderColor: "var(--border-color)" }}
           >
-            <button
+            <Button
               onClick={() => {
                 toggleTVMode();
                 setIsOpen(false);
               }}
-              className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200"
+              variant="tertiary"
+              fullWidth
+              className="flex items-center justify-between px-3 py-2 text-sm"
               style={{
                 backgroundColor: isTVMode
                   ? "var(--accent-primary)"
@@ -170,18 +172,20 @@ const UserMenu = () => {
                 <span>TV Mode</span>
               </div>
               {isTVMode && <span className="text-sm">✓</span>}
-            </button>
+            </Button>
           </div>
 
           {/* Logout */}
           <div className="px-4 py-3">
-            <button
+            <Button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 hover:bg-red-50 text-red-600 hover:text-red-700"
+              variant="tertiary"
+              fullWidth
+              className="flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
+              icon={<ThemedIcon name="logout" size={16} color="currentColor" />}
             >
-              <ThemedIcon name="logout" size={16} color="currentColor" />
-              <span>Sign Out</span>
-            </button>
+              Sign Out
+            </Button>
           </div>
         </div>
       )}

@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import {
   getStreamSegment,
   playVideo,
@@ -30,6 +33,10 @@ import setupRoutes from "./routes/setup.js";
 import { authenticateToken } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
 
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export const setupAPI = () => {
   const app = express();
   app.use(
@@ -47,6 +54,25 @@ export const setupAPI = () => {
       status: "healthy",
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || "1.0.0",
+    });
+  });
+
+  // Version endpoint (no auth required)
+  app.get("/api/version", (req, res) => {
+    // Read version from package.json
+    const packagePath = path.join(__dirname, '../package.json');
+
+    let version = "1.0.0";
+    try {
+      const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+      version = packageJson.version;
+    } catch (err) {
+      logger.error('Failed to read package.json version:', { error: err });
+    }
+
+    res.json({
+      server: version,
+      buildDate: process.env.BUILD_DATE || new Date().toISOString(),
     });
   });
 

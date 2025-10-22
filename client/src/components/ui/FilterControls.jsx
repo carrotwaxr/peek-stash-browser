@@ -1,4 +1,5 @@
 import SearchableSelect from "./SearchableSelect.jsx";
+import Button from "./Button.jsx";
 
 /**
  * Reusable Sort Control Component
@@ -288,17 +289,14 @@ export const FilterPanel = ({
 
           {/* Clear Filters Button */}
           {hasActiveFilters && (
-            <button
+            <Button
               onClick={onClear}
-              className="px-3 py-1 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
-              style={{
-                backgroundColor: "var(--bg-secondary)",
-                borderColor: "var(--border-color)",
-                color: "var(--text-primary)",
-              }}
+              variant="secondary"
+              size="sm"
+              className="px-3 py-1 text-sm"
             >
               Clear All
-            </button>
+            </Button>
           )}
         </div>
 
@@ -311,27 +309,21 @@ export const FilterPanel = ({
           className="flex items-center justify-end space-x-3 pt-4 border-t"
           style={{ borderColor: "var(--border-color)" }}
         >
-          <button
+          <Button
             onClick={onToggle}
-            className="px-4 py-2 border rounded-md text-sm hover:bg-opacity-80 transition-colors"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              borderColor: "var(--border-color)",
-              color: "var(--text-primary)",
-            }}
+            variant="secondary"
+            size="sm"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={onSubmit}
-            className="px-6 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90"
-            style={{
-              backgroundColor: "var(--accent-primary)",
-              color: "white",
-            }}
+            variant="primary"
+            size="sm"
+            className="px-6"
           >
             Apply Filters
-          </button>
+          </Button>
         </div>
       </div>
     </div>

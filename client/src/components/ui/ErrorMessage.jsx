@@ -1,3 +1,5 @@
+import Button from "./Button.jsx";
+
 /**
  * Reusable error display component
  * Supports both inline and toast display modes
@@ -60,17 +62,14 @@ const ErrorMessage = ({
           </div>
         </div>
         {showRetry && onRetry && (
-          <button
+          <Button
             onClick={onRetry}
-            className="ml-2 px-3 py-1 text-sm rounded hover:opacity-80 focus:outline-none focus:ring-2 transition-opacity flex-shrink-0"
-            style={{
-              backgroundColor: "var(--accent-error)",
-              color: "white",
-              borderColor: "var(--accent-error)",
-            }}
+            variant="destructive"
+            size="sm"
+            className="ml-2 flex-shrink-0"
           >
             Retry
-          </button>
+          </Button>
         )}
       </div>
     </div>

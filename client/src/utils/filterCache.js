@@ -106,7 +106,7 @@ export const clearAllCaches = () => {
 export const getCacheStats = () => {
   const stats = {};
 
-  Object.entries(CACHE_KEYS).forEach(([entityType, cacheKey]) => {
+  Object.entries(CACHE_KEYS).forEach(([entityType]) => {
     const cached = getCache(entityType);
     stats[entityType] = {
       cached: !!cached,

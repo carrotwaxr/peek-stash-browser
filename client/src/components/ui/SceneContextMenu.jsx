@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { showSuccess, showWarning, showError } from "../../utils/toast.jsx";
+import Button from "./Button.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -63,22 +64,27 @@ const SceneContextMenu = ({ sceneId }) => {
   return (
     <div className="absolute top-2 left-2 z-20" ref={menuRef}>
       {/* Three-dot button */}
-      <button
+      <Button
         onClick={(e) => {
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
-        className="p-1.5 rounded-full bg-black/70 hover:bg-black/90 transition-colors"
+        variant="tertiary"
+        className="p-1.5 rounded-full !border-0"
+        style={{
+          backgroundColor: "rgba(0, 0, 0, 0.7)",
+        }}
         title="More options"
-      >
-        <svg
-          className="w-4 h-4 text-white"
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-        </svg>
-      </button>
+        icon={
+          <svg
+            className="w-4 h-4 text-white"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+          </svg>
+        }
+      />
 
       {/* Dropdown menu */}
       {showMenu && (
@@ -124,15 +130,16 @@ const SceneContextMenu = ({ sceneId }) => {
             ) : (
               <div className="py-1">
                 {playlists.map((playlist) => (
-                  <button
+                  <Button
                     key={playlist.id}
                     onClick={(e) => {
                       e.stopPropagation();
                       addToPlaylist(playlist.id);
                     }}
-                    className="w-full text-left px-4 py-2 text-sm transition-colors"
+                    variant="tertiary"
+                    fullWidth
+                    className="text-left px-4 py-2 text-sm"
                     style={{
-                      color: "var(--text-primary)",
                       backgroundColor: "transparent",
                     }}
                     onMouseEnter={(e) => {
@@ -149,7 +156,7 @@ const SceneContextMenu = ({ sceneId }) => {
                     >
                       {playlist._count?.items || 0} videos
                     </div>
-                  </button>
+                  </Button>
                 ))}
               </div>
             )}

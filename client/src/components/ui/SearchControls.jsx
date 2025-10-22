@@ -5,6 +5,7 @@ import Pagination from "./Pagination.jsx";
 import SearchInput from "./SearchInput.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
 import FilterPresets from "./FilterPresets.jsx";
+import Button from "./Button.jsx";
 import {
   SortControl,
   FilterPanel,
@@ -416,40 +417,31 @@ const SearchControls = ({
               onChange={handleSortChange}
               label="Sort"
             />
-            <button
-              onClick={() => handleSortChange(sortField)} // This will toggle direction for same field
-              className="py-1 border rounded-md text-sm"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                borderColor: "var(--border-color)",
-                color: "var(--text-primary)",
-              }}
-            >
-              {sortDirection === "ASC" ? <LucideArrowUp /> : <LucideArrowDown />}
-            </button>
+            <Button
+              onClick={() => handleSortChange(sortField)}
+              variant="secondary"
+              size="sm"
+              className="py-1"
+              icon={sortDirection === "ASC" ? <LucideArrowUp /> : <LucideArrowDown />}
+            />
           </div>
 
           {/* Filters Toggle Button */}
-          <button
+          <Button
             onClick={handleToggleFilterPanel}
-            className="px-4 py-2 border rounded-md text-sm font-medium transition-colors hover:bg-opacity-80 flex items-center space-x-2"
-            style={{
-              backgroundColor: isFilterPanelOpen
-                ? "var(--accent-primary)"
-                : "var(--bg-card)",
-              borderColor: isFilterPanelOpen
-                ? "var(--accent-primary)"
-                : "var(--border-color)",
-              color: isFilterPanelOpen ? "white" : "var(--text-primary)",
-            }}
+            variant={isFilterPanelOpen ? "primary" : "secondary"}
+            size="sm"
+            className="flex items-center space-x-2 font-medium"
+            icon={
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            }
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                clipRule="evenodd"
-              />
-            </svg>
             <span>Filters</span>
             {hasActiveFilters && !isFilterPanelOpen && (
               <span
@@ -472,7 +464,7 @@ const SearchControls = ({
                 }
               </span>
             )}
-          </button>
+          </Button>
 
           {/* Filter Presets */}
           <FilterPresets

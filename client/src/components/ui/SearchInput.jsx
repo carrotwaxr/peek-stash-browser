@@ -2,6 +2,7 @@
  * Reusable search input component with debouncing
  */
 import { useState, useEffect } from "react";
+import Button from "./Button.jsx";
 
 const SearchInput = ({
   placeholder = "Search...",
@@ -80,25 +81,27 @@ const SearchInput = ({
       />
 
       {query && (
-        <button
+        <Button
           onClick={handleClear}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-70"
-        >
-          <svg
-            className="h-5 w-5"
-            style={{ color: "var(--text-muted)" }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
+          variant="tertiary"
+          className="absolute inset-y-0 right-0 pr-3 flex items-center hover:opacity-70 !p-0 !border-0"
+          icon={
+            <svg
+              className="h-5 w-5"
+              style={{ color: "var(--text-muted)" }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          }
+        />
       )}
     </div>
   );

@@ -52,7 +52,7 @@ const NavigableGrid = ({
   };
 
   // Spatial navigation hook
-  const { focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
+  const { focusedIndex: _focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
     items,
     columns,
     enabled: enableKeyboard,
@@ -70,6 +70,7 @@ const NavigableGrid = ({
     updateColumns(); // Initial calculation
     window.addEventListener("resize", updateColumns);
     return () => window.removeEventListener("resize", updateColumns);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gridClassName]);
 
   // Set initial focus when grid loads
@@ -118,6 +119,7 @@ const NavigableGrid = ({
 /**
  * Higher-order component to make any card component keyboard-focusable
  */
+// eslint-disable-next-line react-refresh/only-export-components, no-unused-vars
 export const makeNavigable = (CardComponent) => {
   return forwardRef((props, ref) => {
     const { tabIndex, className = "", onFocus, onClick, item, ...rest } = props;

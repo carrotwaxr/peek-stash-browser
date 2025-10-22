@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { showSuccess, showWarning, showError } from "../../utils/toast.jsx";
+import Button from "./Button.jsx";
+import Paper from "./Paper.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -150,21 +152,19 @@ const AddToPlaylistButton = ({
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
+      <Button
         onClick={(e) => {
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
-        className={`flex items-center gap-2 ${compact ? "p-2 rounded hover:bg-opacity-80" : "px-4 py-2 rounded-lg"}`}
-        style={{
-          backgroundColor: "var(--accent-primary)",
-          color: "white",
-        }}
+        variant="primary"
+        className={compact ? "p-2" : ""}
+        size={compact ? "sm" : "md"}
+        icon={icon || null}
         title="Add to playlist"
       >
-        {icon || null}
         {buttonText || (compact ? "+" : "+ Playlist")}
-      </button>
+      </Button>
 
       {showMenu && (
         <div
@@ -199,15 +199,16 @@ const AddToPlaylistButton = ({
             ) : (
               <div className="py-1">
                 {/* Create New Playlist Option */}
-                <button
+                <Button
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowCreateModal(true);
                   }}
-                  className="w-full text-left px-4 py-2 text-sm font-medium hover:bg-opacity-80 transition-colors border-b"
+                  variant="tertiary"
+                  fullWidth
+                  className="text-left px-4 py-2 text-sm font-medium border-b"
                   style={{
                     color: "var(--accent-color)",
-                    backgroundColor: "transparent",
                     borderColor: "var(--border-color)",
                   }}
                   onMouseEnter={(e) => {
@@ -218,7 +219,7 @@ const AddToPlaylistButton = ({
                   }}
                 >
                   + Create New Playlist
-                </button>
+                </Button>
 
                 {/* Existing Playlists */}
                 {playlists.length === 0 ? (
@@ -232,16 +233,17 @@ const AddToPlaylistButton = ({
                   </div>
                 ) : (
                   playlists.map((playlist) => (
-                    <button
+                    <Button
                       key={playlist.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         addToPlaylist(playlist.id);
                       }}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-opacity-80 transition-colors"
+                      variant="tertiary"
+                      fullWidth
+                      className="text-left px-4 py-2 text-sm"
                       style={{
                         color: "var(--text-primary)",
-                        backgroundColor: "transparent",
                       }}
                       onMouseEnter={(e) => {
                         e.target.style.backgroundColor = "var(--bg-secondary)";
@@ -257,7 +259,7 @@ const AddToPlaylistButton = ({
                       >
                         {playlist._count?.items || 0} videos
                       </div>
-                    </button>
+                    </Button>
                   ))
                 )}
               </div>
@@ -272,23 +274,10 @@ const AddToPlaylistButton = ({
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowCreateModal(false)}
         >
-          <div
-            className="card max-w-md w-full m-4"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="card-header">
-              <h2
-                className="text-xl font-semibold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Create New Playlist
-              </h2>
-            </div>
-            <form onSubmit={createPlaylistAndAdd} className="card-body">
+          <Paper className="max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
+            <Paper.Header title="Create New Playlist" />
+            <form onSubmit={createPlaylistAndAdd}>
+              <Paper.Body>
               <div className="space-y-4">
                 <div>
                   <label
@@ -337,34 +326,26 @@ const AddToPlaylistButton = ({
                   />
                 </div>
                 <div className="flex gap-3 justify-end">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
+                    variant="secondary"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={creating || !newPlaylistName.trim()}
-                    className="px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--accent-color)",
-                      color: "white",
-                      opacity: creating || !newPlaylistName.trim() ? 0.6 : 1,
-                    }}
+                    variant="primary"
+                    loading={creating}
                   >
-                    {creating ? "Creating..." : "Create & Add"}
-                  </button>
+                    Create & Add
+                  </Button>
                 </div>
               </div>
+              </Paper.Body>
             </form>
-          </div>
+          </Paper>
         </div>
       )}
     </div>

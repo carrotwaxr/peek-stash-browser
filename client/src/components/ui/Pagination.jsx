@@ -1,3 +1,5 @@
+import Button from "./Button.jsx";
+
 /**
  * Reusable pagination component
  */
@@ -35,48 +37,28 @@ const Pagination = ({
 
       <nav className="flex items-center gap-2 w-full sm:w-auto justify-center">
         {/* First Page Button */}
-        <button
+        <Button
           onClick={() => onPageChange?.(1)}
           disabled={currentPage <= 1}
-          className={`
-            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
-            ${
-              currentPage <= 1
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:opacity-70"
-            }
-          `}
-          style={{
-            backgroundColor: "var(--bg-card)",
-            color: "var(--text-primary)",
-            border: "1px solid var(--border-color)",
-          }}
+          variant="secondary"
+          size="sm"
           title="First Page"
+          aria-label="First Page"
         >
           «
-        </button>
+        </Button>
 
         {/* Previous Page Button */}
-        <button
+        <Button
           onClick={() => onPageChange?.(currentPage - 1)}
           disabled={currentPage <= 1}
-          className={`
-            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
-            ${
-              currentPage <= 1
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:opacity-70"
-            }
-          `}
-          style={{
-            backgroundColor: "var(--bg-card)",
-            color: "var(--text-primary)",
-            border: "1px solid var(--border-color)",
-          }}
+          variant="secondary"
+          size="sm"
           title="Previous Page"
+          aria-label="Previous Page"
         >
           ‹
-        </button>
+        </Button>
 
         {/* Page Dropdown */}
         <select
@@ -97,48 +79,28 @@ const Pagination = ({
         </select>
 
         {/* Next Page Button */}
-        <button
+        <Button
           onClick={() => onPageChange?.(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className={`
-            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
-            ${
-              currentPage >= totalPages
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:opacity-70"
-            }
-          `}
-          style={{
-            backgroundColor: "var(--bg-card)",
-            color: "var(--text-primary)",
-            border: "1px solid var(--border-color)",
-          }}
+          variant="secondary"
+          size="sm"
           title="Next Page"
+          aria-label="Next Page"
         >
           ›
-        </button>
+        </Button>
 
         {/* Last Page Button */}
-        <button
+        <Button
           onClick={() => onPageChange?.(totalPages)}
           disabled={currentPage >= totalPages}
-          className={`
-            px-4 py-3 sm:px-2 sm:py-1 rounded text-sm font-medium transition-colors
-            ${
-              currentPage >= totalPages
-                ? "opacity-50 cursor-not-allowed"
-                : "hover:opacity-70"
-            }
-          `}
-          style={{
-            backgroundColor: "var(--bg-card)",
-            color: "var(--text-primary)",
-            border: "1px solid var(--border-color)",
-          }}
+          variant="secondary"
+          size="sm"
           title="Last Page"
+          aria-label="Last Page"
         >
           »
-        </button>
+        </Button>
       </nav>
 
       {showPerPageSelector && onPerPageChange && (
