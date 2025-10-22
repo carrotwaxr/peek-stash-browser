@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useLocation } from "react-router-dom";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
-import { LucideStar } from "lucide-react";
+import Button from "../ui/Button.jsx";
+import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 
 const StudioDetail = () => {
   const { studioId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [studio, setStudio] = useState(null);
 
@@ -45,19 +47,14 @@ const StudioDetail = () => {
       <div className="max-w-none">
         {/* Back Button */}
         <div className="mt-6 mb-6">
-          <Link
-            to={location.state?.referrerUrl || "/studios"}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors"
-            style={{
-              color: "var(--accent-primary)",
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              border: "1px solid",
-            }}
+          <Button
+            onClick={() => navigate(location.state?.referrerUrl || "/studios")}
+            variant="secondary"
+            icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
+            title="Back to Studios"
           >
-            <span>←</span>
-            <span>Back to Studios</span>
-          </Link>
+            <span className="hidden sm:inline">Back</span>
+          </Button>
         </div>
 
         {/* Studio Header with Logo Floating Right on Large Screens */}
