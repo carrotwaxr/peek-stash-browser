@@ -1,13 +1,10 @@
-import { Link } from 'react-router-dom';
-import Tooltip from '../ui/Tooltip.jsx';
+import { Link } from "react-router-dom";
+import Tooltip from "../ui/Tooltip.jsx";
 
 /**
  * Scene metadata: performers and tags with image-rich tooltips
  */
-const SceneMetadata = ({
-  scene,
-  className = ""
-}) => {
+const SceneMetadata = ({ scene, className = "" }) => {
   // Performer tooltip content with images in a grid
   const performersContent = scene.performers && scene.performers.length > 0 && (
     <div>
@@ -27,7 +24,10 @@ const SceneMetadata = ({
                 className="w-10 h-10 rounded-full object-cover flex-shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{backgroundColor: "var(--bg-tertiary)"}}>
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: "var(--bg-tertiary)" }}
+              >
                 <span className="text-lg">👤</span>
               </div>
             )}
@@ -36,7 +36,7 @@ const SceneMetadata = ({
         ))}
       </div>
       {scene.performers.length > 8 && (
-        <div className="text-xs mt-2" style={{color: "var(--text-muted)"}}>
+        <div className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
           +{scene.performers.length - 8} more
         </div>
       )}
@@ -62,7 +62,10 @@ const SceneMetadata = ({
                 className="w-10 h-10 rounded object-cover flex-shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style={{backgroundColor: "var(--bg-tertiary)"}}>
+              <div
+                className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: "var(--bg-tertiary)" }}
+              >
                 <span className="text-lg">🏷️</span>
               </div>
             )}
@@ -71,7 +74,7 @@ const SceneMetadata = ({
         ))}
       </div>
       {scene.tags.length > 8 && (
-        <div className="text-xs mt-2" style={{color: "var(--text-muted)"}}>
+        <div className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
           +{scene.tags.length - 8} more
         </div>
       )}
@@ -79,45 +82,51 @@ const SceneMetadata = ({
   );
 
   return (
-    <div className={`flex items-center justify-center gap-3 md:gap-4 ${className}`}>
+    <div
+      className={`flex items-center justify-center gap-3 md:gap-4 ${className}`}
+    >
       {scene.performers && scene.performers.length > 0 && (
-        <Tooltip
-          content={performersContent}
-          clickable={true}
-          position="bottom"
-        >
-          <div className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
-            style={{
-              backgroundColor: 'var(--status-info-bg)',
-              border: '1px solid var(--status-info-border)',
-            }}
-          >
-            <span className="text-xl">👥</span>
-            <span className="text-sm font-medium" style={{ color: 'var(--status-info-text)' }}>
-              {scene.performers.length}
-            </span>
-          </div>
+        <Tooltip content={performersContent} clickable={true} position="bottom">
+          <SceneMetadataEntityInfoChip
+            count={scene.performers.length}
+            icon="👥"
+            type="performer"
+          />
         </Tooltip>
       )}
       {scene.tags && scene.tags.length > 0 && (
-        <Tooltip
-          content={tagsContent}
-          clickable={true}
-          position="bottom"
-        >
-          <div className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
-            style={{
-              backgroundColor: 'var(--selection-bg)',
-              border: '1px solid var(--accent-secondary)',
-            }}
-          >
-            <span className="text-xl">🏷️</span>
-            <span className="text-sm font-medium" style={{ color: 'var(--accent-secondary)' }}>
-              {scene.tags.length}
-            </span>
-          </div>
+        <Tooltip content={tagsContent} clickable={true} position="bottom">
+          <SceneMetadataEntityInfoChip
+            count={scene.tags.length}
+            icon="🏷️"
+            type="tag"
+          />
         </Tooltip>
       )}
+    </div>
+  );
+};
+
+const SceneMetadataEntityInfoChip = ({ count, icon, type }) => {
+  const color =
+    type === "performer"
+      ? "var(--status-info-text)"
+      : "var(--accent-secondary)";
+  const fadedColor = `color-mix(in srgb, ${color} 70%, transparent)`;
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
+      style={{
+        backgroundColor: "var(--selection-bg)",
+        border: `1px solid ${fadedColor}`,
+      }}
+    >
+      <span className="text-xl leading-none flex items-center justify-center">
+        {icon}
+      </span>
+      <span className="text-sm font-medium" style={{ color: fadedColor }}>
+        {count}
+      </span>
     </div>
   );
 };
