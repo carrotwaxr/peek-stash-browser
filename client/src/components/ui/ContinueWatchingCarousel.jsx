@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { PlayCircle } from 'lucide-react';
 import SceneCarousel from './SceneCarousel.jsx';
 import { useAllWatchHistory } from '../../hooks/useWatchHistory.js';
@@ -11,6 +11,7 @@ import { libraryApi } from '../../services/api.js';
  */
 const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: watchHistoryList, loading: loadingHistory, error } = useAllWatchHistory({
     inProgress: true,
     limit: 12
@@ -74,9 +75,13 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
   const handleSceneClick = (scene) => {
     const currentIndex = scenes.findIndex(s => s.id === scene.id);
 
+    // Capture current URL with search params for Back button
+    const referrerUrl = `${location.pathname}${location.search}`;
+
     navigate(`/video/${scene.id}`, {
       state: {
         scene,
+        referrerUrl, // Store current URL to preserve filters when going back
         shouldResume: true, // Auto-resume from continue watching
         playlist: {
           id: "virtual-carousel",

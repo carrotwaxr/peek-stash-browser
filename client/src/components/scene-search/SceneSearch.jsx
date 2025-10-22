@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { ErrorMessage, LoadingSpinner, PageHeader, PageLayout } from "../ui";
 import SceneGrid from "./SceneGrid.jsx";
@@ -25,6 +25,7 @@ const SceneSearch = ({
   title,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -76,9 +77,13 @@ const SceneSearch = ({
     const currentScenes = data?.scenes || [];
     const currentIndex = currentScenes.findIndex(s => s.id === scene.id);
 
+    // Capture current URL with search params for Back button
+    const referrerUrl = `${location.pathname}${location.search}`;
+
     navigate(`/video/${scene.id}`, {
       state: {
         scene,
+        referrerUrl, // Store current URL to preserve filters when going back
         playlist: {
           id: "virtual-grid",
           name: title || "Scene Grid",

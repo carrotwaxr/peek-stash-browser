@@ -146,7 +146,15 @@ const Scene = () => {
       <header className="container-fluid py-3 mt-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              // If we have a referrer URL with filters, navigate to it
+              // Otherwise use browser back
+              if (location.state?.referrerUrl) {
+                navigate(location.state.referrerUrl);
+              } else {
+                navigate(-1);
+              }
+            }}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-md text-sm transition-colors flex-shrink-0 self-start"
             style={{
               color: "var(--accent-primary)",
