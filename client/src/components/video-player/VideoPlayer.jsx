@@ -492,14 +492,16 @@ const VideoPlayer = ({
     fetchVideoData();
   }, [fetchVideoData]);
 
-  // Auto-start playback if navigating from a playing video in a playlist
+  // Auto-start playback if navigating from a playing video in a playlist OR resuming from Continue Watching
   useEffect(() => {
     const shouldAutoplay = sessionStorage.getItem('videoPlayerAutoplay');
-    if (shouldAutoplay === 'true' && showPoster && !isInitializing && !video) {
+    const shouldResume = location.state?.shouldResume;
+
+    if ((shouldAutoplay === 'true' || shouldResume) && showPoster && !isInitializing && !video) {
       // Automatically start playing (skip poster)
       handlePlay();
     }
-  }, [scene.id, showPoster, isInitializing, video, handlePlay]);
+  }, [scene.id, showPoster, isInitializing, video, handlePlay, location.state]);
 
   return (
     <section>

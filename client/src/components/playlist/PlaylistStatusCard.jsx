@@ -126,6 +126,30 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
 
     if (index < 0 || index >= totalScenes) return;
 
+    // Check if there's a video player currently playing
+    // If so, set autoplay flag for next video
+    const videoElements = document.querySelectorAll('video');
+    let isPlaying = false;
+
+    videoElements.forEach(video => {
+      if (!video.paused && !video.ended && video.readyState > 2) {
+        isPlaying = true;
+      }
+    });
+
+    if (isPlaying) {
+      sessionStorage.setItem('videoPlayerAutoplay', 'true');
+
+      // Also check if video is fullscreen
+      const isFullscreen = document.fullscreenElement ||
+                          document.webkitFullscreenElement ||
+                          document.mozFullScreenElement ||
+                          document.msFullscreenElement;
+      if (isFullscreen) {
+        sessionStorage.setItem('videoPlayerFullscreen', 'true');
+      }
+    }
+
     const targetScene = playlist.scenes[index];
     navigate(`/video/${targetScene.sceneId}`, {
       state: {
