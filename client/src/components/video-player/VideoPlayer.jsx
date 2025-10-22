@@ -85,19 +85,31 @@ const VideoPlayer = ({
     navigate
   );
 
-  // Wrap navigation functions to preserve fullscreen state
+  // Wrap navigation functions to preserve fullscreen state and playing state
   const playPreviousInPlaylist = useCallback(() => {
     const player = playerRef.current;
-    if (player && player.isFullscreen && player.isFullscreen()) {
-      sessionStorage.setItem('videoPlayerFullscreen', 'true');
+    if (player) {
+      if (player.isFullscreen && player.isFullscreen()) {
+        sessionStorage.setItem('videoPlayerFullscreen', 'true');
+      }
+      // Store playing state for autoplay
+      if (!player.paused()) {
+        sessionStorage.setItem('videoPlayerAutoplay', 'true');
+      }
     }
     originalPlayPrevious();
   }, [originalPlayPrevious]);
 
   const playNextInPlaylist = useCallback(() => {
     const player = playerRef.current;
-    if (player && player.isFullscreen && player.isFullscreen()) {
-      sessionStorage.setItem('videoPlayerFullscreen', 'true');
+    if (player) {
+      if (player.isFullscreen && player.isFullscreen()) {
+        sessionStorage.setItem('videoPlayerFullscreen', 'true');
+      }
+      // Store playing state for autoplay
+      if (!player.paused()) {
+        sessionStorage.setItem('videoPlayerAutoplay', 'true');
+      }
     }
     originalPlayNext();
   }, [originalPlayNext]);
@@ -244,18 +256,23 @@ const VideoPlayer = ({
           const shouldResume = location.state?.shouldResume;
           const resumeTime = initialResumeTimeRef.current;
 
+          // Check for playlist navigation flags
+          const wasFullscreen = sessionStorage.getItem('videoPlayerFullscreen');
+          const shouldAutoplay = sessionStorage.getItem('videoPlayerAutoplay');
+
+          if (wasFullscreen === 'true') {
+            sessionStorage.removeItem('videoPlayerFullscreen');
+          }
+          if (shouldAutoplay === 'true') {
+            sessionStorage.removeItem('videoPlayerAutoplay');
+          }
+
           if (shouldResume && !hasResumedRef.current && resumeTime > 0) {
             // Resume from saved position
             console.log('[Resume Debug] Player ready, resuming to:', resumeTime);
             hasResumedRef.current = true;
 
             player.currentTime(resumeTime);
-
-            // Check fullscreen flag before playing
-            const wasFullscreen = sessionStorage.getItem('videoPlayerFullscreen');
-            if (wasFullscreen === 'true') {
-              sessionStorage.removeItem('videoPlayerFullscreen');
-            }
 
             player.play().then(() => {
               console.log('[Resume Debug] Playing from resume time:', player.currentTime());
@@ -275,14 +292,8 @@ const VideoPlayer = ({
             }).catch((err) => {
               console.log('[Resume Debug] Autoplay failed:', err.message);
             });
-          } else {
-            // Normal play from beginning
-            // Check fullscreen flag before playing
-            const wasFullscreen = sessionStorage.getItem('videoPlayerFullscreen');
-            if (wasFullscreen === 'true') {
-              sessionStorage.removeItem('videoPlayerFullscreen');
-            }
-
+          } else if (shouldAutoplay === 'true') {
+            // Autoplay for playlist navigation (user was watching and navigated)
             player.play().then(() => {
               // Re-enter fullscreen if it was active before navigation
               if (wasFullscreen === 'true') {
