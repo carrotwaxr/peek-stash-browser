@@ -1,3 +1,0 @@
-# Environment
-
-Documentation coming soon.

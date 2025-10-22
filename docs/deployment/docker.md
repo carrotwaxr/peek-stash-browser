@@ -1,3 +1,0 @@
-# Docker
-
-Documentation coming soon.

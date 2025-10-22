@@ -228,6 +228,81 @@ If Stash has multiple libraries (e.g., `/data` for videos, `/images` for images)
 
 **Advanced:** Path mappings can also be managed later via Settings → Path Mappings
 
+## Updating Peek
+
+### Check for Updates
+
+Peek includes a built-in update checker:
+
+1. Navigate to **Settings → Server Settings**
+2. Scroll to the **Version Information** section
+3. Click **Check for Updates**
+
+The system will check GitHub for new releases and notify you if an update is available.
+
+### Update to Latest Version
+
+To update your Docker container to the latest version:
+
+**Step 1: Stop and remove the current container**
+```bash
+docker stop peek-stash-browser
+docker rm peek-stash-browser
+```
+
+**Step 2: Pull the latest image**
+```bash
+docker pull carrotwaxr/peek-stash-browser:latest
+```
+
+**Step 3: Start the new container**
+
+Use the same `docker run` command you used for initial installation. Your data persists in the `peek-data` volume.
+
+**Linux/macOS example:**
+```bash
+docker run -d \
+  --name peek-stash-browser \
+  -p 6969:80 \
+  -v /path/to/stash/media:/app/media:ro \
+  -v peek-data:/app/data \
+  -e STASH_URL="http://your-stash-server:9999/graphql" \
+  -e STASH_API_KEY="your_stash_api_key" \
+  -e JWT_SECRET="${JWT_SECRET}" \
+  carrotwaxr/peek-stash-browser:latest
+```
+
+**Windows example:**
+```powershell
+docker run -d `
+  --name peek-stash-browser `
+  -p 6969:80 `
+  -v peek-media:/app/media:ro `
+  -v peek-data:/app/data `
+  -e STASH_URL=http://192.168.1.100:9999/graphql `
+  -e STASH_API_KEY=your_api_key `
+  -e JWT_SECRET=$jwt `
+  carrotwaxr/peek-stash-browser:latest
+```
+
+**unRAID users:** Simply click **Force Update** in the Docker tab to pull the latest image and restart.
+
+**Note:** Your database, user settings, path mappings, and playlists are stored in the `peek-data` volume and will persist across updates.
+
+### Use Specific Version
+
+If you prefer to pin to a specific version instead of `:latest`:
+
+```bash
+# Pull specific version
+docker pull carrotwaxr/peek-stash-browser:1.0.0
+
+# Use in docker run command
+docker run ... carrotwaxr/peek-stash-browser:1.0.0
+```
+
+Available versions are listed on [GitHub Releases](https://github.com/carrotwaxr/peek-stash-browser/releases).
+
 ## Beta Testing
 
 This is **beta software**. Please help improve Peek by:
