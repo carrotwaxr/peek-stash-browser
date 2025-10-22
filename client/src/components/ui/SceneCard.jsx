@@ -30,6 +30,8 @@ const SceneCard = forwardRef(
     const { isTVMode } = useTVMode();
     const longPressTimerRef = useRef(null);
     const [isLongPressing, setIsLongPressing] = useState(false);
+    const startPosRef = useRef({ x: 0, y: 0 });
+    const hasMovedRef = useRef(false);
 
     const handleClick = (e) => {
       // Don't interfere with clicks on interactive elements
@@ -111,10 +113,35 @@ const SceneCard = forwardRef(
         return;
       }
 
+      // Track starting position
+      const touch = e.touches[0];
+      startPosRef.current = { x: touch.clientX, y: touch.clientY };
+      hasMovedRef.current = false;
+
       longPressTimerRef.current = setTimeout(() => {
-        setIsLongPressing(true);
-        onToggleSelect?.(scene);
+        // Only trigger if hasn't moved (not dragging)
+        if (!hasMovedRef.current) {
+          setIsLongPressing(true);
+          onToggleSelect?.(scene);
+        }
       }, 500); // 500ms for long press
+    };
+
+    const handleTouchMove = (e) => {
+      // Check if user has moved beyond threshold (indicates scrolling/dragging)
+      if (longPressTimerRef.current && e.touches.length > 0) {
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
+        const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
+        const moveThreshold = 10; // pixels
+
+        if (deltaX > moveThreshold || deltaY > moveThreshold) {
+          // User is dragging/scrolling, cancel long press
+          hasMovedRef.current = true;
+          clearTimeout(longPressTimerRef.current);
+          longPressTimerRef.current = null;
+        }
+      }
     };
 
     const handleTouchEnd = () => {
@@ -122,6 +149,7 @@ const SceneCard = forwardRef(
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
+      hasMovedRef.current = false;
     };
 
     // Cleanup on unmount
@@ -181,7 +209,9 @@ const SceneCard = forwardRef(
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         onKeyDown={handleKeyDown}
         onFocus={onFocus}
         tabIndex={isTVMode ? tabIndex : -1}
