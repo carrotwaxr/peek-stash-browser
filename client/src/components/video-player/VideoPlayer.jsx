@@ -497,11 +497,16 @@ const VideoPlayer = ({
     const shouldAutoplay = sessionStorage.getItem('videoPlayerAutoplay');
     const shouldResume = location.state?.shouldResume;
 
-    if ((shouldAutoplay === 'true' || shouldResume) && showPoster && !isInitializing && !video) {
+    // For shouldResume, wait until we've captured the resume time from watch history
+    // For shouldAutoplay, trigger immediately
+    const canAutoplay = shouldAutoplay === 'true' ||
+                       (shouldResume && initialResumeTimeRef.current !== null);
+
+    if (canAutoplay && showPoster && !isInitializing && !video) {
       // Automatically start playing (skip poster)
       handlePlay();
     }
-  }, [scene.id, showPoster, isInitializing, video, handlePlay, location.state]);
+  }, [scene.id, showPoster, isInitializing, video, handlePlay, location.state, watchHistory]);
 
   return (
     <section>
