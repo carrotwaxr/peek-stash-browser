@@ -15,6 +15,34 @@ const SceneTitle = ({
 }) => {
   const title = getSceneTitle(scene);
 
+  // Handle click to set autoplay flag if video is playing
+  const handleClick = (e) => {
+    // Check if there's a video player currently playing and we're in a playlist
+    if (linkState?.playlist) {
+      const videoElements = document.querySelectorAll('video');
+      let isPlaying = false;
+
+      videoElements.forEach(video => {
+        if (!video.paused && !video.ended && video.readyState > 2) {
+          isPlaying = true;
+        }
+      });
+
+      if (isPlaying) {
+        sessionStorage.setItem('videoPlayerAutoplay', 'true');
+
+        // Also check if video is fullscreen
+        const isFullscreen = document.fullscreenElement ||
+                            document.webkitFullscreenElement ||
+                            document.mozFullScreenElement ||
+                            document.msFullscreenElement;
+        if (isFullscreen) {
+          sessionStorage.setItem('videoPlayerFullscreen', 'true');
+        }
+      }
+    }
+  };
+
   const titleStyle = maxLines ? {
     color: 'var(--text-primary)',
     display: '-webkit-box',
@@ -32,6 +60,7 @@ const SceneTitle = ({
       <Link
         to={`/scene/${scene.id}`}
         state={linkState}
+        onClick={handleClick}
         className={`font-semibold hover:underline block ${titleClassName}`}
         style={titleStyle}
       >
