@@ -33,5 +33,6 @@ router.get("/all", getAllUsers);
 router.post("/create", createUser);
 router.delete("/:userId", deleteUser);
 router.put("/:userId/role", updateUserRole);
+router.put("/:userId/settings", updateUserSettings); // Admin can update any user's settings
 
 export default router;

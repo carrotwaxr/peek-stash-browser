@@ -71,10 +71,23 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
  */
 export const updateUserSettings = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const currentUserId = req.user?.id;
+    const currentUserRole = req.user?.role;
 
-    if (!userId) {
+    if (!currentUserId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Determine target user ID
+    // If userId param provided (admin updating another user), use that
+    // Otherwise, user is updating their own settings
+    let targetUserId = currentUserId;
+    if (req.params.userId) {
+      // Admin updating another user's settings
+      if (currentUserRole !== 'admin') {
+        return res.status(403).json({ error: "Only admins can update other users' settings" });
+      }
+      targetUserId = parseInt(req.params.userId);
     }
 
     const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences, minimumPlayPercent, syncToStash } = req.body;
@@ -118,7 +131,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: targetUserId },
       data: {
         ...(preferredQuality !== undefined && { preferredQuality }),
         ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
