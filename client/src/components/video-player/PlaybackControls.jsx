@@ -1,14 +1,26 @@
+import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import AddToPlaylistButton from "../ui/AddToPlaylistButton.jsx";
 import OCounterButton from "../ui/OCounterButton.jsx";
 
-const PlaybackControls = ({
-  scene,
-  playlist,
-  currentPlaylistIndex,
-  quality,
-  setQuality,
-  onOCounterIncrement,
-}) => {
+const PlaybackControls = () => {
+  const {
+    scene,
+    sceneLoading,
+    videoLoading,
+    playlist,
+    currentIndex,
+    quality,
+    setQuality,
+    oCounter,
+    incrementOCounter,
+  } = useScenePlayer();
+
+  // Don't render if no scene data yet
+  if (!scene) {
+    return null;
+  }
+
+  const isLoading = sceneLoading || videoLoading;
   return (
     <section className="container-fluid py-4 mt-6">
       <div
@@ -28,7 +40,7 @@ const PlaybackControls = ({
               Playlist:
             </span>
             <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-              {playlist.name} ({currentPlaylistIndex + 1}/{playlist.scenes.length})
+              {playlist.name} ({currentIndex + 1}/{playlist.scenes.length})
             </span>
           </div>
         )}
@@ -44,12 +56,15 @@ const PlaybackControls = ({
           <select
             value={quality}
             onChange={(e) => setQuality(e.target.value)}
+            disabled={isLoading}
             className="btn text-sm"
             style={{
               backgroundColor: "var(--bg-card)",
               border: "1px solid var(--border-color)",
               color: "var(--text-primary)",
               padding: "8px 12px",
+              opacity: isLoading ? 0.6 : 1,
+              cursor: isLoading ? "not-allowed" : "pointer",
             }}
           >
             <option value="direct">Direct Play</option>
@@ -61,17 +76,21 @@ const PlaybackControls = ({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-4">
+        <div
+          className="flex items-center gap-4"
+          style={{ opacity: isLoading ? 0.6 : 1 }}
+        >
           {/* O Counter Button */}
           <OCounterButton
-            sceneId={scene.id}
-            initialCount={scene.o_counter ?? 0}
-            onIncrement={onOCounterIncrement}
+            sceneId={scene?.id}
+            initialCount={oCounter}
+            onIncrement={incrementOCounter}
             className="text-base"
+            disabled={isLoading}
           />
 
           {/* Add to Playlist Button */}
-          <AddToPlaylistButton sceneId={scene.id} />
+          <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
         </div>
       </div>
     </section>

@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { canDirectPlayVideo } from "../../utils/videoFormat.js";
+import {
+  ScenePlayerProvider,
+  useScenePlayer,
+} from "../../contexts/ScenePlayerContext.jsx";
 import Navigation from "../ui/Navigation.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
@@ -8,96 +12,31 @@ import SceneDetails from "./SceneDetails.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { libraryApi } from "../../services/api.js";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
 
-const Scene = () => {
-  const { sceneId } = useParams();
+// Inner component that reads from context
+const SceneContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const pageRef = useRef(null);
 
-  // Local state for fetched data
-  const [scene, setScene] = useState(location.state?.scene);
-  const [playlist, setPlaylist] = useState(location.state?.playlist);
-  const [isLoading, setIsLoading] = useState(!location.state?.scene);
-  const [fetchError, setFetchError] = useState(null);
-
-  // Update scene and playlist when location state changes (playlist navigation)
-  useEffect(() => {
-    if (location.state?.scene) {
-      setScene(location.state.scene);
-      setPlaylist(location.state.playlist);
-      setIsLoading(false);
-      setFetchError(null);
-    }
-  }, [location.state]);
+  // Read state from context
+  const { scene, sceneLoading, sceneError, playlist } = useScenePlayer();
 
   // Set page title to scene title (with fallback to filename)
   const displayTitle = scene?.title || scene?.files?.[0]?.basename || "Scene";
   usePageTitle(displayTitle);
 
   // Set initial focus to video player when page loads
-  useInitialFocus(pageRef, ".vjs-big-play-button, button", !isLoading);
+  useInitialFocus(pageRef, ".vjs-big-play-button, button", !sceneLoading);
 
+  // Local UI state (not managed by context)
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
-  const [quality, setQuality] = useState("direct");
 
-  // Callback to update scene's o_counter when incremented
-  const handleOCounterIncrement = (newCount) => {
-    setScene((prevScene) => ({
-      ...prevScene,
-      o_counter: newCount,
-    }));
-  };
-
-  // Fetch scene data if not provided via navigation state
-  useEffect(() => {
-    const fetchScene = async () => {
-      // If we already have scene data from navigation state, skip fetching
-      if (location.state?.scene && location.state.scene.id === sceneId) {
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setFetchError(null);
-        const sceneData = await libraryApi.findSceneById(sceneId);
-
-        if (sceneData) {
-          setScene(sceneData);
-        } else {
-          setFetchError("Scene not found");
-        }
-      } catch (error) {
-        setFetchError(error.message || "Failed to load scene");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchScene();
-  }, [sceneId, location.state]);
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div
-        className="min-h-screen"
-        style={{ backgroundColor: "var(--bg-primary)" }}
-      >
-        <Navigation />
-        <div className="flex items-center justify-center min-h-screen">
-          <LoadingSpinner />
-        </div>
-      </div>
-    );
-  }
-
-  // Error or scene not found
-  if (fetchError || !scene) {
+  // Only show full-page error for critical failures (no scene at all)
+  // Let individual components handle loading states
+  if (sceneError && !scene) {
     return (
       <div
         className="min-h-screen"
@@ -110,11 +49,8 @@ const Scene = () => {
               className="text-xl mb-2"
               style={{ color: "var(--text-primary)" }}
             >
-              {fetchError || "Scene not found"}
+              {sceneError?.message || "Scene not found"}
             </h2>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Scene ID: {sceneId}
-            </p>
             <Button onClick={() => navigate("/scenes")} variant="primary">
               Browse Scenes
             </Button>
@@ -123,9 +59,6 @@ const Scene = () => {
       </div>
     );
   }
-
-  const firstFile = scene.files?.[0];
-  const compatibility = firstFile ? canDirectPlayVideo(firstFile) : null;
 
   return (
     <div
@@ -159,7 +92,7 @@ const Scene = () => {
             className="text-2xl font-bold line-clamp-2"
             style={{ color: "var(--text-primary)" }}
           >
-            {displayTitle}
+            {sceneLoading && !scene ? "Loading..." : displayTitle}
           </h1>
         </div>
       </header>
@@ -167,38 +100,16 @@ const Scene = () => {
       {/* Main content area */}
       <main className="container-fluid" style={{ marginTop: 0, paddingTop: 0 }}>
         {/* Video player section */}
-        <VideoPlayer
-          scene={scene}
-          playlist={playlist}
-          compatibility={compatibility}
-          firstFile={firstFile}
-          externalQuality={quality}
-          externalSetQuality={setQuality}
-        />
+        <VideoPlayer />
 
         {/* Playback Controls */}
-        <PlaybackControls
-          scene={scene}
-          playlist={playlist}
-          currentPlaylistIndex={playlist?.currentIndex || 0}
-          quality={quality}
-          setQuality={setQuality}
-          onOCounterIncrement={handleOCounterIncrement}
-        />
+        <PlaybackControls />
 
         {/* Playlist Status Card */}
-        {playlist && (
-          <PlaylistStatusCard
-            playlist={playlist}
-            currentIndex={playlist.currentIndex || 0}
-          />
-        )}
+        {playlist && <PlaylistStatusCard />}
 
         {/* Scene Details */}
         <SceneDetails
-          scene={scene}
-          firstFile={firstFile}
-          compatibility={compatibility}
           showDetails={showDetails}
           setShowDetails={setShowDetails}
           showTechnicalDetails={showTechnicalDetails}
@@ -206,6 +117,82 @@ const Scene = () => {
         />
       </main>
     </div>
+  );
+};
+
+// Outer component that wraps everything in ScenePlayerProvider
+const Scene = () => {
+  const { sceneId } = useParams();
+  const location = useLocation();
+
+  // Extract data from location.state
+  let playlist = location.state?.playlist;
+  const shouldResume = location.state?.shouldResume;
+
+  // Persist auto-playlists to sessionStorage for page refresh support
+  // Use a stable key that doesn't change when navigating between scenes
+  const PLAYLIST_STORAGE_KEY = 'currentPlaylist';
+
+  // If playlist came via location.state, save it
+  if (playlist) {
+    sessionStorage.setItem(PLAYLIST_STORAGE_KEY, JSON.stringify(playlist));
+  }
+
+  // If no playlist in location.state, try to restore from sessionStorage
+  // This handles page refresh for auto-generated playlists
+  if (!playlist) {
+    const storedPlaylist = sessionStorage.getItem(PLAYLIST_STORAGE_KEY);
+    if (storedPlaylist) {
+      try {
+        const parsed = JSON.parse(storedPlaylist);
+        // Verify the current scene is actually in this playlist
+        const sceneInPlaylist = parsed.scenes?.some(s => s.sceneId === sceneId);
+        if (sceneInPlaylist) {
+          playlist = parsed;
+          // Update currentIndex to match the current scene
+          const currentIndex = parsed.scenes.findIndex(s => s.sceneId === sceneId);
+          if (currentIndex >= 0) {
+            playlist.currentIndex = currentIndex;
+          }
+        } else {
+          // Scene not in stored playlist, clear it
+          sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
+        }
+      } catch (e) {
+        console.error('Failed to parse stored playlist:', e);
+        sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
+      }
+    }
+  }
+
+  // Cleanup: Clear playlist when navigating away from scene player
+  useEffect(() => {
+    return () => {
+      // Only clear if we're navigating away, not just to another scene
+      // This is handled by checking if location.state has a playlist on next navigation
+    };
+  }, []);
+
+  // Compute compatibility if scene data is available from navigation state
+  // (only available when navigating from scene cards, not on direct page load)
+  const scene = location.state?.scene;
+  const firstFile = scene?.files?.[0];
+  const compatibility = firstFile ? canDirectPlayVideo(firstFile) : null;
+
+  // Always default to "direct" quality - the auto-fallback mechanism in
+  // useVideoPlayerSources will switch to 480p if browser can't play the codec
+  const initialQuality = "direct";
+
+  return (
+    <ScenePlayerProvider
+      sceneId={sceneId}
+      playlist={playlist}
+      shouldResume={shouldResume}
+      compatibility={compatibility}
+      initialQuality={initialQuality}
+    >
+      <SceneContent />
+    </ScenePlayerProvider>
   );
 };
 
