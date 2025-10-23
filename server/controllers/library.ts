@@ -63,23 +63,11 @@ export const findPerformers = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter, performer_filter, ids, performer_ids } = req.body;
 
-    // Always filter to only show performers with scenes
-    const enhancedFilter = {
-      ...performer_filter,
-      scene_count: {
-        modifier: "GREATER_THAN" as any,
-        value: 0,
-      },
-    };
-
     const queryInputs = removeEmptyValues({
       filter: filter as FindFilterType,
       ids: ids as string[],
       performer_ids: performer_ids as number[],
-      performer_filter:
-        ids || performer_ids
-          ? performer_filter
-          : (enhancedFilter as PerformerFilterType),
+      performer_filter: performer_filter as PerformerFilterType,
     });
 
     const performers: FindPerformersQuery = await stash.findPerformers(
@@ -112,18 +100,9 @@ export const findStudios = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter, studio_filter, ids } = req.body;
 
-    // Always filter to only show studios with scenes
-    const enhancedFilter = {
-      ...studio_filter,
-      scene_count: {
-        modifier: "GREATER_THAN" as any,
-        value: 0,
-      },
-    };
-
     const studios: FindStudiosQuery = await stash.findStudios({
       filter: filter as FindFilterType,
-      studio_filter: enhancedFilter as StudioFilterType,
+      studio_filter: studio_filter as StudioFilterType,
       ids: ids as string[],
     });
 
@@ -153,18 +132,9 @@ export const findTags = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter, tag_filter, ids } = req.body;
 
-    // Always filter to only show tags with scenes
-    const enhancedFilter = {
-      ...tag_filter,
-      scene_count: {
-        modifier: "GREATER_THAN" as any,
-        value: 0,
-      },
-    };
-
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
-      tag_filter: enhancedFilter as TagFilterType,
+      tag_filter: tag_filter as TagFilterType,
       ids: ids as string[],
     });
 
@@ -196,17 +166,8 @@ export const findPerformersMinimal = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter } = req.body;
 
-    // Always filter to only show performers with scenes
-    const enhancedFilter = {
-      scene_count: {
-        modifier: "GREATER_THAN" as any,
-        value: 0,
-      },
-    };
-
     const performers: FindPerformersQuery = await stash.findPerformers({
       filter: filter as FindFilterType,
-      performer_filter: enhancedFilter as PerformerFilterType,
     });
 
     // Return only id and name
@@ -230,17 +191,8 @@ export const findStudiosMinimal = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter } = req.body;
 
-    // Always filter to only show studios with scenes
-    const enhancedFilter = {
-      scene_count: {
-        modifier: "GREATER_THAN" as any,
-        value: 0,
-      },
-    };
-
     const studios: FindStudiosQuery = await stash.findStudios({
       filter: filter as FindFilterType,
-      studio_filter: enhancedFilter as StudioFilterType,
     });
 
     // Return only id and name
@@ -264,17 +216,8 @@ export const findTagsMinimal = async (req: Request, res: Response) => {
     const stash = getStash();
     const { filter } = req.body;
 
-    // Always filter to only show tags with scenes
-    const enhancedFilter = {
-      scene_count: {
-        modifier: "GREATER_THAN" as any,
-        value: 0,
-      },
-    };
-
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
-      tag_filter: enhancedFilter as TagFilterType,
     });
 
     // Return only id and name
