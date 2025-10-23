@@ -20,14 +20,370 @@ import {
   transformStudio,
   transformTag,
 } from "../utils/pathMapping.js";
+import prisma from "../prisma/singleton.js";
+
+/**
+ * Override scene watch history fields with per-user data from Peek database
+ * This ensures each Peek user sees ONLY their own activity, not Stash's aggregate
+ */
+export async function injectUserWatchHistory(scenes: any[], userId: number): Promise<any[]> {
+  if (!scenes || scenes.length === 0) {
+    return scenes;
+  }
+
+  // Fetch watch history for these scenes for this user
+  const sceneIds = scenes.map((s) => s.id);
+  const watchHistoryRecords = await prisma.watchHistory.findMany({
+    where: {
+      userId: userId,
+      sceneId: { in: sceneIds },
+    },
+  });
+
+  // Create lookup map
+  const watchHistoryMap = new Map();
+  for (const wh of watchHistoryRecords) {
+    // Parse JSON fields
+    const oHistory = Array.isArray(wh.oHistory)
+      ? wh.oHistory
+      : JSON.parse((wh.oHistory as string) || "[]");
+    const playHistory = Array.isArray(wh.playHistory)
+      ? wh.playHistory
+      : JSON.parse((wh.playHistory as string) || "[]");
+
+    watchHistoryMap.set(wh.sceneId, {
+      resume_time: wh.resumeTime || 0,
+      play_duration: wh.playDuration || 0,
+      play_count: wh.playCount || 0,
+      play_history: playHistory,
+      o_counter: wh.oCount || 0,
+      o_history: oHistory,
+    });
+  }
+
+  // Override scene fields with per-user values
+  return scenes.map((scene) => {
+    const userWatchHistory = watchHistoryMap.get(scene.id);
+
+    if (userWatchHistory) {
+      return {
+        ...scene,
+        ...userWatchHistory,
+      };
+    }
+
+    // No watch history for this user - return zeros
+    return {
+      ...scene,
+      resume_time: 0,
+      play_duration: 0,
+      play_count: 0,
+      play_history: [],
+      o_counter: 0,
+      o_history: [],
+    };
+  });
+}
+
+/**
+ * Check if a sort field is a watch history field that needs re-sorting after user data injection
+ */
+function isWatchHistoryField(field: string): boolean {
+  const watchHistoryFields = [
+    'play_count',
+    'play_duration',
+    'o_counter',
+    'last_played_at',
+    // Stash may use different field names for last_o_at
+    'organized_at', // Common alternative
+    'o_date', // Another possible field name
+  ];
+  return watchHistoryFields.includes(field.toLowerCase());
+}
+
+/**
+ * Get field value from scene object, handling nested properties
+ */
+function getFieldValue(scene: any, field: string): any {
+  // Direct field access
+  if (scene[field] !== undefined) {
+    return scene[field];
+  }
+
+  // Try snake_case to camelCase conversion
+  const camelField = field.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+  if (scene[camelField] !== undefined) {
+    return scene[camelField];
+  }
+
+  return null;
+}
+
+/**
+ * Custom pagination logic for watch history field sorts
+ * Query Peek database first, sort by user's watch history, then fill remainder from Stash
+ * Stash query uses same sort field so scenes without watch history are sorted by Stash's aggregate values
+ */
+async function findScenesWithCustomSort(
+  req: Request,
+  res: Response,
+  userId: number,
+  sortField: string,
+  sortDirection: string,
+  page: number,
+  perPage: number,
+  scene_filter: any
+) {
+  try {
+    const stash = getStash();
+
+    // Step 1: Get all watch history records for this user from Peek database
+    const watchHistoryRecords = await prisma.watchHistory.findMany({
+      where: { userId },
+    });
+
+    // Create map of sceneId -> watch history stats
+    const watchHistoryMap = new Map();
+    const sceneIdsWithHistory = watchHistoryRecords.map((wh) => {
+      const oHistory = Array.isArray(wh.oHistory)
+        ? wh.oHistory
+        : JSON.parse((wh.oHistory as string) || "[]");
+      const playHistory = Array.isArray(wh.playHistory)
+        ? wh.playHistory
+        : JSON.parse((wh.playHistory as string) || "[]");
+
+      watchHistoryMap.set(wh.sceneId, {
+        sceneId: wh.sceneId,
+        resume_time: wh.resumeTime || 0,
+        play_duration: wh.playDuration || 0,
+        play_count: wh.playCount || 0,
+        play_history: playHistory,
+        o_counter: wh.oCount || 0,
+        o_history: oHistory,
+        last_played_at: playHistory.length > 0 ? playHistory[playHistory.length - 1] : null,
+      });
+
+      return wh.sceneId;
+    });
+
+    // Step 2: Fetch full scene details from Stash for scenes with watch history
+    let scenesWithHistory: any[] = [];
+    if (sceneIdsWithHistory.length > 0) {
+      const historyScenes: FindScenesQuery = await stash.findScenes({
+        ids: sceneIdsWithHistory,
+        scene_filter: scene_filter as SceneFilterType,
+      });
+
+      // Merge watch history stats with scene data
+      scenesWithHistory = historyScenes.findScenes.scenes.map((scene) => {
+        const transformed = transformScene(scene as Scene);
+        const userHistory = watchHistoryMap.get(scene.id);
+        return { ...transformed, ...userHistory };
+      });
+
+      // Step 3: Sort by requested field (using per-user data) with secondary sort by title
+      scenesWithHistory.sort((a, b) => {
+        const aValue = getFieldValue(a, sortField) || 0;
+        const bValue = getFieldValue(b, sortField) || 0;
+
+        // Primary sort by the requested field
+        let comparison = 0;
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          comparison = aValue.localeCompare(bValue);
+        } else {
+          comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        }
+
+        // Apply sort direction
+        if (sortDirection.toUpperCase() === 'DESC') {
+          comparison = -comparison;
+        }
+
+        // Secondary sort by title if primary values are equal
+        if (comparison === 0) {
+          const aTitle = a.title || '';
+          const bTitle = b.title || '';
+          return aTitle.localeCompare(bTitle);
+        }
+
+        return comparison;
+      });
+    }
+
+    // Step 4: Get total count from Stash (lightweight query)
+    // This ensures accurate pagination regardless of how many scenes have watch history
+    const countQuery: FindScenesQuery = await stash.findScenes({
+      filter: {
+        page: 1,
+        per_page: 1, // Minimal fetch, we only need the count
+        sort: sortField,
+        direction: sortDirection,
+      } as FindFilterType,
+      scene_filter: scene_filter as SceneFilterType,
+    });
+    const stashTotalCount = countQuery.findScenes.count || 0;
+
+    // Calculate actual total: Stash's count, accounting for scenes we already have in watch history
+    // (avoid double-counting scenes that appear in both Peek watch history AND Stash results)
+    const totalCount = scenesWithHistory.length + stashTotalCount - sceneIdsWithHistory.length;
+
+    // Step 5: Calculate pagination
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+
+    // Scenes from watch history that belong on this page
+    const historyScenesOnPage = scenesWithHistory.slice(startIndex, endIndex);
+
+    // Step 6: If page isn't full, query Stash for additional scenes
+    // Use same sort field so Stash's aggregate values provide meaningful ordering
+    // Keep fetching until we have enough scenes or run out of scenes
+    const remainingSlots = perPage - historyScenesOnPage.length;
+    let fillScenes: any[] = [];
+
+    if (remainingSlots > 0) {
+      const historyCount = scenesWithHistory.length;
+      const stashSkip = Math.max(0, startIndex - historyCount);
+
+      // Track how many scenes we've collected and offset for pagination
+      let collectedCount = 0;
+      let currentOffset = stashSkip;
+      const batchSize = 120; // Fetch in batches of 120
+      const maxAttempts = 5; // Try 5 batches before falling back to full query
+      let attempts = 0;
+      let exhaustedResults = false;
+
+      // Keep fetching until we have enough scenes or run out
+      while (collectedCount < remainingSlots && attempts < maxAttempts) {
+        attempts++;
+
+        const fillScenesQuery: FindScenesQuery = await stash.findScenes({
+          filter: {
+            page: Math.floor(currentOffset / batchSize) + 1,
+            per_page: batchSize,
+            sort: sortField, // Use same sort field for better UX (Stash's aggregate values)
+            direction: sortDirection,
+          } as FindFilterType,
+          scene_filter: scene_filter as SceneFilterType,
+        });
+
+        // If Stash returns no scenes, we've exhausted the results
+        if (fillScenesQuery.findScenes.scenes.length === 0) {
+          exhaustedResults = true;
+          break;
+        }
+
+        // Filter out scenes that already have watch history (duplicates)
+        const filteredBatch = fillScenesQuery.findScenes.scenes
+          .filter((scene) => !sceneIdsWithHistory.includes(scene.id));
+
+        // Transform and add zero watch history values
+        const transformedBatch = filteredBatch.map((scene) => {
+          const transformed = transformScene(scene as Scene);
+          return {
+            ...transformed,
+            resume_time: 0,
+            play_duration: 0,
+            play_count: 0,
+            play_history: [],
+            o_counter: 0,
+            o_history: [],
+            last_played_at: null,
+          };
+        });
+
+        // Add to our collection
+        fillScenes.push(...transformedBatch);
+        collectedCount = fillScenes.length;
+
+        // If we have enough, trim to exact amount needed
+        if (collectedCount >= remainingSlots) {
+          fillScenes = fillScenes.slice(0, remainingSlots);
+          break;
+        }
+
+        // Move to next batch
+        currentOffset += batchSize;
+      }
+
+      // If we still don't have enough scenes after max attempts and didn't exhaust results,
+      // do a final expensive query to get ALL scenes (per_page: -1)
+      if (attempts >= maxAttempts && collectedCount < remainingSlots && !exhaustedResults) {
+        console.warn("Falling back to full scene query after max attempts", {
+          attempts,
+          collectedCount,
+          remainingSlots,
+          sceneIdsWithHistory: sceneIdsWithHistory.length,
+        });
+
+        const fullQuery: FindScenesQuery = await stash.findScenes({
+          filter: {
+            per_page: -1, // Get everything
+            sort: sortField,
+            direction: sortDirection,
+          } as FindFilterType,
+          scene_filter: scene_filter as SceneFilterType,
+        });
+
+        // Filter out all scenes with watch history, skip to correct offset, take what we need
+        const allScenesWithoutHistory = fullQuery.findScenes.scenes
+          .filter((scene) => !sceneIdsWithHistory.includes(scene.id))
+          .slice(stashSkip, stashSkip + remainingSlots);
+
+        // Transform and add zero watch history values
+        fillScenes = allScenesWithoutHistory.map((scene) => {
+          const transformed = transformScene(scene as Scene);
+          return {
+            ...transformed,
+            resume_time: 0,
+            play_duration: 0,
+            play_count: 0,
+            play_history: [],
+            o_counter: 0,
+            o_history: [],
+            last_played_at: null,
+          };
+        });
+      }
+    }
+
+    // Step 7: Combine both groups (history scenes first, then fill scenes)
+    const finalScenes = [...historyScenesOnPage, ...fillScenes];
+
+    // Return properly formatted response matching Stash's structure
+    res.json({
+      findScenes: {
+        count: totalCount,
+        scenes: finalScenes,
+      },
+    });
+  } catch (error) {
+    console.error("Error in findScenesWithCustomSort:", error);
+    res.status(500).json({
+      error: "Failed to find scenes with custom sort",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
 
 // New POST endpoints for filtered searching
 
 export const findScenes = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
+    const userId = (req as any).user?.id;
     const { filter, scene_filter, ids, scene_ids } = req.body;
 
+    const sortField = filter?.sort;
+    const sortDirection = filter?.direction || 'DESC';
+    const page = filter?.page || 1;
+    const perPage = filter?.per_page || 40;
+
+    // If sorting by watch history fields, use custom pagination logic
+    if (sortField && isWatchHistoryField(sortField)) {
+      return await findScenesWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, scene_filter);
+    }
+
+    // Standard Stash query for non-watch-history sorts
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
       scene_filter: scene_filter as SceneFilterType,
@@ -39,9 +395,12 @@ export const findScenes = async (req: Request, res: Response) => {
       transformScene(s as Scene)
     );
 
+    // Override with per-user watch history
+    const scenesWithUserHistory = await injectUserWatchHistory(mutatedScenes, userId);
+
     res.json({
       ...scenes,
-      findScenes: { ...scenes.findScenes, scenes: mutatedScenes },
+      findScenes: { ...scenes.findScenes, scenes: scenesWithUserHistory },
     });
   } catch (error) {
     console.error("Error in findScenes:", error);
@@ -58,11 +417,263 @@ const removeEmptyValues = (obj: any) => {
   );
 };
 
+/**
+ * Calculate per-user performer statistics from watch history
+ * For each performer, aggregate stats from scenes they appear in that the user has watched
+ */
+async function calculateUserPerformerStats(userId: number) {
+  const stash = getStash();
+
+  // Get all watch history for this user
+  const watchHistoryRecords = await prisma.watchHistory.findMany({
+    where: { userId },
+  });
+
+  if (watchHistoryRecords.length === 0) {
+    return new Map(); // No watch history, return empty map
+  }
+
+  // Get all scene IDs with watch history
+  const sceneIds = watchHistoryRecords.map((wh) => wh.sceneId);
+
+  // Query Stash for these scenes to get their performers
+  const scenesQuery: FindScenesQuery = await stash.findScenes({
+    ids: sceneIds,
+  });
+
+  // Build map of performerId -> stats
+  const performerStatsMap = new Map<string, {
+    o_counter: number;
+    play_count: number;
+    last_played_at: string | null;
+    last_o_at: string | null;
+    play_duration: number;
+  }>();
+
+  // For each scene, aggregate stats for each performer
+  scenesQuery.findScenes.scenes.forEach((scene) => {
+    const watchHistory = watchHistoryRecords.find((wh) => wh.sceneId === scene.id);
+    if (!watchHistory) return;
+
+    // Parse JSON fields
+    const oHistory = Array.isArray(watchHistory.oHistory)
+      ? watchHistory.oHistory
+      : JSON.parse((watchHistory.oHistory as string) || "[]");
+    const playHistory = Array.isArray(watchHistory.playHistory)
+      ? watchHistory.playHistory
+      : JSON.parse((watchHistory.playHistory as string) || "[]");
+
+    // Get performers from scene
+    const performers = (scene as any).performers || [];
+
+    performers.forEach((performer: any) => {
+      const performerId = performer.id;
+      const existing = performerStatsMap.get(performerId) || {
+        o_counter: 0,
+        play_count: 0,
+        last_played_at: null,
+        last_o_at: null,
+        play_duration: 0,
+      };
+
+      // Add o_count from this scene
+      existing.o_counter += watchHistory.oCount || 0;
+
+      // Increment play_count if this scene was played
+      if (watchHistory.playCount > 0) {
+        existing.play_count += 1;
+      }
+
+      // Add play_duration from this scene
+      existing.play_duration += watchHistory.playDuration || 0;
+
+      // Update last_played_at if this scene was played more recently
+      if (playHistory.length > 0) {
+        const lastPlayed = playHistory[playHistory.length - 1];
+        if (!existing.last_played_at || lastPlayed > existing.last_played_at) {
+          existing.last_played_at = lastPlayed;
+        }
+      }
+
+      // Update last_o_at if this scene had O more recently
+      if (oHistory.length > 0) {
+        const lastO = oHistory[oHistory.length - 1];
+        if (!existing.last_o_at || lastO > existing.last_o_at) {
+          existing.last_o_at = lastO;
+        }
+      }
+
+      performerStatsMap.set(performerId, existing);
+    });
+  });
+
+  return performerStatsMap;
+}
+
+/**
+ * Override performer watch history fields with per-user data from Peek database
+ */
+export async function injectUserPerformerStats(performers: any[], userId: number): Promise<any[]> {
+  if (!performers || performers.length === 0) {
+    return performers;
+  }
+
+  // Calculate stats from watch history
+  const performerStatsMap = await calculateUserPerformerStats(userId);
+
+  // Override performer fields with per-user values
+  return performers.map((performer) => {
+    const userStats = performerStatsMap.get(performer.id);
+
+    if (userStats) {
+      return {
+        ...performer,
+        o_counter: userStats.o_counter,
+        play_count: userStats.play_count,
+        play_duration: userStats.play_duration,
+        last_played_at: userStats.last_played_at,
+        last_o_at: userStats.last_o_at,
+      };
+    }
+
+    // No watch history for this user - return zeros
+    return {
+      ...performer,
+      o_counter: 0,
+      play_count: 0,
+      play_duration: 0,
+      last_played_at: null,
+      last_o_at: null,
+    };
+  });
+}
+
+/**
+ * Check if a sort field is a performer stat field that needs re-sorting after user data injection
+ */
+function isPerformerStatField(field: string): boolean {
+  const performerStatFields = [
+    'o_counter',
+    'play_count',
+    'play_duration',
+    'last_played_at',
+    'last_o_at',
+  ];
+  return performerStatFields.includes(field.toLowerCase());
+}
+
+/**
+ * Custom pagination logic for performer stat field sorts
+ * Calculate per-user stats, sort by those values, then paginate
+ */
+async function findPerformersWithCustomSort(
+  req: Request,
+  res: Response,
+  userId: number,
+  sortField: string,
+  sortDirection: string,
+  page: number,
+  perPage: number,
+  performer_filter: any
+) {
+  try {
+    const stash = getStash();
+
+    // Step 1: Get total count from Stash (lightweight query)
+    const countQuery: FindPerformersQuery = await stash.findPerformers({
+      filter: {
+        page: 1,
+        per_page: 1,
+        sort: sortField,
+        direction: sortDirection,
+      } as FindFilterType,
+      performer_filter: performer_filter as PerformerFilterType,
+    });
+    const totalCount = countQuery.findPerformers.count || 0;
+
+    // Step 2: Fetch ALL performers matching the filter (we need to calculate stats for all to sort correctly)
+    // This is expensive but necessary for accurate per-user sorting
+    const allPerformersQuery: FindPerformersQuery = await stash.findPerformers({
+      filter: {
+        per_page: -1, // Get all performers
+      } as FindFilterType,
+      performer_filter: performer_filter as PerformerFilterType,
+    });
+
+    // Step 3: Transform performers
+    const transformedPerformers = allPerformersQuery.findPerformers.performers.map((performer) =>
+      transformPerformer(performer as any)
+    );
+
+    // Step 4: Inject per-user stats
+    const performersWithUserStats = await injectUserPerformerStats(transformedPerformers, userId);
+
+    // Step 5: Sort by requested field
+    performersWithUserStats.sort((a, b) => {
+      const aValue = getFieldValue(a, sortField) || 0;
+      const bValue = getFieldValue(b, sortField) || 0;
+
+      // Primary sort by the requested field
+      let comparison = 0;
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        comparison = aValue.localeCompare(bValue);
+      } else {
+        comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      }
+
+      // Apply sort direction
+      if (sortDirection.toUpperCase() === 'DESC') {
+        comparison = -comparison;
+      }
+
+      // Secondary sort by name if primary values are equal
+      if (comparison === 0) {
+        const aName = a.name || '';
+        const bName = b.name || '';
+        return aName.localeCompare(bName);
+      }
+
+      return comparison;
+    });
+
+    // Step 6: Paginate
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedPerformers = performersWithUserStats.slice(startIndex, endIndex);
+
+    // Return properly formatted response matching Stash's structure
+    res.json({
+      findPerformers: {
+        count: totalCount,
+        performers: paginatedPerformers,
+      },
+    });
+  } catch (error) {
+    console.error("Error in findPerformersWithCustomSort:", error);
+    res.status(500).json({
+      error: "Failed to find performers with custom sort",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
 export const findPerformers = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
+    const userId = (req as any).user?.id;
     const { filter, performer_filter, ids, performer_ids } = req.body;
 
+    const sortField = filter?.sort;
+    const sortDirection = filter?.direction || 'DESC';
+    const page = filter?.page || 1;
+    const perPage = filter?.per_page || 40;
+
+    // If sorting by performer stat fields, use custom pagination logic
+    if (sortField && isPerformerStatField(sortField)) {
+      return await findPerformersWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, performer_filter);
+    }
+
+    // Standard Stash query for non-stat sorts
     const queryInputs = removeEmptyValues({
       filter: filter as FindFilterType,
       ids: ids as string[],
@@ -75,17 +686,17 @@ export const findPerformers = async (req: Request, res: Response) => {
     );
 
     // Transform performers to add API key to image paths
-    const transformedPerformers = {
-      ...performers,
-      findPerformers: {
-        ...performers.findPerformers,
-        performers: performers.findPerformers.performers.map((performer) =>
-          transformPerformer(performer as any)
-        ),
-      },
-    };
+    const transformedPerformers = performers.findPerformers.performers.map((performer) =>
+      transformPerformer(performer as any)
+    );
 
-    res.json(transformedPerformers);
+    // Override with per-user stats
+    const performersWithUserStats = await injectUserPerformerStats(transformedPerformers, userId);
+
+    res.json({
+      ...performers,
+      findPerformers: { ...performers.findPerformers, performers: performersWithUserStats },
+    });
   } catch (error) {
     console.error("Error in findPerformers:", error);
     res.status(500).json({
@@ -241,6 +852,7 @@ export const findTagsMinimal = async (req: Request, res: Response) => {
 export const updateScene = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = (req as any).user?.id;
     const updateData = req.body;
 
     const stash = getStash();
@@ -251,7 +863,13 @@ export const updateScene = async (req: Request, res: Response) => {
       },
     });
 
-    res.json({ success: true, scene: updatedScene.sceneUpdate });
+    // Override with per-user watch history
+    const sceneWithUserHistory = await injectUserWatchHistory(
+      [updatedScene.sceneUpdate],
+      userId
+    );
+
+    res.json({ success: true, scene: sceneWithUserHistory[0] });
   } catch (error) {
     console.error("Error updating scene:", error);
     res.status(500).json({ error: "Failed to update scene" });
