@@ -19,6 +19,7 @@ import {
   getVideoJsOptions,
   disableLiveTracker,
   setupDoubleTapFullscreen,
+  togglePlaybackRateControl,
 } from "./videoPlayerUtils.js";
 // Logging utilities removed - verbose logging disabled for production
 
@@ -182,6 +183,9 @@ const VideoPlayer = ({
             disableLiveTracker(player, "after quality switch");
           }
 
+          // Show/hide playback rate control based on new quality mode
+          togglePlaybackRateControl(player, isDirectPlay);
+
           player.play().catch(() => {
             // Autoplay failed, user interaction required
           });
@@ -230,7 +234,7 @@ const VideoPlayer = ({
         ];
       }
 
-      const videoJsOptions = getVideoJsOptions(sources);
+      const videoJsOptions = getVideoJsOptions(sources, isDirectPlay);
 
       playerRef.current = videojs(videoElement, videoJsOptions, () => {
         const player = playerRef.current;
@@ -243,6 +247,9 @@ const VideoPlayer = ({
         if (!isDirectPlay && player.liveTracker) {
           disableLiveTracker(player);
         }
+
+        // Show/hide playback rate control based on playback mode
+        togglePlaybackRateControl(player, isDirectPlay);
 
         setIsInitializing(false);
 
@@ -384,29 +391,6 @@ const VideoPlayer = ({
             playNextInPlaylist();
           });
         }
-
-        // Setup watch history event listeners
-        const handlePlay = () => {
-          startTracking();
-        };
-
-        const handlePause = () => {
-          stopTracking();
-        };
-
-        const handleSeeked = () => {
-          const currentTime = player.currentTime();
-          trackSeek(0, currentTime);
-        };
-
-        const handleEnded = () => {
-          stopTracking();
-        };
-
-        player.on('play', handlePlay);
-        player.on('pause', handlePause);
-        player.on('seeked', handleSeeked);
-        player.on('ended', handleEnded);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -424,6 +408,47 @@ const VideoPlayer = ({
     playPreviousInPlaylist,
     playNextInPlaylist,
   ]);
+
+  // Setup watch history event listeners (separate effect to handle callback changes)
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || player.isDisposed() || showPoster) {
+      return;
+    }
+
+    const handlePlay = () => {
+      startTracking();
+    };
+
+    const handlePause = () => {
+      stopTracking();
+    };
+
+    const handleSeeked = () => {
+      const currentTime = player.currentTime();
+      trackSeek(0, currentTime);
+    };
+
+    const handleEnded = () => {
+      stopTracking();
+    };
+
+    // Register event listeners
+    player.on('play', handlePlay);
+    player.on('pause', handlePause);
+    player.on('seeked', handleSeeked);
+    player.on('ended', handleEnded);
+
+    // Cleanup - remove event listeners
+    return () => {
+      if (player && !player.isDisposed()) {
+        player.off('play', handlePlay);
+        player.off('pause', handlePause);
+        player.off('seeked', handleSeeked);
+        player.off('ended', handleEnded);
+      }
+    };
+  }, [startTracking, stopTracking, trackSeek, showPoster]);
 
   // Update playlist buttons when currentPlaylistIndex changes or when player becomes ready
   useEffect(() => {

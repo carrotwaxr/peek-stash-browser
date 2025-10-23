@@ -60,6 +60,7 @@ const getSortOptions = (artifactType) => {
 
 const SearchControls = ({
   artifactType = "scene",
+  children,
   initialSort = "o_counter",
   onQueryChange,
   permanentFilters = {},
@@ -173,7 +174,18 @@ const SearchControls = ({
       lastSyncedUrl.current = newUrl;
       setSearchParams(params, { replace: true });
     }
-  }, [searchText, sortField, sortDirection, currentPage, perPage, filters, filterOptions, setSearchParams, syncToUrl, searchParams]);
+  }, [
+    searchText,
+    sortField,
+    sortDirection,
+    currentPage,
+    perPage,
+    filters,
+    filterOptions,
+    setSearchParams,
+    syncToUrl,
+    searchParams,
+  ]);
 
   // Trigger initial query from URL params
   useEffect(() => {
@@ -191,6 +203,7 @@ const SearchControls = ({
       };
       onQueryChange(query);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized]);
 
   // Clear all filters
@@ -242,52 +255,70 @@ const SearchControls = ({
   };
 
   // Handle removing a single filter chip
-  const handleRemoveFilter = useCallback((filterKey) => {
-    setCurrentPage(1); // Reset to first page
+  const handleRemoveFilter = useCallback(
+    (filterKey) => {
+      setCurrentPage(1); // Reset to first page
 
-    // Remove the filter by resetting it to default value
-    const newFilters = { ...filters };
-    delete newFilters[filterKey];
+      // Remove the filter by resetting it to default value
+      const newFilters = { ...filters };
+      delete newFilters[filterKey];
 
-    // Re-apply permanent filters
-    const updatedFilters = { ...newFilters, ...permanentFilters };
-    setFilters(updatedFilters);
+      // Re-apply permanent filters
+      const updatedFilters = { ...newFilters, ...permanentFilters };
+      setFilters(updatedFilters);
 
-    // Trigger search with updated filters
-    const query = {
-      filter: {
-        direction: sortDirection,
-        page: 1,
-        per_page: perPage,
-        q: searchText,
-        sort: sortField,
-      },
-      ...buildFilter(artifactType, updatedFilters),
-    };
+      // Trigger search with updated filters
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page: 1,
+          per_page: perPage,
+          q: searchText,
+          sort: sortField,
+        },
+        ...buildFilter(artifactType, updatedFilters),
+      };
 
-    onQueryChange(query);
-  }, [filters, permanentFilters, sortDirection, perPage, searchText, sortField, artifactType, onQueryChange]);
+      onQueryChange(query);
+    },
+    [
+      filters,
+      permanentFilters,
+      sortDirection,
+      perPage,
+      searchText,
+      sortField,
+      artifactType,
+      onQueryChange,
+    ]
+  );
 
   // Handle loading a saved preset
-  const handleLoadPreset = useCallback((preset) => {
-    setCurrentPage(1); // Reset to first page
-    setFilters({ ...permanentFilters, ...preset.filters });
-    setSort([preset.sort, preset.direction]);
+  const handleLoadPreset = useCallback(
+    (preset) => {
+      setCurrentPage(1); // Reset to first page
+      setFilters({ ...permanentFilters, ...preset.filters });
+      setSort([preset.sort, preset.direction]);
 
-    // Trigger search with preset values
-    const query = {
-      filter: {
-        direction: preset.direction,
-        page: 1,
-        per_page: perPage,
-        q: searchText,
-        sort: preset.sort,
-      },
-      ...buildFilter(artifactType, { ...permanentFilters, ...preset.filters }),
-    };
+      // Trigger search with preset values
+      const query = {
+        filter: {
+          direction: preset.direction,
+          page: 1,
+          per_page: perPage,
+          q: searchText,
+          sort: preset.sort,
+        },
+        ...buildFilter(artifactType, {
+          ...permanentFilters,
+          ...preset.filters,
+        }),
+      };
 
-    onQueryChange(query);
-  }, [permanentFilters, perPage, searchText, artifactType, onQueryChange]);
+      onQueryChange(query);
+    },
+    [permanentFilters, perPage, searchText, artifactType, onQueryChange]
+  );
 
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -396,7 +427,7 @@ const SearchControls = ({
   );
 
   return (
-    <div className="mb-6">
+    <div>
       {/* Mobile-responsive controls - wrap on small screens */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 mb-4">
         {/* Search Input - Full width on mobile */}
@@ -422,7 +453,13 @@ const SearchControls = ({
               variant="secondary"
               size="sm"
               className="py-1"
-              icon={sortDirection === "ASC" ? <LucideArrowUp /> : <LucideArrowDown />}
+              icon={
+                sortDirection === "ASC" ? (
+                  <LucideArrowUp size={22} />
+                ) : (
+                  <LucideArrowDown size={22} />
+                )
+              }
             />
           </div>
 
@@ -488,7 +525,7 @@ const SearchControls = ({
 
       {/* Top Pagination */}
       {totalPages > 1 && (
-        <div className="mt-4">
+        <div className="mt-4 mb-4">
           <Pagination
             currentPage={currentPage}
             onPageChange={handlePageChange}
@@ -532,7 +569,9 @@ const SearchControls = ({
                   className="flex items-center justify-between py-2 px-3 mb-3 rounded-md cursor-pointer hover:opacity-80 transition-opacity"
                   style={{
                     backgroundColor: "var(--bg-secondary)",
-                    borderBottom: isCollapsed ? "none" : "2px solid var(--accent-primary)",
+                    borderBottom: isCollapsed
+                      ? "none"
+                      : "2px solid var(--accent-primary)",
                   }}
                   onClick={opt.collapsible ? toggleSection : undefined}
                 >
@@ -544,7 +583,9 @@ const SearchControls = ({
                   </h3>
                   {opt.collapsible && (
                     <svg
-                      className={`w-4 h-4 transition-transform ${isCollapsed ? "" : "rotate-180"}`}
+                      className={`w-4 h-4 transition-transform ${
+                        isCollapsed ? "" : "rotate-180"
+                      }`}
                       style={{ color: "var(--text-muted)" }}
                       fill="none"
                       stroke="currentColor"
@@ -591,7 +632,21 @@ const SearchControls = ({
           );
         })}
       </FilterPanel>
-
+      {children}
+      {/* Top Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+            perPage={perPage}
+            onPerPageChange={handlePerPageChange}
+            totalCount={totalCount}
+            showInfo={true}
+            totalPages={totalPages}
+          />
+        </div>
+      )}
     </div>
   );
 };

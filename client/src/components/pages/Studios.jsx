@@ -6,15 +6,9 @@ import {
   useLocation,
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import {
-  PageHeader,
-  PageLayout,
-  ErrorMessage,
-  LoadingSpinner,
-} from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import Pagination from "../ui/Pagination.jsx";
 import EntityImage from "../ui/EntityImage.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
@@ -27,7 +21,7 @@ const Studios = () => {
   usePageTitle("Studios");
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
@@ -75,20 +69,6 @@ const Studios = () => {
 
   // Calculate totalPages based on urlPerPage (from URL params), not lastQuery
   const totalPages = Math.ceil(totalCount / urlPerPage);
-
-  // Pagination handlers that update URL params (SearchControls will react to these changes)
-  const handlePageChange = (newPage) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("page", newPage.toString());
-    setSearchParams(params, { replace: true });
-  };
-
-  const handlePerPageChange = (newPerPage) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("perPage", newPerPage.toString());
-    params.set("page", "1"); // Reset to first page when changing perPage
-    setSearchParams(params, { replace: true });
-  };
 
   // Spatial navigation
   const { setItemRef, isFocused } = useSpatialNavigation({
@@ -141,54 +121,41 @@ const Studios = () => {
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}
-        />
-
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(12)].map((_, i) => (
-              <div
-                key={i}
-                className="rounded-lg animate-pulse"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                  height: "8rem",
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <>
-            <div
-              ref={gridRef}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            >
-              {currentStudios.map((studio, index) => (
-                <StudioCard
-                  key={studio.id}
-                  ref={(el) => setItemRef(index, el)}
-                  studio={studio}
-                  tabIndex={isFocused(index) ? 0 : -1}
-                  className={isFocused(index) ? "keyboard-focus" : ""}
-                  isTVMode={isTVMode}
-                  referrerUrl={`${location.pathname}${location.search}`}
+        >
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(12)].map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg animate-pulse"
+                  style={{
+                    backgroundColor: "var(--bg-tertiary)",
+                    height: "8rem",
+                  }}
                 />
               ))}
             </div>
-
-            {/* Bottom Pagination */}
-            {totalPages > 1 && (
-              <Pagination
-                currentPage={urlPage}
-                onPageChange={handlePageChange}
-                perPage={urlPerPage}
-                onPerPageChange={handlePerPageChange}
-                showInfo={false}
-                showPerPageSelector={false}
-                totalPages={totalPages}
-              />
-            )}
-          </>
-        )}
+          ) : (
+            <>
+              <div
+                ref={gridRef}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              >
+                {currentStudios.map((studio, index) => (
+                  <StudioCard
+                    key={studio.id}
+                    ref={(el) => setItemRef(index, el)}
+                    studio={studio}
+                    tabIndex={isFocused(index) ? 0 : -1}
+                    className={isFocused(index) ? "keyboard-focus" : ""}
+                    isTVMode={isTVMode}
+                    referrerUrl={`${location.pathname}${location.search}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </SearchControls>
       </div>
     </PageLayout>
   );

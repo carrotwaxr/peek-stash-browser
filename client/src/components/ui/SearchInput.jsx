@@ -69,7 +69,7 @@ const SearchInput = ({
         placeholder={placeholder}
         autoFocus={autoFocus}
         className={`
-          block w-full pl-10 pr-10 py-2 border rounded-md
+          block w-full pl-10 pr-10 py-1 border rounded-md
           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
           transition-colors duration-200
         `}

@@ -26,7 +26,38 @@
 }
 
 .poster-play-button {
+  /* Match Video.js big play button size */
+  width: 7.5rem;
+  height: 7.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
   transition: transform 0.3s ease;
+}
+
+.poster-play-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: white;
+  margin-left: 0.25rem; /* Slight offset to center visually */
+}
+
+/* Mobile sizing for poster play button */
+@media (max-width: 768px) {
+  .poster-play-button {
+    width: 9rem !important;
+    height: 9rem !important;
+  }
+
+  .poster-play-icon {
+    width: 3rem !important;
+    height: 3rem !important;
+  }
 }
 
 .video-container .video-js {
@@ -42,16 +73,41 @@
 }
 
 .video-js .vjs-big-play-button {
-  background: rgba(0, 0, 0, 0.7);
-  border: 2px solid var(--accent-primary);
-  border-radius: 50%;
-  font-size: 3rem;
-  transition: all 0.3s ease;
+  /* Size - larger than poster button (120px) */
+  width: 7.5rem !important;
+  height: 7.5rem !important;
+
+  /* Clean black circle background to match poster */
+  background: rgba(0, 0, 0, 0.7) !important;
+
+  /* Remove border - poster has none */
+  border: none !important;
+
+  /* Keep rounded */
+  border-radius: 50% !important;
+
+  /* Center the icon */
+  line-height: 7.5rem !important;
+
+  /* Transition for hover effect */
+  transition: all 0.3s ease !important;
 }
 
 .video-js .vjs-big-play-button:hover {
-  background: var(--accent-primary);
-  border-color: var(--accent-primary);
+  /* Scale on hover like poster button */
+  transform: scale(1.1);
+
+  /* Keep same background on hover - no color change */
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: none !important;
+}
+
+/* Style the play icon to match poster */
+.video-js .vjs-big-play-button .vjs-icon-placeholder::before {
+  /* Make icon white and larger */
+  color: white !important;
+  font-size: 2rem !important;
+  line-height: 7.5rem !important;
 }
 
 .video-js .vjs-play-progress {
@@ -161,6 +217,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center !important; /* Fix vertical alignment with other controls */
 }
 
 .vjs-playlist-prev:hover:not(:disabled),
@@ -200,15 +257,40 @@
   height: 0.5rem !important;
 }
 
+/* Playback rate control - fix alignment and sizing */
+.video-js .vjs-control-bar .vjs-playback-rate {
+  height: 2.75rem !important;
+  align-self: center !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.video-js .vjs-control-bar .vjs-playback-rate .vjs-playback-rate-value {
+  line-height: 2.75rem !important;
+  height: 2.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 0.5rem !important;
+}
+
+/* All menu button controls - consistent alignment */
+.video-js .vjs-control-bar .vjs-menu-button {
+  align-self: center !important;
+}
+
 /* Mobile-specific adjustments */
 @media (max-width: 768px) {
-  /* Big play button (center of video) - larger on mobile */
+  /* Big play button (center of video) - even larger on mobile for easier tapping */
   .video-js .vjs-big-play-button {
-    font-size: 3.5rem;
-    width: 2em;
-    height: 2em;
-    line-height: 2em;
-    border-width: 3px;
+    width: 9rem !important;
+    height: 9rem !important;
+    line-height: 9rem !important;
+  }
+
+  /* Scale icon size proportionally on mobile */
+  .video-js .vjs-big-play-button .vjs-icon-placeholder::before {
+    font-size: 2.5rem !important;
+    line-height: 9rem !important;
   }
 }
 

@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { ErrorMessage, LoadingSpinner, PageHeader, PageLayout } from "../ui";
+import { ErrorMessage, PageHeader, PageLayout } from "../ui";
 import SceneGrid from "./SceneGrid.jsx";
 import SearchControls from "../ui/SearchControls.jsx";
-import Pagination from "../ui/Pagination.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 
@@ -26,7 +25,6 @@ const SceneSearch = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
@@ -41,7 +39,7 @@ const SceneSearch = ({
   const handleSceneClick = (scene) => {
     // Navigate to video player page with scene data and virtual playlist context
     const currentScenes = data?.scenes || [];
-    const currentIndex = currentScenes.findIndex(s => s.id === scene.id);
+    const currentIndex = currentScenes.findIndex((s) => s.id === scene.id);
 
     // Build navigation state
     const navigationState = {
@@ -54,10 +52,10 @@ const SceneSearch = ({
         scenes: currentScenes.map((s, idx) => ({
           sceneId: s.id,
           scene: s,
-          position: idx
+          position: idx,
         })),
-        currentIndex: currentIndex >= 0 ? currentIndex : 0
-      }
+        currentIndex: currentIndex >= 0 ? currentIndex : 0,
+      },
     };
 
     // Only capture referrerUrl if captureReferrer is true
@@ -97,25 +95,10 @@ const SceneSearch = ({
   const totalCount = data?.count || 0;
 
   // Read pagination state from lastQuery (SearchControls manages URL params)
-  const currentPage = lastQuery?.filter?.page || 1;
   const currentPerPage = lastQuery?.filter?.per_page || 24;
 
   // Calculate totalPages based on currentPerPage from query
   const totalPages = Math.ceil(totalCount / currentPerPage);
-
-  // Bottom pagination handlers - these update URL params which SearchControls will detect
-  const handlePageChange = (newPage) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('page', newPage.toString());
-    setSearchParams(params, { replace: true });
-  };
-
-  const handlePerPageChange = (newPerPage) => {
-    const params = new URLSearchParams(searchParams);
-    params.set('per_page', newPerPage.toString());
-    params.set('page', '1'); // Reset to first page when changing perPage
-    setSearchParams(params, { replace: true });
-  };
 
   if (error) {
     return (
@@ -139,31 +122,17 @@ const SceneSearch = ({
         totalPages={totalPages}
         totalCount={totalCount}
         syncToUrl={captureReferrer}
-      />
-
-      <SceneGrid
-        scenes={currentScenes || []}
-        loading={isLoading}
-        error={error}
-        onSceneClick={handleSceneClick}
-        emptyMessage="No scenes found"
-        emptyDescription="Try adjusting your search filters"
-        enableKeyboard={true}
-      />
-
-      {/* Bottom Pagination */}
-      {!isLoading && totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-          perPage={currentPerPage}
-          onPerPageChange={handlePerPageChange}
-          totalCount={totalCount}
-          showInfo={true}
-          showPerPageSelector={false}
-          totalPages={totalPages}
+      >
+        <SceneGrid
+          scenes={currentScenes || []}
+          loading={isLoading}
+          error={error}
+          onSceneClick={handleSceneClick}
+          emptyMessage="No scenes found"
+          emptyDescription="Try adjusting your search filters"
+          enableKeyboard={true}
         />
-      )}
+      </SearchControls>
     </PageLayout>
   );
 };
