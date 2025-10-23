@@ -170,7 +170,10 @@ export const FilterControl = ({
         return (
           <div className="flex flex-col space-y-2">
             <div>
-              <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="text-xs mb-1"
+                style={{ color: "var(--text-muted)" }}
+              >
                 From:
               </div>
               <input
@@ -182,7 +185,10 @@ export const FilterControl = ({
               />
             </div>
             <div>
-              <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="text-xs mb-1"
+                style={{ color: "var(--text-muted)" }}
+              >
                 To:
               </div>
               <input
@@ -309,11 +315,7 @@ export const FilterPanel = ({
           className="flex items-center justify-end space-x-3 pt-4 border-t"
           style={{ borderColor: "var(--border-color)" }}
         >
-          <Button
-            onClick={onToggle}
-            variant="secondary"
-            size="sm"
-          >
+          <Button onClick={onToggle} variant="secondary" size="sm">
             Cancel
           </Button>
           <Button

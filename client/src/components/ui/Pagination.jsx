@@ -1,3 +1,9 @@
+import {
+  LucideArrowLeft,
+  LucideArrowLeftToLine,
+  LucideArrowRight,
+  LucideArrowRightToLine,
+} from "lucide-react";
 import Button from "./Button.jsx";
 
 /**
@@ -44,9 +50,8 @@ const Pagination = ({
           size="sm"
           title="First Page"
           aria-label="First Page"
-        >
-          «
-        </Button>
+          icon={<LucideArrowLeftToLine size={16} />}
+        />
 
         {/* Previous Page Button */}
         <Button
@@ -56,9 +61,8 @@ const Pagination = ({
           size="sm"
           title="Previous Page"
           aria-label="Previous Page"
-        >
-          ‹
-        </Button>
+          icon={<LucideArrowLeft size={16} />}
+        />
 
         {/* Page Dropdown */}
         <select
@@ -69,6 +73,7 @@ const Pagination = ({
             backgroundColor: "var(--bg-card)",
             color: "var(--text-primary)",
             border: "1px solid var(--border-color)",
+            height: "1.75rem",
           }}
         >
           {allPages.map((page) => (
@@ -86,9 +91,8 @@ const Pagination = ({
           size="sm"
           title="Next Page"
           aria-label="Next Page"
-        >
-          ›
-        </Button>
+          icon={<LucideArrowRight size={16} />}
+        />
 
         {/* Last Page Button */}
         <Button
@@ -98,9 +102,8 @@ const Pagination = ({
           size="sm"
           title="Last Page"
           aria-label="Last Page"
-        >
-          »
-        </Button>
+          icon={<LucideArrowRightToLine size={16} />}
+        />
       </nav>
 
       {showPerPageSelector && onPerPageChange && (
@@ -121,6 +124,7 @@ const Pagination = ({
               backgroundColor: "var(--bg-card)",
               color: "var(--text-primary)",
               border: "1px solid var(--border-color)",
+              height: "1.75rem",
             }}
           >
             {perPageOptions.map((option) => (
