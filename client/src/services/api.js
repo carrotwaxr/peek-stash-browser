@@ -244,7 +244,6 @@ export const filterHelpers = {
       value: minRating,
     },
   }),
-
 };
 
 // Predefined filter combinations for common use cases
@@ -253,8 +252,8 @@ export const commonFilters = {
    * Get high-rated scenes
    */
   highRatedScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "rating", "DESC"),
-    scene_filter: filterHelpers.ratingFilter(75),
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: filterHelpers.ratingFilter(80),
   }),
 
   /**
@@ -268,8 +267,10 @@ export const commonFilters = {
   /** Get highest bitrate scenes
    */
   highBitrateScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "bitrate", "DESC"),
-    scene_filter: {},
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: {
+      bitrate: { modifier: "GREATER_THAN", value: 14000000 },
+    },
   }),
 
   /** Get barely legal scenes
@@ -290,7 +291,10 @@ export const commonFilters = {
    * Get long scenes (over 30 minutes)
    */
   longScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "duration", "DESC"),
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: {
+      duration: { modifier: "GREATER_THAN", value: 4800 },
+    },
   }),
 
   /**
