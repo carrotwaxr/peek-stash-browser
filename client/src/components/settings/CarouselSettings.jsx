@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { GripVertical, Eye, EyeOff } from "lucide-react";
 import Button from "../ui/Button.jsx";
 
@@ -46,6 +46,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   const [draggedIndex, setDraggedIndex] = useState(null);
   const [touchStartY, setTouchStartY] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const itemsRef = useRef([]);
 
   useEffect(() => {
     // Sort by order on initial load
@@ -84,14 +85,15 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     setDraggedIndex(null);
   };
 
-  // Touch event handlers for mobile support
-  const handleTouchStart = (e, index) => {
+  // Touch event handlers for mobile support (useCallback for stable references)
+  const handleTouchStart = useCallback((e) => {
     e.preventDefault(); // Prevent scrolling during drag
+    const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
     setDraggedIndex(index);
     setTouchStartY(e.touches[0].clientY);
-  };
+  }, []);
 
-  const handleTouchMove = (e, index) => {
+  const handleTouchMove = useCallback((e) => {
     e.preventDefault(); // Prevent scrolling - must be first
 
     if (draggedIndex === null || touchStartY === null) {
@@ -113,10 +115,6 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
       return;
     }
 
-    if (targetIndex === index) {
-      return; // Already at target position
-    }
-
     const newPreferences = [...preferences];
     const [draggedItem] = newPreferences.splice(draggedIndex, 1);
     newPreferences.splice(targetIndex, 0, draggedItem);
@@ -131,12 +129,37 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     setDraggedIndex(targetIndex);
     setTouchStartY(currentY);
     setHasChanges(true);
-  };
+  }, [draggedIndex, touchStartY, preferences]);
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = useCallback(() => {
     setDraggedIndex(null);
     setTouchStartY(null);
-  };
+  }, []);
+
+  // Manually attach touch event listeners with { passive: false }
+  useEffect(() => {
+    const items = itemsRef.current;
+
+    // Attach listeners to each item
+    items.forEach((item) => {
+      if (item) {
+        item.addEventListener('touchstart', handleTouchStart, { passive: false });
+        item.addEventListener('touchmove', handleTouchMove, { passive: false });
+        item.addEventListener('touchend', handleTouchEnd, { passive: false });
+      }
+    });
+
+    // Cleanup: remove listeners on unmount or when handlers change
+    return () => {
+      items.forEach((item) => {
+        if (item) {
+          item.removeEventListener('touchstart', handleTouchStart);
+          item.removeEventListener('touchmove', handleTouchMove);
+          item.removeEventListener('touchend', handleTouchEnd);
+        }
+      });
+    };
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd, preferences.length]);
 
   const toggleEnabled = (id) => {
     const updated = preferences.map((pref) =>
@@ -181,13 +204,12 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
           return (
             <div
               key={pref.id}
+              ref={(el) => (itemsRef.current[index] = el)}
+              data-index={index}
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
-              onTouchStart={(e) => handleTouchStart(e, index)}
-              onTouchMove={(e) => handleTouchMove(e, index)}
-              onTouchEnd={handleTouchEnd}
               className={`
                 flex items-center justify-between p-4 rounded-lg border
                 transition-all duration-200 cursor-move
