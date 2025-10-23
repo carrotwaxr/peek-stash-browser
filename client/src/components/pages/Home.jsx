@@ -8,8 +8,8 @@ import {
   Zap,
   Calendar,
   Heart,
-  Building2,
   Tag,
+  Video,
 } from "lucide-react";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
@@ -69,9 +69,7 @@ const CAROUSEL_DEFINITIONS = [
   },
   {
     title: "Favorite Studios",
-    icon: (
-      <Building2 className="w-6 h-6" style={{ color: "var(--text-muted)" }} />
-    ),
+    icon: <Video className="w-6 h-6" style={{ color: "var(--accent-info)" }} />,
     fetchKey: "favoriteStudioScenes",
   },
   {

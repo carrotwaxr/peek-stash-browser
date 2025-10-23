@@ -19,7 +19,6 @@ import {
   transformPerformer,
   transformStudio,
   transformTag,
-  appendApiKeyToUrl
 } from "../utils/pathMapping.js";
 
 // New POST endpoints for filtered searching
