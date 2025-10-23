@@ -22,6 +22,10 @@ model User {
     carouselPreferences Json?       // Array of {id, enabled, order} for homepage carousels
     filterPresets      Json?       // Object with keys: scene, performer, studio, tag - each containing array of saved presets
 
+    // Watch history settings
+    minimumPlayPercent Int         @default(20)        // Percent of video to watch before incrementing play_count (0-100)
+    syncToStash        Boolean     @default(false)     // Admin-only: Sync this user's activity to Stash
+
     // Future features
     watchHistory WatchHistory[]
     playlists   Playlist[]

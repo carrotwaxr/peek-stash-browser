@@ -59,15 +59,20 @@ export const setupAPI = () => {
 
   // Version endpoint (no auth required)
   app.get("/api/version", (req, res) => {
-    // Read version from package.json
-    const packagePath = path.join(__dirname, '../package.json');
+    // Read version from package.json (use process.cwd() for reliable path resolution)
+    const packagePath = path.join(process.cwd(), 'package.json');
 
     let version = "1.0.0";
     try {
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
       version = packageJson.version;
     } catch (err) {
-      logger.error('Failed to read package.json version:', { error: err });
+      logger.error('Failed to read package.json version:', {
+        error: err,
+        packagePath,
+        cwd: process.cwd(),
+        __dirname
+      });
     }
 
     res.json({

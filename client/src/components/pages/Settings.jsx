@@ -10,6 +10,7 @@ import SuccessMessage from "../ui/SuccessMessage.jsx";
 import WarningMessage from "../ui/WarningMessage.jsx";
 import ErrorMessage from "../ui/ErrorMessage.jsx";
 import InfoMessage from "../ui/InfoMessage.jsx";
+import { showSuccess, showError } from "../../utils/toast.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -21,7 +22,6 @@ const Settings = () => {
   const { changeTheme, availableThemes, currentTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
   // Get rating color based on value
@@ -38,6 +38,7 @@ const Settings = () => {
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
   const [carouselPreferences, setCarouselPreferences] = useState([]);
+  const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -59,6 +60,7 @@ const Settings = () => {
       setPreferredQuality(settings.preferredQuality || "auto");
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
       setCarouselPreferences(settings.carouselPreferences || []);
+      setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
     } catch {
       setError("Failed to load settings");
     } finally {
@@ -68,7 +70,6 @@ const Settings = () => {
 
   const saveCarouselPreferences = async (newPreferences) => {
     try {
-      setMessage(null);
       setError(null);
 
       await api.put("/user/settings", {
@@ -76,10 +77,9 @@ const Settings = () => {
       });
 
       setCarouselPreferences(newPreferences);
-      setMessage("Carousel preferences saved successfully!");
-      setTimeout(() => setMessage(null), 3000);
-    } catch {
-      setError("Failed to save carousel preferences");
+      showSuccess("Carousel preferences saved successfully!");
+    } catch (err) {
+      showError(err.response?.data?.error || "Failed to save carousel preferences");
     }
   };
 
@@ -87,18 +87,17 @@ const Settings = () => {
     e.preventDefault();
     try {
       setSaving(true);
-      setMessage(null);
       setError(null);
 
       await api.put("/user/settings", {
         preferredQuality,
         preferredPlaybackMode,
+        minimumPlayPercent,
       });
 
-      setMessage("Settings saved successfully!");
-      setTimeout(() => setMessage(null), 3000);
-    } catch {
-      setError("Failed to save settings");
+      showSuccess("Settings saved successfully!");
+    } catch (err) {
+      showError(err.response?.data?.error || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -108,18 +107,17 @@ const Settings = () => {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      showError("New passwords do not match");
       return;
     }
 
     if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+      showError("Password must be at least 6 characters");
       return;
     }
 
     try {
       setPasswordChanging(true);
-      setMessage(null);
       setError(null);
 
       await api.post("/user/change-password", {
@@ -127,13 +125,12 @@ const Settings = () => {
         newPassword,
       });
 
-      setMessage("Password changed successfully!");
+      showSuccess("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to change password");
+      showError(err.response?.data?.error || "Failed to change password");
     } finally {
       setPasswordChanging(false);
     }
@@ -164,33 +161,6 @@ const Settings = () => {
             Manage your personal preferences and account settings
           </p>
         </div>
-
-        {/* Messages */}
-        {message && (
-          <div
-            className="mb-6 p-4 rounded-lg"
-            style={{
-              backgroundColor: "rgba(34, 197, 94, 0.1)",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
-              color: "rgb(34, 197, 94)",
-            }}
-          >
-            {message}
-          </div>
-        )}
-
-        {error && (
-          <div
-            className="mb-6 p-4 rounded-lg"
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "rgb(239, 68, 68)",
-            }}
-          >
-            {error}
-          </div>
-        )}
 
         {/* Theme */}
         <Paper className="mb-6">
@@ -347,6 +317,37 @@ const Settings = () => {
                   >
                     Auto uses direct play when supported, otherwise transcodes.
                     Direct play offers best quality but limited codec support.
+                  </p>
+                </div>
+
+                {/* Minimum Play Percent */}
+                <div>
+                  <label
+                    htmlFor="minimumPlayPercent"
+                    className="block text-sm font-medium mb-2"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Minimum Play Percent: {minimumPlayPercent}%
+                  </label>
+                  <input
+                    id="minimumPlayPercent"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={minimumPlayPercent}
+                    onChange={(e) => setMinimumPlayPercent(parseInt(e.target.value))}
+                    className="range-slider"
+                    style={{
+                      background: `linear-gradient(to right, var(--accent-info) 0%, var(--accent-info) ${minimumPlayPercent}%, var(--border-color) ${minimumPlayPercent}%, var(--border-color) 100%)`
+                    }}
+                  />
+                  <p
+                    className="text-sm mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Percentage of video to watch before counting as "played". This
+                    determines when the play count increments during watch sessions.
                   </p>
                 </div>
 

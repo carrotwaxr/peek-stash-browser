@@ -113,10 +113,10 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
     // Send immediate ping
     sendPing();
 
-    // Set up 30-second ping interval
+    // Set up 10-second ping interval (matching Stash's pattern)
     pingIntervalRef.current = setInterval(() => {
       sendPing();
-    }, 30000); // 30 seconds
+    }, 10000); // 10 seconds
   }, [playerRef, sceneId, isAuthenticated, sendPing]);
 
   /**

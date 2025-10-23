@@ -153,6 +153,26 @@ const ServerSettings = () => {
     }
   };
 
+  const toggleSyncToStash = async (userId, username, currentSyncToStash) => {
+    const newSyncToStash = !currentSyncToStash;
+
+    try {
+      setError(null);
+      setMessage(null);
+
+      await api.put(`/user/${userId}/settings`, { syncToStash: newSyncToStash });
+
+      setMessage(
+        `Stash sync ${newSyncToStash ? "enabled" : "disabled"} for "${username}"!`
+      );
+      loadUsers();
+
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to update sync setting");
+    }
+  };
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -410,6 +430,12 @@ const ServerSettings = () => {
                         Role
                       </th>
                       <th
+                        className="text-center px-6 py-4 font-medium"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Sync to Stash
+                      </th>
+                      <th
                         className="text-left px-6 py-4 font-medium"
                         style={{ color: "var(--text-secondary)" }}
                       >
@@ -466,6 +492,28 @@ const ServerSettings = () => {
                           >
                             {user.role}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={user.syncToStash || false}
+                            onChange={() =>
+                              toggleSyncToStash(
+                                user.id,
+                                user.username,
+                                user.syncToStash
+                              )
+                            }
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{
+                              accentColor: "var(--primary-color)",
+                            }}
+                            title={
+                              user.syncToStash
+                                ? "Syncing activity to Stash"
+                                : "Not syncing to Stash"
+                            }
+                          />
                         </td>
                         <td
                           className="px-6 py-4 text-sm"

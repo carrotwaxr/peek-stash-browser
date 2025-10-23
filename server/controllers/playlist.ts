@@ -88,8 +88,13 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
         // Transform scenes to add API key to image paths
         const transformedScenes = scenes.map((s: any) => transformScene(s as Scene));
 
+        // Override with per-user watch history
+        const { injectUserWatchHistory } = await import("./library.js");
+        const userId = (req as any).user?.id;
+        const scenesWithUserHistory = await injectUserWatchHistory(transformedScenes, userId);
+
         // Create a map of scene ID to scene data
-        const sceneMap = new Map(transformedScenes.map((s: any) => [s.id, s]));
+        const sceneMap = new Map(scenesWithUserHistory.map((s: any) => [s.id, s]));
 
         // Attach scene data to each playlist item
         const itemsWithScenes = playlist.items.map(item => ({

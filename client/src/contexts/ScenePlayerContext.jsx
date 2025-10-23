@@ -154,7 +154,7 @@ export function ScenePlayerProvider({
 
     dispatch({ type: 'INCREMENT_O_COUNTER_START' });
     try {
-      await api.post('/watch-history/o', { sceneId: state.scene.id });
+      await api.post('/watch-history/increment-o', { sceneId: state.scene.id });
       dispatch({ type: 'INCREMENT_O_COUNTER_SUCCESS' });
     } catch (error) {
       console.error('Error incrementing O counter:', error);

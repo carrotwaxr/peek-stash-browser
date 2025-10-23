@@ -40,6 +40,8 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         customTheme: true,
         carouselPreferences: true,
         filterPresets: true,
+        minimumPlayPercent: true,
+        syncToStash: true,
       },
     });
 
@@ -54,6 +56,8 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         theme: user.theme,
         customTheme: user.customTheme,
         carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
+        minimumPlayPercent: user.minimumPlayPercent,
+        syncToStash: user.syncToStash,
       },
     });
   } catch (error) {
@@ -73,7 +77,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences } = req.body;
+    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences, minimumPlayPercent, syncToStash } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
@@ -85,6 +89,18 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
 
     if (preferredPlaybackMode && !validPlaybackModes.includes(preferredPlaybackMode)) {
       return res.status(400).json({ error: "Invalid playback mode setting" });
+    }
+
+    // Validate minimumPlayPercent if provided
+    if (minimumPlayPercent !== undefined) {
+      if (typeof minimumPlayPercent !== 'number' || minimumPlayPercent < 0 || minimumPlayPercent > 100) {
+        return res.status(400).json({ error: "Minimum play percent must be a number between 0 and 100" });
+      }
+    }
+
+    // Validate syncToStash if provided (admin only can change this)
+    if (syncToStash !== undefined && typeof syncToStash !== 'boolean') {
+      return res.status(400).json({ error: "Sync to Stash must be a boolean" });
     }
 
     // Validate carousel preferences if provided
@@ -109,6 +125,8 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         ...(theme !== undefined && { theme }),
         ...(customTheme !== undefined && { customTheme }),
         ...(carouselPreferences !== undefined && { carouselPreferences }),
+        ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
+        ...(syncToStash !== undefined && { syncToStash }),
       },
       select: {
         id: true,
@@ -119,6 +137,8 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         theme: true,
         customTheme: true,
         carouselPreferences: true,
+        minimumPlayPercent: true,
+        syncToStash: true,
       },
     });
 
@@ -130,6 +150,8 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         theme: updatedUser.theme,
         customTheme: updatedUser.customTheme,
         carouselPreferences: updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
+        minimumPlayPercent: updatedUser.minimumPlayPercent,
+        syncToStash: updatedUser.syncToStash,
       },
     });
   } catch (error) {
@@ -207,6 +229,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
         role: true,
         createdAt: true,
         updatedAt: true,
+        syncToStash: true,
       },
       orderBy: {
         createdAt: "desc",

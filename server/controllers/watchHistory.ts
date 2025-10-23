@@ -5,9 +5,17 @@ import getStash from '../stash.js';
 
 const MINIMUM_WATCH_DURATION = 300; // 5 minutes in seconds
 
+// Session tracking: prevent duplicate play_count increments per viewing session
+// Key format: "userId:sceneId"
+const sessionPlayCountIncrements = new Map<string, boolean>();
+
+function getSessionKey(userId: number, sceneId: string): string {
+  return `${userId}:${sceneId}`;
+}
+
 /**
  * Update watch history with periodic ping from video player
- * Tracks playback progress, increments play count if threshold met
+ * Tracks playback progress matching Stash's pattern with per-user tracking
  */
 export async function pingWatchHistory(req: Request, res: Response) {
   try {
@@ -25,13 +33,33 @@ export async function pingWatchHistory(req: Request, res: Response) {
       quality,
     });
 
+    // Get user settings for minimumPlayPercent and syncToStash
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { minimumPlayPercent: true, syncToStash: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    // Get scene duration from Stash
+    const stash = getStash();
+    let sceneDuration = 0;
+    try {
+      const sceneData = await stash.findScenes({ ids: [sceneId] });
+      sceneDuration = sceneData.findScenes.scenes[0]?.files?.[0]?.duration || 0;
+    } catch (error) {
+      logger.error('Failed to fetch scene duration from Stash', { sceneId, error });
+      // Continue without duration - won't be able to calculate percentages
+    }
+
     // Get or create watch history record
     let watchHistory = await prisma.watchHistory.findUnique({
       where: { userId_sceneId: { userId, sceneId } },
     });
 
     const now = new Date();
-    const isNewSession = !watchHistory || !sessionStart;
 
     if (!watchHistory) {
       // Create new watch history record
@@ -91,34 +119,89 @@ export async function pingWatchHistory(req: Request, res: Response) {
       }
     }
 
-    // Increment play count if this session has reached 5 minutes
+    // Calculate new total play duration
+    const newPlayDuration = watchHistory.playDuration + playbackDelta;
+
+    // Calculate percentages (Stash's pattern)
+    const percentPlayed = sceneDuration > 0 ? (newPlayDuration / sceneDuration) * 100 : 0;
+    const percentCompleted = sceneDuration > 0 ? (currentTime / sceneDuration) * 100 : 0;
+
+    // Session tracking: check if we've already incremented play_count for this session
+    const sessionKey = getSessionKey(userId, sceneId);
+    const hasIncrementedThisSession = sessionPlayCountIncrements.get(sessionKey) || false;
+
+    // Increment play count ONCE per session when threshold is met
     let newPlayCount = watchHistory.playCount;
-    if (totalSessionDuration >= MINIMUM_WATCH_DURATION && isNewSession) {
+    let playCountIncremented = false;
+    const playHistoryArray = Array.isArray(watchHistory.playHistory)
+      ? watchHistory.playHistory
+      : JSON.parse(watchHistory.playHistory as string || '[]');
+
+    if (!hasIncrementedThisSession && percentPlayed >= user.minimumPlayPercent) {
       newPlayCount++;
-      logger.info('Play count incremented', { userId, sceneId, newPlayCount });
+      playCountIncremented = true;
+      sessionPlayCountIncrements.set(sessionKey, true);
+
+      // Append timestamp to play history (Stash's pattern)
+      playHistoryArray.push(now.toISOString());
+
+      logger.info('Play count incremented (percentage threshold met)', {
+        userId,
+        sceneId,
+        newPlayCount,
+        percentPlayed: percentPlayed.toFixed(2),
+        threshold: user.minimumPlayPercent,
+      });
     }
 
-    // Update watch history
+    // Reset resume_time to 0 when video is 98%+ complete (Stash's pattern)
+    const resumeTime = percentCompleted >= 98 ? 0 : currentTime;
+
+    // Update watch history in Peek database
     const updated = await prisma.watchHistory.update({
       where: { id: watchHistory.id },
       data: {
-        resumeTime: currentTime,
+        resumeTime,
         lastPlayedAt: now,
         playCount: newPlayCount,
-        playDuration: watchHistory.playDuration + playbackDelta,
-        playHistory: JSON.stringify([
-          ...playHistory,
-          {
-            startTime: sessionStart || now.toISOString(),
-            endTime: now.toISOString(),
-            quality: quality || 'unknown',
-            duration: playbackDelta,
-            totalSessionDuration,
-            seekEvents: seekEvents || [],
-          },
-        ]),
+        playDuration: newPlayDuration,
+        playHistory: JSON.stringify(playHistoryArray),
       },
     });
+
+    // Sync to Stash if user has sync enabled
+    if (user.syncToStash) {
+      try {
+        // Save activity (resume time and play duration) on every ping
+        await stash.sceneSaveActivity({
+          id: sceneId,
+          resume_time: resumeTime,
+          playDuration: playbackDelta
+        });
+
+        // Add play history timestamp if play_count was incremented
+        if (playCountIncremented) {
+          await stash.sceneAddPlay({
+            id: sceneId,
+            times: [now.toISOString()]
+          });
+        }
+
+        logger.info('Synced activity to Stash', {
+          userId,
+          sceneId,
+          resumeTime,
+          playbackDelta,
+          playCountIncremented
+        });
+      } catch (stashError) {
+        // Don't fail the request if Stash sync fails - Peek DB is source of truth
+        logger.error('Failed to sync activity to Stash', {
+          sceneId,
+          error: stashError
+        });
+      }
+    }
 
     res.json({
       success: true,
@@ -148,6 +231,16 @@ export async function incrementOCounter(req: Request, res: Response) {
     }
 
     logger.info('Incrementing O counter', { userId, sceneId });
+
+    // Get user settings for syncToStash
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
 
     // Get or create watch history record
     let watchHistory = await prisma.watchHistory.findUnique({
@@ -186,30 +279,31 @@ export async function incrementOCounter(req: Request, res: Response) {
       });
     }
 
-    // Also increment O counter in Stash and get the new global count
-    let stashOCount = watchHistory.oCount; // Fallback to Peek count if Stash fails
-    try {
-      logger.info('Attempting to increment O counter in Stash', { sceneId });
-      const stash = getStash();
-      logger.info('Got Stash instance', { stashUrl: process.env.STASH_URL });
-      const result = await stash.sceneIncrementO({ id: sceneId });
-      logger.info('Successfully incremented O counter in Stash', { sceneId, result });
+    // Sync to Stash if user has sync enabled
+    let stashOCount = watchHistory.oCount; // Default to Peek count
+    if (user.syncToStash) {
+      try {
+        logger.info('Syncing O counter increment to Stash', { sceneId });
+        const stash = getStash();
+        const result = await stash.sceneIncrementO({ id: sceneId });
+        logger.info('Successfully incremented O counter in Stash', { sceneId, result });
 
-      // Use the Stash global count (result.sceneIncrementO is the new count)
-      stashOCount = result.sceneIncrementO || watchHistory.oCount;
-    } catch (stashError) {
-      // Don't fail the request if Stash is unavailable
-      logger.error('Failed to increment O counter in Stash', {
-        sceneId,
-        error: stashError,
-        errorMessage: (stashError as Error).message,
-        errorStack: (stashError as Error).stack
-      });
+        // Use the Stash global count (result.sceneIncrementO is the new count)
+        stashOCount = result.sceneIncrementO || watchHistory.oCount;
+      } catch (stashError) {
+        // Don't fail the request if Stash sync fails - Peek DB is source of truth
+        logger.error('Failed to sync O counter increment to Stash', {
+          sceneId,
+          error: stashError,
+          errorMessage: (stashError as Error).message,
+          errorStack: (stashError as Error).stack
+        });
+      }
     }
 
     res.json({
       success: true,
-      oCount: stashOCount, // Return the Stash global count
+      oCount: user.syncToStash ? stashOCount : watchHistory.oCount, // Return Stash count if syncing, otherwise Peek count
       timestamp: now.toISOString(),
     });
   } catch (error) {
