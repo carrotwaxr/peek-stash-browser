@@ -19,6 +19,7 @@ import {
   getVideoJsOptions,
   disableLiveTracker,
   setupDoubleTapFullscreen,
+  togglePlaybackRateControl,
 } from "./videoPlayerUtils.js";
 // Logging utilities removed - verbose logging disabled for production
 
@@ -182,6 +183,9 @@ const VideoPlayer = ({
             disableLiveTracker(player, "after quality switch");
           }
 
+          // Show/hide playback rate control based on new quality mode
+          togglePlaybackRateControl(player, isDirectPlay);
+
           player.play().catch(() => {
             // Autoplay failed, user interaction required
           });
@@ -230,7 +234,7 @@ const VideoPlayer = ({
         ];
       }
 
-      const videoJsOptions = getVideoJsOptions(sources);
+      const videoJsOptions = getVideoJsOptions(sources, isDirectPlay);
 
       playerRef.current = videojs(videoElement, videoJsOptions, () => {
         const player = playerRef.current;
@@ -243,6 +247,9 @@ const VideoPlayer = ({
         if (!isDirectPlay && player.liveTracker) {
           disableLiveTracker(player);
         }
+
+        // Show/hide playback rate control based on playback mode
+        togglePlaybackRateControl(player, isDirectPlay);
 
         setIsInitializing(false);
 

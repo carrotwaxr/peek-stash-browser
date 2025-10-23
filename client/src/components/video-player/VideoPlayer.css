@@ -217,6 +217,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  align-self: center !important; /* Fix vertical alignment with other controls */
 }
 
 .vjs-playlist-prev:hover:not(:disabled),
@@ -254,6 +255,27 @@
 /* Progress bar - thicker and easier to click */
 .video-js .vjs-control-bar .vjs-progress-holder {
   height: 0.5rem !important;
+}
+
+/* Playback rate control - fix alignment and sizing */
+.video-js .vjs-control-bar .vjs-playback-rate {
+  height: 2.75rem !important;
+  align-self: center !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.video-js .vjs-control-bar .vjs-playback-rate .vjs-playback-rate-value {
+  line-height: 2.75rem !important;
+  height: 2.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 0.5rem !important;
+}
+
+/* All menu button controls - consistent alignment */
+.video-js .vjs-control-bar .vjs-menu-button {
+  align-self: center !important;
 }
 
 /* Mobile-specific adjustments */

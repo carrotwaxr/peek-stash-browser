@@ -18,11 +18,20 @@ describe('videoPlayerUtils', () => {
       expect(options).toHaveProperty('liveui', false);
     });
 
-    it('should include playback rate options', () => {
+    it('should include playback rate options only for direct play', () => {
       const sources = [];
-      const options = getVideoJsOptions(sources);
 
-      expect(options.playbackRates).toEqual([0.5, 1, 1.25, 1.5, 2]);
+      // Direct play - should have playback rates
+      const directOptions = getVideoJsOptions(sources, true);
+      expect(directOptions.playbackRates).toEqual([0.5, 1, 1.25, 1.5, 2]);
+
+      // Transcoded - should NOT have playback rates
+      const transcodedOptions = getVideoJsOptions(sources, false);
+      expect(transcodedOptions.playbackRates).toBeUndefined();
+
+      // Default (no parameter) - should NOT have playback rates
+      const defaultOptions = getVideoJsOptions(sources);
+      expect(defaultOptions.playbackRates).toBeUndefined();
     });
 
     it('should configure HLS/VHS settings', () => {

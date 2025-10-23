@@ -348,15 +348,16 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
 
 /**
  * Get Video.js options configuration
+ * @param {Array} sources - Video sources
+ * @param {boolean} isDirectPlay - Whether this is direct play (enables playback rate control)
  */
-export const getVideoJsOptions = (sources) => {
-  return {
+export const getVideoJsOptions = (sources, isDirectPlay = false) => {
+  const options = {
     autoplay: true,
     controls: true,
     responsive: true,
     fluid: true,
     sources: sources,
-    playbackRates: [0.5, 1, 1.25, 1.5, 2],
     liveui: false,
     html5: {
       vhs: {
@@ -379,6 +380,35 @@ export const getVideoJsOptions = (sources) => {
       qualityLevels: {},
     },
   };
+
+  // Only enable playback rate control for direct play
+  // Transcoded HLS streams don't support playback rate changes reliably
+  if (isDirectPlay) {
+    options.playbackRates = [0.5, 1, 1.25, 1.5, 2];
+  }
+
+  return options;
+};
+
+/**
+ * Show or hide the playback rate control
+ * @param {Object} player - Video.js player instance
+ * @param {boolean} show - Whether to show the control
+ */
+export const togglePlaybackRateControl = (player, show) => {
+  if (!player || player.isDisposed()) return;
+
+  const controlBar = player.controlBar;
+  if (!controlBar) return;
+
+  const playbackRateControl = controlBar.getChild('PlaybackRateMenuButton');
+  if (playbackRateControl) {
+    if (show) {
+      playbackRateControl.show();
+    } else {
+      playbackRateControl.hide();
+    }
+  }
 };
 
 /**
