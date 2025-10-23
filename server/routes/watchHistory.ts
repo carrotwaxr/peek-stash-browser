@@ -17,7 +17,7 @@ router.use(authenticateToken);
 router.post("/ping", pingWatchHistory);
 
 // Increment O counter
-router.post("/increment-o", incrementOCounter);
+router.post("/o", incrementOCounter);
 
 // Get all watch history for current user (Continue Watching carousel)
 router.get("/", getAllWatchHistory);
