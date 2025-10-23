@@ -121,7 +121,7 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
       clearInterval(pingIntervalRef.current);
       pingIntervalRef.current = null;
     }
-  }, [sendPing, sceneId]);
+  }, [sendPing]);
 
   /**
    * Track seek event

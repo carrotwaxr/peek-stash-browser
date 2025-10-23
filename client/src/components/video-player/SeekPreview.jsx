@@ -15,6 +15,27 @@ const SeekPreview = ({ scene, playerRef }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipStyle, setTooltipStyle] = useState({});
   const seekBarRef = useRef(null);
+  const hideTimerRef = useRef(null);
+
+  // Start or reset the auto-hide timer
+  const startHideTimer = useCallback(() => {
+    // Clear existing timer
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+    }
+    // Set new timer - hide after 2.5 seconds
+    hideTimerRef.current = setTimeout(() => {
+      setIsVisible(false);
+    }, 2500);
+  }, []);
+
+  // Clear the auto-hide timer
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
 
   // Load and parse VTT file
   useEffect(() => {
@@ -33,8 +54,15 @@ const SeekPreview = ({ scene, playerRef }) => {
       });
   }, [scene?.paths?.vtt]);
 
-  // Handle mouse move over seek bar
-  const handleMouseMove = useCallback((event) => {
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      clearHideTimer();
+    };
+  }, [clearHideTimer]);
+
+  // Update preview position based on clientX coordinate
+  const updatePreviewPosition = useCallback((clientX) => {
     if (!playerRef.current || cues.length === 0) {
       return;
     }
@@ -46,10 +74,10 @@ const SeekPreview = ({ scene, playerRef }) => {
     }
 
     const seekBarRect = seekBar.getBoundingClientRect();
-    const mouseX = event.clientX - seekBarRect.left;
+    const mouseX = clientX - seekBarRect.left;
     const percentage = Math.max(0, Math.min(1, mouseX / seekBarRect.width));
 
-    // Calculate time based on mouse position
+    // Calculate time based on position
     const duration = player.duration();
     if (!duration || isNaN(duration)) return;
 
@@ -82,11 +110,31 @@ const SeekPreview = ({ scene, playerRef }) => {
       top: `${top}px`,
     });
     setIsVisible(true);
-  }, [playerRef, cues]);
+    startHideTimer(); // Reset the auto-hide timer
+  }, [playerRef, cues, startHideTimer]);
+
+  // Handle mouse move over seek bar
+  const handleMouseMove = useCallback((event) => {
+    updatePreviewPosition(event.clientX);
+  }, [updatePreviewPosition]);
+
+  // Handle touch move over seek bar
+  const handleTouchMove = useCallback((event) => {
+    if (event.touches.length > 0) {
+      updatePreviewPosition(event.touches[0].clientX);
+    }
+  }, [updatePreviewPosition]);
 
   const handleMouseLeave = useCallback(() => {
     setIsVisible(false);
-  }, []);
+    clearHideTimer();
+  }, [clearHideTimer]);
+
+  // Handle touch end/cancel - hide preview immediately
+  const handleTouchEnd = useCallback(() => {
+    setIsVisible(false);
+    clearHideTimer();
+  }, [clearHideTimer]);
 
   // Find the Video.js seek bar element and attach listeners
   useEffect(() => {
@@ -99,15 +147,25 @@ const SeekPreview = ({ scene, playerRef }) => {
 
     if (progressControl) {
       seekBarRef.current = progressControl;
+
+      // Mouse events for desktop
       progressControl.addEventListener('mousemove', handleMouseMove);
       progressControl.addEventListener('mouseleave', handleMouseLeave);
+
+      // Touch events for mobile
+      progressControl.addEventListener('touchmove', handleTouchMove);
+      progressControl.addEventListener('touchend', handleTouchEnd);
+      progressControl.addEventListener('touchcancel', handleTouchEnd);
 
       return () => {
         progressControl.removeEventListener('mousemove', handleMouseMove);
         progressControl.removeEventListener('mouseleave', handleMouseLeave);
+        progressControl.removeEventListener('touchmove', handleTouchMove);
+        progressControl.removeEventListener('touchend', handleTouchEnd);
+        progressControl.removeEventListener('touchcancel', handleTouchEnd);
       };
     }
-  }, [playerRef, handleMouseMove, handleMouseLeave]);
+  }, [playerRef, handleMouseMove, handleMouseLeave, handleTouchMove, handleTouchEnd]);
 
   // Don't render if no sprite data available
   if (!scene?.paths?.sprite || !scene?.paths?.vtt || cues.length === 0) {
