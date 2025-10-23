@@ -120,6 +120,104 @@ function getFieldValue(scene: any, field: string): any {
 }
 
 /**
+ * Check if scene_filter contains any watch history field filters
+ */
+function hasWatchHistoryFilters(scene_filter: any): boolean {
+  if (!scene_filter) return false;
+
+  const watchHistoryFilterFields = [
+    'play_count',
+    'play_duration',
+    'o_counter',
+    'last_played_at',
+    'last_o_at',
+  ];
+
+  return watchHistoryFilterFields.some(field => scene_filter[field] !== undefined);
+}
+
+/**
+ * Apply watch history field filters to watch history records
+ */
+function filterWatchHistory(watchHistoryRecords: any[], scene_filter: any): any[] {
+  return watchHistoryRecords.filter((wh) => {
+    // Parse JSON fields
+    const oHistory = Array.isArray(wh.oHistory)
+      ? wh.oHistory
+      : JSON.parse((wh.oHistory as string) || "[]");
+    const playHistory = Array.isArray(wh.playHistory)
+      ? wh.playHistory
+      : JSON.parse((wh.playHistory as string) || "[]");
+
+    const stats = {
+      play_count: wh.playCount || 0,
+      play_duration: wh.playDuration || 0,
+      o_counter: wh.oCount || 0,
+      last_played_at: playHistory.length > 0 ? playHistory[playHistory.length - 1] : null,
+      last_o_at: oHistory.length > 0 ? oHistory[oHistory.length - 1] : null,
+    };
+
+    // Apply each filter
+    for (const [field, filterValue] of Object.entries(scene_filter)) {
+      if (!isWatchHistoryField(field)) continue;
+      if (!filterValue || typeof filterValue !== 'object') continue;
+
+      const filter = filterValue as any;
+      const value = stats[field as keyof typeof stats];
+
+      // Handle different filter modifiers
+      if (filter.modifier === 'EQUALS' && value !== filter.value) {
+        return false;
+      }
+      if (filter.modifier === 'NOT_EQUALS' && value === filter.value) {
+        return false;
+      }
+      if (filter.modifier === 'GREATER_THAN' && (value === null || value <= filter.value)) {
+        return false;
+      }
+      if (filter.modifier === 'LESS_THAN' && (value === null || value >= filter.value)) {
+        return false;
+      }
+      if (filter.modifier === 'BETWEEN') {
+        if (value === null || value < filter.value || value > filter.value2) {
+          return false;
+        }
+      }
+      if (filter.modifier === 'IS_NULL' && value !== null) {
+        return false;
+      }
+      if (filter.modifier === 'NOT_NULL' && value === null) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+/**
+ * Remove watch history filters from scene_filter so they don't get sent to Stash
+ */
+function removeWatchHistoryFilters(scene_filter: any): any {
+  if (!scene_filter) return scene_filter;
+
+  const cleaned = { ...scene_filter };
+  const watchHistoryFilterFields = [
+    'play_count',
+    'play_duration',
+    'o_counter',
+    'last_played_at',
+    'last_o_at',
+  ];
+
+  watchHistoryFilterFields.forEach(field => {
+    delete cleaned[field];
+  });
+
+  return cleaned;
+}
+
+/**
  * Custom pagination logic for watch history field sorts
  * Query Peek database first, sort by user's watch history, then fill remainder from Stash
  * Stash query uses same sort field so scenes without watch history are sorted by Stash's aggregate values
@@ -378,12 +476,93 @@ export const findScenes = async (req: Request, res: Response) => {
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
 
+    // If filtering by watch history fields, only return scenes from user's watch history
+    if (hasWatchHistoryFilters(scene_filter)) {
+      // Get all watch history for this user
+      const watchHistoryRecords = await prisma.watchHistory.findMany({
+        where: { userId },
+      });
+
+      // Filter watch history by the criteria
+      const filteredWatchHistory = filterWatchHistory(watchHistoryRecords, scene_filter);
+
+      // Get scene IDs that match the watch history filter
+      const matchingSceneIds = filteredWatchHistory.map(wh => wh.sceneId);
+
+      if (matchingSceneIds.length === 0) {
+        // No scenes match the filter
+        return res.json({
+          findScenes: {
+            count: 0,
+            scenes: [],
+          },
+        });
+      }
+
+      // Remove watch history filters from scene_filter before querying Stash
+      const cleanedSceneFilter = removeWatchHistoryFilters(scene_filter);
+
+      // Query Stash for these specific scenes with remaining filters
+      const scenes: FindScenesQuery = await stash.findScenes({
+        ids: matchingSceneIds,
+        scene_filter: cleanedSceneFilter as SceneFilterType,
+      });
+
+      // Transform scenes
+      const transformedScenes = scenes.findScenes.scenes.map((s) =>
+        transformScene(s as Scene)
+      );
+
+      // Inject user watch history
+      const scenesWithUserHistory = await injectUserWatchHistory(transformedScenes, userId);
+
+      // Sort if needed
+      if (sortField) {
+        scenesWithUserHistory.sort((a, b) => {
+          const aValue = getFieldValue(a, sortField) || 0;
+          const bValue = getFieldValue(b, sortField) || 0;
+
+          let comparison = 0;
+          if (typeof aValue === 'string' && typeof bValue === 'string') {
+            comparison = aValue.localeCompare(bValue);
+          } else {
+            comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+          }
+
+          if (sortDirection.toUpperCase() === 'DESC') {
+            comparison = -comparison;
+          }
+
+          // Secondary sort by title
+          if (comparison === 0) {
+            const aTitle = a.title || '';
+            const bTitle = b.title || '';
+            return aTitle.localeCompare(bTitle);
+          }
+
+          return comparison;
+        });
+      }
+
+      // Paginate
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedScenes = scenesWithUserHistory.slice(startIndex, endIndex);
+
+      return res.json({
+        findScenes: {
+          count: scenesWithUserHistory.length,
+          scenes: paginatedScenes,
+        },
+      });
+    }
+
     // If sorting by watch history fields, use custom pagination logic
     if (sortField && isWatchHistoryField(sortField)) {
       return await findScenesWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, scene_filter);
     }
 
-    // Standard Stash query for non-watch-history sorts
+    // Standard Stash query for non-watch-history sorts/filters
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
       scene_filter: scene_filter as SceneFilterType,
@@ -563,6 +742,106 @@ function isPerformerStatField(field: string): boolean {
 }
 
 /**
+ * Check if performer_filter contains any stat field filters
+ */
+function hasPerformerStatFilters(performer_filter: any): boolean {
+  if (!performer_filter) return false;
+
+  const performerStatFilterFields = [
+    'o_counter',
+    'play_count',
+    'play_duration',
+    'last_played_at',
+    'last_o_at',
+  ];
+
+  return performerStatFilterFields.some(field => performer_filter[field] !== undefined);
+}
+
+/**
+ * Apply performer stat filters to performer stats map
+ */
+function filterPerformerStats(
+  performerStatsMap: Map<string, any>,
+  performer_filter: any
+): string[] {
+  const matchingPerformerIds: string[] = [];
+
+  for (const [performerId, stats] of performerStatsMap.entries()) {
+    let matches = true;
+
+    // Apply each filter
+    for (const [field, filterValue] of Object.entries(performer_filter)) {
+      if (!isPerformerStatField(field)) continue;
+      if (!filterValue || typeof filterValue !== 'object') continue;
+
+      const filter = filterValue as any;
+      const value = stats[field];
+
+      // Handle different filter modifiers
+      if (filter.modifier === 'EQUALS' && value !== filter.value) {
+        matches = false;
+        break;
+      }
+      if (filter.modifier === 'NOT_EQUALS' && value === filter.value) {
+        matches = false;
+        break;
+      }
+      if (filter.modifier === 'GREATER_THAN' && (value === null || value <= filter.value)) {
+        matches = false;
+        break;
+      }
+      if (filter.modifier === 'LESS_THAN' && (value === null || value >= filter.value)) {
+        matches = false;
+        break;
+      }
+      if (filter.modifier === 'BETWEEN') {
+        if (value === null || value < filter.value || value > filter.value2) {
+          matches = false;
+          break;
+        }
+      }
+      if (filter.modifier === 'IS_NULL' && value !== null) {
+        matches = false;
+        break;
+      }
+      if (filter.modifier === 'NOT_NULL' && value === null) {
+        matches = false;
+        break;
+      }
+    }
+
+    if (matches) {
+      matchingPerformerIds.push(performerId);
+    }
+  }
+
+  return matchingPerformerIds;
+}
+
+/**
+ * Remove performer stat filters from performer_filter so they don't get sent to Stash
+ */
+function removePerformerStatFilters(performer_filter: any): any {
+  if (!performer_filter) return performer_filter;
+
+  const cleaned = { ...performer_filter };
+  const performerStatFilterFields = [
+    'o_counter',
+    'play_count',
+    'play_duration',
+    'last_played_at',
+    'last_o_at',
+  ];
+
+  performerStatFilterFields.forEach(field => {
+    delete cleaned[field];
+  });
+
+  return cleaned;
+}
+
+/**
  * Custom pagination logic for performer stat field sorts
  * Calculate per-user stats, sort by those values, then paginate
  */
@@ -668,12 +947,98 @@ export const findPerformers = async (req: Request, res: Response) => {
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
 
+    // If filtering by performer stat fields, only return performers from user's watch history
+    if (hasPerformerStatFilters(performer_filter)) {
+      // Calculate per-user performer stats
+      const performerStatsMap = await calculateUserPerformerStats(userId);
+
+      if (performerStatsMap.size === 0) {
+        // No watch history, return empty results
+        return res.json({
+          findPerformers: {
+            count: 0,
+            performers: [],
+          },
+        });
+      }
+
+      // Filter by stat criteria
+      const matchingPerformerIds = filterPerformerStats(performerStatsMap, performer_filter);
+
+      if (matchingPerformerIds.length === 0) {
+        // No performers match the filter
+        return res.json({
+          findPerformers: {
+            count: 0,
+            performers: [],
+          },
+        });
+      }
+
+      // Remove stat filters from performer_filter before querying Stash
+      const cleanedPerformerFilter = removePerformerStatFilters(performer_filter);
+
+      // Query Stash for these specific performers with remaining filters
+      const performers: FindPerformersQuery = await stash.findPerformers({
+        ids: matchingPerformerIds,
+        performer_filter: cleanedPerformerFilter as PerformerFilterType,
+      });
+
+      // Transform performers
+      const transformedPerformers = performers.findPerformers.performers.map((performer) =>
+        transformPerformer(performer as any)
+      );
+
+      // Inject user stats
+      const performersWithUserStats = await injectUserPerformerStats(transformedPerformers, userId);
+
+      // Sort if needed
+      if (sortField) {
+        performersWithUserStats.sort((a, b) => {
+          const aValue = getFieldValue(a, sortField) || 0;
+          const bValue = getFieldValue(b, sortField) || 0;
+
+          let comparison = 0;
+          if (typeof aValue === 'string' && typeof bValue === 'string') {
+            comparison = aValue.localeCompare(bValue);
+          } else {
+            comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+          }
+
+          if (sortDirection.toUpperCase() === 'DESC') {
+            comparison = -comparison;
+          }
+
+          // Secondary sort by name
+          if (comparison === 0) {
+            const aName = a.name || '';
+            const bName = b.name || '';
+            return aName.localeCompare(bName);
+          }
+
+          return comparison;
+        });
+      }
+
+      // Paginate
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedPerformers = performersWithUserStats.slice(startIndex, endIndex);
+
+      return res.json({
+        findPerformers: {
+          count: performersWithUserStats.length,
+          performers: paginatedPerformers,
+        },
+      });
+    }
+
     // If sorting by performer stat fields, use custom pagination logic
     if (sortField && isPerformerStatField(sortField)) {
       return await findPerformersWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, performer_filter);
     }
 
-    // Standard Stash query for non-stat sorts
+    // Standard Stash query for non-stat sorts/filters
     const queryInputs = removeEmptyValues({
       filter: filter as FindFilterType,
       ids: ids as string[],
