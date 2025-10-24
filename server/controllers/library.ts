@@ -22,6 +22,7 @@ import {
 } from "../utils/pathMapping.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from '../utils/logger.js';
+import { stashCache, ratingCache, CACHE_KEYS } from '../utils/cache.js';
 
 /**
  * Override scene watch history fields with per-user data from Peek database
@@ -588,25 +589,36 @@ async function findScenesWithCustomSort(
       scenesToFetch = sceneIdsWithHistory;
     }
 
-    // Step 2: Fetch full scene details from Stash
+    // Step 2: Fetch full scene details from Stash (with caching)
     let scenesWithHistory: any[] = [];
     if (scenesToFetch && scenesToFetch.length > 0) {
-      const historyScenes: FindScenesQuery = await stash.findScenes({
-        ids: scenesToFetch,
-        scene_filter: cleanedSceneFilter as SceneFilterType,
-      });
+      // Check cache for ALL scenes first
+      let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
+
+      if (!allScenes) {
+        logger.info('Cache miss - fetching ALL scenes from Stash');
+        const allScenesQuery: FindScenesQuery = await stash.findScenes({
+          filter: { per_page: -1 } as FindFilterType,
+        });
+        allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
+        stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
+      } else {
+        logger.info('Cache hit - using cached scenes', { count: allScenes.length });
+      }
+
+      // Filter to only scenes we need (scenesToFetch) and apply scene_filter
+      const filteredScenes = allScenes.filter((scene: any) => scenesToFetch.includes(scene.id));
 
       // Merge watch history stats with scene data (or inject zeros if no history)
-      scenesWithHistory = historyScenes.findScenes.scenes.map((scene) => {
-        const transformed = transformScene(scene as Scene);
+      scenesWithHistory = filteredScenes.map((scene: any) => {
         const userHistory = watchHistoryMap.get(scene.id);
 
         // If scene has watch history, merge it; otherwise inject zeros
         if (userHistory) {
-          return { ...transformed, ...userHistory };
+          return { ...scene, ...userHistory };
         } else {
           return {
-            ...transformed,
+            ...scene,
             resume_time: 0,
             play_duration: 0,
             play_count: 0,
@@ -647,29 +659,27 @@ async function findScenesWithCustomSort(
       });
     }
 
-    // Step 4: Calculate total count
+    // Step 4: Calculate total count from cached scenes
     let totalCount: number;
 
     if (favoriteSceneIds) {
       // If favorites filter is active, we already have ALL favorited scenes
       totalCount = scenesWithHistory.length;
     } else {
-      // Get total count from Stash (lightweight query)
-      // This ensures accurate pagination regardless of how many scenes have watch history
-      const countQuery: FindScenesQuery = await stash.findScenes({
-        filter: {
-          page: 1,
-          per_page: 1, // Minimal fetch, we only need the count
-          sort: sortField,
-          direction: sortDirection,
-        } as FindFilterType,
-        scene_filter: cleanedSceneFilter as SceneFilterType,
-      });
-      const stashTotalCount = countQuery.findScenes.count || 0;
+      // Use cached scenes to get total count (no need to query Stash)
+      let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
+      if (!allScenes) {
+        // This shouldn't happen since we cache in Step 2, but just in case
+        logger.warn('Cache miss in count step - fetching from Stash');
+        const allScenesQuery: FindScenesQuery = await stash.findScenes({
+          filter: { per_page: -1 } as FindFilterType,
+        });
+        allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
+        stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
+      }
 
-      // Calculate actual total: Stash's count, accounting for scenes we already have in watch history
-      // (avoid double-counting scenes that appear in both Peek watch history AND Stash results)
-      totalCount = scenesWithHistory.length + stashTotalCount - sceneIdsWithHistory.length;
+      // Calculate actual total: all scenes from Stash
+      totalCount = allScenes.length;
     }
 
     // Step 5: Calculate pagination
@@ -679,117 +689,45 @@ async function findScenesWithCustomSort(
     // Scenes from watch history that belong on this page
     const historyScenesOnPage = scenesWithHistory.slice(startIndex, endIndex);
 
-    // Step 6: If page isn't full, query Stash for additional scenes
-    // Use same sort field so Stash's aggregate values provide meaningful ordering
-    // Keep fetching until we have enough scenes or run out of scenes
+    // Step 6: If page isn't full, use cached scenes to fill remaining slots
     // SKIP this if favorites filter is active - we already have all favorited scenes
     const remainingSlots = perPage - historyScenesOnPage.length;
     let fillScenes: any[] = [];
 
     if (remainingSlots > 0 && !favoriteSceneIds) {
+      // Use cached scenes (already fetched in Step 2)
+      let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
+
+      if (!allScenes) {
+        // This shouldn't happen since we cache in Step 2, but just in case
+        logger.warn('Cache miss in fill scenes step - fetching from Stash');
+        const allScenesQuery: FindScenesQuery = await stash.findScenes({
+          filter: { per_page: -1 } as FindFilterType,
+        });
+        allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
+        stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
+      }
+
+      // Filter out scenes that already have watch history (duplicates)
+      const scenesWithoutHistory = allScenes.filter((scene: any) => !sceneIdsWithHistory.includes(scene.id));
+
+      // Calculate skip offset
       const historyCount = scenesWithHistory.length;
       const stashSkip = Math.max(0, startIndex - historyCount);
 
-      // Track how many scenes we've collected and offset for pagination
-      let collectedCount = 0;
-      let currentOffset = stashSkip;
-      const batchSize = 120; // Fetch in batches of 120
-      const maxAttempts = 5; // Try 5 batches before falling back to full query
-      let attempts = 0;
-      let exhaustedResults = false;
-
-      // Keep fetching until we have enough scenes or run out
-      while (collectedCount < remainingSlots && attempts < maxAttempts) {
-        attempts++;
-
-        const fillScenesQuery: FindScenesQuery = await stash.findScenes({
-          filter: {
-            page: Math.floor(currentOffset / batchSize) + 1,
-            per_page: batchSize,
-            sort: sortField, // Use same sort field for better UX (Stash's aggregate values)
-            direction: sortDirection,
-          } as FindFilterType,
-          scene_filter: cleanedSceneFilter as SceneFilterType,
-        });
-
-        // If Stash returns no scenes, we've exhausted the results
-        if (fillScenesQuery.findScenes.scenes.length === 0) {
-          exhaustedResults = true;
-          break;
-        }
-
-        // Filter out scenes that already have watch history (duplicates)
-        const filteredBatch = fillScenesQuery.findScenes.scenes
-          .filter((scene) => !sceneIdsWithHistory.includes(scene.id));
-
-        // Transform and add zero watch history values
-        const transformedBatch = filteredBatch.map((scene) => {
-          const transformed = transformScene(scene as Scene);
-          return {
-            ...transformed,
-            resume_time: 0,
-            play_duration: 0,
-            play_count: 0,
-            play_history: [],
-            o_counter: 0,
-            o_history: [],
-            last_played_at: null,
-          };
-        });
-
-        // Add to our collection
-        fillScenes.push(...transformedBatch);
-        collectedCount = fillScenes.length;
-
-        // If we have enough, trim to exact amount needed
-        if (collectedCount >= remainingSlots) {
-          fillScenes = fillScenes.slice(0, remainingSlots);
-          break;
-        }
-
-        // Move to next batch
-        currentOffset += batchSize;
-      }
-
-      // If we still don't have enough scenes after max attempts and didn't exhaust results,
-      // do a final expensive query to get ALL scenes (per_page: -1)
-      if (attempts >= maxAttempts && collectedCount < remainingSlots && !exhaustedResults) {
-        console.warn("Falling back to full scene query after max attempts", {
-          attempts,
-          collectedCount,
-          remainingSlots,
-          sceneIdsWithHistory: sceneIdsWithHistory.length,
-        });
-
-        const fullQuery: FindScenesQuery = await stash.findScenes({
-          filter: {
-            per_page: -1, // Get everything
-            sort: sortField,
-            direction: sortDirection,
-          } as FindFilterType,
-          scene_filter: cleanedSceneFilter as SceneFilterType,
-        });
-
-        // Filter out all scenes with watch history (duplicates)
-        const allScenesWithoutHistory = fullQuery.findScenes.scenes
-          .filter((scene) => !sceneIdsWithHistory.includes(scene.id))
-          .slice(stashSkip, stashSkip + remainingSlots);
-
-        // Transform and add zero watch history values
-        fillScenes = allScenesWithoutHistory.map((scene) => {
-          const transformed = transformScene(scene as Scene);
-          return {
-            ...transformed,
-            resume_time: 0,
-            play_duration: 0,
-            play_count: 0,
-            play_history: [],
-            o_counter: 0,
-            o_history: [],
-            last_played_at: null,
-          };
-        });
-      }
+      // Get the scenes we need for this page
+      fillScenes = scenesWithoutHistory
+        .slice(stashSkip, stashSkip + remainingSlots)
+        .map((scene: any) => ({
+          ...scene,
+          resume_time: 0,
+          play_duration: 0,
+          play_count: 0,
+          play_history: [],
+          o_counter: 0,
+          o_history: [],
+          last_played_at: null,
+        }));
     }
 
     // Step 7: Combine both groups (history scenes first, then fill scenes)
@@ -1730,17 +1668,28 @@ export const findPerformers = async (req: Request, res: Response) => {
       // Strip rating filters before querying Stash
       const cleanedPerformerFilter = removeRatingFilters(performer_filter);
 
-      // Fetch ALL performers (per_page: -1 gets everything)
-      const performers: FindPerformersQuery = await stash.findPerformers({
-        filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
-        performer_filter: cleanedPerformerFilter as PerformerFilterType,
-        ids: ids as string[],
-        performer_ids: performer_ids as number[],
-      });
+      // Check cache for ALL performers first
+      let transformedPerformers = stashCache.get<any[]>(CACHE_KEYS.PERFORMERS_ALL);
 
-      const transformedPerformers = performers.findPerformers.performers.map((performer) =>
-        transformPerformer(performer as any)
-      );
+      if (!transformedPerformers) {
+        logger.info('Cache miss - fetching ALL performers from Stash');
+        // Fetch ALL performers (per_page: -1 gets everything)
+        const performers: FindPerformersQuery = await stash.findPerformers({
+          filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
+          performer_filter: cleanedPerformerFilter as PerformerFilterType,
+          ids: ids as string[],
+          performer_ids: performer_ids as number[],
+        });
+
+        transformedPerformers = performers.findPerformers.performers.map((performer) =>
+          transformPerformer(performer as any)
+        );
+
+        // Cache for 1 hour
+        stashCache.set(CACHE_KEYS.PERFORMERS_ALL, transformedPerformers);
+      } else {
+        logger.info('Cache hit - using cached performers', { count: transformedPerformers.length });
+      }
 
       logger.info('Fetched performers for rating sort', {
         userId,
@@ -1948,16 +1897,26 @@ export const findStudios = async (req: Request, res: Response) => {
       // Strip rating filters before querying Stash
       const cleanedStudioFilter = removeRatingFilters(studio_filter);
 
-      // Fetch ALL studios (per_page: -1 gets everything)
-      const studios: FindStudiosQuery = await stash.findStudios({
-        filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
-        studio_filter: cleanedStudioFilter as StudioFilterType,
-        ids: ids as string[],
-      });
+      // Check cache for ALL studios first
+      let transformedStudioList = stashCache.get<any[]>(CACHE_KEYS.STUDIOS_ALL);
 
-      const transformedStudioList = studios.findStudios.studios.map((studio) =>
-        transformStudio(studio as any)
-      );
+      if (!transformedStudioList) {
+        logger.info('Cache miss - fetching ALL studios from Stash');
+        // Fetch ALL studios (per_page: -1 gets everything)
+        const studios: FindStudiosQuery = await stash.findStudios({
+          filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
+          studio_filter: cleanedStudioFilter as StudioFilterType,
+          ids: ids as string[],
+        });
+
+        transformedStudioList = studios.findStudios.studios.map((studio) =>
+          transformStudio(studio as any)
+        );
+
+        stashCache.set(CACHE_KEYS.STUDIOS_ALL, transformedStudioList);
+      } else {
+        logger.info('Cache hit - using cached studios', { count: transformedStudioList.length });
+      }
 
       // Inject user ratings
       let studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
@@ -2084,23 +2043,24 @@ export const findTags = async (req: Request, res: Response) => {
       // Remove rating filters from tag_filter before querying Stash
       const cleanedTagFilter = hasRatingFilter ? removeRatingFilters(tag_filter) : tag_filter;
 
-      // When filtering by favorites, we must fetch ALL, sort on Peek side, and paginate
-      // Stash ignores sort when specific IDs are provided
-      const stashFilter = {
-        page: 1,
-        per_page: Math.min(tagIdsToFetch?.length || 1000, 1000),
-        sort: 'name', // Fallback sort for Stash (doesn't matter, we'll sort on Peek side)
-        direction: sortDirection
-      };
+      // Check cache for ALL tags first
+      let allTags = stashCache.get<any[]>(CACHE_KEYS.TAGS_ALL);
 
-      // Query Stash for tags
-      const tags: FindTagsQuery = await stash.findTags({
-        filter: stashFilter as FindFilterType,
-        ids: tagIdsToFetch || (ids as string[]),
-        tag_filter: cleanedTagFilter as TagFilterType,
-      });
+      if (!allTags) {
+        logger.info('Cache miss - fetching ALL tags from Stash');
+        const tagsQuery: FindTagsQuery = await stash.findTags({
+          filter: { per_page: -1 } as FindFilterType,
+        });
+        allTags = tagsQuery.findTags.tags.map((tag) => transformTag(tag as any));
+        stashCache.set(CACHE_KEYS.TAGS_ALL, allTags);
+      } else {
+        logger.info('Cache hit - using cached tags', { count: allTags.length });
+      }
 
-      const transformedTagList = tags.findTags.tags.map((tag) => transformTag(tag as any));
+      // Filter to only tags we need (if tagIdsToFetch is provided)
+      const transformedTagList = tagIdsToFetch
+        ? allTags.filter((tag: any) => tagIdsToFetch.includes(tag.id))
+        : allTags;
 
       // Inject user ratings
       let tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
