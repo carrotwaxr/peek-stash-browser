@@ -180,7 +180,7 @@ const PerformerDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              performers: { value: [performerId], modifier: "INCLUDES" },
+              performers: { value: [parseInt(performerId, 10)], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
               performers: [{ id: performerId, name: performer.name }],

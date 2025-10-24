@@ -105,7 +105,7 @@ const StudioDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              studios: { value: [studioId], modifier: "INCLUDES" },
+              studios: { value: [parseInt(studioId, 10)], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
               studios: [

@@ -104,7 +104,7 @@ const TagDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              tags: { value: [tagId], modifier: "INCLUDES" },
+              tags: { value: [parseInt(tagId, 10)], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
               tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
