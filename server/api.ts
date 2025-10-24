@@ -25,6 +25,7 @@ import {
   updateStudio,
   updateTag,
 } from "./controllers/library.js";
+import { proxyStashMedia } from "./controllers/proxy.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import playlistRoutes from "./routes/playlist.js";
@@ -81,6 +82,9 @@ export const setupAPI = () => {
       buildDate: process.env.BUILD_DATE || new Date().toISOString(),
     });
   });
+
+  // Media proxy (public - no auth required for images)
+  app.get("/api/proxy/stash", proxyStashMedia);
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);

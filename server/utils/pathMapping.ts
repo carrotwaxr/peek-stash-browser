@@ -252,9 +252,11 @@ export function translateStashPath(stashPath: string): string {
 }
 
 /**
- * Append API key to Stash image/video URLs for authentication
+ * Convert Stash URLs to Peek proxy URLs to avoid exposing API keys
+ * Original: http://stash:6969/image/123?foo=bar
+ * Proxied: http://peek:8000/api/proxy/stash?path=/image/123?foo=bar
  */
-export const appendApiKeyToUrl = (url: string): string => {
+export const convertToProxyUrl = (url: string): string => {
   try {
     // Skip null, undefined, or empty values
     if (!url || typeof url !== "string" || url.trim() === "") {
@@ -262,20 +264,24 @@ export const appendApiKeyToUrl = (url: string): string => {
     }
 
     const urlObj = new URL(url);
-    if (!urlObj.searchParams.has("apikey")) {
-      const apiKey = process.env.STASH_API_KEY;
-      if (!apiKey) {
-        logger.error("STASH_API_KEY not found in environment variables");
-        return url; // Return original if no API key
-      }
-      urlObj.searchParams.append("apikey", apiKey);
-    }
-    return urlObj.toString();
+
+    // Extract the path and query string from the Stash URL
+    const pathWithQuery = urlObj.pathname + urlObj.search;
+
+    // Construct Peek proxy URL
+    // This assumes Peek is accessed via the same host as the client
+    // The client will use relative URLs which work in both dev and production
+    const proxyUrl = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+
+    return proxyUrl;
   } catch (urlError) {
-    logger.error(`Error processing URL: ${url}`, { error: urlError });
+    logger.error(`Error converting URL to proxy: ${url}`, { error: urlError });
     return url; // Return original URL if parsing fails
   }
 };
+
+// Keep the old function for backward compatibility but make it use the proxy
+export const appendApiKeyToUrl = convertToProxyUrl;
 
 /**
  * Transform performer to add API key to image_path
