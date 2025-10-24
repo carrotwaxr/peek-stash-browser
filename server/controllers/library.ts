@@ -883,14 +883,14 @@ export const findScenes = async (req: Request, res: Response) => {
         // Remove rating filters from scene_filter before querying Stash
         const cleanedSceneFilter = removeRatingFilters(scene_filter);
 
-        // Check if sort field is Peek-only (watch history or rating field)
-        const usePeekSort = sortField && isPeekOnlySortField(sortField);
-
-        // If using Peek-only sort, we need to fetch ALL matching scenes, sort them, then paginate
-        // Use fallback sort for Stash (date is universally supported)
-        const stashFilter = usePeekSort
-          ? { page: 1, per_page: Math.min(matchingSceneIds.length, 1000), sort: 'date', direction: sortDirection }
-          : filter;
+        // When filtering by favorites, we must fetch ALL, sort on Peek side, and paginate
+        // Stash ignores sort when specific IDs are provided
+        const stashFilter = {
+          page: 1,
+          per_page: Math.min(matchingSceneIds.length, 1000),
+          sort: 'date', // Fallback sort for Stash (doesn't matter, we'll sort on Peek side)
+          direction: sortDirection
+        };
 
         // Query Stash for these specific scenes with remaining filters
         const scenes: FindScenesQuery = await stash.findScenes({
@@ -907,9 +907,9 @@ export const findScenes = async (req: Request, res: Response) => {
         let scenesWithUserData = await injectUserWatchHistory(transformedScenes, userId);
         scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
-        // If using Peek-only sort, sort and paginate here
-        if (usePeekSort) {
-          // Sort by the requested Peek-only field
+        // Always sort on Peek side when favorite filter is active
+        // (Stash ignores sort when IDs are provided)
+        if (sortField) {
           scenesWithUserData.sort((a, b) => {
             const aValue = getFieldValue(a, sortField) || 0;
             const bValue = getFieldValue(b, sortField) || 0;
@@ -935,27 +935,76 @@ export const findScenes = async (req: Request, res: Response) => {
 
             return comparison;
           });
-
-          // Apply pagination to sorted results
-          const startIndex = (page - 1) * perPage;
-          const endIndex = startIndex + perPage;
-          const paginatedScenes = scenesWithUserData.slice(startIndex, endIndex);
-
-          return res.json({
-            findScenes: {
-              count: scenesWithUserData.length,
-              scenes: paginatedScenes,
-            },
-          });
         }
+
+        // Apply pagination to sorted results
+        const startIndex = (page - 1) * perPage;
+        const endIndex = startIndex + perPage;
+        const paginatedScenes = scenesWithUserData.slice(startIndex, endIndex);
 
         return res.json({
           findScenes: {
-            count: scenes.findScenes.count,
-            scenes: scenesWithUserData,
+            count: scenesWithUserData.length,
+            scenes: paginatedScenes,
           },
         });
       }
+    }
+
+    // If sorting by rating without favorite filter, handle on Peek side
+    if (sortField && isRatingField(sortField)) {
+      // Fetch all scenes with fallback sort
+      const scenes: FindScenesQuery = await stash.findScenes({
+        filter: { page: 1, per_page: 1000, sort: 'date', direction: sortDirection } as FindFilterType,
+        scene_filter: scene_filter as SceneFilterType,
+        ids: ids as string[],
+        scene_ids: scene_ids as number[],
+      });
+
+      const transformedScenes = scenes.findScenes.scenes.map((s) =>
+        transformScene(s as Scene)
+      );
+
+      // Inject user data
+      let scenesWithUserData = await injectUserWatchHistory(transformedScenes, userId);
+      scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
+
+      // Sort by rating
+      scenesWithUserData.sort((a, b) => {
+        const aValue = getFieldValue(a, sortField) || 0;
+        const bValue = getFieldValue(b, sortField) || 0;
+
+        let comparison = 0;
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          comparison = aValue.localeCompare(bValue);
+        } else {
+          comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        }
+
+        if (sortDirection.toUpperCase() === 'DESC') {
+          comparison = -comparison;
+        }
+
+        if (comparison === 0) {
+          const aTitle = a.title || '';
+          const bTitle = b.title || '';
+          return aTitle.localeCompare(bTitle);
+        }
+
+        return comparison;
+      });
+
+      // Paginate
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedScenes = scenesWithUserData.slice(startIndex, endIndex);
+
+      return res.json({
+        findScenes: {
+          count: scenesWithUserData.length,
+          scenes: paginatedScenes,
+        },
+      });
     }
 
     // Standard Stash query for non-rating/watch-history filters
@@ -1474,14 +1523,14 @@ export const findPerformers = async (req: Request, res: Response) => {
         // Remove rating filters from performer_filter before querying Stash
         const cleanedPerformerFilter = removeRatingFilters(performer_filter);
 
-        // Check if sort field is Peek-only (watch history or rating field)
-        const usePeekSort = sortField && (isPeekOnlySortField(sortField) || isPerformerStatField(sortField));
-
-        // If using Peek-only sort, we need to fetch ALL matching performers, sort them, then paginate
-        // Use fallback sort for Stash (name is universally supported)
-        const stashFilter = usePeekSort
-          ? { page: 1, per_page: Math.min(matchingPerformerIds.length, 1000), sort: 'name', direction: sortDirection }
-          : filter;
+        // When filtering by favorites, we must fetch ALL, sort on Peek side, and paginate
+        // Stash ignores sort when specific IDs are provided
+        const stashFilter = {
+          page: 1,
+          per_page: Math.min(matchingPerformerIds.length, 1000),
+          sort: 'name', // Fallback sort for Stash (doesn't matter, we'll sort on Peek side)
+          direction: sortDirection
+        };
 
         // Query Stash for these specific performers with remaining filters
         const performers: FindPerformersQuery = await stash.findPerformers({
@@ -1498,9 +1547,9 @@ export const findPerformers = async (req: Request, res: Response) => {
         let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
         performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
 
-        // If using Peek-only sort, sort and paginate here
-        if (usePeekSort) {
-          // Sort by the requested Peek-only field
+        // Always sort on Peek side when favorite filter is active
+        // (Stash ignores sort when IDs are provided)
+        if (sortField) {
           performersWithUserData.sort((a, b) => {
             const aValue = getFieldValue(a, sortField) || 0;
             const bValue = getFieldValue(b, sortField) || 0;
@@ -1526,27 +1575,76 @@ export const findPerformers = async (req: Request, res: Response) => {
 
             return comparison;
           });
-
-          // Apply pagination to sorted results
-          const startIndex = (page - 1) * perPage;
-          const endIndex = startIndex + perPage;
-          const paginatedPerformers = performersWithUserData.slice(startIndex, endIndex);
-
-          return res.json({
-            findPerformers: {
-              count: performersWithUserData.length,
-              performers: paginatedPerformers,
-            },
-          });
         }
+
+        // Apply pagination to sorted results
+        const startIndex = (page - 1) * perPage;
+        const endIndex = startIndex + perPage;
+        const paginatedPerformers = performersWithUserData.slice(startIndex, endIndex);
 
         return res.json({
           findPerformers: {
-            count: performers.findPerformers.count,
-            performers: performersWithUserData,
+            count: performersWithUserData.length,
+            performers: paginatedPerformers,
           },
         });
       }
+    }
+
+    // If sorting by rating without favorite filter, handle on Peek side
+    if (sortField && isRatingField(sortField)) {
+      // Fetch all performers with fallback sort
+      const performers: FindPerformersQuery = await stash.findPerformers({
+        filter: { page: 1, per_page: 1000, sort: 'name', direction: sortDirection } as FindFilterType,
+        performer_filter: performer_filter as PerformerFilterType,
+        ids: ids as string[],
+        performer_ids: performer_ids as number[],
+      });
+
+      const transformedPerformers = performers.findPerformers.performers.map((performer) =>
+        transformPerformer(performer as any)
+      );
+
+      // Inject user data
+      let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
+      performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
+
+      // Sort by rating
+      performersWithUserData.sort((a, b) => {
+        const aValue = getFieldValue(a, sortField) || 0;
+        const bValue = getFieldValue(b, sortField) || 0;
+
+        let comparison = 0;
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          comparison = aValue.localeCompare(bValue);
+        } else {
+          comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+        }
+
+        if (sortDirection.toUpperCase() === 'DESC') {
+          comparison = -comparison;
+        }
+
+        if (comparison === 0) {
+          const aName = a.name || '';
+          const bName = b.name || '';
+          return aName.localeCompare(bName);
+        }
+
+        return comparison;
+      });
+
+      // Paginate
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedPerformers = performersWithUserData.slice(startIndex, endIndex);
+
+      return res.json({
+        findPerformers: {
+          count: performersWithUserData.length,
+          performers: paginatedPerformers,
+        },
+      });
     }
 
     // Standard Stash query for non-rating/stat filters
@@ -1627,14 +1725,14 @@ export const findStudios = async (req: Request, res: Response) => {
         // Remove rating filters from studio_filter before querying Stash
         const cleanedStudioFilter = removeRatingFilters(studio_filter);
 
-        // Check if sort field is Peek-only (rating field)
-        const usePeekSort = sortField && isPeekOnlySortField(sortField);
-
-        // If using Peek-only sort, we need to fetch ALL matching studios, sort them, then paginate
-        // Use fallback sort for Stash (name is universally supported)
-        const stashFilter = usePeekSort
-          ? { page: 1, per_page: Math.min(matchingStudioIds.length, 1000), sort: 'name', direction: sortDirection }
-          : filter;
+        // When filtering by favorites, we must fetch ALL, sort on Peek side, and paginate
+        // Stash ignores sort when specific IDs are provided
+        const stashFilter = {
+          page: 1,
+          per_page: Math.min(matchingStudioIds.length, 1000),
+          sort: 'name', // Fallback sort for Stash (doesn't matter, we'll sort on Peek side)
+          direction: sortDirection
+        };
 
         // Query Stash for these specific studios with remaining filters
         const studios: FindStudiosQuery = await stash.findStudios({
@@ -1650,9 +1748,9 @@ export const findStudios = async (req: Request, res: Response) => {
         // Inject user data
         let studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
 
-        // If using Peek-only sort, sort and paginate here
-        if (usePeekSort) {
-          // Sort by the requested Peek-only field
+        // Always sort on Peek side when favorite filter is active
+        // (Stash ignores sort when IDs are provided)
+        if (sortField) {
           studiosWithUserRatings.sort((a, b) => {
             const aValue = getFieldValue(a, sortField) || 0;
             const bValue = getFieldValue(b, sortField) || 0;
@@ -1678,24 +1776,17 @@ export const findStudios = async (req: Request, res: Response) => {
 
             return comparison;
           });
-
-          // Apply pagination to sorted results
-          const startIndex = (page - 1) * perPage;
-          const endIndex = startIndex + perPage;
-          const paginatedStudios = studiosWithUserRatings.slice(startIndex, endIndex);
-
-          return res.json({
-            findStudios: {
-              count: studiosWithUserRatings.length,
-              studios: paginatedStudios,
-            },
-          });
         }
+
+        // Apply pagination to sorted results
+        const startIndex = (page - 1) * perPage;
+        const endIndex = startIndex + perPage;
+        const paginatedStudios = studiosWithUserRatings.slice(startIndex, endIndex);
 
         return res.json({
           findStudios: {
-            count: studios.findStudios.count,
-            studios: studiosWithUserRatings,
+            count: studiosWithUserRatings.length,
+            studios: paginatedStudios,
           },
         });
       }
@@ -1835,10 +1926,14 @@ export const findTags = async (req: Request, res: Response) => {
       // Remove rating filters from tag_filter before querying Stash
       const cleanedTagFilter = hasRatingFilter ? removeRatingFilters(tag_filter) : tag_filter;
 
-      // Use fallback sort if sorting by Peek-only field
-      const stashFilter = usePeekSort
-        ? { page: 1, per_page: Math.min(tagIdsToFetch?.length || 1000, 1000), sort: 'name', direction: sortDirection }
-        : filter;
+      // When filtering by favorites, we must fetch ALL, sort on Peek side, and paginate
+      // Stash ignores sort when specific IDs are provided
+      const stashFilter = {
+        page: 1,
+        per_page: Math.min(tagIdsToFetch?.length || 1000, 1000),
+        sort: 'name', // Fallback sort for Stash (doesn't matter, we'll sort on Peek side)
+        direction: sortDirection
+      };
 
       // Query Stash for tags
       const tags: FindTagsQuery = await stash.findTags({
@@ -1852,8 +1947,9 @@ export const findTags = async (req: Request, res: Response) => {
       // Inject user ratings
       let tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
 
-      // If using Peek-only sort, sort here
-      if (usePeekSort) {
+      // Always sort on Peek side when favorite filter is active or rating sort
+      // (Stash ignores sort when IDs are provided)
+      if (sortField) {
         tagsWithUserRatings.sort((a, b) => {
           const aValue = getFieldValue(a, sortField) || 0;
           const bValue = getFieldValue(b, sortField) || 0;
@@ -1877,24 +1973,17 @@ export const findTags = async (req: Request, res: Response) => {
 
           return comparison;
         });
-
-        // Paginate
-        const startIndex = (page - 1) * perPage;
-        const endIndex = startIndex + perPage;
-        const paginatedTags = tagsWithUserRatings.slice(startIndex, endIndex);
-
-        return res.json({
-          findTags: {
-            count: tagsWithUserRatings.length,
-            tags: paginatedTags,
-          },
-        });
       }
+
+      // Paginate
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedTags = tagsWithUserRatings.slice(startIndex, endIndex);
 
       return res.json({
         findTags: {
-          count: tags.findTags.count,
-          tags: tagsWithUserRatings,
+          count: tagsWithUserRatings.length,
+          tags: paginatedTags,
         },
       });
     }
