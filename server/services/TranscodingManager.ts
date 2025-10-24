@@ -830,16 +830,18 @@ ${session.quality}/stream.m3u8
   }
 
   /**
-   * Cleanup inactive sessions (30 minutes)
+   * Cleanup inactive sessions (90 seconds)
+   * Sessions are kept alive by segment requests during active playback
+   * When user navigates away, no more segments = cleanup after 90s
    */
   private cleanupOldSessions(): void {
-    const cutoff = Date.now() - 30 * 60 * 1000; // 30 minutes
+    const cutoff = Date.now() - 90 * 1000; // 90 seconds
 
     for (const [sessionId, session] of this.sessions) {
       if (session.lastAccess < cutoff) {
         logger.info("Cleaning up inactive session", {
           sessionId,
-          lastAccessAge: Math.floor((Date.now() - session.lastAccess) / 60000) + " minutes",
+          lastAccessAge: Math.floor((Date.now() - session.lastAccess) / 1000) + " seconds",
         });
         this.killSession(sessionId);
       }
