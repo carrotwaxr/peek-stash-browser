@@ -63,7 +63,7 @@ const ServerStatsSection = () => {
       </Paper.Header>
       <Paper.Body>
         {/* System Resources */}
-        <div className="mb-6">
+        <div>
           <h3
             className="text-sm font-semibold mb-4"
             style={{ color: "var(--text-secondary)" }}
@@ -98,8 +98,10 @@ const ServerStatsSection = () => {
           </div>
         </div>
 
+        <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
+
         {/* Cache Statistics */}
-        <div className="mb-6">
+        <div>
           <h3
             className="text-sm font-semibold mb-4"
             style={{ color: "var(--text-secondary)" }}
@@ -146,8 +148,10 @@ const ServerStatsSection = () => {
           </div>
         </div>
 
+        <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
+
         {/* Database & Transcoding */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           {/* Database */}
           <div>
             <h3
@@ -194,7 +198,7 @@ const ServerStatsSection = () => {
 
         {/* Active Transcoding Sessions */}
         {stats.transcoding?.sessions?.length > 0 && (
-          <div className="mt-6">
+          <div>
             <h3
               className="text-sm font-semibold mb-3"
               style={{ color: "var(--text-secondary)" }}

@@ -76,28 +76,6 @@ export const getStats = async (req: Request, res: Response) => {
       logger.debug('Could not read segments directory', { error: (err as Error).message });
     }
 
-    // Get package versions with fallbacks
-    let serverVersion = '1.0.0';
-    let clientVersion = '1.0.0';
-    try {
-      // Read server package.json from file system
-      const serverPackageJsonPath = path.join(process.cwd(), 'package.json');
-      const serverPackageJson = JSON.parse(await fs.readFile(serverPackageJsonPath, 'utf-8'));
-      serverVersion = serverPackageJson.version || '1.0.0';
-
-      // Try to get client version
-      const clientPackageJsonPath = path.join(process.cwd(), '../client/package.json');
-      try {
-        const clientPackageJson = JSON.parse(await fs.readFile(clientPackageJsonPath, 'utf-8'));
-        clientVersion = clientPackageJson.version || serverVersion;
-      } catch {
-        // Client package.json not available in production, use server version
-        clientVersion = serverVersion;
-      }
-    } catch (err) {
-      logger.warn('Could not read package versions', { error: (err as Error).message });
-    }
-
     // System metrics with fallbacks
     const uptime = process.uptime();
     const memUsage = process.memoryUsage();
@@ -106,13 +84,6 @@ export const getStats = async (req: Request, res: Response) => {
     const cpuCount = os.cpus().length;
 
     const stats = {
-      // Version info
-      version: {
-        server: serverVersion,
-        client: clientVersion,
-        node: process.version,
-      },
-
       // System metrics
       system: {
         platform: os.platform(),
@@ -190,7 +161,6 @@ export const getStats = async (req: Request, res: Response) => {
 
     // Return a minimal safe response instead of 500
     res.json({
-      version: { server: '1.0.0', client: '1.0.0', node: process.version },
       system: {
         platform: os.platform(),
         arch: os.arch(),
