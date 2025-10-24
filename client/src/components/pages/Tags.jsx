@@ -116,7 +116,7 @@ const Tags = () => {
         {/* Controls Section */}
         <SearchControls
           artifactType="tag"
-          initialSort="scene_count"
+          initialSort="scenes_count"
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}
