@@ -86,6 +86,198 @@ export async function injectUserWatchHistory(scenes: any[], userId: number): Pro
 }
 
 /**
+ * Override scene rating/favorite fields with per-user data from Peek database
+ */
+export async function injectUserSceneRatings(scenes: any[], userId: number): Promise<any[]> {
+  if (!scenes || scenes.length === 0) {
+    return scenes;
+  }
+
+  // Fetch ratings for these scenes for this user
+  const sceneIds = scenes.map((s) => s.id);
+  const ratingRecords = await prisma.sceneRating.findMany({
+    where: {
+      userId: userId,
+      sceneId: { in: sceneIds },
+    },
+  });
+
+  // Create lookup map
+  const ratingMap = new Map();
+  for (const rating of ratingRecords) {
+    ratingMap.set(rating.sceneId, {
+      rating: rating.rating,
+      rating100: rating.rating, // Stash uses rating100
+      favorite: rating.favorite,
+    });
+  }
+
+  // Override scene fields with per-user values
+  return scenes.map((scene) => {
+    const userRating = ratingMap.get(scene.id);
+
+    if (userRating) {
+      return {
+        ...scene,
+        ...userRating,
+      };
+    }
+
+    // No rating for this user - return nulls/defaults
+    return {
+      ...scene,
+      rating: null,
+      rating100: null,
+      favorite: false,
+    };
+  });
+}
+
+/**
+ * Override performer rating/favorite fields with per-user data from Peek database
+ */
+export async function injectUserPerformerRatings(performers: any[], userId: number): Promise<any[]> {
+  if (!performers || performers.length === 0) {
+    return performers;
+  }
+
+  // Fetch ratings for these performers for this user
+  const performerIds = performers.map((p) => p.id);
+  const ratingRecords = await prisma.performerRating.findMany({
+    where: {
+      userId: userId,
+      performerId: { in: performerIds },
+    },
+  });
+
+  // Create lookup map
+  const ratingMap = new Map();
+  for (const rating of ratingRecords) {
+    ratingMap.set(rating.performerId, {
+      rating: rating.rating,
+      rating100: rating.rating, // Stash uses rating100
+      favorite: rating.favorite,
+    });
+  }
+
+  // Override performer fields with per-user values
+  return performers.map((performer) => {
+    const userRating = ratingMap.get(performer.id);
+
+    if (userRating) {
+      return {
+        ...performer,
+        ...userRating,
+      };
+    }
+
+    // No rating for this user - return nulls/defaults
+    return {
+      ...performer,
+      rating: null,
+      rating100: null,
+      favorite: false,
+    };
+  });
+}
+
+/**
+ * Override studio rating/favorite fields with per-user data from Peek database
+ */
+export async function injectUserStudioRatings(studios: any[], userId: number): Promise<any[]> {
+  if (!studios || studios.length === 0) {
+    return studios;
+  }
+
+  // Fetch ratings for these studios for this user
+  const studioIds = studios.map((s) => s.id);
+  const ratingRecords = await prisma.studioRating.findMany({
+    where: {
+      userId: userId,
+      studioId: { in: studioIds },
+    },
+  });
+
+  // Create lookup map
+  const ratingMap = new Map();
+  for (const rating of ratingRecords) {
+    ratingMap.set(rating.studioId, {
+      rating: rating.rating,
+      rating100: rating.rating, // Stash uses rating100
+      favorite: rating.favorite,
+    });
+  }
+
+  // Override studio fields with per-user values
+  return studios.map((studio) => {
+    const userRating = ratingMap.get(studio.id);
+
+    if (userRating) {
+      return {
+        ...studio,
+        ...userRating,
+      };
+    }
+
+    // No rating for this user - return nulls/defaults
+    return {
+      ...studio,
+      rating: null,
+      rating100: null,
+      favorite: false,
+    };
+  });
+}
+
+/**
+ * Override tag favorite field with per-user data from Peek database
+ */
+export async function injectUserTagRatings(tags: any[], userId: number): Promise<any[]> {
+  if (!tags || tags.length === 0) {
+    return tags;
+  }
+
+  // Fetch ratings for these tags for this user
+  const tagIds = tags.map((t) => t.id);
+  const ratingRecords = await prisma.tagRating.findMany({
+    where: {
+      userId: userId,
+      tagId: { in: tagIds },
+    },
+  });
+
+  // Create lookup map
+  const ratingMap = new Map();
+  for (const rating of ratingRecords) {
+    ratingMap.set(rating.tagId, {
+      rating: rating.rating,
+      rating100: rating.rating, // Stash uses rating100 (even though tags don't have it in Stash)
+      favorite: rating.favorite,
+    });
+  }
+
+  // Override tag fields with per-user values
+  return tags.map((tag) => {
+    const userRating = ratingMap.get(tag.id);
+
+    if (userRating) {
+      return {
+        ...tag,
+        ...userRating,
+      };
+    }
+
+    // No rating for this user - return nulls/defaults
+    return {
+      ...tag,
+      rating: null,
+      rating100: null,
+      favorite: false,
+    };
+  });
+}
+
+/**
  * Check if a sort field is a watch history field that needs re-sorting after user data injection
  */
 function isWatchHistoryField(field: string): boolean {
@@ -99,6 +291,18 @@ function isWatchHistoryField(field: string): boolean {
     'o_date', // Another possible field name
   ];
   return watchHistoryFields.includes(field.toLowerCase());
+}
+
+/**
+ * Check if a sort field is a rating/favorite field
+ */
+function isRatingField(field: string): boolean {
+  const ratingFields = [
+    'rating',
+    'rating100',
+    'favorite',
+  ];
+  return ratingFields.includes(field.toLowerCase());
 }
 
 /**
@@ -211,6 +415,41 @@ function removeWatchHistoryFilters(scene_filter: any): any {
   ];
 
   watchHistoryFilterFields.forEach(field => {
+    delete cleaned[field];
+  });
+
+  return cleaned;
+}
+
+/**
+ * Check if filter contains any rating/favorite field filters
+ */
+function hasRatingFilters(filter: any): boolean {
+  if (!filter) return false;
+
+  const ratingFilterFields = [
+    'rating',
+    'rating100',
+    'favorite',
+  ];
+
+  return ratingFilterFields.some(field => filter[field] !== undefined);
+}
+
+/**
+ * Remove rating filters from filter so they don't get sent to Stash
+ */
+function removeRatingFilters(filter: any): any {
+  if (!filter) return filter;
+
+  const cleaned = { ...filter };
+  const ratingFilterFields = [
+    'rating',
+    'rating100',
+    'favorite',
+  ];
+
+  ratingFilterFields.forEach(field => {
     delete cleaned[field];
   });
 
@@ -514,11 +753,14 @@ export const findScenes = async (req: Request, res: Response) => {
       );
 
       // Inject user watch history
-      const scenesWithUserHistory = await injectUserWatchHistory(transformedScenes, userId);
+      let scenesWithUserData = await injectUserWatchHistory(transformedScenes, userId);
+
+      // Inject user ratings
+      scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
       // Sort if needed
       if (sortField) {
-        scenesWithUserHistory.sort((a, b) => {
+        scenesWithUserData.sort((a, b) => {
           const aValue = getFieldValue(a, sortField) || 0;
           const bValue = getFieldValue(b, sortField) || 0;
 
@@ -547,11 +789,11 @@ export const findScenes = async (req: Request, res: Response) => {
       // Paginate
       const startIndex = (page - 1) * perPage;
       const endIndex = startIndex + perPage;
-      const paginatedScenes = scenesWithUserHistory.slice(startIndex, endIndex);
+      const paginatedScenes = scenesWithUserData.slice(startIndex, endIndex);
 
       return res.json({
         findScenes: {
-          count: scenesWithUserHistory.length,
+          count: scenesWithUserData.length,
           scenes: paginatedScenes,
         },
       });
@@ -562,7 +804,12 @@ export const findScenes = async (req: Request, res: Response) => {
       return await findScenesWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, scene_filter);
     }
 
-    // Standard Stash query for non-watch-history sorts/filters
+    // If sorting by rating fields, use custom pagination logic
+    if (sortField && isRatingField(sortField)) {
+      return await findScenesWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, scene_filter);
+    }
+
+    // Standard Stash query for non-watch-history/rating sorts/filters
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
       scene_filter: scene_filter as SceneFilterType,
@@ -574,12 +821,13 @@ export const findScenes = async (req: Request, res: Response) => {
       transformScene(s as Scene)
     );
 
-    // Override with per-user watch history
-    const scenesWithUserHistory = await injectUserWatchHistory(mutatedScenes, userId);
+    // Override with per-user watch history and ratings
+    let scenesWithUserData = await injectUserWatchHistory(mutatedScenes, userId);
+    scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
     res.json({
       ...scenes,
-      findScenes: { ...scenes.findScenes, scenes: scenesWithUserHistory },
+      findScenes: { ...scenes.findScenes, scenes: scenesWithUserData },
     });
   } catch (error) {
     console.error("Error in findScenes:", error);
@@ -1056,11 +1304,14 @@ export const findPerformers = async (req: Request, res: Response) => {
     );
 
     // Override with per-user stats
-    const performersWithUserStats = await injectUserPerformerStats(transformedPerformers, userId);
+    let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
+
+    // Override with per-user ratings
+    performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
 
     res.json({
       ...performers,
-      findPerformers: { ...performers.findPerformers, performers: performersWithUserStats },
+      findPerformers: { ...performers.findPerformers, performers: performersWithUserData },
     });
   } catch (error) {
     console.error("Error in findPerformers:", error);
@@ -1074,6 +1325,7 @@ export const findPerformers = async (req: Request, res: Response) => {
 export const findStudios = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
+    const userId = (req as any).user?.id;
     const { filter, studio_filter, ids } = req.body;
 
     const studios: FindStudiosQuery = await stash.findStudios({
@@ -1083,17 +1335,17 @@ export const findStudios = async (req: Request, res: Response) => {
     });
 
     // Transform studios to add API key to image paths
-    const transformedStudios = {
-      ...studios,
-      findStudios: {
-        ...studios.findStudios,
-        studios: studios.findStudios.studios.map((studio) =>
-          transformStudio(studio as any)
-        ),
-      },
-    };
+    const transformedStudios = studios.findStudios.studios.map((studio) =>
+      transformStudio(studio as any)
+    );
 
-    res.json(transformedStudios);
+    // Override with per-user ratings
+    const studiosWithUserRatings = await injectUserStudioRatings(transformedStudios, userId);
+
+    res.json({
+      ...studios,
+      findStudios: { ...studios.findStudios, studios: studiosWithUserRatings },
+    });
   } catch (error) {
     console.error("Error in findStudios:", error);
     res.status(500).json({
@@ -1106,6 +1358,7 @@ export const findStudios = async (req: Request, res: Response) => {
 export const findTags = async (req: Request, res: Response) => {
   try {
     const stash = getStash();
+    const userId = (req as any).user?.id;
     const { filter, tag_filter, ids } = req.body;
 
     const tags: FindTagsQuery = await stash.findTags({
@@ -1115,15 +1368,15 @@ export const findTags = async (req: Request, res: Response) => {
     });
 
     // Transform tags to add API key to image paths
-    const transformedTags = {
-      ...tags,
-      findTags: {
-        ...tags.findTags,
-        tags: tags.findTags.tags.map((tag) => transformTag(tag as any)),
-      },
-    };
+    const transformedTags = tags.findTags.tags.map((tag) => transformTag(tag as any));
 
-    res.json(transformedTags);
+    // Override with per-user ratings
+    const tagsWithUserRatings = await injectUserTagRatings(transformedTags, userId);
+
+    res.json({
+      ...tags,
+      findTags: { ...tags.findTags, tags: tagsWithUserRatings },
+    });
   } catch (error) {
     console.error("Error in findTags:", error);
     res.status(500).json({
