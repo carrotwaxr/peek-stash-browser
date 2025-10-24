@@ -1336,12 +1336,19 @@ export const findPerformers = async (req: Request, res: Response) => {
       return await findPerformersWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, performer_filter);
     }
 
+    // Check if there are rating/favorite filters that need to be handled on Peek side
+    const hasRatingFilter = hasRatingFilters(performer_filter);
+    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(performer_filter) : null;
+
+    // Remove rating filters from performer_filter before sending to Stash
+    const cleanedPerformerFilter = hasRatingFilter ? removeRatingFilters(performer_filter) : performer_filter;
+
     // Standard Stash query for non-stat sorts/filters
     const queryInputs = removeEmptyValues({
       filter: filter as FindFilterType,
       ids: ids as string[],
       performer_ids: performer_ids as number[],
-      performer_filter: performer_filter as PerformerFilterType,
+      performer_filter: cleanedPerformerFilter as PerformerFilterType,
     });
 
     const performers: FindPerformersQuery = await stash.findPerformers(
@@ -1358,9 +1365,14 @@ export const findPerformers = async (req: Request, res: Response) => {
     // Override with per-user ratings
     performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
 
+    // Apply rating filters if present
+    if (hasRatingFilter && ratingFilterValues) {
+      performersWithUserData = applyRatingFilters(performersWithUserData, ratingFilterValues);
+    }
+
     res.json({
       ...performers,
-      findPerformers: { ...performers.findPerformers, performers: performersWithUserData },
+      findPerformers: { ...performers.findPerformers, performers: performersWithUserData, count: performersWithUserData.length },
     });
   } catch (error) {
     console.error("Error in findPerformers:", error);
@@ -1377,9 +1389,16 @@ export const findStudios = async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
     const { filter, studio_filter, ids } = req.body;
 
+    // Check if there are rating/favorite filters that need to be handled on Peek side
+    const hasRatingFilter = hasRatingFilters(studio_filter);
+    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(studio_filter) : null;
+
+    // Remove rating filters from studio_filter before sending to Stash
+    const cleanedStudioFilter = hasRatingFilter ? removeRatingFilters(studio_filter) : studio_filter;
+
     const studios: FindStudiosQuery = await stash.findStudios({
       filter: filter as FindFilterType,
-      studio_filter: studio_filter as StudioFilterType,
+      studio_filter: cleanedStudioFilter as StudioFilterType,
       ids: ids as string[],
     });
 
@@ -1389,13 +1408,19 @@ export const findStudios = async (req: Request, res: Response) => {
     );
 
     // Inject user ratings
-    const studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
+    let studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
+
+    // Apply rating filters if present
+    if (hasRatingFilter && ratingFilterValues) {
+      studiosWithUserRatings = applyRatingFilters(studiosWithUserRatings, ratingFilterValues);
+    }
 
     const transformedStudios = {
       ...studios,
       findStudios: {
         ...studios.findStudios,
         studios: studiosWithUserRatings,
+        count: studiosWithUserRatings.length,
       },
     };
 
@@ -1457,9 +1482,16 @@ export const findTags = async (req: Request, res: Response) => {
     }
 
     // Standard query for other sorts
+    // Check if there are rating/favorite filters that need to be handled on Peek side
+    const hasRatingFilter = hasRatingFilters(tag_filter);
+    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(tag_filter) : null;
+
+    // Remove rating filters from tag_filter before sending to Stash
+    const cleanedTagFilter = hasRatingFilter ? removeRatingFilters(tag_filter) : tag_filter;
+
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
-      tag_filter: tag_filter as TagFilterType,
+      tag_filter: cleanedTagFilter as TagFilterType,
       ids: ids as string[],
     });
 
@@ -1467,13 +1499,19 @@ export const findTags = async (req: Request, res: Response) => {
     const transformedTagList = tags.findTags.tags.map((tag) => transformTag(tag as any));
 
     // Inject user ratings
-    const tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
+    let tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
+
+    // Apply rating filters if present
+    if (hasRatingFilter && ratingFilterValues) {
+      tagsWithUserRatings = applyRatingFilters(tagsWithUserRatings, ratingFilterValues);
+    }
 
     const transformedTags = {
       ...tags,
       findTags: {
         ...tags.findTags,
         tags: tagsWithUserRatings,
+        count: tagsWithUserRatings.length,
       },
     };
 
