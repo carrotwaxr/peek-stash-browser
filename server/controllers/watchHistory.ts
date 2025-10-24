@@ -117,6 +117,20 @@ export async function pingWatchHistory(req: Request, res: Response) {
           playbackDelta: playbackDelta.toFixed(2),
         });
       }
+
+      // Cap playback delta to reasonable maximum (60 seconds)
+      // Pings happen every ~10 seconds, so >60s indicates tab was backgrounded/sleeping
+      const MAX_PING_DELTA = 60;
+      if (playbackDelta > MAX_PING_DELTA) {
+        logger.warn('Capping excessive playback delta', {
+          userId,
+          sceneId,
+          originalDelta: playbackDelta.toFixed(2),
+          cappedDelta: MAX_PING_DELTA,
+          timeSinceLastPing: timeSinceLastPing.toFixed(2),
+        });
+        playbackDelta = MAX_PING_DELTA;
+      }
     }
 
     // Calculate new total play duration
@@ -181,9 +195,17 @@ export async function pingWatchHistory(req: Request, res: Response) {
 
         // Add play history timestamp if play_count was incremented
         if (playCountIncremented) {
-          await stash.sceneAddPlay({
+          const addPlayResult = await stash.sceneAddPlay({
             id: sceneId,
             times: [now.toISOString()]
+          });
+
+          logger.info('Added play timestamp to Stash', {
+            userId,
+            sceneId,
+            stashPlayCount: addPlayResult.sceneAddPlay.count,
+            stashPlayHistory: addPlayResult.sceneAddPlay.history,
+            peekPlayCount: newPlayCount
           });
         }
 
