@@ -91,8 +91,28 @@ export async function pingWatchHistory(req: Request, res: Response) {
       const sessionStartTime = new Date(sessionStart);
       totalSessionDuration = (now.getTime() - sessionStartTime.getTime()) / 1000;
 
-      // Calculate delta since last ping (use lastPlayedAt as reference)
-      const lastPingTime = watchHistory.lastPlayedAt || sessionStartTime;
+      // Detect if this is a new session vs continuing an existing session
+      // If lastPlayedAt is >2 minutes before sessionStart, treat as new session
+      const SESSION_BOUNDARY_SECONDS = 120;
+      let lastPingTime = sessionStartTime;
+
+      if (watchHistory.lastPlayedAt) {
+        const timeSinceLastPlayed = (sessionStartTime.getTime() - watchHistory.lastPlayedAt.getTime()) / 1000;
+
+        if (timeSinceLastPlayed <= SESSION_BOUNDARY_SECONDS) {
+          // Continuing recent session, use lastPlayedAt
+          lastPingTime = watchHistory.lastPlayedAt;
+        } else {
+          // New session after significant gap, use sessionStart
+          logger.info('New viewing session detected', {
+            userId,
+            sceneId,
+            timeSinceLastPlayed: timeSinceLastPlayed.toFixed(2),
+            usingSessionStart: true,
+          });
+        }
+      }
+
       const timeSinceLastPing = (now.getTime() - lastPingTime.getTime()) / 1000;
 
       // Start with the time delta
