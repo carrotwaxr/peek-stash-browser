@@ -668,7 +668,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Filter in code only if both options are selected
       const filteredPerformers = (syncOptions.performers.rating && syncOptions.performers.favorite)
-        ? performers.filter(p => (p.rating100 !== null && p.rating100 > 0) || p.favorite)
+        ? performers.filter((p: any) => (p.rating100 !== null && p.rating100 > 0) || p.favorite)
         : performers;
 
       stats.performers.checked = filteredPerformers.length;
@@ -735,7 +735,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Filter in code only if both options are selected
       const filteredStudios = (syncOptions.studios.rating && syncOptions.studios.favorite)
-        ? studios.filter(s => (s.rating100 !== null && s.rating100 > 0) || s.favorite)
+        ? studios.filter((s: any) => (s.rating100 !== null && s.rating100 > 0) || s.favorite)
         : studios;
 
       stats.studios.checked = filteredStudios.length;
