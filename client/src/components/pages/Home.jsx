@@ -10,6 +10,7 @@ import {
   Heart,
   Tag,
   Video,
+  PlayCircle,
 } from "lucide-react";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
