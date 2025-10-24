@@ -99,7 +99,8 @@ const Home = () => {
       />
 
       {activeCarousels.map((def) => {
-        const { title, icon, fetchKey, isSpecial } = def;
+        const { title, iconComponent: IconComponent, iconProps, fetchKey, isSpecial } = def;
+        const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
 
         // Special handling for Continue Watching carousel
         if (isSpecial && fetchKey === "continueWatching") {

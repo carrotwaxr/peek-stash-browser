@@ -18,61 +18,57 @@ import {
 export const CAROUSEL_DEFINITIONS = [
   {
     title: "Continue Watching",
-    icon: <PlayCircle className="w-6 h-6" color="#10b981" />,
+    iconComponent: PlayCircle,
+    iconProps: { className: "w-6 h-6", color: "#10b981" },
     fetchKey: "continueWatching",
     isSpecial: true, // Not a standard query carousel
   },
   {
     title: "Recently Added",
-    icon: <Clock className="w-6 h-6" style={{ color: "var(--accent-info)" }} />,
+    iconComponent: Clock,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-info)" } },
     fetchKey: "recentlyAddedScenes",
   },
   {
     title: "High Rated",
-    icon: <Star className="w-6 h-6" style={{ color: "var(--icon-rating)" }} />,
+    iconComponent: Star,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--icon-rating)" } },
     fetchKey: "highRatedScenes",
   },
   {
     title: "Favorite Performers",
-    icon: (
-      <Heart className="w-6 h-6" style={{ color: "var(--accent-error)" }} />
-    ),
+    iconComponent: Heart,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-error)" } },
     fetchKey: "favoritePerformerScenes",
   },
   {
     title: "Favorite Tags",
-    icon: (
-      <Tag className="w-6 h-6" style={{ color: "var(--accent-primary)" }} />
-    ),
+    iconComponent: Tag,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-primary)" } },
     fetchKey: "favoriteTagScenes",
   },
   {
     title: "Favorite Studios",
-    icon: <Video className="w-6 h-6" style={{ color: "var(--accent-info)" }} />,
+    iconComponent: Video,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-info)" } },
     fetchKey: "favoriteStudioScenes",
   },
   {
     title: "Barely Legal",
-    icon: (
-      <Calendar
-        className="w-6 h-6"
-        style={{ color: "var(--accent-warning)" }}
-      />
-    ),
+    iconComponent: Calendar,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-warning)" } },
     fetchKey: "barelyLegalScenes",
   },
   {
     title: "Feature Length",
-    icon: (
-      <Film className="w-6 h-6" style={{ color: "var(--accent-secondary)" }} />
-    ),
+    iconComponent: Film,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-secondary)" } },
     fetchKey: "longScenes",
   },
   {
     title: "High Bitrate",
-    icon: (
-      <Zap className="w-6 h-6" style={{ color: "var(--accent-success)" }} />
-    ),
+    iconComponent: Zap,
+    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-success)" } },
     fetchKey: "highBitrateScenes",
   },
 ];
