@@ -505,6 +505,36 @@ async function findScenesWithCustomSort(
   try {
     const stash = getStash();
 
+    // Check if there are rating/favorite filters that need to be handled
+    const hasRatingFilter = hasRatingFilters(scene_filter);
+    let favoriteSceneIds: string[] | null = null;
+
+    // If filtering by favorite, get matching scene IDs from Peek first
+    if (hasRatingFilter) {
+      const ratingFilterValues = getRatingFilterValues(scene_filter);
+
+      if (ratingFilterValues.favorite !== undefined) {
+        const matchingRatings = await prisma.sceneRating.findMany({
+          where: {
+            userId,
+            favorite: ratingFilterValues.favorite,
+          },
+          select: { sceneId: true },
+        });
+
+        favoriteSceneIds = matchingRatings.map(r => r.sceneId);
+
+        if (favoriteSceneIds.length === 0) {
+          return res.json({
+            findScenes: {
+              count: 0,
+              scenes: [],
+            },
+          });
+        }
+      }
+    }
+
     // Step 1: Get all watch history records for this user from Peek database
     const watchHistoryRecords = await prisma.watchHistory.findMany({
       where: { userId },
@@ -512,7 +542,7 @@ async function findScenesWithCustomSort(
 
     // Create map of sceneId -> watch history stats
     const watchHistoryMap = new Map();
-    const sceneIdsWithHistory = watchHistoryRecords.map((wh) => {
+    let sceneIdsWithHistory = watchHistoryRecords.map((wh) => {
       const oHistory = Array.isArray(wh.oHistory)
         ? wh.oHistory
         : JSON.parse((wh.oHistory as string) || "[]");
@@ -534,12 +564,21 @@ async function findScenesWithCustomSort(
       return wh.sceneId;
     });
 
+    // If favorite filter is active, intersect with favorited scene IDs
+    if (favoriteSceneIds) {
+      const favoriteSet = new Set(favoriteSceneIds);
+      sceneIdsWithHistory = sceneIdsWithHistory.filter(id => favoriteSet.has(id));
+    }
+
+    // Remove rating filters from scene_filter before querying Stash
+    const cleanedSceneFilter = hasRatingFilter ? removeRatingFilters(scene_filter) : scene_filter;
+
     // Step 2: Fetch full scene details from Stash for scenes with watch history
     let scenesWithHistory: any[] = [];
     if (sceneIdsWithHistory.length > 0) {
       const historyScenes: FindScenesQuery = await stash.findScenes({
         ids: sceneIdsWithHistory,
-        scene_filter: scene_filter as SceneFilterType,
+        scene_filter: cleanedSceneFilter as SceneFilterType,
       });
 
       // Merge watch history stats with scene data
