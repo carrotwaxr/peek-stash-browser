@@ -9,8 +9,7 @@ import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import { getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import StarRating from "../ui/StarRating.jsx";
-import FavoriteButton from "../ui/FavoriteButton.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -213,16 +212,13 @@ const PerformerCard = forwardRef(
           </h3>
 
           {/* Rating and Favorite */}
-          <div className="flex items-center justify-center gap-2 mb-2" onClick={(e) => e.preventDefault()}>
-            <StarRating
-              rating={performer.rating}
-              readonly={true}
+          <div className="flex items-center justify-center mb-2" onClick={(e) => e.preventDefault()}>
+            <RatingControls
+              entityType="performer"
+              entityId={performer.id}
+              initialRating={performer.rating}
+              initialFavorite={performer.favorite || false}
               size={16}
-            />
-            <FavoriteButton
-              isFavorite={performer.favorite || false}
-              size={16}
-              disabled={true}
             />
           </div>
 
