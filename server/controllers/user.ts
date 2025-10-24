@@ -606,41 +606,84 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
     // Fetch all entities from Stash (per_page: -1 = unlimited)
     console.log('Syncing from Stash: Fetching all entities...');
 
-    // 1. Sync Scenes - Only fetch scenes with ratings
-    if (syncOptions.scenes.rating) {
+    // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
+    if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
+      let sceneFilter: any = {};
+
+      // Determine which filter to use
+      if (syncOptions.scenes.rating && !syncOptions.scenes.oCounter) {
+        sceneFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
+      } else if (syncOptions.scenes.oCounter && !syncOptions.scenes.rating) {
+        sceneFilter = { o_counter: { value: 0, modifier: 'GREATER_THAN' } };
+      }
+      // If both are selected, fetch all scenes (can't do OR in single query)
+
       const scenesData = await stash.findScenes({
         filter: { per_page: -1 },
-        scene_filter: {
-          rating100: { value: 0, modifier: 'GREATER_THAN' }
-        }
+        scene_filter: Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined
       });
       const scenes = scenesData.findScenes.scenes;
-      stats.scenes.checked = scenes.length;
 
-      for (const scene of scenes) {
-        const existingRating = await prisma.sceneRating.findUnique({
-          where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
-        });
+      // Filter in code only if both options are selected
+      const filteredScenes = (syncOptions.scenes.rating && syncOptions.scenes.oCounter)
+        ? scenes.filter((s: any) => (s.rating100 !== null && s.rating100 > 0) || (s.o_counter !== null && s.o_counter > 0))
+        : scenes;
 
-        const stashRating = scene.rating100;
+      stats.scenes.checked = filteredScenes.length;
 
-        if (!existingRating) {
-          // Create new rating record
-          await prisma.sceneRating.create({
-            data: {
-              userId: targetUserId,
-              sceneId: scene.id,
-              rating: stashRating,
-              favorite: false, // Scenes don't have favorites in Stash
-            }
+      for (const scene of filteredScenes) {
+        // Handle rating sync
+        if (syncOptions.scenes.rating && scene.rating100 && scene.rating100 > 0) {
+          const existingRating = await prisma.sceneRating.findUnique({
+            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
           });
-          stats.scenes.created++;
-        } else {
-          // Update if different
-          if (existingRating.rating !== stashRating) {
+
+          const stashRating = scene.rating100;
+
+          if (!existingRating) {
+            await prisma.sceneRating.create({
+              data: {
+                userId: targetUserId,
+                sceneId: scene.id,
+                rating: stashRating,
+                favorite: false,
+              }
+            });
+            stats.scenes.created++;
+          } else if (existingRating.rating !== stashRating) {
             await prisma.sceneRating.update({
               where: { id: existingRating.id },
               data: { rating: stashRating }
+            });
+            stats.scenes.updated++;
+          }
+        }
+
+        // Handle o_counter sync
+        if (syncOptions.scenes.oCounter && scene.o_counter && scene.o_counter > 0) {
+          const existingWatchHistory = await prisma.watchHistory.findUnique({
+            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
+          });
+
+          const stashOCounter = scene.o_counter;
+
+          if (!existingWatchHistory) {
+            await prisma.watchHistory.create({
+              data: {
+                userId: targetUserId,
+                sceneId: scene.id,
+                oCount: stashOCounter,
+                oHistory: [], // Don't have timestamp data, just the count
+                playCount: 0,
+                playDuration: 0,
+                playHistory: [],
+              }
+            });
+            stats.scenes.created++;
+          } else if (existingWatchHistory.oCount !== stashOCounter) {
+            await prisma.watchHistory.update({
+              where: { id: existingWatchHistory.id },
+              data: { oCount: stashOCounter }
             });
             stats.scenes.updated++;
           }

@@ -53,7 +53,7 @@ const ServerSettings = () => {
   const [syncResult, setSyncResult] = useState(null);
   const [syncError, setSyncError] = useState(null);
   const [syncOptions, setSyncOptions] = useState({
-    scenes: { rating: true, favorite: false }, // Scenes don't have favorites in Stash
+    scenes: { rating: true, favorite: false, oCounter: false }, // Scenes don't have favorites in Stash
     performers: { rating: true, favorite: true },
     studios: { rating: true, favorite: true },
     tags: { rating: false, favorite: true }, // Tags don't have ratings in Stash
@@ -357,7 +357,7 @@ const ServerSettings = () => {
     setSyncError(null);
     // Reset sync options to defaults
     setSyncOptions({
-      scenes: { rating: true, favorite: false },
+      scenes: { rating: true, favorite: false, oCounter: false },
       performers: { rating: true, favorite: true },
       studios: { rating: true, favorite: true },
       tags: { rating: false, favorite: true },
@@ -1043,7 +1043,7 @@ const ServerSettings = () => {
                   <ul className="list-disc list-inside space-y-1 text-xs" style={{ color: "var(--text-muted)" }}>
                     <li>Only imports items that have the selected fields set in Stash</li>
                     <li>Updates existing Peek data if values differ from Stash</li>
-                    <li>Does not import watch history or O counts</li>
+                    <li>O Counter import syncs total count only (not individual timestamps)</li>
                     <li>May take several minutes for large libraries</li>
                   </ul>
                 </div>
@@ -1072,6 +1072,16 @@ const ServerSettings = () => {
                             style={{ accentColor: "var(--primary-color)" }}
                           />
                           <span style={{ color: "var(--text-primary)" }}>Rating</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.scenes.oCounter}
+                            onChange={() => toggleSyncOption('scenes', 'oCounter')}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>O Counter</span>
                         </label>
                         <p className="text-xs ml-6" style={{ color: "var(--text-muted)" }}>
                           Scenes do not have favorites in Stash
