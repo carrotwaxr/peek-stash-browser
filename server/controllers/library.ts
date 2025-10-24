@@ -842,15 +842,67 @@ export const findScenes = async (req: Request, res: Response) => {
 
     // Check if there are rating/favorite filters that need to be handled on Peek side
     const hasRatingFilter = hasRatingFilters(scene_filter);
-    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(scene_filter) : null;
 
-    // Remove rating filters from scene_filter before sending to Stash
-    const cleanedSceneFilter = hasRatingFilter ? removeRatingFilters(scene_filter) : scene_filter;
+    // If filtering by rating/favorite, fetch matching scene IDs from Peek first
+    if (hasRatingFilter) {
+      const ratingFilterValues = getRatingFilterValues(scene_filter);
 
-    // Standard Stash query for non-watch-history sorts/filters
+      // Query Peek database for scenes matching the rating filter
+      let peekQuery: any = { userId };
+
+      if (ratingFilterValues.favorite !== undefined) {
+        // Fetch scene IDs with matching favorite status from SceneRating table
+        const matchingRatings = await prisma.sceneRating.findMany({
+          where: {
+            userId,
+            favorite: ratingFilterValues.favorite,
+          },
+          select: { sceneId: true },
+        });
+
+        const matchingSceneIds = matchingRatings.map(r => r.sceneId);
+
+        if (matchingSceneIds.length === 0) {
+          // No scenes match the filter
+          return res.json({
+            findScenes: {
+              count: 0,
+              scenes: [],
+            },
+          });
+        }
+
+        // Remove rating filters from scene_filter before querying Stash
+        const cleanedSceneFilter = removeRatingFilters(scene_filter);
+
+        // Query Stash for these specific scenes with remaining filters
+        const scenes: FindScenesQuery = await stash.findScenes({
+          filter: filter as FindFilterType,
+          ids: matchingSceneIds,
+          scene_filter: cleanedSceneFilter as SceneFilterType,
+        });
+
+        const transformedScenes = scenes.findScenes.scenes.map((s) =>
+          transformScene(s as Scene)
+        );
+
+        // Inject user data
+        let scenesWithUserData = await injectUserWatchHistory(transformedScenes, userId);
+        scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
+
+        return res.json({
+          findScenes: {
+            count: scenes.findScenes.count,
+            scenes: scenesWithUserData,
+          },
+        });
+      }
+    }
+
+    // Standard Stash query for non-rating/watch-history filters
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
-      scene_filter: cleanedSceneFilter as SceneFilterType,
+      scene_filter: scene_filter as SceneFilterType,
       ids: ids as string[],
       scene_ids: scene_ids as number[],
     });
@@ -864,14 +916,9 @@ export const findScenes = async (req: Request, res: Response) => {
     // Override with per-user ratings
     scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
-    // Apply rating filters if present
-    if (hasRatingFilter && ratingFilterValues) {
-      scenesWithUserData = applyRatingFilters(scenesWithUserData, ratingFilterValues);
-    }
-
     res.json({
       ...scenes,
-      findScenes: { ...scenes.findScenes, scenes: scenesWithUserData, count: scenesWithUserData.length },
+      findScenes: { ...scenes.findScenes, scenes: scenesWithUserData },
     });
   } catch (error) {
     console.error("Error in findScenes:", error);
@@ -1338,17 +1385,66 @@ export const findPerformers = async (req: Request, res: Response) => {
 
     // Check if there are rating/favorite filters that need to be handled on Peek side
     const hasRatingFilter = hasRatingFilters(performer_filter);
-    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(performer_filter) : null;
 
-    // Remove rating filters from performer_filter before sending to Stash
-    const cleanedPerformerFilter = hasRatingFilter ? removeRatingFilters(performer_filter) : performer_filter;
+    // If filtering by rating/favorite, fetch matching performer IDs from Peek first
+    if (hasRatingFilter) {
+      const ratingFilterValues = getRatingFilterValues(performer_filter);
 
-    // Standard Stash query for non-stat sorts/filters
+      if (ratingFilterValues.favorite !== undefined) {
+        // Fetch performer IDs with matching favorite status from PerformerRating table
+        const matchingRatings = await prisma.performerRating.findMany({
+          where: {
+            userId,
+            favorite: ratingFilterValues.favorite,
+          },
+          select: { performerId: true },
+        });
+
+        const matchingPerformerIds = matchingRatings.map(r => r.performerId);
+
+        if (matchingPerformerIds.length === 0) {
+          // No performers match the filter
+          return res.json({
+            findPerformers: {
+              count: 0,
+              performers: [],
+            },
+          });
+        }
+
+        // Remove rating filters from performer_filter before querying Stash
+        const cleanedPerformerFilter = removeRatingFilters(performer_filter);
+
+        // Query Stash for these specific performers with remaining filters
+        const performers: FindPerformersQuery = await stash.findPerformers({
+          filter: filter as FindFilterType,
+          ids: matchingPerformerIds,
+          performer_filter: cleanedPerformerFilter as PerformerFilterType,
+        });
+
+        const transformedPerformers = performers.findPerformers.performers.map((performer) =>
+          transformPerformer(performer as any)
+        );
+
+        // Inject user data
+        let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
+        performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
+
+        return res.json({
+          findPerformers: {
+            count: performers.findPerformers.count,
+            performers: performersWithUserData,
+          },
+        });
+      }
+    }
+
+    // Standard Stash query for non-rating/stat filters
     const queryInputs = removeEmptyValues({
       filter: filter as FindFilterType,
       ids: ids as string[],
       performer_ids: performer_ids as number[],
-      performer_filter: cleanedPerformerFilter as PerformerFilterType,
+      performer_filter: performer_filter as PerformerFilterType,
     });
 
     const performers: FindPerformersQuery = await stash.findPerformers(
@@ -1365,14 +1461,9 @@ export const findPerformers = async (req: Request, res: Response) => {
     // Override with per-user ratings
     performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
 
-    // Apply rating filters if present
-    if (hasRatingFilter && ratingFilterValues) {
-      performersWithUserData = applyRatingFilters(performersWithUserData, ratingFilterValues);
-    }
-
     res.json({
       ...performers,
-      findPerformers: { ...performers.findPerformers, performers: performersWithUserData, count: performersWithUserData.length },
+      findPerformers: { ...performers.findPerformers, performers: performersWithUserData },
     });
   } catch (error) {
     console.error("Error in findPerformers:", error);
@@ -1391,14 +1482,63 @@ export const findStudios = async (req: Request, res: Response) => {
 
     // Check if there are rating/favorite filters that need to be handled on Peek side
     const hasRatingFilter = hasRatingFilters(studio_filter);
-    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(studio_filter) : null;
 
-    // Remove rating filters from studio_filter before sending to Stash
-    const cleanedStudioFilter = hasRatingFilter ? removeRatingFilters(studio_filter) : studio_filter;
+    // If filtering by rating/favorite, fetch matching studio IDs from Peek first
+    if (hasRatingFilter) {
+      const ratingFilterValues = getRatingFilterValues(studio_filter);
 
+      if (ratingFilterValues.favorite !== undefined) {
+        // Fetch studio IDs with matching favorite status from StudioRating table
+        const matchingRatings = await prisma.studioRating.findMany({
+          where: {
+            userId,
+            favorite: ratingFilterValues.favorite,
+          },
+          select: { studioId: true },
+        });
+
+        const matchingStudioIds = matchingRatings.map(r => r.studioId);
+
+        if (matchingStudioIds.length === 0) {
+          // No studios match the filter
+          return res.json({
+            findStudios: {
+              count: 0,
+              studios: [],
+            },
+          });
+        }
+
+        // Remove rating filters from studio_filter before querying Stash
+        const cleanedStudioFilter = removeRatingFilters(studio_filter);
+
+        // Query Stash for these specific studios with remaining filters
+        const studios: FindStudiosQuery = await stash.findStudios({
+          filter: filter as FindFilterType,
+          ids: matchingStudioIds,
+          studio_filter: cleanedStudioFilter as StudioFilterType,
+        });
+
+        const transformedStudioList = studios.findStudios.studios.map((studio) =>
+          transformStudio(studio as any)
+        );
+
+        // Inject user data
+        const studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
+
+        return res.json({
+          findStudios: {
+            count: studios.findStudios.count,
+            studios: studiosWithUserRatings,
+          },
+        });
+      }
+    }
+
+    // Standard Stash query for non-rating filters
     const studios: FindStudiosQuery = await stash.findStudios({
       filter: filter as FindFilterType,
-      studio_filter: cleanedStudioFilter as StudioFilterType,
+      studio_filter: studio_filter as StudioFilterType,
       ids: ids as string[],
     });
 
@@ -1408,19 +1548,13 @@ export const findStudios = async (req: Request, res: Response) => {
     );
 
     // Inject user ratings
-    let studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
-
-    // Apply rating filters if present
-    if (hasRatingFilter && ratingFilterValues) {
-      studiosWithUserRatings = applyRatingFilters(studiosWithUserRatings, ratingFilterValues);
-    }
+    const studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
 
     const transformedStudios = {
       ...studios,
       findStudios: {
         ...studios.findStudios,
         studios: studiosWithUserRatings,
-        count: studiosWithUserRatings.length,
       },
     };
 
@@ -1484,14 +1618,61 @@ export const findTags = async (req: Request, res: Response) => {
     // Standard query for other sorts
     // Check if there are rating/favorite filters that need to be handled on Peek side
     const hasRatingFilter = hasRatingFilters(tag_filter);
-    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(tag_filter) : null;
 
-    // Remove rating filters from tag_filter before sending to Stash
-    const cleanedTagFilter = hasRatingFilter ? removeRatingFilters(tag_filter) : tag_filter;
+    // If filtering by rating/favorite, fetch matching tag IDs from Peek first
+    if (hasRatingFilter) {
+      const ratingFilterValues = getRatingFilterValues(tag_filter);
 
+      if (ratingFilterValues.favorite !== undefined) {
+        // Fetch tag IDs with matching favorite status from TagRating table
+        const matchingRatings = await prisma.tagRating.findMany({
+          where: {
+            userId,
+            favorite: ratingFilterValues.favorite,
+          },
+          select: { tagId: true },
+        });
+
+        const matchingTagIds = matchingRatings.map(r => r.tagId);
+
+        if (matchingTagIds.length === 0) {
+          // No tags match the filter
+          return res.json({
+            findTags: {
+              count: 0,
+              tags: [],
+            },
+          });
+        }
+
+        // Remove rating filters from tag_filter before querying Stash
+        const cleanedTagFilter = removeRatingFilters(tag_filter);
+
+        // Query Stash for these specific tags with remaining filters
+        const tags: FindTagsQuery = await stash.findTags({
+          filter: filter as FindFilterType,
+          ids: matchingTagIds,
+          tag_filter: cleanedTagFilter as TagFilterType,
+        });
+
+        const transformedTagList = tags.findTags.tags.map((tag) => transformTag(tag as any));
+
+        // Inject user data
+        const tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
+
+        return res.json({
+          findTags: {
+            count: tags.findTags.count,
+            tags: tagsWithUserRatings,
+          },
+        });
+      }
+    }
+
+    // Standard Stash query for non-rating filters
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
-      tag_filter: cleanedTagFilter as TagFilterType,
+      tag_filter: tag_filter as TagFilterType,
       ids: ids as string[],
     });
 
@@ -1499,19 +1680,13 @@ export const findTags = async (req: Request, res: Response) => {
     const transformedTagList = tags.findTags.tags.map((tag) => transformTag(tag as any));
 
     // Inject user ratings
-    let tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
-
-    // Apply rating filters if present
-    if (hasRatingFilter && ratingFilterValues) {
-      tagsWithUserRatings = applyRatingFilters(tagsWithUserRatings, ratingFilterValues);
-    }
+    const tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
 
     const transformedTags = {
       ...tags,
       findTags: {
         ...tags.findTags,
         tags: tagsWithUserRatings,
-        count: tagsWithUserRatings.length,
       },
     };
 
