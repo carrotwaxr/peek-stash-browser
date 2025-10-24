@@ -10,6 +10,8 @@ import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import EntityImage from "../ui/EntityImage.jsx";
+import StarRating from "../ui/StarRating.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -195,6 +197,20 @@ const StudioCard = forwardRef(
             >
               {truncateText(studio.name, 30)}
             </h3>
+
+            {/* Rating and Favorite */}
+            <div className="flex items-center gap-2 mb-2" onClick={(e) => e.preventDefault()}>
+              <StarRating
+                rating={studio.rating}
+                readonly={true}
+                size={16}
+              />
+              <FavoriteButton
+                isFavorite={studio.favorite || false}
+                size={16}
+                disabled={true}
+              />
+            </div>
 
             {studio.scene_count > 0 && (
               <p

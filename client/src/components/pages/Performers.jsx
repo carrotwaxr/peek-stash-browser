@@ -7,8 +7,10 @@ import {
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
-import { formatRating, getInitials, truncateText } from "../../utils/format.js";
+import { getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
+import StarRating from "../ui/StarRating.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -203,30 +205,32 @@ const PerformerCard = forwardRef(
           </div>
 
           <h3
-            className="font-semibold mb-1"
+            className="font-semibold mb-2"
             style={{ color: "var(--text-primary)" }}
             title={performer.name}
           >
             {truncateText(performer.name, 20)}
           </h3>
 
-          {performer.rating100 && (
-            <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>
-              {formatRating(performer.rating100)}
-            </p>
-          )}
+          {/* Rating and Favorite */}
+          <div className="flex items-center justify-center gap-2 mb-2" onClick={(e) => e.preventDefault()}>
+            <StarRating
+              rating={performer.rating}
+              readonly={true}
+              size={16}
+            />
+            <FavoriteButton
+              isFavorite={performer.favorite || false}
+              size={16}
+              disabled={true}
+            />
+          </div>
 
           {performer.scene_count > 0 && (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>
               {performer.scene_count} scene
               {performer.scene_count !== 1 ? "s" : ""}
             </p>
-          )}
-
-          {performer.favorite && (
-            <div className="mt-2">
-              <span className="text-yellow-500 text-sm">★ Favorite</span>
-            </div>
           )}
         </div>
       </Link>

@@ -16,16 +16,31 @@ export default function StarRating({
 }) {
   const [hoverRating, setHoverRating] = useState(null);
 
-  // Convert 0-100 rating to 0-5 stars
+  // Convert 0-100 rating to 0-5 stars (with half-star accuracy)
+  // 10 = 0.5 stars, 20 = 1 star, 30 = 1.5 stars, etc.
   const starsValue = rating ? rating / 20 : 0;
   const displayValue = hoverRating !== null ? hoverRating : starsValue;
 
-  const handleClick = (starIndex) => {
+  const handleClick = (starIndex, isHalf = false) => {
     if (readonly || !onChange) return;
 
-    // starIndex is 1-5, convert to 0-100
-    const newRating = starIndex * 20;
+    // starIndex is 1-5, convert to 0-100 with half-star support
+    // Full star: 1 = 20, 2 = 40, 3 = 60, 4 = 80, 5 = 100
+    // Half star: 0.5 = 10, 1.5 = 30, 2.5 = 50, 3.5 = 70, 4.5 = 90
+    const starValue = isHalf ? starIndex - 0.5 : starIndex;
+    const newRating = Math.round(starValue * 20);
     onChange(newRating);
+  };
+
+  const handleStarClick = (e, starNumber) => {
+    if (readonly || !onChange) return;
+
+    // Determine if clicking left half (half star) or right half (full star)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const isLeftHalf = clickX < rect.width / 2;
+
+    handleClick(starNumber, isLeftHalf);
   };
 
   const handleMouseEnter = (starIndex) => {
@@ -40,33 +55,52 @@ export default function StarRating({
 
   const renderStar = (index) => {
     const starNumber = index + 1;
-    const isFilled = starNumber <= Math.round(displayValue);
-    const isPartial = !isFilled && starNumber - 0.5 <= displayValue;
+    // Check if star should be fully filled
+    const isFilled = displayValue >= starNumber;
+    // Check if star should be half-filled (e.g., 3.5 stars means 4th star is half)
+    const isHalf = !isFilled && displayValue >= starNumber - 0.5;
 
     return (
       <button
         key={index}
         type="button"
-        onClick={() => handleClick(starNumber)}
+        onClick={(e) => handleStarClick(e, starNumber)}
         onMouseEnter={() => handleMouseEnter(starNumber)}
         onMouseLeave={handleMouseLeave}
         disabled={readonly || !onChange}
         className={`
+          relative
           ${readonly || !onChange ? 'cursor-default' : 'cursor-pointer hover:scale-110'}
           transition-transform
           ${className}
         `}
         aria-label={`Rate ${starNumber} star${starNumber > 1 ? 's' : ''}`}
       >
-        <Star
-          size={size}
-          className={`
-            ${isFilled ? 'fill-yellow-400 text-yellow-400' : ''}
-            ${isPartial ? 'fill-yellow-400/50 text-yellow-400' : ''}
-            ${!isFilled && !isPartial ? 'text-gray-400' : ''}
-            transition-colors
-          `}
-        />
+        {isHalf ? (
+          // Half-filled star using gradient
+          <>
+            <Star
+              size={size}
+              className="text-gray-400"
+            />
+            <Star
+              size={size}
+              className="fill-yellow-400 text-yellow-400 absolute inset-0"
+              style={{
+                clipPath: 'inset(0 50% 0 0)',
+              }}
+            />
+          </>
+        ) : (
+          // Full or empty star
+          <Star
+            size={size}
+            className={`
+              ${isFilled ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}
+              transition-colors
+            `}
+          />
+        )}
       </button>
     );
   };
