@@ -991,17 +991,27 @@ export const findScenes = async (req: Request, res: Response) => {
       // Strip rating filters before querying Stash
       const cleanedSceneFilter = removeRatingFilters(scene_filter);
 
-      // Fetch ALL scenes (per_page: -1 gets everything)
-      const scenes: FindScenesQuery = await stash.findScenes({
-        filter: { page: 1, per_page: -1, sort: 'date', direction: 'DESC' } as FindFilterType,
-        scene_filter: cleanedSceneFilter as SceneFilterType,
-        ids: ids as string[],
-        scene_ids: scene_ids as number[],
-      });
+      // Check cache for ALL scenes first
+      let transformedScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
 
-      const transformedScenes = scenes.findScenes.scenes.map((s) =>
-        transformScene(s as Scene)
-      );
+      if (!transformedScenes) {
+        logger.info('Cache miss - fetching ALL scenes from Stash for rating sort');
+        // Fetch ALL scenes (per_page: -1 gets everything)
+        const scenes: FindScenesQuery = await stash.findScenes({
+          filter: { page: 1, per_page: -1, sort: 'date', direction: 'DESC' } as FindFilterType,
+          scene_filter: cleanedSceneFilter as SceneFilterType,
+          ids: ids as string[],
+          scene_ids: scene_ids as number[],
+        });
+
+        transformedScenes = scenes.findScenes.scenes.map((s) =>
+          transformScene(s as Scene)
+        );
+
+        stashCache.set(CACHE_KEYS.SCENES_ALL, transformedScenes);
+      } else {
+        logger.info('Cache hit - using cached scenes for rating sort', { count: transformedScenes.length });
+      }
 
       // Inject user data
       let scenesWithUserData = await injectUserWatchHistory(transformedScenes, userId);
@@ -1359,19 +1369,29 @@ async function findPerformersWithCustomSort(
     });
     const totalCount = countQuery.findPerformers.count || 0;
 
-    // Step 2: Fetch ALL performers matching the filter (we need to calculate stats for all to sort correctly)
-    // This is expensive but necessary for accurate per-user sorting
-    const allPerformersQuery: FindPerformersQuery = await stash.findPerformers({
-      filter: {
-        per_page: -1, // Get all performers
-      } as FindFilterType,
-      performer_filter: performer_filter as PerformerFilterType,
-    });
+    // Step 2: Check cache for ALL performers first
+    let transformedPerformers = stashCache.get<any[]>(CACHE_KEYS.PERFORMERS_ALL);
 
-    // Step 3: Transform performers
-    const transformedPerformers = allPerformersQuery.findPerformers.performers.map((performer) =>
-      transformPerformer(performer as any)
-    );
+    if (!transformedPerformers) {
+      logger.info('Cache miss - fetching ALL performers from Stash for o_counter sort');
+      // Fetch ALL performers matching the filter (we need to calculate stats for all to sort correctly)
+      // This is expensive but necessary for accurate per-user sorting
+      const allPerformersQuery: FindPerformersQuery = await stash.findPerformers({
+        filter: {
+          per_page: -1, // Get all performers
+        } as FindFilterType,
+        performer_filter: performer_filter as PerformerFilterType,
+      });
+
+      // Step 3: Transform performers
+      transformedPerformers = allPerformersQuery.findPerformers.performers.map((performer) =>
+        transformPerformer(performer as any)
+      );
+
+      stashCache.set(CACHE_KEYS.PERFORMERS_ALL, transformedPerformers);
+    } else {
+      logger.info('Cache hit - using cached performers for o_counter sort', { count: transformedPerformers.length });
+    }
 
     // Step 4: Inject per-user stats
     let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
