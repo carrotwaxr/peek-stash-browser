@@ -631,62 +631,79 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       stats.scenes.checked = filteredScenes.length;
 
+      // Track unique scenes to avoid double-counting when syncing both rating and o_counter
+      const createdScenes = new Set<string>();
+      const updatedScenes = new Set<string>();
+
       for (const scene of filteredScenes) {
-        // Handle rating sync
+        let sceneWasCreated = false;
+        let sceneWasUpdated = false;
+
+        // Handle rating sync (use upsert to prevent duplicate key errors)
         if (syncOptions.scenes.rating && scene.rating100 && scene.rating100 > 0) {
+          const stashRating = scene.rating100;
+
+          // Check if record exists before upsert to track created vs updated
           const existingRating = await prisma.sceneRating.findUnique({
             where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
           });
 
-          const stashRating = scene.rating100;
+          await prisma.sceneRating.upsert({
+            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } },
+            update: { rating: stashRating },
+            create: {
+              userId: targetUserId,
+              sceneId: scene.id,
+              rating: stashRating,
+              favorite: false,
+            }
+          });
 
           if (!existingRating) {
-            await prisma.sceneRating.create({
-              data: {
-                userId: targetUserId,
-                sceneId: scene.id,
-                rating: stashRating,
-                favorite: false,
-              }
-            });
-            stats.scenes.created++;
+            sceneWasCreated = true;
           } else if (existingRating.rating !== stashRating) {
-            await prisma.sceneRating.update({
-              where: { id: existingRating.id },
-              data: { rating: stashRating }
-            });
-            stats.scenes.updated++;
+            sceneWasUpdated = true;
           }
         }
 
-        // Handle o_counter sync
+        // Handle o_counter sync (use upsert to prevent duplicate key errors)
         if (syncOptions.scenes.oCounter && scene.o_counter && scene.o_counter > 0) {
+          const stashOCounter = scene.o_counter;
+
+          // Check if record exists before upsert to track created vs updated
           const existingWatchHistory = await prisma.watchHistory.findUnique({
             where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
           });
 
-          const stashOCounter = scene.o_counter;
+          await prisma.watchHistory.upsert({
+            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } },
+            update: { oCount: stashOCounter },
+            create: {
+              userId: targetUserId,
+              sceneId: scene.id,
+              oCount: stashOCounter,
+              oHistory: [], // Don't have timestamp data, just the count
+              playCount: 0,
+              playDuration: 0,
+              playHistory: [],
+            }
+          });
 
           if (!existingWatchHistory) {
-            await prisma.watchHistory.create({
-              data: {
-                userId: targetUserId,
-                sceneId: scene.id,
-                oCount: stashOCounter,
-                oHistory: [], // Don't have timestamp data, just the count
-                playCount: 0,
-                playDuration: 0,
-                playHistory: [],
-              }
-            });
-            stats.scenes.created++;
+            sceneWasCreated = true;
           } else if (existingWatchHistory.oCount !== stashOCounter) {
-            await prisma.watchHistory.update({
-              where: { id: existingWatchHistory.id },
-              data: { oCount: stashOCounter }
-            });
-            stats.scenes.updated++;
+            sceneWasUpdated = true;
           }
+        }
+
+        // Count each unique scene only once (not once per record type)
+        if (sceneWasCreated && !createdScenes.has(scene.id)) {
+          stats.scenes.created++;
+          createdScenes.add(scene.id);
+        }
+        if (sceneWasUpdated && !updatedScenes.has(scene.id)) {
+          stats.scenes.updated++;
+          updatedScenes.add(scene.id);
         }
       }
     }
@@ -717,41 +734,37 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       stats.performers.checked = filteredPerformers.length;
 
       for (const performer of filteredPerformers) {
+        const stashRating = syncOptions.performers.rating ? performer.rating100 : null;
+        const stashFavorite = syncOptions.performers.favorite ? (performer.favorite || false) : false;
+
+        // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.performerRating.findUnique({
           where: { userId_performerId: { userId: targetUserId, performerId: performer.id } }
         });
 
-        const stashRating = syncOptions.performers.rating ? performer.rating100 : null;
-        const stashFavorite = syncOptions.performers.favorite ? (performer.favorite || false) : false;
+        const updates: any = {};
+        if (syncOptions.performers.rating) updates.rating = stashRating;
+        if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
+
+        await prisma.performerRating.upsert({
+          where: { userId_performerId: { userId: targetUserId, performerId: performer.id } },
+          update: updates,
+          create: {
+            userId: targetUserId,
+            performerId: performer.id,
+            rating: stashRating,
+            favorite: stashFavorite,
+          }
+        });
 
         if (!existingRating) {
-          await prisma.performerRating.create({
-            data: {
-              userId: targetUserId,
-              performerId: performer.id,
-              rating: stashRating,
-              favorite: stashFavorite,
-            }
-          });
           stats.performers.created++;
         } else {
           let needsUpdate = false;
-          const updates: any = {};
-
-          if (syncOptions.performers.rating && existingRating.rating !== stashRating) {
-            updates.rating = stashRating;
-            needsUpdate = true;
-          }
-          if (syncOptions.performers.favorite && existingRating.favorite !== stashFavorite) {
-            updates.favorite = stashFavorite;
-            needsUpdate = true;
-          }
+          if (syncOptions.performers.rating && existingRating.rating !== stashRating) needsUpdate = true;
+          if (syncOptions.performers.favorite && existingRating.favorite !== stashFavorite) needsUpdate = true;
 
           if (needsUpdate) {
-            await prisma.performerRating.update({
-              where: { id: existingRating.id },
-              data: updates
-            });
             stats.performers.updated++;
           }
         }
@@ -784,41 +797,37 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       stats.studios.checked = filteredStudios.length;
 
       for (const studio of filteredStudios) {
+        const stashRating = syncOptions.studios.rating ? studio.rating100 : null;
+        const stashFavorite = syncOptions.studios.favorite ? (studio.favorite || false) : false;
+
+        // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.studioRating.findUnique({
           where: { userId_studioId: { userId: targetUserId, studioId: studio.id } }
         });
 
-        const stashRating = syncOptions.studios.rating ? studio.rating100 : null;
-        const stashFavorite = syncOptions.studios.favorite ? (studio.favorite || false) : false;
+        const updates: any = {};
+        if (syncOptions.studios.rating) updates.rating = stashRating;
+        if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
+
+        await prisma.studioRating.upsert({
+          where: { userId_studioId: { userId: targetUserId, studioId: studio.id } },
+          update: updates,
+          create: {
+            userId: targetUserId,
+            studioId: studio.id,
+            rating: stashRating,
+            favorite: stashFavorite,
+          }
+        });
 
         if (!existingRating) {
-          await prisma.studioRating.create({
-            data: {
-              userId: targetUserId,
-              studioId: studio.id,
-              rating: stashRating,
-              favorite: stashFavorite,
-            }
-          });
           stats.studios.created++;
         } else {
           let needsUpdate = false;
-          const updates: any = {};
-
-          if (syncOptions.studios.rating && existingRating.rating !== stashRating) {
-            updates.rating = stashRating;
-            needsUpdate = true;
-          }
-          if (syncOptions.studios.favorite && existingRating.favorite !== stashFavorite) {
-            updates.favorite = stashFavorite;
-            needsUpdate = true;
-          }
+          if (syncOptions.studios.rating && existingRating.rating !== stashRating) needsUpdate = true;
+          if (syncOptions.studios.favorite && existingRating.favorite !== stashFavorite) needsUpdate = true;
 
           if (needsUpdate) {
-            await prisma.studioRating.update({
-              where: { id: existingRating.id },
-              data: updates
-            });
             stats.studios.updated++;
           }
         }
@@ -835,31 +844,28 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       stats.tags.checked = tags.length;
 
       for (const tag of tags) {
+        const stashFavorite = tag.favorite || false;
+
+        // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.tagRating.findUnique({
           where: { userId_tagId: { userId: targetUserId, tagId: tag.id } }
         });
 
-        const stashFavorite = tag.favorite || false;
+        await prisma.tagRating.upsert({
+          where: { userId_tagId: { userId: targetUserId, tagId: tag.id } },
+          update: { favorite: stashFavorite },
+          create: {
+            userId: targetUserId,
+            tagId: tag.id,
+            rating: null, // Tags don't have ratings in Stash
+            favorite: stashFavorite,
+          }
+        });
 
         if (!existingRating) {
-          await prisma.tagRating.create({
-            data: {
-              userId: targetUserId,
-              tagId: tag.id,
-              rating: null, // Tags don't have ratings in Stash
-              favorite: stashFavorite,
-            }
-          });
           stats.tags.created++;
-        } else {
-          // Update if different
-          if (existingRating.favorite !== stashFavorite) {
-            await prisma.tagRating.update({
-              where: { id: existingRating.id },
-              data: { favorite: stashFavorite }
-            });
-            stats.tags.updated++;
-          }
+        } else if (existingRating.favorite !== stashFavorite) {
+          stats.tags.updated++;
         }
       }
     }
