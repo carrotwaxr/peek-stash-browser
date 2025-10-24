@@ -1,6 +1,7 @@
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import AddToPlaylistButton from "../ui/AddToPlaylistButton.jsx";
 import OCounterButton from "../ui/OCounterButton.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
 
 const PlaybackControls = () => {
   const {
@@ -80,6 +81,15 @@ const PlaybackControls = () => {
           className="flex items-center gap-4"
           style={{ opacity: isLoading ? 0.6 : 1 }}
         >
+          {/* Rating and Favorite */}
+          <RatingControls
+            entityType="scene"
+            entityId={scene?.id}
+            initialRating={scene?.rating}
+            initialFavorite={scene?.favorite || false}
+            size={20}
+          />
+
           {/* O Counter Button */}
           <OCounterButton
             sceneId={scene?.id}
