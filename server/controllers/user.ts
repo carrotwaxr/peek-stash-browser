@@ -656,7 +656,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       if (syncOptions.performers.rating && !syncOptions.performers.favorite) {
         performerFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
       } else if (syncOptions.performers.favorite && !syncOptions.performers.rating) {
-        performerFilter = { is_favorite: true };
+        performerFilter = { filter_favorites: true };
       }
       // If both are selected, fetch all and filter in code (can't do OR in single query)
 
@@ -723,7 +723,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       if (syncOptions.studios.rating && !syncOptions.studios.favorite) {
         studioFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
       } else if (syncOptions.studios.favorite && !syncOptions.studios.rating) {
-        studioFilter = { is_favorite: true };
+        studioFilter = { favorite: true };
       }
       // If both are selected, fetch all and filter in code (can't do OR in single query)
 
@@ -786,7 +786,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
     if (syncOptions.tags.favorite) {
       const tagsData = await stash.findTags({
         filter: { per_page: -1 },
-        tag_filter: { is_favorite: true }
+        tag_filter: { favorite: true }
       });
       const tags = tagsData.findTags.tags;
       stats.tags.checked = tags.length;
