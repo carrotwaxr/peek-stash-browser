@@ -83,8 +83,8 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
     // Otherwise, user is updating their own settings
     let targetUserId = currentUserId;
     if (req.params.userId) {
-      // Admin updating another user's settings
-      if (currentUserRole !== 'admin') {
+      // Admin updating another user's settings (or admin updating themselves via ServerSettings)
+      if (currentUserRole !== 'ADMIN') {
         return res.status(403).json({ error: "Only admins can update other users' settings" });
       }
       targetUserId = parseInt(req.params.userId);
