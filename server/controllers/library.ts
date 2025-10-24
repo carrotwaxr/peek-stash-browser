@@ -580,145 +580,33 @@ async function findScenesWithCustomSort(
     // Remove rating filters from scene_filter before querying Stash
     const cleanedSceneFilter = hasRatingFilter ? removeRatingFilters(scene_filter) : scene_filter;
 
-    // If favorites filter is active, we should ONLY work with favorited scenes
-    // Don't intersect - use ALL favorited scenes (whether they have watch history or not)
-    let scenesToFetch: string[];
-    if (favoriteSceneIds) {
-      scenesToFetch = favoriteSceneIds;
+    // Step 2: Get ALL scenes from cache and inject watch history
+    let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
+
+    if (!allScenes) {
+      logger.info('Cache miss - fetching ALL scenes from Stash for watch history sort');
+      const allScenesQuery: FindScenesQuery = await stash.findScenes({
+        filter: { per_page: -1 } as FindFilterType,
+      });
+      allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
+      stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
     } else {
-      scenesToFetch = sceneIdsWithHistory;
+      logger.info('Cache hit - using cached scenes for watch history sort', { count: allScenes.length });
     }
 
-    // Step 2: Fetch full scene details from Stash (with caching)
-    let scenesWithHistory: any[] = [];
-    if (scenesToFetch && scenesToFetch.length > 0) {
-      // Check cache for ALL scenes first
-      let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
+    // If favorites filter is active, filter to only favorited scenes
+    const scenesToProcess = favoriteSceneIds
+      ? allScenes.filter((scene: any) => favoriteSceneIds.includes(scene.id))
+      : allScenes;
 
-      if (!allScenes) {
-        logger.info('Cache miss - fetching ALL scenes from Stash');
-        const allScenesQuery: FindScenesQuery = await stash.findScenes({
-          filter: { per_page: -1 } as FindFilterType,
-        });
-        allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
-        stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
+    // Inject watch history for ALL scenes (o_counter = 0 for scenes without history)
+    const scenesWithHistory = scenesToProcess.map((scene: any) => {
+      const userHistory = watchHistoryMap.get(scene.id);
+
+      if (userHistory) {
+        return { ...scene, ...userHistory };
       } else {
-        logger.info('Cache hit - using cached scenes', { count: allScenes.length });
-      }
-
-      // Filter to only scenes we need (scenesToFetch) and apply scene_filter
-      const filteredScenes = allScenes.filter((scene: any) => scenesToFetch.includes(scene.id));
-
-      // Merge watch history stats with scene data (or inject zeros if no history)
-      scenesWithHistory = filteredScenes.map((scene: any) => {
-        const userHistory = watchHistoryMap.get(scene.id);
-
-        // If scene has watch history, merge it; otherwise inject zeros
-        if (userHistory) {
-          return { ...scene, ...userHistory };
-        } else {
-          return {
-            ...scene,
-            resume_time: 0,
-            play_duration: 0,
-            play_count: 0,
-            play_history: [],
-            o_counter: 0,
-            o_history: [],
-            last_played_at: null,
-          };
-        }
-      });
-
-      // Step 3: Sort by requested field (using per-user data) with secondary sort by title
-      scenesWithHistory.sort((a, b) => {
-        const aValue = getFieldValue(a, sortField) || 0;
-        const bValue = getFieldValue(b, sortField) || 0;
-
-        // Primary sort by the requested field
-        let comparison = 0;
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          comparison = aValue.localeCompare(bValue);
-        } else {
-          comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-        }
-
-        // Apply sort direction
-        if (sortDirection.toUpperCase() === 'DESC') {
-          comparison = -comparison;
-        }
-
-        // Secondary sort by title if primary values are equal
-        if (comparison === 0) {
-          const aTitle = a.title || '';
-          const bTitle = b.title || '';
-          return aTitle.localeCompare(bTitle);
-        }
-
-        return comparison;
-      });
-    }
-
-    // Step 4: Calculate total count from cached scenes
-    let totalCount: number;
-
-    if (favoriteSceneIds) {
-      // If favorites filter is active, we already have ALL favorited scenes
-      totalCount = scenesWithHistory.length;
-    } else {
-      // Use cached scenes to get total count (no need to query Stash)
-      let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
-      if (!allScenes) {
-        // This shouldn't happen since we cache in Step 2, but just in case
-        logger.warn('Cache miss in count step - fetching from Stash');
-        const allScenesQuery: FindScenesQuery = await stash.findScenes({
-          filter: { per_page: -1 } as FindFilterType,
-        });
-        allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
-        stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
-      }
-
-      // Calculate actual total: all scenes from Stash
-      totalCount = allScenes.length;
-    }
-
-    // Step 5: Calculate pagination
-    const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-
-    // Scenes from watch history that belong on this page
-    const historyScenesOnPage = scenesWithHistory.slice(startIndex, endIndex);
-
-    // Step 6: If page isn't full, use cached scenes to fill remaining slots
-    // SKIP this if favorites filter is active - we already have all favorited scenes
-    const remainingSlots = perPage - historyScenesOnPage.length;
-    let fillScenes: any[] = [];
-
-    if (remainingSlots > 0 && !favoriteSceneIds) {
-      // Use cached scenes (already fetched in Step 2)
-      let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
-
-      if (!allScenes) {
-        // This shouldn't happen since we cache in Step 2, but just in case
-        logger.warn('Cache miss in fill scenes step - fetching from Stash');
-        const allScenesQuery: FindScenesQuery = await stash.findScenes({
-          filter: { per_page: -1 } as FindFilterType,
-        });
-        allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
-        stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
-      }
-
-      // Filter out scenes that already have watch history (duplicates)
-      const scenesWithoutHistory = allScenes.filter((scene: any) => !sceneIdsWithHistory.includes(scene.id));
-
-      // Calculate skip offset
-      const historyCount = scenesWithHistory.length;
-      const stashSkip = Math.max(0, startIndex - historyCount);
-
-      // Get the scenes we need for this page
-      fillScenes = scenesWithoutHistory
-        .slice(stashSkip, stashSkip + remainingSlots)
-        .map((scene: any) => ({
+        return {
           ...scene,
           resume_time: 0,
           play_duration: 0,
@@ -727,19 +615,50 @@ async function findScenesWithCustomSort(
           o_counter: 0,
           o_history: [],
           last_played_at: null,
-        }));
-    }
+        };
+      }
+    });
 
-    // Step 7: Combine both groups (history scenes first, then fill scenes)
-    const finalScenes = [...historyScenesOnPage, ...fillScenes];
+    // Step 3: Sort ALL scenes by requested field
+    scenesWithHistory.sort((a, b) => {
+      const aValue = getFieldValue(a, sortField) || 0;
+      const bValue = getFieldValue(b, sortField) || 0;
 
-    // Step 8: Inject user ratings
-    const scenesWithRatings = await injectUserSceneRatings(finalScenes, userId);
+      // Primary sort by the requested field
+      let comparison = 0;
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        comparison = aValue.localeCompare(bValue);
+      } else {
+        comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      }
+
+      // Apply sort direction
+      if (sortDirection.toUpperCase() === 'DESC') {
+        comparison = -comparison;
+      }
+
+      // Secondary sort by title if primary values are equal
+      if (comparison === 0) {
+        const aTitle = a.title || '';
+        const bTitle = b.title || '';
+        return aTitle.localeCompare(bTitle);
+      }
+
+      return comparison;
+    });
+
+    // Step 4: Paginate
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedScenes = scenesWithHistory.slice(startIndex, endIndex);
+
+    // Step 5: Inject user ratings
+    const scenesWithRatings = await injectUserSceneRatings(paginatedScenes, userId);
 
     // Return properly formatted response matching Stash's structure
     res.json({
       findScenes: {
-        count: totalCount,
+        count: scenesWithHistory.length,  // Total count of all scenes (after filtering by favorites if applicable)
         scenes: scenesWithRatings,
       },
     });
