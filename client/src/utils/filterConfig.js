@@ -753,7 +753,7 @@ export const buildSceneFilter = (filters) => {
   if (performerIds.length > 0) {
     sceneFilter.performers = {
       value: [...new Set(performerIds)], // Remove duplicates
-      modifier: "INCLUDES_ALL",
+      modifier: filters.performers?.modifier || "INCLUDES_ALL",
     };
   }
 
@@ -783,7 +783,7 @@ export const buildSceneFilter = (filters) => {
   if (tagIds.length > 0) {
     sceneFilter.tags = {
       value: [...new Set(tagIds)], // Remove duplicates
-      modifier: "INCLUDES_ALL",
+      modifier: filters.tags?.modifier || "INCLUDES_ALL",
     };
   }
 

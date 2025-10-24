@@ -580,18 +580,20 @@ async function findScenesWithCustomSort(
     // Remove rating filters from scene_filter before querying Stash
     const cleanedSceneFilter = hasRatingFilter ? removeRatingFilters(scene_filter) : scene_filter;
 
-    // Step 2: Get ALL scenes from cache and inject watch history
-    let allScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
+    // Step 2: Get scenes - use cache only if no filters present
+    const hasFilters = cleanedSceneFilter && Object.keys(cleanedSceneFilter).length > 0;
+    let allScenes = hasFilters ? null : stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
 
     if (!allScenes) {
-      logger.info('Cache miss - fetching ALL scenes from Stash for watch history sort');
       const allScenesQuery: FindScenesQuery = await stash.findScenes({
         filter: { per_page: -1 } as FindFilterType,
+        scene_filter: cleanedSceneFilter as SceneFilterType,
       });
       allScenes = allScenesQuery.findScenes.scenes.map((scene) => transformScene(scene as Scene));
-      stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
-    } else {
-      logger.info('Cache hit - using cached scenes for watch history sort', { count: allScenes.length });
+      // Only cache unfiltered results
+      if (!hasFilters) {
+        stashCache.set(CACHE_KEYS.SCENES_ALL, allScenes);
+      }
     }
 
     // If favorites filter is active, filter to only favorited scenes
