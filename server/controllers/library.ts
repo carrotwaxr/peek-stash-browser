@@ -411,6 +411,62 @@ function removeWatchHistoryFilters(scene_filter: any): any {
 }
 
 /**
+ * Check if scene_filter contains rating or favorite filters
+ * These are per-user fields stored in Peek, not Stash
+ */
+function hasRatingFilters(scene_filter: any): boolean {
+  if (!scene_filter) return false;
+  return scene_filter.rating !== undefined || scene_filter.favorite !== undefined;
+}
+
+/**
+ * Remove rating and favorite filters from scene_filter
+ * These will be applied after fetching from Stash
+ */
+function removeRatingFilters(scene_filter: any): any {
+  if (!scene_filter) return scene_filter;
+
+  const cleaned = { ...scene_filter };
+  delete cleaned.rating;
+  delete cleaned.favorite;
+
+  return cleaned;
+}
+
+/**
+ * Extract rating filter values from scene_filter
+ */
+function getRatingFilterValues(scene_filter: any): { rating?: any; favorite?: boolean } {
+  return {
+    rating: scene_filter?.rating,
+    favorite: scene_filter?.favorite,
+  };
+}
+
+/**
+ * Apply rating filters to scenes (filter by per-user rating/favorite values)
+ */
+function applyRatingFilters(scenes: any[], ratingFilters: { rating?: any; favorite?: boolean }): any[] {
+  return scenes.filter(scene => {
+    // Filter by favorite
+    if (ratingFilters.favorite !== undefined) {
+      const sceneFavorite = scene.favorite || false;
+      if (sceneFavorite !== ratingFilters.favorite) {
+        return false;
+      }
+    }
+
+    // Filter by rating (if rating filter is implemented in the future)
+    if (ratingFilters.rating !== undefined) {
+      // Rating filter logic can be added here
+      // For now, we only support favorite filtering
+    }
+
+    return true;
+  });
+}
+
+/**
  * Check if a sort field is a rating field
  */
 function isRatingField(field: string): boolean {
@@ -725,8 +781,13 @@ export const findScenes = async (req: Request, res: Response) => {
         });
       }
 
-      // Remove watch history filters from scene_filter before querying Stash
-      const cleanedSceneFilter = removeWatchHistoryFilters(scene_filter);
+      // Remove watch history filters and rating filters from scene_filter before querying Stash
+      let cleanedSceneFilter = removeWatchHistoryFilters(scene_filter);
+      const hasRatingFilter = hasRatingFilters(scene_filter);
+      const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(scene_filter) : null;
+      if (hasRatingFilter) {
+        cleanedSceneFilter = removeRatingFilters(cleanedSceneFilter);
+      }
 
       // Query Stash for these specific scenes with remaining filters
       const scenes: FindScenesQuery = await stash.findScenes({
@@ -743,6 +804,11 @@ export const findScenes = async (req: Request, res: Response) => {
       let scenesWithUserData = await injectUserWatchHistory(transformedScenes, userId);
       // Inject user ratings
       scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
+
+      // Apply rating filters if present
+      if (hasRatingFilter && ratingFilterValues) {
+        scenesWithUserData = applyRatingFilters(scenesWithUserData, ratingFilterValues);
+      }
 
       // Sort if needed
       const scenesWithUserHistory = scenesWithUserData;
@@ -791,10 +857,17 @@ export const findScenes = async (req: Request, res: Response) => {
       return await findScenesWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, scene_filter);
     }
 
+    // Check if there are rating/favorite filters that need to be handled on Peek side
+    const hasRatingFilter = hasRatingFilters(scene_filter);
+    const ratingFilterValues = hasRatingFilter ? getRatingFilterValues(scene_filter) : null;
+
+    // Remove rating filters from scene_filter before sending to Stash
+    const cleanedSceneFilter = hasRatingFilter ? removeRatingFilters(scene_filter) : scene_filter;
+
     // Standard Stash query for non-watch-history sorts/filters
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
-      scene_filter: scene_filter as SceneFilterType,
+      scene_filter: cleanedSceneFilter as SceneFilterType,
       ids: ids as string[],
       scene_ids: scene_ids as number[],
     });
@@ -808,9 +881,14 @@ export const findScenes = async (req: Request, res: Response) => {
     // Override with per-user ratings
     scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
+    // Apply rating filters if present
+    if (hasRatingFilter && ratingFilterValues) {
+      scenesWithUserData = applyRatingFilters(scenesWithUserData, ratingFilterValues);
+    }
+
     res.json({
       ...scenes,
-      findScenes: { ...scenes.findScenes, scenes: scenesWithUserData },
+      findScenes: { ...scenes.findScenes, scenes: scenesWithUserData, count: scenesWithUserData.length },
     });
   } catch (error) {
     console.error("Error in findScenes:", error);
