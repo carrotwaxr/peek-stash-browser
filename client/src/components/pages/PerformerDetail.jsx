@@ -4,6 +4,7 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
 import {
   LucideMars,
   LucideStar,
@@ -140,16 +141,24 @@ const PerformerDetail = () => {
               {performer.name}
             </h1>
             <PerformerGenderIcon gender={performer.gender} size={32} />
-            {performer.favorite && (
-              <LucideStar size={32} color="#efdd03" fill="#efdd03" />
-            )}
           </div>
 
           {performer?.alias_list?.length > 0 && (
-            <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
+            <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
               Also known as: {performer.alias_list.join(", ")}
             </p>
           )}
+
+          {/* Rating Controls */}
+          <div className="mt-4">
+            <RatingControls
+              entityType="performer"
+              entityId={performer.id}
+              initialRating={performer.rating}
+              initialFavorite={performer.favorite || false}
+              size={24}
+            />
+          </div>
         </div>
 
         {/* Two Column Layout - Image on left, content on right (lg+) */}

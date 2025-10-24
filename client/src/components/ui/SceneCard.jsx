@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { formatFileSize } from "../../utils/format.js";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
 import {
   SceneTitle,
   SceneStats,
@@ -351,6 +352,17 @@ const SceneCard = forwardRef(
           <div className="py-2" style={{ minHeight: "3.5rem", maxHeight: "3.5rem" }}>
             <SceneMetadata
               scene={scene}
+            />
+          </div>
+
+          {/* Rating Controls */}
+          <div className="py-2 flex justify-center">
+            <RatingControls
+              entityType="scene"
+              entityId={scene.id}
+              initialRating={scene.rating}
+              initialFavorite={scene.favorite || false}
+              size={18}
             />
           </div>
 
