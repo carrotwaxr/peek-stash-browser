@@ -230,7 +230,8 @@ export async function injectUserStudioRatings(studios: any[], userId: number): P
 }
 
 /**
- * Override tag favorite field with per-user data from Peek database
+ * Override tag rating/favorite fields with per-user data from Peek database
+ * NOTE: Tags in Stash only have favorite, not rating - but Peek adds rating support
  */
 export async function injectUserTagRatings(tags: any[], userId: number): Promise<any[]> {
   if (!tags || tags.length === 0) {
@@ -251,7 +252,7 @@ export async function injectUserTagRatings(tags: any[], userId: number): Promise
   for (const rating of ratingRecords) {
     ratingMap.set(rating.tagId, {
       rating: rating.rating,
-      rating100: rating.rating, // Stash uses rating100 (even though tags don't have it in Stash)
+      rating100: rating.rating, // Stash uses rating100
       favorite: rating.favorite,
     });
   }
@@ -291,18 +292,6 @@ function isWatchHistoryField(field: string): boolean {
     'o_date', // Another possible field name
   ];
   return watchHistoryFields.includes(field.toLowerCase());
-}
-
-/**
- * Check if a sort field is a rating/favorite field
- */
-function isRatingField(field: string): boolean {
-  const ratingFields = [
-    'rating',
-    'rating100',
-    'favorite',
-  ];
-  return ratingFields.includes(field.toLowerCase());
 }
 
 /**
@@ -422,37 +411,32 @@ function removeWatchHistoryFilters(scene_filter: any): any {
 }
 
 /**
- * Check if filter contains any rating/favorite field filters
+ * Check if a sort field is a rating field
  */
-function hasRatingFilters(filter: any): boolean {
-  if (!filter) return false;
-
-  const ratingFilterFields = [
-    'rating',
-    'rating100',
-    'favorite',
-  ];
-
-  return ratingFilterFields.some(field => filter[field] !== undefined);
+function isRatingField(field: string): boolean {
+  const ratingFields = ['rating', 'rating100', 'favorite'];
+  return ratingFields.includes(field.toLowerCase());
 }
 
 /**
- * Remove rating filters from filter so they don't get sent to Stash
+ * Check if filter contains any rating field filters
+ */
+function hasRatingFilters(filter: any): boolean {
+  if (!filter) return false;
+  const ratingFields = ['rating', 'rating100', 'favorite'];
+  return ratingFields.some(field => filter[field] !== undefined);
+}
+
+/**
+ * Remove rating filters from filter object (so Stash doesn't see them)
  */
 function removeRatingFilters(filter: any): any {
   if (!filter) return filter;
-
   const cleaned = { ...filter };
-  const ratingFilterFields = [
-    'rating',
-    'rating100',
-    'favorite',
-  ];
-
-  ratingFilterFields.forEach(field => {
+  const ratingFields = ['rating', 'rating100', 'favorite'];
+  ratingFields.forEach(field => {
     delete cleaned[field];
   });
-
   return cleaned;
 }
 
@@ -754,13 +738,13 @@ export const findScenes = async (req: Request, res: Response) => {
 
       // Inject user watch history
       let scenesWithUserData = await injectUserWatchHistory(transformedScenes, userId);
-
       // Inject user ratings
       scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
       // Sort if needed
+      const scenesWithUserHistory = scenesWithUserData;
       if (sortField) {
-        scenesWithUserData.sort((a, b) => {
+        scenesWithUserHistory.sort((a, b) => {
           const aValue = getFieldValue(a, sortField) || 0;
           const bValue = getFieldValue(b, sortField) || 0;
 
@@ -789,11 +773,11 @@ export const findScenes = async (req: Request, res: Response) => {
       // Paginate
       const startIndex = (page - 1) * perPage;
       const endIndex = startIndex + perPage;
-      const paginatedScenes = scenesWithUserData.slice(startIndex, endIndex);
+      const paginatedScenes = scenesWithUserHistory.slice(startIndex, endIndex);
 
       return res.json({
         findScenes: {
-          count: scenesWithUserData.length,
+          count: scenesWithUserHistory.length,
           scenes: paginatedScenes,
         },
       });
@@ -804,12 +788,7 @@ export const findScenes = async (req: Request, res: Response) => {
       return await findScenesWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, scene_filter);
     }
 
-    // If sorting by rating fields, use custom pagination logic
-    if (sortField && isRatingField(sortField)) {
-      return await findScenesWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, scene_filter);
-    }
-
-    // Standard Stash query for non-watch-history/rating sorts/filters
+    // Standard Stash query for non-watch-history sorts/filters
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
       scene_filter: scene_filter as SceneFilterType,
@@ -821,8 +800,9 @@ export const findScenes = async (req: Request, res: Response) => {
       transformScene(s as Scene)
     );
 
-    // Override with per-user watch history and ratings
+    // Override with per-user watch history
     let scenesWithUserData = await injectUserWatchHistory(mutatedScenes, userId);
+    // Override with per-user ratings
     scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
     res.json({
@@ -1238,9 +1218,12 @@ export const findPerformers = async (req: Request, res: Response) => {
       );
 
       // Inject user stats
-      const performersWithUserStats = await injectUserPerformerStats(transformedPerformers, userId);
+      let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
+      // Inject user ratings
+      performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
 
       // Sort if needed
+      const performersWithUserStats = performersWithUserData;
       if (sortField) {
         performersWithUserStats.sort((a, b) => {
           const aValue = getFieldValue(a, sortField) || 0;
@@ -1305,7 +1288,6 @@ export const findPerformers = async (req: Request, res: Response) => {
 
     // Override with per-user stats
     let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
-
     // Override with per-user ratings
     performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
 
@@ -1335,17 +1317,22 @@ export const findStudios = async (req: Request, res: Response) => {
     });
 
     // Transform studios to add API key to image paths
-    const transformedStudios = studios.findStudios.studios.map((studio) =>
+    const transformedStudioList = studios.findStudios.studios.map((studio) =>
       transformStudio(studio as any)
     );
 
-    // Override with per-user ratings
-    const studiosWithUserRatings = await injectUserStudioRatings(transformedStudios, userId);
+    // Inject user ratings
+    const studiosWithUserRatings = await injectUserStudioRatings(transformedStudioList, userId);
 
-    res.json({
+    const transformedStudios = {
       ...studios,
-      findStudios: { ...studios.findStudios, studios: studiosWithUserRatings },
-    });
+      findStudios: {
+        ...studios.findStudios,
+        studios: studiosWithUserRatings,
+      },
+    };
+
+    res.json(transformedStudios);
   } catch (error) {
     console.error("Error in findStudios:", error);
     res.status(500).json({
@@ -1368,15 +1355,20 @@ export const findTags = async (req: Request, res: Response) => {
     });
 
     // Transform tags to add API key to image paths
-    const transformedTags = tags.findTags.tags.map((tag) => transformTag(tag as any));
+    const transformedTagList = tags.findTags.tags.map((tag) => transformTag(tag as any));
 
-    // Override with per-user ratings
-    const tagsWithUserRatings = await injectUserTagRatings(transformedTags, userId);
+    // Inject user ratings
+    const tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
 
-    res.json({
+    const transformedTags = {
       ...tags,
-      findTags: { ...tags.findTags, tags: tagsWithUserRatings },
-    });
+      findTags: {
+        ...tags.findTags,
+        tags: tagsWithUserRatings,
+      },
+    };
+
+    res.json(transformedTags);
   } catch (error) {
     console.error("Error in findTags:", error);
     res.status(500).json({
