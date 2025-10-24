@@ -6,6 +6,10 @@ import Button from "../ui/Button.jsx";
  * Carousel metadata mapping fetchKey to display information
  */
 const CAROUSEL_METADATA = {
+  continueWatching: {
+    title: "Continue Watching",
+    description: "Resume your in-progress scenes",
+  },
   highRatedScenes: { title: "High Rated", description: "Top rated scenes" },
   recentlyAddedScenes: {
     title: "Recently Added",

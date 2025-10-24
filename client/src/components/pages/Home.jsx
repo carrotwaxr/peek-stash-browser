@@ -27,6 +27,12 @@ const api = axios.create({
 
 const CAROUSEL_DEFINITIONS = [
   {
+    title: "Continue Watching",
+    icon: <PlayCircle className="w-6 h-6" color="#10b981" />,
+    fetchKey: "continueWatching",
+    isSpecial: true, // Not a standard query carousel
+  },
+  {
     title: "High Rated",
     icon: <Star className="w-6 h-6" style={{ color: "var(--icon-rating)" }} />,
     fetchKey: "highRatedScenes",
@@ -96,13 +102,37 @@ const Home = () => {
     const loadPreferences = async () => {
       try {
         const response = await api.get("/user/settings");
-        const prefs =
-          response.data.settings.carouselPreferences ||
-          CAROUSEL_DEFINITIONS.map((def, idx) => ({
+        let prefs = response.data.settings.carouselPreferences;
+
+        // If no preferences exist, create defaults
+        if (!prefs) {
+          prefs = CAROUSEL_DEFINITIONS.map((def, idx) => ({
             id: def.fetchKey,
             enabled: true,
             order: idx,
           }));
+        } else {
+          // Migrate: Add any new carousels that don't exist in saved preferences
+          const existingIds = new Set(prefs.map((p) => p.id));
+          const missingCarousels = CAROUSEL_DEFINITIONS.filter(
+            (def) => !existingIds.has(def.fetchKey)
+          );
+
+          // Add missing carousels at the end (or at beginning for continueWatching)
+          missingCarousels.forEach((def) => {
+            const newPref = {
+              id: def.fetchKey,
+              enabled: true,
+              order: def.fetchKey === "continueWatching" ? -1 : prefs.length,
+            };
+            prefs.push(newPref);
+          });
+
+          // Re-normalize order values
+          prefs.sort((a, b) => a.order - b.order);
+          prefs = prefs.map((pref, idx) => ({ ...pref, order: idx }));
+        }
+
         setCarouselPreferences(prefs);
       } catch {
         // Fallback to all enabled if fetch fails
@@ -173,24 +203,34 @@ const Home = () => {
         subtitle="Discover your favorite content and explore new scenes"
       />
 
-      {/* Continue Watching Carousel - Always at the top */}
-      <ContinueWatchingCarousel
-        selectedScenes={selectedScenes}
-        onToggleSelect={handleToggleSelect}
-      />
+      {activeCarousels.map((def) => {
+        const { title, icon, fetchKey, isSpecial } = def;
 
-      {activeCarousels.map(({ title, icon, fetchKey }) => (
-        <HomeCarousel
-          key={fetchKey}
-          title={title}
-          icon={icon}
-          fetchKey={fetchKey}
-          createSceneClickHandler={createSceneClickHandler}
-          carouselQueries={carouselQueries}
-          selectedScenes={selectedScenes}
-          onToggleSelect={handleToggleSelect}
-        />
-      ))}
+        // Special handling for Continue Watching carousel
+        if (isSpecial && fetchKey === "continueWatching") {
+          return (
+            <ContinueWatchingCarousel
+              key={fetchKey}
+              selectedScenes={selectedScenes}
+              onToggleSelect={handleToggleSelect}
+            />
+          );
+        }
+
+        // Standard query-based carousel
+        return (
+          <HomeCarousel
+            key={fetchKey}
+            title={title}
+            icon={icon}
+            fetchKey={fetchKey}
+            createSceneClickHandler={createSceneClickHandler}
+            carouselQueries={carouselQueries}
+            selectedScenes={selectedScenes}
+            onToggleSelect={handleToggleSelect}
+          />
+        );
+      })}
 
       {/* Bulk Action Bar */}
       {selectedScenes.length > 0 && (
