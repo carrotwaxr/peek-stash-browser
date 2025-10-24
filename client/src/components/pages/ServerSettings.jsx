@@ -173,10 +173,14 @@ const ServerSettings = () => {
       setError(null);
       setMessage(null);
 
-      await api.put(`/user/${userId}/settings`, { syncToStash: newSyncToStash });
+      await api.put(`/user/${userId}/settings`, {
+        syncToStash: newSyncToStash,
+      });
 
       setMessage(
-        `Stash sync ${newSyncToStash ? "enabled" : "disabled"} for "${username}"!`
+        `Stash sync ${
+          newSyncToStash ? "enabled" : "disabled"
+        } for "${username}"!`
       );
       loadUsers();
 
@@ -314,7 +318,9 @@ const ServerSettings = () => {
 
     try {
       // Check GitHub API for latest release
-      const response = await fetch('https://api.github.com/repos/carrotwaxr/peek-stash-browser/releases/latest');
+      const response = await fetch(
+        "https://api.github.com/repos/carrotwaxr/peek-stash-browser/releases/latest"
+      );
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -326,7 +332,7 @@ const ServerSettings = () => {
       }
 
       const data = await response.json();
-      const latestTag = data.tag_name.replace('v', ''); // Remove 'v' prefix if present
+      const latestTag = data.tag_name.replace("v", ""); // Remove 'v' prefix if present
       setLatestVersion(latestTag);
     } catch (err) {
       console.error("Failed to check for updates:", err);
@@ -339,8 +345,8 @@ const ServerSettings = () => {
   const compareVersions = (current, latest) => {
     if (!current || !latest) return false;
 
-    const currentParts = current.split('.').map(Number);
-    const latestParts = latest.split('.').map(Number);
+    const currentParts = current.split(".").map(Number);
+    const latestParts = latest.split(".").map(Number);
 
     for (let i = 0; i < 3; i++) {
       if ((latestParts[i] || 0) > (currentParts[i] || 0)) return true;
@@ -375,11 +381,16 @@ const ServerSettings = () => {
     setMessage(null);
 
     try {
-      const response = await api.post(`/user/${syncTargetUser.id}/sync-from-stash`, {
-        options: syncOptions
-      });
+      const response = await api.post(
+        `/user/${syncTargetUser.id}/sync-from-stash`,
+        {
+          options: syncOptions,
+        }
+      );
       setSyncResult(response.data.stats);
-      setMessage(`Successfully synced data from Stash for ${syncTargetUser.username}!`);
+      setMessage(
+        `Successfully synced data from Stash for ${syncTargetUser.username}!`
+      );
       setTimeout(() => setMessage(null), 5000);
     } catch (err) {
       setSyncError(err.response?.data?.error || "Failed to sync from Stash");
@@ -391,12 +402,12 @@ const ServerSettings = () => {
   };
 
   const toggleSyncOption = (entityType, field) => {
-    setSyncOptions(prev => ({
+    setSyncOptions((prev) => ({
       ...prev,
       [entityType]: {
         ...prev[entityType],
-        [field]: !prev[entityType][field]
-      }
+        [field]: !prev[entityType][field],
+      },
     }));
   };
 
@@ -788,66 +799,68 @@ const ServerSettings = () => {
                 </div>
 
                 {/* Update Notification */}
-                {latestVersion && compareVersions(CLIENT_VERSION, latestVersion) && (
-                  <div
-                    className="p-4 rounded-lg"
-                    style={{
-                      backgroundColor: "rgba(59, 130, 246, 0.1)",
-                      border: "1px solid rgba(59, 130, 246, 0.3)",
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <svg
-                        className="w-5 h-5 flex-shrink-0 mt-0.5"
-                        style={{ color: "rgb(59, 130, 246)" }}
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      <div className="flex-1">
-                        <p
-                          className="font-medium mb-1"
+                {latestVersion &&
+                  compareVersions(CLIENT_VERSION, latestVersion) && (
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: "rgba(59, 130, 246, 0.1)",
+                        border: "1px solid rgba(59, 130, 246, 0.3)",
+                      }}
+                    >
+                      <div className="flex items-start gap-3">
+                        <svg
+                          className="w-5 h-5 flex-shrink-0 mt-0.5"
                           style={{ color: "rgb(59, 130, 246)" }}
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
                         >
-                          Update Available
-                        </p>
-                        <p
-                          className="text-sm mb-2"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          Version {latestVersion} is now available. You're running version {CLIENT_VERSION}.
-                        </p>
-                        <a
-                          href="https://github.com/carrotwaxr/peek-stash-browser/releases/latest"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium inline-flex items-center gap-1 hover:underline"
-                          style={{ color: "rgb(59, 130, 246)" }}
-                        >
-                          View Release Notes
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                        <div className="flex-1">
+                          <p
+                            className="font-medium mb-1"
+                            style={{ color: "rgb(59, 130, 246)" }}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                            />
-                          </svg>
-                        </a>
+                            Update Available
+                          </p>
+                          <p
+                            className="text-sm mb-2"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            Version {latestVersion} is now available. You're
+                            running version {CLIENT_VERSION}.
+                          </p>
+                          <a
+                            href="https://github.com/carrotwaxr/peek-stash-browser/releases/latest"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium inline-flex items-center gap-1 hover:underline"
+                            style={{ color: "rgb(59, 130, 246)" }}
+                          >
+                            View Release Notes
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                              />
+                            </svg>
+                          </a>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Error State */}
                 {updateError && (
@@ -863,17 +876,18 @@ const ServerSettings = () => {
                 )}
 
                 {/* Up to Date Message */}
-                {latestVersion && !compareVersions(CLIENT_VERSION, latestVersion) && (
-                  <div
-                    className="p-3 rounded-lg text-sm"
-                    style={{
-                      backgroundColor: "rgba(34, 197, 94, 0.1)",
-                      color: "rgb(34, 197, 94)",
-                    }}
-                  >
-                    ✓ You're running the latest version
-                  </div>
-                )}
+                {latestVersion &&
+                  !compareVersions(CLIENT_VERSION, latestVersion) && (
+                    <div
+                      className="p-3 rounded-lg text-sm"
+                      style={{
+                        backgroundColor: "rgba(34, 197, 94, 0.1)",
+                        color: "rgb(34, 197, 94)",
+                      }}
+                    >
+                      ✓ You're running the latest version
+                    </div>
+                  )}
               </div>
             </Paper.Body>
           </Paper>
@@ -1038,12 +1052,24 @@ const ServerSettings = () => {
                   }}
                 >
                   <p className="mb-2">
-                    Select which data to import from Stash. Only fields that exist in Stash are shown.
+                    Select which data to import from Stash. Only fields that
+                    exist in Stash are shown.
                   </p>
-                  <ul className="list-disc list-inside space-y-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <li>Only imports items that have the selected fields set in Stash</li>
-                    <li>Updates existing Peek data if values differ from Stash</li>
-                    <li>O Counter import syncs total count only (not individual timestamps)</li>
+                  <ul
+                    className="list-disc list-inside space-y-1 text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <li>
+                      Only imports items that have the selected fields set in
+                      Stash
+                    </li>
+                    <li>
+                      Updates existing Peek data if values differ from Stash
+                    </li>
+                    <li>
+                      O Counter import syncs total count only (not individual
+                      timestamps)
+                    </li>
                     <li>May take several minutes for large libraries</li>
                   </ul>
                 </div>
@@ -1059,7 +1085,10 @@ const ServerSettings = () => {
                         border: "1px solid var(--border-color)",
                       }}
                     >
-                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                      <h4
+                        className="font-medium mb-3"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         Scenes
                       </h4>
                       <div className="space-y-2">
@@ -1067,23 +1096,46 @@ const ServerSettings = () => {
                           <input
                             type="checkbox"
                             checked={syncOptions.scenes.rating}
-                            onChange={() => toggleSyncOption('scenes', 'rating')}
+                            onChange={() =>
+                              toggleSyncOption("scenes", "rating")
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
-                          <span style={{ color: "var(--text-primary)" }}>Rating</span>
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Rating
+                          </span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={syncOptions.scenes.oCounter}
-                            onChange={() => toggleSyncOption('scenes', 'oCounter')}
+                            onChange={() =>
+                              toggleSyncOption("scenes", "oCounter")
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
-                          <span style={{ color: "var(--text-primary)" }}>O Counter</span>
+                          <span style={{ color: "var(--text-primary)" }}>
+                            O Counter
+                          </span>
                         </label>
-                        <p className="text-xs ml-6" style={{ color: "var(--text-muted)" }}>
+                        {syncOptions.scenes.oCounter && (
+                          <p
+                            className="text-xs ml-6 p-2 rounded"
+                            style={{
+                              color: "rgb(245, 158, 11)",
+                              backgroundColor: "rgba(245, 158, 11, 0.1)",
+                              border: "1px solid rgba(245, 158, 11, 0.3)",
+                            }}
+                          >
+                            ⚠️ Warning: Only the total O Counter value will be synced. Individual timestamps (last O at) from Stash history will not be imported.
+                          </p>
+                        )}
+                        <p
+                          className="text-xs ml-6"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           Scenes do not have favorites in Stash
                         </p>
                       </div>
@@ -1097,7 +1149,10 @@ const ServerSettings = () => {
                         border: "1px solid var(--border-color)",
                       }}
                     >
-                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                      <h4
+                        className="font-medium mb-3"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         Performers
                       </h4>
                       <div className="space-y-2">
@@ -1105,21 +1160,29 @@ const ServerSettings = () => {
                           <input
                             type="checkbox"
                             checked={syncOptions.performers.rating}
-                            onChange={() => toggleSyncOption('performers', 'rating')}
+                            onChange={() =>
+                              toggleSyncOption("performers", "rating")
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
-                          <span style={{ color: "var(--text-primary)" }}>Rating</span>
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Rating
+                          </span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={syncOptions.performers.favorite}
-                            onChange={() => toggleSyncOption('performers', 'favorite')}
+                            onChange={() =>
+                              toggleSyncOption("performers", "favorite")
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
-                          <span style={{ color: "var(--text-primary)" }}>Favorite</span>
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Favorite
+                          </span>
                         </label>
                       </div>
                     </div>
@@ -1132,7 +1195,10 @@ const ServerSettings = () => {
                         border: "1px solid var(--border-color)",
                       }}
                     >
-                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                      <h4
+                        className="font-medium mb-3"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         Studios
                       </h4>
                       <div className="space-y-2">
@@ -1140,21 +1206,29 @@ const ServerSettings = () => {
                           <input
                             type="checkbox"
                             checked={syncOptions.studios.rating}
-                            onChange={() => toggleSyncOption('studios', 'rating')}
+                            onChange={() =>
+                              toggleSyncOption("studios", "rating")
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
-                          <span style={{ color: "var(--text-primary)" }}>Rating</span>
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Rating
+                          </span>
                         </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={syncOptions.studios.favorite}
-                            onChange={() => toggleSyncOption('studios', 'favorite')}
+                            onChange={() =>
+                              toggleSyncOption("studios", "favorite")
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
-                          <span style={{ color: "var(--text-primary)" }}>Favorite</span>
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Favorite
+                          </span>
                         </label>
                       </div>
                     </div>
@@ -1167,7 +1241,10 @@ const ServerSettings = () => {
                         border: "1px solid var(--border-color)",
                       }}
                     >
-                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                      <h4
+                        className="font-medium mb-3"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         Tags
                       </h4>
                       <div className="space-y-2">
@@ -1175,13 +1252,20 @@ const ServerSettings = () => {
                           <input
                             type="checkbox"
                             checked={syncOptions.tags.favorite}
-                            onChange={() => toggleSyncOption('tags', 'favorite')}
+                            onChange={() =>
+                              toggleSyncOption("tags", "favorite")
+                            }
                             className="w-4 h-4 rounded cursor-pointer"
                             style={{ accentColor: "var(--primary-color)" }}
                           />
-                          <span style={{ color: "var(--text-primary)" }}>Favorite</span>
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Favorite
+                          </span>
                         </label>
-                        <p className="text-xs ml-6" style={{ color: "var(--text-muted)" }}>
+                        <p
+                          className="text-xs ml-6"
+                          style={{ color: "var(--text-muted)" }}
+                        >
                           Tags do not have ratings in Stash
                         </p>
                       </div>
@@ -1201,14 +1285,23 @@ const ServerSettings = () => {
                     <div className="flex flex-col items-center gap-4">
                       <div
                         className="animate-spin w-12 h-12 border-4 border-t-transparent rounded-full"
-                        style={{ borderColor: "rgba(59, 130, 246, 0.3)", borderTopColor: "transparent" }}
+                        style={{
+                          borderColor: "rgba(59, 130, 246, 0.3)",
+                          borderTopColor: "transparent",
+                        }}
                       ></div>
                       <div>
-                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           Syncing from Stash...
                         </p>
-                        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                          This may take a few minutes. Please wait.
+                        <p
+                          className="text-sm"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          This may take several minutes. Please wait.
                         </p>
                       </div>
                     </div>
@@ -1224,12 +1317,18 @@ const ServerSettings = () => {
                       border: "1px solid rgba(34, 197, 94, 0.3)",
                     }}
                   >
-                    <p className="font-medium mb-3" style={{ color: "rgb(34, 197, 94)" }}>
+                    <p
+                      className="font-medium mb-3"
+                      style={{ color: "rgb(34, 197, 94)" }}
+                    >
                       ✓ Sync Completed Successfully
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           Scenes
                         </p>
                         <p style={{ color: "var(--text-secondary)" }}>
@@ -1241,11 +1340,15 @@ const ServerSettings = () => {
                         </p>
                       </div>
                       <div>
-                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           Performers
                         </p>
                         <p style={{ color: "var(--text-secondary)" }}>
-                          {syncResult.performers.checked.toLocaleString()} checked
+                          {syncResult.performers.checked.toLocaleString()}{" "}
+                          checked
                           <br />
                           {syncResult.performers.created} new
                           <br />
@@ -1253,7 +1356,10 @@ const ServerSettings = () => {
                         </p>
                       </div>
                       <div>
-                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           Studios
                         </p>
                         <p style={{ color: "var(--text-secondary)" }}>
@@ -1265,7 +1371,10 @@ const ServerSettings = () => {
                         </p>
                       </div>
                       <div>
-                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "var(--text-primary)" }}
+                        >
                           Tags
                         </p>
                         <p style={{ color: "var(--text-secondary)" }}>

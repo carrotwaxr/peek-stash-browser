@@ -20,7 +20,8 @@ const Pagination = ({
   showPerPageSelector = true,
   className = "",
 }) => {
-  if (!totalPages || totalPages <= 1) return null;
+  // Don't render if no pages at all
+  if (!totalPages || totalPages < 1) return null;
 
   const perPageOptions = [12, 24, 36, 48, 60, 72, 84, 96, 108, 120];
 

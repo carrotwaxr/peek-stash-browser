@@ -204,13 +204,11 @@ const TagCard = forwardRef(
               <span>
                 <span style={{ color: "var(--icon-play-count)" }}>▶</span> {tag.play_count || 0}
               </span>
-              <div onClick={(e) => e.preventDefault()}>
-                <OCounterButton
-                  initialCount={tag.o_counter || 0}
-                  readOnly={true}
-                  className="text-xs"
-                />
-              </div>
+              <OCounterButton
+                initialCount={tag.o_counter || 0}
+                readOnly={true}
+                className="text-xs"
+              />
             </div>
 
             {/* Rating and Favorite */}

@@ -31,13 +31,13 @@ const OCounterButton = ({
   }, [initialCount]);
 
   const handleClick = async (e) => {
-    // Stop propagation to prevent triggering parent click handlers (like navigating to scene)
-    e.preventDefault();
-    e.stopPropagation();
-
     if (readOnly || disabled || isIncrementing || !sceneId) {
       return;
     }
+
+    // Stop propagation to prevent triggering parent click handlers (like navigating to scene)
+    e.preventDefault();
+    e.stopPropagation();
 
     try {
       setIsIncrementing(true);
@@ -70,13 +70,16 @@ const OCounterButton = ({
     }
   };
 
+  // Render as plain span when readOnly (allows clicks to bubble to parent Link)
+  const Element = readOnly ? 'span' : 'button';
+
   return (
-    <button
-      onClick={handleClick}
-      disabled={disabled || isIncrementing || readOnly}
+    <Element
+      onClick={readOnly ? undefined : handleClick}
+      disabled={readOnly ? undefined : (disabled || isIncrementing)}
       className={`flex items-center gap-1 transition-all ${className}`}
       style={{
-        cursor: readOnly ? 'default' : (disabled || isIncrementing ? 'not-allowed' : 'pointer'),
+        cursor: readOnly ? 'inherit' : (disabled || isIncrementing ? 'not-allowed' : 'pointer'),
         opacity: disabled ? 0.5 : 1,
         position: 'relative',
       }}
@@ -142,7 +145,7 @@ const OCounterButton = ({
           }
         }
       `}</style>
-    </button>
+    </Element>
   );
 };
 

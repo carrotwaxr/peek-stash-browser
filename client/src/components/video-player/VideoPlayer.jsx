@@ -200,6 +200,28 @@ const VideoPlayer = () => {
   }, [startTracking, stopTracking, trackSeek]);
 
   // ============================================================================
+  // ASPECT RATIO CALCULATION
+  // ============================================================================
+  // Extract video dimensions from scene metadata
+  const videoWidth = firstFile?.width || 1920;
+  const videoHeight = firstFile?.height || 1080;
+  const aspectRatio = videoWidth / videoHeight;
+
+  // Determine container height based on aspect ratio
+  // This prevents square/portrait videos from dominating vertical space
+  let containerHeight;
+  if (aspectRatio > 1.5) {
+    // Landscape videos (16:9, etc.) - most common case
+    containerHeight = "56.25vw"; // 9/16 * 100
+  } else if (aspectRatio < 0.75) {
+    // Portrait videos (9:16, etc.) - phone recordings
+    containerHeight = "177.78vw"; // 16/9 * 100
+  } else {
+    // Square-ish videos (4:3, 1:1, etc.)
+    containerHeight = "100vw"; // 1:1
+  }
+
+  // ============================================================================
   // RENDER
   // ============================================================================
   return (
@@ -212,8 +234,21 @@ const VideoPlayer = () => {
 
           NOTE: No key={scene?.id} here - that was destroying the container on scene changes
         */}
-        <div data-vjs-player style={{ position: "relative" }}>
-          <div ref={videoRef} />
+        <div
+          data-vjs-player
+          style={{
+            position: "relative",
+            height: containerHeight,
+            maxHeight: "calc(100vh - 200px)", // Reserve space for navbar/controls
+            overflow: "hidden",
+            width: "100%"
+          }}
+        >
+          <div ref={videoRef} style={{
+            position: "absolute",
+            width: "100%",
+            height: "100%"
+          }} />
 
           {/* Loading overlay for scene or video data */}
           {(!scene || videoLoading || isInitializing || isAutoFallback) && (

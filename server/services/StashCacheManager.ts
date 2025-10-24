@@ -18,6 +18,7 @@ export type NormalizedScene = Scene & {
   play_history: string[];
   o_history: any[]; // Match Stash's Scene type
   last_played_at: string | null;
+  last_o_at: string | null;
 }
 
 /**
@@ -150,6 +151,7 @@ class StashCacheManager {
           play_history: [],
           o_history: [],
           last_played_at: null,
+          last_o_at: null,
         });
       });
 

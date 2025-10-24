@@ -521,7 +521,7 @@ const SearchControls = ({
       />
 
       {/* Top Pagination */}
-      {totalPages > 1 && (
+      {totalPages >= 1 && (
         <div className="mt-4 mb-4">
           <Pagination
             currentPage={currentPage}
@@ -630,8 +630,8 @@ const SearchControls = ({
         })}
       </FilterPanel>
       {children}
-      {/* Top Pagination */}
-      {totalPages > 1 && (
+      {/* Bottom Pagination */}
+      {totalPages >= 1 && (
         <div className="mt-4">
           <Pagination
             currentPage={currentPage}

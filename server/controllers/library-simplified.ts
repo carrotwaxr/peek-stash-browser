@@ -42,6 +42,7 @@ async function mergeScenesWithUserData(
           play_history: playHistory,
           o_history: oHistory,
           last_played_at: playHistory.length > 0 ? playHistory[playHistory.length - 1] : null,
+          last_o_at: oHistory.length > 0 ? oHistory[oHistory.length - 1] : null,
         },
       ];
     })
@@ -87,13 +88,14 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
 
   // Filter by rating100
   if (filters.rating100) {
-    const { modifier, value } = filters.rating100;
+    const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((s) => {
       const rating = s.rating100 || 0;
       if (modifier === 'GREATER_THAN') return rating > value;
       if (modifier === 'LESS_THAN') return rating < value;
       if (modifier === 'EQUALS') return rating === value;
       if (modifier === 'NOT_EQUALS') return rating !== value;
+      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
       return true;
     });
   }
@@ -102,15 +104,16 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   if (filters.performers) {
     const { value: performerIds, modifier } = filters.performers;
     filtered = filtered.filter((s) => {
-      const scenePerformerIds = (s.performers || []).map((p) => p.id);
+      const scenePerformerIds = (s.performers || []).map((p: any) => String(p.id));
+      const filterPerformerIds = performerIds.map((id: any) => String(id));
       if (modifier === 'INCLUDES') {
-        return performerIds.some((id: string) => scenePerformerIds.includes(id));
+        return filterPerformerIds.some((id: string) => scenePerformerIds.includes(id));
       }
       if (modifier === 'INCLUDES_ALL') {
-        return performerIds.every((id: string) => scenePerformerIds.includes(id));
+        return filterPerformerIds.every((id: string) => scenePerformerIds.includes(id));
       }
       if (modifier === 'EXCLUDES') {
-        return !performerIds.some((id: string) => scenePerformerIds.includes(id));
+        return !filterPerformerIds.some((id: string) => scenePerformerIds.includes(id));
       }
       return true;
     });
@@ -120,15 +123,16 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   if (filters.tags) {
     const { value: tagIds, modifier } = filters.tags;
     filtered = filtered.filter((s) => {
-      const sceneTagIds = (s.tags || []).map((t) => t.id);
+      const sceneTagIds = (s.tags || []).map((t: any) => String(t.id));
+      const filterTagIds = tagIds.map((id: any) => String(id));
       if (modifier === 'INCLUDES') {
-        return tagIds.some((id: string) => sceneTagIds.includes(id));
+        return filterTagIds.some((id: string) => sceneTagIds.includes(id));
       }
       if (modifier === 'INCLUDES_ALL') {
-        return tagIds.every((id: string) => sceneTagIds.includes(id));
+        return filterTagIds.every((id: string) => sceneTagIds.includes(id));
       }
       if (modifier === 'EXCLUDES') {
-        return !tagIds.some((id: string) => sceneTagIds.includes(id));
+        return !filterTagIds.some((id: string) => sceneTagIds.includes(id));
       }
       return true;
     });
@@ -139,11 +143,13 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { value: studioIds, modifier } = filters.studios;
     filtered = filtered.filter((s) => {
       if (!s.studio) return modifier === 'EXCLUDES';
+      const filterStudioIds = studioIds.map((id: any) => String(id));
+      const studioId = String(s.studio.id);
       if (modifier === 'INCLUDES') {
-        return studioIds.includes(s.studio.id);
+        return filterStudioIds.includes(studioId);
       }
       if (modifier === 'EXCLUDES') {
-        return !studioIds.includes(s.studio.id);
+        return !filterStudioIds.includes(studioId);
       }
       return true;
     });
@@ -151,31 +157,33 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
 
   // Filter by bitrate
   if (filters.bitrate) {
-    const { modifier, value } = filters.bitrate;
+    const { modifier, value, value2 } = filters.bitrate;
     filtered = filtered.filter((s) => {
       const bitrate = s.files?.[0]?.bit_rate || 0;
       if (modifier === 'GREATER_THAN') return bitrate > value;
       if (modifier === 'LESS_THAN') return bitrate < value;
       if (modifier === 'EQUALS') return bitrate === value;
+      if (modifier === 'BETWEEN') return bitrate >= value && bitrate <= value2;
       return true;
     });
   }
 
   // Filter by duration
   if (filters.duration) {
-    const { modifier, value } = filters.duration;
+    const { modifier, value, value2 } = filters.duration;
     filtered = filtered.filter((s) => {
       const duration = s.files?.[0]?.duration || 0;
       if (modifier === 'GREATER_THAN') return duration > value;
       if (modifier === 'LESS_THAN') return duration < value;
       if (modifier === 'EQUALS') return duration === value;
+      if (modifier === 'BETWEEN') return duration >= value && duration <= value2;
       return true;
     });
   }
 
-  // Filter by date (created_at)
+  // Filter by created_at
   if (filters.created_at) {
-    const { modifier, value } = filters.created_at;
+    const { modifier, value, value2 } = filters.created_at;
     filtered = filtered.filter((s) => {
       if (!s.created_at) return false;
       const sceneDate = new Date(s.created_at);
@@ -185,6 +193,176 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
       if (modifier === 'EQUALS') {
         return sceneDate.toDateString() === filterDate.toDateString();
       }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return sceneDate >= filterDate && sceneDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by updated_at
+  if (filters.updated_at) {
+    const { modifier, value, value2 } = filters.updated_at;
+    filtered = filtered.filter((s) => {
+      if (!s.updated_at) return false;
+      const sceneDate = new Date(s.updated_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return sceneDate > filterDate;
+      if (modifier === 'LESS_THAN') return sceneDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return sceneDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return sceneDate >= filterDate && sceneDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by o_counter
+  if (filters.o_counter) {
+    const { modifier, value, value2 } = filters.o_counter;
+    filtered = filtered.filter((s) => {
+      const oCounter = s.o_counter || 0;
+      if (modifier === 'GREATER_THAN') return oCounter > value;
+      if (modifier === 'LESS_THAN') return oCounter < value;
+      if (modifier === 'EQUALS') return oCounter === value;
+      if (modifier === 'NOT_EQUALS') return oCounter !== value;
+      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
+      return true;
+    });
+  }
+
+  // Filter by play_count
+  if (filters.play_count) {
+    const { modifier, value, value2 } = filters.play_count;
+    filtered = filtered.filter((s) => {
+      const playCount = s.play_count || 0;
+      if (modifier === 'GREATER_THAN') return playCount > value;
+      if (modifier === 'LESS_THAN') return playCount < value;
+      if (modifier === 'EQUALS') return playCount === value;
+      if (modifier === 'NOT_EQUALS') return playCount !== value;
+      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by play_duration
+  if (filters.play_duration) {
+    const { modifier, value, value2 } = filters.play_duration;
+    filtered = filtered.filter((s) => {
+      const playDuration = s.play_duration || 0;
+      if (modifier === 'GREATER_THAN') return playDuration > value;
+      if (modifier === 'LESS_THAN') return playDuration < value;
+      if (modifier === 'EQUALS') return playDuration === value;
+      if (modifier === 'BETWEEN') return playDuration >= value && playDuration <= value2;
+      return true;
+    });
+  }
+
+  // Filter by performer_count
+  if (filters.performer_count) {
+    const { modifier, value, value2 } = filters.performer_count;
+    filtered = filtered.filter((s) => {
+      const performerCount = s.performers?.length || 0;
+      if (modifier === 'GREATER_THAN') return performerCount > value;
+      if (modifier === 'LESS_THAN') return performerCount < value;
+      if (modifier === 'EQUALS') return performerCount === value;
+      if (modifier === 'BETWEEN') return performerCount >= value && performerCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by tag_count
+  if (filters.tag_count) {
+    const { modifier, value, value2 } = filters.tag_count;
+    filtered = filtered.filter((s) => {
+      const tagCount = s.tags?.length || 0;
+      if (modifier === 'GREATER_THAN') return tagCount > value;
+      if (modifier === 'LESS_THAN') return tagCount < value;
+      if (modifier === 'EQUALS') return tagCount === value;
+      if (modifier === 'BETWEEN') return tagCount >= value && tagCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by framerate
+  if (filters.framerate) {
+    const { modifier, value, value2 } = filters.framerate;
+    filtered = filtered.filter((s) => {
+      const framerate = s.files?.[0]?.frame_rate || 0;
+      if (modifier === 'GREATER_THAN') return framerate > value;
+      if (modifier === 'LESS_THAN') return framerate < value;
+      if (modifier === 'EQUALS') return framerate === value;
+      if (modifier === 'BETWEEN') return framerate >= value && framerate <= value2;
+      return true;
+    });
+  }
+
+  // Filter by last_played_at
+  if (filters.last_played_at) {
+    const { modifier, value, value2 } = filters.last_played_at;
+    filtered = filtered.filter((s) => {
+      if (!s.last_played_at) return false;
+      const lastPlayedDate = new Date(s.last_played_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return lastPlayedDate > filterDate;
+      if (modifier === 'LESS_THAN') return lastPlayedDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return lastPlayedDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return lastPlayedDate >= filterDate && lastPlayedDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by last_o_at
+  if (filters.last_o_at) {
+    const { modifier, value, value2 } = filters.last_o_at;
+    filtered = filtered.filter((s) => {
+      if (!s.last_o_at) return false;
+      const lastODate = new Date(s.last_o_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return lastODate > filterDate;
+      if (modifier === 'LESS_THAN') return lastODate < filterDate;
+      if (modifier === 'EQUALS') {
+        return lastODate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return lastODate >= filterDate && lastODate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by title
+  if (filters.title) {
+    const { value, modifier } = filters.title;
+    const searchValue = value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const title = (s.title || '').toLowerCase();
+      if (modifier === 'INCLUDES') return title.includes(searchValue);
+      if (modifier === 'EXCLUDES') return !title.includes(searchValue);
+      if (modifier === 'EQUALS') return title === searchValue;
+      return true;
+    });
+  }
+
+  // Filter by details
+  if (filters.details) {
+    const { value, modifier } = filters.details;
+    const searchValue = value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const details = (s.details || '').toLowerCase();
+      if (modifier === 'INCLUDES') return details.includes(searchValue);
+      if (modifier === 'EXCLUDES') return !details.includes(searchValue);
+      if (modifier === 'EQUALS') return details === searchValue;
       return true;
     });
   }
@@ -236,6 +414,7 @@ function getFieldValue(scene: any, field: string): any {
   if (field === 'o_counter') return scene.o_counter || 0;
   if (field === 'play_count') return scene.play_count || 0;
   if (field === 'last_played_at') return scene.last_played_at || '';
+  if (field === 'last_o_at') return scene.last_o_at || '';
 
   // Rating fields
   if (field === 'rating') return scene.rating || 0;
@@ -248,10 +427,15 @@ function getFieldValue(scene: any, field: string): any {
   if (field === 'title') return scene.title || '';
   if (field === 'random') return Math.random();
 
+  // Count fields
+  if (field === 'performer_count') return scene.performers?.length || 0;
+  if (field === 'tag_count') return scene.tags?.length || 0;
+
   // File fields
   if (field === 'bitrate') return scene.files?.[0]?.bit_rate || 0;
   if (field === 'duration') return scene.files?.[0]?.duration || 0;
   if (field === 'filesize') return scene.files?.[0]?.size || 0;
+  if (field === 'framerate') return scene.files?.[0]?.frame_rate || 0;
 
   return scene[field] || 0;
 }
@@ -285,14 +469,35 @@ export const findScenes = async (req: Request, res: Response) => {
     // Step 2: Merge with user data
     scenes = await mergeScenesWithUserData(scenes, userId);
 
-    // Step 3: Apply filters (merge root-level ids with scene_filter)
+    // Step 3: Apply search query if provided
+    const searchQuery = filter?.q || '';
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      scenes = scenes.filter((s) => {
+        const title = s.title || '';
+        const details = s.details || '';
+        const performers = (s.performers || []).map((p: any) => p.name || '').join(' ');
+        const studio = s.studio?.name || '';
+        const tags = (s.tags || []).map((t: any) => t.name || '').join(' ');
+
+        return (
+          title.toLowerCase().includes(lowerQuery) ||
+          details.toLowerCase().includes(lowerQuery) ||
+          performers.toLowerCase().includes(lowerQuery) ||
+          studio.toLowerCase().includes(lowerQuery) ||
+          tags.toLowerCase().includes(lowerQuery)
+        );
+      });
+    }
+
+    // Step 4: Apply filters (merge root-level ids with scene_filter)
     const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
     scenes = applySceneFilters(scenes, mergedFilter);
 
-    // Step 4: Sort
+    // Step 5: Sort
     scenes = sortScenes(scenes, sortField, sortDirection);
 
-    // Step 5: Paginate
+    // Step 6: Paginate
     const total = scenes.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
@@ -391,6 +596,7 @@ export const findPerformers = async (req: Request, res: Response) => {
     const sortDirection = filter?.direction || 'ASC';
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
+    const searchQuery = filter?.q || '';
 
     // Step 1: Get all performers from cache
     let performers = stashCacheManager.getAllPerformers();
@@ -408,14 +614,24 @@ export const findPerformers = async (req: Request, res: Response) => {
     // Step 2: Merge with user data
     performers = await mergePerformersWithUserData(performers, userId);
 
-    // Step 3: Apply filters (merge root-level ids with performer_filter)
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      performers = performers.filter((p) => {
+        const name = p.name || '';
+        const aliases = p.alias_list?.join(' ') || '';
+        return name.toLowerCase().includes(lowerQuery) || aliases.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Step 4: Apply filters (merge root-level ids with performer_filter)
     const mergedFilter = { ...performer_filter, ids: ids || performer_filter?.ids };
     performers = applyPerformerFilters(performers, mergedFilter);
 
-    // Step 4: Sort
+    // Step 5: Sort
     performers = sortPerformers(performers, sortField, sortDirection);
 
-    // Step 5: Paginate
+    // Step 6: Paginate
     const total = performers.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
@@ -455,15 +671,108 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
     filtered = filtered.filter((p) => p.favorite === filters.favorite);
   }
 
+  // Filter by gender
+  if (filters.gender) {
+    const { modifier, value } = filters.gender;
+    filtered = filtered.filter((p) => {
+      if (modifier === 'EQUALS') return p.gender === value;
+      if (modifier === 'NOT_EQUALS') return p.gender !== value;
+      return true;
+    });
+  }
+
   // Filter by rating100
   if (filters.rating100) {
-    const { modifier, value } = filters.rating100;
+    const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((p) => {
       const rating = p.rating100 || 0;
       if (modifier === 'GREATER_THAN') return rating > value;
       if (modifier === 'LESS_THAN') return rating < value;
       if (modifier === 'EQUALS') return rating === value;
       if (modifier === 'NOT_EQUALS') return rating !== value;
+      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      return true;
+    });
+  }
+
+  // Filter by o_counter
+  if (filters.o_counter) {
+    const { modifier, value, value2 } = filters.o_counter;
+    filtered = filtered.filter((p) => {
+      const oCounter = p.o_counter || 0;
+      if (modifier === 'GREATER_THAN') return oCounter > value;
+      if (modifier === 'LESS_THAN') return oCounter < value;
+      if (modifier === 'EQUALS') return oCounter === value;
+      if (modifier === 'NOT_EQUALS') return oCounter !== value;
+      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
+      return true;
+    });
+  }
+
+  // Filter by play_count
+  if (filters.play_count) {
+    const { modifier, value, value2 } = filters.play_count;
+    filtered = filtered.filter((p) => {
+      const playCount = p.play_count || 0;
+      if (modifier === 'GREATER_THAN') return playCount > value;
+      if (modifier === 'LESS_THAN') return playCount < value;
+      if (modifier === 'EQUALS') return playCount === value;
+      if (modifier === 'NOT_EQUALS') return playCount !== value;
+      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by scene_count
+  if (filters.scene_count) {
+    const { modifier, value, value2 } = filters.scene_count;
+    filtered = filtered.filter((p) => {
+      const sceneCount = p.scene_count || 0;
+      if (modifier === 'GREATER_THAN') return sceneCount > value;
+      if (modifier === 'LESS_THAN') return sceneCount < value;
+      if (modifier === 'EQUALS') return sceneCount === value;
+      if (modifier === 'NOT_EQUALS') return sceneCount !== value;
+      if (modifier === 'BETWEEN') return sceneCount >= value && sceneCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by created_at (date)
+  if (filters.created_at) {
+    const { modifier, value, value2 } = filters.created_at;
+    filtered = filtered.filter((p) => {
+      if (!p.created_at) return false;
+      const performerDate = new Date(p.created_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return performerDate > filterDate;
+      if (modifier === 'LESS_THAN') return performerDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return performerDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return performerDate >= filterDate && performerDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by updated_at (date)
+  if (filters.updated_at) {
+    const { modifier, value, value2 } = filters.updated_at;
+    filtered = filtered.filter((p) => {
+      if (!p.updated_at) return false;
+      const performerDate = new Date(p.updated_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return performerDate > filterDate;
+      if (modifier === 'LESS_THAN') return performerDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return performerDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return performerDate >= filterDate && performerDate <= filterDate2;
+      }
       return true;
     });
   }
@@ -515,8 +824,10 @@ function getPerformerFieldValue(performer: any, field: string): any {
   if (field === 'rating100') return performer.rating100 || 0;
   if (field === 'o_counter') return performer.o_counter || 0;
   if (field === 'play_count') return performer.play_count || 0;
+  if (field === 'scene_count' || field === 'scenes_count') return performer.scene_count || 0;
   if (field === 'name') return performer.name || '';
   if (field === 'created_at') return performer.created_at || '';
+  if (field === 'updated_at') return performer.updated_at || '';
   if (field === 'random') return Math.random();
   return performer[field] || 0;
 }
@@ -598,6 +909,7 @@ export const findStudios = async (req: Request, res: Response) => {
     const sortDirection = filter?.direction || 'ASC';
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
+    const searchQuery = filter?.q || '';
 
     // Step 1: Get all studios from cache
     let studios = stashCacheManager.getAllStudios();
@@ -615,14 +927,24 @@ export const findStudios = async (req: Request, res: Response) => {
     // Step 2: Merge with user data
     studios = await mergeStudiosWithUserData(studios, userId);
 
-    // Step 3: Apply filters (merge root-level ids with studio_filter)
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      studios = studios.filter((s) => {
+        const name = s.name || '';
+        const details = s.details || '';
+        return name.toLowerCase().includes(lowerQuery) || details.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Step 4: Apply filters (merge root-level ids with studio_filter)
     const mergedFilter = { ...studio_filter, ids: ids || studio_filter?.ids };
     studios = applyStudioFilters(studios, mergedFilter);
 
-    // Step 4: Sort
+    // Step 5: Sort
     studios = sortStudios(studios, sortField, sortDirection);
 
-    // Step 5: Paginate
+    // Step 6: Paginate
     const total = studios.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
@@ -664,39 +986,114 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
 
   // Filter by rating100
   if (filters.rating100) {
-    const { modifier, value } = filters.rating100;
+    const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((s) => {
       const rating = s.rating100 || 0;
       if (modifier === 'GREATER_THAN') return rating > value;
       if (modifier === 'LESS_THAN') return rating < value;
       if (modifier === 'EQUALS') return rating === value;
       if (modifier === 'NOT_EQUALS') return rating !== value;
+      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
       return true;
     });
   }
 
   // Filter by o_counter
   if (filters.o_counter) {
-    const { modifier, value } = filters.o_counter;
+    const { modifier, value, value2 } = filters.o_counter;
     filtered = filtered.filter((s) => {
       const oCounter = s.o_counter || 0;
       if (modifier === 'GREATER_THAN') return oCounter > value;
       if (modifier === 'LESS_THAN') return oCounter < value;
       if (modifier === 'EQUALS') return oCounter === value;
       if (modifier === 'NOT_EQUALS') return oCounter !== value;
+      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
       return true;
     });
   }
 
   // Filter by play_count
   if (filters.play_count) {
-    const { modifier, value } = filters.play_count;
+    const { modifier, value, value2 } = filters.play_count;
     filtered = filtered.filter((s) => {
       const playCount = s.play_count || 0;
       if (modifier === 'GREATER_THAN') return playCount > value;
       if (modifier === 'LESS_THAN') return playCount < value;
       if (modifier === 'EQUALS') return playCount === value;
       if (modifier === 'NOT_EQUALS') return playCount !== value;
+      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by scene_count
+  if (filters.scene_count) {
+    const { modifier, value, value2 } = filters.scene_count;
+    filtered = filtered.filter((s) => {
+      const sceneCount = s.scene_count || 0;
+      if (modifier === 'GREATER_THAN') return sceneCount > value;
+      if (modifier === 'LESS_THAN') return sceneCount < value;
+      if (modifier === 'EQUALS') return sceneCount === value;
+      if (modifier === 'NOT_EQUALS') return sceneCount !== value;
+      if (modifier === 'BETWEEN') return sceneCount >= value && sceneCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by name (text search)
+  if (filters.name) {
+    const searchValue = filters.name.value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const name = s.name || '';
+      return name.toLowerCase().includes(searchValue);
+    });
+  }
+
+  // Filter by details (text search)
+  if (filters.details) {
+    const searchValue = filters.details.value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const details = s.details || '';
+      return details.toLowerCase().includes(searchValue);
+    });
+  }
+
+  // Filter by created_at (date)
+  if (filters.created_at) {
+    const { modifier, value, value2 } = filters.created_at;
+    filtered = filtered.filter((s) => {
+      if (!s.created_at) return false;
+      const studioDate = new Date(s.created_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return studioDate > filterDate;
+      if (modifier === 'LESS_THAN') return studioDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return studioDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return studioDate >= filterDate && studioDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by updated_at (date)
+  if (filters.updated_at) {
+    const { modifier, value, value2 } = filters.updated_at;
+    filtered = filtered.filter((s) => {
+      if (!s.updated_at) return false;
+      const studioDate = new Date(s.updated_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return studioDate > filterDate;
+      if (modifier === 'LESS_THAN') return studioDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return studioDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return studioDate >= filterDate && studioDate <= filterDate2;
+      }
       return true;
     });
   }
@@ -748,8 +1145,10 @@ function getStudioFieldValue(studio: any, field: string): any {
   if (field === 'rating100') return studio.rating100 || 0;
   if (field === 'o_counter') return studio.o_counter || 0;
   if (field === 'play_count') return studio.play_count || 0;
+  if (field === 'scene_count' || field === 'scenes_count') return studio.scene_count || 0;
   if (field === 'name') return studio.name || '';
   if (field === 'created_at') return studio.created_at || '';
+  if (field === 'updated_at') return studio.updated_at || '';
   if (field === 'random') return Math.random();
   return studio[field] || 0;
 }
@@ -832,6 +1231,7 @@ export const findTags = async (req: Request, res: Response) => {
     const sortDirection = filter?.direction || 'ASC';
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
+    const searchQuery = filter?.q || '';
 
     // Step 1: Get all tags from cache
     let tags = stashCacheManager.getAllTags();
@@ -849,14 +1249,24 @@ export const findTags = async (req: Request, res: Response) => {
     // Step 2: Merge with user data
     tags = await mergeTagsWithUserData(tags, userId);
 
-    // Step 3: Apply filters (merge root-level ids with tag_filter)
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      tags = tags.filter((t) => {
+        const name = t.name || '';
+        const description = t.description || '';
+        return name.toLowerCase().includes(lowerQuery) || description.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Step 4: Apply filters (merge root-level ids with tag_filter)
     const mergedFilter = { ...tag_filter, ids: ids || tag_filter?.ids };
     tags = applyTagFilters(tags, mergedFilter);
 
-    // Step 4: Sort
+    // Step 5: Sort
     tags = sortTags(tags, sortField, sortDirection);
 
-    // Step 5: Paginate
+    // Step 6: Paginate
     const total = tags.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
@@ -898,39 +1308,114 @@ function applyTagFilters(tags: any[], filters: any): any[] {
 
   // Filter by rating100
   if (filters.rating100) {
-    const { modifier, value } = filters.rating100;
+    const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((t) => {
       const rating = t.rating100 || 0;
       if (modifier === 'GREATER_THAN') return rating > value;
       if (modifier === 'LESS_THAN') return rating < value;
       if (modifier === 'EQUALS') return rating === value;
       if (modifier === 'NOT_EQUALS') return rating !== value;
+      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
       return true;
     });
   }
 
   // Filter by o_counter
   if (filters.o_counter) {
-    const { modifier, value } = filters.o_counter;
+    const { modifier, value, value2 } = filters.o_counter;
     filtered = filtered.filter((t) => {
       const oCounter = t.o_counter || 0;
       if (modifier === 'GREATER_THAN') return oCounter > value;
       if (modifier === 'LESS_THAN') return oCounter < value;
       if (modifier === 'EQUALS') return oCounter === value;
       if (modifier === 'NOT_EQUALS') return oCounter !== value;
+      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
       return true;
     });
   }
 
   // Filter by play_count
   if (filters.play_count) {
-    const { modifier, value } = filters.play_count;
+    const { modifier, value, value2 } = filters.play_count;
     filtered = filtered.filter((t) => {
       const playCount = t.play_count || 0;
       if (modifier === 'GREATER_THAN') return playCount > value;
       if (modifier === 'LESS_THAN') return playCount < value;
       if (modifier === 'EQUALS') return playCount === value;
       if (modifier === 'NOT_EQUALS') return playCount !== value;
+      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by scene_count
+  if (filters.scene_count) {
+    const { modifier, value, value2 } = filters.scene_count;
+    filtered = filtered.filter((t) => {
+      const sceneCount = t.scene_count || 0;
+      if (modifier === 'GREATER_THAN') return sceneCount > value;
+      if (modifier === 'LESS_THAN') return sceneCount < value;
+      if (modifier === 'EQUALS') return sceneCount === value;
+      if (modifier === 'NOT_EQUALS') return sceneCount !== value;
+      if (modifier === 'BETWEEN') return sceneCount >= value && sceneCount <= value2;
+      return true;
+    });
+  }
+
+  // Filter by name (text search)
+  if (filters.name) {
+    const searchValue = filters.name.value.toLowerCase();
+    filtered = filtered.filter((t) => {
+      const name = t.name || '';
+      return name.toLowerCase().includes(searchValue);
+    });
+  }
+
+  // Filter by description (text search)
+  if (filters.description) {
+    const searchValue = filters.description.value.toLowerCase();
+    filtered = filtered.filter((t) => {
+      const description = t.description || '';
+      return description.toLowerCase().includes(searchValue);
+    });
+  }
+
+  // Filter by created_at (date)
+  if (filters.created_at) {
+    const { modifier, value, value2 } = filters.created_at;
+    filtered = filtered.filter((t) => {
+      if (!t.created_at) return false;
+      const tagDate = new Date(t.created_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return tagDate > filterDate;
+      if (modifier === 'LESS_THAN') return tagDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return tagDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return tagDate >= filterDate && tagDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by updated_at (date)
+  if (filters.updated_at) {
+    const { modifier, value, value2 } = filters.updated_at;
+    filtered = filtered.filter((t) => {
+      if (!t.updated_at) return false;
+      const tagDate = new Date(t.updated_at);
+      const filterDate = new Date(value);
+      if (modifier === 'GREATER_THAN') return tagDate > filterDate;
+      if (modifier === 'LESS_THAN') return tagDate < filterDate;
+      if (modifier === 'EQUALS') {
+        return tagDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === 'BETWEEN') {
+        const filterDate2 = new Date(value2);
+        return tagDate >= filterDate && tagDate <= filterDate2;
+      }
       return true;
     });
   }
@@ -982,8 +1467,10 @@ function getTagFieldValue(tag: any, field: string): any {
   if (field === 'rating100') return tag.rating100 || 0;
   if (field === 'o_counter') return tag.o_counter || 0;
   if (field === 'play_count') return tag.play_count || 0;
+  if (field === 'scene_count' || field === 'scenes_count') return tag.scene_count || 0;
   if (field === 'name') return tag.name || '';
   if (field === 'created_at') return tag.created_at || '';
+  if (field === 'updated_at') return tag.updated_at || '';
   if (field === 'random') return Math.random();
   return tag[field] || 0;
 }
@@ -993,14 +1480,44 @@ function getTagFieldValue(tag: any, field: string): any {
  */
 export const findPerformersMinimal = async (req: Request, res: Response) => {
   try {
-    const performers = stashCacheManager.getAllPerformers();
-    const minimal = performers.map((p) => ({ id: p.id, name: p.name }));
+    const { filter } = req.body;
+    const searchQuery = filter?.q || '';
+    const sortField = filter?.sort || 'name';
+    const sortDirection = filter?.direction || 'ASC';
+    const perPage = filter?.per_page || -1; // -1 means all results
+
+    let performers = stashCacheManager.getAllPerformers();
+
+    // Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      performers = performers.filter((p) => {
+        const name = p.name || '';
+        const aliases = p.alias_list?.join(' ') || '';
+        return name.toLowerCase().includes(lowerQuery) || aliases.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Sort
+    performers.sort((a, b) => {
+      const aValue = (a as any)[sortField] || '';
+      const bValue = (b as any)[sortField] || '';
+      const comparison = typeof aValue === 'string'
+        ? aValue.localeCompare(bValue)
+        : aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      return sortDirection.toUpperCase() === 'DESC' ? -comparison : comparison;
+    });
+
+    // Paginate (if per_page !== -1)
+    let paginatedPerformers = performers;
+    if (perPage !== -1 && perPage > 0) {
+      paginatedPerformers = performers.slice(0, perPage);
+    }
+
+    const minimal = paginatedPerformers.map((p) => ({ id: p.id, name: p.name }));
 
     res.json({
-      findPerformers: {
-        count: minimal.length,
-        performers: minimal,
-      },
+      performers: minimal,
     });
   } catch (error) {
     logger.error('Error in findPerformersMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -1016,14 +1533,44 @@ export const findPerformersMinimal = async (req: Request, res: Response) => {
  */
 export const findStudiosMinimal = async (req: Request, res: Response) => {
   try {
-    const studios = stashCacheManager.getAllStudios();
-    const minimal = studios.map((s) => ({ id: s.id, name: s.name }));
+    const { filter } = req.body;
+    const searchQuery = filter?.q || '';
+    const sortField = filter?.sort || 'name';
+    const sortDirection = filter?.direction || 'ASC';
+    const perPage = filter?.per_page || -1; // -1 means all results
+
+    let studios = stashCacheManager.getAllStudios();
+
+    // Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      studios = studios.filter((s) => {
+        const name = s.name || '';
+        const details = s.details || '';
+        return name.toLowerCase().includes(lowerQuery) || details.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Sort
+    studios.sort((a, b) => {
+      const aValue = (a as any)[sortField] || '';
+      const bValue = (b as any)[sortField] || '';
+      const comparison = typeof aValue === 'string'
+        ? aValue.localeCompare(bValue)
+        : aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      return sortDirection.toUpperCase() === 'DESC' ? -comparison : comparison;
+    });
+
+    // Paginate (if per_page !== -1)
+    let paginatedStudios = studios;
+    if (perPage !== -1 && perPage > 0) {
+      paginatedStudios = studios.slice(0, perPage);
+    }
+
+    const minimal = paginatedStudios.map((s) => ({ id: s.id, name: s.name }));
 
     res.json({
-      findStudios: {
-        count: minimal.length,
-        studios: minimal,
-      },
+      studios: minimal,
     });
   } catch (error) {
     logger.error('Error in findStudiosMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
@@ -1039,14 +1586,44 @@ export const findStudiosMinimal = async (req: Request, res: Response) => {
  */
 export const findTagsMinimal = async (req: Request, res: Response) => {
   try {
-    const tags = stashCacheManager.getAllTags();
-    const minimal = tags.map((t) => ({ id: t.id, name: t.name }));
+    const { filter } = req.body;
+    const searchQuery = filter?.q || '';
+    const sortField = filter?.sort || 'name';
+    const sortDirection = filter?.direction || 'ASC';
+    const perPage = filter?.per_page || -1; // -1 means all results
+
+    let tags = stashCacheManager.getAllTags();
+
+    // Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      tags = tags.filter((t) => {
+        const name = t.name || '';
+        const description = t.description || '';
+        return name.toLowerCase().includes(lowerQuery) || description.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Sort
+    tags.sort((a, b) => {
+      const aValue = (a as any)[sortField] || '';
+      const bValue = (b as any)[sortField] || '';
+      const comparison = typeof aValue === 'string'
+        ? aValue.localeCompare(bValue)
+        : aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+      return sortDirection.toUpperCase() === 'DESC' ? -comparison : comparison;
+    });
+
+    // Paginate (if per_page !== -1)
+    let paginatedTags = tags;
+    if (perPage !== -1 && perPage > 0) {
+      paginatedTags = tags.slice(0, perPage);
+    }
+
+    const minimal = paginatedTags.map((t) => ({ id: t.id, name: t.name }));
 
     res.json({
-      findTags: {
-        count: minimal.length,
-        tags: minimal,
-      },
+      tags: minimal,
     });
   } catch (error) {
     logger.error('Error in findTagsMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
