@@ -1415,6 +1415,48 @@ export const findTags = async (req: Request, res: Response) => {
     const userId = (req as any).user?.id;
     const { filter, tag_filter, ids } = req.body;
 
+    const sortField = filter?.sort;
+    const sortDirection = filter?.direction || 'DESC';
+    const page = filter?.page || 1;
+    const perPage = filter?.per_page || 24;
+
+    // If sorting by rating, handle on Peek side (Stash doesn't support it)
+    if (sortField === 'rating') {
+      // Fetch all tags (or a large batch) without rating sort
+      const tags: FindTagsQuery = await stash.findTags({
+        filter: { ...filter, sort: 'name', per_page: 1000 } as FindFilterType,
+        tag_filter: tag_filter as TagFilterType,
+        ids: ids as string[],
+      });
+
+      // Transform tags to add API key to image paths
+      const transformedTagList = tags.findTags.tags.map((tag) => transformTag(tag as any));
+
+      // Inject user ratings
+      let tagsWithUserRatings = await injectUserTagRatings(transformedTagList, userId);
+
+      // Sort by rating
+      tagsWithUserRatings.sort((a, b) => {
+        const aRating = a.rating || 0;
+        const bRating = b.rating || 0;
+        const comparison = aRating > bRating ? 1 : aRating < bRating ? -1 : 0;
+        return sortDirection.toUpperCase() === 'DESC' ? -comparison : comparison;
+      });
+
+      // Paginate
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedTags = tagsWithUserRatings.slice(startIndex, endIndex);
+
+      return res.json({
+        findTags: {
+          count: tagsWithUserRatings.length,
+          tags: paginatedTags,
+        },
+      });
+    }
+
+    // Standard query for other sorts
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
       tag_filter: tag_filter as TagFilterType,
