@@ -1,816 +1,535 @@
-# Pull Request: Major Feature Improvements & Performance Optimization
+# Peek v1.1.0 - Major Feature Release
 
-## Summary
+## Overview
 
-This PR contains 52 commits implementing major features, performance improvements, and bug fixes across the entire Peek application.
+This release adds **68 commits** with major new features, performance improvements, and quality-of-life enhancements across the entire Peek application.
 
-**Highlights:**
-- ⭐ **Per-user ratings and favorites** - Full implementation with database schema, API, UI components, filtering, and sorting
-- 🚀 **Performance optimization** - 70-80% reduction in data transfer, <1s response times with caching
-- 🔒 **Public media access** - Server-side proxy hides Stash API keys from clients
-- 🎬 **Video player overhaul** - Modular architecture with context, custom hooks, and Video.js plugins
-- 📊 **Stash sync** - One-way sync with selective import and GraphQL filtering
-- 🎨 **UI improvements** - Interactive ratings, mobile optimizations, accessibility enhancements
+**Key Highlights:**
+- 📊 **Server Statistics Dashboard** - Real-time monitoring of system resources, cache, and transcoding
+- ⚡ **Performance Improvements** - 70-80% faster with in-memory caching, <1s response times
+- 🎬 **Continue Watching** - Carousel showing recently viewed scenes with resume positions
+- 💀 **Skeleton Loading Cards** - Animated placeholders prevent layout shift
+- ⭐ **Per-User Ratings & Favorites** - Complete rating system with filtering and sorting
+- 🔒 **Public Media Proxy** - Share images without exposing Stash API keys
+- 🎥 **Video Player Improvements** - Dynamic aspect ratios, faster transcoding cleanup
+- 📈 **Cache Optimization** - Comprehensive caching system with 97% performance boost
 
 ---
 
-## Major Features
+## What's New
 
-### 1. Per-User Ratings & Favorites System
+### 1. Server Statistics Dashboard 📊
 
-**Complete implementation of per-user ratings and favorites:**
+**Real-time monitoring UI for server health and performance:**
 
-#### Database Schema (Prisma)
-- `SceneRating` model (sceneId, userId, rating, favorite, createdAt, updatedAt)
-- `PerformerRating` model (performerId, userId, rating, favorite)
-- `StudioRating` model (studioId, userId, rating, favorite)
-- `TagRating` model (tagId, userId, rating, favorite)
-- Unique constraints on (entityId, userId) pairs
+**Features:**
+- **System Resources:**
+  - Uptime tracking (days/hours/minutes)
+  - CPU core count
+  - System memory usage with percentage bar
+  - Process heap memory usage
 
-#### Backend API
-- `POST /api/ratings/scene` - Create/update scene rating
-- `POST /api/ratings/performer` - Create/update performer rating
-- `POST /api/ratings/studio` - Create/update studio rating
-- `POST /api/ratings/tag` - Create/update tag rating
-- Rating injection in all library endpoints (findScenes, findPerformers, findStudios, findTags)
-- Favorite filtering support for all entity types
-- Rating sorting support for all entity types
+- **Cache Statistics:**
+  - Entity counts (Scenes, Performers, Studios, Tags)
+  - Cache size and initialization status
+  - Last refresh timestamp
+  - Auto-refresh every 10 seconds
 
-#### Frontend UI
-- `RatingControls.jsx` - Interactive star rating component with favorite toggle
-- Integrated into scene cards, performer cards, studio cards, tag cards
-- Integrated into video player controls
-- Hover preview for half-star ratings
-- Real-time updates without page refresh
-- Click propagation prevention to avoid navigation conflicts
+- **Database Info:**
+  - SQLite database file size
 
-#### Features
-- **Filtering by favorites** - ✅ checkbox for all entity types
-- **Filtering by rating** - Min/max range sliders for all entity types
-- **Combined filters** - Intersection logic (favorite + rating filters work together)
-- **Sorting by rating** - ASC/DESC for all entity types
-- **Per-user O counter** - Peek tracks per-user O counts, not Stash global counts
-- **No sync to Stash** - Ratings/favorites are Peek-only (documented policy)
+- **Transcoding Sessions:**
+  - Active session count
+  - Cache size (transcoded segments)
+  - Session details table (Scene ID, Quality, Age, Status)
+  - Live monitoring of active FFmpeg processes
+
+**UI:**
+- Clean stat cards with icons
+- Progress bars for memory usage (color-coded: green → yellow → red)
+- Responsive grid layout (1-4 columns based on screen size)
+- Manual refresh button
+
+**Location:** Server Settings → Server Statistics section
 
 **Commits:**
-- `eefdc71` - feat: Add database schema and API endpoints
-- `ecd06d9` - feat: Implement per-user rating/favorite injection
-- `250a51e` - feat: Add frontend UI and API
-- `ff90952` - feat: Integrate ratings into library endpoints
-- `b287870` - feat: Integrate RatingControls into scene cards
-- `595fe73` - feat: Display ratings on all entity cards
-- `db17d36` - docs: Document no-sync policy
-- `ec548aa` - fix: Add rating injection to custom sort functions
-- `22999e9` - feat: Add rating sort option to Tags
-- `6f284f2` - feat: Add hover preview for half-star ratings
-- `88978a5` - fix: Return per-user Peek O count
-- `62e6f99` - feat: Add rating/favorite controls to video player
-- `22eb8e3` - fix: Handle favorite/rating filters on Peek side
-- `41592c7` - fix: Remove duplicate rating filter functions
-- `0117e85` - fix: Handle tag rating sort on Peek side
-- `657f1cb` - fix: Add favorite filter support to all entities
-- `f170db6` - feat: Make rating controls interactive on grid cards
-- `d0b79d3` - fix: Preserve pagination when filtering by favorites
-- `567d78c` - fix: Handle Peek-only sorts with rating filters
-- `803fc9a` - fix: Rating filters for all entity types and combined intersection
-- `45a4483` - fix: Filter UI improvements and sync filter field names
+- `1dc3ec3` - feat: Add comprehensive server statistics monitoring UI
+- `16d98c4` - fix: Correct import syntax and package.json loading
+- `6ee0a95` - refactor: Remove redundant version display
 
 ---
 
-### 2. Performance Optimization & Caching
+### 2. Continue Watching Feature 🎬
 
-**In-memory caching infrastructure with dramatic performance improvements:**
+**Resume watching recently viewed scenes:**
 
-#### Caching System
-- NodeCache with 1-hour TTL for Stash entities
-- Separate caches for Stash data and user ratings
-- ~55 MB memory footprint for full library (50K scenes, 20K performers)
-- Automatic cache expiration and stats logging every 30 minutes
+**Features:**
+- New "Continue Watching" carousel on Home page
+- Shows scenes with watch history and resume positions
+- Displays "Resume at XX:XX" timestamp on scene cards
+- Configurable in carousel settings:
+  - Toggle on/off
+  - Reorder within carousel list
+  - Default: enabled, positioned after "New Scenes"
+
+**Smart Behavior:**
+- Only shows scenes with partial playback (not fully watched)
+- Sorted by most recent first (last_viewed_at DESC)
+- Limited to 24 most recent scenes
+
+**Commits:**
+- `66006d8` - feat: Add Continue Watching to carousel settings
+- `c8cffac` - fix: Add missing PlayCircle import
+- `5b3299e` - fix: Add Continue Watching to carousel settings and reorder defaults
+- `98567b9` - fix: Resolve module loading error with icon components
+
+---
+
+### 3. Skeleton Loading Cards 💀
+
+**Animated placeholder cards for better loading UX:**
+
+**Features:**
+- Match actual card dimensions (no layout shift when content loads)
+- Animated shimmer effect (pulse animation)
+- Applied to ALL grids:
+  - **Scenes:** 25rem height (matches portrait video cards)
+  - **Scene Carousel:** 17.5rem × 25rem (matches carousel cards)
+  - **Performers:** 20rem height (matches performer portrait cards)
+  - **Studios:** 8rem height (matches horizontal studio cards)
+  - **Tags:** 8rem height (matches horizontal tag cards)
+
+**Benefits:**
+- No more tiny loading spinners
+- Prevents jarring layout shift when images load
+- Better visual feedback during data fetching
+- Consistent loading UX across entire app
+
+**Commit:**
+- `60630d9` - feat: Add skeleton loading cards for better loading UX
+
+---
+
+### 4. Video Player Improvements 🎥
+
+**Dynamic aspect ratios and faster transcoding cleanup:**
+
+**Aspect Ratio Handling:**
+- Calculates aspect ratio from actual video dimensions (width/height)
+- Supports all formats:
+  - 16:9 widescreen (most common)
+  - 4:3 standard (pillarboxed with black bars)
+  - 9:16 portrait (vertical videos)
+  - Any custom ratio
+- Max-width 1920px with centering on ultra-wide displays
+- No more stretched or cut-off videos
+
+**Transcoding Cleanup:**
+- Reduced session timeout from 30 minutes to 90 seconds
+- Sessions kept alive by segment requests during playback
+- When you navigate away, FFmpeg stops after 90s of inactivity
+- Prevents orphaned processes consuming server resources
+
+**Commit:**
+- `c421346` - fix: Use actual video aspect ratios and reduce transcoding cleanup timeout
+
+---
+
+### 5. Cache System Enhancements ⚡
+
+**Comprehensive caching with dramatic performance boost:**
+
+**Improvements:**
+- Full in-memory caching system (NodeCache)
+- 1-hour TTL with automatic expiration
+- Cache statistics in Server Settings
+- ~55 MB memory footprint for full library
 - Cache hit/miss logging for debugging
 
-#### Performance Improvements
-- **Before:** 15-20s for scenes rating sort (every request)
-- **After:** 10-15s first load, <500ms subsequent requests (97% faster)
-- **Before:** 2-3 minutes for full Stash sync
-- **After:** 30-60 seconds with GraphQL filtering (70% faster)
+**Performance Results:**
+- **Scenes rating sort:**
+  - First load: 10-15s (populates cache)
+  - Subsequent: <500ms (97% faster!)
+- **Performers O count sort:**
+  - First load: 5-10s
+  - Subsequent: <500ms (97% faster!)
+- **Stash sync:**
+  - Before: 2-3 minutes
+  - After: 30-60 seconds (70% faster)
 
 **Commits:**
-- `14aa0d4` - perf: Add in-memory caching for Stash entity queries
-- `00afc9a` - fix: Add missing caching for scenes rating sort and performers o_counter sort
-- `4730198` - fix: TypeScript errors in sync and add cache infrastructure
+- `bc9e654` - feat: Implement in-memory caching system
+- `85555a7` - feat: Optimize cache queries and enhance UI
+- `71a57d6` - docs: Add comprehensive cache optimization analysis
 
 ---
 
-### 3. Stash Media Proxy (Public Access)
+### 6. O Counter Sync from Stash 📈
 
-**Server-side proxy for media files that hides API keys:**
+**Sync O counter data from Stash during downsync:**
 
-#### Features
-- Public endpoint: `/api/proxy/stash?path=/scene/123/screenshot`
-- Supports images (JPEG, PNG, WebP), sprites, VTT files
-- Streams media with proper cache headers (1-year immutable)
-- No authentication required (enables public sharing)
-- Hides Stash API keys from client browsers
+**Features:**
+- New checkbox in Server Settings → Sync from Stash
+- "Sync O Counter" option for Scenes
+- Downloads `o_counter` field from Stash scenes
+- Imports into Peek watch history (per-user O counter)
+- One-way sync (Peek → local database only)
 
-#### Use Cases
-- Share individual scene screenshots publicly
-- Embed Peek images in external sites
-- Browse Peek without Stash credentials
-- Reverse proxy setups (Nginx, Caddy, etc.)
+**Use Case:**
+- Migrate existing Stash O counter data to Peek
+- Preserve O counter history when switching to Peek
+- Combine with other sync options (ratings, favorites)
 
-**Commits:**
-- `b33c747` - feat: Add Stash media proxy to hide API keys from clients
+**Commit:**
+- `1a07e11` - feat: Add O Counter sync option to Stash downsync
 
 ---
 
-### 4. Stash Sync with Selective Import
+### 7. Scene Filtering & Sorting Enhancements 🔍
 
-**One-way sync from Stash with GraphQL filtering:**
+**Improved filtering, sorting, and video player UX:**
 
-#### Features
-- Selective sync options per entity type:
+**Features:**
+- Enhanced scene filtering options
+- Additional sort fields for scenes
+- Better handling of combined filters
+- Video player UX improvements
+
+**Commit:**
+- `c29107c` - feat: Enhance scene filtering, sorting, and video player UX
+
+---
+
+### 8. Entity Detail Page Fixes 🐛
+
+**Fixed scene filtering on Performer/Studio/Tag detail pages:**
+
+**Issues Fixed:**
+- Entity detail pages now correctly filter scenes by entity ID
+- URL parameters converted to integers (not strings)
+- Scene lists on detail pages show correct results
+
+**Example:**
+- Before: `/performers/123` showed ALL scenes (broken filter)
+- After: `/performers/123` shows only scenes with performer ID 123
+
+**Commits:**
+- `efa7f5a` - fix: Entity detail pages now correctly filter scenes
+- `d82b531` - fix: Convert URL param IDs to integers
+
+---
+
+### 9. Per-User Ratings & Favorites System ⭐
+
+**(Previously released, included for completeness)**
+
+**Complete implementation:**
+
+- Database schema for all entity types (Scenes, Performers, Studios, Tags)
+- Interactive star ratings (5-star, half-star precision)
+- Favorite toggle (heart icon)
+- Filter by favorites (✅ checkbox)
+- Filter by rating (min/max sliders)
+- Sort by rating (ASC/DESC)
+- Rating controls in video player
+- Per-user O counter display
+- No sync to Stash (Peek-only feature)
+
+**21 commits implementing ratings/favorites**
+
+---
+
+### 10. Stash Media Proxy 🔒
+
+**(Previously released, included for completeness)**
+
+**Public access to media without exposing API keys:**
+
+- Server-side proxy: `/api/proxy/stash?path=...`
+- Supports images, sprites, VTT files
+- No authentication required
+- Enables public sharing
+- Hides Stash credentials from browsers
+
+---
+
+### 11. Stash Sync with Selective Import 📥
+
+**(Previously released, included for completeness)**
+
+**One-way sync with GraphQL filtering:**
+
+- Selective sync per entity type:
   - Scenes: Rating only, Favorite only, Both, or All
   - Performers: Rating only, Favorite only, Both, or All
   - Studios: Rating only, Favorite only, Both, or All
   - Tags: Favorite only or All
-- GraphQL filtering reduces data transfer by 70-80%
-- Example: 21K scenes → ~4.5K rated scenes transferred
+- 70-80% reduction in data transfer
 - Progress reporting with created/updated/checked counts
-- Automatic cache invalidation after sync
-
-**Commits:**
-- `7ac5c9a` - feat: Add one-way Stash sync with selective import
-
----
-
-### 5. Video Player Overhaul
-
-**Modular architecture with React context and custom hooks:**
-
-#### Architecture
-- `VideoPlayerContext.jsx` - Centralized player state management
-- `useVideoPlayer.js` - Core Video.js integration hook
-- `usePlaybackTracking.js` - Watch history and O counter tracking
-- `usePlaylistNavigation.js` - Playlist next/prev/autoplay logic
-- `useOrientationFullscreen.js` - Mobile fullscreen on orientation change
-- Video.js plugin integration for quality selector
-
-#### Features
-- Playlist autoplay with next/prev buttons
-- Watch history tracking (play count, last viewed position)
-- O counter integration in player controls
-- Mobile-optimized fullscreen behavior
-- Quality selector for transcoding
-- Modular, testable code structure
-
-**Commits:**
-- `d91cd6b` - refactor: Major video player overhaul with context, modular hooks, and Video.js plugin integration
-
----
-
-### 6. Watch History Per-User Implementation
-
-**Per-user sorting and filtering for watch history fields:**
-
-#### Features
-- Sort by O counter (ASC/DESC) - per-user values
-- Sort by play count (ASC/DESC) - per-user values
-- Filter by O counter min/max - per-user values
-- Filter by play count min/max - per-user values
-- Correct ASC sorting (zeros first, non-zeros on last page)
-- Fixed playback delta calculations to prevent massive jumps
-
-**Commits:**
-- `2884726` - feat: Implement per-user sorting for watch history fields
-- `4bf0da8` - feat: Implement per-user filtering for watch history fields
-- `be75e40` - fix: Correct O counter endpoint route path
-- `00843b6` - fix: Correct O counter endpoint mismatch
-- `60336ed` - fix: Correct ASC sorting for watch history fields
-- `7fed913` - fix: Cap playback delta and improve Stash sync logging
-- `44c66e2` - fix: Detect new viewing sessions to prevent massive playback deltas
-
----
-
-### 7. Admin & User Management
-
-**Multi-user support with admin controls:**
-
-#### Features
-- Admin can update other users' settings (not just their own)
-- Role-based access control (ADMIN vs USER)
-- Proper role comparison (uppercase 'ADMIN')
-
-**Commits:**
-- `08fc6c3` - fix: Add admin route to update other users' settings
-- `3eaed5d` - fix: Use uppercase 'ADMIN' for role comparison
-
----
-
-### 8. UI/UX Improvements
-
-**Mobile optimizations and accessibility:**
-
-#### Features
-- Prevent page scroll during carousel drag on mobile
-- Simplified pagination select styling
-- Fixed carousel queries for better experience
-- Removed hardcoded scene_count > 0 filters (shows all entities)
-
-**Commits:**
-- `c770ff9` - remove hardcoded scene_count greater than 0 filters
-- `f5e13c8` - adjust carousel queries for better experience
-- `7f69485` - fix: Simplify pagination select styling
-- `87ebe06` - fix: Prevent page scroll during carousel reordering on mobile
-
----
-
-### 9. Codebase Cleanup
-
-**Removed unused code and dead files:**
-
-- Removed 81 lines of complex pagination logic (simplified algorithm)
-- Deleted dead code files
-- Cleaned up duplicate function definitions
-
-**Commits:**
-- `0c75f52` - chore: Remove unused code and dead files to reduce codebase bloat
-
----
-
-### 10. Bug Fixes
-
-**Numerous bug fixes across all features:**
-
-#### Filtering & Sorting
-- `aac2c07` - fix: Sort and pagination when favorite filters are active
-- `1c2757c` - fix: Handle favorite filters in findScenesWithCustomSort
-- `b8c5606` - fix: Use cleanedSceneFilter in findScenesWithCustomSort fill query
-- `e91c5f6` - fix: Strip rating filters in all entity standard query paths
-- `3b89adc` - fix: Add missing logger import to library controller
-- `af275c6` - fix: Correct scene count sort field name for Tags and Studios
-- `8f93054` - Revert "fix: Correct scene count sort field name" (rollback incorrect fix)
-- `54406c3` - fix: Resolve favorites filter issues in scenes with custom sort
-
----
-
-## Complete Commit List (52 commits)
-
-### Foundation & Infrastructure (8 commits)
-1. `c770ff9` - remove hardcoded scene_count greater than 0 filters
-2. `f5e13c8` - adjust carousel queries for better experience
-3. `7f69485` - fix: Simplify pagination select styling and remove conflicting height constraint
-4. `87ebe06` - fix: Prevent page scroll during carousel reordering on mobile devices
-5. `0c75f52` - chore: Remove unused code and dead files to reduce codebase bloat
-6. `08fc6c3` - fix: Add admin route to update other users' settings
-7. `3eaed5d` - fix: Use uppercase 'ADMIN' for role comparison
-8. `3b89adc` - fix: Add missing logger import to library controller
-
-### Video Player Overhaul (1 commit)
-9. `d91cd6b` - refactor: Major video player overhaul with context, modular hooks, and Video.js plugin integration
-
-### Watch History (5 commits)
-10. `2884726` - feat: Implement per-user sorting for watch history fields
-11. `4bf0da8` - feat: Implement per-user filtering for watch history fields
-12. `be75e40` - fix: Correct O counter endpoint route path
-13. `00843b6` - fix: Correct O counter endpoint mismatch between frontend and backend
-14. `7fed913` - fix: Cap playback delta and improve Stash sync logging
-15. `44c66e2` - fix: Detect new viewing sessions to prevent massive playback deltas
-
-### Per-User Ratings & Favorites (21 commits)
-16. `eefdc71` - feat: Add database schema and API endpoints for per-user ratings/favorites
-17. `ecd06d9` - feat: Implement per-user rating/favorite injection for all entity types
-18. `250a51e` - feat: Add frontend UI and API for per-user ratings and favorites
-19. `ff90952` - feat: Integrate per-user ratings into all library endpoints
-20. `b287870` - feat: Integrate RatingControls component into scene cards and detail pages
-21. `595fe73` - feat: Display per-user ratings and favorites on all entity cards
-22. `db17d36` - docs: Document no-sync policy for ratings and favorites
-23. `ec548aa` - fix: Add rating injection to custom sort functions
-24. `22999e9` - feat: Add rating sort option to Tags
-25. `6f284f2` - feat: Add hover preview for half-star ratings
-26. `88978a5` - fix: Return per-user Peek O count instead of Stash global count
-27. `62e6f99` - feat: Add rating and favorite controls to video player
-28. `22eb8e3` - fix: Handle favorite/rating filters on Peek side, not Stash
-29. `41592c7` - fix: Remove duplicate rating filter function definitions
-30. `0117e85` - fix: Handle tag rating sort on Peek side
-31. `657f1cb` - fix: Add favorite filter support to Performers, Studios, and Tags
-32. `f170db6` - feat: Make rating controls interactive on entity grid cards
-33. `d0b79d3` - fix: Preserve pagination when filtering by favorites
-34. `567d78c` - fix: Handle Peek-only sorts with rating filters across all entity types
-35. `803fc9a` - fix: Rating filters for all entity types and combined filter intersection
-36. `45a4483` - fix: Filter UI improvements and sync filter field names
-
-### Filter & Sort Bug Fixes (9 commits)
-37. `aac2c07` - fix: Sort and pagination when favorite filters are active
-38. `1c2757c` - fix: Handle favorite filters in findScenesWithCustomSort
-39. `b8c5606` - fix: Use cleanedSceneFilter in findScenesWithCustomSort fill query
-40. `e91c5f6` - fix: Strip rating filters in all entity standard query paths
-41. `af275c6` - fix: Correct scene count sort field name for Tags and Studios
-42. `8f93054` - Revert "fix: Correct scene count sort field name for Tags and Studios"
-43. `54406c3` - fix: Resolve favorites filter issues in scenes with custom sort
-
-### Performance & Caching (4 commits)
-44. `7ac5c9a` - feat: Add one-way Stash sync with selective import and GraphQL filtering
-45. `4730198` - fix: TypeScript errors in sync and add cache infrastructure
-46. `14aa0d4` - perf: Add in-memory caching for Stash entity queries
-47. `00afc9a` - fix: Add missing caching for scenes rating sort and performers o_counter sort
-
-### Public Media Access (2 commits)
-48. `60336ed` - fix: Correct ASC sorting for watch history fields (o_counter, play_count)
-49. `b33c747` - feat: Add Stash media proxy to hide API keys from clients
-
----
-
-## Testing Instructions
-
-### Prerequisites
-- Docker environment running: `docker-compose up -d`
-- Fresh cache: `docker-compose restart peek-server`
-- Test user account with some rated/favorited content
-
----
-
-## Test 1: Per-User Ratings & Favorites
-
-**Objective:** Verify complete ratings/favorites functionality
-
-### 1.1: Rate Scenes
-1. Navigate to Scenes page
-2. Click stars on a scene card
-3. **Expected:** Rating updates immediately, star count changes
-4. Refresh page
-5. **Expected:** Rating persists
-
-### 1.2: Favorite Entities
-1. Navigate to Performers page
-2. Click heart icon on a performer card
-3. **Expected:** Heart fills red, favorite status updates
-4. Navigate away and back
-5. **Expected:** Heart remains filled
-
-### 1.3: Filter by Favorites
-1. Navigate to Scenes page
-2. Open Filters panel
-3. Check "✅ Favorites only"
-4. **Expected:** Only favorited scenes displayed
-5. **URL:** `?favorite=true`
-
-### 1.4: Filter by Rating
-1. Navigate to Performers page
-2. Open Filters panel
-3. Set "Min Rating: 80"
-4. Click "Apply Filters"
-5. **Expected:** Only performers with rating ≥ 80 shown
-6. **URL:** `?rating_min=80`
-
-### 1.5: Combined Filters (Favorite + Rating)
-1. Navigate to Performers page
-2. Open Filters panel
-3. Check "✅ Favorites only"
-4. Set "Min Rating: 80"
-5. Click "Apply Filters"
-6. **Expected:** Only performers that are BOTH favorited AND rated ≥ 80
-7. **URL:** `?favorite=true&rating_min=80`
-8. **Success:** List should be intersection of both filters (not just favorite OR just rating)
-
-### 1.6: Sort by Rating
-1. Navigate to Tags page
-2. Click "Sort by: Rating"
-3. Direction: DESC
-4. **Expected:** Highest rated tags first
-5. Flip to ASC
-6. **Expected:** Lowest rated tags first (unrated tags show as 0)
-
-### 1.7: Rating in Video Player
-1. Navigate to Scenes, click a scene
-2. Video player opens
-3. Locate rating controls (stars + heart) in player UI
-4. Click stars to rate
-5. **Expected:** Rating updates without leaving player
-6. **Expected:** Rating persists in scene card when returning to list
-
-### 1.8: O Counter Display on Performer Cards
-1. Navigate to Performers page
-2. **Expected:** Each performer card shows 💦 icon with count
-3. **Expected:** Shows "0" for performers with no O count (not hidden)
-4. **Expected:** Read-only (clicking doesn't increment)
-
-**Success Criteria:**
-- ✅ All entity types support ratings/favorites (Scenes, Performers, Studios, Tags)
-- ✅ Ratings/favorites persist across page reloads
-- ✅ Filtering by favorite works for all entity types
-- ✅ Filtering by rating works for all entity types
-- ✅ Combined filters use intersection logic (both conditions must match)
-- ✅ Sorting by rating works ASC/DESC
-- ✅ Rating controls integrated in video player
-- ✅ O Counter displays on performer cards (read-only mode)
-
----
-
-## Test 2: Performance & Caching
-
-**Objective:** Verify caching dramatically improves performance
-
-### 2.1: Scenes Rating Sort (Cache Miss)
-1. Restart server: `docker-compose restart peek-server`
-2. Navigate to Scenes page
-3. Click "Sort by: Rating"
-4. Direction: DESC
-5. **⏱️ Expected:** 10-15 seconds (fetching all scenes from Stash)
-6. Check logs: `docker-compose logs peek-server --tail=50 | grep -i cache`
-7. **Expected log:** `Cache miss - fetching ALL scenes from Stash for rating sort`
-
-### 2.2: Scenes Rating Sort (Cache Hit)
-1. Click sort direction to switch to ASC
-2. **⏱️ Expected:** <500ms (instant - uses cached data)
-3. Check logs: `docker-compose logs peek-server --tail=50 | grep -i cache`
-4. **Expected log:** `Cache hit - using cached scenes for rating sort {"count":21218}`
-
-### 2.3: Pagination with Cache
-1. Navigate to page 2, 3, etc.
-2. **⏱️ Expected:** <500ms per page (instant - all pages use same cache)
-3. Flip sort direction
-4. **⏱️ Expected:** <500ms (instant)
-
-### 2.4: Performers O Count Sort
-1. Navigate to Performers page
-2. Click "Sort by: O Count"
-3. Direction: DESC
-4. **⏱️ First load:** 5-10 seconds (cache miss)
-5. Flip to ASC
-6. **⏱️ Flip:** <500ms (cache hit)
-
-### 2.5: Verify ASC Sorting (Bug Fix)
-1. Sort Performers by O Count ASC
-2. First page shows performers with o_counter = 0
-3. Navigate to LAST page
-4. **Expected:** Performers with highest o_counter values (not zeros)
-5. **Bug Fix:** Before fix, ASC showed zeros on last page (incorrect)
-
-### 2.6: Cache Expiration
-1. Wait 1 hour ⏰ (or restart: `docker-compose restart peek-server`)
-2. Sort scenes by Rating again
-3. **⏱️ Expected:** 10-15 seconds (cache miss - re-fetches from Stash)
-4. Check logs for "Cache miss"
-
-**Success Criteria:**
-- ✅ First load: 10-15s for scenes, 5-10s for performers (populates cache)
-- ✅ Sort flip: <500ms (97% faster)
-- ✅ Pagination: <500ms (instant)
-- ✅ Logs show "Cache hit" for subsequent requests
-- ✅ ASC sorting correct (zeros first, non-zeros on last page)
-- ✅ Cache expires after 1 hour or server restart
-
----
-
-## Test 3: Stash Sync with Selective Import
-
-**Objective:** Verify GraphQL filtering reduces data transfer
-
-### 3.1: Configure Sync Options
-1. Navigate to Server Settings
-2. Scroll to "Sync from Stash" section
-3. Select sync options:
-   - ✅ Scenes: Rating only
-   - ✅ Performers: Rating + Favorite
-   - ✅ Studios: Rating + Favorite
-   - ✅ Tags: Favorite only
-
-### 3.2: Run Sync
-1. Click "Sync from Stash"
-2. Watch progress stats
-
-**Expected Results:**
-```
-Scenes:
-  Checked: ~21K (your total scene count)
-  Created/Updated: ~4.5K (only scenes with ratings)
-
-Performers:
-  Checked: ~6.7K (your total performer count)
-  Created/Updated: ~3.2K (only with ratings/favorites)
-
-Studios:
-  Checked: ~1K (your total studio count)
-  Created/Updated: ~880 (only with ratings/favorites)
-
-Tags:
-  Checked: ~200 (your total tag count)
-  Created/Updated: ~26 (only favorited tags)
-```
-
-### 3.3: Verify Logs
-```bash
-docker-compose logs peek-server --tail=100 | grep "Sync"
-```
-**Expected:** Messages about fetching only filtered entities
-
-**Success Criteria:**
-- ✅ Sync completes in 30-60 seconds (vs 2-3 minutes before)
-- ✅ "Checked" count matches total entity count in Stash
-- ✅ "Created/Updated" count much lower than "Checked" (only filtered entities)
-- ✅ 70-80% reduction in data transfer
-
----
-
-## Test 4: Media Proxy (Public Access)
-
-**Objective:** Verify images load through proxy without exposing API keys
-
-### 4.1: Scene Images
-1. Navigate to Scenes page
-2. Open Browser DevTools → Network tab
-3. Filter: `proxy`
-4. Click on any scene card
-
-**Expected Network Requests:**
-```
-GET /api/proxy/stash?path=%2Fscene%2F123%2Fscreenshot...
-Status: 200
-Type: image/jpeg
-Cache-Control: public, max-age=31536000, immutable
-```
-
-**Should NOT see:**
-- ❌ Direct Stash URLs (e.g., `http://10.0.0.4:6969/scene/...`)
-- ❌ API keys in URL parameters (`apikey=xxxxx`)
-
-### 4.2: Performer Images
-1. Navigate to Performers page
-2. Network tab → Filter: `proxy`
-3. **Expected:**
-   ```
-   GET /api/proxy/stash?path=%2Fperformer%2F456%2Fimage...
-   ```
-
-### 4.3: Studio & Tag Images
-1. Navigate to Studios page
-2. **Expected:** `/api/proxy/stash?path=%2Fstudio%2F789%2Fimage...`
-3. Navigate to Tags page
-4. **Expected:** `/api/proxy/stash?path=%2Ftag%2F101%2Fimage...`
-
-### 4.4: Video Sprites & VTT
-1. Play a video with sprite thumbnails
-2. Hover over timeline
-3. **Expected:** Thumbnail previews appear
-4. Check Network tab:
-   ```
-   GET /api/proxy/stash?path=%2Fscene%2F123%2Fsprite...
-   Status: 200
-   Type: image/jpeg
-   ```
-
-### 4.5: Public Access (No Auth)
-1. Open incognito window (or logout of Peek)
-2. Try to access proxied image directly:
-   ```
-   http://localhost:6969/api/proxy/stash?path=/scene/123/screenshot
-   ```
-3. **Expected:** Image loads successfully (no 401/403 error)
-4. **Use case:** Share scene screenshots publicly without Stash credentials
-
-**Success Criteria:**
-- ✅ All images load through `/api/proxy/stash`
-- ✅ No API keys visible in URLs
-- ✅ Proper cache headers (1-year immutable)
-- ✅ Images display correctly
-- ✅ Public access works (no authentication required)
-
----
-
-## Test 5: Video Player Improvements
-
-**Objective:** Verify modular video player architecture
-
-### 5.1: Playlist Navigation
-1. Create a playlist with 5+ scenes
-2. Play first scene
-3. Click "Next" button
-4. **Expected:** Advances to next scene in playlist
-5. Click "Previous" button
-6. **Expected:** Returns to previous scene
-
-### 5.2: Playlist Autoplay
-1. Enable autoplay in playlist
-2. Watch a scene to completion
-3. **Expected:** Automatically advances to next scene
-4. **Expected:** No autoplay if disabled
-
-### 5.3: Watch History Tracking
-1. Play a scene for 2 minutes
-2. Navigate away
-3. Return to scene detail page
-4. **Expected:** "Last viewed: 2m ago" or similar
-5. **Expected:** Play count incremented
-6. Resume playback
-7. **Expected:** Resumes from last position
-
-### 5.4: O Counter in Player
-1. Play a scene
-2. Locate O counter button (💦 icon)
-3. Click to increment
-4. **Expected:** Count increases, animation shows "+1"
-5. **Expected:** Count persists in scene card
-
-### 5.5: Mobile Fullscreen
-1. Open Peek on mobile device (or emulate in DevTools)
-2. Rotate device to landscape
-3. **Expected:** Video enters fullscreen automatically
-4. Rotate back to portrait
-5. **Expected:** Exits fullscreen
-
-**Success Criteria:**
-- ✅ Playlist next/prev navigation works
-- ✅ Autoplay optional and functional
-- ✅ Watch history tracks play count and position
-- ✅ O counter integrated in player controls
-- ✅ Mobile fullscreen on orientation change
-
----
-
-## Test 6: UI/UX Improvements
-
-**Objective:** Verify mobile optimizations and accessibility
-
-### 6.1: Mobile Carousel Drag
-1. Open Peek on mobile (or emulate in DevTools)
-2. Navigate to Home page (carousel)
-3. Drag carousel left/right
-4. **Expected:** Carousel scrolls, page does NOT scroll
-5. **Bug Fix:** Before fix, dragging carousel also scrolled the page
-
-### 6.2: Pagination Select
-1. Navigate to Scenes page
-2. Click pagination "Items per page" dropdown
-3. **Expected:** Clean styling, no conflicting height constraints
-4. Select different per-page value (12, 24, 48, 96)
-5. **Expected:** Page updates with new item count
-
-### 6.3: Show All Entities
-1. Navigate to Performers page
-2. **Expected:** Shows performers with scene_count = 0 (not hidden)
-3. Navigate to Studios page
-4. **Expected:** Shows studios with scene_count = 0 (not hidden)
-5. **Bug Fix:** Before fix, entities with 0 scenes were hidden
-
-**Success Criteria:**
-- ✅ Mobile carousel drag doesn't scroll page
-- ✅ Pagination select has clean styling
-- ✅ All entities shown regardless of scene count
-
----
-
-## Test 7: Filter UI Improvements
-
-**Objective:** Verify filter chip display and URL parameter handling
-
-### 7.1: Filter Chips
-1. Navigate to Scenes page
-2. Open Filters panel
-3. Apply multiple filters:
-   - ✅ Favorites only
-   - Min Rating: 80
-   - Resolution: 1080p
-4. **Expected:** Filter chips appear above results:
-   ```
-   [Favorite] [Rating: ≥ 80] [Resolution: 1080p]
-   ```
-5. Click X on a chip
-6. **Expected:** Filter removed, results update
-
-### 7.2: Multi-Select Filter Chips
-1. Navigate to Scenes page
-2. Open Filters panel
-3. Select multiple performers (if multi-select available)
-4. **Expected:** Chip shows "Performers: 3 selected"
-5. **Bug Fix:** Before fix, multi-select filters showed incorrectly
-
-### 7.3: URL Parameter Persistence
-1. Apply filters: Favorite + Rating min 80
-2. **URL:** `?favorite=true&rating_min=80`
-3. Copy URL, paste in new tab
-4. **Expected:** Filters applied automatically from URL
-5. **Expected:** Filter chips displayed
-6. **Bug Fix:** Before fix, ID fields weren't parsed as integers
-
-**Success Criteria:**
-- ✅ Filter chips display for all filter types
-- ✅ Multi-select shows "X selected"
-- ✅ Chips removable via X button
-- ✅ URL parameters persist filters across page loads
-- ✅ ID fields parsed as integers (not strings)
 
 ---
 
 ## Performance Benchmarks
 
-**Before this PR:**
+**Before this release:**
 | Operation | Time |
 |-----------|------|
 | Scenes rating sort (first load) | 15-20s |
-| Scenes rating sort (flip direction) | 15-20s |
-| Performers o_count sort | 10-15s |
-| Sync all entities | 2-3 minutes |
-| Image loading | Requires Stash network access |
+| Scenes rating sort (subsequent) | 15-20s |
+| Performers O count sort | 10-15s |
+| Stash sync | 2-3 minutes |
 
-**After this PR:**
+**After this release:**
 | Operation | Time | Improvement |
 |-----------|------|-------------|
 | Scenes rating sort (first load) | 10-15s | ~25% faster |
-| Scenes rating sort (flip direction) | <500ms | **97% faster** |
-| Performers o_count sort (first load) | 5-10s | ~33% faster |
-| Performers o_count sort (flip direction) | <500ms | **97% faster** |
-| Sync all entities | 30-60s | **70% faster** |
-| Image loading | Works without Stash access | **Enables public access** |
+| Scenes rating sort (subsequent) | <500ms | **97% faster** ⚡ |
+| Performers O count sort (first load) | 5-10s | ~33% faster |
+| Performers O count sort (subsequent) | <500ms | **97% faster** ⚡ |
+| Stash sync | 30-60s | **70% faster** ⚡ |
 
 ---
 
-## Memory Usage
+## What's Fixed
 
-**Cache Memory Footprint (1-hour window):**
-- 50K scenes: ~45 MB
-- 20K performers: ~4 MB
-- 2K studios: ~0.4 MB
-- 2K tags: ~0.2 MB
-- User ratings (10 users): ~3.3 MB
-- **Total: ~55 MB** (acceptable for Docker container)
+### Bug Fixes in This Release:
 
-**Monitor memory:**
+1. **Video aspect ratios** - Dynamic calculation prevents stretched/cut-off videos
+2. **Transcoding cleanup** - Sessions stop 90s after inactivity (not 30 minutes)
+3. **Entity detail pages** - Correctly filter scenes by entity ID
+4. **URL parameters** - Properly parsed as integers
+5. **Continue Watching** - Imports and icon loading errors fixed
+6. **Server stats** - Package.json loading and version display corrected
+
+### Previous Bug Fixes (from earlier PRs):
+
+- Favorite filter pagination preservation
+- Rating filter intersection logic
+- ASC sorting for watch history fields
+- Playback delta calculations
+- Scene count sorting for Tags and Studios
+- Mobile carousel scroll prevention
+- Pagination select styling
+
+---
+
+## Testing Instructions
+
+### Test 1: Server Statistics Dashboard
+
+1. Navigate to **Server Settings**
+2. Scroll to **Server Statistics** section
+3. Verify sections display:
+   - System Resources (uptime, CPU, memory with progress bars)
+   - Cache Statistics (counts for scenes/performers/studios/tags)
+   - Database size
+   - Transcoding sessions (if any active)
+4. Click **Refresh** button
+5. **Expected:** Stats update, spinner animation on button
+6. Watch for auto-refresh every 10 seconds
+
+**Success:** All stats display correctly, progress bars color-coded, refresh works
+
+---
+
+### Test 2: Continue Watching
+
+1. Watch a video for ~30 seconds, then navigate away
+2. Navigate to **Home** page
+3. **Expected:** "Continue Watching" carousel appears
+4. **Expected:** Scene card shows "Resume at 00:30" or similar
+5. Click the scene card
+6. **Expected:** Video resumes from 30-second mark
+7. Navigate to **Server Settings → Carousel Settings**
+8. Toggle "Continue Watching" off
+9. **Expected:** Carousel disappears from Home page
+10. Reorder "Continue Watching" to top of list
+11. **Expected:** Carousel moves to first position
+
+**Success:** Resume positions tracked, carousel configurable
+
+---
+
+### Test 3: Skeleton Loading
+
+1. Clear browser cache (Ctrl+Shift+Delete → Cached images)
+2. Navigate to **Scenes** page
+3. **Expected:** Skeleton cards appear (animated shimmer, full size)
+4. **Expected:** When images load, no layout shift
+5. Test on other pages:
+   - Performers (skeleton cards match performer card height)
+   - Studios (horizontal skeleton cards)
+   - Tags (horizontal skeleton cards)
+
+**Success:** No tiny spinners, no layout shift, smooth loading experience
+
+---
+
+### Test 4: Video Player Aspect Ratios
+
+1. Play a standard 16:9 video
+2. **Expected:** Video fills width properly (up to 1920px), no black bars top/bottom
+3. Play a 4:3 video (older format)
+4. **Expected:** Pillarboxed (black bars on left/right), not stretched
+5. Play a 9:16 portrait video (if available)
+6. **Expected:** Vertical video displays correctly, letterboxed
+7. Test on ultra-wide monitor (>1920px width)
+8. **Expected:** Video centered with subtle gutters
+
+**Success:** All aspect ratios display correctly without stretching or cutting off
+
+---
+
+### Test 5: Transcoding Cleanup
+
+1. Start playing a video (transcoding begins)
+2. Check **Server Settings → Server Statistics**
+3. **Expected:** Active transcoding session shown
+4. Navigate away from video (go to Scenes list)
+5. Wait 90-120 seconds
+6. Refresh Server Statistics
+7. **Expected:** Transcoding session removed (FFmpeg stopped)
+
+**Success:** Sessions cleaned up ~90s after last activity
+
+---
+
+### Test 6: Cache Performance
+
+1. Restart server: `docker-compose restart peek-server`
+2. Navigate to Scenes, sort by **Rating DESC**
+3. **⏱️ First load:** 10-15 seconds (cache miss)
+4. Check logs: `docker-compose logs peek-server --tail=50 | grep cache`
+5. **Expected log:** "Cache miss - fetching ALL scenes"
+6. Flip sort to **Rating ASC**
+7. **⏱️ Subsequent:** <500ms (instant - cache hit)
+8. Navigate through pages 2, 3, 4
+9. **⏱️ Each page:** <500ms (instant)
+
+**Success:** 97% performance improvement on cached requests
+
+---
+
+### Test 7: O Counter Sync
+
+1. Navigate to **Server Settings → Sync from Stash**
+2. Check **"Sync O Counter"** for Scenes
+3. Click **"Sync from Stash"**
+4. Watch progress (e.g., "Checked: 21K, Updated: 500")
+5. Navigate to Scenes with O counters in Stash
+6. **Expected:** O counter values imported to Peek
+
+**Success:** Stash O counter data migrated to Peek
+
+---
+
+## Upgrading to v1.1.0
+
+### Docker Users (Recommended):
+
 ```bash
-docker stats peek-stash-browser-peek-server-1
+# Pull latest image
+docker pull carrotwaxr/peek-stash-browser:latest
+
+# Restart container
+cd peek-stash-browser
+docker-compose down
+docker-compose up -d
 ```
+
+### Manual Build:
+
+```bash
+cd peek-stash-browser
+git pull origin master
+docker-compose up --build -d
+```
+
+**No data migration required** - Database schema updates automatically (Prisma migrations)
 
 ---
 
 ## Breaking Changes
 
-**None.** This is a backward-compatible enhancement.
+**None.** This is a fully backward-compatible release.
 
-**Existing functionality:**
-- ✅ All existing features continue to work
-- ✅ API responses unchanged (URLs transformed server-side)
-- ✅ Client code requires no changes
-- ✅ Database migrations automatic (Prisma)
+- All existing features continue to work
+- API endpoints unchanged
+- Database migrations automatic
+- No configuration changes required
+
+---
+
+## Known Issues
+
+None at this time. Please report any issues on GitHub:
+https://github.com/carrotwaxr/peek-stash-browser/issues
 
 ---
 
 ## Rollback Plan
 
-If issues are found:
+If you encounter issues:
 
-1. **Revert the PR:**
-   ```bash
-   git revert <merge-commit-sha>
-   git push origin master
-   ```
-
-2. **Or use previous Docker image:**
-   ```bash
-   docker pull carrotwaxr/peek-stash-browser:previous-version
-   docker-compose down
-   docker-compose up -d
-   ```
-
-**No data migration required** - Caching is in-memory only, ratings stored in SQLite.
-
----
-
-## Debugging Commands
-
-**Check logs:**
 ```bash
-docker-compose logs peek-server --tail=200
-```
-
-**Look for errors:**
-```bash
-docker-compose logs peek-server | grep -i "error"
-```
-
-**Check cache activity:**
-```bash
-docker-compose logs peek-server | grep -i "cache"
-```
-
-**Verify proxy requests:**
-```bash
-docker-compose logs peek-server | grep -i "proxy"
-```
-
-**Monitor sync progress:**
-```bash
-docker-compose logs peek-server | grep -i "sync"
+# Use previous version
+docker pull carrotwaxr/peek-stash-browser:v1.0.0
+docker-compose down
+docker-compose up -d
 ```
 
 ---
 
-## Next Steps
+## Complete Changelog (68 Commits)
 
-After testing and merging:
+### New Features (This Release)
 
-1. **Squash commits** (optional - 52 commits may be too granular)
-2. **Update version** in package.json (both client and server)
-3. **Create git tag** (e.g., `v1.1.0`)
-4. **Push tag** to trigger Docker build and release
-5. **Users update** via `docker pull` and restart
+1. `c421346` - fix: Use actual video aspect ratios and reduce transcoding cleanup timeout
+2. `6ee0a95` - refactor: Remove redundant version display from stats section
+3. `16d98c4` - fix: Correct import syntax and package.json loading in stats controller
+4. `1dc3ec3` - feat: Add comprehensive server statistics monitoring UI
+5. `85555a7` - feat: Optimize cache queries and enhance UI with missing fields
+6. `71a57d6` - docs: Add comprehensive cache optimization analysis
+7. `98567b9` - fix: Resolve module loading error by using icon components
+8. `5b3299e` - fix: Add Continue Watching to carousel settings and reorder defaults
+9. `c8cffac` - fix: Add missing PlayCircle import in Home.jsx
+10. `66006d8` - feat: Add Continue Watching to carousel settings
+11. `60630d9` - feat: Add skeleton loading cards for better loading UX
+12. `c29107c` - feat: Enhance scene filtering, sorting, and video player UX
+13. `1a07e11` - feat: Add O Counter sync option to Stash downsync
+14. `bc9e654` - feat: Implement in-memory caching system with bug fixes
+15. `efa7f5a` - fix: Entity detail pages now correctly filter scenes
+16. `d82b531` - fix: Convert URL param IDs to integers
 
-Enjoy the massive improvements! 🚀
+### Previous Features (52 commits)
+
+*Ratings & Favorites (21 commits), Performance & Caching (4 commits), Stash Sync (1 commit), Media Proxy (2 commits), Video Player Overhaul (1 commit), Watch History (5 commits), UI/UX (4 commits), Bug Fixes (14 commits)*
+
+Full list: https://github.com/carrotwaxr/peek-stash-browser/compare/v1.0.0...v1.1.0
+
+---
+
+## Credits
+
+**Developed with:** Claude Code (Anthropic)
+**Contributions:** Beta testers and community feedback
+
+---
+
+## What's Next (v1.2.0 Preview)
+
+Planned for next release:
+- Duplicate detection and merging
+- Advanced playlist features
+- Scene tagging workflow improvements
+- Mobile app (React Native)
+
+Stay tuned! 🚀
+
+---
+
+**Enjoy Peek v1.1.0!** 🎉
+
+Questions? Feedback? Join the discussion:
+- GitHub Issues: https://github.com/carrotwaxr/peek-stash-browser/issues
+- Discord: [Your Discord link]
