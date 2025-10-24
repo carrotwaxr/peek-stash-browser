@@ -11,6 +11,7 @@ import WarningMessage from "../ui/WarningMessage.jsx";
 import ErrorMessage from "../ui/ErrorMessage.jsx";
 import InfoMessage from "../ui/InfoMessage.jsx";
 import { showSuccess, showError } from "../../utils/toast.jsx";
+import { migrateCarouselPreferences } from "../../constants/carousels.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -49,7 +50,11 @@ const Settings = () => {
 
       setPreferredQuality(settings.preferredQuality || "auto");
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
-      setCarouselPreferences(settings.carouselPreferences || []);
+
+      // Migrate carousel preferences to include any new carousels
+      const migratedPrefs = migrateCarouselPreferences(settings.carouselPreferences);
+      setCarouselPreferences(migratedPrefs);
+
       setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
     } catch {
       setError("Failed to load settings");

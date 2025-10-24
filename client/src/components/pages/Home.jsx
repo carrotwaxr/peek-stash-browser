@@ -1,17 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import {
-  Star,
-  Clock,
-  Film,
-  Zap,
-  Calendar,
-  Heart,
-  Tag,
-  Video,
-  PlayCircle,
-} from "lucide-react";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
 import BulkActionBar from "../ui/BulkActionBar.jsx";
@@ -20,73 +9,12 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import { CAROUSEL_DEFINITIONS, migrateCarouselPreferences } from "../../constants/carousels.js";
 
 const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
-
-const CAROUSEL_DEFINITIONS = [
-  {
-    title: "Continue Watching",
-    icon: <PlayCircle className="w-6 h-6" color="#10b981" />,
-    fetchKey: "continueWatching",
-    isSpecial: true, // Not a standard query carousel
-  },
-  {
-    title: "High Rated",
-    icon: <Star className="w-6 h-6" style={{ color: "var(--icon-rating)" }} />,
-    fetchKey: "highRatedScenes",
-  },
-  {
-    title: "Recently Added",
-    icon: <Clock className="w-6 h-6" style={{ color: "var(--accent-info)" }} />,
-    fetchKey: "recentlyAddedScenes",
-  },
-  {
-    title: "Feature Length",
-    icon: (
-      <Film className="w-6 h-6" style={{ color: "var(--accent-secondary)" }} />
-    ),
-    fetchKey: "longScenes",
-  },
-  {
-    title: "High Bitrate",
-    icon: (
-      <Zap className="w-6 h-6" style={{ color: "var(--accent-success)" }} />
-    ),
-    fetchKey: "highBitrateScenes",
-  },
-  {
-    title: "Barely Legal",
-    icon: (
-      <Calendar
-        className="w-6 h-6"
-        style={{ color: "var(--accent-warning)" }}
-      />
-    ),
-    fetchKey: "barelyLegalScenes",
-  },
-  {
-    title: "Favorite Performers",
-    icon: (
-      <Heart className="w-6 h-6" style={{ color: "var(--accent-error)" }} />
-    ),
-    fetchKey: "favoritePerformerScenes",
-  },
-  {
-    title: "Favorite Studios",
-    icon: <Video className="w-6 h-6" style={{ color: "var(--accent-info)" }} />,
-    fetchKey: "favoriteStudioScenes",
-  },
-  {
-    title: "Favorite Tags",
-    icon: (
-      <Tag className="w-6 h-6" style={{ color: "var(--accent-primary)" }} />
-    ),
-    fetchKey: "favoriteTagScenes",
-  },
-];
 
 const SCENES_PER_CAROUSEL = 12;
 
@@ -103,47 +31,13 @@ const Home = () => {
     const loadPreferences = async () => {
       try {
         const response = await api.get("/user/settings");
-        let prefs = response.data.settings.carouselPreferences;
-
-        // If no preferences exist, create defaults
-        if (!prefs) {
-          prefs = CAROUSEL_DEFINITIONS.map((def, idx) => ({
-            id: def.fetchKey,
-            enabled: true,
-            order: idx,
-          }));
-        } else {
-          // Migrate: Add any new carousels that don't exist in saved preferences
-          const existingIds = new Set(prefs.map((p) => p.id));
-          const missingCarousels = CAROUSEL_DEFINITIONS.filter(
-            (def) => !existingIds.has(def.fetchKey)
-          );
-
-          // Add missing carousels at the end (or at beginning for continueWatching)
-          missingCarousels.forEach((def) => {
-            const newPref = {
-              id: def.fetchKey,
-              enabled: true,
-              order: def.fetchKey === "continueWatching" ? -1 : prefs.length,
-            };
-            prefs.push(newPref);
-          });
-
-          // Re-normalize order values
-          prefs.sort((a, b) => a.order - b.order);
-          prefs = prefs.map((pref, idx) => ({ ...pref, order: idx }));
-        }
-
+        const prefs = migrateCarouselPreferences(
+          response.data.settings.carouselPreferences
+        );
         setCarouselPreferences(prefs);
       } catch {
         // Fallback to all enabled if fetch fails
-        setCarouselPreferences(
-          CAROUSEL_DEFINITIONS.map((def, idx) => ({
-            id: def.fetchKey,
-            enabled: true,
-            order: idx,
-          }))
-        );
+        setCarouselPreferences(migrateCarouselPreferences([]));
       } finally {
         setLoadingPreferences(false);
       }
