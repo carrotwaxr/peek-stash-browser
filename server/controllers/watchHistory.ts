@@ -280,16 +280,16 @@ export async function incrementOCounter(req: Request, res: Response) {
     }
 
     // Sync to Stash if user has sync enabled
-    let stashOCount = watchHistory.oCount; // Default to Peek count
     if (user.syncToStash) {
       try {
         logger.info('Syncing O counter increment to Stash', { sceneId });
         const stash = getStash();
         const result = await stash.sceneIncrementO({ id: sceneId });
-        logger.info('Successfully incremented O counter in Stash', { sceneId, result });
-
-        // Use the Stash global count (result.sceneIncrementO is the new count)
-        stashOCount = result.sceneIncrementO || watchHistory.oCount;
+        logger.info('Successfully incremented O counter in Stash', {
+          sceneId,
+          stashGlobalCount: result.sceneIncrementO,
+          peekUserCount: watchHistory.oCount
+        });
       } catch (stashError) {
         // Don't fail the request if Stash sync fails - Peek DB is source of truth
         logger.error('Failed to sync O counter increment to Stash', {
@@ -301,9 +301,10 @@ export async function incrementOCounter(req: Request, res: Response) {
       }
     }
 
+    // Always return the user's personal Peek count (not Stash's global count)
     res.json({
       success: true,
-      oCount: user.syncToStash ? stashOCount : watchHistory.oCount, // Return Stash count if syncing, otherwise Peek count
+      oCount: watchHistory.oCount,
       timestamp: now.toISOString(),
     });
   } catch (error) {
