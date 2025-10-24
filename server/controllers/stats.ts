@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
-import stashCacheManager from '../services/StashCacheManager.js';
-import transcodingManager from '../services/TranscodingManager.js';
+import { stashCacheManager } from '../services/StashCacheManager.js';
+import { transcodingManager } from '../services/TranscodingManager.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -80,8 +80,10 @@ export const getStats = async (req: Request, res: Response) => {
     let serverVersion = '1.0.0';
     let clientVersion = '1.0.0';
     try {
-      const serverPackageJson = await import('../../package.json', { assert: { type: 'json' } });
-      serverVersion = serverPackageJson.default.version || '1.0.0';
+      // Read server package.json from file system
+      const serverPackageJsonPath = path.join(process.cwd(), 'package.json');
+      const serverPackageJson = JSON.parse(await fs.readFile(serverPackageJsonPath, 'utf-8'));
+      serverVersion = serverPackageJson.version || '1.0.0';
 
       // Try to get client version
       const clientPackageJsonPath = path.join(process.cwd(), '../client/package.json');
