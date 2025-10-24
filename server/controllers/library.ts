@@ -992,6 +992,13 @@ export const findScenes = async (req: Request, res: Response) => {
 
     // If sorting by rating without favorite filter, handle on Peek side
     if (sortField && isRatingField(sortField)) {
+      logger.info('Scenes rating sort detected', {
+        userId,
+        sortField,
+        sortDirection,
+        isRatingField: isRatingField(sortField),
+      });
+
       // Fetch all scenes with fallback sort
       const scenes: FindScenesQuery = await stash.findScenes({
         filter: { page: 1, per_page: 1000, sort: 'date', direction: sortDirection } as FindFilterType,
@@ -1047,9 +1054,13 @@ export const findScenes = async (req: Request, res: Response) => {
     }
 
     // Standard Stash query for non-rating/watch-history filters
+    // Always strip rating filters (favorite, rating, rating100) before querying Stash
+    // Stash has its own 'favorite' field which would conflict with Peek's per-user favorites
+    const cleanedSceneFilter = removeRatingFilters(scene_filter);
+
     const scenes: FindScenesQuery = await stash.findScenes({
       filter: filter as FindFilterType,
-      scene_filter: scene_filter as SceneFilterType,
+      scene_filter: cleanedSceneFilter as SceneFilterType,
       ids: ids as string[],
       scene_ids: scene_ids as number[],
     });
@@ -1537,6 +1548,13 @@ export const findPerformers = async (req: Request, res: Response) => {
     if (hasRatingFilter) {
       const ratingFilterValues = getRatingFilterValues(performer_filter);
 
+      logger.info('Performers rating filter detected', {
+        userId,
+        hasRatingFilter,
+        ratingFilterValues,
+        performer_filter,
+      });
+
       if (ratingFilterValues.favorite !== undefined) {
         // Fetch performer IDs with matching favorite status from PerformerRating table
         const matchingRatings = await prisma.performerRating.findMany({
@@ -1548,6 +1566,12 @@ export const findPerformers = async (req: Request, res: Response) => {
         });
 
         const matchingPerformerIds = matchingRatings.map(r => r.performerId);
+
+        logger.info('Found favorited performers', {
+          userId,
+          count: matchingPerformerIds.length,
+          performerIds: matchingPerformerIds,
+        });
 
         if (matchingPerformerIds.length === 0) {
           // No performers match the filter
@@ -1687,11 +1711,15 @@ export const findPerformers = async (req: Request, res: Response) => {
     }
 
     // Standard Stash query for non-rating/stat filters
+    // Always strip rating filters (favorite, rating, rating100) before querying Stash
+    // Stash has its own 'favorite' field which would conflict with Peek's per-user favorites
+    const cleanedPerformerFilter = removeRatingFilters(performer_filter);
+
     const queryInputs = removeEmptyValues({
       filter: filter as FindFilterType,
       ids: ids as string[],
       performer_ids: performer_ids as number[],
-      performer_filter: performer_filter as PerformerFilterType,
+      performer_filter: cleanedPerformerFilter as PerformerFilterType,
     });
 
     const performers: FindPerformersQuery = await stash.findPerformers(
@@ -1886,9 +1914,13 @@ export const findStudios = async (req: Request, res: Response) => {
     }
 
     // Standard Stash query for non-rating filters
+    // Always strip rating filters (favorite, rating, rating100) before querying Stash
+    // Stash has its own 'favorite' field which would conflict with Peek's per-user favorites
+    const cleanedStudioFilter = removeRatingFilters(studio_filter);
+
     const studios: FindStudiosQuery = await stash.findStudios({
       filter: filter as FindFilterType,
-      studio_filter: studio_filter as StudioFilterType,
+      studio_filter: cleanedStudioFilter as StudioFilterType,
       ids: ids as string[],
     });
 
@@ -2028,9 +2060,13 @@ export const findTags = async (req: Request, res: Response) => {
     }
 
     // Standard Stash query for non-rating filters
+    // Always strip rating filters (favorite, rating, rating100) before querying Stash
+    // Stash has its own 'favorite' field which would conflict with Peek's per-user favorites
+    const cleanedTagFilter = removeRatingFilters(tag_filter);
+
     const tags: FindTagsQuery = await stash.findTags({
       filter: filter as FindFilterType,
-      tag_filter: tag_filter as TagFilterType,
+      tag_filter: cleanedTagFilter as TagFilterType,
       ids: ids as string[],
     });
 
