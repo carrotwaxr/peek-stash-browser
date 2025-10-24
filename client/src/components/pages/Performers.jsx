@@ -10,6 +10,7 @@ import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import { getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
+import OCounterButton from "../ui/OCounterButton.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -222,12 +223,24 @@ const PerformerCard = forwardRef(
             />
           </div>
 
-          {performer.scene_count > 0 && (
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {performer.scene_count} scene
-              {performer.scene_count !== 1 ? "s" : ""}
-            </p>
-          )}
+          {/* Stats */}
+          <div className="text-xs space-y-1.5 flex flex-col items-center" style={{ color: "var(--text-muted)" }}>
+            {performer.scene_count > 0 && (
+              <p>
+                {performer.scene_count} scene
+                {performer.scene_count !== 1 ? "s" : ""}
+              </p>
+            )}
+            {performer.o_counter !== undefined && (
+              <div onClick={(e) => e.preventDefault()}>
+                <OCounterButton
+                  initialCount={performer.o_counter}
+                  readOnly={true}
+                  className="text-xs"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </Link>
     );

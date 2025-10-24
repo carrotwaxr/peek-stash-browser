@@ -1478,13 +1478,13 @@ export const findPerformers = async (req: Request, res: Response) => {
       });
     }
 
-    // If sorting by performer stat fields, use custom pagination logic
-    if (sortField && isPerformerStatField(sortField)) {
+    // Check if there are rating/favorite filters that need to be handled on Peek side (MUST check before stat field sorting)
+    const hasRatingFilter = hasRatingFilters(performer_filter);
+
+    // If sorting by performer stat fields WITHOUT rating filters, use custom pagination logic
+    if (!hasRatingFilter && sortField && isPerformerStatField(sortField)) {
       return await findPerformersWithCustomSort(req, res, userId, sortField, sortDirection, page, perPage, performer_filter);
     }
-
-    // Check if there are rating/favorite filters that need to be handled on Peek side
-    const hasRatingFilter = hasRatingFilters(performer_filter);
 
     // If filtering by rating/favorite, fetch matching performer IDs from Peek first
     if (hasRatingFilter) {
@@ -1497,8 +1497,11 @@ export const findPerformers = async (req: Request, res: Response) => {
         performer_filter,
       });
 
+      // Collect performer IDs matching the filters (will be intersected if both exist)
+      let performerIdsToFetch: string[] | undefined = undefined;
+
+      // If filtering by favorite, get matching performer IDs from Peek
       if (ratingFilterValues.favorite !== undefined) {
-        // Fetch performer IDs with matching favorite status from PerformerRating table
         const matchingRatings = await prisma.performerRating.findMany({
           where: {
             userId,
@@ -1507,16 +1510,14 @@ export const findPerformers = async (req: Request, res: Response) => {
           select: { performerId: true },
         });
 
-        const matchingPerformerIds = matchingRatings.map(r => r.performerId);
+        performerIdsToFetch = matchingRatings.map(r => r.performerId);
 
         logger.info('Found favorited performers', {
           userId,
-          count: matchingPerformerIds.length,
-          performerIds: matchingPerformerIds,
+          count: performerIdsToFetch.length,
         });
 
-        if (matchingPerformerIds.length === 0) {
-          // No performers match the filter
+        if (performerIdsToFetch.length === 0) {
           return res.json({
             findPerformers: {
               count: 0,
@@ -1524,79 +1525,158 @@ export const findPerformers = async (req: Request, res: Response) => {
             },
           });
         }
+      }
 
-        // Remove rating filters from performer_filter before querying Stash
-        const cleanedPerformerFilter = removeRatingFilters(performer_filter);
+      // If filtering by rating100, get matching performer IDs from Peek
+      if (ratingFilterValues.rating100 !== undefined) {
+        const rating100 = ratingFilterValues.rating100;
+        const whereClause: any = { userId };
 
-        // When filtering by favorites, we must fetch ALL, sort on Peek side, and paginate
-        // Stash ignores sort when specific IDs are provided
-        const stashFilter = {
-          page: 1,
-          per_page: Math.min(matchingPerformerIds.length, 1000),
-          sort: 'name', // Fallback sort for Stash (doesn't matter, we'll sort on Peek side)
-          direction: sortDirection
-        };
-
-        // Query Stash for these specific performers with remaining filters
-        const performers: FindPerformersQuery = await stash.findPerformers({
-          filter: stashFilter as FindFilterType,
-          ids: matchingPerformerIds,
-          performer_filter: cleanedPerformerFilter as PerformerFilterType,
-        });
-
-        const transformedPerformers = performers.findPerformers.performers.map((performer) =>
-          transformPerformer(performer as any)
-        );
-
-        // Inject user data
-        let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
-        performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
-
-        // Always sort on Peek side when favorite filter is active
-        // (Stash ignores sort when IDs are provided)
-        if (sortField) {
-          performersWithUserData.sort((a, b) => {
-            const aValue = getFieldValue(a, sortField) || 0;
-            const bValue = getFieldValue(b, sortField) || 0;
-
-            let comparison = 0;
-            if (typeof aValue === 'string' && typeof bValue === 'string') {
-              comparison = aValue.localeCompare(bValue);
-            } else {
-              comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-            }
-
-            // Apply sort direction
-            if (sortDirection.toUpperCase() === 'DESC') {
-              comparison = -comparison;
-            }
-
-            // Secondary sort by name if primary values are equal
-            if (comparison === 0) {
-              const aName = a.name || '';
-              const bName = b.name || '';
-              return aName.localeCompare(bName);
-            }
-
-            return comparison;
-          });
+        // Build rating condition based on modifier
+        if (rating100.modifier === 'BETWEEN' && rating100.value2 !== undefined) {
+          whereClause.rating = {
+            gte: parseInt(rating100.value),
+            lte: parseInt(rating100.value2)
+          };
+        } else if (rating100.modifier === 'GREATER_THAN') {
+          whereClause.rating = { gte: parseInt(rating100.value) };
+        } else if (rating100.modifier === 'LESS_THAN') {
+          whereClause.rating = { lte: parseInt(rating100.value) };
+        } else if (rating100.modifier === 'EQUALS') {
+          whereClause.rating = parseInt(rating100.value);
         }
 
-        // Apply pagination to sorted results
-        const startIndex = (page - 1) * perPage;
-        const endIndex = startIndex + perPage;
-        const paginatedPerformers = performersWithUserData.slice(startIndex, endIndex);
+        const matchingRatings = await prisma.performerRating.findMany({
+          where: whereClause,
+          select: { performerId: true },
+        });
 
+        const ratingPerformerIds = matchingRatings.map(r => r.performerId);
+
+        // If we already have performerIdsToFetch from favorite filter, intersect them
+        if (performerIdsToFetch) {
+          performerIdsToFetch = performerIdsToFetch.filter(id => ratingPerformerIds.includes(id));
+        } else {
+          performerIdsToFetch = ratingPerformerIds;
+        }
+
+        if (performerIdsToFetch.length === 0) {
+          return res.json({
+            findPerformers: {
+              count: 0,
+              performers: [],
+            },
+          });
+        }
+      }
+
+      // Now fetch performers based on the combined filters
+      if (performerIdsToFetch && performerIdsToFetch.length === 0) {
         return res.json({
           findPerformers: {
-            count: performersWithUserData.length,
-            performers: paginatedPerformers,
+            count: 0,
+            performers: [],
           },
         });
       }
+
+      // Remove rating filters from performer_filter before querying Stash
+      const cleanedPerformerFilter = removeRatingFilters(performer_filter);
+
+      // If sorting by rating field, use caching approach (fetch ALL, filter, sort, paginate)
+      // This ensures proper pagination across all performers
+      let transformedPerformers;
+      if (sortField && isRatingField(sortField)) {
+        // Check cache for ALL performers first
+        transformedPerformers = stashCache.get<any[]>(CACHE_KEYS.PERFORMERS_ALL);
+
+        if (!transformedPerformers) {
+          logger.info('Cache miss - fetching ALL performers from Stash for favorite+rating sort');
+          const performers: FindPerformersQuery = await stash.findPerformers({
+            filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
+            performer_filter: cleanedPerformerFilter as PerformerFilterType,
+          });
+
+          transformedPerformers = performers.findPerformers.performers.map((performer) =>
+            transformPerformer(performer as any)
+          );
+
+          stashCache.set(CACHE_KEYS.PERFORMERS_ALL, transformedPerformers);
+        } else {
+          logger.info('Cache hit - using cached performers for favorite+rating sort', { count: transformedPerformers.length });
+        }
+
+        // Filter to only performers matching the combined filters
+        if (performerIdsToFetch) {
+          transformedPerformers = transformedPerformers.filter((p: any) => performerIdsToFetch.includes(p.id));
+        }
+
+      } else {
+        // For non-rating sorts, fetch only matching performers directly
+        // Stash ignores sort when specific IDs are provided, so we'll sort on Peek side
+        const stashFilter = {
+          page: 1,
+          per_page: performerIdsToFetch ? Math.min(performerIdsToFetch.length, 1000) : 1000,
+          sort: 'name',
+          direction: sortDirection
+        };
+
+        const performers: FindPerformersQuery = await stash.findPerformers({
+          filter: stashFilter as FindFilterType,
+          ids: performerIdsToFetch,
+          performer_filter: cleanedPerformerFilter as PerformerFilterType,
+        });
+
+        transformedPerformers = performers.findPerformers.performers.map((performer) =>
+          transformPerformer(performer as any)
+        );
+      }
+
+      // Inject user data
+      let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
+      performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
+
+      // Always sort on Peek side when filters are active
+      if (sortField) {
+        performersWithUserData.sort((a, b) => {
+          const aValue = getFieldValue(a, sortField) || 0;
+          const bValue = getFieldValue(b, sortField) || 0;
+
+          let comparison = 0;
+          if (typeof aValue === 'string' && typeof bValue === 'string') {
+            comparison = aValue.localeCompare(bValue);
+          } else {
+            comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+          }
+
+          if (sortDirection.toUpperCase() === 'DESC') {
+            comparison = -comparison;
+          }
+
+          if (comparison === 0) {
+            const aName = a.name || '';
+            const bName = b.name || '';
+            return aName.localeCompare(bName);
+          }
+
+          return comparison;
+        });
+      }
+
+      // Apply pagination to sorted results
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedPerformers = performersWithUserData.slice(startIndex, endIndex);
+
+      return res.json({
+        findPerformers: {
+          count: performersWithUserData.length,
+          performers: paginatedPerformers,
+        },
+      });
     }
 
-    // If sorting by rating without favorite filter, handle on Peek side
+    // If sorting by rating without filters, handle on Peek side
     if (sortField && isRatingField(sortField)) {
       logger.info('Performers rating sort detected', {
         userId,
@@ -1829,6 +1909,98 @@ export const findStudios = async (req: Request, res: Response) => {
           },
         });
       }
+
+      // If filtering by rating100, fetch matching studio IDs from Peek
+      if (ratingFilterValues.rating100 !== undefined) {
+        const rating100 = ratingFilterValues.rating100;
+        const whereClause: any = { userId };
+
+        // Build rating condition based on modifier
+        if (rating100.modifier === 'BETWEEN' && rating100.value2 !== undefined) {
+          whereClause.rating = {
+            gte: parseInt(rating100.value),
+            lte: parseInt(rating100.value2)
+          };
+        } else if (rating100.modifier === 'GREATER_THAN') {
+          whereClause.rating = { gte: parseInt(rating100.value) };
+        } else if (rating100.modifier === 'LESS_THAN') {
+          whereClause.rating = { lte: parseInt(rating100.value) };
+        } else if (rating100.modifier === 'EQUALS') {
+          whereClause.rating = parseInt(rating100.value);
+        }
+
+        const matchingRatings = await prisma.studioRating.findMany({
+          where: whereClause,
+          select: { studioId: true },
+        });
+
+        const ratingStudioIds = matchingRatings.map(r => r.studioId);
+
+        if (ratingStudioIds.length === 0) {
+          return res.json({
+            findStudios: {
+              count: 0,
+              studios: [],
+            },
+          });
+        }
+
+        // Remove rating filters from studio_filter before querying Stash
+        const cleanedStudioFilter = removeRatingFilters(studio_filter);
+
+        // Fetch matching studios from Stash
+        const studios: FindStudiosQuery = await stash.findStudios({
+          filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
+          ids: ratingStudioIds,
+          studio_filter: cleanedStudioFilter as StudioFilterType,
+        });
+
+        let transformedStudios = studios.findStudios.studios.map((studio) =>
+          transformStudio(studio as any)
+        );
+
+        // Inject user ratings
+        let studiosWithUserRatings = await injectUserStudioRatings(transformedStudios, userId);
+
+        // Sort if needed
+        if (sortField) {
+          studiosWithUserRatings.sort((a, b) => {
+            const aValue = getFieldValue(a, sortField) || 0;
+            const bValue = getFieldValue(b, sortField) || 0;
+
+            let comparison = 0;
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+              comparison = aValue.localeCompare(bValue);
+            } else {
+              comparison = aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+            }
+
+            if (sortDirection.toUpperCase() === 'DESC') {
+              comparison = -comparison;
+            }
+
+            if (comparison === 0) {
+              const aName = a.name || '';
+              const bName = b.name || '';
+              return aName.localeCompare(bName);
+            }
+
+            return comparison;
+          });
+        }
+
+        // Apply pagination
+        const startIndex = (page - 1) * perPage;
+        const endIndex = startIndex + perPage;
+        const paginatedStudios = studiosWithUserRatings.slice(startIndex, endIndex);
+
+        return res.json({
+          findStudios: {
+            count: studiosWithUserRatings.length,
+            studios: paginatedStudios,
+          },
+        });
+      }
     }
 
     // If sorting by rating without favorite filter, handle on Peek side
@@ -1968,6 +2140,53 @@ export const findTags = async (req: Request, res: Response) => {
         });
 
         tagIdsToFetch = matchingRatings.map(r => r.tagId);
+
+        if (tagIdsToFetch.length === 0) {
+          return res.json({
+            findTags: {
+              count: 0,
+              tags: [],
+            },
+          });
+        }
+      }
+
+      // If filtering by rating, get matching tag IDs from Peek
+      if (ratingFilterValues.rating100 !== undefined) {
+        const rating100 = ratingFilterValues.rating100;
+        const whereClause: any = { userId };
+
+        // Build rating condition based on modifier
+        if (rating100.modifier === 'BETWEEN' && rating100.value2 !== undefined) {
+          // Between min and max
+          whereClause.rating = {
+            gte: parseInt(rating100.value),
+            lte: parseInt(rating100.value2)
+          };
+        } else if (rating100.modifier === 'GREATER_THAN') {
+          // Greater than or equal to min
+          whereClause.rating = { gte: parseInt(rating100.value) };
+        } else if (rating100.modifier === 'LESS_THAN') {
+          // Less than or equal to max
+          whereClause.rating = { lte: parseInt(rating100.value) };
+        } else if (rating100.modifier === 'EQUALS') {
+          // Exact rating value
+          whereClause.rating = parseInt(rating100.value);
+        }
+
+        const matchingRatings = await prisma.tagRating.findMany({
+          where: whereClause,
+          select: { tagId: true },
+        });
+
+        const ratingTagIds = matchingRatings.map(r => r.tagId);
+
+        // If we already have tagIdsToFetch from favorite filter, intersect them
+        if (tagIdsToFetch) {
+          tagIdsToFetch = tagIdsToFetch.filter(id => ratingTagIds.includes(id));
+        } else {
+          tagIdsToFetch = ratingTagIds;
+        }
 
         if (tagIdsToFetch.length === 0) {
           return res.json({

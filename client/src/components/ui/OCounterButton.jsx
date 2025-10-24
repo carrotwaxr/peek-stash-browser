@@ -10,13 +10,15 @@ import { apiPost } from '../../services/api.js';
  * @param {Function} onIncrement - Optional callback after successful increment (receives new count)
  * @param {string} className - Optional additional CSS classes
  * @param {boolean} disabled - Whether button is disabled
+ * @param {boolean} readOnly - Display-only mode (no click functionality)
  */
 const OCounterButton = ({
   sceneId,
   initialCount = 0,
   onIncrement,
   className = '',
-  disabled = false
+  disabled = false,
+  readOnly = false
 }) => {
   const [count, setCount] = useState(initialCount);
   const [isIncrementing, setIsIncrementing] = useState(false);
@@ -33,7 +35,7 @@ const OCounterButton = ({
     e.preventDefault();
     e.stopPropagation();
 
-    if (disabled || isIncrementing || !sceneId) {
+    if (readOnly || disabled || isIncrementing || !sceneId) {
       return;
     }
 
@@ -71,15 +73,15 @@ const OCounterButton = ({
   return (
     <button
       onClick={handleClick}
-      disabled={disabled || isIncrementing}
+      disabled={disabled || isIncrementing || readOnly}
       className={`flex items-center gap-1 transition-all ${className}`}
       style={{
-        cursor: disabled || isIncrementing ? 'not-allowed' : 'pointer',
+        cursor: readOnly ? 'default' : (disabled || isIncrementing ? 'not-allowed' : 'pointer'),
         opacity: disabled ? 0.5 : 1,
         position: 'relative',
       }}
-      title={error || (isIncrementing ? 'Incrementing...' : 'Click to increment O counter')}
-      aria-label={`O counter: ${count}. Click to increment.`}
+      title={error || (readOnly ? `O counter: ${count}` : (isIncrementing ? 'Incrementing...' : 'Click to increment O counter'))}
+      aria-label={readOnly ? `O counter: ${count}` : `O counter: ${count}. Click to increment.`}
     >
       <span
         className={`transition-transform ${showFeedback ? 'scale-125' : 'scale-100'}`}

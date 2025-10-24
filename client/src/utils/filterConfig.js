@@ -1196,6 +1196,14 @@ export const buildTagFilter = (filters) => {
     tagFilter.favorite = true;
   }
 
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min || filters.rating?.max) {
+    tagFilter.rating100 = {};
+    if (filters.rating.min) tagFilter.rating100.value = parseInt(filters.rating.min);
+    tagFilter.rating100.modifier = filters.rating.max ? "BETWEEN" : "GREATER_THAN";
+    if (filters.rating.max) tagFilter.rating100.value2 = parseInt(filters.rating.max);
+  }
+
   // Range filter
   if (filters.sceneCount?.min || filters.sceneCount?.max) {
     tagFilter.scene_count = {};
