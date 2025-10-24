@@ -11,7 +11,27 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
+ * IMPORTANT: Rating and Favorite Sync Policy
+ *
+ * Unlike watch history fields (play_count, o_counter, last_played_at),
+ * ratings and favorites are NEVER synced back to Stash, regardless of
+ * user sync settings.
+ *
+ * Rationale:
+ * - Ratings/favorites are subjective personal preferences
+ * - Multiple Peek users sharing a Stash instance would constantly
+ *   overwrite each other's values
+ * - Watch history fields accumulate (counts increase, timestamps update)
+ *   and can be meaningfully synced
+ * - Ratings/favorites are Peek-only to provide true per-user experience
+ *
+ * These endpoints ONLY update Peek's local database. DO NOT add Stash
+ * API calls to these functions.
+ */
+
+/**
  * Update rating and/or favorite for a scene
+ * PEEK-ONLY: Does not sync to Stash
  */
 export async function updateSceneRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -70,6 +90,7 @@ export async function updateSceneRating(req: AuthenticatedRequest, res: Response
 
 /**
  * Update rating and/or favorite for a performer
+ * PEEK-ONLY: Does not sync to Stash
  */
 export async function updatePerformerRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -128,6 +149,7 @@ export async function updatePerformerRating(req: AuthenticatedRequest, res: Resp
 
 /**
  * Update rating and/or favorite for a studio
+ * PEEK-ONLY: Does not sync to Stash
  */
 export async function updateStudioRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -186,6 +208,7 @@ export async function updateStudioRating(req: AuthenticatedRequest, res: Respons
 
 /**
  * Update rating and/or favorite for a tag
+ * PEEK-ONLY: Does not sync to Stash
  */
 export async function updateTagRating(req: AuthenticatedRequest, res: Response) {
   try {
