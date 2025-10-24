@@ -411,62 +411,6 @@ function removeWatchHistoryFilters(scene_filter: any): any {
 }
 
 /**
- * Check if scene_filter contains rating or favorite filters
- * These are per-user fields stored in Peek, not Stash
- */
-function hasRatingFilters(scene_filter: any): boolean {
-  if (!scene_filter) return false;
-  return scene_filter.rating !== undefined || scene_filter.favorite !== undefined;
-}
-
-/**
- * Remove rating and favorite filters from scene_filter
- * These will be applied after fetching from Stash
- */
-function removeRatingFilters(scene_filter: any): any {
-  if (!scene_filter) return scene_filter;
-
-  const cleaned = { ...scene_filter };
-  delete cleaned.rating;
-  delete cleaned.favorite;
-
-  return cleaned;
-}
-
-/**
- * Extract rating filter values from scene_filter
- */
-function getRatingFilterValues(scene_filter: any): { rating?: any; favorite?: boolean } {
-  return {
-    rating: scene_filter?.rating,
-    favorite: scene_filter?.favorite,
-  };
-}
-
-/**
- * Apply rating filters to scenes (filter by per-user rating/favorite values)
- */
-function applyRatingFilters(scenes: any[], ratingFilters: { rating?: any; favorite?: boolean }): any[] {
-  return scenes.filter(scene => {
-    // Filter by favorite
-    if (ratingFilters.favorite !== undefined) {
-      const sceneFavorite = scene.favorite || false;
-      if (sceneFavorite !== ratingFilters.favorite) {
-        return false;
-      }
-    }
-
-    // Filter by rating (if rating filter is implemented in the future)
-    if (ratingFilters.rating !== undefined) {
-      // Rating filter logic can be added here
-      // For now, we only support favorite filtering
-    }
-
-    return true;
-  });
-}
-
-/**
  * Check if a sort field is a rating field
  */
 function isRatingField(field: string): boolean {
@@ -494,6 +438,45 @@ function removeRatingFilters(filter: any): any {
     delete cleaned[field];
   });
   return cleaned;
+}
+
+/**
+ * Extract rating filter values from filter
+ */
+function getRatingFilterValues(filter: any): { rating?: any; rating100?: any; favorite?: boolean } {
+  return {
+    rating: filter?.rating,
+    rating100: filter?.rating100,
+    favorite: filter?.favorite,
+  };
+}
+
+/**
+ * Apply rating filters to scenes (filter by per-user rating/favorite values)
+ */
+function applyRatingFilters(scenes: any[], ratingFilters: { rating?: any; rating100?: any; favorite?: boolean }): any[] {
+  return scenes.filter(scene => {
+    // Filter by favorite
+    if (ratingFilters.favorite !== undefined) {
+      const sceneFavorite = scene.favorite || false;
+      if (sceneFavorite !== ratingFilters.favorite) {
+        return false;
+      }
+    }
+
+    // Filter by rating (if rating filter is implemented in the future)
+    if (ratingFilters.rating !== undefined) {
+      // Rating filter logic can be added here
+      // For now, we only support favorite filtering
+    }
+
+    if (ratingFilters.rating100 !== undefined) {
+      // Rating100 filter logic can be added here
+      // For now, we only support favorite filtering
+    }
+
+    return true;
+  });
 }
 
 /**
