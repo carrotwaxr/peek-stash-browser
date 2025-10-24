@@ -29,6 +29,7 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import playlistRoutes from "./routes/playlist.js";
 import watchHistoryRoutes from "./routes/watchHistory.js";
+import ratingsRoutes from "./routes/ratings.js";
 import setupRoutes from "./routes/setup.js";
 import { authenticateToken } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
@@ -95,6 +96,9 @@ export const setupAPI = () => {
 
   // Watch history routes (protected)
   app.use("/api/watch-history", watchHistoryRoutes);
+
+  // Rating and favorite routes (protected)
+  app.use("/api/ratings", ratingsRoutes);
 
   // New filtered search endpoints (protected)
   app.post("/api/library/scenes", authenticateToken, findScenes);
