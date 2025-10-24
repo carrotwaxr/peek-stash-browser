@@ -299,13 +299,21 @@ function isWatchHistoryField(field: string): boolean {
  * Get field value from scene object, handling nested properties
  */
 function getFieldValue(scene: any, field: string): any {
-  // Direct field access
-  if (scene[field] !== undefined) {
-    return scene[field];
+  // Map plural sort field names to singular data field names
+  // Stash uses plural for sort (scenes_count) but singular in data (scene_count)
+  const fieldMap: Record<string, string> = {
+    'scenes_count': 'scene_count',
+  };
+
+  const mappedField = fieldMap[field] || field;
+
+  // Direct field access with mapped field name
+  if (scene[mappedField] !== undefined) {
+    return scene[mappedField];
   }
 
   // Try snake_case to camelCase conversion
-  const camelField = field.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+  const camelField = mappedField.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
   if (scene[camelField] !== undefined) {
     return scene[camelField];
   }
@@ -432,7 +440,7 @@ function isPeekOnlySortField(field: string): boolean {
  */
 function hasRatingFilters(filter: any): boolean {
   if (!filter) return false;
-  const ratingFields = ['rating', 'rating100', 'favorite'];
+  const ratingFields = ['rating', 'rating100', 'favorite', 'filter_favorites'];
   return ratingFields.some(field => filter[field] !== undefined);
 }
 
@@ -442,7 +450,7 @@ function hasRatingFilters(filter: any): boolean {
 function removeRatingFilters(filter: any): any {
   if (!filter) return filter;
   const cleaned = { ...filter };
-  const ratingFields = ['rating', 'rating100', 'favorite'];
+  const ratingFields = ['rating', 'rating100', 'favorite', 'filter_favorites'];
   ratingFields.forEach(field => {
     delete cleaned[field];
   });
@@ -453,10 +461,13 @@ function removeRatingFilters(filter: any): any {
  * Extract rating filter values from filter
  */
 function getRatingFilterValues(filter: any): { rating?: any; rating100?: any; favorite?: boolean } {
+  // Handle both 'favorite' and 'filter_favorites' field names
+  const favoriteValue = filter?.favorite !== undefined ? filter.favorite : filter?.filter_favorites;
+
   return {
     rating: filter?.rating,
     rating100: filter?.rating100,
-    favorite: filter?.favorite,
+    favorite: favoriteValue,
   };
 }
 
@@ -565,28 +576,46 @@ async function findScenesWithCustomSort(
       return wh.sceneId;
     });
 
-    // If favorite filter is active, intersect with favorited scene IDs
-    if (favoriteSceneIds) {
-      const favoriteSet = new Set(favoriteSceneIds);
-      sceneIdsWithHistory = sceneIdsWithHistory.filter(id => favoriteSet.has(id));
-    }
-
     // Remove rating filters from scene_filter before querying Stash
     const cleanedSceneFilter = hasRatingFilter ? removeRatingFilters(scene_filter) : scene_filter;
 
-    // Step 2: Fetch full scene details from Stash for scenes with watch history
+    // If favorites filter is active, we should ONLY work with favorited scenes
+    // Don't intersect - use ALL favorited scenes (whether they have watch history or not)
+    let scenesToFetch: string[];
+    if (favoriteSceneIds) {
+      scenesToFetch = favoriteSceneIds;
+    } else {
+      scenesToFetch = sceneIdsWithHistory;
+    }
+
+    // Step 2: Fetch full scene details from Stash
     let scenesWithHistory: any[] = [];
-    if (sceneIdsWithHistory.length > 0) {
+    if (scenesToFetch && scenesToFetch.length > 0) {
       const historyScenes: FindScenesQuery = await stash.findScenes({
-        ids: sceneIdsWithHistory,
+        ids: scenesToFetch,
         scene_filter: cleanedSceneFilter as SceneFilterType,
       });
 
-      // Merge watch history stats with scene data
+      // Merge watch history stats with scene data (or inject zeros if no history)
       scenesWithHistory = historyScenes.findScenes.scenes.map((scene) => {
         const transformed = transformScene(scene as Scene);
         const userHistory = watchHistoryMap.get(scene.id);
-        return { ...transformed, ...userHistory };
+
+        // If scene has watch history, merge it; otherwise inject zeros
+        if (userHistory) {
+          return { ...transformed, ...userHistory };
+        } else {
+          return {
+            ...transformed,
+            resume_time: 0,
+            play_duration: 0,
+            play_count: 0,
+            play_history: [],
+            o_counter: 0,
+            o_history: [],
+            last_played_at: null,
+          };
+        }
       });
 
       // Step 3: Sort by requested field (using per-user data) with secondary sort by title
@@ -618,22 +647,30 @@ async function findScenesWithCustomSort(
       });
     }
 
-    // Step 4: Get total count from Stash (lightweight query)
-    // This ensures accurate pagination regardless of how many scenes have watch history
-    const countQuery: FindScenesQuery = await stash.findScenes({
-      filter: {
-        page: 1,
-        per_page: 1, // Minimal fetch, we only need the count
-        sort: sortField,
-        direction: sortDirection,
-      } as FindFilterType,
-      scene_filter: scene_filter as SceneFilterType,
-    });
-    const stashTotalCount = countQuery.findScenes.count || 0;
+    // Step 4: Calculate total count
+    let totalCount: number;
 
-    // Calculate actual total: Stash's count, accounting for scenes we already have in watch history
-    // (avoid double-counting scenes that appear in both Peek watch history AND Stash results)
-    const totalCount = scenesWithHistory.length + stashTotalCount - sceneIdsWithHistory.length;
+    if (favoriteSceneIds) {
+      // If favorites filter is active, we already have ALL favorited scenes
+      totalCount = scenesWithHistory.length;
+    } else {
+      // Get total count from Stash (lightweight query)
+      // This ensures accurate pagination regardless of how many scenes have watch history
+      const countQuery: FindScenesQuery = await stash.findScenes({
+        filter: {
+          page: 1,
+          per_page: 1, // Minimal fetch, we only need the count
+          sort: sortField,
+          direction: sortDirection,
+        } as FindFilterType,
+        scene_filter: cleanedSceneFilter as SceneFilterType,
+      });
+      const stashTotalCount = countQuery.findScenes.count || 0;
+
+      // Calculate actual total: Stash's count, accounting for scenes we already have in watch history
+      // (avoid double-counting scenes that appear in both Peek watch history AND Stash results)
+      totalCount = scenesWithHistory.length + stashTotalCount - sceneIdsWithHistory.length;
+    }
 
     // Step 5: Calculate pagination
     const startIndex = (page - 1) * perPage;
@@ -645,10 +682,11 @@ async function findScenesWithCustomSort(
     // Step 6: If page isn't full, query Stash for additional scenes
     // Use same sort field so Stash's aggregate values provide meaningful ordering
     // Keep fetching until we have enough scenes or run out of scenes
+    // SKIP this if favorites filter is active - we already have all favorited scenes
     const remainingSlots = perPage - historyScenesOnPage.length;
     let fillScenes: any[] = [];
 
-    if (remainingSlots > 0) {
+    if (remainingSlots > 0 && !favoriteSceneIds) {
       const historyCount = scenesWithHistory.length;
       const stashSkip = Math.max(0, startIndex - historyCount);
 
@@ -729,10 +767,10 @@ async function findScenesWithCustomSort(
             sort: sortField,
             direction: sortDirection,
           } as FindFilterType,
-          scene_filter: scene_filter as SceneFilterType,
+          scene_filter: cleanedSceneFilter as SceneFilterType,
         });
 
-        // Filter out all scenes with watch history, skip to correct offset, take what we need
+        // Filter out all scenes with watch history (duplicates)
         const allScenesWithoutHistory = fullQuery.findScenes.scenes
           .filter((scene) => !sceneIdsWithHistory.includes(scene.id))
           .slice(stashSkip, stashSkip + remainingSlots);
@@ -891,9 +929,21 @@ export const findScenes = async (req: Request, res: Response) => {
     // Check if there are rating/favorite filters that need to be handled on Peek side
     const hasRatingFilter = hasRatingFilters(scene_filter);
 
+    logger.info('Scenes filter check', {
+      userId,
+      sortField,
+      hasRatingFilter,
+      scene_filter,
+    });
+
     // If filtering by rating/favorite, fetch matching scene IDs from Peek first
     if (hasRatingFilter) {
       const ratingFilterValues = getRatingFilterValues(scene_filter);
+
+      logger.info('Scenes has rating filter', {
+        userId,
+        ratingFilterValues,
+      });
 
       // Query Peek database for scenes matching the rating filter
       let peekQuery: any = { userId };
@@ -1000,10 +1050,13 @@ export const findScenes = async (req: Request, res: Response) => {
         isRatingField: isRatingField(sortField),
       });
 
-      // Fetch all scenes with fallback sort
+      // Strip rating filters before querying Stash
+      const cleanedSceneFilter = removeRatingFilters(scene_filter);
+
+      // Fetch ALL scenes (per_page: -1 gets everything)
       const scenes: FindScenesQuery = await stash.findScenes({
-        filter: { page: 1, per_page: 1000, sort: 'date', direction: sortDirection } as FindFilterType,
-        scene_filter: scene_filter as SceneFilterType,
+        filter: { page: 1, per_page: -1, sort: 'date', direction: 'DESC' } as FindFilterType,
+        scene_filter: cleanedSceneFilter as SceneFilterType,
         ids: ids as string[],
         scene_ids: scene_ids as number[],
       });
@@ -1448,6 +1501,17 @@ export const findPerformers = async (req: Request, res: Response) => {
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
 
+    logger.info('findPerformers request', {
+      userId,
+      sortField,
+      sortDirection,
+      page,
+      perPage,
+      performer_filter,
+      hasIds: !!ids,
+      hasPerformerIds: !!performer_ids,
+    });
+
     // If filtering by performer stat fields, only return performers from user's watch history
     if (hasPerformerStatFilters(performer_filter)) {
       // Calculate per-user performer stats
@@ -1657,10 +1721,19 @@ export const findPerformers = async (req: Request, res: Response) => {
 
     // If sorting by rating without favorite filter, handle on Peek side
     if (sortField && isRatingField(sortField)) {
-      // Fetch all performers with fallback sort
+      logger.info('Performers rating sort detected', {
+        userId,
+        sortField,
+        sortDirection,
+      });
+
+      // Strip rating filters before querying Stash
+      const cleanedPerformerFilter = removeRatingFilters(performer_filter);
+
+      // Fetch ALL performers (per_page: -1 gets everything)
       const performers: FindPerformersQuery = await stash.findPerformers({
-        filter: { page: 1, per_page: 1000, sort: 'name', direction: sortDirection } as FindFilterType,
-        performer_filter: performer_filter as PerformerFilterType,
+        filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
+        performer_filter: cleanedPerformerFilter as PerformerFilterType,
         ids: ids as string[],
         performer_ids: performer_ids as number[],
       });
@@ -1669,9 +1742,19 @@ export const findPerformers = async (req: Request, res: Response) => {
         transformPerformer(performer as any)
       );
 
+      logger.info('Fetched performers for rating sort', {
+        userId,
+        count: transformedPerformers.length,
+      });
+
       // Inject user data
       let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
       performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
+
+      logger.info('Sample ratings after injection', {
+        userId,
+        sample: performersWithUserData.slice(0, 5).map(p => ({ name: p.name, rating: p.rating, rating100: p.rating100 })),
+      });
 
       // Sort by rating
       performersWithUserData.sort((a, b) => {
@@ -1862,10 +1945,13 @@ export const findStudios = async (req: Request, res: Response) => {
 
     // If sorting by rating without favorite filter, handle on Peek side
     if (sortField && isPeekOnlySortField(sortField)) {
-      // Fetch all studios with fallback sort
+      // Strip rating filters before querying Stash
+      const cleanedStudioFilter = removeRatingFilters(studio_filter);
+
+      // Fetch ALL studios (per_page: -1 gets everything)
       const studios: FindStudiosQuery = await stash.findStudios({
-        filter: { page: 1, per_page: 1000, sort: 'name', direction: sortDirection } as FindFilterType,
-        studio_filter: studio_filter as StudioFilterType,
+        filter: { page: 1, per_page: -1, sort: 'name', direction: 'ASC' } as FindFilterType,
+        studio_filter: cleanedStudioFilter as StudioFilterType,
         ids: ids as string[],
       });
 
