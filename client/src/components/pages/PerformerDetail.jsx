@@ -441,6 +441,26 @@ const PerformerStats = ({ performer }) => {
           value={performer?.o_counter || 0}
           valueColor="var(--accent-primary)"
         />
+        <StatField
+          label="Galleries:"
+          value={performer?.gallery_count || 0}
+          valueColor="var(--text-secondary)"
+        />
+        <StatField
+          label="Images:"
+          value={performer?.image_count || 0}
+          valueColor="var(--text-secondary)"
+        />
+        <StatField
+          label="Groups:"
+          value={performer?.group_count || 0}
+          valueColor="var(--text-secondary)"
+        />
+        <StatField
+          label="Movies:"
+          value={performer?.movie_count || 0}
+          valueColor="var(--text-secondary)"
+        />
       </div>
 
       {/* Visual Rating Display */}

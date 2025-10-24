@@ -102,6 +102,24 @@ const SceneDetails = ({
                   )}
                 </div>
 
+                {/* Director */}
+                {scene.director && (
+                  <div className="mb-4">
+                    <h3
+                      className="text-sm font-medium mb-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Director
+                    </h3>
+                    <p
+                      className="text-base"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {scene.director}
+                    </p>
+                  </div>
+                )}
+
                 {/* Description - Full Width */}
                 {scene.details && (
                   <div className="mb-6">

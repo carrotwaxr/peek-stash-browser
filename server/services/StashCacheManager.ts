@@ -123,8 +123,9 @@ class StashCacheManager {
       const stash = getStash();
 
       // Fetch all entities in parallel
+      // Use compact query for scenes to reduce bandwidth (trimmed nested objects)
       const [scenesResult, performersResult, studiosResult, tagsResult] = await Promise.all([
-        stash.findScenes({ filter: { per_page: -1 } }),
+        stash.findScenesCompact({ filter: { per_page: -1 } }),
         stash.findPerformers({ filter: { per_page: -1 } }),
         stash.findStudios({ filter: { per_page: -1 } }),
         stash.findTags({ filter: { per_page: -1 } }),
