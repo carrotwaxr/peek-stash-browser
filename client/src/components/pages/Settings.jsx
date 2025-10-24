@@ -24,16 +24,6 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  // Get rating color based on value
-  const getRatingColor = (rating) => {
-    if (!rating) return 'var(--text-muted)';
-    if (rating >= 80) return 'var(--rating-excellent)';
-    if (rating >= 60) return 'var(--rating-good)';
-    if (rating >= 40) return 'var(--rating-average)';
-    if (rating >= 20) return 'var(--rating-poor)';
-    return 'var(--rating-bad)';
-  };
-
   // Settings state
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
@@ -201,45 +191,13 @@ const Settings = () => {
               </div>
 
               {/* Status Messages */}
-              <div className="mb-8">
+              <div>
                 <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Status Messages</h4>
                 <div className="space-y-3">
                   <SuccessMessage message="Operation completed successfully!" />
                   <InfoMessage message="Here's some helpful information." />
                   <WarningMessage message="Please review this warning." />
                   <ErrorMessage message="An error occurred during processing." />
-                </div>
-              </div>
-
-              {/* Rating Gradient */}
-              <div>
-                <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Rating Colors (0-100)</h4>
-                <div className="space-y-2">
-                  {[
-                    { rating: 0, label: "No rating" },
-                    { rating: 10, label: "0-19: Bad" },
-                    { rating: 20, label: "20-39: Poor" },
-                    { rating: 30, label: "20-39: Poor" },
-                    { rating: 40, label: "40-59: Average" },
-                    { rating: 50, label: "40-59: Average" },
-                    { rating: 60, label: "60-79: Good" },
-                    { rating: 70, label: "60-79: Good" },
-                    { rating: 80, label: "80-100: Excellent" },
-                    { rating: 90, label: "80-100: Excellent" },
-                    { rating: 100, label: "80-100: Excellent" },
-                  ].map((item) => (
-                    <div key={item.rating} className="flex items-center gap-3">
-                      <div
-                        className="w-16 h-8 rounded flex items-center justify-center text-white text-sm font-semibold"
-                        style={{ backgroundColor: getRatingColor(item.rating) }}
-                      >
-                        {item.rating}
-                      </div>
-                      <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>

@@ -20,6 +20,8 @@ import {
   findPerformersMinimal,
   findStudiosMinimal,
   findTagsMinimal,
+} from "./controllers/library-simplified.js";
+import {
   updateScene,
   updatePerformer,
   updateStudio,
@@ -32,8 +34,9 @@ import playlistRoutes from "./routes/playlist.js";
 import watchHistoryRoutes from "./routes/watchHistory.js";
 import ratingsRoutes from "./routes/ratings.js";
 import setupRoutes from "./routes/setup.js";
-import { authenticateToken } from "./middleware/auth.js";
+import { authenticateToken, requireCacheReady } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
+import { stashCacheManager } from "./services/StashCacheManager.js";
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -83,6 +86,12 @@ export const setupAPI = () => {
     });
   });
 
+  // Cache stats endpoint (admin only - authenticated)
+  app.get("/api/stats", authenticateToken, (req, res) => {
+    const stats = stashCacheManager.getStats();
+    res.json(stats);
+  });
+
   // Media proxy (public - no auth required for images)
   app.get("/api/proxy/stash", proxyStashMedia);
 
@@ -104,16 +113,16 @@ export const setupAPI = () => {
   // Rating and favorite routes (protected)
   app.use("/api/ratings", ratingsRoutes);
 
-  // New filtered search endpoints (protected)
-  app.post("/api/library/scenes", authenticateToken, findScenes);
-  app.post("/api/library/performers", authenticateToken, findPerformers);
-  app.post("/api/library/studios", authenticateToken, findStudios);
-  app.post("/api/library/tags", authenticateToken, findTags);
+  // New filtered search endpoints (protected + require cache ready)
+  app.post("/api/library/scenes", authenticateToken, requireCacheReady, findScenes);
+  app.post("/api/library/performers", authenticateToken, requireCacheReady, findPerformers);
+  app.post("/api/library/studios", authenticateToken, requireCacheReady, findStudios);
+  app.post("/api/library/tags", authenticateToken, requireCacheReady, findTags);
 
   // Minimal data endpoints for filter dropdowns (id + name only)
-  app.post("/api/library/performers/minimal", authenticateToken, findPerformersMinimal);
-  app.post("/api/library/studios/minimal", authenticateToken, findStudiosMinimal);
-  app.post("/api/library/tags/minimal", authenticateToken, findTagsMinimal);
+  app.post("/api/library/performers/minimal", authenticateToken, requireCacheReady, findPerformersMinimal);
+  app.post("/api/library/studios/minimal", authenticateToken, requireCacheReady, findStudiosMinimal);
+  app.post("/api/library/tags/minimal", authenticateToken, requireCacheReady, findTagsMinimal);
 
   // Update endpoints for CRUD operations
   app.put("/api/library/scenes/:id", authenticateToken, updateScene);

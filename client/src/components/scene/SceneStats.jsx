@@ -3,7 +3,7 @@ import OCounterButton from '../ui/OCounterButton.jsx';
 import Tooltip from '../ui/Tooltip.jsx';
 
 /**
- * Scene stats: rating, o counter, play count, organized, resolution, file size
+ * Scene stats: o counter, play count, organized, resolution, file size
  */
 const SceneStats = ({
   scene,
@@ -13,28 +13,8 @@ const SceneStats = ({
   hideFileInfo = false, // Hide resolution and filesize (for when they're shown elsewhere)
   centered = false // Center the stats
 }) => {
-  // Calculate color based on rating (gradient from red to yellow to green)
-  const getRatingColor = (rating) => {
-    if (!rating) return 'var(--text-muted)';
-
-    if (rating >= 80) {
-      return 'var(--rating-excellent)';
-    } else if (rating >= 60) {
-      return 'var(--rating-good)';
-    } else if (rating >= 40) {
-      return 'var(--rating-average)';
-    } else if (rating >= 20) {
-      return 'var(--rating-poor)';
-    } else {
-      return 'var(--rating-bad)';
-    }
-  };
-
   return (
     <div className={`flex ${noWrap ? 'flex-nowrap' : 'flex-wrap'} items-center ${centered ? 'justify-center' : ''} gap-2 md:gap-4 text-xs ${className}`} style={{ color: 'var(--text-muted)' }}>
-      <span style={{ color: getRatingColor(scene.rating100), fontWeight: scene.rating100 ? '600' : '400' }}>
-        {scene.rating100 ? `${scene.rating100}/100` : '—'}
-      </span>
       <OCounterButton
         sceneId={scene.id}
         initialCount={scene.o_counter ?? 0}

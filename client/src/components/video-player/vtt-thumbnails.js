@@ -226,7 +226,8 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
   }
 
   getFullyQualifiedUrl(path, base) {
-    if (path.indexOf("//") >= 0) {
+    // If path contains "//" it's a full URL, or if it starts with "/" it's an absolute path
+    if (path.indexOf("//") >= 0 || path.charAt(0) === "/") {
       return path;
     }
 

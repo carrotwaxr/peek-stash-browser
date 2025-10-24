@@ -48,6 +48,8 @@ export const PERFORMER_SORT_OPTIONS = [
 export const STUDIO_SORT_OPTIONS = [
   { value: "created_at", label: "Created At" },
   { value: "name", label: "Name" },
+  { value: "o_counter", label: "O Count" },
+  { value: "play_count", label: "Play Count" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
   { value: "scenes_count", label: "Scene Count" },
@@ -58,6 +60,8 @@ export const STUDIO_SORT_OPTIONS = [
 export const TAG_SORT_OPTIONS = [
   { value: "created_at", label: "Created At" },
   { value: "name", label: "Name" },
+  { value: "o_counter", label: "O Count" },
+  { value: "play_count", label: "Play Count" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
   { value: "scenes_count", label: "Scene Count" },
@@ -636,6 +640,22 @@ export const STUDIO_FILTER_OPTIONS = [
     max: 1000,
   },
   {
+    key: "oCounter",
+    label: "O Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+  {
+    key: "playCount",
+    label: "Play Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+  {
     key: "favorite",
     label: "Favorite Studios",
     type: "checkbox",
@@ -699,6 +719,22 @@ export const TAG_FILTER_OPTIONS = [
   {
     key: "sceneCount",
     label: "Scene Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+  {
+    key: "oCounter",
+    label: "O Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+  {
+    key: "playCount",
+    label: "Play Count",
     type: "range",
     defaultValue: {},
     min: 0,

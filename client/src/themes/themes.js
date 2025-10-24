@@ -42,13 +42,6 @@ export const themes = {
       "--controls-bg": "rgba(10, 10, 11, 0.8)",
       "--progress-bg": "#2a2a32",
 
-      // Rating gradient (0-100 scale)
-      "--rating-excellent": "#22c55e", // 80-100: Green
-      "--rating-good": "#84cc16", // 60-79: Lime
-      "--rating-average": "#eab308", // 40-59: Yellow
-      "--rating-poor": "#f97316", // 20-39: Orange
-      "--rating-bad": "#ef4444", // 0-19: Red
-
       // Role badges
       "--role-admin-bg": "rgba(168, 85, 247, 0.1)",
       "--role-admin-text": "#a855f7",
@@ -113,13 +106,6 @@ export const themes = {
       "--controls-bg": "rgba(0, 0, 0, 0.7)",
       "--progress-bg": "#e5e7eb",
 
-      // Rating gradient (0-100 scale)
-      "--rating-excellent": "#059669", // 80-100: Green
-      "--rating-good": "#65a30d", // 60-79: Lime
-      "--rating-average": "#ca8a04", // 40-59: Yellow
-      "--rating-poor": "#ea580c", // 20-39: Orange
-      "--rating-bad": "#dc2626", // 0-19: Red
-
       // Role badges
       "--role-admin-bg": "rgba(109, 44, 227, 0.1)", // Purple tint to match primary
       "--role-admin-text": "#6D2CE3", // Match primary
@@ -182,13 +168,6 @@ export const themes = {
       "--player-bg": "#000000",
       "--controls-bg": "rgba(30, 41, 59, 0.8)",
       "--progress-bg": "#475569",
-
-      // Rating gradient (0-100 scale)
-      "--rating-excellent": "#22c55e", // 80-100: Green
-      "--rating-good": "#84cc16", // 60-79: Lime
-      "--rating-average": "#eab308", // 40-59: Yellow
-      "--rating-poor": "#f97316", // 20-39: Orange
-      "--rating-bad": "#ef4444", // 0-19: Red
 
       // Role badges
       "--role-admin-bg": "rgba(139, 92, 246, 0.1)",
@@ -254,13 +233,6 @@ export const themes = {
       "--controls-bg": "rgba(0, 0, 0, 0.7)",
       "--progress-bg": "#4F1B74",
 
-      // Rating gradient (0-100 scale)
-      "--rating-excellent": "#4ade80", // 80-100: Bright green
-      "--rating-good": "#a3e635", // 60-79: Lime
-      "--rating-average": "#fbbf24", // 40-59: Yellow
-      "--rating-poor": "#fb923c", // 20-39: Orange
-      "--rating-bad": "#f87171", // 0-19: Soft red
-
       // Role badges
       "--role-admin-bg": "rgba(153, 132, 212, 0.15)", // Purple tint matching secondary
       "--role-admin-text": "#9984D4", // Match secondary color
@@ -324,13 +296,6 @@ export const themes = {
       "--player-bg": "#000000",
       "--controls-bg": "rgba(0, 0, 0, 0.7)",
       "--progress-bg": "#2a2a32",
-
-      // Rating gradient (0-100 scale)
-      "--rating-excellent": "#22c55e", // 80-100: Green
-      "--rating-good": "#a3e635", // 60-79: Lime
-      "--rating-average": "#fbbf24", // 40-59: Yellow
-      "--rating-poor": "#fb923c", // 20-39: Orange
-      "--rating-bad": "#f87171", // 0-19: Red
 
       // Role badges
       "--role-admin-bg": "rgba(255, 163, 26, 0.15)", // Orange tint matching primary

@@ -11,6 +11,7 @@ import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import EntityImage from "../ui/EntityImage.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
+import OCounterButton from "../ui/OCounterButton.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -184,6 +185,7 @@ const TagCard = forwardRef(
           />
 
           <div className="flex-1 min-w-0">
+            {/* Name */}
             <h3
               className="font-semibold mb-2"
               style={{ color: "var(--text-primary)" }}
@@ -191,6 +193,25 @@ const TagCard = forwardRef(
             >
               {truncateText(tag.name, 30)}
             </h3>
+
+            {/* Scene Count */}
+            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              {tag.scene_count || 0} scene{tag.scene_count !== 1 ? "s" : ""}
+            </div>
+
+            {/* Status Icons */}
+            <div className="flex flex-wrap items-center gap-2 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              <span>
+                <span style={{ color: "var(--icon-play-count)" }}>▶</span> {tag.play_count || 0}
+              </span>
+              <div onClick={(e) => e.preventDefault()}>
+                <OCounterButton
+                  initialCount={tag.o_counter || 0}
+                  readOnly={true}
+                  className="text-xs"
+                />
+              </div>
+            </div>
 
             {/* Rating and Favorite */}
             <div className="flex items-center mb-2" onClick={(e) => e.preventDefault()}>
@@ -203,15 +224,7 @@ const TagCard = forwardRef(
               />
             </div>
 
-            {tag.scene_count > 0 && (
-              <p
-                className="text-sm mb-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {tag.scene_count} scene{tag.scene_count !== 1 ? "s" : ""}
-              </p>
-            )}
-
+            {/* Description (optional) */}
             {tag.description && (
               <p
                 className="text-sm mt-2"
