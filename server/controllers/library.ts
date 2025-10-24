@@ -670,11 +670,14 @@ async function findScenesWithCustomSort(
     // Step 7: Combine both groups (history scenes first, then fill scenes)
     const finalScenes = [...historyScenesOnPage, ...fillScenes];
 
+    // Step 8: Inject user ratings
+    const scenesWithRatings = await injectUserSceneRatings(finalScenes, userId);
+
     // Return properly formatted response matching Stash's structure
     res.json({
       findScenes: {
         count: totalCount,
-        scenes: finalScenes,
+        scenes: scenesWithRatings,
       },
     });
   } catch (error) {
@@ -1113,7 +1116,10 @@ async function findPerformersWithCustomSort(
     );
 
     // Step 4: Inject per-user stats
-    const performersWithUserStats = await injectUserPerformerStats(transformedPerformers, userId);
+    let performersWithUserData = await injectUserPerformerStats(transformedPerformers, userId);
+    // Inject per-user ratings
+    performersWithUserData = await injectUserPerformerRatings(performersWithUserData, userId);
+    const performersWithUserStats = performersWithUserData;
 
     // Step 5: Sort by requested field
     performersWithUserStats.sort((a, b) => {
