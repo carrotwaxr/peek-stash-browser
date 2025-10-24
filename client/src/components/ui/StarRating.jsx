@@ -43,9 +43,16 @@ export default function StarRating({
     handleClick(starNumber, isLeftHalf);
   };
 
-  const handleMouseEnter = (starIndex) => {
+  const handleMouseMove = (e, starIndex) => {
     if (readonly || !onChange) return;
-    setHoverRating(starIndex);
+
+    // Determine if hovering over left half (half star) or right half (full star)
+    const rect = e.currentTarget.getBoundingClientRect();
+    const hoverX = e.clientX - rect.left;
+    const isLeftHalf = hoverX < rect.width / 2;
+
+    // Show half-star or full-star preview
+    setHoverRating(isLeftHalf ? starIndex - 0.5 : starIndex);
   };
 
   const handleMouseLeave = () => {
@@ -65,7 +72,7 @@ export default function StarRating({
         key={index}
         type="button"
         onClick={(e) => handleStarClick(e, starNumber)}
-        onMouseEnter={() => handleMouseEnter(starNumber)}
+        onMouseMove={(e) => handleMouseMove(e, starNumber)}
         onMouseLeave={handleMouseLeave}
         disabled={readonly || !onChange}
         className={`
