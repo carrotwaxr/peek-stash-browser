@@ -59,6 +59,7 @@ export const TAG_SORT_OPTIONS = [
   { value: "created_at", label: "Created At" },
   { value: "name", label: "Name" },
   { value: "random", label: "Random" },
+  { value: "rating", label: "Rating" },
   { value: "scenes_count", label: "Scene Count" },
   { value: "updated_at", label: "Updated At" },
 ];
