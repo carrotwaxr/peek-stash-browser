@@ -670,7 +670,7 @@ async function findScenesWithCustomSort(
             sort: sortField, // Use same sort field for better UX (Stash's aggregate values)
             direction: sortDirection,
           } as FindFilterType,
-          scene_filter: scene_filter as SceneFilterType,
+          scene_filter: cleanedSceneFilter as SceneFilterType,
         });
 
         // If Stash returns no scenes, we've exhausted the results
