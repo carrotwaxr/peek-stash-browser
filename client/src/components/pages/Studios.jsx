@@ -10,6 +10,8 @@ import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import EntityImage from "../ui/EntityImage.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
+import OCounterButton from "../ui/OCounterButton.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -188,37 +190,49 @@ const StudioCard = forwardRef(
           />
 
           <div className="flex-1 min-w-0">
+            {/* Name */}
             <h3
-              className="font-semibold mb-2"
+              className="font-semibold mb-1"
               style={{ color: "var(--text-primary)" }}
               title={studio.name}
             >
               {truncateText(studio.name, 30)}
             </h3>
 
-            {studio.scene_count > 0 && (
-              <p
-                className="text-sm mb-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {studio.scene_count} scene{studio.scene_count !== 1 ? "s" : ""}
-              </p>
-            )}
-
+            {/* URL */}
             {studio.url && (
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
                 {truncateText(studio.url, 40)}
               </p>
             )}
 
-            {studio.details && (
-              <p
-                className="text-sm mt-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {truncateText(studio.details, 80)}
-              </p>
-            )}
+            {/* Scene Count */}
+            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              {studio.scene_count || 0} scene{studio.scene_count !== 1 ? "s" : ""}
+            </div>
+
+            {/* Status Icons */}
+            <div className="flex flex-wrap items-center gap-2 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              <span>
+                <span style={{ color: "var(--icon-play-count)" }}>▶</span> {studio.play_count || 0}
+              </span>
+              <OCounterButton
+                initialCount={studio.o_counter || 0}
+                readOnly={true}
+                className="text-xs"
+              />
+            </div>
+
+            {/* Rating and Favorite */}
+            <div className="flex items-center" onClick={(e) => e.preventDefault()}>
+              <RatingControls
+                entityType="studio"
+                entityId={studio.id}
+                initialRating={studio.rating}
+                initialFavorite={studio.favorite || false}
+                size={16}
+              />
+            </div>
           </div>
         </div>
       </Link>

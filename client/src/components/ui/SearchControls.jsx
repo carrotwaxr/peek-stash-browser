@@ -12,11 +12,8 @@ import {
   FilterControl,
 } from "../ui/FilterControls.jsx";
 import {
-  ORGANIZED_OPTIONS,
   PERFORMER_FILTER_OPTIONS,
   PERFORMER_SORT_OPTIONS,
-  RATING_OPTIONS,
-  RESOLUTION_OPTIONS,
   SCENE_FILTER_OPTIONS,
   SCENE_SORT_OPTIONS,
   STUDIO_FILTER_OPTIONS,
@@ -524,7 +521,7 @@ const SearchControls = ({
       />
 
       {/* Top Pagination */}
-      {totalPages > 1 && (
+      {totalPages >= 1 && (
         <div className="mt-4 mb-4">
           <Pagination
             currentPage={currentPage}
@@ -633,8 +630,8 @@ const SearchControls = ({
         })}
       </FilterPanel>
       {children}
-      {/* Top Pagination */}
-      {totalPages > 1 && (
+      {/* Bottom Pagination */}
+      {totalPages >= 1 && (
         <div className="mt-4">
           <Pagination
             currentPage={currentPage}

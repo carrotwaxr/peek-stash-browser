@@ -10,7 +10,8 @@ import {
   updateUserRole,
   getFilterPresets,
   saveFilterPreset,
-  deleteFilterPreset
+  deleteFilterPreset,
+  syncFromStash
 } from "../controllers/user.js";
 
 const router = express.Router();
@@ -33,5 +34,7 @@ router.get("/all", getAllUsers);
 router.post("/create", createUser);
 router.delete("/:userId", deleteUser);
 router.put("/:userId/role", updateUserRole);
+router.put("/:userId/settings", updateUserSettings); // Admin can update any user's settings
+router.post("/:userId/sync-from-stash", syncFromStash); // Admin can sync Stash data for any user
 
 export default router;

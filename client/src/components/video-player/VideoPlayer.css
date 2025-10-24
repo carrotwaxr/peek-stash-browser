@@ -1,333 +1,36 @@
-/* VideoPlayer specific styles using CSS custom properties */
-
-.video-container {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background-color: var(--player-bg);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-}
-
-/* Poster view styles */
-.video-poster {
-  background: linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
-    linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
-    linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-  background-color: #0f0f0f;
-}
-
-.video-poster:hover .poster-play-button {
-  transform: scale(1.1);
-}
-
-.poster-play-button {
-  /* Match Video.js big play button size */
-  width: 7.5rem;
-  height: 7.5rem;
-  background: rgba(0, 0, 0, 0.7);
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  pointer-events: auto;
-  transition: transform 0.3s ease;
-}
-
-.poster-play-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  color: white;
-  margin-left: 0.25rem; /* Slight offset to center visually */
-}
-
-/* Mobile sizing for poster play button */
-@media (max-width: 768px) {
-  .poster-play-button {
-    width: 9rem !important;
-    height: 9rem !important;
-  }
-
-  .poster-play-icon {
-    width: 3rem !important;
-    height: 3rem !important;
-  }
-}
-
-.video-container .video-js {
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-}
-
-/* Override Video.js theme colors to match our theme */
-.video-js .vjs-control-bar {
-  background: var(--controls-bg);
-  backdrop-filter: blur(8px);
-}
-
-.video-js .vjs-big-play-button {
-  /* Size - larger than poster button (120px) */
-  width: 7.5rem !important;
-  height: 7.5rem !important;
-
-  /* Clean black circle background to match poster */
-  background: rgba(0, 0, 0, 0.7) !important;
-
-  /* Remove border - poster has none */
-  border: none !important;
-
-  /* Keep rounded */
-  border-radius: 50% !important;
-
-  /* Center the icon */
-  line-height: 7.5rem !important;
-
-  /* Transition for hover effect */
-  transition: all 0.3s ease !important;
-}
-
-.video-js .vjs-big-play-button:hover {
-  /* Scale on hover like poster button */
-  transform: scale(1.1);
-
-  /* Keep same background on hover - no color change */
-  background: rgba(0, 0, 0, 0.7) !important;
-  border: none !important;
-}
-
-/* Style the play icon to match poster */
-.video-js .vjs-big-play-button .vjs-icon-placeholder::before {
-  /* Make icon white and larger */
-  color: white !important;
-  font-size: 2rem !important;
-  line-height: 7.5rem !important;
-}
-
-.video-js .vjs-play-progress {
-  background-color: var(--accent-primary);
-}
-
-.video-js .vjs-load-progress {
-  background-color: rgba(255, 255, 255, 0.3);
-}
-
-.video-js .vjs-progress-holder {
-  background-color: var(--progress-bg);
-}
-
-/* Quality selector styling */
-.vjs-quality-selector {
-  position: relative;
-  display: flex;
-  align-items: center;
-  margin-right: 0.5rem;
-}
-
-.vjs-quality-button {
+/* Big play button - matching Stash's clean styling */
+.video-js .vjs-big-play-button,
+.video-js .vjs-big-play-button:hover,
+.video-js .vjs-big-play-button:focus,
+.video-js:hover .vjs-big-play-button {
   background: none;
   border: none;
-  color: white;
-  cursor: pointer;
-  padding: 0.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  border-radius: 4px;
-  transition: background-color 0.2s ease;
+  font-size: 10em;
 }
 
-.vjs-quality-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+/* Playlist navigation buttons - use ::before like Video.js icon fonts */
+.video-js .vjs-playlist-prev .vjs-icon-placeholder::before {
+  content: "‹‹";
 }
 
-.vjs-quality-menu {
+.video-js .vjs-playlist-next .vjs-icon-placeholder::before {
+  content: "››";
+}
+
+/* VTT Thumbnails - matching Stash's styling */
+.video-js .vjs-vtt-thumbnail-display {
   position: absolute;
-  bottom: 100%;
-  right: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: var(--shadow-md);
-  min-width: 100px;
-  z-index: 1000;
-  margin-bottom: 0.5rem;
+  border: 2px solid white;
+  border-radius: 2px;
+  bottom: 6em;
+  box-shadow: 0 0 7px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  pointer-events: none;
+  background-size: cover;
 }
 
-.vjs-quality-item {
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  transition: background-color 0.2s ease;
-}
-
-.vjs-quality-item:hover {
-  background-color: var(--bg-hover);
-}
-
-.vjs-quality-item:first-child {
-  border-radius: 6px 6px 0 0;
-}
-
-.vjs-quality-item:last-child {
-  border-radius: 0 0 6px 6px;
-}
-
-/*
- * IMPORTANT: Video.js applies highly-specific default styles.
- * We need !important to override Video.js's built-in styles for better UX.
- */
-
-/* Control bar - compact height */
-.video-js .vjs-control-bar {
-  height: auto !important;
-  min-height: 2.75rem !important;
-  padding: 0.25rem 0 !important;
-}
-
-/* All buttons - consistent sizing */
-.video-js .vjs-control-bar button.vjs-control {
-  width: 2.75rem !important;
-  height: 2.75rem !important;
-  min-height: 2.75rem !important;
-}
-
-/* Icon placeholders - larger and clearer */
-.video-js .vjs-control-bar .vjs-icon-placeholder::before {
-  font-size: 1.5rem !important;
-  line-height: 2.75rem !important;
-}
-
-/* Playlist navigation buttons */
-.vjs-playlist-prev,
-.vjs-playlist-next {
-  cursor: pointer;
-  background: none;
-  border: none;
-  color: #fff;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: center !important; /* Fix vertical alignment with other controls */
-}
-
-.vjs-playlist-prev:hover:not(:disabled),
-.vjs-playlist-next:hover:not(:disabled) {
-  color: var(--accent-primary);
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.vjs-playlist-prev:disabled,
-.vjs-playlist-next:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-/* Playlist buttons - text characters instead of icons */
-.video-js .vjs-control-bar .vjs-playlist-prev .vjs-icon-placeholder,
-.video-js .vjs-control-bar .vjs-playlist-next .vjs-icon-placeholder {
-  font-size: 1.5rem !important;
-  line-height: 2.75rem !important;
-  font-weight: bold !important;
-}
-
-/* Time displays - readable size */
-.video-js .vjs-control-bar .vjs-time-control {
-  font-size: 0.875rem !important;
-  padding: 0 0.5rem !important;
-  min-width: auto !important;
-}
-
-/* Progress control - vertically centered */
-.video-js .vjs-control-bar .vjs-progress-control {
-  align-self: center !important;
-}
-
-/* Progress bar - thicker and easier to click */
-.video-js .vjs-control-bar .vjs-progress-holder {
-  height: 0.5rem !important;
-}
-
-/* Playback rate control - fix alignment and sizing */
-.video-js .vjs-control-bar .vjs-playback-rate {
-  height: 2.75rem !important;
-  align-self: center !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
-.video-js .vjs-control-bar .vjs-playback-rate .vjs-playback-rate-value {
-  line-height: 2.75rem !important;
-  height: 2.75rem !important;
-  display: flex !important;
-  align-items: center !important;
-  padding: 0 0.5rem !important;
-}
-
-/* All menu button controls - consistent alignment */
-.video-js .vjs-control-bar .vjs-menu-button {
-  align-self: center !important;
-}
-
-/* Mobile-specific adjustments */
-@media (max-width: 768px) {
-  /* Big play button (center of video) - even larger on mobile for easier tapping */
-  .video-js .vjs-big-play-button {
-    width: 9rem !important;
-    height: 9rem !important;
-    line-height: 9rem !important;
-  }
-
-  /* Scale icon size proportionally on mobile */
-  .video-js .vjs-big-play-button .vjs-icon-placeholder::before {
-    font-size: 2.5rem !important;
-    line-height: 9rem !important;
-  }
-}
-
-/* Responsive video container */
-@media (max-width: 768px) {
-  .video-container {
-    aspect-ratio: 16 / 9;
-    margin: 0; /* Respect container padding for centered video */
-    border-radius: 8px; /* Keep rounded corners on mobile */
-  }
-}
-
-/* Full screen improvements */
-.video-js.vjs-fullscreen {
-  background-color: var(--player-bg);
-}
-
-.video-js.vjs-fullscreen .vjs-control-bar {
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-}
-
-/* Loading state */
-.video-js .vjs-loading-spinner {
-  border-color: var(--accent-primary) transparent var(--accent-primary)
-    transparent;
-}
-
-/* Volume control */
-.video-js .vjs-volume-level {
-  background-color: var(--accent-primary);
-}
-
-/* Custom space utilities for VideoPlayer */
-.space-y-4 > * + * {
-  margin-top: 1rem;
-}
-
-.space-y-6 > * + * {
-  margin-top: 1.5rem;
+/* Adjust thumbnail position on mobile/touch */
+.video-js.vjs-mobile-ui .vjs-vtt-thumbnail-display {
+  bottom: 2.8em;
 }

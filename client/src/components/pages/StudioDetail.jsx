@@ -4,6 +4,7 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
 import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 
@@ -67,17 +68,25 @@ const StudioDetail = () => {
               >
                 {studio?.name || `Studio ${studioId}`}
               </h1>
-              {studio?.favorite && (
-                <LucideStar size={32} color="#efdd03" fill="#efdd03" />
-              )}
             </div>
 
             {/* Aliases */}
             {studio?.aliases && studio.aliases.length > 0 && (
-              <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
+              <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
                 Also known as: {studio.aliases.join(", ")}
               </p>
             )}
+
+            {/* Rating Controls */}
+            <div className="mt-4">
+              <RatingControls
+                entityType="studio"
+                entityId={studio.id}
+                initialRating={studio.rating}
+                initialFavorite={studio.favorite || false}
+                size={24}
+              />
+            </div>
           </div>
 
           {/* Studio Logo - Below name on mobile, floats right on large screens */}
@@ -96,7 +105,7 @@ const StudioDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              studios: { value: [studioId], modifier: "INCLUDES" },
+              studios: { value: [parseInt(studioId, 10)], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
               studios: [

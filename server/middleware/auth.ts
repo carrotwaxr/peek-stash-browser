@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { Request, Response, NextFunction } from "express";
 import prisma from "../prisma/singleton.js";
+import { stashCacheManager } from "../services/StashCacheManager.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -66,6 +67,21 @@ export const requireAdmin = (
 ) => {
   if (!req.user || req.user.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required." });
+  }
+  next();
+};
+
+export const requireCacheReady = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (!stashCacheManager.isReady()) {
+    return res.status(503).json({
+      error: "Server is initializing",
+      message: "Cache is still loading. Please wait a moment and try again.",
+      ready: false,
+    });
   }
   next();
 };

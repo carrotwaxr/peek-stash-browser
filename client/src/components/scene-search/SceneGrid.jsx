@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
 import { LucideCheckSquare, LucideSquare } from "lucide-react";
 import SceneCard from "../ui/SceneCard.jsx";
+import SkeletonSceneCard from "../ui/SkeletonSceneCard.jsx";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import ErrorMessage from "../ui/ErrorMessage.jsx";
 import EmptyState from "../ui/EmptyState.jsx";
@@ -93,14 +94,7 @@ const SceneGrid = ({
     return (
       <div className="grid gap-6 scene-grid-responsive">
         {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="rounded-lg animate-pulse"
-            style={{
-              backgroundColor: "var(--bg-tertiary)",
-              height: "25rem"
-            }}
-          />
+          <SkeletonSceneCard key={i} />
         ))}
       </div>
     );

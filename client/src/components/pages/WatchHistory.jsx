@@ -23,6 +23,7 @@ const WatchHistory = () => {
     data: watchHistoryList,
     loading: loadingHistory,
     error,
+    refresh: refreshWatchHistory,
   } = useAllWatchHistory({
     inProgress: filterBy === "in_progress",
     limit: 100,
@@ -127,12 +128,11 @@ const WatchHistory = () => {
       setIsClearing(true);
       await apiDelete("/watch-history");
 
-      // Reset state
-      setScenes([]);
-      setShowConfirmDialog(false);
+      // Refresh watch history data from API
+      await refreshWatchHistory();
 
-      // Refetch watch history to update the UI
-      window.location.reload();
+      // Close dialog
+      setShowConfirmDialog(false);
     } catch (err) {
       console.error("Error clearing watch history:", err);
       alert("Failed to clear watch history. Please try again.");

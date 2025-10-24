@@ -1,16 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import {
-  Star,
-  Clock,
-  Film,
-  Zap,
-  Calendar,
-  Heart,
-  Tag,
-  Video,
-} from "lucide-react";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
 import BulkActionBar from "../ui/BulkActionBar.jsx";
@@ -19,67 +9,12 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import { CAROUSEL_DEFINITIONS, migrateCarouselPreferences } from "../../constants/carousels.js";
 
 const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
-
-const CAROUSEL_DEFINITIONS = [
-  {
-    title: "High Rated",
-    icon: <Star className="w-6 h-6" style={{ color: "var(--icon-rating)" }} />,
-    fetchKey: "highRatedScenes",
-  },
-  {
-    title: "Recently Added",
-    icon: <Clock className="w-6 h-6" style={{ color: "var(--accent-info)" }} />,
-    fetchKey: "recentlyAddedScenes",
-  },
-  {
-    title: "Feature Length",
-    icon: (
-      <Film className="w-6 h-6" style={{ color: "var(--accent-secondary)" }} />
-    ),
-    fetchKey: "longScenes",
-  },
-  {
-    title: "High Bitrate",
-    icon: (
-      <Zap className="w-6 h-6" style={{ color: "var(--accent-success)" }} />
-    ),
-    fetchKey: "highBitrateScenes",
-  },
-  {
-    title: "Barely Legal",
-    icon: (
-      <Calendar
-        className="w-6 h-6"
-        style={{ color: "var(--accent-warning)" }}
-      />
-    ),
-    fetchKey: "barelyLegalScenes",
-  },
-  {
-    title: "Favorite Performers",
-    icon: (
-      <Heart className="w-6 h-6" style={{ color: "var(--accent-error)" }} />
-    ),
-    fetchKey: "favoritePerformerScenes",
-  },
-  {
-    title: "Favorite Studios",
-    icon: <Video className="w-6 h-6" style={{ color: "var(--accent-info)" }} />,
-    fetchKey: "favoriteStudioScenes",
-  },
-  {
-    title: "Favorite Tags",
-    icon: (
-      <Tag className="w-6 h-6" style={{ color: "var(--accent-primary)" }} />
-    ),
-    fetchKey: "favoriteTagScenes",
-  },
-];
 
 const SCENES_PER_CAROUSEL = 12;
 
@@ -96,23 +31,13 @@ const Home = () => {
     const loadPreferences = async () => {
       try {
         const response = await api.get("/user/settings");
-        const prefs =
-          response.data.settings.carouselPreferences ||
-          CAROUSEL_DEFINITIONS.map((def, idx) => ({
-            id: def.fetchKey,
-            enabled: true,
-            order: idx,
-          }));
+        const prefs = migrateCarouselPreferences(
+          response.data.settings.carouselPreferences
+        );
         setCarouselPreferences(prefs);
       } catch {
         // Fallback to all enabled if fetch fails
-        setCarouselPreferences(
-          CAROUSEL_DEFINITIONS.map((def, idx) => ({
-            id: def.fetchKey,
-            enabled: true,
-            order: idx,
-          }))
-        );
+        setCarouselPreferences(migrateCarouselPreferences([]));
       } finally {
         setLoadingPreferences(false);
       }
@@ -173,24 +98,35 @@ const Home = () => {
         subtitle="Discover your favorite content and explore new scenes"
       />
 
-      {/* Continue Watching Carousel - Always at the top */}
-      <ContinueWatchingCarousel
-        selectedScenes={selectedScenes}
-        onToggleSelect={handleToggleSelect}
-      />
+      {activeCarousels.map((def) => {
+        const { title, iconComponent: IconComponent, iconProps, fetchKey, isSpecial } = def;
+        const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
 
-      {activeCarousels.map(({ title, icon, fetchKey }) => (
-        <HomeCarousel
-          key={fetchKey}
-          title={title}
-          icon={icon}
-          fetchKey={fetchKey}
-          createSceneClickHandler={createSceneClickHandler}
-          carouselQueries={carouselQueries}
-          selectedScenes={selectedScenes}
-          onToggleSelect={handleToggleSelect}
-        />
-      ))}
+        // Special handling for Continue Watching carousel
+        if (isSpecial && fetchKey === "continueWatching") {
+          return (
+            <ContinueWatchingCarousel
+              key={fetchKey}
+              selectedScenes={selectedScenes}
+              onToggleSelect={handleToggleSelect}
+            />
+          );
+        }
+
+        // Standard query-based carousel
+        return (
+          <HomeCarousel
+            key={fetchKey}
+            title={title}
+            icon={icon}
+            fetchKey={fetchKey}
+            createSceneClickHandler={createSceneClickHandler}
+            carouselQueries={carouselQueries}
+            selectedScenes={selectedScenes}
+            onToggleSelect={handleToggleSelect}
+          />
+        );
+      })}
 
       {/* Bulk Action Bar */}
       {selectedScenes.length > 0 && (

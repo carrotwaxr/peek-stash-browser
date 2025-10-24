@@ -4,6 +4,7 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
 import {
   LucideMars,
   LucideStar,
@@ -140,16 +141,24 @@ const PerformerDetail = () => {
               {performer.name}
             </h1>
             <PerformerGenderIcon gender={performer.gender} size={32} />
-            {performer.favorite && (
-              <LucideStar size={32} color="#efdd03" fill="#efdd03" />
-            )}
           </div>
 
           {performer?.alias_list?.length > 0 && (
-            <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
+            <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
               Also known as: {performer.alias_list.join(", ")}
             </p>
           )}
+
+          {/* Rating Controls */}
+          <div className="mt-4">
+            <RatingControls
+              entityType="performer"
+              entityId={performer.id}
+              initialRating={performer.rating}
+              initialFavorite={performer.favorite || false}
+              size={24}
+            />
+          </div>
         </div>
 
         {/* Two Column Layout - Image on left, content on right (lg+) */}
@@ -171,7 +180,7 @@ const PerformerDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              performers: { value: [performerId], modifier: "INCLUDES" },
+              performers: { value: [parseInt(performerId, 10)], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
               performers: [{ id: performerId, name: performer.name }],
@@ -431,6 +440,26 @@ const PerformerStats = ({ performer }) => {
           label="O-Count:"
           value={performer?.o_counter || 0}
           valueColor="var(--accent-primary)"
+        />
+        <StatField
+          label="Galleries:"
+          value={performer?.gallery_count || 0}
+          valueColor="var(--text-secondary)"
+        />
+        <StatField
+          label="Images:"
+          value={performer?.image_count || 0}
+          valueColor="var(--text-secondary)"
+        />
+        <StatField
+          label="Groups:"
+          value={performer?.group_count || 0}
+          valueColor="var(--text-secondary)"
+        />
+        <StatField
+          label="Movies:"
+          value={performer?.movie_count || 0}
+          valueColor="var(--text-secondary)"
         />
       </div>
 

@@ -1,102 +1,11 @@
 import videojs from "video.js";
 
 // Set VideoJS global log level to reduce console spam
-// Options: 'all', 'debug', 'info', 'warn', 'error', 'off'
 videojs.log.level("warn");
 
 /**
- * Configure HLS for VOD (Video On Demand) behavior
- * Sets duration from scene metadata when player reports Infinity
- */
-export const setupHLSforVOD = (player, scene) => {
-  let durationSet = false;
-
-  player.on("loadedmetadata", () => {
-    const duration = scene?.files?.[0]?.duration;
-    if (!durationSet && duration && player.duration() === Infinity) {
-      player.duration(duration);
-      durationSet = true;
-    }
-  });
-};
-
-/**
- * Manage loading buffer for smooth playback
- * Pauses playback when buffer is low and resumes when sufficient
- */
-export const setupLoadingBuffer = (player, minBufferSeconds = 6) => {
-  let isWaitingForBuffer = false;
-  let hasStartedPlayback = false;
-  let userPaused = false;
-
-  const checkBuffer = () => {
-    const currentTime = player.currentTime();
-    const buffered = player.buffered();
-
-    if (buffered.length > 0) {
-      const bufferedEnd = buffered.end(buffered.length - 1);
-      const bufferAhead = bufferedEnd - currentTime;
-
-      // If we're playing and buffer is low, pause and wait
-      if (
-        !player.paused() &&
-        bufferAhead < minBufferSeconds &&
-        !isWaitingForBuffer
-      ) {
-        isWaitingForBuffer = true;
-        userPaused = false;
-        player.pause();
-        player.addClass("vjs-waiting");
-      }
-
-      // If we're waiting for buffer and it's now sufficient, resume
-      if (isWaitingForBuffer && bufferAhead >= minBufferSeconds) {
-        isWaitingForBuffer = false;
-        player.removeClass("vjs-waiting");
-
-        if (!userPaused) {
-          player.play().catch(() => {
-            // Failed to resume playback after buffering
-          });
-        }
-      }
-    }
-  };
-
-  // Track user-initiated pauses
-  player.on("pause", () => {
-    if (!isWaitingForBuffer) {
-      userPaused = true;
-    }
-  });
-
-  // Track user-initiated plays
-  player.on("play", () => {
-    userPaused = false;
-  });
-
-  // Track when playback actually starts
-  player.on("playing", () => {
-    hasStartedPlayback = true;
-    userPaused = false;
-  });
-
-  // Check buffer on progress events (new data loaded)
-  player.on("progress", () => {
-    checkBuffer();
-  });
-
-  // Check buffer during playback
-  player.on("timeupdate", () => {
-    if (hasStartedPlayback && !player.paused()) {
-      checkBuffer();
-    }
-  });
-};
-
-/**
  * Setup playlist navigation buttons in Video.js control bar
- * Adds Previous/Next buttons on either side of the play button
+ * Adds Previous/Next buttons for navigating between scenes
  */
 export const setupPlaylistControls = (
   player,
@@ -106,7 +15,18 @@ export const setupPlaylistControls = (
   onNext
 ) => {
   const addButtons = () => {
+    // Check if controlBar exists
+    if (!player.controlBar || !player.controlBar.el) {
+      setTimeout(addButtons, 200);
+      return;
+    }
+
     const controlBar = player.controlBar.el();
+    if (!controlBar) {
+      setTimeout(addButtons, 200);
+      return;
+    }
+
     const playToggle = controlBar.querySelector(".vjs-play-control");
 
     if (!playToggle) {
@@ -129,7 +49,7 @@ export const setupPlaylistControls = (
     prevButton.title = hasPrevious ? "Previous Video" : "No previous video";
     prevButton.disabled = !hasPrevious;
     prevButton.innerHTML = `
-      <span class="vjs-icon-placeholder" aria-hidden="true">‹‹</span>
+      <span class="vjs-icon-placeholder" aria-hidden="true"></span>
       <span class="vjs-control-text" aria-live="polite">Previous Video</span>
     `;
 
@@ -148,7 +68,7 @@ export const setupPlaylistControls = (
     nextButton.title = hasNext ? "Next Video" : "No next video";
     nextButton.disabled = !hasNext;
     nextButton.innerHTML = `
-      <span class="vjs-icon-placeholder" aria-hidden="true">››</span>
+      <span class="vjs-icon-placeholder" aria-hidden="true"></span>
       <span class="vjs-control-text" aria-live="polite">Next Video</span>
     `;
 
@@ -164,123 +84,6 @@ export const setupPlaylistControls = (
 
   player.ready(() => {
     setTimeout(addButtons, 100);
-  });
-};
-
-/**
- * Setup quality selector for HLS streams
- * Creates a dropdown menu to manually select quality levels
- */
-export const setupQualitySelector = (player) => {
-  player.ready(() => {
-    const qualityLevels = player.qualityLevels();
-    let qualitySelectorCreated = false;
-
-    const createQualityMenu = () => {
-      if (qualitySelectorCreated) return;
-
-      const qualities = ["Auto"];
-      const qualityMap = new Map();
-
-      // Collect available qualities
-      for (let i = 0; i < qualityLevels.length; i++) {
-        const quality = qualityLevels[i];
-        const height = quality.height;
-        const label = `${height}p`;
-
-        if (!qualities.includes(label)) {
-          qualities.push(label);
-          qualityMap.set(label, i);
-        }
-      }
-
-      // Add quality selector to control bar
-      if (qualities.length > 1) {
-        qualitySelectorCreated = true;
-
-        const qualityButton = document.createElement("div");
-        qualityButton.className = "vjs-quality-selector vjs-control vjs-button";
-
-        const activeQuality =
-          qualityLevels.selectedIndex >= 0
-            ? `${qualityLevels[qualityLevels.selectedIndex].height}p`
-            : "Auto";
-
-        qualityButton.innerHTML = `
-          <button class="vjs-quality-button" type="button" aria-live="polite" title="Quality">
-            <span class="vjs-icon-chapters"></span>
-            <span class="vjs-quality-text">${activeQuality}</span>
-          </button>
-          <div class="vjs-quality-menu" style="display: none;">
-            ${qualities
-              .map(
-                (q) =>
-                  `<div class="vjs-quality-item ${
-                    q === activeQuality ? "vjs-selected" : ""
-                  }" data-quality="${q}">${q}</div>`
-              )
-              .join("")}
-          </div>
-        `;
-
-        const controlBar = player.controlBar.el();
-        const fullscreenToggle = controlBar.querySelector(
-          ".vjs-fullscreen-control"
-        );
-        controlBar.insertBefore(qualityButton, fullscreenToggle);
-
-        // Handle quality selection
-        qualityButton.addEventListener("click", () => {
-          const menu = qualityButton.querySelector(".vjs-quality-menu");
-          menu.style.display = menu.style.display === "none" ? "block" : "none";
-        });
-
-        qualityButton.querySelectorAll(".vjs-quality-item").forEach((item) => {
-          item.addEventListener("click", (e) => {
-            const selectedQuality = e.target.dataset.quality;
-            const button = qualityButton.querySelector(".vjs-quality-text");
-            button.textContent = selectedQuality;
-
-            // Update selected class
-            qualityButton
-              .querySelectorAll(".vjs-quality-item")
-              .forEach((i) => i.classList.remove("vjs-selected"));
-            e.target.classList.add("vjs-selected");
-
-            if (selectedQuality === "Auto") {
-              for (let i = 0; i < qualityLevels.length; i++) {
-                qualityLevels[i].enabled = true;
-              }
-            } else {
-              for (let i = 0; i < qualityLevels.length; i++) {
-                qualityLevels[i].enabled = false;
-              }
-              const selectedIndex = qualityMap.get(selectedQuality);
-              if (selectedIndex !== undefined) {
-                qualityLevels[selectedIndex].enabled = true;
-              }
-            }
-
-            qualityButton.querySelector(".vjs-quality-menu").style.display =
-              "none";
-          });
-        });
-
-        // Update displayed quality when it changes
-        qualityLevels.on("change", () => {
-          const currentQuality =
-            qualityLevels.selectedIndex >= 0
-              ? `${qualityLevels[qualityLevels.selectedIndex].height}p`
-              : "Auto";
-          const button = qualityButton.querySelector(".vjs-quality-text");
-          if (button && button.textContent === "Auto") {
-            button.textContent = currentQuality;
-          }
-        });
-      }
-    };
-
-    qualityLevels.on("addqualitylevel", createQualityMenu);
   });
 };
 
@@ -347,53 +150,8 @@ export const setupTranscodedSeeking = (player, sessionId, api) => {
 };
 
 /**
- * Get Video.js options configuration
- * @param {Array} sources - Video sources
- * @param {boolean} isDirectPlay - Whether this is direct play (enables playback rate control)
- */
-export const getVideoJsOptions = (sources, isDirectPlay = false) => {
-  const options = {
-    autoplay: true,
-    controls: true,
-    responsive: true,
-    fluid: true,
-    sources: sources,
-    liveui: false,
-    html5: {
-      vhs: {
-        overrideNative: !videojs.browser.IS_SAFARI,
-        enableLowInitialPlaylist: false,
-        smoothQualityChange: true,
-        useBandwidthFromLocalStorage: true,
-        limitRenditionByPlayerDimensions: true,
-        useDevicePixelRatio: true,
-        allowSeeksWithinUnsafeLiveWindow: true,
-        liveRangeSafeTimeDelta: 30,
-        playlistExclusionDuration: 300,
-        handlePartialData: true,
-        experimentalBufferBasedABR: false,
-      },
-      nativeAudioTracks: false,
-      nativeVideoTracks: false,
-    },
-    plugins: {
-      qualityLevels: {},
-    },
-  };
-
-  // Only enable playback rate control for direct play
-  // Transcoded HLS streams don't support playback rate changes reliably
-  if (isDirectPlay) {
-    options.playbackRates = [0.5, 1, 1.25, 1.5, 2];
-  }
-
-  return options;
-};
-
-/**
  * Show or hide the playback rate control
- * @param {Object} player - Video.js player instance
- * @param {boolean} show - Whether to show the control
+ * Only visible for direct play (transcoded HLS doesn't support playback rate)
  */
 export const togglePlaybackRateControl = (player, show) => {
   if (!player || player.isDisposed()) return;
@@ -401,7 +159,7 @@ export const togglePlaybackRateControl = (player, show) => {
   const controlBar = player.controlBar;
   if (!controlBar) return;
 
-  const playbackRateControl = controlBar.getChild('PlaybackRateMenuButton');
+  const playbackRateControl = controlBar.getChild("PlaybackRateMenuButton");
   if (playbackRateControl) {
     if (show) {
       playbackRateControl.show();
@@ -412,23 +170,14 @@ export const togglePlaybackRateControl = (player, show) => {
 };
 
 /**
- * Disable live tracker to force VOD UI mode
- */
-export const disableLiveTracker = (player) => {
-  if (player.liveTracker) {
-    player.liveTracker.dispose();
-    player.liveTracker = null;
-  }
-};
-
-/**
- * Setup double-tap to toggle fullscreen on mobile
+ * Setup double-tap to toggle fullscreen on mobile, single-tap to play/pause
  */
 export const setupDoubleTapFullscreen = (player) => {
   let lastTap = 0;
+  let singleTapTimer = null;
   const doubleTapDelay = 300; // milliseconds
 
-  const videoElement = player.el().querySelector('video');
+  const videoElement = player.el().querySelector("video");
   if (!videoElement) return;
 
   const handleDoubleTap = (e) => {
@@ -436,8 +185,14 @@ export const setupDoubleTapFullscreen = (player) => {
     const tapLength = currentTime - lastTap;
 
     if (tapLength < doubleTapDelay && tapLength > 0) {
-      // Double tap detected
+      // Double tap detected - handle fullscreen
       e.preventDefault();
+
+      // Cancel pending single-tap play/pause action
+      if (singleTapTimer) {
+        clearTimeout(singleTapTimer);
+        singleTapTimer = null;
+      }
 
       if (player.isFullscreen && player.isFullscreen()) {
         player.exitFullscreen();
@@ -447,14 +202,37 @@ export const setupDoubleTapFullscreen = (player) => {
 
       lastTap = 0; // Reset to prevent triple-tap
     } else {
+      // Potential single tap - wait to confirm
       lastTap = currentTime;
+
+      // Cancel any existing timer
+      if (singleTapTimer) {
+        clearTimeout(singleTapTimer);
+      }
+
+      // Set timer to trigger play/pause after doubleTapDelay
+      singleTapTimer = setTimeout(() => {
+        // Confirm it's still a single tap (no second tap came)
+        if (lastTap === currentTime) {
+          // Toggle play/pause
+          if (player.paused()) {
+            player.play();
+          } else {
+            player.pause();
+          }
+        }
+        singleTapTimer = null;
+      }, doubleTapDelay);
     }
   };
 
-  videoElement.addEventListener('touchend', handleDoubleTap);
+  videoElement.addEventListener("touchend", handleDoubleTap);
 
   // Return cleanup function
   return () => {
-    videoElement.removeEventListener('touchend', handleDoubleTap);
+    if (singleTapTimer) {
+      clearTimeout(singleTapTimer);
+    }
+    videoElement.removeEventListener("touchend", handleDoubleTap);
   };
 };

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { apiPost, apiGet } from '../services/api.js';
-import { useAuth } from './useAuth.js';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { apiPost, apiGet } from "../services/api.js";
+import { useAuth } from "./useAuth.js";
 
 /**
  * Hook for tracking watch history with periodic pings
@@ -20,7 +20,7 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
   const sessionStartRef = useRef(null);
   const pingIntervalRef = useRef(null);
   const seekEventsRef = useRef([]);
-  const currentQualityRef = useRef('auto');
+  const currentQualityRef = useRef("auto");
   const hasIncrementedPlayCountRef = useRef(false);
 
   /**
@@ -38,8 +38,8 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
       const data = await apiGet(`/watch-history/${sceneId}`);
       setWatchHistory(data);
     } catch (err) {
-      console.error('Error fetching watch history:', err);
-      setError(err.message || 'Failed to fetch watch history');
+      console.error("Error fetching watch history:", err);
+      setError(err.message || "Failed to fetch watch history");
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,12 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
    * Send ping to server with current playback state
    */
   const sendPing = useCallback(async () => {
-    if (!playerRef.current || !sceneId || !isAuthenticated) {
+    if (
+      !playerRef.current ||
+      playerRef.current.isDisposed?.() ||
+      !sceneId ||
+      !isAuthenticated
+    ) {
       return;
     }
 
@@ -64,7 +69,7 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
         seekEvents: seekEventsRef.current,
       };
 
-      const response = await apiPost('/watch-history/ping', pingData);
+      const response = await apiPost("/watch-history/ping", pingData);
 
       // Update local state with server response
       if (response.success) {
@@ -76,7 +81,7 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
         }
       }
     } catch (err) {
-      console.error('Error sending watch history ping:', err);
+      console.error("Error sending watch history ping:", err);
       // Don't set error state for ping failures - they're not critical
     }
   }, [playerRef, sceneId, isAuthenticated, watchHistory?.playCount]);
@@ -85,7 +90,12 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
    * Start tracking watch session
    */
   const startTracking = useCallback(() => {
-    if (!playerRef.current || !sceneId || !isAuthenticated) {
+    if (
+      !playerRef.current ||
+      playerRef.current.isDisposed?.() ||
+      !sceneId ||
+      !isAuthenticated
+    ) {
       return;
     }
 
@@ -103,10 +113,10 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
     // Send immediate ping
     sendPing();
 
-    // Set up 30-second ping interval
+    // Set up 10-second ping interval (matching Stash's pattern)
     pingIntervalRef.current = setInterval(() => {
       sendPing();
-    }, 30000); // 30 seconds
+    }, 10000); // 10 seconds
   }, [playerRef, sceneId, isAuthenticated, sendPing]);
 
   /**
@@ -150,7 +160,7 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
     }
 
     try {
-      const response = await apiPost('/watch-history/increment-o', { sceneId });
+      const response = await apiPost("/watch-history/increment-o", { sceneId });
 
       if (response.success) {
         // Update local state
@@ -162,7 +172,7 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
         return response;
       }
     } catch (err) {
-      console.error('Error incrementing O counter:', err);
+      console.error("Error incrementing O counter:", err);
       throw err;
     }
   }, [sceneId, isAuthenticated]);
@@ -203,10 +213,10 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [playerRef, startTracking, stopTracking]);
 
@@ -225,14 +235,17 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
           seekEvents: seekEventsRef.current,
         };
 
-        navigator.sendBeacon('/api/watch-history/ping', JSON.stringify(pingData));
+        navigator.sendBeacon(
+          "/api/watch-history/ping",
+          JSON.stringify(pingData)
+        );
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [playerRef, sceneId]);
 
@@ -285,8 +298,8 @@ export function useAllWatchHistory({ inProgress = false, limit = 20 } = {}) {
       const response = await apiGet(`/watch-history?${queryParams}`);
       setData(response.watchHistory || []);
     } catch (err) {
-      console.error('Error fetching all watch history:', err);
-      setError(err.message || 'Failed to fetch watch history');
+      console.error("Error fetching all watch history:", err);
+      setError(err.message || "Failed to fetch watch history");
     } finally {
       setLoading(false);
     }

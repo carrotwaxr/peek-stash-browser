@@ -1,39 +1,52 @@
 import { Link } from "react-router-dom";
 import Paper from "../ui/Paper.jsx";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+
+const formatDuration = (seconds) => {
+  if (!seconds) return "Unknown";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+};
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return "Unknown";
+  const gb = bytes / (1024 * 1024 * 1024);
+  if (gb >= 1) return `${gb.toFixed(2)} GB`;
+  const mb = bytes / (1024 * 1024);
+  return `${mb.toFixed(1)} MB`;
+};
 
 const SceneDetails = ({
-  scene,
-  firstFile,
-  compatibility,
   showDetails,
   setShowDetails,
   showTechnicalDetails,
   setShowTechnicalDetails,
 }) => {
-  const formatDuration = (seconds) => {
-    if (!seconds) return "Unknown";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
+  const { scene, sceneLoading, compatibility } = useScenePlayer();
 
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
-  };
+  // Don't render if no scene data yet
+  if (!scene) {
+    return null;
+  }
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return "Unknown";
-    const gb = bytes / (1024 * 1024 * 1024);
-    if (gb >= 1) return `${gb.toFixed(2)} GB`;
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(1)} MB`;
-  };
+  const firstFile = scene?.files?.[0];
 
   return (
-    <section className="container-fluid mt-6">
+    <section
+      className="container-fluid mt-6"
+      style={{
+        opacity: sceneLoading ? 0.6 : 1,
+        transition: "opacity 0.2s ease-in-out",
+      }}
+    >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-8">
         {/* Primary details */}
         <div className="lg:col-span-2">
@@ -89,6 +102,24 @@ const SceneDetails = ({
                   )}
                 </div>
 
+                {/* Director */}
+                {scene.director && (
+                  <div className="mb-4">
+                    <h3
+                      className="text-sm font-medium mb-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Director
+                    </h3>
+                    <p
+                      className="text-base"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {scene.director}
+                    </p>
+                  </div>
+                )}
+
                 {/* Description - Full Width */}
                 {scene.details && (
                   <div className="mb-6">
@@ -140,14 +171,14 @@ const SceneDetails = ({
                           className="flex flex-col items-center rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
                           style={{
                             backgroundColor: "var(--bg-secondary)",
-                            width: "100px"
+                            width: "100px",
                           }}
                         >
                           <div
                             className="w-full overflow-hidden flex items-center justify-center"
                             style={{
                               backgroundColor: "var(--border-color)",
-                              height: "120px"
+                              height: "120px",
                             }}
                           >
                             {performer.image_path ? (
@@ -219,9 +250,7 @@ const SceneDetails = ({
           <Paper>
             <Paper.Header
               className="cursor-pointer"
-              onClick={() =>
-                setShowTechnicalDetails(!showTechnicalDetails)
-              }
+              onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
             >
               <div className="flex items-center justify-between">
                 <Paper.Title>Technical Details</Paper.Title>
@@ -236,38 +265,60 @@ const SceneDetails = ({
                   <>
                     {/* Video Section */}
                     <div className="mb-6">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-                          style={{
-                            color: "var(--text-primary)",
-                            borderBottom: "2px solid var(--accent-primary)"
-                          }}>
+                      <h3
+                        className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+                        style={{
+                          color: "var(--text-primary)",
+                          borderBottom: "2px solid var(--accent-primary)",
+                        }}
+                      >
                         Video
                       </h3>
                       <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span style={{ color: "var(--text-secondary)" }}>Resolution:</span>
-                          <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            Resolution:
+                          </span>
+                          <span
+                            className="font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
                             {firstFile.width} × {firstFile.height}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span style={{ color: "var(--text-secondary)" }}>Codec:</span>
-                          <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            Codec:
+                          </span>
+                          <span
+                            className="font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
                             {firstFile.video_codec?.toUpperCase() || "Unknown"}
                           </span>
                         </div>
                         {firstFile.frame_rate && (
                           <div className="flex justify-between">
-                            <span style={{ color: "var(--text-secondary)" }}>Frame Rate:</span>
-                            <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                            <span style={{ color: "var(--text-secondary)" }}>
+                              Frame Rate:
+                            </span>
+                            <span
+                              className="font-medium"
+                              style={{ color: "var(--text-primary)" }}
+                            >
                               {firstFile.frame_rate} fps
                             </span>
                           </div>
                         )}
                         {firstFile.bitrate && (
                           <div className="flex justify-between">
-                            <span style={{ color: "var(--text-secondary)" }}>Bitrate:</span>
-                            <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                            <span style={{ color: "var(--text-secondary)" }}>
+                              Bitrate:
+                            </span>
+                            <span
+                              className="font-medium"
+                              style={{ color: "var(--text-primary)" }}
+                            >
                               {Math.round(firstFile.bitrate / 1000)} kbps
                             </span>
                           </div>
@@ -277,17 +328,24 @@ const SceneDetails = ({
 
                     {/* Audio Section */}
                     <div className="mb-6">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-                          style={{
-                            color: "var(--text-primary)",
-                            borderBottom: "2px solid var(--accent-primary)"
-                          }}>
+                      <h3
+                        className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+                        style={{
+                          color: "var(--text-primary)",
+                          borderBottom: "2px solid var(--accent-primary)",
+                        }}
+                      >
                         Audio
                       </h3>
                       <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span style={{ color: "var(--text-secondary)" }}>Codec:</span>
-                          <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            Codec:
+                          </span>
+                          <span
+                            className="font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
                             {firstFile.audio_codec?.toUpperCase() || "Unknown"}
                           </span>
                         </div>
@@ -296,23 +354,35 @@ const SceneDetails = ({
 
                     {/* File Information Section */}
                     <div className="mb-6">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-                          style={{
-                            color: "var(--text-primary)",
-                            borderBottom: "2px solid var(--accent-primary)"
-                          }}>
+                      <h3
+                        className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+                        style={{
+                          color: "var(--text-primary)",
+                          borderBottom: "2px solid var(--accent-primary)",
+                        }}
+                      >
                         File Information
                       </h3>
                       <div className="space-y-3">
                         <div className="flex justify-between">
-                          <span style={{ color: "var(--text-secondary)" }}>Format:</span>
-                          <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            Format:
+                          </span>
+                          <span
+                            className="font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
                             {firstFile.format?.toUpperCase() || "Unknown"}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span style={{ color: "var(--text-secondary)" }}>File Size:</span>
-                          <span className="font-medium" style={{ color: "var(--text-primary)" }}>
+                          <span style={{ color: "var(--text-secondary)" }}>
+                            File Size:
+                          </span>
+                          <span
+                            className="font-medium"
+                            style={{ color: "var(--text-primary)" }}
+                          >
                             {formatFileSize(firstFile.size)}
                           </span>
                         </div>
@@ -323,11 +393,13 @@ const SceneDetails = ({
 
                 {compatibility && (
                   <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
-                        style={{
-                          color: "var(--text-primary)",
-                          borderBottom: "2px solid var(--accent-primary)"
-                        }}>
+                    <h3
+                      className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+                      style={{
+                        color: "var(--text-primary)",
+                        borderBottom: "2px solid var(--accent-primary)",
+                      }}
+                    >
                       Playback Method
                     </h3>
                     <p

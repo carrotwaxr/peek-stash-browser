@@ -4,7 +4,6 @@ import { fileURLToPath } from "url";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 const execAsync = promisify(exec);
 const prisma = new PrismaClient();
@@ -25,6 +24,7 @@ dotenv.config({ path: envPath });
 import { setupAPI } from "./api.js";
 import { logger } from "./utils/logger.js";
 import { pathMapper } from "./utils/pathMapping.js";
+import { stashCacheManager } from "./services/StashCacheManager.js";
 
 const main = async () => {
   logger.info("Starting Peek server");
@@ -37,7 +37,21 @@ const main = async () => {
   // Initialize path mapper (loads from database or migrates from env vars)
   await pathMapper.initialize();
 
-  setupAPI();
+  // Start API server immediately so /api/setup/status is available
+  const app = setupAPI();
+  logger.info("Server started - accepting connections during cache load");
+
+  // Initialize Stash cache (fetch all entities from Stash)
+  // This happens AFTER server starts listening, so setup endpoints work during cache load
+  logger.info("Initializing Stash cache...");
+  try {
+    await stashCacheManager.initialize();
+  } catch (error) {
+    logger.error("Failed to initialize Stash cache", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    logger.warn("Server will continue without cache - performance may be degraded");
+  }
 };
 
 const initializeDatabase = async () => {
@@ -86,9 +100,11 @@ main().catch(async (e) => {
 
 // Cleanup on exit
 process.on("SIGTERM", async () => {
+  stashCacheManager.cleanup();
   await prisma.$disconnect();
 });
 
 process.on("SIGINT", async () => {
+  stashCacheManager.cleanup();
   await prisma.$disconnect();
 });

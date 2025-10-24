@@ -40,6 +40,8 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         customTheme: true,
         carouselPreferences: true,
         filterPresets: true,
+        minimumPlayPercent: true,
+        syncToStash: true,
       },
     });
 
@@ -54,6 +56,8 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         theme: user.theme,
         customTheme: user.customTheme,
         carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
+        minimumPlayPercent: user.minimumPlayPercent,
+        syncToStash: user.syncToStash,
       },
     });
   } catch (error) {
@@ -67,13 +71,26 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
  */
 export const updateUserSettings = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const currentUserId = req.user?.id;
+    const currentUserRole = req.user?.role;
 
-    if (!userId) {
+    if (!currentUserId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences } = req.body;
+    // Determine target user ID
+    // If userId param provided (admin updating another user), use that
+    // Otherwise, user is updating their own settings
+    let targetUserId = currentUserId;
+    if (req.params.userId) {
+      // Admin updating another user's settings (or admin updating themselves via ServerSettings)
+      if (currentUserRole !== 'ADMIN') {
+        return res.status(403).json({ error: "Only admins can update other users' settings" });
+      }
+      targetUserId = parseInt(req.params.userId);
+    }
+
+    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences, minimumPlayPercent, syncToStash } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
@@ -85,6 +102,18 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
 
     if (preferredPlaybackMode && !validPlaybackModes.includes(preferredPlaybackMode)) {
       return res.status(400).json({ error: "Invalid playback mode setting" });
+    }
+
+    // Validate minimumPlayPercent if provided
+    if (minimumPlayPercent !== undefined) {
+      if (typeof minimumPlayPercent !== 'number' || minimumPlayPercent < 0 || minimumPlayPercent > 100) {
+        return res.status(400).json({ error: "Minimum play percent must be a number between 0 and 100" });
+      }
+    }
+
+    // Validate syncToStash if provided (admin only can change this)
+    if (syncToStash !== undefined && typeof syncToStash !== 'boolean') {
+      return res.status(400).json({ error: "Sync to Stash must be a boolean" });
     }
 
     // Validate carousel preferences if provided
@@ -102,13 +131,15 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: targetUserId },
       data: {
         ...(preferredQuality !== undefined && { preferredQuality }),
         ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
         ...(theme !== undefined && { theme }),
         ...(customTheme !== undefined && { customTheme }),
         ...(carouselPreferences !== undefined && { carouselPreferences }),
+        ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
+        ...(syncToStash !== undefined && { syncToStash }),
       },
       select: {
         id: true,
@@ -119,6 +150,8 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         theme: true,
         customTheme: true,
         carouselPreferences: true,
+        minimumPlayPercent: true,
+        syncToStash: true,
       },
     });
 
@@ -130,6 +163,8 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         theme: updatedUser.theme,
         customTheme: updatedUser.customTheme,
         carouselPreferences: updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
+        minimumPlayPercent: updatedUser.minimumPlayPercent,
+        syncToStash: updatedUser.syncToStash,
       },
     });
   } catch (error) {
@@ -207,6 +242,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
         role: true,
         createdAt: true,
         updatedAt: true,
+        syncToStash: true,
       },
       orderBy: {
         createdAt: "desc",
@@ -523,5 +559,320 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
   } catch (error) {
     console.error("Error deleting filter preset:", error);
     res.status(500).json({ error: "Failed to delete filter preset" });
+  }
+};
+
+/**
+ * Sync ratings and favorites from Stash to Peek (one-way)
+ * This is a one-time import operation, not continuous sync
+ * Admin only - syncs data for a specific user
+ */
+export const syncFromStash = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const currentUser = req.user;
+
+    // Only admins can sync
+    if (!currentUser || currentUser.role !== 'ADMIN') {
+      return res.status(403).json({ error: "Only admins can sync from Stash" });
+    }
+
+    const targetUserId = parseInt(req.params.userId);
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    // Get sync options from request body
+    const { options } = req.body;
+
+    // Default options if not provided
+    const syncOptions = options || {
+      scenes: { rating: true, favorite: false },
+      performers: { rating: true, favorite: true },
+      studios: { rating: true, favorite: true },
+      tags: { rating: false, favorite: true },
+    };
+
+    // Import stash singleton
+    const getStash = (await import('../stash.js')).default;
+    const stash = getStash();
+
+    const stats = {
+      scenes: { checked: 0, updated: 0, created: 0 },
+      performers: { checked: 0, updated: 0, created: 0 },
+      studios: { checked: 0, updated: 0, created: 0 },
+      tags: { checked: 0, updated: 0, created: 0 },
+    };
+
+    // Fetch all entities from Stash (per_page: -1 = unlimited)
+    console.log('Syncing from Stash: Fetching all entities...');
+
+    // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
+    if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
+      let sceneFilter: any = {};
+
+      // Determine which filter to use
+      if (syncOptions.scenes.rating && !syncOptions.scenes.oCounter) {
+        sceneFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
+      } else if (syncOptions.scenes.oCounter && !syncOptions.scenes.rating) {
+        sceneFilter = { o_counter: { value: 0, modifier: 'GREATER_THAN' } };
+      }
+      // If both are selected, fetch all scenes (can't do OR in single query)
+
+      const scenesData = await stash.findScenes({
+        filter: { per_page: -1 },
+        scene_filter: Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined
+      });
+      const scenes = scenesData.findScenes.scenes;
+
+      // Filter in code only if both options are selected
+      const filteredScenes = (syncOptions.scenes.rating && syncOptions.scenes.oCounter)
+        ? scenes.filter((s: any) => (s.rating100 !== null && s.rating100 > 0) || (s.o_counter !== null && s.o_counter > 0))
+        : scenes;
+
+      stats.scenes.checked = filteredScenes.length;
+
+      for (const scene of filteredScenes) {
+        // Handle rating sync
+        if (syncOptions.scenes.rating && scene.rating100 && scene.rating100 > 0) {
+          const existingRating = await prisma.sceneRating.findUnique({
+            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
+          });
+
+          const stashRating = scene.rating100;
+
+          if (!existingRating) {
+            await prisma.sceneRating.create({
+              data: {
+                userId: targetUserId,
+                sceneId: scene.id,
+                rating: stashRating,
+                favorite: false,
+              }
+            });
+            stats.scenes.created++;
+          } else if (existingRating.rating !== stashRating) {
+            await prisma.sceneRating.update({
+              where: { id: existingRating.id },
+              data: { rating: stashRating }
+            });
+            stats.scenes.updated++;
+          }
+        }
+
+        // Handle o_counter sync
+        if (syncOptions.scenes.oCounter && scene.o_counter && scene.o_counter > 0) {
+          const existingWatchHistory = await prisma.watchHistory.findUnique({
+            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
+          });
+
+          const stashOCounter = scene.o_counter;
+
+          if (!existingWatchHistory) {
+            await prisma.watchHistory.create({
+              data: {
+                userId: targetUserId,
+                sceneId: scene.id,
+                oCount: stashOCounter,
+                oHistory: [], // Don't have timestamp data, just the count
+                playCount: 0,
+                playDuration: 0,
+                playHistory: [],
+              }
+            });
+            stats.scenes.created++;
+          } else if (existingWatchHistory.oCount !== stashOCounter) {
+            await prisma.watchHistory.update({
+              where: { id: existingWatchHistory.id },
+              data: { oCount: stashOCounter }
+            });
+            stats.scenes.updated++;
+          }
+        }
+      }
+    }
+
+    // 2. Sync Performers
+    if (syncOptions.performers.rating || syncOptions.performers.favorite) {
+      let performerFilter: any = {};
+
+      // Use GraphQL filter when only one option is selected
+      if (syncOptions.performers.rating && !syncOptions.performers.favorite) {
+        performerFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
+      } else if (syncOptions.performers.favorite && !syncOptions.performers.rating) {
+        performerFilter = { filter_favorites: true };
+      }
+      // If both are selected, fetch all and filter in code (can't do OR in single query)
+
+      const performersData = await stash.findPerformers({
+        filter: { per_page: -1 },
+        performer_filter: Object.keys(performerFilter).length > 0 ? performerFilter : undefined
+      });
+      const performers = performersData.findPerformers.performers;
+
+      // Filter in code only if both options are selected
+      const filteredPerformers = (syncOptions.performers.rating && syncOptions.performers.favorite)
+        ? performers.filter((p: any) => (p.rating100 !== null && p.rating100 > 0) || p.favorite)
+        : performers;
+
+      stats.performers.checked = filteredPerformers.length;
+
+      for (const performer of filteredPerformers) {
+        const existingRating = await prisma.performerRating.findUnique({
+          where: { userId_performerId: { userId: targetUserId, performerId: performer.id } }
+        });
+
+        const stashRating = syncOptions.performers.rating ? performer.rating100 : null;
+        const stashFavorite = syncOptions.performers.favorite ? (performer.favorite || false) : false;
+
+        if (!existingRating) {
+          await prisma.performerRating.create({
+            data: {
+              userId: targetUserId,
+              performerId: performer.id,
+              rating: stashRating,
+              favorite: stashFavorite,
+            }
+          });
+          stats.performers.created++;
+        } else {
+          let needsUpdate = false;
+          const updates: any = {};
+
+          if (syncOptions.performers.rating && existingRating.rating !== stashRating) {
+            updates.rating = stashRating;
+            needsUpdate = true;
+          }
+          if (syncOptions.performers.favorite && existingRating.favorite !== stashFavorite) {
+            updates.favorite = stashFavorite;
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            await prisma.performerRating.update({
+              where: { id: existingRating.id },
+              data: updates
+            });
+            stats.performers.updated++;
+          }
+        }
+      }
+    }
+
+    // 3. Sync Studios
+    if (syncOptions.studios.rating || syncOptions.studios.favorite) {
+      let studioFilter: any = {};
+
+      // Use GraphQL filter when only one option is selected
+      if (syncOptions.studios.rating && !syncOptions.studios.favorite) {
+        studioFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
+      } else if (syncOptions.studios.favorite && !syncOptions.studios.rating) {
+        studioFilter = { favorite: true };
+      }
+      // If both are selected, fetch all and filter in code (can't do OR in single query)
+
+      const studiosData = await stash.findStudios({
+        filter: { per_page: -1 },
+        studio_filter: Object.keys(studioFilter).length > 0 ? studioFilter : undefined
+      });
+      const studios = studiosData.findStudios.studios;
+
+      // Filter in code only if both options are selected
+      const filteredStudios = (syncOptions.studios.rating && syncOptions.studios.favorite)
+        ? studios.filter((s: any) => (s.rating100 !== null && s.rating100 > 0) || s.favorite)
+        : studios;
+
+      stats.studios.checked = filteredStudios.length;
+
+      for (const studio of filteredStudios) {
+        const existingRating = await prisma.studioRating.findUnique({
+          where: { userId_studioId: { userId: targetUserId, studioId: studio.id } }
+        });
+
+        const stashRating = syncOptions.studios.rating ? studio.rating100 : null;
+        const stashFavorite = syncOptions.studios.favorite ? (studio.favorite || false) : false;
+
+        if (!existingRating) {
+          await prisma.studioRating.create({
+            data: {
+              userId: targetUserId,
+              studioId: studio.id,
+              rating: stashRating,
+              favorite: stashFavorite,
+            }
+          });
+          stats.studios.created++;
+        } else {
+          let needsUpdate = false;
+          const updates: any = {};
+
+          if (syncOptions.studios.rating && existingRating.rating !== stashRating) {
+            updates.rating = stashRating;
+            needsUpdate = true;
+          }
+          if (syncOptions.studios.favorite && existingRating.favorite !== stashFavorite) {
+            updates.favorite = stashFavorite;
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            await prisma.studioRating.update({
+              where: { id: existingRating.id },
+              data: updates
+            });
+            stats.studios.updated++;
+          }
+        }
+      }
+    }
+
+    // 4. Sync Tags - Only fetch favorited tags
+    if (syncOptions.tags.favorite) {
+      const tagsData = await stash.findTags({
+        filter: { per_page: -1 },
+        tag_filter: { favorite: true }
+      });
+      const tags = tagsData.findTags.tags;
+      stats.tags.checked = tags.length;
+
+      for (const tag of tags) {
+        const existingRating = await prisma.tagRating.findUnique({
+          where: { userId_tagId: { userId: targetUserId, tagId: tag.id } }
+        });
+
+        const stashFavorite = tag.favorite || false;
+
+        if (!existingRating) {
+          await prisma.tagRating.create({
+            data: {
+              userId: targetUserId,
+              tagId: tag.id,
+              rating: null, // Tags don't have ratings in Stash
+              favorite: stashFavorite,
+            }
+          });
+          stats.tags.created++;
+        } else {
+          // Update if different
+          if (existingRating.favorite !== stashFavorite) {
+            await prisma.tagRating.update({
+              where: { id: existingRating.id },
+              data: { favorite: stashFavorite }
+            });
+            stats.tags.updated++;
+          }
+        }
+      }
+    }
+
+    console.log('Stash sync completed', { targetUserId, stats });
+
+    res.json({
+      success: true,
+      message: 'Successfully synced ratings and favorites from Stash',
+      stats
+    });
+  } catch (error) {
+    console.error("Error syncing from Stash:", error);
+    res.status(500).json({ error: "Failed to sync from Stash" });
   }
 };

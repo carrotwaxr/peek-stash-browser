@@ -20,17 +20,22 @@ import {
   findPerformersMinimal,
   findStudiosMinimal,
   findTagsMinimal,
+} from "./controllers/library-simplified.js";
+import {
   updateScene,
   updatePerformer,
   updateStudio,
   updateTag,
 } from "./controllers/library.js";
+import { proxyStashMedia } from "./controllers/proxy.js";
+import * as statsController from "./controllers/stats.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import playlistRoutes from "./routes/playlist.js";
 import watchHistoryRoutes from "./routes/watchHistory.js";
+import ratingsRoutes from "./routes/ratings.js";
 import setupRoutes from "./routes/setup.js";
-import { authenticateToken } from "./middleware/auth.js";
+import { authenticateToken, requireCacheReady } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -59,15 +64,20 @@ export const setupAPI = () => {
 
   // Version endpoint (no auth required)
   app.get("/api/version", (req, res) => {
-    // Read version from package.json
-    const packagePath = path.join(__dirname, '../package.json');
+    // Read version from package.json (use process.cwd() for reliable path resolution)
+    const packagePath = path.join(process.cwd(), 'package.json');
 
     let version = "1.0.0";
     try {
       const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
       version = packageJson.version;
     } catch (err) {
-      logger.error('Failed to read package.json version:', { error: err });
+      logger.error('Failed to read package.json version:', {
+        error: err,
+        packagePath,
+        cwd: process.cwd(),
+        __dirname
+      });
     }
 
     res.json({
@@ -75,6 +85,12 @@ export const setupAPI = () => {
       buildDate: process.env.BUILD_DATE || new Date().toISOString(),
     });
   });
+
+  // Server stats endpoint (admin only - authenticated)
+  app.get("/api/stats", authenticateToken, statsController.getStats);
+
+  // Media proxy (public - no auth required for images)
+  app.get("/api/proxy/stash", proxyStashMedia);
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
@@ -91,16 +107,19 @@ export const setupAPI = () => {
   // Watch history routes (protected)
   app.use("/api/watch-history", watchHistoryRoutes);
 
-  // New filtered search endpoints (protected)
-  app.post("/api/library/scenes", authenticateToken, findScenes);
-  app.post("/api/library/performers", authenticateToken, findPerformers);
-  app.post("/api/library/studios", authenticateToken, findStudios);
-  app.post("/api/library/tags", authenticateToken, findTags);
+  // Rating and favorite routes (protected)
+  app.use("/api/ratings", ratingsRoutes);
+
+  // New filtered search endpoints (protected + require cache ready)
+  app.post("/api/library/scenes", authenticateToken, requireCacheReady, findScenes);
+  app.post("/api/library/performers", authenticateToken, requireCacheReady, findPerformers);
+  app.post("/api/library/studios", authenticateToken, requireCacheReady, findStudios);
+  app.post("/api/library/tags", authenticateToken, requireCacheReady, findTags);
 
   // Minimal data endpoints for filter dropdowns (id + name only)
-  app.post("/api/library/performers/minimal", authenticateToken, findPerformersMinimal);
-  app.post("/api/library/studios/minimal", authenticateToken, findStudiosMinimal);
-  app.post("/api/library/tags/minimal", authenticateToken, findTagsMinimal);
+  app.post("/api/library/performers/minimal", authenticateToken, requireCacheReady, findPerformersMinimal);
+  app.post("/api/library/studios/minimal", authenticateToken, requireCacheReady, findStudiosMinimal);
+  app.post("/api/library/tags/minimal", authenticateToken, requireCacheReady, findTagsMinimal);
 
   // Update endpoints for CRUD operations
   app.put("/api/library/scenes/:id", authenticateToken, updateScene);

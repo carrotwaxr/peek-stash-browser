@@ -7,8 +7,11 @@ import {
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
-import { formatRating, getInitials, truncateText } from "../../utils/format.js";
+import { getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
+import OCounterButton from "../ui/OCounterButton.jsx";
+import { LucideVenus, LucideMars, LucideUser } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -162,6 +165,16 @@ const Performers = () => {
   );
 };
 
+const PerformerGenderIcon = ({ gender, size = 16 }) => {
+  if (gender === "FEMALE") {
+    return <LucideVenus size={size} color="#ff0080" />;
+  } else if (gender === "MALE") {
+    return <LucideMars size={size} color="#0561fa" />;
+  } else {
+    return <LucideUser size={size} color="#6c757d" />;
+  }
+};
+
 const PerformerCard = forwardRef(
   (
     { performer, tabIndex, className = "", isTVMode = false, referrerUrl },
@@ -182,6 +195,7 @@ const PerformerCard = forwardRef(
         aria-label={`Performer: ${performer.name}`}
       >
         <div className="text-center">
+          {/* Image */}
           <div className="w-full aspect-[2/3] rounded mb-3 overflow-hidden">
             {performer.image_path ? (
               <img
@@ -202,32 +216,45 @@ const PerformerCard = forwardRef(
             )}
           </div>
 
-          <h3
-            className="font-semibold mb-1"
-            style={{ color: "var(--text-primary)" }}
-            title={performer.name}
-          >
-            {truncateText(performer.name, 20)}
-          </h3>
+          {/* Name with Gender Icon */}
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <h3
+              className="font-semibold"
+              style={{ color: "var(--text-primary)" }}
+              title={performer.name}
+            >
+              {truncateText(performer.name, 20)}
+            </h3>
+            <PerformerGenderIcon gender={performer.gender} size={16} />
+          </div>
 
-          {performer.rating100 && (
-            <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>
-              {formatRating(performer.rating100)}
-            </p>
-          )}
+          {/* Scene Count */}
+          <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+            {performer.scene_count || 0} scene{performer.scene_count !== 1 ? "s" : ""}
+          </div>
 
-          {performer.scene_count > 0 && (
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {performer.scene_count} scene
-              {performer.scene_count !== 1 ? "s" : ""}
-            </p>
-          )}
+          {/* Status Icons */}
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+            <span>
+              <span style={{ color: "var(--icon-play-count)" }}>▶</span> {performer.play_count || 0}
+            </span>
+            <OCounterButton
+              initialCount={performer.o_counter || 0}
+              readOnly={true}
+              className="text-xs"
+            />
+          </div>
 
-          {performer.favorite && (
-            <div className="mt-2">
-              <span className="text-yellow-500 text-sm">★ Favorite</span>
-            </div>
-          )}
+          {/* Rating and Favorite */}
+          <div className="flex items-center justify-center" onClick={(e) => e.preventDefault()}>
+            <RatingControls
+              entityType="performer"
+              entityId={performer.id}
+              initialRating={performer.rating}
+              initialFavorite={performer.favorite || false}
+              size={16}
+            />
+          </div>
         </div>
       </Link>
     );

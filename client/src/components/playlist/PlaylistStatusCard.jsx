@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
@@ -8,15 +7,15 @@ import {
   Repeat,
   Repeat1,
 } from "lucide-react";
-import { usePlaylistNavigation } from "../video-player/usePlaylistNavigation.js";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import Button from "../ui/Button.jsx";
 
 /**
  * PlaylistStatusCard - Shows playlist context when viewing a scene from a playlist
  * Displays current position, navigation controls, and quick scene access
  */
-const PlaylistStatusCard = ({ playlist, currentIndex }) => {
-  const navigate = useNavigate();
+const PlaylistStatusCard = () => {
+  const { playlist, currentIndex, gotoSceneIndex } = useScenePlayer();
   const currentThumbnailRef = useRef(null);
   const desktopScrollRef = useRef(null);
   const mobileScrollRef = useRef(null);
@@ -29,13 +28,6 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
   // Shuffle and repeat state (initialize from playlist)
   const [shuffle, setShuffle] = useState(playlist?.shuffle || false);
   const [repeat, setRepeat] = useState(playlist?.repeat || "none");
-
-  // Use playlist navigation hook for smart next/previous
-  const { playNextInPlaylist, playPreviousInPlaylist } = usePlaylistNavigation(
-    { ...playlist, shuffle, repeat },
-    currentIndex,
-    navigate
-  );
 
   // Scroll current thumbnail into view when currentIndex changes
   useEffect(() => {
@@ -159,59 +151,33 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
       }
     }
 
-    const targetScene = playlist.scenes[index];
-    navigate(`/video/${targetScene.sceneId}`, {
-      state: {
-        scene: targetScene.scene,
-        playlist: {
-          ...playlist,
-          currentIndex: index,
-        },
-      },
-    });
+    // Use context action to navigate to scene
+    gotoSceneIndex(index);
   };
 
   const handlePrevious = () => {
-    if (shuffle || repeat !== "none") {
-      // Use smart navigation with shuffle/repeat support
-      playPreviousInPlaylist?.();
-    } else if (hasPrevious) {
-      // Simple navigation for non-shuffle, non-repeat
+    if (hasPrevious) {
       navigateToScene(currentIndex - 1);
     }
+    // TODO: Add shuffle/repeat support via context
   };
 
   const handleNext = () => {
-    if (shuffle || repeat !== "none") {
-      // Use smart navigation with shuffle/repeat support
-      playNextInPlaylist?.();
-    } else if (hasNext) {
-      // Simple navigation for non-shuffle, non-repeat
+    if (hasNext) {
       navigateToScene(currentIndex + 1);
     }
+    // TODO: Add shuffle/repeat support via context
   };
 
   const goToPlaylist = () => {
-    navigate(`/playlist/${playlist.id}`);
+    // Navigate to playlist page (different route, so we use window.location)
+    window.location.href = `/playlist/${playlist.id}`;
   };
 
   const toggleShuffle = () => {
     const newShuffle = !shuffle;
     setShuffle(newShuffle);
-
-    // Update playlist state with new shuffle setting
-    navigate(window.location.pathname, {
-      state: {
-        scene: playlist.scenes[currentIndex]?.scene,
-        playlist: {
-          ...playlist,
-          shuffle: newShuffle,
-          repeat: repeat,
-          currentIndex: currentIndex,
-        },
-      },
-      replace: true,
-    });
+    // TODO: Persist shuffle state in context if needed
   };
 
   const toggleRepeat = () => {
@@ -219,20 +185,7 @@ const PlaylistStatusCard = ({ playlist, currentIndex }) => {
     const currentIdx = repeatModes.indexOf(repeat);
     const newRepeat = repeatModes[(currentIdx + 1) % repeatModes.length];
     setRepeat(newRepeat);
-
-    // Update playlist state with new repeat setting
-    navigate(window.location.pathname, {
-      state: {
-        scene: playlist.scenes[currentIndex]?.scene,
-        playlist: {
-          ...playlist,
-          shuffle: shuffle,
-          repeat: newRepeat,
-          currentIndex: currentIndex,
-        },
-      },
-      replace: true,
-    });
+    // TODO: Persist repeat state in context if needed
   };
 
   return (

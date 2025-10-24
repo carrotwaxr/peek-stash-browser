@@ -22,7 +22,25 @@ async function apiFetch(endpoint, options = {}) {
   const response = await fetch(url, config);
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    // Try to parse error response body
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { error: `HTTP error! status: ${response.status}` };
+    }
+
+    // Create error with additional metadata
+    const error = new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+    error.status = response.status;
+    error.data = errorData;
+
+    // Special handling for 503 - server initializing
+    if (response.status === 503 && errorData.ready === false) {
+      error.isInitializing = true;
+    }
+
+    throw error;
   }
 
   return await response.json();
@@ -46,6 +64,16 @@ async function apiPost(endpoint, data) {
 }
 
 /**
+ * PUT request wrapper
+ */
+async function apiPut(endpoint, data) {
+  return apiFetch(endpoint, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+/**
  * DELETE request wrapper
  */
 async function apiDelete(endpoint) {
@@ -55,7 +83,7 @@ async function apiDelete(endpoint) {
 }
 
 // Export API helper functions
-export { apiGet, apiPost, apiDelete };
+export { apiGet, apiPost, apiPut, apiDelete };
 
 // New filtered search API endpoints
 export const libraryApi = {
@@ -244,7 +272,6 @@ export const filterHelpers = {
       value: minRating,
     },
   }),
-
 };
 
 // Predefined filter combinations for common use cases
@@ -253,8 +280,8 @@ export const commonFilters = {
    * Get high-rated scenes
    */
   highRatedScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "rating", "DESC"),
-    scene_filter: filterHelpers.ratingFilter(75),
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: filterHelpers.ratingFilter(80),
   }),
 
   /**
@@ -268,8 +295,10 @@ export const commonFilters = {
   /** Get highest bitrate scenes
    */
   highBitrateScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "bitrate", "DESC"),
-    scene_filter: {},
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: {
+      bitrate: { modifier: "GREATER_THAN", value: 14000000 },
+    },
   }),
 
   /** Get barely legal scenes
@@ -290,7 +319,10 @@ export const commonFilters = {
    * Get long scenes (over 30 minutes)
    */
   longScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "duration", "DESC"),
+    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
+    scene_filter: {
+      duration: { modifier: "GREATER_THAN", value: 4800 },
+    },
   }),
 
   /**
@@ -389,4 +421,49 @@ export const setupApi = {
    * @returns {Promise<{success: boolean}>}
    */
   deletePathMapping: (id) => apiDelete(`/setup/path-mappings/${id}`),
+};
+
+/**
+ * Rating and favorite API endpoints
+ */
+export const ratingsApi = {
+  /**
+   * Update rating and/or favorite for a scene
+   * @param {string} sceneId - Scene ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateSceneRating: (sceneId, data) => apiPut(`/ratings/scene/${sceneId}`, data),
+
+  /**
+   * Update rating and/or favorite for a performer
+   * @param {string} performerId - Performer ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updatePerformerRating: (performerId, data) => apiPut(`/ratings/performer/${performerId}`, data),
+
+  /**
+   * Update rating and/or favorite for a studio
+   * @param {string} studioId - Studio ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateStudioRating: (studioId, data) => apiPut(`/ratings/studio/${studioId}`, data),
+
+  /**
+   * Update rating and/or favorite for a tag
+   * @param {string} tagId - Tag ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateTagRating: (tagId, data) => apiPut(`/ratings/tag/${tagId}`, data),
 };

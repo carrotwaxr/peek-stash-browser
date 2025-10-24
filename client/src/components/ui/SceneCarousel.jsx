@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import SceneCard from "./SceneCard.jsx";
+import SkeletonSceneCard from "./SkeletonSceneCard.jsx";
 import Button from "./Button.jsx";
 
 const SceneCarousel = ({
@@ -66,13 +67,11 @@ const SceneCarousel = ({
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className="flex-shrink-0 rounded-lg animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                width: "17.5rem",
-                height: "25rem"
-              }}
-            />
+              className="flex-shrink-0"
+              style={{ width: "280px", minWidth: "280px" }}
+            >
+              <SkeletonSceneCard />
+            </div>
           ))}
         </div>
       </div>

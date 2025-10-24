@@ -10,6 +10,8 @@ import SuccessMessage from "../ui/SuccessMessage.jsx";
 import WarningMessage from "../ui/WarningMessage.jsx";
 import ErrorMessage from "../ui/ErrorMessage.jsx";
 import InfoMessage from "../ui/InfoMessage.jsx";
+import { showSuccess, showError } from "../../utils/toast.jsx";
+import { migrateCarouselPreferences } from "../../constants/carousels.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -21,23 +23,13 @@ const Settings = () => {
   const { changeTheme, availableThemes, currentTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
-
-  // Get rating color based on value
-  const getRatingColor = (rating) => {
-    if (!rating) return 'var(--text-muted)';
-    if (rating >= 80) return 'var(--rating-excellent)';
-    if (rating >= 60) return 'var(--rating-good)';
-    if (rating >= 40) return 'var(--rating-average)';
-    if (rating >= 20) return 'var(--rating-poor)';
-    return 'var(--rating-bad)';
-  };
 
   // Settings state
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
   const [carouselPreferences, setCarouselPreferences] = useState([]);
+  const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -58,7 +50,12 @@ const Settings = () => {
 
       setPreferredQuality(settings.preferredQuality || "auto");
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
-      setCarouselPreferences(settings.carouselPreferences || []);
+
+      // Migrate carousel preferences to include any new carousels
+      const migratedPrefs = migrateCarouselPreferences(settings.carouselPreferences);
+      setCarouselPreferences(migratedPrefs);
+
+      setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
     } catch {
       setError("Failed to load settings");
     } finally {
@@ -68,7 +65,6 @@ const Settings = () => {
 
   const saveCarouselPreferences = async (newPreferences) => {
     try {
-      setMessage(null);
       setError(null);
 
       await api.put("/user/settings", {
@@ -76,10 +72,9 @@ const Settings = () => {
       });
 
       setCarouselPreferences(newPreferences);
-      setMessage("Carousel preferences saved successfully!");
-      setTimeout(() => setMessage(null), 3000);
-    } catch {
-      setError("Failed to save carousel preferences");
+      showSuccess("Carousel preferences saved successfully!");
+    } catch (err) {
+      showError(err.response?.data?.error || "Failed to save carousel preferences");
     }
   };
 
@@ -87,18 +82,17 @@ const Settings = () => {
     e.preventDefault();
     try {
       setSaving(true);
-      setMessage(null);
       setError(null);
 
       await api.put("/user/settings", {
         preferredQuality,
         preferredPlaybackMode,
+        minimumPlayPercent,
       });
 
-      setMessage("Settings saved successfully!");
-      setTimeout(() => setMessage(null), 3000);
-    } catch {
-      setError("Failed to save settings");
+      showSuccess("Settings saved successfully!");
+    } catch (err) {
+      showError(err.response?.data?.error || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -108,18 +102,17 @@ const Settings = () => {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      showError("New passwords do not match");
       return;
     }
 
     if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+      showError("Password must be at least 6 characters");
       return;
     }
 
     try {
       setPasswordChanging(true);
-      setMessage(null);
       setError(null);
 
       await api.post("/user/change-password", {
@@ -127,13 +120,12 @@ const Settings = () => {
         newPassword,
       });
 
-      setMessage("Password changed successfully!");
+      showSuccess("Password changed successfully!");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setTimeout(() => setMessage(null), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to change password");
+      showError(err.response?.data?.error || "Failed to change password");
     } finally {
       setPasswordChanging(false);
     }
@@ -164,33 +156,6 @@ const Settings = () => {
             Manage your personal preferences and account settings
           </p>
         </div>
-
-        {/* Messages */}
-        {message && (
-          <div
-            className="mb-6 p-4 rounded-lg"
-            style={{
-              backgroundColor: "rgba(34, 197, 94, 0.1)",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
-              color: "rgb(34, 197, 94)",
-            }}
-          >
-            {message}
-          </div>
-        )}
-
-        {error && (
-          <div
-            className="mb-6 p-4 rounded-lg"
-            style={{
-              backgroundColor: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "rgb(239, 68, 68)",
-            }}
-          >
-            {error}
-          </div>
-        )}
 
         {/* Theme */}
         <Paper className="mb-6">
@@ -231,45 +196,13 @@ const Settings = () => {
               </div>
 
               {/* Status Messages */}
-              <div className="mb-8">
+              <div>
                 <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Status Messages</h4>
                 <div className="space-y-3">
                   <SuccessMessage message="Operation completed successfully!" />
                   <InfoMessage message="Here's some helpful information." />
                   <WarningMessage message="Please review this warning." />
                   <ErrorMessage message="An error occurred during processing." />
-                </div>
-              </div>
-
-              {/* Rating Gradient */}
-              <div>
-                <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Rating Colors (0-100)</h4>
-                <div className="space-y-2">
-                  {[
-                    { rating: 0, label: "No rating" },
-                    { rating: 10, label: "0-19: Bad" },
-                    { rating: 20, label: "20-39: Poor" },
-                    { rating: 30, label: "20-39: Poor" },
-                    { rating: 40, label: "40-59: Average" },
-                    { rating: 50, label: "40-59: Average" },
-                    { rating: 60, label: "60-79: Good" },
-                    { rating: 70, label: "60-79: Good" },
-                    { rating: 80, label: "80-100: Excellent" },
-                    { rating: 90, label: "80-100: Excellent" },
-                    { rating: 100, label: "80-100: Excellent" },
-                  ].map((item) => (
-                    <div key={item.rating} className="flex items-center gap-3">
-                      <div
-                        className="w-16 h-8 rounded flex items-center justify-center text-white text-sm font-semibold"
-                        style={{ backgroundColor: getRatingColor(item.rating) }}
-                      >
-                        {item.rating}
-                      </div>
-                      <span className="text-sm" style={{ color: "var(--text-muted)" }}>
-                        {item.label}
-                      </span>
-                    </div>
-                  ))}
                 </div>
               </div>
             </div>
@@ -347,6 +280,37 @@ const Settings = () => {
                   >
                     Auto uses direct play when supported, otherwise transcodes.
                     Direct play offers best quality but limited codec support.
+                  </p>
+                </div>
+
+                {/* Minimum Play Percent */}
+                <div>
+                  <label
+                    htmlFor="minimumPlayPercent"
+                    className="block text-sm font-medium mb-2"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Minimum Play Percent: {minimumPlayPercent}%
+                  </label>
+                  <input
+                    id="minimumPlayPercent"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={minimumPlayPercent}
+                    onChange={(e) => setMinimumPlayPercent(parseInt(e.target.value))}
+                    className="range-slider"
+                    style={{
+                      background: `linear-gradient(to right, var(--accent-info) 0%, var(--accent-info) ${minimumPlayPercent}%, var(--border-color) ${minimumPlayPercent}%, var(--border-color) 100%)`
+                    }}
+                  />
+                  <p
+                    className="text-sm mt-1"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Percentage of video to watch before counting as "played". This
+                    determines when the play count increments during watch sessions.
                   </p>
                 </div>
 

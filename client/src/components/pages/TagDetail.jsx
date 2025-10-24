@@ -4,6 +4,7 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
+import RatingControls from "../ui/RatingControls.jsx";
 import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 
@@ -65,16 +66,24 @@ const TagDetail = () => {
             >
               {tag?.name || `Tag ${tagId}`}
             </h1>
-            {tag?.favorite && (
-              <LucideStar size={32} color="#efdd03" fill="#efdd03" />
-            )}
           </div>
 
           {tag?.aliases && tag.aliases.length > 0 && (
-            <p className="text-xl" style={{ color: "var(--text-secondary)" }}>
+            <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
               Also known as: {tag.aliases.join(", ")}
             </p>
           )}
+
+          {/* Rating Controls */}
+          <div className="mt-4">
+            <RatingControls
+              entityType="tag"
+              entityId={tag.id}
+              initialRating={tag.rating}
+              initialFavorite={tag.favorite || false}
+              size={24}
+            />
+          </div>
         </div>
 
         {/* Two Column Layout - Image on left, content on right (lg+) */}
@@ -95,7 +104,7 @@ const TagDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              tags: { value: [tagId], modifier: "INCLUDES" },
+              tags: { value: [parseInt(tagId, 10)], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
               tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],

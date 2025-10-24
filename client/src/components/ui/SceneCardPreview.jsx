@@ -10,7 +10,6 @@ import { fetchAndParseVTT, getEvenlySpacedSprites } from '../../utils/spriteShee
  * @param {number} spriteCount - Number of sprites to cycle through (default: 5)
  */
 const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
-  const [_cues, setCues] = useState([]);
   const [sprites, setSprites] = useState([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
@@ -65,7 +64,6 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
     setIsLoading(true);
     fetchAndParseVTT(scene.paths.vtt)
       .then(parsedCues => {
-        setCues(parsedCues);
         if (parsedCues.length > 0) {
           const evenlySpaced = getEvenlySpacedSprites(parsedCues, spriteCount);
           setSprites(evenlySpaced);
@@ -75,7 +73,6 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
       .catch((err) => {
         console.error('[SceneCardPreview] Error loading VTT:', err);
         setIsLoading(false);
-        setCues([]);
       });
   }, [scene?.paths?.vtt, spriteCount]);
 

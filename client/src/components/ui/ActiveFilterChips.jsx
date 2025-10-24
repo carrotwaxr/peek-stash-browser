@@ -46,6 +46,18 @@ const ActiveFilterChips = ({
       case "text":
         return `${label}: "${filterValue}"`;
 
+      case "searchable-select": {
+        // For multi-select, show count if array
+        if (Array.isArray(filterValue)) {
+          if (filterValue.length === 0) return null;
+          return filterValue.length === 1
+            ? `${label}: 1 selected`
+            : `${label}: ${filterValue.length} selected`;
+        }
+        // For single select, just show that it's set
+        return filterValue ? `${label}: selected` : null;
+      }
+
       case "range":
         if (!filterValue.min && !filterValue.max) return null;
         if (filterValue.min && filterValue.max) {

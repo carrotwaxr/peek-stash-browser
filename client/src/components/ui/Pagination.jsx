@@ -20,7 +20,8 @@ const Pagination = ({
   showPerPageSelector = true,
   className = "",
 }) => {
-  if (!totalPages || totalPages <= 1) return null;
+  // Don't render if no pages at all
+  if (!totalPages || totalPages < 1) return null;
 
   const perPageOptions = [12, 24, 36, 48, 60, 72, 84, 96, 108, 120];
 
@@ -68,12 +69,12 @@ const Pagination = ({
         <select
           value={currentPage}
           onChange={(e) => onPageChange?.(parseInt(e.target.value))}
-          className="px-4 py-3 sm:px-3 sm:py-1 rounded text-sm font-medium transition-colors flex-grow sm:flex-grow-0"
+          className="px-3 py-1 rounded text-sm font-medium transition-colors flex-grow sm:flex-grow-0"
           style={{
             backgroundColor: "var(--bg-card)",
             color: "var(--text-primary)",
             border: "1px solid var(--border-color)",
-            height: "1.75rem",
+            height: "1.8rem",
           }}
         >
           {allPages.map((page) => (
@@ -119,12 +120,12 @@ const Pagination = ({
             id="perPage"
             value={perPage}
             onChange={(e) => onPerPageChange(parseInt(e.target.value))}
-            className="px-4 py-3 sm:px-3 sm:py-1 rounded text-sm font-medium transition-colors"
+            className="px-3 py-1 rounded text-sm font-medium transition-colors"
             style={{
               backgroundColor: "var(--bg-card)",
               color: "var(--text-primary)",
               border: "1px solid var(--border-color)",
-              height: "1.75rem",
+              height: "1.8rem",
             }}
           >
             {perPageOptions.map((option) => (
