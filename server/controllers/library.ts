@@ -21,6 +21,7 @@ import {
   transformTag,
 } from "../utils/pathMapping.js";
 import prisma from "../prisma/singleton.js";
+import { logger } from '../utils/logger.js';
 
 /**
  * Override scene watch history fields with per-user data from Peek database
