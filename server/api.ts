@@ -28,6 +28,7 @@ import {
   updateTag,
 } from "./controllers/library.js";
 import { proxyStashMedia } from "./controllers/proxy.js";
+import * as statsController from "./controllers/stats.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/user.js";
 import playlistRoutes from "./routes/playlist.js";
@@ -36,7 +37,6 @@ import ratingsRoutes from "./routes/ratings.js";
 import setupRoutes from "./routes/setup.js";
 import { authenticateToken, requireCacheReady } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
-import { stashCacheManager } from "./services/StashCacheManager.js";
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -86,11 +86,8 @@ export const setupAPI = () => {
     });
   });
 
-  // Cache stats endpoint (admin only - authenticated)
-  app.get("/api/stats", authenticateToken, (req, res) => {
-    const stats = stashCacheManager.getStats();
-    res.json(stats);
-  });
+  // Server stats endpoint (admin only - authenticated)
+  app.get("/api/stats", authenticateToken, statsController.getStats);
 
   // Media proxy (public - no auth required for images)
   app.get("/api/proxy/stash", proxyStashMedia);

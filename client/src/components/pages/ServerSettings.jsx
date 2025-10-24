@@ -7,6 +7,7 @@ import { PageLayout } from "../ui/index.js";
 import { setupApi } from "../../services/api.js";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
+import ServerStatsSection from "../settings/ServerStatsSection.jsx";
 import packageJson from "../../../package.json";
 
 const api = axios.create({
@@ -743,6 +744,9 @@ const ServerSettings = () => {
               )}
             </Paper.Body>
           </Paper>
+
+          {/* Server Statistics Section */}
+          <ServerStatsSection />
 
           {/* Version Information Section */}
           <Paper className="mb-6">
