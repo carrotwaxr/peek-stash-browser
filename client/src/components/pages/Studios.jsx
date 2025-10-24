@@ -118,7 +118,7 @@ const Studios = () => {
         {/* Controls Section */}
         <SearchControls
           artifactType="studio"
-          initialSort="scenes_count"
+          initialSort="scene_count"
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}

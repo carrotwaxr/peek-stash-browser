@@ -1448,6 +1448,18 @@ export const findPerformers = async (req: Request, res: Response) => {
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
 
+    logger.info('findPerformers request received', {
+      userId,
+      sortField,
+      sortDirection,
+      page,
+      perPage,
+      performer_filter: JSON.stringify(performer_filter),
+      filter: JSON.stringify(filter),
+      hasIds: !!ids,
+      hasPerformerIds: !!performer_ids,
+    });
+
     // If filtering by performer stat fields, only return performers from user's watch history
     if (hasPerformerStatFilters(performer_filter)) {
       // Calculate per-user performer stats
