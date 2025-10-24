@@ -46,6 +46,16 @@ async function apiPost(endpoint, data) {
 }
 
 /**
+ * PUT request wrapper
+ */
+async function apiPut(endpoint, data) {
+  return apiFetch(endpoint, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+/**
  * DELETE request wrapper
  */
 async function apiDelete(endpoint) {
@@ -55,7 +65,7 @@ async function apiDelete(endpoint) {
 }
 
 // Export API helper functions
-export { apiGet, apiPost, apiDelete };
+export { apiGet, apiPost, apiPut, apiDelete };
 
 // New filtered search API endpoints
 export const libraryApi = {
@@ -393,4 +403,49 @@ export const setupApi = {
    * @returns {Promise<{success: boolean}>}
    */
   deletePathMapping: (id) => apiDelete(`/setup/path-mappings/${id}`),
+};
+
+/**
+ * Rating and favorite API endpoints
+ */
+export const ratingsApi = {
+  /**
+   * Update rating and/or favorite for a scene
+   * @param {string} sceneId - Scene ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateSceneRating: (sceneId, data) => apiPut(`/ratings/scene/${sceneId}`, data),
+
+  /**
+   * Update rating and/or favorite for a performer
+   * @param {string} performerId - Performer ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updatePerformerRating: (performerId, data) => apiPut(`/ratings/performer/${performerId}`, data),
+
+  /**
+   * Update rating and/or favorite for a studio
+   * @param {string} studioId - Studio ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateStudioRating: (studioId, data) => apiPut(`/ratings/studio/${studioId}`, data),
+
+  /**
+   * Update rating and/or favorite for a tag
+   * @param {string} tagId - Tag ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateTagRating: (tagId, data) => apiPut(`/ratings/tag/${tagId}`, data),
 };

@@ -688,6 +688,14 @@ export const TAG_FILTER_OPTIONS = [
     placeholder: "Search description...",
   },
   {
+    key: "rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
+  },
+  {
     key: "sceneCount",
     label: "Scene Count",
     type: "range",
