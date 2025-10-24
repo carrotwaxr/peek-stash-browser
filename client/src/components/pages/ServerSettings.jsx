@@ -46,6 +46,19 @@ const ServerSettings = () => {
   const [updateError, setUpdateError] = useState(null);
   const CLIENT_VERSION = packageJson.version;
 
+  // Stash sync state
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncTargetUser, setSyncTargetUser] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState(null);
+  const [syncOptions, setSyncOptions] = useState({
+    scenes: { rating: true, favorite: false }, // Scenes don't have favorites in Stash
+    performers: { rating: true, favorite: true },
+    studios: { rating: true, favorite: true },
+    tags: { rating: false, favorite: true }, // Tags don't have ratings in Stash
+  });
+
   useEffect(() => {
     // Redirect if not admin
     if (currentUser && currentUser.role !== "ADMIN") {
@@ -336,6 +349,57 @@ const ServerSettings = () => {
     return false;
   };
 
+  // Open sync modal for a user
+  const openSyncModal = (user) => {
+    setSyncTargetUser(user);
+    setShowSyncModal(true);
+    setSyncResult(null);
+    setSyncError(null);
+    // Reset sync options to defaults
+    setSyncOptions({
+      scenes: { rating: true, favorite: false },
+      performers: { rating: true, favorite: true },
+      studios: { rating: true, favorite: true },
+      tags: { rating: false, favorite: true },
+    });
+  };
+
+  // Stash sync function
+  const syncFromStash = async () => {
+    if (!syncTargetUser) return;
+
+    setSyncing(true);
+    setSyncError(null);
+    setSyncResult(null);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await api.post(`/user/${syncTargetUser.id}/sync-from-stash`, {
+        options: syncOptions
+      });
+      setSyncResult(response.data.stats);
+      setMessage(`Successfully synced data from Stash for ${syncTargetUser.username}!`);
+      setTimeout(() => setMessage(null), 5000);
+    } catch (err) {
+      setSyncError(err.response?.data?.error || "Failed to sync from Stash");
+      setError(err.response?.data?.error || "Failed to sync from Stash");
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const toggleSyncOption = (entityType, field) => {
+    setSyncOptions(prev => ({
+      ...prev,
+      [entityType]: {
+        ...prev[entityType],
+        [field]: !prev[entityType][field]
+      }
+    }));
+  };
+
   if (loading) {
     return (
       <PageLayout>
@@ -523,6 +587,14 @@ const ServerSettings = () => {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              onClick={() => openSyncModal(user)}
+                              variant="tertiary"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
+                            >
+                              Sync from Stash
+                            </Button>
                             <Button
                               onClick={() =>
                                 changeUserRole(
@@ -934,6 +1006,324 @@ const ServerSettings = () => {
                 </div>
               </Paper.Body>
             </form>
+          </Paper>
+        </div>
+      )}
+
+      {/* Sync from Stash Modal */}
+      {showSyncModal && syncTargetUser && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => !syncing && setShowSyncModal(false)}
+        >
+          <Paper
+            className="max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Paper.Header>
+              <Paper.Title>Sync from Stash</Paper.Title>
+              <Paper.Subtitle className="mt-1">
+                Import ratings and favorites for {syncTargetUser.username}
+              </Paper.Subtitle>
+            </Paper.Header>
+            <Paper.Body>
+              <div className="space-y-4">
+                {/* Info Message */}
+                <div
+                  className="p-4 rounded-lg text-sm"
+                  style={{
+                    backgroundColor: "rgba(59, 130, 246, 0.1)",
+                    border: "1px solid rgba(59, 130, 246, 0.3)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  <p className="mb-2">
+                    Select which data to import from Stash. Only fields that exist in Stash are shown.
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                    <li>Only imports items that have the selected fields set in Stash</li>
+                    <li>Updates existing Peek data if values differ from Stash</li>
+                    <li>Does not import watch history or O counts</li>
+                    <li>May take several minutes for large libraries</li>
+                  </ul>
+                </div>
+
+                {/* Sync Options */}
+                {!syncing && !syncResult && (
+                  <div className="space-y-4">
+                    {/* Scenes */}
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                        Scenes
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.scenes.rating}
+                            onChange={() => toggleSyncOption('scenes', 'rating')}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>Rating</span>
+                        </label>
+                        <p className="text-xs ml-6" style={{ color: "var(--text-muted)" }}>
+                          Scenes do not have favorites in Stash
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Performers */}
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                        Performers
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.performers.rating}
+                            onChange={() => toggleSyncOption('performers', 'rating')}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>Rating</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.performers.favorite}
+                            onChange={() => toggleSyncOption('performers', 'favorite')}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>Favorite</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Studios */}
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                        Studios
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.studios.rating}
+                            onChange={() => toggleSyncOption('studios', 'rating')}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>Rating</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.studios.favorite}
+                            onChange={() => toggleSyncOption('studios', 'favorite')}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>Favorite</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Tags */}
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <h4 className="font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+                        Tags
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.tags.favorite}
+                            onChange={() => toggleSyncOption('tags', 'favorite')}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>Favorite</span>
+                        </label>
+                        <p className="text-xs ml-6" style={{ color: "var(--text-muted)" }}>
+                          Tags do not have ratings in Stash
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Loading State */}
+                {syncing && (
+                  <div
+                    className="p-6 rounded-lg text-center"
+                    style={{
+                      backgroundColor: "rgba(59, 130, 246, 0.05)",
+                      border: "1px solid rgba(59, 130, 246, 0.2)",
+                    }}
+                  >
+                    <div className="flex flex-col items-center gap-4">
+                      <div
+                        className="animate-spin w-12 h-12 border-4 border-t-transparent rounded-full"
+                        style={{ borderColor: "rgba(59, 130, 246, 0.3)", borderTopColor: "transparent" }}
+                      ></div>
+                      <div>
+                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                          Syncing from Stash...
+                        </p>
+                        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                          This may take a few minutes. Please wait.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Success Result */}
+                {syncResult && !syncing && (
+                  <div
+                    className="p-4 rounded-lg"
+                    style={{
+                      backgroundColor: "rgba(34, 197, 94, 0.1)",
+                      border: "1px solid rgba(34, 197, 94, 0.3)",
+                    }}
+                  >
+                    <p className="font-medium mb-3" style={{ color: "rgb(34, 197, 94)" }}>
+                      ✓ Sync Completed Successfully
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                          Scenes
+                        </p>
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {syncResult.scenes.checked.toLocaleString()} checked
+                          <br />
+                          {syncResult.scenes.created} new
+                          <br />
+                          {syncResult.scenes.updated} updated
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                          Performers
+                        </p>
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {syncResult.performers.checked.toLocaleString()} checked
+                          <br />
+                          {syncResult.performers.created} new
+                          <br />
+                          {syncResult.performers.updated} updated
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                          Studios
+                        </p>
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {syncResult.studios.checked.toLocaleString()} checked
+                          <br />
+                          {syncResult.studios.created} new
+                          <br />
+                          {syncResult.studios.updated} updated
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+                          Tags
+                        </p>
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {syncResult.tags.checked.toLocaleString()} checked
+                          <br />
+                          {syncResult.tags.created} new
+                          <br />
+                          {syncResult.tags.updated} updated
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {syncError && (
+                  <div
+                    className="p-3 rounded-lg text-sm"
+                    style={{
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      color: "rgb(239, 68, 68)",
+                    }}
+                  >
+                    {syncError}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  {!syncing && !syncResult && (
+                    <>
+                      <Button
+                        onClick={syncFromStash}
+                        variant="primary"
+                        fullWidth
+                      >
+                        Start Sync
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowSyncModal(false);
+                          setSyncTargetUser(null);
+                          setSyncResult(null);
+                          setSyncError(null);
+                        }}
+                        variant="secondary"
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+                  {syncResult && (
+                    <Button
+                      onClick={() => {
+                        setShowSyncModal(false);
+                        setSyncTargetUser(null);
+                        setSyncResult(null);
+                        setSyncError(null);
+                      }}
+                      variant="primary"
+                      fullWidth
+                    >
+                      Close
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </Paper.Body>
           </Paper>
         </div>
       )}
