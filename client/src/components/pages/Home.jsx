@@ -208,16 +208,11 @@ const HomeCarousel = ({
     if (error?.isInitializing) {
       if (retryCount < 60) { // Max 60 retries (5 minutes at 5s intervals)
         onInitializing(true);
-        console.log(`[${title}] Server initializing, retry ${retryCount + 1}/60 in 5 seconds...`);
         const timer = setTimeout(() => {
-          console.log(`[${title}] Retrying fetch...`);
           setRetryCount(prev => prev + 1);
           refetch();
         }, 5000); // Retry every 5 seconds
-        return () => {
-          console.log(`[${title}] Clearing timeout`);
-          clearTimeout(timer);
-        };
+        return () => clearTimeout(timer);
       } else {
         onInitializing(false);
         console.error(`[${title}] Failed to load after ${retryCount} retries:`, error);
@@ -225,7 +220,6 @@ const HomeCarousel = ({
     } else if (!error) {
       onInitializing(false);
       setRetryCount(0); // Reset retry count on success
-      console.log(`[${title}] Loaded successfully`);
     }
   }, [error, refetch, retryCount, onInitializing, title]);
 

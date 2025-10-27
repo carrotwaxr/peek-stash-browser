@@ -26,15 +26,11 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
   // Fetch full scene data for each watch history entry
   useEffect(() => {
     const fetchScenes = async () => {
-      console.log('[Continue Watching] fetchScenes triggered - loadingHistory:', loadingHistory, 'watchHistoryList:', watchHistoryList?.length, 'retryTrigger:', retryTrigger);
-
       if (loadingHistory) {
-        console.log('[Continue Watching] Skipping - watch history still loading');
         return;
       }
 
       if (!watchHistoryList || watchHistoryList.length === 0) {
-        console.log('[Continue Watching] No watch history data');
         setScenes([]);
         setLoading(false);
         return;
@@ -42,7 +38,6 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
 
       try {
         setLoading(true);
-        console.log('[Continue Watching] Fetching scenes for', watchHistoryList.length, 'history entries...');
 
         // Extract scene IDs from watch history
         const sceneIds = watchHistoryList.map(wh => wh.sceneId);
@@ -50,7 +45,6 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
         // Fetch scenes in bulk
         const response = await libraryApi.findScenes({ ids: sceneIds });
         const fetchedScenes = response?.findScenes?.scenes || [];
-        console.log('[Continue Watching] Fetched', fetchedScenes.length, 'scenes');
 
         // Match scenes with watch history data and add progress info
         const scenesWithProgress = fetchedScenes.map(scene => {
@@ -88,10 +82,8 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
 
         setScenes(filteredScenes);
         setScenesFetchError(null);
-        console.log('[Continue Watching] Successfully filtered to', filteredScenes.length, 'scenes');
       } catch (err) {
-        console.error('[Continue Watching] Error fetching scenes:', err);
-        console.error('[Continue Watching] Error details:', { isInitializing: err.isInitializing, status: err.status, message: err.message });
+        console.error('Error fetching continue watching scenes:', err);
         setScenesFetchError(err);
         setScenes([]);
       } finally {
@@ -110,24 +102,18 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
 
     if (isInitializing && retryCount < 60 && onInitializing) {
       onInitializing(true);
-      console.log(`[Continue Watching] Server initializing, retry ${retryCount + 1}/60 in 5 seconds...`);
       const timer = setTimeout(() => {
-        console.log(`[Continue Watching] Retrying both watch history and scenes fetch...`);
         setRetryCount(prev => prev + 1);
         refresh(); // Retry watch history fetch
         setRetryTrigger(prev => prev + 1); // Trigger scenes refetch
       }, 5000);
-      return () => {
-        console.log(`[Continue Watching] Clearing timeout`);
-        clearTimeout(timer);
-      };
+      return () => clearTimeout(timer);
     } else if (isInitializing && retryCount >= 60 && onInitializing) {
       onInitializing(false);
       console.error(`[Continue Watching] Failed to load after ${retryCount} retries`);
     } else if (!isInitializing && onInitializing) {
       onInitializing(false);
       setRetryCount(0);
-      console.log(`[Continue Watching] Loaded successfully`);
     }
   }, [error, scenesFetchError, refresh, retryCount, onInitializing]);
 
