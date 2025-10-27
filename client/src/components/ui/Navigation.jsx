@@ -27,6 +27,8 @@ const Navigation = () => {
         return "Studios";
       case "/tags":
         return "Tags";
+      case "/galleries":
+        return "Galleries";
       case "/playlists":
         return "Playlists";
       case "/":
@@ -44,6 +46,7 @@ const Navigation = () => {
     { name: "Performers", path: "/performers", icon: "user-star" },
     { name: "Studios", path: "/studios", icon: "spotlight" },
     { name: "Tags", path: "/tags", icon: "tags" },
+    { name: "Galleries", path: "/galleries", icon: "images" },
     { name: "Playlists", path: "/playlists", icon: "list" },
   ];
 
