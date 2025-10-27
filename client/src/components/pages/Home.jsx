@@ -136,6 +136,15 @@ const Home = () => {
               key={fetchKey}
               selectedScenes={selectedScenes}
               onToggleSelect={handleToggleSelect}
+              onInitializing={(initializing) => {
+                if (initializing) {
+                  setIsInitializing(true);
+                  setInitMessage("Server is loading cache, please wait...");
+                } else {
+                  setIsInitializing(false);
+                  setInitMessage(null);
+                }
+              }}
             />
           );
         }
