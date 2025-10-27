@@ -1869,3 +1869,150 @@ export const updateTag = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to update tag" });
   }
 };
+
+/**
+ * Find similar scenes based on weighted scoring
+ * Performers: 3 points each
+ * Tags: 1 point each (squashed from scene, performers, studio)
+ * Studio: 1 point
+ */
+export const findSimilarScenes = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const perPage = 12; // Fixed at 12 scenes per page
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Get all scenes from cache
+    const allScenes = stashCacheManager.getAllScenes();
+
+    // Find the current scene
+    const currentScene = allScenes.find((s: NormalizedScene) => s.id === id);
+    if (!currentScene) {
+      return res.status(404).json({ error: 'Scene not found' });
+    }
+
+    // Helper to get squashed tags (scene + performers + studio)
+    const getSquashedTagIds = (scene: NormalizedScene): Set<string> => {
+      const tagIds = new Set<string>();
+
+      // Scene tags
+      (scene.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+
+      // Performer tags
+      (scene.performers || []).forEach((p: any) => {
+        (p.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+      });
+
+      // Studio tags
+      if (scene.studio?.tags) {
+        scene.studio.tags.forEach((t: any) => tagIds.add(String(t.id)));
+      }
+
+      return tagIds;
+    };
+
+    // Check if scene has any metadata
+    const hasMetadata = (scene: NormalizedScene): boolean => {
+      const hasPerformers = scene.performers && scene.performers.length > 0;
+      const hasStudio = !!scene.studio;
+      const hasTags = getSquashedTagIds(scene).size > 0;
+      return hasPerformers || hasStudio || hasTags;
+    };
+
+    // If current scene has no metadata, return empty results
+    if (!hasMetadata(currentScene)) {
+      return res.json({
+        scenes: [],
+        count: 0,
+        page,
+        perPage,
+      });
+    }
+
+    // Get current scene's metadata
+    const currentPerformerIds = new Set(
+      (currentScene.performers || []).map((p: any) => String(p.id))
+    );
+    const currentStudioId = currentScene.studio?.id ? String(currentScene.studio.id) : null;
+    const currentTagIds = getSquashedTagIds(currentScene);
+
+    // Calculate similarity scores for all other scenes
+    interface ScoredScene {
+      scene: NormalizedScene;
+      score: number;
+    }
+
+    const scoredScenes: ScoredScene[] = [];
+
+    for (const scene of allScenes) {
+      // Skip current scene
+      if (scene.id === id) continue;
+
+      // Skip scenes with no metadata
+      if (!hasMetadata(scene)) continue;
+
+      let score = 0;
+
+      // Score for matching performers (3 points each)
+      if (scene.performers) {
+        for (const performer of scene.performers) {
+          if (currentPerformerIds.has(String(performer.id))) {
+            score += 3;
+          }
+        }
+      }
+
+      // Score for matching studio (1 point)
+      if (currentStudioId && scene.studio?.id === currentStudioId) {
+        score += 1;
+      }
+
+      // Score for matching tags (1 point each)
+      const sceneTagIds = getSquashedTagIds(scene);
+      for (const tagId of currentTagIds) {
+        if (sceneTagIds.has(tagId)) {
+          score += 1;
+        }
+      }
+
+      // Only include scenes with at least some similarity
+      if (score > 0) {
+        scoredScenes.push({ scene, score });
+      }
+    }
+
+    // Sort by score descending, then by date descending as tiebreaker
+    scoredScenes.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      // Tiebreaker: newer scenes first
+      const dateA = a.scene.date ? new Date(a.scene.date).getTime() : 0;
+      const dateB = b.scene.date ? new Date(b.scene.date).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    // Paginate results
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedScenes = scoredScenes.slice(startIndex, endIndex).map(s => s.scene);
+
+    // Merge with user data
+    const scenesWithUserData = await mergeScenesWithUserData(paginatedScenes, userId);
+
+    res.json({
+      scenes: scenesWithUserData,
+      count: scoredScenes.length,
+      page,
+      perPage,
+    });
+  } catch (error: any) {
+    logger.error('Error finding similar scenes:', error);
+    res.status(500).json({ error: 'Failed to find similar scenes' });
+  }
+};

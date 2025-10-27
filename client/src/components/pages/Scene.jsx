@@ -10,6 +10,7 @@ import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import SceneDetails from "./SceneDetails.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
+import ScenesLikeThis from "../ui/ScenesLikeThis.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import Button from "../ui/Button.jsx";
@@ -115,6 +116,9 @@ const SceneContent = () => {
           showTechnicalDetails={showTechnicalDetails}
           setShowTechnicalDetails={setShowTechnicalDetails}
         />
+
+        {/* Scenes Like This - lazy loaded */}
+        {scene && <ScenesLikeThis sceneId={scene.id} />}
       </main>
     </div>
   );
