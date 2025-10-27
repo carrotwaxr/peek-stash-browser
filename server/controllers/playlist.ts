@@ -89,9 +89,9 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
         const transformedScenes = scenes.map((s: any) => transformScene(s as Scene));
 
         // Override with per-user watch history
-        const { injectUserWatchHistory } = await import("./library.js");
+        const { mergeScenesWithUserData } = await import("./library.js");
         const userId = (req as any).user?.id;
-        const scenesWithUserHistory = await injectUserWatchHistory(transformedScenes, userId);
+        const scenesWithUserHistory = await mergeScenesWithUserData(transformedScenes, userId);
 
         // Create a map of scene ID to scene data
         const sceneMap = new Map(scenesWithUserHistory.map((s: any) => [s.id, s]));

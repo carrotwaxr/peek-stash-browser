@@ -29,6 +29,8 @@ export type NormalizedPerformer = Performer & {
   favorite: boolean;
   o_counter: number;
   play_count: number;
+  last_played_at: string | null;
+  last_o_at: string | null;
 }
 
 /**
@@ -165,6 +167,8 @@ class StashCacheManager {
           favorite: false,
           o_counter: 0,
           play_count: 0,
+          last_played_at: null,
+          last_o_at: null,
         });
       });
 
