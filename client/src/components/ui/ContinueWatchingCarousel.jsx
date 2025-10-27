@@ -20,6 +20,7 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
+  const [retryTrigger, setRetryTrigger] = useState(0);
   const [scenesFetchError, setScenesFetchError] = useState(null);
 
   // Fetch full scene data for each watch history entry
@@ -33,6 +34,7 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
 
       try {
         setLoading(true);
+        console.log('[Continue Watching] Fetching scenes...');
 
         // Extract scene IDs from watch history
         const sceneIds = watchHistoryList.map(wh => wh.sceneId);
@@ -40,6 +42,7 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
         // Fetch scenes in bulk
         const response = await libraryApi.findScenes({ ids: sceneIds });
         const fetchedScenes = response?.findScenes?.scenes || [];
+        console.log('[Continue Watching] Fetched', fetchedScenes.length, 'scenes');
 
         // Match scenes with watch history data and add progress info
         const scenesWithProgress = fetchedScenes.map(scene => {
@@ -89,7 +92,7 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
     if (!loadingHistory) {
       fetchScenes();
     }
-  }, [watchHistoryList, loadingHistory]);
+  }, [watchHistoryList, loadingHistory, retryTrigger]);
 
   // Handle server initialization state
   useEffect(() => {
@@ -101,9 +104,10 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
       onInitializing(true);
       console.log(`[Continue Watching] Server initializing, retry ${retryCount + 1}/60 in 5 seconds...`);
       const timer = setTimeout(() => {
-        console.log(`[Continue Watching] Retrying fetch...`);
+        console.log(`[Continue Watching] Retrying both watch history and scenes fetch...`);
         setRetryCount(prev => prev + 1);
         refetch(); // Retry watch history fetch
+        setRetryTrigger(prev => prev + 1); // Trigger scenes refetch
       }, 5000);
       return () => {
         console.log(`[Continue Watching] Clearing timeout`);
