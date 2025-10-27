@@ -14,6 +14,11 @@ const ErrorMessage = ({
 }) => {
   if (!error) return null;
 
+  // Extract error message from error object or use string directly
+  const errorMessage = typeof error === 'string'
+    ? error
+    : error?.message || error?.toString() || "An error occurred";
+
   const baseClasses = mode === "inline"
     ? "px-4 py-3 rounded-lg border"
     : "px-4 py-3 rounded-lg";
@@ -58,7 +63,7 @@ const ErrorMessage = ({
                 {title}:{" "}
               </strong>
             )}
-            <span className="block sm:inline">{error}</span>
+            <span className="block sm:inline">{errorMessage}</span>
           </div>
         </div>
         {showRetry && onRetry && (

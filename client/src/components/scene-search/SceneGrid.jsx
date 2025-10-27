@@ -25,7 +25,7 @@ const SceneGrid = ({
   enableKeyboard = true,
 }) => {
   const gridRef = useRef();
-  const columns = useGridColumns('scenes');
+  const columns = useGridColumns("scenes");
   const { isTVMode } = useTVMode();
 
   // Selection state (always enabled, no mode toggle)
@@ -33,10 +33,10 @@ const SceneGrid = ({
 
   // Selection handlers
   const handleToggleSelect = (scene) => {
-    setSelectedScenes(prev => {
-      const isSelected = prev.some(s => s.id === scene.id);
+    setSelectedScenes((prev) => {
+      const isSelected = prev.some((s) => s.id === scene.id);
       if (isSelected) {
-        return prev.filter(s => s.id !== scene.id);
+        return prev.filter((s) => s.id !== scene.id);
       } else {
         return [...prev, scene];
       }
@@ -65,13 +65,19 @@ const SceneGrid = ({
   };
 
   // Spatial navigation hook
-  const { focusedIndex: _focusedIndex, setItemRef, isFocused } = useSpatialNavigation({
+  const {
+    focusedIndex: _focusedIndex,
+    setItemRef,
+    isFocused,
+  } = useSpatialNavigation({
     items: scenes,
     columns,
     enabled: isTVMode && enableKeyboard,
     onSelect: handleKeyboardSelect,
-    onPageUp: () => onPageChange && currentPage > 1 && onPageChange(currentPage - 1),
-    onPageDown: () => onPageChange && currentPage < totalPages && onPageChange(currentPage + 1),
+    onPageUp: () =>
+      onPageChange && currentPage > 1 && onPageChange(currentPage - 1),
+    onPageDown: () =>
+      onPageChange && currentPage < totalPages && onPageChange(currentPage + 1),
   });
 
   // Set initial focus when grid loads (only in TV mode)
@@ -130,7 +136,7 @@ const SceneGrid = ({
         <div className="flex items-center justify-end gap-3">
           <Button
             onClick={handleSelectAll}
-            variant="secondary"
+            variant="primary"
             size="sm"
             className="font-medium"
           >
@@ -148,10 +154,7 @@ const SceneGrid = ({
       )}
 
       {/* Grid */}
-      <div
-        ref={gridRef}
-        className="grid gap-6 scene-grid-responsive"
-      >
+      <div ref={gridRef} className="grid gap-6 scene-grid-responsive">
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}
@@ -159,12 +162,8 @@ const SceneGrid = ({
             scene={scene}
             onClick={onSceneClick}
             tabIndex={isFocused(index) ? 0 : -1}
-            className={
-              isFocused(index)
-                ? "keyboard-focus"
-                : ""
-            }
-            isSelected={selectedScenes.some(s => s.id === scene.id)}
+            className={isFocused(index) ? "keyboard-focus" : ""}
+            isSelected={selectedScenes.some((s) => s.id === scene.id)}
             onToggleSelect={handleToggleSelect}
             selectionMode={selectedScenes.length > 0}
           />

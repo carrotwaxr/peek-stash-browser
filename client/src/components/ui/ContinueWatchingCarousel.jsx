@@ -9,20 +9,27 @@ import { libraryApi } from '../../services/api.js';
  * Continue Watching carousel component
  * Shows scenes that have been partially watched with resume times
  */
-const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
+const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onInitializing }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: watchHistoryList, loading: loadingHistory, error } = useAllWatchHistory({
+  const { data: watchHistoryList, loading: loadingHistory, error, refresh } = useAllWatchHistory({
     inProgress: true,
     limit: 12
   });
 
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryTrigger, setRetryTrigger] = useState(0);
+  const [scenesFetchError, setScenesFetchError] = useState(null);
 
   // Fetch full scene data for each watch history entry
   useEffect(() => {
     const fetchScenes = async () => {
+      if (loadingHistory) {
+        return;
+      }
+
       if (!watchHistoryList || watchHistoryList.length === 0) {
         setScenes([]);
         setLoading(false);
@@ -74,18 +81,41 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
         });
 
         setScenes(filteredScenes);
+        setScenesFetchError(null);
       } catch (err) {
         console.error('Error fetching continue watching scenes:', err);
+        setScenesFetchError(err);
         setScenes([]);
       } finally {
         setLoading(false);
       }
     };
 
-    if (!loadingHistory) {
-      fetchScenes();
+    fetchScenes();
+  }, [watchHistoryList, loadingHistory, retryTrigger]);
+
+  // Handle server initialization state
+  useEffect(() => {
+    const isWatchHistoryInitializing = error?.isInitializing;
+    const isScenesInitializing = scenesFetchError?.isInitializing;
+    const isInitializing = isWatchHistoryInitializing || isScenesInitializing;
+
+    if (isInitializing && retryCount < 60 && onInitializing) {
+      onInitializing(true);
+      const timer = setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        refresh(); // Retry watch history fetch
+        setRetryTrigger(prev => prev + 1); // Trigger scenes refetch
+      }, 5000);
+      return () => clearTimeout(timer);
+    } else if (isInitializing && retryCount >= 60 && onInitializing) {
+      onInitializing(false);
+      console.error(`[Continue Watching] Failed to load after ${retryCount} retries`);
+    } else if (!isInitializing && onInitializing) {
+      onInitializing(false);
+      setRetryCount(0);
     }
-  }, [watchHistoryList, loadingHistory]);
+  }, [error, scenesFetchError, refresh, retryCount, onInitializing]);
 
   const handleSceneClick = (scene) => {
     const currentIndex = scenes.findIndex(s => s.id === scene.id);
@@ -114,14 +144,19 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
     });
   };
 
-  // Don't show carousel if no scenes in progress or error occurred
-  if (error || (!loading && scenes.length === 0)) {
+  // Don't show carousel if error (non-initialization) or no scenes
+  const isInitializing = error?.isInitializing || scenesFetchError?.isInitializing;
+  if ((error && !error.isInitializing) || (scenesFetchError && !scenesFetchError.isInitializing)) {
+    console.error('Continue Watching error (non-initialization):', error || scenesFetchError);
+    return null;
+  }
+  if (!loading && !isInitializing && scenes.length === 0) {
     return null;
   }
 
   return (
     <SceneCarousel
-      loading={loading}
+      loading={loading || isInitializing}
       title="Continue Watching"
       titleIcon={<PlayCircle className="w-6 h-6" color="#10b981" />}
       scenes={scenes}

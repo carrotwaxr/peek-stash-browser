@@ -229,6 +229,20 @@ export const SCENE_FILTER_OPTIONS = [
     defaultValue: false,
     placeholder: "Favorite Performers Only",
   },
+  {
+    key: "studioFavorite",
+    label: "Favorite Studios",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorite Studios Only",
+  },
+  {
+    key: "tagFavorite",
+    label: "Favorite Tags",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorite Tags Only",
+  },
 
   // Date Ranges
   {
@@ -829,6 +843,12 @@ export const buildSceneFilter = (filters) => {
   }
   if (filters.performerFavorite === true || filters.performerFavorite === "TRUE") {
     sceneFilter.performer_favorite = true;
+  }
+  if (filters.studioFavorite === true || filters.studioFavorite === "TRUE") {
+    sceneFilter.studio_favorite = true;
+  }
+  if (filters.tagFavorite === true || filters.tagFavorite === "TRUE") {
+    sceneFilter.tag_favorite = true;
   }
   if (filters.organized) {
     sceneFilter.organized = filters.organized === "TRUE";

@@ -4,6 +4,7 @@ import axios from "axios";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
 import BulkActionBar from "../ui/BulkActionBar.jsx";
+import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import { PageHeader, PageLayout } from "../ui/index.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";
@@ -25,6 +26,8 @@ const Home = () => {
   const [carouselPreferences, setCarouselPreferences] = useState([]);
   const [_loadingPreferences, setLoadingPreferences] = useState(true);
   const [selectedScenes, setSelectedScenes] = useState([]);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initMessage, setInitMessage] = useState(null);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -98,6 +101,30 @@ const Home = () => {
         subtitle="Discover your favorite content and explore new scenes"
       />
 
+      {/* Show initialization message at top */}
+      {isInitializing && (
+        <div
+          className="mb-6 px-6 py-4 rounded-lg border-l-4"
+          style={{
+            backgroundColor: 'var(--status-info-bg)',
+            borderLeftColor: 'var(--accent-info)',
+            border: '1px solid var(--status-info-border)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <LoadingSpinner size="md" />
+            <div>
+              <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {initMessage || "Server is loading cache, please wait..."}
+              </p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                This may take a minute on first startup. Checking every 5 seconds...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeCarousels.map((def) => {
         const { title, iconComponent: IconComponent, iconProps, fetchKey, isSpecial } = def;
         const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
@@ -109,6 +136,15 @@ const Home = () => {
               key={fetchKey}
               selectedScenes={selectedScenes}
               onToggleSelect={handleToggleSelect}
+              onInitializing={(initializing) => {
+                if (initializing) {
+                  setIsInitializing(true);
+                  setInitMessage("Server is loading cache, please wait...");
+                } else {
+                  setIsInitializing(false);
+                  setInitMessage(null);
+                }
+              }}
             />
           );
         }
@@ -124,6 +160,15 @@ const Home = () => {
             carouselQueries={carouselQueries}
             selectedScenes={selectedScenes}
             onToggleSelect={handleToggleSelect}
+            onInitializing={(initializing) => {
+              if (initializing) {
+                setIsInitializing(true);
+                setInitMessage("Server is loading cache, please wait...");
+              } else {
+                setIsInitializing(false);
+                setInitMessage(null);
+              }
+            }}
           />
         );
       })}
@@ -147,22 +192,50 @@ const HomeCarousel = ({
   carouselQueries,
   selectedScenes,
   onToggleSelect,
+  onInitializing,
 }) => {
+  const [retryCount, setRetryCount] = useState(0);
   const fetchFunction = carouselQueries[fetchKey];
   const {
     data: scenes,
     loading,
     error,
+    refetch,
   } = useAsyncData(fetchFunction, [fetchKey]);
 
-  if (error) {
+  // Handle server initialization state
+  useEffect(() => {
+    if (error?.isInitializing) {
+      if (retryCount < 60) { // Max 60 retries (5 minutes at 5s intervals)
+        onInitializing(true);
+        const timer = setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          refetch();
+        }, 5000); // Retry every 5 seconds
+        return () => clearTimeout(timer);
+      } else {
+        onInitializing(false);
+        console.error(`[${title}] Failed to load after ${retryCount} retries:`, error);
+      }
+    } else if (!error) {
+      onInitializing(false);
+      setRetryCount(0); // Reset retry count on success
+    }
+  }, [error, refetch, retryCount, onInitializing, title]);
+
+  // Silently skip failed carousels (non-initialization errors only)
+  if (error && !error.isInitializing) {
     console.error(`Failed to load carousel "${title}":`, error);
-    return null; // Silently skip failed carousels
+    return null;
   }
+
+  // During initialization, show loading skeletons
+  // Keep component mounted to allow retry useEffect to continue running
+  const isInitializing = error?.isInitializing;
 
   return (
     <SceneCarousel
-      loading={loading}
+      loading={loading || isInitializing}
       title={title}
       titleIcon={icon}
       scenes={scenes || []}

@@ -20,8 +20,6 @@ import {
   findPerformersMinimal,
   findStudiosMinimal,
   findTagsMinimal,
-} from "./controllers/library-simplified.js";
-import {
   updateScene,
   updatePerformer,
   updateStudio,

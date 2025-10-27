@@ -23,7 +23,8 @@ export function useAsyncData(fetchFunction, dependencies = []) {
       const result = await fetchFunction();
       setData(result);
     } catch (err) {
-      setError(err.message || "An error occurred");
+      // Preserve full error object to maintain isInitializing flag
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -83,7 +84,8 @@ export function usePaginatedData(fetchFunction, initialPage = 1, perPage = 24) {
           items.length === perPage && (data?.length || 0) + items.length < count
         );
       } catch (err) {
-        setError(err.message || "An error occurred");
+        // Preserve full error object to maintain isInitializing flag
+        setError(err);
       } finally {
         setLoading(false);
       }
@@ -143,7 +145,8 @@ export function useSearch(searchFunction, debounceMs = 300) {
         const searchResults = await searchFunction(query);
         setResults(searchResults);
       } catch (err) {
-        setError(err.message || "Search failed");
+        // Preserve full error object to maintain isInitializing flag
+        setError(err);
       } finally {
         setLoading(false);
       }

@@ -272,6 +272,7 @@ const getPerformers = async (query) => {
     performers: findPerformers?.performers || [],
     count: findPerformers?.count || 0,
   };
+
   return result;
 };
 
