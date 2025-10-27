@@ -200,6 +200,25 @@ export const libraryApi = {
     const result = await apiPost("/library/tags/minimal", params);
     return result?.tags || [];
   },
+
+  /**
+   * Search galleries with filtering and pagination
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @param {Object} params.gallery_filter - Gallery-specific filters
+   */
+  findGalleries: (params = {}) => {
+    return apiPost("/library/galleries", params);
+  },
+
+  /**
+   * Find a single gallery by ID
+   * @param {string} id - Gallery ID
+   * @returns {Promise<Object|null>} Gallery object or null if not found
+   */
+  findGalleryById: async (id) => {
+    return apiGet(`/library/galleries/${id}`);
+  },
 };
 
 // Valid sort field mappings for Stash GraphQL API
@@ -466,4 +485,14 @@ export const ratingsApi = {
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
   updateTagRating: (tagId, data) => apiPut(`/ratings/tag/${tagId}`, data),
+
+  /**
+   * Update rating and/or favorite for a gallery
+   * @param {string} galleryId - Gallery ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateGalleryRating: (galleryId, data) => apiPut(`/library/galleries/${galleryId}/rating`, data),
 };
