@@ -2,9 +2,39 @@ import { Link } from "react-router-dom";
 import Tooltip from "../ui/Tooltip.jsx";
 
 /**
+ * Merge and deduplicate tags from scene, performers, and studio
+ */
+const mergeAllTags = (scene) => {
+  const tagMap = new Map();
+
+  // Add scene tags
+  if (scene.tags) {
+    scene.tags.forEach(tag => tagMap.set(tag.id, tag));
+  }
+
+  // Add performer tags
+  if (scene.performers) {
+    scene.performers.forEach(performer => {
+      if (performer.tags) {
+        performer.tags.forEach(tag => tagMap.set(tag.id, tag));
+      }
+    });
+  }
+
+  // Add studio tags
+  if (scene.studio?.tags) {
+    scene.studio.tags.forEach(tag => tagMap.set(tag.id, tag));
+  }
+
+  return Array.from(tagMap.values());
+};
+
+/**
  * Scene metadata: performers and tags with image-rich tooltips
  */
 const SceneMetadata = ({ scene, className = "" }) => {
+  // Get merged and deduped tags
+  const allTags = mergeAllTags(scene);
   // Performer tooltip content with images in a grid
   const performersContent = scene.performers && scene.performers.length > 0 && (
     <div>
@@ -44,11 +74,11 @@ const SceneMetadata = ({ scene, className = "" }) => {
   );
 
   // Tag tooltip content with images in a grid
-  const tagsContent = scene.tags && scene.tags.length > 0 && (
+  const tagsContent = allTags && allTags.length > 0 && (
     <div>
       <div className="font-semibold mb-3 text-base">Tags</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
-        {scene.tags.slice(0, 8).map((tag) => (
+        {allTags.slice(0, 8).map((tag) => (
           <Link
             key={tag.id}
             to={`/tag/${tag.id}`}
@@ -73,9 +103,9 @@ const SceneMetadata = ({ scene, className = "" }) => {
           </Link>
         ))}
       </div>
-      {scene.tags.length > 8 && (
+      {allTags.length > 8 && (
         <div className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-          +{scene.tags.length - 8} more
+          +{allTags.length - 8} more
         </div>
       )}
     </div>
@@ -94,10 +124,10 @@ const SceneMetadata = ({ scene, className = "" }) => {
           />
         </Tooltip>
       )}
-      {scene.tags && scene.tags.length > 0 && (
+      {allTags && allTags.length > 0 && (
         <Tooltip content={tagsContent} clickable={true} position="bottom">
           <SceneMetadataEntityInfoChip
-            count={scene.tags.length}
+            count={allTags.length}
             icon="🏷️"
             type="tag"
           />

@@ -131,7 +131,7 @@ const Scene = () => {
 
   // Persist auto-playlists to sessionStorage for page refresh support
   // Use a stable key that doesn't change when navigating between scenes
-  const PLAYLIST_STORAGE_KEY = 'currentPlaylist';
+  const PLAYLIST_STORAGE_KEY = "currentPlaylist";
 
   // If playlist came via location.state, save it
   if (playlist) {
@@ -146,11 +146,15 @@ const Scene = () => {
       try {
         const parsed = JSON.parse(storedPlaylist);
         // Verify the current scene is actually in this playlist
-        const sceneInPlaylist = parsed.scenes?.some(s => s.sceneId === sceneId);
+        const sceneInPlaylist = parsed.scenes?.some(
+          (s) => s.sceneId === sceneId
+        );
         if (sceneInPlaylist) {
           playlist = parsed;
           // Update currentIndex to match the current scene
-          const currentIndex = parsed.scenes.findIndex(s => s.sceneId === sceneId);
+          const currentIndex = parsed.scenes.findIndex(
+            (s) => s.sceneId === sceneId
+          );
           if (currentIndex >= 0) {
             playlist.currentIndex = currentIndex;
           }
@@ -159,7 +163,7 @@ const Scene = () => {
           sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
         }
       } catch (e) {
-        console.error('Failed to parse stored playlist:', e);
+        console.error("Failed to parse stored playlist:", e);
         sessionStorage.removeItem(PLAYLIST_STORAGE_KEY);
       }
     }

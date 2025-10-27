@@ -45,6 +45,6 @@
     "graphql-tag": "^2.12.6",
     "jsonwebtoken": "^9.0.2",
     "node-cache": "^5.1.2",
-    "stashapp-api": "^0.3.0"
+    "stashapp-api": "^0.3.1"
   }
 }
