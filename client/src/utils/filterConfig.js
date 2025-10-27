@@ -229,6 +229,20 @@ export const SCENE_FILTER_OPTIONS = [
     defaultValue: false,
     placeholder: "Favorite Performers Only",
   },
+  {
+    key: "studioFavorite",
+    label: "Favorite Studios",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorite Studios Only",
+  },
+  {
+    key: "tagFavorite",
+    label: "Favorite Tags",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorite Tags Only",
+  },
 
   // Date Ranges
   {

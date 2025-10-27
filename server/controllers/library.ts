@@ -368,6 +368,29 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     });
   }
 
+  // Filter by performer favorite
+  if (filters.performerFavorite) {
+    filtered = filtered.filter((s) => {
+      const performers = s.performers || [];
+      return performers.some((p: any) => p.favorite === true);
+    });
+  }
+
+  // Filter by studio favorite
+  if (filters.studioFavorite) {
+    filtered = filtered.filter((s) => {
+      return s.studio?.favorite === true;
+    });
+  }
+
+  // Filter by tag favorite
+  if (filters.tagFavorite) {
+    filtered = filtered.filter((s) => {
+      const tags = s.tags || [];
+      return tags.some((t: any) => t.favorite === true);
+    });
+  }
+
   return filtered;
 }
 
