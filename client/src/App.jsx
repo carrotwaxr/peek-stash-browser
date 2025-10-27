@@ -23,6 +23,7 @@ const Performers = lazy(() => import("./components/pages/Performers.jsx"));
 const Studios = lazy(() => import("./components/pages/Studios.jsx"));
 const Tags = lazy(() => import("./components/pages/Tags.jsx"));
 const Galleries = lazy(() => import("./components/pages/Galleries.jsx"));
+const GalleryDetail = lazy(() => import("./components/pages/GalleryDetail.jsx"));
 const Scene = lazy(() => import("./components/pages/Scene.jsx"));
 const PerformerDetail = lazy(() => import("./components/pages/PerformerDetail.jsx"));
 const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
@@ -143,6 +144,14 @@ const AppContent = () => {
             element={
               <GlobalLayout>
                 <Galleries />
+              </GlobalLayout>
+            }
+          />
+          <Route
+            path="/gallery/:galleryId"
+            element={
+              <GlobalLayout>
+                <GalleryDetail />
               </GlobalLayout>
             }
           />
