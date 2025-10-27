@@ -1869,3 +1869,350 @@ export const updateTag = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to update tag" });
   }
 };
+
+/**
+ * Find similar scenes based on weighted scoring
+ * Performers: 3 points each
+ * Tags: 1 point each (squashed from scene, performers, studio)
+ * Studio: 1 point
+ */
+export const findSimilarScenes = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const perPage = 12; // Fixed at 12 scenes per page
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Get all scenes from cache
+    const allScenes = stashCacheManager.getAllScenes();
+
+    // Find the current scene
+    const currentScene = allScenes.find((s: NormalizedScene) => s.id === id);
+    if (!currentScene) {
+      return res.status(404).json({ error: 'Scene not found' });
+    }
+
+    // Helper to get squashed tags (scene + performers + studio)
+    const getSquashedTagIds = (scene: NormalizedScene): Set<string> => {
+      const tagIds = new Set<string>();
+
+      // Scene tags
+      (scene.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+
+      // Performer tags
+      (scene.performers || []).forEach((p: any) => {
+        (p.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+      });
+
+      // Studio tags
+      if (scene.studio?.tags) {
+        scene.studio.tags.forEach((t: any) => tagIds.add(String(t.id)));
+      }
+
+      return tagIds;
+    };
+
+    // Check if scene has any metadata
+    const hasMetadata = (scene: NormalizedScene): boolean => {
+      const hasPerformers = scene.performers && scene.performers.length > 0;
+      const hasStudio = !!scene.studio;
+      const hasTags = getSquashedTagIds(scene).size > 0;
+      return hasPerformers || hasStudio || hasTags;
+    };
+
+    // If current scene has no metadata, return empty results
+    if (!hasMetadata(currentScene)) {
+      return res.json({
+        scenes: [],
+        count: 0,
+        page,
+        perPage,
+      });
+    }
+
+    // Get current scene's metadata
+    const currentPerformerIds = new Set(
+      (currentScene.performers || []).map((p: any) => String(p.id))
+    );
+    const currentStudioId = currentScene.studio?.id ? String(currentScene.studio.id) : null;
+    const currentTagIds = getSquashedTagIds(currentScene);
+
+    // Calculate similarity scores for all other scenes
+    interface ScoredScene {
+      scene: NormalizedScene;
+      score: number;
+    }
+
+    const scoredScenes: ScoredScene[] = [];
+
+    for (const scene of allScenes) {
+      // Skip current scene
+      if (scene.id === id) continue;
+
+      // Skip scenes with no metadata
+      if (!hasMetadata(scene)) continue;
+
+      let score = 0;
+
+      // Score for matching performers (3 points each)
+      if (scene.performers) {
+        for (const performer of scene.performers) {
+          if (currentPerformerIds.has(String(performer.id))) {
+            score += 3;
+          }
+        }
+      }
+
+      // Score for matching studio (1 point)
+      if (currentStudioId && scene.studio?.id === currentStudioId) {
+        score += 1;
+      }
+
+      // Score for matching tags (1 point each)
+      const sceneTagIds = getSquashedTagIds(scene);
+      for (const tagId of currentTagIds) {
+        if (sceneTagIds.has(tagId)) {
+          score += 1;
+        }
+      }
+
+      // Only include scenes with at least some similarity
+      if (score > 0) {
+        scoredScenes.push({ scene, score });
+      }
+    }
+
+    // Sort by score descending, then by date descending as tiebreaker
+    scoredScenes.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      // Tiebreaker: newer scenes first
+      const dateA = a.scene.date ? new Date(a.scene.date).getTime() : 0;
+      const dateB = b.scene.date ? new Date(b.scene.date).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    // Paginate results
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedScenes = scoredScenes.slice(startIndex, endIndex).map(s => s.scene);
+
+    // Merge with user data
+    const scenesWithUserData = await mergeScenesWithUserData(paginatedScenes, userId);
+
+    res.json({
+      scenes: scenesWithUserData,
+      count: scoredScenes.length,
+      page,
+      perPage,
+    });
+  } catch (error: any) {
+    logger.error('Error finding similar scenes:', error);
+    res.status(500).json({ error: 'Failed to find similar scenes' });
+  }
+};
+
+/**
+ * Get recommended scenes based on user preferences and watch history
+ * Uses favorites, ratings (80+), watch status, and engagement quality
+ */
+export const getRecommendedScenes = async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const perPage = parseInt(req.query.per_page as string) || 24;
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Fetch user ratings and watch history
+    const [performerRatings, studioRatings, tagRatings, watchHistory] = await Promise.all([
+      prisma.performerRating.findMany({ where: { userId } }),
+      prisma.studioRating.findMany({ where: { userId } }),
+      prisma.tagRating.findMany({ where: { userId } }),
+      prisma.watchHistory.findMany({ where: { userId } }),
+    ]);
+
+    // Build sets of favorite and highly-rated entities
+    const favoritePerformers = new Set(
+      performerRatings.filter(r => r.favorite).map(r => r.performerId)
+    );
+    const highlyRatedPerformers = new Set(
+      performerRatings.filter(r => r.rating !== null && r.rating >= 80).map(r => r.performerId)
+    );
+    const favoriteStudios = new Set(
+      studioRatings.filter(r => r.favorite).map(r => r.studioId)
+    );
+    const highlyRatedStudios = new Set(
+      studioRatings.filter(r => r.rating !== null && r.rating >= 80).map(r => r.studioId)
+    );
+    const favoriteTags = new Set(
+      tagRatings.filter(r => r.favorite).map(r => r.tagId)
+    );
+    const highlyRatedTags = new Set(
+      tagRatings.filter(r => r.rating !== null && r.rating >= 80).map(r => r.tagId)
+    );
+
+    // Check if user has any favorites or highly-rated entities
+    const hasCriteria =
+      favoritePerformers.size > 0 || highlyRatedPerformers.size > 0 ||
+      favoriteStudios.size > 0 || highlyRatedStudios.size > 0 ||
+      favoriteTags.size > 0 || highlyRatedTags.size > 0;
+
+    if (!hasCriteria) {
+      return res.json({
+        scenes: [],
+        count: 0,
+        page,
+        perPage,
+        message: 'Rate or favorite some performers, studios, or tags to get recommendations',
+      });
+    }
+
+    // Build watch history map
+    const watchMap = new Map(
+      watchHistory.map(wh => {
+        const playHistory = Array.isArray(wh.playHistory)
+          ? wh.playHistory
+          : JSON.parse((wh.playHistory as string) || '[]');
+        const lastPlayedAt = playHistory.length > 0
+          ? new Date(playHistory[playHistory.length - 1])
+          : null;
+
+        return [
+          wh.sceneId,
+          {
+            playCount: wh.playCount || 0,
+            lastPlayedAt,
+          },
+        ];
+      })
+    );
+
+    // Get all scenes
+    const allScenes = stashCacheManager.getAllScenes();
+
+    // Helper to get squashed tags
+    const getSquashedTagIds = (scene: NormalizedScene): Set<string> => {
+      const tagIds = new Set<string>();
+      (scene.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+      (scene.performers || []).forEach((p: any) => {
+        (p.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+      });
+      if (scene.studio?.tags) {
+        scene.studio.tags.forEach((t: any) => tagIds.add(String(t.id)));
+      }
+      return tagIds;
+    };
+
+    // Score all scenes
+    interface ScoredScene {
+      scene: NormalizedScene;
+      score: number;
+    }
+
+    const scoredScenes: ScoredScene[] = [];
+    const now = new Date();
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    for (const scene of allScenes) {
+      let baseScore = 0;
+
+      // Score performers
+      if (scene.performers) {
+        for (const performer of scene.performers) {
+          const performerId = String(performer.id);
+          if (favoritePerformers.has(performerId)) {
+            baseScore += 5;
+          } else if (highlyRatedPerformers.has(performerId)) {
+            baseScore += 3;
+          }
+        }
+      }
+
+      // Score studio
+      if (scene.studio) {
+        const studioId = String(scene.studio.id);
+        if (favoriteStudios.has(studioId)) {
+          baseScore += 3;
+        } else if (highlyRatedStudios.has(studioId)) {
+          baseScore += 2;
+        }
+      }
+
+      // Score tags (squashed)
+      const sceneTagIds = getSquashedTagIds(scene);
+      for (const tagId of sceneTagIds) {
+        if (favoriteTags.has(tagId)) {
+          baseScore += 1;
+        } else if (highlyRatedTags.has(tagId)) {
+          baseScore += 0.5;
+        }
+      }
+
+      // Skip if no base score (doesn't match any criteria)
+      if (baseScore === 0) continue;
+
+      // Watch status modifier
+      const watchData = watchMap.get(scene.id);
+      if (!watchData || watchData.playCount === 0) {
+        // Never watched
+        baseScore += 100;
+      } else if (watchData.lastPlayedAt) {
+        const daysSinceWatched = (now.getTime() - watchData.lastPlayedAt.getTime()) / (24 * 60 * 60 * 1000);
+
+        if (daysSinceWatched > 14) {
+          // Not recently watched
+          baseScore += 50;
+        } else if (daysSinceWatched >= 1) {
+          // Recently watched (1-14 days)
+          baseScore -= 50;
+        } else {
+          // Very recently watched (<24 hours)
+          baseScore -= 100;
+        }
+      }
+
+      // Engagement quality multiplier
+      const oCounter = scene.o_counter || 0;
+      const engagementMultiplier = 1.0 + (Math.min(oCounter, 10) * 0.03);
+      const finalScore = baseScore * engagementMultiplier;
+
+      // Only include scenes with positive final scores
+      if (finalScore > 0) {
+        scoredScenes.push({ scene, score: finalScore });
+      }
+    }
+
+    // Sort by score descending
+    scoredScenes.sort((a, b) => b.score - a.score);
+
+    // Cap at top 500 recommendations
+    const cappedScenes = scoredScenes.slice(0, 500);
+
+    // Paginate
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedScenes = cappedScenes.slice(startIndex, endIndex).map(s => s.scene);
+
+    // Merge with user data
+    const scenesWithUserData = await mergeScenesWithUserData(paginatedScenes, userId);
+
+    res.json({
+      scenes: scenesWithUserData,
+      count: cappedScenes.length,
+      page,
+      perPage,
+    });
+  } catch (error: any) {
+    logger.error('Error getting recommended scenes:', error);
+    res.status(500).json({ error: 'Failed to get recommended scenes' });
+  }
+};

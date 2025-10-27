@@ -19,6 +19,8 @@ const Navigation = () => {
     switch (path) {
       case "/scenes":
         return "Scenes";
+      case "/recommended":
+        return "Recommended";
       case "/performers":
         return "Performers";
       case "/studios":
@@ -38,6 +40,7 @@ const Navigation = () => {
 
   const navItems = [
     { name: "Scenes", path: "/scenes", icon: "clapperboard" },
+    { name: "Recommended", path: "/recommended", icon: "sparkles" },
     { name: "Performers", path: "/performers", icon: "user-star" },
     { name: "Studios", path: "/studios", icon: "spotlight" },
     { name: "Tags", path: "/tags", icon: "tags" },

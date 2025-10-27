@@ -14,6 +14,8 @@ import {
 } from "./controllers/video.js";
 import {
   findScenes,
+  findSimilarScenes,
+  getRecommendedScenes,
   findPerformers,
   findStudios,
   findTags,
@@ -110,6 +112,8 @@ export const setupAPI = () => {
 
   // New filtered search endpoints (protected + require cache ready)
   app.post("/api/library/scenes", authenticateToken, requireCacheReady, findScenes);
+  app.get("/api/library/scenes/:id/similar", authenticateToken, requireCacheReady, findSimilarScenes);
+  app.get("/api/library/scenes/recommended", authenticateToken, requireCacheReady, getRecommendedScenes);
   app.post("/api/library/performers", authenticateToken, requireCacheReady, findPerformers);
   app.post("/api/library/studios", authenticateToken, requireCacheReady, findStudios);
   app.post("/api/library/tags", authenticateToken, requireCacheReady, findTags);
