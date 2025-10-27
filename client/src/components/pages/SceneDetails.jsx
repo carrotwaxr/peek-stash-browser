@@ -24,6 +24,14 @@ const formatFileSize = (bytes) => {
   return `${mb.toFixed(1)} MB`;
 };
 
+const formatBitRate = (bitsPerSecond) => {
+  if (!bitsPerSecond) return "Unknown";
+  const mbps = bitsPerSecond / (1000 * 1000);
+  if (mbps >= 1) return `${mbps.toFixed(2)} Mbps`;
+  const kbps = bitsPerSecond / 1000;
+  return `${kbps.toFixed(0)} Kbps`;
+};
+
 const SceneDetails = ({
   showDetails,
   setShowDetails,
@@ -310,16 +318,16 @@ const SceneDetails = ({
                             </span>
                           </div>
                         )}
-                        {firstFile.bitrate && (
+                        {firstFile.bit_rate && (
                           <div className="flex justify-between">
                             <span style={{ color: "var(--text-secondary)" }}>
-                              Bitrate:
+                              Bit Rate:
                             </span>
                             <span
                               className="font-medium"
                               style={{ color: "var(--text-primary)" }}
                             >
-                              {Math.round(firstFile.bitrate / 1000)} kbps
+                              {formatBitRate(firstFile.bit_rate)}
                             </span>
                           </div>
                         )}
