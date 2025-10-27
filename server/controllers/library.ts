@@ -162,20 +162,36 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     });
   }
 
-  // Filter by tags
+  // Filter by tags (squashed: scene + performers + studio tags)
   if (filters.tags) {
     const { value: tagIds, modifier } = filters.tags;
     filtered = filtered.filter((s) => {
-      const sceneTagIds = (s.tags || []).map((t: any) => String(t.id));
+      // Collect all tag IDs from scene, performers, and studio
+      const allTagIds = new Set<string>();
+
+      // Add scene tags
+      (s.tags || []).forEach((t: any) => allTagIds.add(String(t.id)));
+
+      // Add performer tags
+      (s.performers || []).forEach((p: any) => {
+        (p.tags || []).forEach((t: any) => allTagIds.add(String(t.id)));
+      });
+
+      // Add studio tags
+      if (s.studio?.tags) {
+        s.studio.tags.forEach((t: any) => allTagIds.add(String(t.id)));
+      }
+
       const filterTagIds = tagIds.map((id: any) => String(id));
+
       if (modifier === 'INCLUDES') {
-        return filterTagIds.some((id: string) => sceneTagIds.includes(id));
+        return filterTagIds.some((id: string) => allTagIds.has(id));
       }
       if (modifier === 'INCLUDES_ALL') {
-        return filterTagIds.every((id: string) => sceneTagIds.includes(id));
+        return filterTagIds.every((id: string) => allTagIds.has(id));
       }
       if (modifier === 'EXCLUDES') {
-        return !filterTagIds.some((id: string) => sceneTagIds.includes(id));
+        return !filterTagIds.some((id: string) => allTagIds.has(id));
       }
       return true;
     });

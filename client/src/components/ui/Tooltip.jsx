@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -14,42 +14,146 @@ const Tooltip = ({
   clickable = false, // Enable click-to-open mode for mobile
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [tooltipPosition, setTooltipPosition] = useState({
+    top: 0,
+    left: 0,
+    finalPosition: position,
+    arrowOffset: 24,
+  });
   const triggerRef = useRef(null);
   const tooltipRef = useRef(null);
   const hideTimeoutRef = useRef(null);
 
-  // Update tooltip position when visibility changes
-  useEffect(() => {
-    if (isVisible && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      // For fixed positioning, use viewport coordinates directly (no scroll offset)
+  // Calculate and update tooltip position
+  const calculatePosition = useCallback(() => {
+    if (!isVisible || !triggerRef.current || !tooltipRef.current) return;
 
-      let top = 0;
-      let left = 0;
+    const triggerRect = triggerRef.current.getBoundingClientRect();
+    const tooltipRect = tooltipRef.current.getBoundingClientRect();
+    const viewport = {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
 
-      switch (position) {
-        case "top":
-          top = rect.top - 8; // 8px gap above
-          left = rect.left;
-          break;
-        case "bottom":
-          top = rect.bottom + 8; // 8px gap below
-          left = rect.left;
-          break;
-        case "left":
-          top = rect.top;
-          left = rect.left - 8; // 8px gap to the left
-          break;
-        case "right":
-          top = rect.top;
-          left = rect.right + 8; // 8px gap to the right
-          break;
+    const GAP = 8; // Gap between trigger and tooltip
+    const EDGE_PADDING = 16; // Minimum distance from viewport edge
+
+    // Calculate available space on each side
+    const spaceAbove = triggerRect.top;
+    const spaceBelow = viewport.height - triggerRect.bottom;
+    const spaceLeft = triggerRect.left;
+    const spaceRight = viewport.width - triggerRect.right;
+
+    // Determine best vertical position
+    let finalPosition = position;
+    let top = 0;
+    let left = 0;
+
+    // Auto-flip vertical position if not enough space
+    if (position === "top" && spaceAbove < tooltipRect.height + GAP + EDGE_PADDING) {
+      if (spaceBelow > spaceAbove) {
+        finalPosition = "bottom";
       }
-
-      setTooltipPosition({ top, left, width: rect.width });
+    } else if (position === "bottom" && spaceBelow < tooltipRect.height + GAP + EDGE_PADDING) {
+      if (spaceAbove > spaceBelow) {
+        finalPosition = "top";
+      }
     }
+
+    // Calculate vertical position
+    switch (finalPosition) {
+      case "top":
+        top = triggerRect.top - GAP;
+        break;
+      case "bottom":
+        top = triggerRect.bottom + GAP;
+        break;
+      case "left":
+      case "right":
+        // Center vertically, but adjust if would go off-screen
+        top = triggerRect.top + triggerRect.height / 2;
+        // Check if centering would push tooltip off-screen
+        if (top + tooltipRect.height / 2 > viewport.height - EDGE_PADDING) {
+          top = viewport.height - EDGE_PADDING - tooltipRect.height;
+        } else if (top - tooltipRect.height / 2 < EDGE_PADDING) {
+          top = EDGE_PADDING;
+        } else {
+          top = top - tooltipRect.height / 2;
+        }
+        break;
+    }
+
+    // Calculate horizontal position
+    switch (finalPosition) {
+      case "top":
+      case "bottom":
+        // Try to align left edge with trigger
+        left = triggerRect.left;
+
+        // Check if tooltip would go off right edge
+        if (left + tooltipRect.width > viewport.width - EDGE_PADDING) {
+          // Shift left to fit
+          left = viewport.width - EDGE_PADDING - tooltipRect.width;
+        }
+
+        // Check if tooltip would go off left edge
+        if (left < EDGE_PADDING) {
+          left = EDGE_PADDING;
+        }
+        break;
+      case "left":
+        left = triggerRect.left - GAP;
+        break;
+      case "right":
+        left = triggerRect.right + GAP;
+        break;
+    }
+
+    // Calculate arrow offset (distance from left edge of tooltip to trigger center)
+    const arrowOffset = Math.max(
+      16, // Minimum offset to keep arrow visible
+      Math.min(
+        triggerRect.left + triggerRect.width / 2 - left,
+        tooltipRect.width - 16 // Maximum offset to keep arrow visible
+      )
+    );
+
+    setTooltipPosition({
+      top,
+      left,
+      finalPosition,
+      arrowOffset,
+    });
   }, [isVisible, position]);
+
+  // Update tooltip position when visibility changes with smart viewport-aware positioning
+  useEffect(() => {
+    calculatePosition();
+  }, [calculatePosition]);
+
+  // Recalculate position after tooltip is rendered (to get accurate dimensions)
+  useEffect(() => {
+    if (isVisible) {
+      // Small delay to ensure tooltip is rendered with content
+      const timer = setTimeout(calculatePosition, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, calculatePosition]);
+
+  // Reposition tooltip on window resize or scroll
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const handleReposition = () => calculatePosition();
+
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true); // Use capture to catch all scroll events
+
+    return () => {
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+    };
+  }, [isVisible, calculatePosition]);
 
   // Handle click outside to close when in clickable mode
   useEffect(() => {
@@ -135,22 +239,14 @@ const Tooltip = ({
         color: "var(--text-tooltip, white)",
         border: "1px solid var(--border-color)",
         minWidth: "200px",
-        maxWidth: "400px",
+        maxWidth: "min(400px, calc(100vw - 32px))", // Responsive max-width
         lineHeight: "1.4",
         wordWrap: "break-word",
-        top: position === "top"
-          ? `${tooltipPosition.top}px`
-          : position === "bottom"
-          ? `${tooltipPosition.top}px`
-          : `${tooltipPosition.top}px`,
-        left: position === "top" || position === "bottom"
-          ? `${tooltipPosition.left}px`
-          : position === "left"
-          ? `${tooltipPosition.left}px`
-          : `${tooltipPosition.left}px`,
-        transform: position === "top"
+        top: `${tooltipPosition.top || 0}px`,
+        left: `${tooltipPosition.left || 0}px`,
+        transform: (tooltipPosition.finalPosition === "top")
           ? "translateY(-100%)"
-          : position === "left"
+          : (tooltipPosition.finalPosition === "left")
           ? "translateX(-100%)"
           : "none",
       }}
@@ -160,28 +256,37 @@ const Tooltip = ({
       ) : (
         content
       )}
-      {/* Arrow */}
+      {/* Arrow - positioned dynamically based on trigger location */}
       <div
-        className={`absolute w-2 h-2 transform rotate-45 ${
-          position === "top"
-            ? "bottom-0 left-6 translate-y-1/2"
-            : position === "bottom"
-            ? "top-0 left-6 -translate-y-1/2"
-            : position === "left"
-            ? "right-0 top-4 translate-x-1/2"
-            : "left-0 top-4 -translate-x-1/2"
-        }`}
+        className={`absolute w-2 h-2 transform rotate-45`}
         style={{
           backgroundColor: "var(--bg-tooltip, #1f2937)",
           borderColor: "var(--border-color)",
           borderWidth:
-            position === "top"
+            (tooltipPosition.finalPosition === "top")
               ? "0 1px 1px 0"
-              : position === "bottom"
+              : (tooltipPosition.finalPosition === "bottom")
               ? "1px 0 0 1px"
-              : position === "left"
+              : (tooltipPosition.finalPosition === "left")
               ? "1px 1px 0 0"
               : "0 0 1px 1px",
+          // Position arrow based on actual position
+          ...(tooltipPosition.finalPosition === "top" && {
+            bottom: "-4px",
+            left: `${tooltipPosition.arrowOffset || 24}px`,
+          }),
+          ...(tooltipPosition.finalPosition === "bottom" && {
+            top: "-4px",
+            left: `${tooltipPosition.arrowOffset || 24}px`,
+          }),
+          ...(tooltipPosition.finalPosition === "left" && {
+            right: "-4px",
+            top: "16px",
+          }),
+          ...(tooltipPosition.finalPosition === "right" && {
+            left: "-4px",
+            top: "16px",
+          }),
         }}
       />
     </div>
