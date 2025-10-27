@@ -2216,3 +2216,304 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to get recommended scenes' });
   }
 };
+
+/**
+ * ========================================
+ * GALLERY ENDPOINTS
+ * ========================================
+ */
+
+/**
+ * Merge galleries with user rating/favorite data
+ */
+async function mergeGalleriesWithUserData(
+  galleries: any[],
+  userId: number
+): Promise<any[]> {
+  const ratings = await prisma.galleryRating.findMany({ where: { userId } });
+
+  const ratingMap = new Map(
+    ratings.map((r) => [
+      r.galleryId,
+      {
+        rating: r.rating,
+        rating100: r.rating,
+        favorite: r.favorite,
+      },
+    ])
+  );
+
+  return galleries.map((gallery) => ({
+    ...gallery,
+    ...ratingMap.get(gallery.id),
+  }));
+}
+
+/**
+ * Apply gallery filters
+ */
+function applyGalleryFilters(galleries: any[], filters: any): any[] {
+  if (!filters) return galleries;
+
+  let filtered = galleries;
+
+  // Filter by IDs
+  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
+    const idSet = new Set(filters.ids);
+    filtered = filtered.filter((g) => idSet.has(g.id));
+  }
+
+  // Filter by favorite
+  if (filters.favorite !== undefined) {
+    filtered = filtered.filter((g) => g.favorite === filters.favorite);
+  }
+
+  // Filter by rating100
+  if (filters.rating100) {
+    const { modifier, value, value2 } = filters.rating100;
+    filtered = filtered.filter((g) => {
+      const rating = g.rating100 || 0;
+      if (modifier === 'GREATER_THAN') return rating > value;
+      if (modifier === 'LESS_THAN') return rating < value;
+      if (modifier === 'EQUALS') return rating === value;
+      if (modifier === 'NOT_EQUALS') return rating !== value;
+      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      return true;
+    });
+  }
+
+  // Filter by image_count
+  if (filters.image_count) {
+    const { modifier, value, value2 } = filters.image_count;
+    filtered = filtered.filter((g) => {
+      const count = g.image_count || 0;
+      if (modifier === 'GREATER_THAN') return count > value;
+      if (modifier === 'LESS_THAN') return count < value;
+      if (modifier === 'EQUALS') return count === value;
+      if (modifier === 'NOT_EQUALS') return count !== value;
+      if (modifier === 'BETWEEN') return count >= value && count <= value2;
+      return true;
+    });
+  }
+
+  // Filter by title (text search)
+  if (filters.title) {
+    const searchValue = filters.title.value.toLowerCase();
+    filtered = filtered.filter((g) => {
+      const title = g.title || '';
+      return title.toLowerCase().includes(searchValue);
+    });
+  }
+
+  // Filter by studio
+  if (filters.studios) {
+    const studioIds = new Set(filters.studios.value);
+    filtered = filtered.filter((g) => g.studio && studioIds.has(g.studio.id));
+  }
+
+  // Filter by performers
+  if (filters.performers) {
+    const performerIds = new Set(filters.performers.value);
+    filtered = filtered.filter((g) =>
+      g.performers?.some((p: any) => performerIds.has(p.id))
+    );
+  }
+
+  // Filter by tags
+  if (filters.tags) {
+    const tagIds = new Set(filters.tags.value);
+    filtered = filtered.filter((g) => g.tags?.some((t: any) => tagIds.has(t.id)));
+  }
+
+  return filtered;
+}
+
+/**
+ * Sort galleries
+ */
+function sortGalleries(galleries: any[], sortField: string, sortDirection: string): any[] {
+  const direction = sortDirection === 'DESC' ? -1 : 1;
+
+  return galleries.sort((a, b) => {
+    let aVal, bVal;
+
+    switch (sortField) {
+      case 'title':
+        aVal = (a.title || '').toLowerCase();
+        bVal = (b.title || '').toLowerCase();
+        break;
+      case 'date':
+        aVal = a.date || '';
+        bVal = b.date || '';
+        break;
+      case 'rating100':
+        aVal = a.rating100 || 0;
+        bVal = b.rating100 || 0;
+        break;
+      case 'image_count':
+        aVal = a.image_count || 0;
+        bVal = b.image_count || 0;
+        break;
+      case 'created_at':
+        aVal = a.created_at || '';
+        bVal = b.created_at || '';
+        break;
+      case 'updated_at':
+        aVal = a.updated_at || '';
+        bVal = b.updated_at || '';
+        break;
+      case 'random':
+        return Math.random() - 0.5;
+      default:
+        aVal = (a.title || '').toLowerCase();
+        bVal = (b.title || '').toLowerCase();
+    }
+
+    if (aVal < bVal) return -1 * direction;
+    if (aVal > bVal) return 1 * direction;
+    return 0;
+  });
+}
+
+/**
+ * Find galleries endpoint
+ */
+export const findGalleries = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { filter, gallery_filter, ids } = req.body;
+
+    const sortField = filter?.sort || 'title';
+    const sortDirection = filter?.direction || 'ASC';
+    const page = filter?.page || 1;
+    const perPage = filter?.per_page || 40;
+    const searchQuery = filter?.q || '';
+
+    // Step 1: Get all galleries from cache
+    let galleries = stashCacheManager.getAllGalleries();
+
+    if (galleries.length === 0) {
+      logger.warn('Gallery cache not initialized, returning empty result');
+      return res.json({
+        findGalleries: {
+          count: 0,
+          galleries: [],
+        },
+      });
+    }
+
+    // Step 2: Merge with user data
+    galleries = await mergeGalleriesWithUserData(galleries, userId);
+
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      galleries = galleries.filter((g) => {
+        const title = g.title || '';
+        const details = g.details || '';
+        const photographer = g.photographer || '';
+        return (
+          title.toLowerCase().includes(lowerQuery) ||
+          details.toLowerCase().includes(lowerQuery) ||
+          photographer.toLowerCase().includes(lowerQuery)
+        );
+      });
+    }
+
+    // Step 4: Apply filters (merge root-level ids with gallery_filter)
+    const mergedFilter = { ...gallery_filter, ids: ids || gallery_filter?.ids };
+    galleries = applyGalleryFilters(galleries, mergedFilter);
+
+    // Step 5: Sort
+    galleries = sortGalleries(galleries, sortField, sortDirection);
+
+    // Step 6: Paginate
+    const total = galleries.length;
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedGalleries = galleries.slice(startIndex, endIndex);
+
+    res.json({
+      findGalleries: {
+        count: total,
+        galleries: paginatedGalleries,
+      },
+    });
+  } catch (error) {
+    logger.error('Error in findGalleries', { error: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json({
+      error: 'Failed to find galleries',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+/**
+ * Find single gallery by ID
+ */
+export const findGalleryById = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { id } = req.params;
+
+    let gallery = stashCacheManager.getGallery(id);
+
+    if (!gallery) {
+      return res.status(404).json({ error: 'Gallery not found' });
+    }
+
+    // Merge with user data
+    const galleries = await mergeGalleriesWithUserData([gallery], userId);
+    gallery = galleries[0];
+
+    res.json(gallery);
+  } catch (error) {
+    logger.error('Error in findGalleryById', { error: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json({
+      error: 'Failed to find gallery',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+/**
+ * Update gallery rating/favorite
+ */
+export const updateGalleryRating = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { galleryId, rating, favorite } = req.body;
+
+    if (!galleryId) {
+      return res.status(400).json({ error: 'Gallery ID is required' });
+    }
+
+    // Upsert rating
+    const galleryRating = await prisma.galleryRating.upsert({
+      where: {
+        userId_galleryId: {
+          userId,
+          galleryId,
+        },
+      },
+      update: {
+        rating: rating !== undefined ? rating : undefined,
+        favorite: favorite !== undefined ? favorite : undefined,
+      },
+      create: {
+        userId,
+        galleryId,
+        rating: rating || null,
+        favorite: favorite || false,
+      },
+    });
+
+    res.json(galleryRating);
+  } catch (error) {
+    logger.error('Error updating gallery rating', { error: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json({
+      error: 'Failed to update gallery rating',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
