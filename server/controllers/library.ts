@@ -18,9 +18,12 @@ export async function mergeScenesWithUserData(
   userId: number
 ): Promise<NormalizedScene[]> {
   // Fetch user data in parallel
-  const [watchHistory, ratings] = await Promise.all([
+  const [watchHistory, sceneRatings, performerRatings, studioRatings, tagRatings] = await Promise.all([
     prisma.watchHistory.findMany({ where: { userId } }),
     prisma.sceneRating.findMany({ where: { userId } }),
+    prisma.performerRating.findMany({ where: { userId } }),
+    prisma.studioRating.findMany({ where: { userId } }),
+    prisma.tagRating.findMany({ where: { userId } }),
   ]);
 
   // Create lookup maps for O(1) access
@@ -50,7 +53,7 @@ export async function mergeScenesWithUserData(
   );
 
   const ratingMap = new Map(
-    ratings.map((r) => [
+    sceneRatings.map((r) => [
       r.sceneId,
       {
         rating: r.rating,
@@ -60,12 +63,51 @@ export async function mergeScenesWithUserData(
     ])
   );
 
-  // Merge data
-  return scenes.map((scene) => ({
-    ...scene,
-    ...watchMap.get(scene.id),
-    ...ratingMap.get(scene.id),
-  }));
+  // Create favorite lookup sets for nested entities
+  const performerFavorites = new Set(
+    performerRatings.filter((r) => r.favorite).map((r) => r.performerId)
+  );
+  const studioFavorites = new Set(
+    studioRatings.filter((r) => r.favorite).map((r) => r.studioId)
+  );
+  const tagFavorites = new Set(
+    tagRatings.filter((r) => r.favorite).map((r) => r.tagId)
+  );
+
+  // Merge data and update nested entity favorites
+  return scenes.map((scene) => {
+    const mergedScene = {
+      ...scene,
+      ...watchMap.get(scene.id),
+      ...ratingMap.get(scene.id),
+    };
+
+    // Update favorite status for nested performers
+    if (mergedScene.performers && Array.isArray(mergedScene.performers)) {
+      mergedScene.performers = mergedScene.performers.map((p: any) => ({
+        ...p,
+        favorite: performerFavorites.has(p.id),
+      }));
+    }
+
+    // Update favorite status for studio
+    if (mergedScene.studio) {
+      mergedScene.studio = {
+        ...mergedScene.studio,
+        favorite: studioFavorites.has(mergedScene.studio.id),
+      };
+    }
+
+    // Update favorite status for nested tags
+    if (mergedScene.tags && Array.isArray(mergedScene.tags)) {
+      mergedScene.tags = mergedScene.tags.map((t: any) => ({
+        ...t,
+        favorite: tagFavorites.has(t.id),
+      }));
+    }
+
+    return mergedScene;
+  });
 }
 
 /**
@@ -369,7 +411,7 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   }
 
   // Filter by performer favorite
-  if (filters.performerFavorite) {
+  if (filters.performer_favorite) {
     filtered = filtered.filter((s) => {
       const performers = s.performers || [];
       return performers.some((p: any) => p.favorite === true);
@@ -377,14 +419,14 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   }
 
   // Filter by studio favorite
-  if (filters.studioFavorite) {
+  if (filters.studio_favorite) {
     filtered = filtered.filter((s) => {
       return s.studio?.favorite === true;
     });
   }
 
   // Filter by tag favorite
-  if (filters.tagFavorite) {
+  if (filters.tag_favorite) {
     filtered = filtered.filter((s) => {
       const tags = s.tags || [];
       return tags.some((t: any) => t.favorite === true);

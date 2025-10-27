@@ -844,6 +844,12 @@ export const buildSceneFilter = (filters) => {
   if (filters.performerFavorite === true || filters.performerFavorite === "TRUE") {
     sceneFilter.performer_favorite = true;
   }
+  if (filters.studioFavorite === true || filters.studioFavorite === "TRUE") {
+    sceneFilter.studio_favorite = true;
+  }
+  if (filters.tagFavorite === true || filters.tagFavorite === "TRUE") {
+    sceneFilter.tag_favorite = true;
+  }
   if (filters.organized) {
     sceneFilter.organized = filters.organized === "TRUE";
   }
