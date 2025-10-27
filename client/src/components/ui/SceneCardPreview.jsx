@@ -1,58 +1,65 @@
-import { useState, useEffect, useRef } from 'react';
-import { fetchAndParseVTT, getEvenlySpacedSprites } from '../../utils/spriteSheet.js';
+import { useState, useEffect, useRef } from "react";
+import {
+  fetchAndParseVTT,
+  getEvenlySpacedSprites,
+} from "../../utils/spriteSheet.js";
 
 /**
  * Animated sprite preview for scene cards
- * Cycles through evenly spaced sprite thumbnails on hover (desktop) or when in view (mobile)
+ * Cycles through evenly spaced sprite thumbnails based on input method and layout:
+ * - Devices with hover (mouse/trackpad): Preview on hover
+ * - Touch-only devices with autoplayOnScroll enabled: Preview when scrolled into view
+ * - Touch-only devices without autoplayOnScroll: No preview (static screenshot)
  *
  * @param {Object} scene - Scene object with paths.sprite and paths.vtt
+ * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (typically for 1-column mobile layouts)
  * @param {number} cycleInterval - Milliseconds between sprite changes (default: 800ms)
  * @param {number} spriteCount - Number of sprites to cycle through (default: 5)
  */
-const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
+const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800, spriteCount = 5 }) => {
   const [sprites, setSprites] = useState([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const [hasHoverCapability, setHasHoverCapability] = useState(true);
+  const [containerElement, setContainerElement] = useState(null);
   const intervalRef = useRef(null);
-  const containerRef = useRef(null);
 
-  // Detect touch device
+  // Detect hover capability (mouse/trackpad vs touch-only)
   useEffect(() => {
-    const checkTouchDevice = () => {
-      return (
-        'ontouchstart' in window ||
-        navigator.maxTouchPoints > 0 ||
-        navigator.msMaxTouchPoints > 0
-      );
-    };
-    setIsTouchDevice(checkTouchDevice());
+    const mediaQuery = window.matchMedia('(hover: hover)');
+    setHasHoverCapability(mediaQuery.matches);
+
+    const handleChange = (e) => setHasHoverCapability(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Intersection Observer for mobile auto-play
+  // Intersection Observer for scroll-based autoplay (touch-only devices with autoplayOnScroll enabled)
   useEffect(() => {
-    if (!isTouchDevice || !containerRef.current) return;
+    if (hasHoverCapability || !autoplayOnScroll || !containerElement) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          setIsInView(entry.isIntersecting);
+          // Only autoplay if at least 60% visible to avoid "all at once" on multi-column
+          setIsInView(entry.isIntersecting && entry.intersectionRatio >= 0.6);
         });
       },
       {
-        threshold: 0.5, // Trigger when 50% visible
+        threshold: [0, 0.3, 0.6, 1.0],
+        rootMargin: "50px",
       }
     );
-
-    observer.observe(containerRef.current);
+    observer.observe(containerElement);
 
     return () => {
       observer.disconnect();
     };
-  }, [isTouchDevice]);
+  }, [hasHoverCapability, autoplayOnScroll, containerElement]);
 
   // Load and parse VTT file
   useEffect(() => {
@@ -63,7 +70,7 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
 
     setIsLoading(true);
     fetchAndParseVTT(scene.paths.vtt)
-      .then(parsedCues => {
+      .then((parsedCues) => {
         if (parsedCues.length > 0) {
           const evenlySpaced = getEvenlySpacedSprites(parsedCues, spriteCount);
           setSprites(evenlySpaced);
@@ -71,18 +78,18 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
         setIsLoading(false);
       })
       .catch((err) => {
-        console.error('[SceneCardPreview] Error loading VTT:', err);
+        console.error("[SceneCardPreview] Error loading VTT:", err);
         setIsLoading(false);
       });
   }, [scene?.paths?.vtt, spriteCount]);
 
   // Measure container width on mount and when hovering
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerElement) return;
 
     const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
+      if (containerElement) {
+        setContainerWidth(containerElement.offsetWidth);
       }
     };
 
@@ -91,21 +98,24 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
 
     // Update on resize
     const resizeObserver = new ResizeObserver(updateWidth);
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(containerElement);
 
     return () => resizeObserver.disconnect();
-  }, []);
+  }, [containerElement]);
 
   // Update width when starting to hover
   useEffect(() => {
-    if (isHovering && containerRef.current && containerWidth === 0) {
-      setContainerWidth(containerRef.current.offsetWidth);
+    if (isHovering && containerElement && containerWidth === 0) {
+      setContainerWidth(containerElement.offsetWidth);
     }
-  }, [isHovering, containerWidth]);
+  }, [isHovering, containerWidth, containerElement]);
 
-  // Cycle through sprites on hover (desktop) or in view (mobile)
+  // Cycle through sprites based on input method and layout
   useEffect(() => {
-    const shouldAnimate = isTouchDevice ? isInView : isHovering;
+    // Determine if we should animate based on hover capability and autoplayOnScroll setting
+    const shouldAnimate = hasHoverCapability
+      ? isHovering // Devices with hover: animate on hover
+      : (autoplayOnScroll && isInView); // Touch-only: animate on scroll (if enabled)
 
     if (!shouldAnimate || sprites.length === 0) {
       if (intervalRef.current) {
@@ -118,7 +128,7 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
 
     // Start cycling
     intervalRef.current = setInterval(() => {
-      setCurrentSpriteIndex(prev => (prev + 1) % sprites.length);
+      setCurrentSpriteIndex((prev) => (prev + 1) % sprites.length);
     }, cycleInterval);
 
     return () => {
@@ -127,14 +137,19 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
         intervalRef.current = null;
       }
     };
-  }, [isHovering, isInView, isTouchDevice, sprites.length, cycleInterval]);
+  }, [isHovering, isInView, hasHoverCapability, autoplayOnScroll, sprites.length, cycleInterval]);
 
   // Don't render anything if no sprite data
-  if (!scene?.paths?.sprite || !scene?.paths?.vtt || sprites.length === 0 || isLoading) {
+  if (
+    !scene?.paths?.sprite ||
+    !scene?.paths?.vtt ||
+    sprites.length === 0 ||
+    isLoading
+  ) {
     return (
       <img
         src={scene?.paths?.screenshot}
-        alt={scene?.title || 'Scene'}
+        alt={scene?.title || "Scene"}
         className="w-full h-full object-cover pointer-events-none"
         loading="lazy"
         onMouseEnter={() => setIsHovering(true)}
@@ -145,22 +160,27 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
 
   // Calculate scale factor based on container width vs sprite thumbnail width
   const currentSprite = sprites[currentSpriteIndex];
-  const scale = currentSprite && containerWidth > 0 ? containerWidth / currentSprite.width : 1;
+  const scale =
+    currentSprite && containerWidth > 0
+      ? containerWidth / currentSprite.width
+      : 1;
 
-  const shouldShowAnimation = isTouchDevice ? isInView : isHovering;
+  const shouldShowAnimation = hasHoverCapability
+    ? isHovering
+    : (autoplayOnScroll && isInView);
 
   return (
     <div
-      ref={containerRef}
+      ref={setContainerElement}
       className="w-full h-full relative overflow-hidden"
-      onMouseEnter={() => !isTouchDevice && setIsHovering(true)}
-      onMouseLeave={() => !isTouchDevice && setIsHovering(false)}
+      onMouseEnter={() => hasHoverCapability && setIsHovering(true)}
+      onMouseLeave={() => hasHoverCapability && setIsHovering(false)}
     >
       {/* Show screenshot when not animating */}
       {!shouldShowAnimation && scene?.paths?.screenshot && (
         <img
           src={scene.paths.screenshot}
-          alt={scene?.title || 'Scene'}
+          alt={scene?.title || "Scene"}
           className="w-full h-full object-cover pointer-events-none"
           loading="lazy"
         />
@@ -171,15 +191,15 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
         <div className="w-full h-full relative overflow-hidden pointer-events-none">
           <img
             src={scene.paths.sprite}
-            alt={scene?.title || 'Scene preview'}
+            alt={scene?.title || "Scene preview"}
             className="pointer-events-none"
             style={{
-              position: 'absolute',
+              position: "absolute",
               left: `-${currentSprite.x * scale}px`,
               top: `-${currentSprite.y * scale}px`,
               transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-              maxWidth: 'none',
+              transformOrigin: "top left",
+              maxWidth: "none",
             }}
           />
         </div>
