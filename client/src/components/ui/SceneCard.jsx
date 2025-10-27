@@ -25,6 +25,7 @@ const SceneCard = forwardRef(
       isSelected = false,
       onToggleSelect,
       selectionMode = false,
+      autoplayOnScroll = false,
     },
     ref
   ) => {
@@ -261,7 +262,7 @@ const SceneCard = forwardRef(
           </div>
 
           {scene.paths?.screenshot ? (
-            <SceneCardPreview scene={scene} cycleInterval={600} spriteCount={10} />
+            <SceneCardPreview scene={scene} autoplayOnScroll={autoplayOnScroll} cycleInterval={600} spriteCount={10} />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <svg
