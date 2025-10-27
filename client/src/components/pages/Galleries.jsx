@@ -8,6 +8,7 @@ import {
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
+import { galleryTitle } from "../../utils/gallery.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -170,7 +171,7 @@ const GalleryCard = forwardRef(
           borderColor: "var(--border-color)",
         }}
         role="button"
-        aria-label={`Gallery: ${gallery.title || "Untitled"}`}
+        aria-label={`Gallery: ${galleryTitle(gallery)}`}
       >
         <div className="text-center">
           {/* Cover Image */}
@@ -178,7 +179,7 @@ const GalleryCard = forwardRef(
             {coverImage ? (
               <img
                 src={coverImage}
-                alt={gallery.title || "Untitled"}
+                alt={galleryTitle(gallery)}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -198,9 +199,9 @@ const GalleryCard = forwardRef(
           <h3
             className="font-semibold mb-2"
             style={{ color: "var(--text-primary)" }}
-            title={gallery.title || "Untitled"}
+            title={galleryTitle(gallery)}
           >
-            {truncateText(gallery.title || "Untitled", 30)}
+            {truncateText(galleryTitle(gallery), 30)}
           </h3>
 
           {/* Image Count */}
