@@ -4,12 +4,14 @@ import { PeekLogo } from "../branding/PeekLogo.jsx";
 import UserMenu from "./UserMenu.jsx";
 import { ThemedIcon } from "../icons/index.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import { useScrollDirection } from "../../hooks/useScrollDirection.js";
 import Button from "./Button.jsx";
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
+  const scrollDirection = useScrollDirection(100);
 
   // Get current page from React Router location
   const getCurrentPage = () => {
@@ -42,12 +44,16 @@ const Navigation = () => {
     { name: "Playlists", path: "/playlists", icon: "list" },
   ];
 
+  // Determine if navbar should be visible
+  const isVisible = scrollDirection === 'top' || scrollDirection === 'up';
+
   return (
     <nav
-      className="w-full py-2 px-2"
+      className="w-full py-2 px-2 fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ease-in-out"
       style={{
         backgroundColor: "var(--bg-secondary)",
         borderBottom: "1px solid var(--border-color)",
+        transform: isVisible ? 'translateY(0)' : 'translateY(-100%)',
       }}
     >
       <div className="w-full max-w-none">

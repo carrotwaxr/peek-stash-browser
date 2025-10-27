@@ -8,6 +8,8 @@ const GlobalLayout = ({ children }) => {
   return (
     <div className="layout-container">
       <Navigation />
+      {/* Spacer to prevent content from going under fixed navbar */}
+      <div style={{ height: '60px' }} />
       <main className="w-full">{children}</main>
     </div>
   );
