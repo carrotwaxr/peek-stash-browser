@@ -981,16 +981,60 @@ export const findScenes = async (req: Request, res: Response) => {
     // Stash has its own 'favorite' field which would conflict with Peek's per-user favorites
     const cleanedSceneFilter = removeRatingFilters(scene_filter);
 
-    const scenes: FindScenesQuery = await stash.findScenes({
-      filter: filter as FindFilterType,
-      scene_filter: cleanedSceneFilter as SceneFilterType,
-      ids: ids as string[],
-      scene_ids: scene_ids as number[],
-    });
+    let mutatedScenes: any[];
 
-    const mutatedScenes = scenes.findScenes.scenes.map((s) =>
-      transformScene(s as Scene)
-    );
+    // If requesting specific IDs, try to use cache first (for Continue Watching, Watch History, etc.)
+    if ((ids && ids.length > 0) || (scene_ids && scene_ids.length > 0)) {
+      const cachedScenes = stashCache.get<any[]>(CACHE_KEYS.SCENES_ALL);
+
+      if (cachedScenes && cachedScenes.length > 0) {
+        logger.info('Using cache for ID-based scene lookup', {
+          requestedIds: ids?.length || scene_ids?.length,
+          cacheSize: cachedScenes.length
+        });
+
+        // Filter cached scenes by requested IDs
+        const requestedIds = ids || scene_ids?.map(String) || [];
+        mutatedScenes = cachedScenes.filter(scene => requestedIds.includes(scene.id));
+
+        // If we found all requested scenes in cache, use them
+        if (mutatedScenes.length === requestedIds.length) {
+          logger.info('Cache hit - all requested scenes found', { found: mutatedScenes.length });
+        } else {
+          // Cache miss - some scenes not in cache, fetch from Stash
+          logger.info('Partial cache miss - fetching from Stash', {
+            cached: mutatedScenes.length,
+            requested: requestedIds.length
+          });
+          const scenes: FindScenesQuery = await stash.findScenes({
+            filter: filter as FindFilterType,
+            scene_filter: cleanedSceneFilter as SceneFilterType,
+            ids: ids as string[],
+            scene_ids: scene_ids as number[],
+          });
+          mutatedScenes = scenes.findScenes.scenes.map((s) => transformScene(s as Scene));
+        }
+      } else {
+        // No cache, fetch from Stash
+        logger.info('Cache miss - fetching scenes from Stash');
+        const scenes: FindScenesQuery = await stash.findScenes({
+          filter: filter as FindFilterType,
+          scene_filter: cleanedSceneFilter as SceneFilterType,
+          ids: ids as string[],
+          scene_ids: scene_ids as number[],
+        });
+        mutatedScenes = scenes.findScenes.scenes.map((s) => transformScene(s as Scene));
+      }
+    } else {
+      // Not requesting specific IDs, query Stash normally
+      const scenes: FindScenesQuery = await stash.findScenes({
+        filter: filter as FindFilterType,
+        scene_filter: cleanedSceneFilter as SceneFilterType,
+        ids: ids as string[],
+        scene_ids: scene_ids as number[],
+      });
+      mutatedScenes = scenes.findScenes.scenes.map((s) => transformScene(s as Scene));
+    }
 
     // Override with per-user watch history
     let scenesWithUserData = await injectUserWatchHistory(mutatedScenes, userId);
@@ -998,8 +1042,10 @@ export const findScenes = async (req: Request, res: Response) => {
     scenesWithUserData = await injectUserSceneRatings(scenesWithUserData, userId);
 
     res.json({
-      ...scenes,
-      findScenes: { ...scenes.findScenes, scenes: scenesWithUserData },
+      findScenes: {
+        count: scenesWithUserData.length,
+        scenes: scenesWithUserData
+      },
     });
   } catch (error) {
     console.error("Error in findScenes:", error);

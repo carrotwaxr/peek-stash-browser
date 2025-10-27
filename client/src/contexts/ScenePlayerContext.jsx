@@ -162,6 +162,10 @@ export function ScenePlayerProvider({
     }
   }, [state.scene?.id]);
 
+  const setOCounter = useCallback((newCount) => {
+    dispatch({ type: 'SET_O_COUNTER', payload: newCount });
+  }, []);
+
   // ============================================================================
   // EFFECTS (after action creators are defined)
   // ============================================================================
@@ -229,6 +233,7 @@ export function ScenePlayerProvider({
     setReady,
     setShouldAutoplay,
     incrementOCounter,
+    setOCounter,
   };
 
   return (

@@ -51,14 +51,29 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect }) => {
           };
         });
 
+        // Filter: Only show scenes where user has watched at least 2% of the video
+        // This prevents accidental clicks from cluttering Continue Watching
+        const MIN_WATCH_PERCENT = 2;
+        const filteredScenes = scenesWithProgress.filter(scene => {
+          const duration = scene.files?.[0]?.duration;
+          const playDuration = scene.watchHistory?.playDuration;
+
+          if (!duration || !playDuration) {
+            return false; // No duration data, exclude
+          }
+
+          const percentWatched = (playDuration / duration) * 100;
+          return percentWatched >= MIN_WATCH_PERCENT;
+        });
+
         // Sort by lastPlayedAt (most recent first)
-        scenesWithProgress.sort((a, b) => {
+        filteredScenes.sort((a, b) => {
           const dateA = a.lastPlayedAt ? new Date(a.lastPlayedAt) : new Date(0);
           const dateB = b.lastPlayedAt ? new Date(b.lastPlayedAt) : new Date(0);
           return dateB - dateA;
         });
 
-        setScenes(scenesWithProgress);
+        setScenes(filteredScenes);
       } catch (err) {
         console.error('Error fetching continue watching scenes:', err);
         setScenes([]);

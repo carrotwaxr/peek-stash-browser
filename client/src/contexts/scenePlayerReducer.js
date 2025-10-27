@@ -221,6 +221,12 @@ export function scenePlayerReducer(state, action) {
         oCounterLoading: false,
       };
 
+    case "SET_O_COUNTER":
+      return {
+        ...state,
+        oCounter: action.payload,
+      };
+
     // Initialize from props
     case "INITIALIZE":
       return {
