@@ -24,6 +24,42 @@ const formatFileSize = (bytes) => {
   return `${mb.toFixed(1)} MB`;
 };
 
+const formatBitRate = (bitsPerSecond) => {
+  if (!bitsPerSecond) return "Unknown";
+  const mbps = bitsPerSecond / (1000 * 1000);
+  if (mbps >= 1) return `${mbps.toFixed(2)} Mbps`;
+  const kbps = bitsPerSecond / 1000;
+  return `${kbps.toFixed(0)} Kbps`;
+};
+
+/**
+ * Merge and deduplicate tags from scene, performers, and studio
+ */
+const mergeAllTags = (scene) => {
+  const tagMap = new Map();
+
+  // Add scene tags
+  if (scene.tags) {
+    scene.tags.forEach(tag => tagMap.set(tag.id, tag));
+  }
+
+  // Add performer tags
+  if (scene.performers) {
+    scene.performers.forEach(performer => {
+      if (performer.tags) {
+        performer.tags.forEach(tag => tagMap.set(tag.id, tag));
+      }
+    });
+  }
+
+  // Add studio tags
+  if (scene.studio?.tags) {
+    scene.studio.tags.forEach(tag => tagMap.set(tag.id, tag));
+  }
+
+  return Array.from(tagMap.values());
+};
+
 const SceneDetails = ({
   showDetails,
   setShowDetails,
@@ -211,35 +247,38 @@ const SceneDetails = ({
                 )}
 
                 {/* Tags */}
-                {scene.tags && scene.tags.length > 0 && (
-                  <div>
-                    <h3
-                      className="text-sm font-medium mb-3"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Tags
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {scene.tags.map((tag) => {
-                        // Generate a color based on tag ID for consistency
-                        const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-                        return (
-                          <Link
-                            key={tag.id}
-                            to={`/tag/${tag.id}`}
-                            className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                            style={{
-                              backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                              color: "white",
-                            }}
-                          >
-                            {tag.name}
-                          </Link>
-                        );
-                      })}
+                {(() => {
+                  const allTags = mergeAllTags(scene);
+                  return allTags.length > 0 && (
+                    <div>
+                      <h3
+                        className="text-sm font-medium mb-3"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Tags
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {allTags.map((tag) => {
+                          // Generate a color based on tag ID for consistency
+                          const hue = (parseInt(tag.id, 10) * 137.5) % 360;
+                          return (
+                            <Link
+                              key={tag.id}
+                              to={`/tag/${tag.id}`}
+                              className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                              style={{
+                                backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                                color: "white",
+                              }}
+                            >
+                              {tag.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </Paper.Body>
             )}
           </Paper>
@@ -310,16 +349,16 @@ const SceneDetails = ({
                             </span>
                           </div>
                         )}
-                        {firstFile.bitrate && (
+                        {firstFile.bit_rate && (
                           <div className="flex justify-between">
                             <span style={{ color: "var(--text-secondary)" }}>
-                              Bitrate:
+                              Bit Rate:
                             </span>
                             <span
                               className="font-medium"
                               style={{ color: "var(--text-primary)" }}
                             >
-                              {Math.round(firstFile.bitrate / 1000)} kbps
+                              {formatBitRate(firstFile.bit_rate)}
                             </span>
                           </div>
                         )}

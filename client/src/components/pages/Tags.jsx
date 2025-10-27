@@ -194,9 +194,21 @@ const TagCard = forwardRef(
               {truncateText(tag.name, 30)}
             </h3>
 
-            {/* Scene Count */}
+            {/* Entity Counts */}
             <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-              {tag.scene_count || 0} scene{tag.scene_count !== 1 ? "s" : ""}
+              {(() => {
+                const counts = [];
+                if (tag.scene_count > 0) {
+                  counts.push(`${tag.scene_count} Scene${tag.scene_count !== 1 ? "s" : ""}`);
+                }
+                if (tag.performer_count > 0) {
+                  counts.push(`${tag.performer_count} Performer${tag.performer_count !== 1 ? "s" : ""}`);
+                }
+                if (tag.studio_count > 0) {
+                  counts.push(`${tag.studio_count} Studio${tag.studio_count !== 1 ? "s" : ""}`);
+                }
+                return counts.length > 0 ? counts.join(", ") : "No content";
+              })()}
             </div>
 
             {/* Status Icons */}

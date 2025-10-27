@@ -144,7 +144,10 @@ const PerformerDetail = () => {
           </div>
 
           {performer?.alias_list?.length > 0 && (
-            <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
+            <p
+              className="text-xl mb-3"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Also known as: {performer.alias_list.join(", ")}
             </p>
           )}
@@ -180,7 +183,10 @@ const PerformerDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              performers: { value: [parseInt(performerId, 10)], modifier: "INCLUDES" },
+              performers: {
+                value: [parseInt(performerId, 10)],
+                modifier: "INCLUDES",
+              },
             }}
             permanentFiltersMetadata={{
               performers: [{ id: performerId, name: performer.name }],
