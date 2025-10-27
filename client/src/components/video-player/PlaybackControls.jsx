@@ -13,7 +13,7 @@ const PlaybackControls = () => {
     quality,
     setQuality,
     oCounter,
-    incrementOCounter,
+    setOCounter,
   } = useScenePlayer();
 
   // Don't render if no scene data yet
@@ -94,7 +94,7 @@ const PlaybackControls = () => {
           <OCounterButton
             sceneId={scene?.id}
             initialCount={oCounter}
-            onIncrement={incrementOCounter}
+            onIncrement={setOCounter}
             className="text-base"
             disabled={isLoading}
           />

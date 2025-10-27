@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import videojs from "video.js";
-import { setupDoubleTapFullscreen } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
 
 /**
@@ -66,7 +65,6 @@ export function useVideoPlayerLifecycle({
 
     playerRef.current = player;
     player.focus();
-    setupDoubleTapFullscreen(player);
 
     player.ready(() => {
       // Player ready
@@ -80,7 +78,7 @@ export function useVideoPlayerLifecycle({
       try {
         player.dispose();
       } catch (error) {
-        console.error('[LIFECYCLE] Disposal error:', error);
+        console.error("[LIFECYCLE] Disposal error:", error);
       }
 
       if (videoElement.parentNode) {
