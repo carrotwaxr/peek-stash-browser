@@ -18,6 +18,7 @@ import "./themes/base.css";
 // Lazy load page components for code splitting
 const Home = lazy(() => import("./components/pages/Home.jsx"));
 const Scenes = lazy(() => import("./components/pages/Scenes.jsx"));
+const Recommended = lazy(() => import("./components/pages/Recommended.jsx"));
 const Performers = lazy(() => import("./components/pages/Performers.jsx"));
 const Studios = lazy(() => import("./components/pages/Studios.jsx"));
 const Tags = lazy(() => import("./components/pages/Tags.jsx"));
@@ -101,6 +102,14 @@ const AppContent = () => {
             element={
               <GlobalLayout>
                 <Scenes />
+              </GlobalLayout>
+            }
+          />
+          <Route
+            path="/recommended"
+            element={
+              <GlobalLayout>
+                <Recommended />
               </GlobalLayout>
             }
           />

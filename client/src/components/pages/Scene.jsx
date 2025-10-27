@@ -70,8 +70,11 @@ const SceneContent = () => {
       {/* Full Navigation Header */}
       <Navigation />
 
+      {/* Spacer to prevent content from going under fixed navbar */}
+      <div style={{ height: '60px' }} />
+
       {/* Video Player Header */}
-      <header className="container-fluid py-3 mt-6 mb-6">
+      <header className="w-full py-8 px-4 lg:px-6 xl:px-8">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <Button
             onClick={() => {
@@ -99,7 +102,7 @@ const SceneContent = () => {
       </header>
 
       {/* Main content area */}
-      <main className="container-fluid" style={{ marginTop: 0, paddingTop: 0 }}>
+      <main className="w-full px-4 lg:px-6 xl:px-8">
         {/* Video player section */}
         <VideoPlayer />
 
