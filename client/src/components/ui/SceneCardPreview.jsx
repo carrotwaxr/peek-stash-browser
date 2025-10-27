@@ -39,11 +39,13 @@ const SceneCardPreview = ({ scene, cycleInterval = 800, spriteCount = 5 }) => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          setIsInView(entry.isIntersecting);
+          // Only autoplay if at least 30% visible and intersecting
+          setIsInView(entry.isIntersecting && entry.intersectionRatio >= 0.3);
         });
       },
       {
-        threshold: 0.5, // Trigger when 50% visible
+        threshold: [0, 0.3, 0.5, 0.7, 1.0], // Multiple thresholds for smooth detection
+        rootMargin: '50px', // Start detecting 50px before entering viewport
       }
     );
 

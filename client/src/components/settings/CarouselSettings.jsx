@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { GripVertical, Eye, EyeOff } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-react";
 import Button from "../ui/Button.jsx";
 
 /**
@@ -43,14 +43,11 @@ const CAROUSEL_METADATA = {
 
 /**
  * CarouselSettings Component
- * Allows users to enable/disable and reorder homepage carousels via drag-and-drop
+ * Allows users to enable/disable and reorder homepage carousels using up/down buttons
  */
 const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   const [preferences, setPreferences] = useState([]);
-  const [draggedIndex, setDraggedIndex] = useState(null);
-  const [touchStartY, setTouchStartY] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
-  const itemsRef = useRef([]);
 
   useEffect(() => {
     // Sort by order on initial load
@@ -58,21 +55,14 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     setPreferences(sorted);
   }, [carouselPreferences]);
 
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-
-    if (draggedIndex === null || draggedIndex === index) {
-      return;
-    }
+  const moveUp = (index) => {
+    if (index === 0) return; // Already at top
 
     const newPreferences = [...preferences];
-    const [draggedItem] = newPreferences.splice(draggedIndex, 1);
-    newPreferences.splice(index, 0, draggedItem);
+    [newPreferences[index - 1], newPreferences[index]] = [
+      newPreferences[index],
+      newPreferences[index - 1],
+    ];
 
     // Update order values
     const reordered = newPreferences.map((pref, idx) => ({
@@ -81,47 +71,17 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     }));
 
     setPreferences(reordered);
-    setDraggedIndex(index);
     setHasChanges(true);
   };
 
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-  };
-
-  // Touch event handlers for mobile support (useCallback for stable references)
-  const handleTouchStart = useCallback((e) => {
-    e.preventDefault(); // Prevent scrolling during drag
-    const index = parseInt(e.currentTarget.getAttribute('data-index'), 10);
-    setDraggedIndex(index);
-    setTouchStartY(e.touches[0].clientY);
-  }, []);
-
-  const handleTouchMove = useCallback((e) => {
-    e.preventDefault(); // Prevent scrolling - must be first
-
-    if (draggedIndex === null || touchStartY === null) {
-      return;
-    }
-
-    const currentY = e.touches[0].clientY;
-    const deltaY = currentY - touchStartY;
-
-    // Determine if we should swap with the item above or below
-    if (Math.abs(deltaY) < 50) {
-      return; // Minimum threshold to trigger reorder
-    }
-
-    const targetIndex = deltaY < 0 ? draggedIndex - 1 : draggedIndex + 1;
-
-    // Ensure target index is within bounds
-    if (targetIndex < 0 || targetIndex >= preferences.length) {
-      return;
-    }
+  const moveDown = (index) => {
+    if (index === preferences.length - 1) return; // Already at bottom
 
     const newPreferences = [...preferences];
-    const [draggedItem] = newPreferences.splice(draggedIndex, 1);
-    newPreferences.splice(targetIndex, 0, draggedItem);
+    [newPreferences[index], newPreferences[index + 1]] = [
+      newPreferences[index + 1],
+      newPreferences[index],
+    ];
 
     // Update order values
     const reordered = newPreferences.map((pref, idx) => ({
@@ -130,40 +90,8 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     }));
 
     setPreferences(reordered);
-    setDraggedIndex(targetIndex);
-    setTouchStartY(currentY);
     setHasChanges(true);
-  }, [draggedIndex, touchStartY, preferences]);
-
-  const handleTouchEnd = useCallback(() => {
-    setDraggedIndex(null);
-    setTouchStartY(null);
-  }, []);
-
-  // Manually attach touch event listeners with { passive: false }
-  useEffect(() => {
-    const items = itemsRef.current;
-
-    // Attach listeners to each item
-    items.forEach((item) => {
-      if (item) {
-        item.addEventListener('touchstart', handleTouchStart, { passive: false });
-        item.addEventListener('touchmove', handleTouchMove, { passive: false });
-        item.addEventListener('touchend', handleTouchEnd, { passive: false });
-      }
-    });
-
-    // Cleanup: remove listeners on unmount or when handlers change
-    return () => {
-      items.forEach((item) => {
-        if (item) {
-          item.removeEventListener('touchstart', handleTouchStart);
-          item.removeEventListener('touchmove', handleTouchMove);
-          item.removeEventListener('touchend', handleTouchEnd);
-        }
-      });
-    };
-  }, [handleTouchStart, handleTouchMove, handleTouchEnd, preferences.length]);
+  };
 
   const toggleEnabled = (id) => {
     const updated = preferences.map((pref) =>
@@ -194,7 +122,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
           Homepage Carousels
         </h3>
         <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
-          Drag to reorder carousels, click the eye icon to toggle visibility
+          Use arrow buttons to reorder carousels, click the eye icon to toggle visibility
         </p>
       </div>
 
@@ -208,16 +136,9 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
           return (
             <div
               key={pref.id}
-              ref={(el) => (itemsRef.current[index] = el)}
-              data-index={index}
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragOver={(e) => handleDragOver(e, index)}
-              onDragEnd={handleDragEnd}
               className={`
                 flex items-center justify-between p-4 rounded-lg border
-                transition-all duration-200 cursor-move
-                ${draggedIndex === index ? "opacity-50" : "opacity-100"}
+                transition-all duration-200
                 ${pref.enabled ? "" : "opacity-60"}
               `}
               style={{
@@ -226,10 +147,24 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
               }}
             >
               <div className="flex items-center space-x-3 flex-1">
-                <GripVertical
-                  className="w-5 h-5 flex-shrink-0"
-                  style={{ color: "var(--text-secondary)" }}
-                />
+                <div className="flex flex-col space-y-1">
+                  <Button
+                    onClick={() => moveUp(index)}
+                    disabled={index === 0}
+                    variant="secondary"
+                    className="p-1"
+                    icon={<ChevronUp className="w-4 h-4" />}
+                    title="Move up"
+                  />
+                  <Button
+                    onClick={() => moveDown(index)}
+                    disabled={index === preferences.length - 1}
+                    variant="secondary"
+                    className="p-1"
+                    icon={<ChevronDown className="w-4 h-4" />}
+                    title="Move down"
+                  />
+                </div>
 
                 <div className="flex-1">
                   <div
