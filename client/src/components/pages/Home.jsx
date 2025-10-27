@@ -101,20 +101,31 @@ const Home = () => {
         subtitle="Discover your favorite content and explore new scenes"
       />
 
-      {/* Show initialization message at page level */}
+      {/* Show initialization message at top */}
       {isInitializing && (
-        <div className="flex flex-col items-center justify-center py-20">
-          <LoadingSpinner size="large" />
-          <p className="mt-4 text-lg" style={{ color: 'var(--text-secondary)' }}>
-            {initMessage || "Server is loading cache, please wait..."}
-          </p>
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-            This may take a minute on first startup
-          </p>
+        <div
+          className="mb-6 px-6 py-4 rounded-lg border-l-4"
+          style={{
+            backgroundColor: 'var(--status-info-bg)',
+            borderLeftColor: 'var(--accent-info)',
+            border: '1px solid var(--status-info-border)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <LoadingSpinner size="md" />
+            <div>
+              <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {initMessage || "Server is loading cache, please wait..."}
+              </p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                This may take a minute on first startup. Checking every 5 seconds...
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      {!isInitializing && activeCarousels.map((def) => {
+      {activeCarousels.map((def) => {
         const { title, iconComponent: IconComponent, iconProps, fetchKey, isSpecial } = def;
         const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
 
@@ -185,35 +196,43 @@ const HomeCarousel = ({
 
   // Handle server initialization state
   useEffect(() => {
-    if (error?.isInitializing && retryCount < 60) { // Max 60 retries (5 minutes at 5s intervals)
-      onInitializing(true);
-      const timer = setTimeout(() => {
-        setRetryCount(prev => prev + 1);
-        refetch();
-      }, 5000); // Retry every 5 seconds
-      return () => clearTimeout(timer);
-    } else if (error?.isInitializing && retryCount >= 60) {
-      onInitializing(false);
-      console.error(`Failed to load carousel "${title}" after ${retryCount} retries:`, error);
+    if (error?.isInitializing) {
+      if (retryCount < 60) { // Max 60 retries (5 minutes at 5s intervals)
+        onInitializing(true);
+        console.log(`[${title}] Server initializing, retry ${retryCount + 1}/60 in 5 seconds...`);
+        const timer = setTimeout(() => {
+          console.log(`[${title}] Retrying fetch...`);
+          setRetryCount(prev => prev + 1);
+          refetch();
+        }, 5000); // Retry every 5 seconds
+        return () => {
+          console.log(`[${title}] Clearing timeout`);
+          clearTimeout(timer);
+        };
+      } else {
+        onInitializing(false);
+        console.error(`[${title}] Failed to load after ${retryCount} retries:`, error);
+      }
     } else if (!error) {
       onInitializing(false);
       setRetryCount(0); // Reset retry count on success
+      console.log(`[${title}] Loaded successfully`);
     }
   }, [error, refetch, retryCount, onInitializing, title]);
 
+  // Silently skip failed carousels (non-initialization errors only)
   if (error && !error.isInitializing) {
     console.error(`Failed to load carousel "${title}":`, error);
-    return null; // Silently skip failed carousels (non-initialization errors)
-  }
-
-  // Don't render carousel during initialization (page-level spinner shown instead)
-  if (error?.isInitializing) {
     return null;
   }
 
+  // During initialization, show loading skeletons
+  // Keep component mounted to allow retry useEffect to continue running
+  const isInitializing = error?.isInitializing;
+
   return (
     <SceneCarousel
-      loading={loading}
+      loading={loading || isInitializing}
       title={title}
       titleIcon={icon}
       scenes={scenes || []}
