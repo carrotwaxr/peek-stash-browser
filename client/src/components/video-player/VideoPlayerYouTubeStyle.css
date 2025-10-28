@@ -171,7 +171,7 @@
 .video-js .vjs-volume-panel:hover,
 .video-js .vjs-volume-panel:focus-within,
 .video-js .vjs-volume-panel.vjs-hover {
-  width: 172px !important; /* 48px button + 124px slider (100px + 24px padding) */
+  width: 156px !important; /* 48px button + 8px margin + 100px slider */
 }
 
 .video-js .vjs-mute-control {
@@ -180,11 +180,11 @@
 }
 
 .video-js .vjs-volume-control {
-  position: relative !important;
+  position: static !important;
   width: 0 !important;
   opacity: 0 !important;
-  padding: 0 !important;
-  transition: width 0.2s ease, opacity 0.2s ease, padding 0.2s ease !important;
+  margin: 0 !important;
+  transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease !important;
 }
 
 .video-js .vjs-volume-panel:hover .vjs-volume-control,
@@ -192,13 +192,14 @@
 .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control {
   width: 100px !important;
   opacity: 1 !important;
-  padding: 0 12px !important;
+  margin-left: 8px !important;
 }
 
 .video-js .vjs-volume-bar {
   background: rgba(255, 255, 255, 0.2) !important;
   height: 4px !important;
   border-radius: 2px !important;
+  margin: 0 8px !important;
 }
 
 .video-js .vjs-volume-level {
