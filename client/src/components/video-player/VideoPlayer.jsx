@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import axios from "axios";
 import "video.js/dist/video-js.css";
 import "./VideoPlayer.css";
+import "./VideoPlayerYouTubeStyle.css";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
