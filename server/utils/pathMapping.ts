@@ -403,3 +403,34 @@ export const transformGallery = (gallery: any) => {
     return gallery; // Return original gallery if transformation fails
   }
 };
+
+export const transformGroup = (group: any) => {
+  try {
+    const mutated: Record<string, any> = {
+      ...group,
+    };
+
+    // Transform front and back image paths
+    if (group.front_image_path) {
+      mutated.front_image_path = appendApiKeyToUrl(group.front_image_path);
+    }
+    if (group.back_image_path) {
+      mutated.back_image_path = appendApiKeyToUrl(group.back_image_path);
+    }
+
+    // Transform studio to add API key to image_path
+    if (group.studio) {
+      mutated.studio = transformStudio(group.studio);
+    }
+
+    // Transform tags to add API key to image_path
+    if (group.tags && Array.isArray(group.tags)) {
+      mutated.tags = group.tags.map((t: any) => transformTag(t));
+    }
+
+    return mutated;
+  } catch (error) {
+    logger.error("Error transforming group", { error });
+    return group; // Return original group if transformation fails
+  }
+};
