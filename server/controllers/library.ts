@@ -2810,10 +2810,7 @@ export const findGroupsMinimal = async (req: Request, res: Response) => {
     if (groups.length === 0) {
       logger.warn('Cache not initialized, returning empty result');
       return res.json({
-        findGroups: {
-          count: 0,
-          groups: [],
-        },
+        groups: [],
       });
     }
 
@@ -2844,10 +2841,7 @@ export const findGroupsMinimal = async (req: Request, res: Response) => {
     }));
 
     res.json({
-      findGroups: {
-        count: minimalGroups.length,
-        groups: minimalGroups,
-      },
+      groups: minimalGroups,
     });
   } catch (error) {
     logger.error('Error in findGroupsMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
