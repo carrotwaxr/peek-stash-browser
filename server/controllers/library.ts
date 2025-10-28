@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 import type { NormalizedScene } from '../services/StashCacheManager.js';
 import getStash from '../stash.js';
 import { convertToProxyUrl } from '../utils/pathMapping.js';
+import { userRestrictionService } from '../services/UserRestrictionService.js';
 
 /**
  * Merge user-specific data into scenes
@@ -604,6 +605,12 @@ export const findScenes = async (req: Request, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with scene_filter)
     const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
     scenes = applySceneFilters(scenes, mergedFilter);
+
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
+    }
 
     // Step 5: Sort
     // Extract group_id for scene_index sorting (use first group if filtering by groups)
