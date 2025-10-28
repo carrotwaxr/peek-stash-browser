@@ -362,6 +362,16 @@ export const transformScene = (scene: any) => {
       mutated.studio = transformStudio(scene.studio);
     }
 
+    // Transform groups - flatten nested structure and add API keys to images
+    if (scene.groups && Array.isArray(scene.groups)) {
+      mutated.groups = scene.groups.map((g: any) => {
+        // Stash returns groups as: { group: { id, name, ... } }
+        // We need to flatten and transform
+        const group = g.group || g;
+        return transformGroup(group);
+      });
+    }
+
     return mutated;
   } catch (error) {
     logger.error("Error transforming scene", { error });
