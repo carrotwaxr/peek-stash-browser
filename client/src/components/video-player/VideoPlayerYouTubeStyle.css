@@ -172,14 +172,16 @@
 .video-js .vjs-volume-control {
   width: 0 !important;
   opacity: 0 !important;
-  transition: width 0.2s ease, opacity 0.2s ease !important;
+  padding: 0 !important;
+  transition: width 0.2s ease, opacity 0.2s ease, padding 0.2s ease !important;
 }
 
 .video-js .vjs-volume-panel:hover .vjs-volume-control,
 .video-js .vjs-volume-panel:focus-within .vjs-volume-control,
 .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control {
-  width: 80px !important;
+  width: 100px !important;
   opacity: 1 !important;
+  padding: 0 12px !important;
 }
 
 .video-js .vjs-volume-bar {
