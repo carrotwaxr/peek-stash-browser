@@ -8,7 +8,7 @@ import { ratingsApi } from '../../services/api';
  * Handles API calls automatically
  */
 export default function RatingControls({
-  entityType, // 'scene', 'performer', 'studio', 'tag'
+  entityType, // 'scene', 'performer', 'studio', 'tag', 'gallery'
   entityId,
   initialRating = null,
   initialFavorite = false,
@@ -31,6 +31,8 @@ export default function RatingControls({
         return ratingsApi.updateStudioRating(entityId, data);
       case 'tag':
         return ratingsApi.updateTagRating(entityId, data);
+      case 'gallery':
+        return ratingsApi.updateGalleryRating(entityId, data);
       default:
         throw new Error(`Unknown entity type: ${entityType}`);
     }

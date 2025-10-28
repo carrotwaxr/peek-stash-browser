@@ -36,6 +36,7 @@ model User {
     performerRatings PerformerRating[]
     studioRatings    StudioRating[]
     tagRatings       TagRating[]
+    galleryRatings   GalleryRating[]
 }
 
 model WatchHistory {
@@ -172,6 +173,23 @@ model TagRating {
     @@unique([userId, tagId])
     @@index([userId])
     @@index([tagId])
+    @@index([favorite])
+}
+
+model GalleryRating {
+    id          Int         @id @default(autoincrement())
+    userId      Int
+    galleryId   String      // Stash gallery ID
+    rating      Int?        // 0-100, null if not rated
+    favorite    Boolean     @default(false)
+    createdAt   DateTime    @default(now())
+    updatedAt   DateTime    @updatedAt
+
+    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, galleryId])
+    @@index([userId])
+    @@index([galleryId])
     @@index([favorite])
 }
 

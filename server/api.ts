@@ -19,6 +19,8 @@ import {
   findPerformers,
   findStudios,
   findTags,
+  findGalleries,
+  findGalleryById,
   findPerformersMinimal,
   findStudiosMinimal,
   findTagsMinimal,
@@ -26,6 +28,7 @@ import {
   updatePerformer,
   updateStudio,
   updateTag,
+  getGalleryImages,
 } from "./controllers/library.js";
 import { proxyStashMedia } from "./controllers/proxy.js";
 import * as statsController from "./controllers/stats.js";
@@ -117,6 +120,9 @@ export const setupAPI = () => {
   app.post("/api/library/performers", authenticateToken, requireCacheReady, findPerformers);
   app.post("/api/library/studios", authenticateToken, requireCacheReady, findStudios);
   app.post("/api/library/tags", authenticateToken, requireCacheReady, findTags);
+  app.post("/api/library/galleries", authenticateToken, requireCacheReady, findGalleries);
+  app.get("/api/library/galleries/:id", authenticateToken, requireCacheReady, findGalleryById);
+  app.get("/api/library/galleries/:galleryId/images", authenticateToken, requireCacheReady, getGalleryImages);
 
   // Minimal data endpoints for filter dropdowns (id + name only)
   app.post("/api/library/performers/minimal", authenticateToken, requireCacheReady, findPerformersMinimal);

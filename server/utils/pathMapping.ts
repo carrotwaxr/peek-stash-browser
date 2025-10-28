@@ -368,3 +368,38 @@ export const transformScene = (scene: any) => {
     return scene; // Return original scene if transformation fails
   }
 };
+
+/**
+ * Transform complete gallery object to add API keys to all image URLs
+ */
+export const transformGallery = (gallery: any) => {
+  try {
+    const mutated: Record<string, any> = {
+      ...gallery,
+      paths: Object.entries(gallery.paths).reduce((acc, [key, val]) => {
+        acc[key] = appendApiKeyToUrl(val as string);
+        return acc;
+      }, {} as { [key: string]: string }),
+    };
+
+    // Transform performers to add API key to image_path
+    if (gallery.performers && Array.isArray(gallery.performers)) {
+      mutated.performers = gallery.performers.map((p: any) => transformPerformer(p));
+    }
+
+    // Transform tags to add API key to image_path
+    if (gallery.tags && Array.isArray(gallery.tags)) {
+      mutated.tags = gallery.tags.map((t: any) => transformTag(t));
+    }
+
+    // Transform studio to add API key to image_path
+    if (gallery.studio) {
+      mutated.studio = transformStudio(gallery.studio);
+    }
+
+    return mutated;
+  } catch (error) {
+    logger.error("Error transforming gallery", { error });
+    return gallery; // Return original gallery if transformation fails
+  }
+};
