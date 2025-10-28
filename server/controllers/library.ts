@@ -2584,6 +2584,63 @@ export const findGalleryById = async (req: Request, res: Response) => {
 };
 
 /**
+ * Minimal galleries - just id and title for dropdowns
+ */
+export const findGalleriesMinimal = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { filter } = req.body;
+    const searchQuery = filter?.q || '';
+
+    // Step 1: Get all galleries from cache
+    let galleries = stashCacheManager.getAllGalleries();
+
+    if (galleries.length === 0) {
+      logger.warn('Gallery cache not initialized, returning empty result');
+      return res.json({
+        galleries: [],
+      });
+    }
+
+    // Step 2: Merge with user data (for favorites)
+    galleries = await mergeGalleriesWithUserData(galleries, userId);
+
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      galleries = galleries.filter((g) => {
+        const title = g.title || '';
+        return title.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Step 4: Sort by title
+    galleries = galleries.sort((a, b) => {
+      const aTitle = (a.title || '').toLowerCase();
+      const bTitle = (b.title || '').toLowerCase();
+      return aTitle.localeCompare(bTitle);
+    });
+
+    // Step 5: Map to minimal shape
+    const minimalGalleries = galleries.map((g) => ({
+      id: g.id,
+      name: g.title, // Use 'title' field but map to 'name' for consistency with other entities
+      favorite: g.favorite,
+    }));
+
+    res.json({
+      galleries: minimalGalleries,
+    });
+  } catch (error) {
+    logger.error('Error in findGalleriesMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json({
+      error: 'Failed to find galleries',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+/**
  * GET /api/library/galleries/:galleryId/images
  * Get images for a specific gallery
  */

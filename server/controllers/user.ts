@@ -970,10 +970,14 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 /**
  * Get content restrictions for a user (Admin only)
  */
-export const getUserRestrictions = async (req: Request, res: Response) => {
+export const getUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const requestingUser = (req as any).user;
+    const requestingUser = req.user;
+
+    if (!requestingUser) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
@@ -995,11 +999,15 @@ export const getUserRestrictions = async (req: Request, res: Response) => {
  * Update content restrictions for a user (Admin only)
  * Replaces all existing restrictions with new ones
  */
-export const updateUserRestrictions = async (req: Request, res: Response) => {
+export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { userId } = req.params;
     const { restrictions } = req.body; // Array of {entityType, mode, entityIds, restrictEmpty}
-    const requestingUser = (req as any).user;
+    const requestingUser = req.user;
+
+    if (!requestingUser) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
@@ -1060,10 +1068,14 @@ export const updateUserRestrictions = async (req: Request, res: Response) => {
 /**
  * Delete all content restrictions for a user (Admin only)
  */
-export const deleteUserRestrictions = async (req: Request, res: Response) => {
+export const deleteUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { userId } = req.params;
-    const requestingUser = (req as any).user;
+    const requestingUser = req.user;
+
+    if (!requestingUser) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
