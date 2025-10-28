@@ -8,7 +8,7 @@ import {
   generateToastColors,
 } from "../utils/colorScale.js";
 
-const generateThemeCSSVars = (config) => {
+export const generateThemeCSSVars = (config) => {
   // Calculate tertiary as lighter/darker than card for skeleton placeholder contrast
   const tertiaryAdjustment = config.mode === "dark" ? 6 : -6;
   const bgTertiary = adjustLightness(

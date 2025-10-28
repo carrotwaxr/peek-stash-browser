@@ -37,7 +37,6 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         preferredQuality: true,
         preferredPlaybackMode: true,
         theme: true,
-        customTheme: true,
         carouselPreferences: true,
         navPreferences: true,
         filterPresets: true,
@@ -55,7 +54,6 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         preferredQuality: user.preferredQuality,
         preferredPlaybackMode: user.preferredPlaybackMode,
         theme: user.theme,
-        customTheme: user.customTheme,
         carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
         navPreferences: user.navPreferences || null,
         minimumPlayPercent: user.minimumPlayPercent,
@@ -92,7 +90,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       targetUserId = parseInt(req.params.userId);
     }
 
-    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
+    const { preferredQuality, preferredPlaybackMode, theme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
@@ -152,7 +150,6 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         ...(preferredQuality !== undefined && { preferredQuality }),
         ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
         ...(theme !== undefined && { theme }),
-        ...(customTheme !== undefined && { customTheme }),
         ...(carouselPreferences !== undefined && { carouselPreferences }),
         ...(navPreferences !== undefined && { navPreferences }),
         ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
@@ -165,7 +162,6 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         preferredQuality: true,
         preferredPlaybackMode: true,
         theme: true,
-        customTheme: true,
         carouselPreferences: true,
         navPreferences: true,
         minimumPlayPercent: true,
@@ -179,7 +175,6 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         preferredQuality: updatedUser.preferredQuality,
         preferredPlaybackMode: updatedUser.preferredPlaybackMode,
         theme: updatedUser.theme,
-        customTheme: updatedUser.customTheme,
         carouselPreferences: updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
         navPreferences: updatedUser.navPreferences || null,
         minimumPlayPercent: updatedUser.minimumPlayPercent,
