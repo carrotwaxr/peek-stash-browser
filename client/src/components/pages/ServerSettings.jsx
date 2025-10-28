@@ -8,6 +8,7 @@ import { setupApi } from "../../services/api.js";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
 import ServerStatsSection from "../settings/ServerStatsSection.jsx";
+import ContentRestrictionsModal from "../settings/ContentRestrictionsModal.jsx";
 import packageJson from "../../../package.json";
 
 const api = axios.create({
@@ -59,6 +60,10 @@ const ServerSettings = () => {
     studios: { rating: true, favorite: true },
     tags: { rating: false, favorite: true }, // Tags don't have ratings in Stash
   });
+
+  // Content restrictions state
+  const [showRestrictionsModal, setShowRestrictionsModal] = useState(false);
+  const [restrictionsTargetUser, setRestrictionsTargetUser] = useState(null);
 
   useEffect(() => {
     // Redirect if not admin
@@ -412,6 +417,18 @@ const ServerSettings = () => {
     }));
   };
 
+  // Open content restrictions modal for a user
+  const openRestrictionsModal = (user) => {
+    setRestrictionsTargetUser(user);
+    setShowRestrictionsModal(true);
+  };
+
+  // Handle restrictions save success
+  const handleRestrictionsSaved = () => {
+    setMessage(`Content restrictions updated for ${restrictionsTargetUser?.username}!`);
+    setTimeout(() => setMessage(null), 3000);
+  };
+
   if (loading) {
     return (
       <PageLayout>
@@ -606,6 +623,15 @@ const ServerSettings = () => {
                               className="px-3 py-1 text-sm"
                             >
                               Sync from Stash
+                            </Button>
+                            <Button
+                              onClick={() => openRestrictionsModal(user)}
+                              variant="tertiary"
+                              size="sm"
+                              className="px-3 py-1 text-sm"
+                              title="Manage content restrictions for this user"
+                            >
+                              Content Restrictions
                             </Button>
                             <Button
                               onClick={() =>
@@ -1591,6 +1617,18 @@ const ServerSettings = () => {
             </form>
           </Paper>
         </div>
+      )}
+
+      {/* Content Restrictions Modal */}
+      {showRestrictionsModal && restrictionsTargetUser && (
+        <ContentRestrictionsModal
+          user={restrictionsTargetUser}
+          onClose={() => {
+            setShowRestrictionsModal(false);
+            setRestrictionsTargetUser(null);
+          }}
+          onSave={handleRestrictionsSaved}
+        />
       )}
     </>
   );

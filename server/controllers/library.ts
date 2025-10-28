@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 import type { NormalizedScene } from '../services/StashCacheManager.js';
 import getStash from '../stash.js';
 import { convertToProxyUrl } from '../utils/pathMapping.js';
+import { userRestrictionService } from '../services/UserRestrictionService.js';
 
 /**
  * Merge user-specific data into scenes
@@ -605,6 +606,12 @@ export const findScenes = async (req: Request, res: Response) => {
     const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
     scenes = applySceneFilters(scenes, mergedFilter);
 
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
+    }
+
     // Step 5: Sort
     // Extract group_id for scene_index sorting (use first group if filtering by groups)
     const groupIdForSort = scene_filter?.groups?.value?.[0];
@@ -782,6 +789,12 @@ export const findPerformers = async (req: Request, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with performer_filter)
     const mergedFilter = { ...performer_filter, ids: ids || performer_filter?.ids };
     performers = applyPerformerFilters(performers, mergedFilter);
+
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      performers = await userRestrictionService.filterPerformersForUser(performers, userId);
+    }
 
     // Step 5: Sort
     performers = sortPerformers(performers, sortField, sortDirection);
@@ -1117,6 +1130,12 @@ export const findStudios = async (req: Request, res: Response) => {
     const mergedFilter = { ...studio_filter, ids: ids || studio_filter?.ids };
     studios = applyStudioFilters(studios, mergedFilter);
 
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      studios = await userRestrictionService.filterStudiosForUser(studios, userId);
+    }
+
     // Step 5: Sort
     studios = sortStudios(studios, sortField, sortDirection);
 
@@ -1438,6 +1457,12 @@ export const findTags = async (req: Request, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with tag_filter)
     const mergedFilter = { ...tag_filter, ids: ids || tag_filter?.ids };
     tags = applyTagFilters(tags, mergedFilter);
+
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      tags = await userRestrictionService.filterTagsForUser(tags, userId);
+    }
 
     // Step 5: Sort
     tags = sortTags(tags, sortField, sortDirection);
@@ -2455,6 +2480,12 @@ export const findGalleries = async (req: Request, res: Response) => {
     const mergedFilter = { ...gallery_filter, ids: ids || gallery_filter?.ids };
     galleries = applyGalleryFilters(galleries, mergedFilter);
 
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      galleries = await userRestrictionService.filterGalleriesForUser(galleries, userId);
+    }
+
     // Step 5: Sort
     galleries = sortGalleries(galleries, sortField, sortDirection);
 
@@ -2547,6 +2578,63 @@ export const findGalleryById = async (req: Request, res: Response) => {
     logger.error('Error in findGalleryById', { error: error instanceof Error ? error.message : 'Unknown error' });
     res.status(500).json({
       error: 'Failed to find gallery',
+      details: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+/**
+ * Minimal galleries - just id and title for dropdowns
+ */
+export const findGalleriesMinimal = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const { filter } = req.body;
+    const searchQuery = filter?.q || '';
+
+    // Step 1: Get all galleries from cache
+    let galleries = stashCacheManager.getAllGalleries();
+
+    if (galleries.length === 0) {
+      logger.warn('Gallery cache not initialized, returning empty result');
+      return res.json({
+        galleries: [],
+      });
+    }
+
+    // Step 2: Merge with user data (for favorites)
+    galleries = await mergeGalleriesWithUserData(galleries, userId);
+
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      galleries = galleries.filter((g) => {
+        const title = g.title || '';
+        return title.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Step 4: Sort by title
+    galleries = galleries.sort((a, b) => {
+      const aTitle = (a.title || '').toLowerCase();
+      const bTitle = (b.title || '').toLowerCase();
+      return aTitle.localeCompare(bTitle);
+    });
+
+    // Step 5: Map to minimal shape
+    const minimalGalleries = galleries.map((g) => ({
+      id: g.id,
+      name: g.title, // Use 'title' field but map to 'name' for consistency with other entities
+      favorite: g.favorite,
+    }));
+
+    res.json({
+      galleries: minimalGalleries,
+    });
+  } catch (error) {
+    logger.error('Error in findGalleriesMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
+    res.status(500).json({
+      error: 'Failed to find galleries',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
@@ -2781,6 +2869,12 @@ export const findGroups = async (req: Request, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with group_filter)
     const mergedFilter = { ...group_filter, ids: ids || group_filter?.ids };
     groups = applyGroupFilters(groups, mergedFilter);
+
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      groups = await userRestrictionService.filterGroupsForUser(groups, userId);
+    }
 
     // Step 5: Sort
     groups = sortGroups(groups, sortField, sortDirection);

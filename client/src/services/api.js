@@ -259,6 +259,17 @@ export const libraryApi = {
     const result = await apiPost("/library/groups/minimal", params);
     return result?.groups || [];
   },
+
+  /**
+   * Find galleries with minimal data (id + name only)
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @returns {Promise<Array>} Array of {id, name} objects
+   */
+  findGalleriesMinimal: async (params = {}) => {
+    const result = await apiPost("/library/galleries/minimal", params);
+    return result?.galleries || [];
+  },
 };
 
 // Valid sort field mappings for Stash GraphQL API

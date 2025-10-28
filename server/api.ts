@@ -26,6 +26,7 @@ import {
   findStudiosMinimal,
   findTagsMinimal,
   findGroupsMinimal,
+  findGalleriesMinimal,
   updateScene,
   updatePerformer,
   updateStudio,
@@ -132,6 +133,7 @@ export const setupAPI = () => {
   app.post("/api/library/studios/minimal", authenticateToken, requireCacheReady, findStudiosMinimal);
   app.post("/api/library/tags/minimal", authenticateToken, requireCacheReady, findTagsMinimal);
   app.post("/api/library/groups/minimal", authenticateToken, requireCacheReady, findGroupsMinimal);
+  app.post("/api/library/galleries/minimal", authenticateToken, requireCacheReady, findGalleriesMinimal);
 
   // Update endpoints for CRUD operations
   app.put("/api/library/scenes/:id", authenticateToken, updateScene);

@@ -966,3 +966,132 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
     res.status(500).json({ error: "Failed to sync from Stash" });
   }
 };
+
+/**
+ * Get content restrictions for a user (Admin only)
+ */
+export const getUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const requestingUser = req.user;
+
+    if (!requestingUser) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Only admins can manage restrictions
+    if (requestingUser.role !== "ADMIN") {
+      return res.status(403).json({ error: "Only administrators can manage content restrictions" });
+    }
+
+    const restrictions = await prisma.userContentRestriction.findMany({
+      where: { userId: parseInt(userId) }
+    });
+
+    res.json({ restrictions });
+  } catch (error) {
+    console.error("Error getting user restrictions:", error);
+    res.status(500).json({ error: "Failed to get content restrictions" });
+  }
+};
+
+/**
+ * Update content restrictions for a user (Admin only)
+ * Replaces all existing restrictions with new ones
+ */
+export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { restrictions } = req.body; // Array of {entityType, mode, entityIds, restrictEmpty}
+    const requestingUser = req.user;
+
+    if (!requestingUser) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Only admins can manage restrictions
+    if (requestingUser.role !== "ADMIN") {
+      return res.status(403).json({ error: "Only administrators can manage content restrictions" });
+    }
+
+    const targetUserId = parseInt(userId);
+
+    // Validate input
+    if (!Array.isArray(restrictions)) {
+      return res.status(400).json({ error: "Restrictions must be an array" });
+    }
+
+    // Validate each restriction
+    for (const r of restrictions) {
+      if (!['groups', 'tags', 'studios', 'galleries'].includes(r.entityType)) {
+        return res.status(400).json({ error: `Invalid entity type: ${r.entityType}` });
+      }
+      if (!['INCLUDE', 'EXCLUDE'].includes(r.mode)) {
+        return res.status(400).json({ error: `Invalid mode: ${r.mode}` });
+      }
+      if (!Array.isArray(r.entityIds)) {
+        return res.status(400).json({ error: "entityIds must be an array" });
+      }
+    }
+
+    // Delete existing restrictions
+    await prisma.userContentRestriction.deleteMany({
+      where: { userId: targetUserId }
+    });
+
+    // Create new restrictions
+    const created = await Promise.all(
+      restrictions.map((r: any) =>
+        prisma.userContentRestriction.create({
+          data: {
+            userId: targetUserId,
+            entityType: r.entityType,
+            mode: r.mode,
+            entityIds: JSON.stringify(r.entityIds),
+            restrictEmpty: r.restrictEmpty || false
+          }
+        })
+      )
+    );
+
+    res.json({
+      success: true,
+      message: 'Content restrictions updated successfully',
+      restrictions: created
+    });
+  } catch (error) {
+    console.error("Error updating user restrictions:", error);
+    res.status(500).json({ error: "Failed to update content restrictions" });
+  }
+};
+
+/**
+ * Delete all content restrictions for a user (Admin only)
+ */
+export const deleteUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const requestingUser = req.user;
+
+    if (!requestingUser) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Only admins can manage restrictions
+    if (requestingUser.role !== "ADMIN") {
+      return res.status(403).json({ error: "Only administrators can manage content restrictions" });
+    }
+
+    await prisma.userContentRestriction.deleteMany({
+      where: { userId: parseInt(userId) }
+    });
+
+    res.json({
+      success: true,
+      message: 'All content restrictions removed successfully'
+    });
+  } catch (error) {
+    console.error("Error deleting user restrictions:", error);
+    res.status(500).json({ error: "Failed to delete content restrictions" });
+  }
+};

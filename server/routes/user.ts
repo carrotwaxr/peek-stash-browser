@@ -11,7 +11,10 @@ import {
   getFilterPresets,
   saveFilterPreset,
   deleteFilterPreset,
-  syncFromStash
+  syncFromStash,
+  getUserRestrictions,
+  updateUserRestrictions,
+  deleteUserRestrictions
 } from "../controllers/user.js";
 
 const router = express.Router();
@@ -36,5 +39,10 @@ router.delete("/:userId", deleteUser);
 router.put("/:userId/role", updateUserRole);
 router.put("/:userId/settings", updateUserSettings); // Admin can update any user's settings
 router.post("/:userId/sync-from-stash", syncFromStash); // Admin can sync Stash data for any user
+
+// Admin-only content restriction routes
+router.get("/:userId/restrictions", getUserRestrictions); // Get user's content restrictions
+router.put("/:userId/restrictions", updateUserRestrictions); // Update user's content restrictions
+router.delete("/:userId/restrictions", deleteUserRestrictions); // Delete all user's content restrictions
 
 export default router;

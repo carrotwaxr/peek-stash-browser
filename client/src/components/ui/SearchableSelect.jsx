@@ -9,7 +9,7 @@ import Button from "./Button.jsx";
  * Supports both single and multi-select modes
  *
  * @param {Object} props
- * @param {"performers"|"studios"|"tags"} props.entityType - Type of entity to search
+ * @param {"performers"|"studios"|"tags"|"groups"|"galleries"} props.entityType - Type of entity to search
  * @param {Array|string} props.value - Selected value(s) - array for multi, string for single
  * @param {Function} props.onChange - Callback when selection changes
  * @param {boolean} props.multi - Enable multi-select mode
@@ -38,6 +38,7 @@ const SearchableSelect = ({
     studios: libraryApi.findStudiosMinimal,
     tags: libraryApi.findTagsMinimal,
     groups: libraryApi.findGroupsMinimal,
+    galleries: libraryApi.findGalleriesMinimal,
   };
 
   // Load selected items' names when value changes
