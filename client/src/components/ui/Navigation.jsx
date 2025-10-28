@@ -5,50 +5,28 @@ import UserMenu from "./UserMenu.jsx";
 import { ThemedIcon } from "../icons/index.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useScrollDirection } from "../../hooks/useScrollDirection.js";
+import { getOrderedNavItems } from "../../constants/navigation.js";
 import Button from "./Button.jsx";
 
-const Navigation = () => {
+const Navigation = ({ navPreferences = [] }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { user } = useAuth();
   const scrollDirection = useScrollDirection(100);
 
+  // Get ordered and filtered nav items based on user preferences
+  const navItems = getOrderedNavItems(navPreferences);
+
   // Get current page from React Router location
   const getCurrentPage = () => {
     const path = location.pathname;
-    switch (path) {
-      case "/scenes":
-        return "Scenes";
-      case "/recommended":
-        return "Recommended";
-      case "/performers":
-        return "Performers";
-      case "/studios":
-        return "Studios";
-      case "/tags":
-        return "Tags";
-      case "/galleries":
-        return "Galleries";
-      case "/playlists":
-        return "Playlists";
-      case "/":
-        return null; // Home page - no nav item should be highlighted
-      default:
-        return null; // Unknown pages - no nav item should be highlighted
-    }
+
+    // Find matching nav item by path
+    const matchingItem = navItems.find(item => item.path === path);
+    return matchingItem ? matchingItem.name : null;
   };
 
   const currentPage = getCurrentPage();
-
-  const navItems = [
-    { name: "Scenes", path: "/scenes", icon: "clapperboard" },
-    { name: "Recommended", path: "/recommended", icon: "sparkles" },
-    { name: "Performers", path: "/performers", icon: "user-star" },
-    { name: "Studios", path: "/studios", icon: "spotlight" },
-    { name: "Tags", path: "/tags", icon: "tags" },
-    { name: "Galleries", path: "/galleries", icon: "images" },
-    { name: "Playlists", path: "/playlists", icon: "list" },
-  ];
 
   // Determine if navbar should be visible
   const isVisible = scrollDirection === 'top' || scrollDirection === 'up';
