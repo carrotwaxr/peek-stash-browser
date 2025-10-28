@@ -128,9 +128,10 @@
   background-size: cover !important;
 }
 
-/* Adjust thumbnail position on mobile/touch */
-.video-js.vjs-mobile-ui .vjs-vtt-thumbnail-display {
-  bottom: 2.8em !important;
+/* Ensure thumbnails show on touch/mobile interaction */
+.video-js .vjs-progress-control:active .vjs-vtt-thumbnail-display,
+.video-js .vjs-slider:active .vjs-vtt-thumbnail-display {
+  opacity: 1 !important;
 }
 
 /* Time tooltip (appears on hover over progress bar) */
@@ -536,9 +537,8 @@
   margin: 0 !important;
 }
 
-/* Match big play button style when video is waiting/loading */
-.video-js.vjs-waiting .vjs-big-play-button,
-.video-js.vjs-seeking .vjs-big-play-button {
+/* Show big play button when buffering (not seeking - let spinner handle that) */
+.video-js.vjs-waiting .vjs-big-play-button {
   display: flex !important;
 }
 
@@ -600,6 +600,11 @@
     width: 48px !important;
     height: 48px !important;
     border-width: 3px !important;
+  }
+
+  /* VTT thumbnails - adjust position for smaller control bar */
+  .video-js .vjs-vtt-thumbnail-display {
+    bottom: 16px !important; /* Above 40px control bar */
   }
 
   /* Hide time divider and duration on very small screens */
