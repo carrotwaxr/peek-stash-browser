@@ -365,10 +365,13 @@ export const transformScene = (scene: any) => {
     // Transform groups - flatten nested structure and add API keys to images
     if (scene.groups && Array.isArray(scene.groups)) {
       mutated.groups = scene.groups.map((g: any) => {
-        // Stash returns groups as: { group: { id, name, ... } }
-        // We need to flatten and transform
+        // Stash returns groups as: { group: { id, name, ... }, scene_index: 2 }
+        // We need to flatten and transform, preserving scene_index
         const group = g.group || g;
-        return transformGroup(group);
+        return {
+          ...transformGroup(group),
+          scene_index: g.scene_index, // Preserve scene_index from SceneGroup
+        };
       });
     }
 
