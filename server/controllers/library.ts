@@ -215,6 +215,25 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     });
   }
 
+  // Filter by groups
+  if (filters.groups) {
+    const { value: groupIds, modifier } = filters.groups;
+    filtered = filtered.filter((s) => {
+      const sceneGroupIds = (s.groups || []).map((g: any) => String(g.id));
+      const filterGroupIds = groupIds.map((id: any) => String(id));
+      if (modifier === 'INCLUDES') {
+        return filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
+      }
+      if (modifier === 'INCLUDES_ALL') {
+        return filterGroupIds.every((id: string) => sceneGroupIds.includes(id));
+      }
+      if (modifier === 'EXCLUDES') {
+        return !filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
+      }
+      return true;
+    });
+  }
+
   // Filter by bitrate
   if (filters.bitrate) {
     const { modifier, value, value2 } = filters.bitrate;
