@@ -61,7 +61,7 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
       },
       {
         threshold: [0, 0.5, 0.9, 1.0],
-        rootMargin: "-5%", // Shrink viewport by 5% for modest clearance
+        rootMargin: "-5% 0px", // 5% clearance from top/bottom, no x-axis restriction
       }
     );
     observer.observe(containerElement);
