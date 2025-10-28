@@ -9,6 +9,7 @@ import { stashCacheManager } from '../services/StashCacheManager.js';
 import { logger } from '../utils/logger.js';
 import type { NormalizedScene } from '../services/StashCacheManager.js';
 import getStash from '../stash.js';
+import { convertToProxyUrl } from '../utils/pathMapping.js';
 
 /**
  * Merge user-specific data into scenes
@@ -2464,9 +2465,54 @@ export const findGalleryById = async (req: Request, res: Response) => {
 
     // Merge with user data
     const galleries = await mergeGalleriesWithUserData([gallery], userId);
-    gallery = galleries[0];
+    const mergedGallery = galleries[0];
 
-    res.json(gallery);
+    if (!mergedGallery) {
+      return res.status(404).json({ error: 'Gallery not found after merge' });
+    }
+
+    // Hydrate performers with full cached data
+    if (mergedGallery.performers && mergedGallery.performers.length > 0) {
+      mergedGallery.performers = mergedGallery.performers.map((performer: any) => {
+        const cachedPerformer = stashCacheManager.getPerformer(performer.id);
+        if (cachedPerformer) {
+          // Return full performer data from cache
+          return cachedPerformer;
+        }
+        // Fallback to basic performer data if not in cache
+        return performer;
+      });
+
+      // Merge performers with user data (ratings/favorites)
+      mergedGallery.performers = await mergePerformersWithUserData(mergedGallery.performers, userId);
+    }
+
+    // Hydrate studio with full cached data
+    if (mergedGallery.studio && mergedGallery.studio.id) {
+      const cachedStudio = stashCacheManager.getStudio(mergedGallery.studio.id);
+      if (cachedStudio) {
+        mergedGallery.studio = cachedStudio;
+        // Merge studio with user data
+        const studios = await mergeStudiosWithUserData([mergedGallery.studio], userId);
+        mergedGallery.studio = studios[0];
+      }
+    }
+
+    // Hydrate tags with full cached data
+    if (mergedGallery.tags && mergedGallery.tags.length > 0) {
+      mergedGallery.tags = mergedGallery.tags.map((tag: any) => {
+        const cachedTag = stashCacheManager.getTag(tag.id);
+        if (cachedTag) {
+          return cachedTag;
+        }
+        return tag;
+      });
+
+      // Merge tags with user data
+      mergedGallery.tags = await mergeTagsWithUserData(mergedGallery.tags, userId);
+    }
+
+    res.json(mergedGallery);
   } catch (error) {
     logger.error('Error in findGalleryById', { error: error instanceof Error ? error.message : 'Unknown error' });
     res.status(500).json({
@@ -2477,42 +2523,58 @@ export const findGalleryById = async (req: Request, res: Response) => {
 };
 
 /**
- * Update gallery rating/favorite
+ * GET /api/library/galleries/:galleryId/images
+ * Get images for a specific gallery
  */
-export const updateGalleryRating = async (req: Request, res: Response) => {
+export const getGalleryImages = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
-    const { galleryId, rating, favorite } = req.body;
+    const { galleryId } = req.params;
+    // @ts-ignore - user is added by authenticateToken middleware
+    const userId = req.user?.id;
 
-    if (!galleryId) {
-      return res.status(400).json({ error: 'Gallery ID is required' });
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Upsert rating
-    const galleryRating = await prisma.galleryRating.upsert({
-      where: {
-        userId_galleryId: {
-          userId,
-          galleryId,
+    // Query images filtered by gallery
+    const stash = getStash();
+    const result = await stash.findImages({
+      filter: {
+        per_page: -1, // Get all images
+        sort: 'path', // Sort by path for consistent ordering
+        direction: 'ASC' as any,
+      },
+      image_filter: {
+        galleries: {
+          value: [galleryId],
+          modifier: 'INCLUDES' as any,
         },
-      },
-      update: {
-        rating: rating !== undefined ? rating : undefined,
-        favorite: favorite !== undefined ? favorite : undefined,
-      },
-      create: {
-        userId,
-        galleryId,
-        rating: rating || null,
-        favorite: favorite || false,
       },
     });
 
-    res.json(galleryRating);
+    const images = result?.findImages?.images || [];
+
+    // Transform image URLs to use proxy
+    const transformedImages = images.map((image: any) => ({
+      ...image,
+      paths: {
+        thumbnail: image.paths?.thumbnail ? convertToProxyUrl(image.paths.thumbnail) : null,
+        preview: image.paths?.preview ? convertToProxyUrl(image.paths.preview) : null,
+        image: image.paths?.image ? convertToProxyUrl(image.paths.image) : null,
+      },
+    }));
+
+    res.json({
+      images: transformedImages,
+      count: result?.findImages?.count || 0,
+    });
   } catch (error) {
-    logger.error('Error updating gallery rating', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error('Error fetching gallery images', {
+      galleryId: req.params.galleryId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
     res.status(500).json({
-      error: 'Failed to update gallery rating',
+      error: 'Failed to fetch gallery images',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
   }

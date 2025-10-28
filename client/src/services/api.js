@@ -219,6 +219,15 @@ export const libraryApi = {
   findGalleryById: async (id) => {
     return apiGet(`/library/galleries/${id}`);
   },
+
+  /**
+   * Get images for a gallery
+   * @param {string} galleryId - Gallery ID
+   * @returns {Promise<Object>} Object with images array and count
+   */
+  getGalleryImages: async (galleryId) => {
+    return apiGet(`/library/galleries/${galleryId}/images`);
+  },
 };
 
 // Valid sort field mappings for Stash GraphQL API
@@ -494,5 +503,5 @@ export const ratingsApi = {
    * @param {boolean} data.favorite - Favorite status
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
-  updateGalleryRating: (galleryId, data) => apiPut(`/library/galleries/${galleryId}/rating`, data),
+  updateGalleryRating: (galleryId, data) => apiPut(`/ratings/gallery/${galleryId}`, data),
 };

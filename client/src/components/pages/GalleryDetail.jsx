@@ -4,6 +4,8 @@ import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
+import Lightbox from "../ui/Lightbox.jsx";
+import PerformerCard from "../ui/PerformerCard.jsx";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { galleryTitle } from "../../utils/gallery.js";
@@ -14,6 +16,11 @@ const GalleryDetail = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [gallery, setGallery] = useState(null);
+  const [images, setImages] = useState([]);
+  const [imagesLoading, setImagesLoading] = useState(true);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxAutoPlay, setLightboxAutoPlay] = useState(false);
 
   // Set page title to gallery name
   usePageTitle(gallery ? galleryTitle(gallery) : "Gallery");
@@ -32,6 +39,22 @@ const GalleryDetail = () => {
     };
 
     fetchGallery();
+  }, [galleryId]);
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        setImagesLoading(true);
+        const data = await libraryApi.getGalleryImages(galleryId);
+        setImages(data.images || []);
+      } catch (error) {
+        console.error("Error loading images:", error);
+      } finally {
+        setImagesLoading(false);
+      }
+    };
+
+    fetchImages();
   }, [galleryId]);
 
   if (isLoading) {
@@ -110,48 +133,100 @@ const GalleryDetail = () => {
         </div>
 
         {/* Gallery Content */}
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Main Content - Images Grid */}
-          <div className="flex-1">
-            {/* Slideshow Button */}
-            <div className="mb-6">
-              <Button
-                variant="primary"
-                icon={<Play size={20} />}
-                onClick={() => {
-                  // TODO: Open lightbox in slideshow mode
-                  console.log("Start slideshow");
-                }}
+        <div className="space-y-8">
+          {/* Performers Row */}
+          {gallery.performers && gallery.performers.length > 0 && (
+            <div>
+              <h2
+                className="text-2xl font-bold mb-4"
+                style={{ color: "var(--text-primary)" }}
               >
-                Play Slideshow
-              </Button>
-            </div>
-
-            {/* Images Grid - Placeholder for now */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {/* TODO: Load and display actual images */}
-              {[...Array(gallery.image_count || 0)].map((_, index) => (
-                <div
-                  key={index}
-                  className="aspect-[2/3] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{
-                    backgroundColor: "var(--bg-secondary)",
-                  }}
-                  onClick={() => {
-                    // TODO: Open lightbox at this image
-                    console.log(`Open image ${index}`);
-                  }}
-                >
-                  <div className="w-full h-full flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
-                    Image {index + 1}
+                Performers
+              </h2>
+              <div className="flex gap-4 overflow-x-auto pb-4">
+                {gallery.performers.map((performer) => (
+                  <div key={performer.id} className="flex-shrink-0 w-48">
+                    <PerformerCard
+                      performer={performer}
+                      referrerUrl={`${location.pathname}${location.search}`}
+                    />
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+          )}
+
+          {/* Slideshow Button */}
+          <div>
+            <Button
+              variant="primary"
+              icon={<Play size={20} />}
+              onClick={() => {
+                setLightboxIndex(0);
+                setLightboxAutoPlay(true);
+                setLightboxOpen(true);
+              }}
+              disabled={images.length === 0}
+            >
+              Play Slideshow
+            </Button>
           </div>
 
-          {/* Sidebar - Gallery Info */}
-          <div className="lg:w-80 space-y-6">
+          {/* Images Grid */}
+          <div>
+
+            {imagesLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {[...Array(gallery.image_count || 12)].map((_, index) => (
+                  <div
+                    key={index}
+                    className="aspect-[2/3] rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                    }}
+                  />
+                ))}
+              </div>
+            ) : images.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {images.map((image, index) => (
+                  <div
+                    key={image.id}
+                    className="aspect-[2/3] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+                    style={{
+                      backgroundColor: "var(--bg-secondary)",
+                      borderColor: "var(--border-color)",
+                    }}
+                    onClick={() => {
+                      setLightboxIndex(index);
+                      setLightboxAutoPlay(false);
+                      setLightboxOpen(true);
+                    }}
+                  >
+                    {image.paths?.thumbnail ? (
+                      <img
+                        src={image.paths.thumbnail}
+                        alt={image.title || `Image ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
+                        No Preview
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12" style={{ color: "var(--text-muted)" }}>
+                No images found in this gallery
+              </div>
+            )}
+          </div>
+
+          {/* Additional Info Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Details */}
             {gallery.details && (
               <Card title="Details">
@@ -174,24 +249,6 @@ const GalleryDetail = () => {
                 >
                   {gallery.studio.name}
                 </Button>
-              </Card>
-            )}
-
-            {/* Performers */}
-            {gallery.performers && gallery.performers.length > 0 && (
-              <Card title="Performers">
-                <div className="space-y-2">
-                  {gallery.performers.map((performer) => (
-                    <Button
-                      key={performer.id}
-                      variant="secondary"
-                      onClick={() => navigate(`/performer/${performer.id}`)}
-                      className="w-full"
-                    >
-                      {performer.name}
-                    </Button>
-                  ))}
-                </div>
               </Card>
             )}
 
@@ -239,6 +296,15 @@ const GalleryDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Lightbox */}
+      <Lightbox
+        images={images}
+        initialIndex={lightboxIndex}
+        isOpen={lightboxOpen}
+        autoPlay={lightboxAutoPlay}
+        onClose={() => setLightboxOpen(false)}
+      />
     </div>
   );
 };

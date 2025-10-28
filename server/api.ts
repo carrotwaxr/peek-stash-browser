@@ -28,7 +28,7 @@ import {
   updatePerformer,
   updateStudio,
   updateTag,
-  updateGalleryRating,
+  getGalleryImages,
 } from "./controllers/library.js";
 import { proxyStashMedia } from "./controllers/proxy.js";
 import * as statsController from "./controllers/stats.js";
@@ -122,6 +122,7 @@ export const setupAPI = () => {
   app.post("/api/library/tags", authenticateToken, requireCacheReady, findTags);
   app.post("/api/library/galleries", authenticateToken, requireCacheReady, findGalleries);
   app.get("/api/library/galleries/:id", authenticateToken, requireCacheReady, findGalleryById);
+  app.get("/api/library/galleries/:galleryId/images", authenticateToken, requireCacheReady, getGalleryImages);
 
   // Minimal data endpoints for filter dropdowns (id + name only)
   app.post("/api/library/performers/minimal", authenticateToken, requireCacheReady, findPerformersMinimal);
@@ -133,7 +134,6 @@ export const setupAPI = () => {
   app.put("/api/library/performers/:id", authenticateToken, updatePerformer);
   app.put("/api/library/studios/:id", authenticateToken, updateStudio);
   app.put("/api/library/tags/:id", authenticateToken, updateTag);
-  app.put("/api/library/galleries/:id/rating", authenticateToken, updateGalleryRating);
 
   // Video playback endpoints (protected)
   app.get("/api/video/play", authenticateToken, playVideo); // New endpoint with query params

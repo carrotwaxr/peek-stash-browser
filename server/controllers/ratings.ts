@@ -264,3 +264,62 @@ export async function updateTagRating(req: AuthenticatedRequest, res: Response) 
     res.status(500).json({ error: 'Failed to update tag rating' });
   }
 }
+
+/**
+ * Update rating and/or favorite for a gallery
+ * PEEK-ONLY: Does not sync to Stash
+ */
+export async function updateGalleryRating(req: AuthenticatedRequest, res: Response) {
+  try {
+    const userId = req.user?.id;
+    const { galleryId } = req.params;
+    const { rating, favorite } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!galleryId) {
+      return res.status(400).json({ error: 'Missing galleryId' });
+    }
+
+    // Validate rating if provided
+    if (rating !== undefined && rating !== null) {
+      if (typeof rating !== 'number' || rating < 0 || rating > 100) {
+        return res.status(400).json({ error: 'Rating must be a number between 0 and 100' });
+      }
+    }
+
+    // Validate favorite if provided
+    if (favorite !== undefined && typeof favorite !== 'boolean') {
+      return res.status(400).json({ error: 'Favorite must be a boolean' });
+    }
+
+    // Upsert rating record
+    const galleryRating = await prisma.galleryRating.upsert({
+      where: {
+        userId_galleryId: { userId, galleryId },
+      },
+      update: {
+        ...(rating !== undefined && { rating }),
+        ...(favorite !== undefined && { favorite }),
+      },
+      create: {
+        userId,
+        galleryId,
+        rating: rating ?? null,
+        favorite: favorite ?? false,
+      },
+    });
+
+    logger.info('Gallery rating updated', { userId, galleryId, rating, favorite });
+
+    res.json({
+      success: true,
+      rating: galleryRating,
+    });
+  } catch (error) {
+    logger.error('Error updating gallery rating', { error });
+    res.status(500).json({ error: 'Failed to update gallery rating' });
+  }
+}
