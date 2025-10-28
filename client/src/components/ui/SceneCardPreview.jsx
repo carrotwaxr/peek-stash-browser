@@ -53,14 +53,15 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Only autoplay if at least 80% visible to avoid triggering too early
-          const newIsInView = entry.isIntersecting && entry.intersectionRatio >= 0.8;
+          // Only autoplay when fully visible (100%) with extra clearance from viewport edges
+          // Negative rootMargin shrinks viewport by 10%, requiring card to be fully within that zone
+          const newIsInView = entry.isIntersecting && entry.intersectionRatio >= 1.0;
           setIsInView(newIsInView);
         });
       },
       {
-        threshold: [0, 0.5, 0.8, 1.0],
-        rootMargin: "0px",
+        threshold: [0, 0.5, 1.0],
+        rootMargin: "-10%", // Shrink viewport by 10%, requiring 10% clearance from edges
       }
     );
     observer.observe(containerElement);
