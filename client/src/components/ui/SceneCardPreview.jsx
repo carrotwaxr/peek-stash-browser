@@ -7,9 +7,12 @@ import {
 /**
  * Animated sprite preview for scene cards
  * Cycles through evenly spaced sprite thumbnails based on input method and layout:
- * - Devices with hover (mouse/trackpad): Preview on hover
- * - Touch-only devices with autoplayOnScroll enabled: Preview when scrolled into view
- * - Touch-only devices without autoplayOnScroll: No preview (static screenshot)
+ * - When autoplayOnScroll=true: Preview when scrolled into view (mobile-first, ignores hover detection)
+ * - When autoplayOnScroll=false on hover-capable devices: Preview on hover
+ * - When autoplayOnScroll=false on touch-only devices: No preview (static screenshot)
+ *
+ * Note: autoplayOnScroll takes priority over hover detection to fix issues where mobile browsers
+ * incorrectly report hover capability (e.g., Chrome on Android).
  *
  * @param {Object} scene - Scene object with paths.sprite and paths.vtt
  * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (typically for 1-column mobile layouts)
@@ -27,39 +30,44 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
   const [containerElement, setContainerElement] = useState(null);
   const intervalRef = useRef(null);
 
+
   // Detect hover capability (mouse/trackpad vs touch-only)
   useEffect(() => {
     const mediaQuery = window.matchMedia('(hover: hover)');
     setHasHoverCapability(mediaQuery.matches);
 
-    const handleChange = (e) => setHasHoverCapability(e.matches);
+    const handleChange = (e) => {
+      setHasHoverCapability(e.matches);
+    };
     mediaQuery.addEventListener('change', handleChange);
 
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Intersection Observer for scroll-based autoplay (touch-only devices with autoplayOnScroll enabled)
+  // Intersection Observer for scroll-based autoplay (when autoplayOnScroll is enabled)
   useEffect(() => {
-    if (hasHoverCapability || !autoplayOnScroll || !containerElement) return;
+    // When autoplayOnScroll is enabled, use intersection observer regardless of hover capability
+    // This fixes mobile devices that incorrectly report hover support
+    if (!autoplayOnScroll || !containerElement) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Only autoplay if at least 60% visible to avoid "all at once" on multi-column
-          setIsInView(entry.isIntersecting && entry.intersectionRatio >= 0.6);
+          // Only autoplay when thumbnail is mostly visible (90%) with clearance from viewport edges
+          // The 5% rootMargin shrink ensures thumbnail isn't right at viewport edge
+          const newIsInView = entry.isIntersecting && entry.intersectionRatio >= 0.9;
+          setIsInView(newIsInView);
         });
       },
       {
-        threshold: [0, 0.3, 0.6, 1.0],
-        rootMargin: "50px",
+        threshold: [0, 0.5, 0.9, 1.0],
+        rootMargin: "-5% 0px", // 5% clearance from top/bottom, no x-axis restriction
       }
     );
     observer.observe(containerElement);
 
-    return () => {
-      observer.disconnect();
-    };
-  }, [hasHoverCapability, autoplayOnScroll, containerElement]);
+    return () => observer.disconnect();
+  }, [autoplayOnScroll, containerElement]);
 
   // Load and parse VTT file
   useEffect(() => {
@@ -113,9 +121,11 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
   // Cycle through sprites based on input method and layout
   useEffect(() => {
     // Determine if we should animate based on hover capability and autoplayOnScroll setting
-    const shouldAnimate = hasHoverCapability
-      ? isHovering // Devices with hover: animate on hover
-      : (autoplayOnScroll && isInView); // Touch-only: animate on scroll (if enabled)
+    // IMPORTANT: When autoplayOnScroll is explicitly enabled, prioritize scroll-based animation
+    // This fixes issues where mobile browsers incorrectly report hover capability
+    const shouldAnimate = autoplayOnScroll
+      ? isInView // When autoplayOnScroll is enabled, animate when in view (mobile-first)
+      : (hasHoverCapability ? isHovering : false); // Otherwise, use hover detection
 
     if (!shouldAnimate || sprites.length === 0) {
       if (intervalRef.current) {
@@ -165,9 +175,10 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
       ? containerWidth / currentSprite.width
       : 1;
 
-  const shouldShowAnimation = hasHoverCapability
-    ? isHovering
-    : (autoplayOnScroll && isInView);
+  // Use same logic as animation check - prioritize autoplayOnScroll when enabled
+  const shouldShowAnimation = autoplayOnScroll
+    ? isInView
+    : (hasHoverCapability ? isHovering : false);
 
   return (
     <div

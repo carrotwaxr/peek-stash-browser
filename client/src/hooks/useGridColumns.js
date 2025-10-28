@@ -17,16 +17,18 @@ export const useGridColumns = (gridType = 'default') => {
 
       switch (gridType) {
         case 'scenes':
-          // Matches scene-grid-responsive CSS breakpoints
-          if (width >= 3840) return 12; // 4K
-          if (width >= 2560) return 10; // 2K
-          if (width >= 1920) return 8;  // 1080p
-          if (width >= 1600) return 7;  // Large desktop
-          if (width >= 1280) return 6;  // xl
-          if (width >= 1024) return 5;  // lg
-          if (width >= 768) return 4;   // md
-          if (width >= 640) return 3;   // sm
-          return 2; // xs
+          // Matches scene-grid-responsive CSS: minmax(320px, 1fr) with gap-6 (24px)
+          // Required width for N columns: (N × 320) + ((N-1) × 24)
+          if (width >= 4104) return 12; // 3840 + 264
+          if (width >= 3416) return 10; // 3200 + 216
+          if (width >= 2728) return 8;  // 2560 + 168
+          if (width >= 2384) return 7;  // 2240 + 144
+          if (width >= 2040) return 6;  // 1920 + 120
+          if (width >= 1696) return 5;  // 1600 + 96
+          if (width >= 1352) return 4;  // 1280 + 72
+          if (width >= 1008) return 3;  // 960 + 48
+          if (width >= 664) return 2;   // 640 + 24
+          return 1; // < 664px (mobile)
 
         case 'performers':
           // Matches xs:1 sm:2 md:3 lg:4 xl:5 2xl:6
