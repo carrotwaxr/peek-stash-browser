@@ -68,6 +68,18 @@ export const TAG_SORT_OPTIONS = [
   { value: "updated_at", label: "Updated At" },
 ];
 
+// Group sorting options (alphabetically organized by label)
+export const GROUP_SORT_OPTIONS = [
+  { value: "created_at", label: "Created At" },
+  { value: "date", label: "Date" },
+  { value: "duration", label: "Duration" },
+  { value: "name", label: "Name" },
+  { value: "random", label: "Random" },
+  { value: "rating", label: "Rating" },
+  { value: "scene_count", label: "Scene Count" },
+  { value: "updated_at", label: "Updated At" },
+];
+
 // Filter type options for different data types
 export const RATING_OPTIONS = [
   { value: "1", label: "1 Star" },
@@ -784,6 +796,96 @@ export const TAG_FILTER_OPTIONS = [
   },
 ];
 
+export const GROUP_FILTER_OPTIONS = [
+  // Common Filters
+  {
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
+  },
+  {
+    key: "name",
+    label: "Name Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search name...",
+  },
+  {
+    key: "synopsis",
+    label: "Synopsis Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search synopsis...",
+  },
+  {
+    key: "director",
+    label: "Director Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search director...",
+  },
+  {
+    key: "rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
+  },
+  {
+    key: "sceneCount",
+    label: "Scene Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+  {
+    key: "duration",
+    label: "Duration (minutes)",
+    type: "range",
+    defaultValue: {},
+    min: 1,
+    max: 300,
+  },
+  {
+    key: "favorite",
+    label: "Favorite Groups",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
+  },
+
+  // Date Ranges
+  {
+    type: "section-header",
+    label: "Date Ranges",
+    key: "section-dates",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "date",
+    label: "Release Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+  {
+    key: "createdAt",
+    label: "Created Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+  {
+    key: "updatedAt",
+    label: "Updated Date",
+    type: "date-range",
+    defaultValue: {},
+  },
+];
+
 /**
  * Helper functions to convert UI filter values to GraphQL filter format
  */
@@ -834,6 +936,21 @@ export const buildSceneFilter = (filters) => {
     sceneFilter.tags = {
       value: [...new Set(tagIds)], // Remove duplicates
       modifier: filters.tags?.modifier || "INCLUDES_ALL",
+    };
+  }
+
+  // Groups: Merge permanent + UI filters
+  const groupIds = [];
+  if (filters.groups?.value) {
+    groupIds.push(...filters.groups.value);
+  }
+  if (filters.groupIds && filters.groupIds.length > 0) {
+    groupIds.push(...filters.groupIds);
+  }
+  if (groupIds.length > 0) {
+    sceneFilter.groups = {
+      value: [...new Set(groupIds)], // Remove duplicates
+      modifier: filters.groups?.modifier || "INCLUDES",
     };
   }
 
@@ -1569,4 +1686,115 @@ export const buildTagFilter = (filters) => {
   }
 
   return tagFilter;
+};
+
+export const buildGroupFilter = (filters) => {
+  const groupFilter = {};
+
+  // Boolean filter
+  if (filters.favorite === true || filters.favorite === "TRUE") {
+    groupFilter.favorite = true;
+  }
+
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
+    groupFilter.rating100 = {};
+    const hasMin = filters.rating.min !== undefined && filters.rating.min !== '';
+    const hasMax = filters.rating.max !== undefined && filters.rating.max !== '';
+
+    if (hasMin && hasMax) {
+      groupFilter.rating100.modifier = "BETWEEN";
+      groupFilter.rating100.value = parseInt(filters.rating.min);
+      groupFilter.rating100.value2 = parseInt(filters.rating.max);
+    } else if (hasMin) {
+      groupFilter.rating100.modifier = "GREATER_THAN";
+      groupFilter.rating100.value = parseInt(filters.rating.min) - 1;
+    } else if (hasMax) {
+      groupFilter.rating100.modifier = "LESS_THAN";
+      groupFilter.rating100.value = parseInt(filters.rating.max) + 1;
+    }
+  }
+
+  // Range filters
+  if (filters.sceneCount?.min !== undefined || filters.sceneCount?.max !== undefined) {
+    groupFilter.scene_count = {};
+    const hasMin = filters.sceneCount.min !== undefined && filters.sceneCount.min !== '';
+    const hasMax = filters.sceneCount.max !== undefined && filters.sceneCount.max !== '';
+
+    if (hasMin && hasMax) {
+      groupFilter.scene_count.modifier = "BETWEEN";
+      groupFilter.scene_count.value = parseInt(filters.sceneCount.min);
+      groupFilter.scene_count.value2 = parseInt(filters.sceneCount.max);
+    } else if (hasMin) {
+      groupFilter.scene_count.modifier = "GREATER_THAN";
+      groupFilter.scene_count.value = parseInt(filters.sceneCount.min) - 1;
+    } else if (hasMax) {
+      groupFilter.scene_count.modifier = "LESS_THAN";
+      groupFilter.scene_count.value = parseInt(filters.sceneCount.max) + 1;
+    }
+  }
+
+  if (filters.duration?.min !== undefined || filters.duration?.max !== undefined) {
+    groupFilter.duration = {};
+    const hasMin = filters.duration.min !== undefined && filters.duration.min !== '';
+    const hasMax = filters.duration.max !== undefined && filters.duration.max !== '';
+
+    if (hasMin && hasMax) {
+      groupFilter.duration.modifier = "BETWEEN";
+      groupFilter.duration.value = parseInt(filters.duration.min) * 60;
+      groupFilter.duration.value2 = parseInt(filters.duration.max) * 60;
+    } else if (hasMin) {
+      groupFilter.duration.modifier = "GREATER_THAN";
+      groupFilter.duration.value = (parseInt(filters.duration.min) * 60) - 1;
+    } else if (hasMax) {
+      groupFilter.duration.modifier = "LESS_THAN";
+      groupFilter.duration.value = (parseInt(filters.duration.max) * 60) + 1;
+    }
+  }
+
+  // Date-range filters
+  if (filters.date?.start || filters.date?.end) {
+    groupFilter.date = {};
+    if (filters.date.start) groupFilter.date.value = filters.date.start;
+    groupFilter.date.modifier = filters.date.end ? "BETWEEN" : "GREATER_THAN";
+    if (filters.date.end) groupFilter.date.value2 = filters.date.end;
+  }
+
+  if (filters.createdAt?.start || filters.createdAt?.end) {
+    groupFilter.created_at = {};
+    if (filters.createdAt.start) groupFilter.created_at.value = filters.createdAt.start;
+    groupFilter.created_at.modifier = filters.createdAt.end ? "BETWEEN" : "GREATER_THAN";
+    if (filters.createdAt.end) groupFilter.created_at.value2 = filters.createdAt.end;
+  }
+
+  if (filters.updatedAt?.start || filters.updatedAt?.end) {
+    groupFilter.updated_at = {};
+    if (filters.updatedAt.start) groupFilter.updated_at.value = filters.updatedAt.start;
+    groupFilter.updated_at.modifier = filters.updatedAt.end ? "BETWEEN" : "GREATER_THAN";
+    if (filters.updatedAt.end) groupFilter.updated_at.value2 = filters.updatedAt.end;
+  }
+
+  // Text search filters
+  if (filters.name) {
+    groupFilter.name = {
+      value: filters.name,
+      modifier: "INCLUDES",
+    };
+  }
+
+  if (filters.synopsis) {
+    groupFilter.synopsis = {
+      value: filters.synopsis,
+      modifier: "INCLUDES",
+    };
+  }
+
+  if (filters.director) {
+    groupFilter.director = {
+      value: filters.director,
+      modifier: "INCLUDES",
+    };
+  }
+
+  return groupFilter;
 };

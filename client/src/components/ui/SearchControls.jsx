@@ -20,10 +20,13 @@ import {
   STUDIO_SORT_OPTIONS,
   TAG_FILTER_OPTIONS,
   TAG_SORT_OPTIONS,
+  GROUP_FILTER_OPTIONS,
+  GROUP_SORT_OPTIONS,
   buildPerformerFilter,
   buildSceneFilter,
   buildStudioFilter,
   buildTagFilter,
+  buildGroupFilter,
 } from "../../utils/filterConfig";
 import { parseSearchParams, buildSearchParams } from "../../utils/urlParams";
 
@@ -35,6 +38,8 @@ const buildFilter = (artifactType, filters) => {
       return { studio_filter: buildStudioFilter(filters) };
     case "tag":
       return { tag_filter: buildTagFilter(filters) };
+    case "group":
+      return { group_filter: buildGroupFilter(filters) };
     case "scene":
     default:
       return { scene_filter: buildSceneFilter(filters) };
@@ -49,6 +54,8 @@ const getSortOptions = (artifactType) => {
       return STUDIO_SORT_OPTIONS;
     case "tag":
       return TAG_SORT_OPTIONS;
+    case "group":
+      return GROUP_SORT_OPTIONS;
     case "scene":
     default:
       return SCENE_SORT_OPTIONS;
@@ -80,6 +87,8 @@ const SearchControls = ({
         return [...STUDIO_FILTER_OPTIONS];
       case "tag":
         return [...TAG_FILTER_OPTIONS];
+      case "group":
+        return [...GROUP_FILTER_OPTIONS];
       case "scene":
       default:
         return [...SCENE_FILTER_OPTIONS];
