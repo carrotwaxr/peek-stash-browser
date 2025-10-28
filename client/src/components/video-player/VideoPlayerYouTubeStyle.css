@@ -160,6 +160,7 @@
 .video-js .vjs-volume-panel {
   display: flex !important;
   align-items: center !important;
+  justify-content: flex-start !important;
   height: 48px !important;
   margin: 0 !important;
   order: 3 !important;
@@ -170,7 +171,8 @@
 
 .video-js .vjs-mute-control {
   margin: 0 !important;
-  position: relative !important;
+  position: absolute !important;
+  left: 0 !important;
   z-index: 2 !important;
 }
 
