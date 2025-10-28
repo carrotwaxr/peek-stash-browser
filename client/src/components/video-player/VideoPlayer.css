@@ -228,6 +228,8 @@
   border-radius: 2px !important;
   margin: 0 !important;
   width: 100px !important;
+  position: relative !important;
+  top: -2px !important;
 }
 
 .video-js .vjs-volume-control .vjs-volume-horizontal {
