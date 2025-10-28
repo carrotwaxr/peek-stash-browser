@@ -251,7 +251,7 @@ const WatchHistory = () => {
               border: "1px solid var(--border-color)",
             }}
           >
-            <p style={{ color: "var(--accent-error)" }}>
+            <p style={{ color: "var(--status-error)" }}>
               Error loading watch history: {error}
             </p>
           </div>

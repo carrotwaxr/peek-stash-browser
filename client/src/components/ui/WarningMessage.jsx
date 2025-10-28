@@ -26,7 +26,7 @@ const WarningMessage = ({
       }
     : {
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--accent-warning)",
+        borderColor: "var(--status-warning)",
         color: "var(--text-primary)",
       };
 
@@ -41,7 +41,7 @@ const WarningMessage = ({
           {/* Warning Icon */}
           <svg
             className="w-5 h-5 flex-shrink-0 mt-0.5"
-            style={{ color: mode === "toast" ? "white" : "var(--accent-warning)" }}
+            style={{ color: mode === "toast" ? "white" : "var(--status-warning)" }}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -53,7 +53,7 @@ const WarningMessage = ({
           </svg>
           <div>
             {mode === "inline" && (
-              <strong className="font-semibold" style={{ color: "var(--accent-warning)" }}>
+              <strong className="font-semibold" style={{ color: "var(--status-warning)" }}>
                 {title}:{" "}
               </strong>
             )}

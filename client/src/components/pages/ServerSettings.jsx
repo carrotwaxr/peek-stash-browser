@@ -575,12 +575,12 @@ const ServerSettings = () => {
                             style={{
                               backgroundColor:
                                 user.role === "ADMIN"
-                                  ? "var(--role-admin-bg)"
-                                  : "var(--role-user-bg)",
+                                  ? "var(--accent-primary)"
+                                  : "var(--bg-tertiary)",
                               color:
                                 user.role === "ADMIN"
-                                  ? "var(--role-admin-text)"
-                                  : "var(--role-user-text)",
+                                  ? "white"
+                                  : "var(--text-secondary)",
                             }}
                           >
                             {user.role}

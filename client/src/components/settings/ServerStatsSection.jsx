@@ -181,7 +181,7 @@ const ServerStatsSection = () => {
                 value={stats.transcoding?.activeSessions || 0}
                 valueColor={
                   stats.transcoding?.activeSessions > 0
-                    ? "var(--accent-success)"
+                    ? "var(--status-success)"
                     : "var(--text-secondary)"
                 }
                 compact
@@ -310,10 +310,10 @@ const StatCard = ({ label, value, subtitle, icon, valueColor, progress, compact 
               width: `${Math.min(progress, 100)}%`,
               backgroundColor:
                 progress > 90
-                  ? "var(--accent-error)"
+                  ? "var(--status-error)"
                   : progress > 70
-                  ? "var(--accent-warning)"
-                  : "var(--accent-success)",
+                  ? "var(--status-warning)"
+                  : "var(--status-success)",
             }}
           />
         </div>

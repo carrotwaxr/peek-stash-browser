@@ -26,7 +26,7 @@ const SuccessMessage = ({
       }
     : {
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--accent-success)",
+        borderColor: "var(--status-success)",
         color: "var(--text-primary)",
       };
 
@@ -41,7 +41,7 @@ const SuccessMessage = ({
           {/* Success Icon */}
           <svg
             className="w-5 h-5 flex-shrink-0 mt-0.5"
-            style={{ color: mode === "toast" ? "white" : "var(--accent-success)" }}
+            style={{ color: mode === "toast" ? "white" : "var(--status-success)" }}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -53,7 +53,7 @@ const SuccessMessage = ({
           </svg>
           <div>
             {mode === "inline" && (
-              <strong className="font-semibold" style={{ color: "var(--accent-success)" }}>
+              <strong className="font-semibold" style={{ color: "var(--status-success)" }}>
                 {title}:{" "}
               </strong>
             )}

@@ -311,7 +311,7 @@ const SceneCard = forwardRef(
                 className="h-full transition-all pointer-events-none"
                 style={{
                   width: `${Math.min(100, (scene.resumeTime / scene.files[0].duration) * 100)}%`,
-                  backgroundColor: "var(--accent-success)"
+                  backgroundColor: "var(--status-success)"
                 }}
                 title={`Resume from ${Math.floor(scene.resumeTime / 60)}:${String(Math.floor(scene.resumeTime % 60)).padStart(2, '0')}`}
               />

@@ -210,3 +210,67 @@ export function generateFocusRing(accentColor) {
     "--border-focus": accentColor,
   };
 }
+
+/**
+ * Convert hex to RGB object
+ * @param {string} hex - Hex color
+ * @returns {Object} RGB values { r, g, b }
+ */
+function hexToRgb(hex) {
+  const h = hex.replace(/^#/, "");
+  return {
+    r: parseInt(h.substr(0, 2), 16),
+    g: parseInt(h.substr(2, 2), 16),
+    b: parseInt(h.substr(4, 2), 16),
+  };
+}
+
+/**
+ * Generate status colors from base status colors
+ * Creates base color + background/border variants with alpha
+ * @param {Object} status - Status colors { success, error, info, warning }
+ * @returns {Object} Complete status color definitions
+ */
+export function generateStatusColors(status) {
+  const colors = {};
+
+  // Generate for each status type
+  Object.entries(status).forEach(([type, baseColor]) => {
+    const rgb = hexToRgb(baseColor);
+
+    colors[`--status-${type}`] = baseColor; // Base color
+    colors[`--status-${type}-bg`] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`; // Background with alpha
+    colors[`--status-${type}-border`] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
+  });
+
+  return colors;
+}
+
+/**
+ * Generate toast notification colors from base status colors
+ * Creates darker/lighter variants for toast backgrounds, borders, and shadows
+ * @param {Object} status - Status colors { success, error, info, warning }
+ * @param {'dark'|'light'} mode - Theme mode
+ * @returns {Object} Toast color definitions
+ */
+export function generateToastColors(status, mode = "dark") {
+  const colors = {};
+
+  // Generate for each status type
+  Object.entries(status).forEach(([type, baseColor]) => {
+    // Toast backgrounds are slightly darker/more saturated versions
+    const toastBg = adjustLightness(baseColor, mode === "dark" ? -8 : -12);
+
+    // Borders are lighter versions
+    const toastBorder = adjustLightness(baseColor, mode === "dark" ? 10 : 8);
+
+    // Shadows use the background color with alpha
+    const bgRgb = hexToRgb(toastBg);
+
+    colors[`--toast-${type}-bg`] = toastBg;
+    colors[`--toast-${type}-border`] = toastBorder;
+    colors[`--toast-${type}-shadow`] = `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
+  });
+
+  return colors;
+}

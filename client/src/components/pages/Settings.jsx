@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { ChevronDown } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { PageLayout } from "../ui/index.js";
@@ -39,6 +40,9 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordChanging, setPasswordChanging] = useState(false);
+
+  // UI state
+  const [uiExamplesExpanded, setUiExamplesExpanded] = useState(false);
 
   // Load user settings on mount
   useEffect(() => {
@@ -168,6 +172,14 @@ const Settings = () => {
 
   return (
     <PageLayout>
+      <style>{`
+        .scene-card-demo:hover {
+          transform: scale(1.03);
+          z-index: 10;
+          box-shadow: var(--shadow-lg), 0 0 0 3px color-mix(in srgb, var(--focus-ring-color) 60%, transparent);
+          border-color: var(--border-focus);
+        }
+      `}</style>
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -207,29 +219,379 @@ const Settings = () => {
               Choose your preferred color theme (changes apply immediately)
             </p>
             <div className="mt-8 pt-6 border-t" style={{ borderColor: "var(--border-color)" }}>
-              <h3 className="text-lg font-semibold mb-6" style={{ color: "var(--text-primary)" }}>UI Examples</h3>
+              <button
+                onClick={() => setUiExamplesExpanded(!uiExamplesExpanded)}
+                className="w-full flex items-center justify-between text-left mb-6 hover:opacity-70 transition-opacity"
+              >
+                <h3 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+                  UI Examples
+                </h3>
+                <ChevronDown
+                  size={20}
+                  style={{
+                    color: "var(--text-secondary)",
+                    transform: uiExamplesExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s",
+                  }}
+                />
+              </button>
 
-              {/* Buttons */}
-              <div className="mb-8">
-                <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Buttons</h4>
-                <div className="flex flex-wrap gap-3">
-                  <Button variant="primary">Primary</Button>
-                  <Button variant="secondary">Secondary</Button>
-                  <Button variant="tertiary">Tertiary</Button>
-                  <Button variant="destructive">Destructive</Button>
-                </div>
-              </div>
+              {uiExamplesExpanded && (
+                <div className="space-y-8">
+                  {/* Typography */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Typography</h4>
+                    <div className="space-y-4 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-secondary)" }}>
+                      <div>
+                        <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Brand Font (--font-brand)</div>
+                        <div className="text-2xl" style={{ fontFamily: "var(--font-brand)", color: "var(--text-primary)" }}>
+                          Peek Stash Browser
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Heading Font (--font-heading)</div>
+                        <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}>Heading Level 1</h1>
+                        <h2 className="text-2xl font-semibold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}>Heading Level 2</h2>
+                        <h3 className="text-xl font-medium" style={{ fontFamily: "var(--font-heading)", color: "var(--text-primary)" }}>Heading Level 3</h3>
+                      </div>
+                      <div>
+                        <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Body Font (--font-body)</div>
+                        <p className="text-base mb-2" style={{ fontFamily: "var(--font-body)", color: "var(--text-primary)" }}>
+                          Primary text: The quick brown fox jumps over the lazy dog
+                        </p>
+                        <p className="text-sm mb-2" style={{ fontFamily: "var(--font-body)", color: "var(--text-secondary)" }}>
+                          Secondary text: The quick brown fox jumps over the lazy dog
+                        </p>
+                        <p className="text-sm" style={{ fontFamily: "var(--font-body)", color: "var(--text-muted)" }}>
+                          Muted text: The quick brown fox jumps over the lazy dog
+                        </p>
+                      </div>
+                      <div>
+                        <div className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>Monospace Font (--font-mono)</div>
+                        <code className="text-sm px-2 py-1 rounded" style={{
+                          fontFamily: "var(--font-mono)",
+                          color: "var(--text-primary)",
+                          backgroundColor: "var(--bg-tertiary)"
+                        }}>
+                          const variable = "monospace";
+                        </code>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Status Messages */}
-              <div>
-                <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Status Messages</h4>
-                <div className="space-y-3">
-                  <SuccessMessage message="Operation completed successfully!" />
-                  <InfoMessage message="Here's some helpful information." />
-                  <WarningMessage message="Please review this warning." />
-                  <ErrorMessage message="An error occurred during processing." />
+                  {/* Colors - Accents */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Accent Colors</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--accent-primary)", color: "white" }}>
+                        <div className="font-medium">Primary</div>
+                        <div className="text-xs opacity-80">--accent-primary</div>
+                      </div>
+                      <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--accent-secondary)", color: "white" }}>
+                        <div className="font-medium">Secondary</div>
+                        <div className="text-xs opacity-80">--accent-secondary</div>
+                      </div>
+                      <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--status-success)", color: "white" }}>
+                        <div className="font-medium">Success</div>
+                        <div className="text-xs opacity-80">--status-success</div>
+                      </div>
+                      <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--status-info)", color: "white" }}>
+                        <div className="font-medium">Info</div>
+                        <div className="text-xs opacity-80">--status-info</div>
+                      </div>
+                      <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--status-warning)", color: "white" }}>
+                        <div className="font-medium">Warning</div>
+                        <div className="text-xs opacity-80">--status-warning</div>
+                      </div>
+                      <div className="p-4 rounded-lg text-center" style={{ backgroundColor: "var(--status-error)", color: "white" }}>
+                        <div className="font-medium">Error</div>
+                        <div className="text-xs opacity-80">--status-error</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Backgrounds */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Background Colors</h4>
+                    <div className="space-y-2">
+                      <div className="p-4 rounded-lg border" style={{
+                        backgroundColor: "var(--bg-primary)",
+                        borderColor: "var(--border-color)",
+                        color: "var(--text-primary)"
+                      }}>
+                        Primary Background (--bg-primary)
+                      </div>
+                      <div className="p-4 rounded-lg border" style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        borderColor: "var(--border-color)",
+                        color: "var(--text-primary)"
+                      }}>
+                        Secondary Background (--bg-secondary)
+                      </div>
+                      <div className="p-4 rounded-lg border" style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        borderColor: "var(--border-color)",
+                        color: "var(--text-primary)"
+                      }}>
+                        Tertiary Background (--bg-tertiary)
+                      </div>
+                      <div className="p-4 rounded-lg border" style={{
+                        backgroundColor: "var(--bg-card)",
+                        borderColor: "var(--border-color)",
+                        color: "var(--text-primary)"
+                      }}>
+                        Card Background (--bg-card)
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Role Badges */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Role Badges</h4>
+                    <div className="flex gap-3">
+                      <span className="px-3 py-1 rounded-full text-sm font-medium" style={{
+                        backgroundColor: "var(--accent-primary)",
+                        color: "white"
+                      }}>
+                        Admin
+                      </span>
+                      <span className="px-3 py-1 rounded-full text-sm font-medium" style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        color: "var(--text-secondary)"
+                      }}>
+                        User
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Buttons</h4>
+                    <div className="flex flex-wrap gap-3">
+                      <Button variant="primary">Primary</Button>
+                      <Button variant="secondary">Secondary</Button>
+                      <Button variant="tertiary">Tertiary</Button>
+                      <Button variant="destructive">Destructive</Button>
+                    </div>
+                  </div>
+
+                  {/* Status Messages */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Status Messages</h4>
+                    <div className="space-y-3">
+                      <SuccessMessage message="Operation completed successfully!" />
+                      <InfoMessage message="Here's some helpful information." />
+                      <WarningMessage message="Please review this warning." />
+                      <ErrorMessage message="An error occurred during processing." />
+                    </div>
+                  </div>
+
+                  {/* Borders & Shadows */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Borders & Shadows</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 rounded-lg border" style={{
+                        borderColor: "var(--border-color)",
+                        backgroundColor: "var(--bg-card)",
+                        color: "var(--text-primary)"
+                      }}>
+                        <div className="font-medium mb-1">Border</div>
+                        <div className="text-sm" style={{ color: "var(--text-muted)" }}>Standard border color</div>
+                      </div>
+                      <div className="p-4 rounded-lg" style={{
+                        boxShadow: "var(--shadow-md)",
+                        backgroundColor: "var(--bg-card)",
+                        color: "var(--text-primary)"
+                      }}>
+                        <div className="font-medium mb-1">Shadow</div>
+                        <div className="text-sm" style={{ color: "var(--text-muted)" }}>Medium shadow effect</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Toast Notifications */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Toast Notifications</h4>
+                    <div className="space-y-3">
+                      <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                        Click the buttons below to see how toast notifications appear in this theme:
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          variant="secondary"
+                          onClick={() => showSuccess("This is a success toast notification!")}
+                        >
+                          Show Success Toast
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => showError("This is an error toast notification!")}
+                        >
+                          Show Error Toast
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div className="p-3 rounded-lg border" style={{
+                          backgroundColor: "var(--toast-info-bg)",
+                          borderColor: "var(--toast-info-border)",
+                          boxShadow: `0 4px 12px var(--toast-info-shadow)`,
+                          color: "white"
+                        }}>
+                          <div className="font-medium mb-1">Info Toast Style</div>
+                          <div className="text-xs opacity-90">--toast-info-bg/border/shadow</div>
+                        </div>
+                        <div className="p-3 rounded-lg border" style={{
+                          backgroundColor: "var(--toast-error-bg)",
+                          borderColor: "var(--toast-error-border)",
+                          boxShadow: `0 4px 12px var(--toast-error-shadow)`,
+                          color: "white"
+                        }}>
+                          <div className="font-medium mb-1">Error Toast Style</div>
+                          <div className="text-xs opacity-90">--toast-error-bg/border/shadow</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scene Card Example */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Scene Card</h4>
+                    <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
+                      The most important UI element - hover to see interaction styling:
+                    </p>
+                    <div className="max-w-xs mx-auto">
+                      <div
+                        className="scene-card-demo rounded-lg border overflow-hidden transition-all duration-300 cursor-pointer"
+                        style={{
+                          backgroundColor: "var(--bg-card)",
+                          borderColor: "var(--border-color)",
+                          borderWidth: "1px",
+                        }}
+                      >
+                        {/* Thumbnail */}
+                        <div className="relative aspect-video overflow-hidden" style={{backgroundColor: "var(--bg-secondary)"}}>
+                          {/* Placeholder */}
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg
+                              className="w-12 h-12"
+                              style={{ color: "var(--text-muted)" }}
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </div>
+
+                          {/* Overlay gradient */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
+
+                          {/* Duration badge */}
+                          <div className="absolute bottom-2 right-2 pointer-events-none">
+                            <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
+                              45m
+                            </span>
+                          </div>
+
+                          {/* Progress bar */}
+                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 pointer-events-none">
+                            <div
+                              className="h-full"
+                              style={{
+                                width: "35%",
+                                backgroundColor: "var(--status-success)"
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="pt-4 px-4 pb-2">
+                          {/* Title and Date - Fixed height */}
+                          <div className="flex flex-col" style={{ minHeight: "4rem", maxHeight: "4rem" }}>
+                            <h3 className="font-semibold mb-1 leading-tight line-clamp-2" style={{ color: "var(--text-primary)" }}>
+                              Example Scene Title Goes Here
+                            </h3>
+                            <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                              2024-01-15
+                            </p>
+                          </div>
+
+                          {/* Stats - Fixed height row */}
+                          <div style={{ minHeight: "1.5rem", maxHeight: "1.5rem", overflow: "hidden" }}>
+                            <div className="flex items-center justify-center gap-4 text-xs" style={{ color: "var(--text-muted)" }}>
+                              <span>💦 12</span>
+                              <span>
+                                <span style={{ color: "var(--status-success)" }}>▶</span> 5
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Description - Fixed height */}
+                          <div style={{ minHeight: "3.75rem", maxHeight: "3.75rem", overflow: "hidden" }}>
+                            <p className="text-sm line-clamp-3" style={{ color: "var(--text-secondary)" }}>
+                              This is a sample scene description that demonstrates how text appears in the card layout with multiple lines.
+                            </p>
+                          </div>
+
+                          {/* Metadata Chips - Fixed height */}
+                          <div className="py-2" style={{ minHeight: "3.5rem", maxHeight: "3.5rem" }}>
+                            <div className="flex items-center justify-center gap-3">
+                              <div
+                                className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
+                                style={{
+                                  backgroundColor: "var(--selection-bg)",
+                                  border: "1px solid color-mix(in srgb, var(--status-info) 70%, transparent)",
+                                }}
+                              >
+                                <span className="text-xl leading-none">👥</span>
+                                <span className="text-sm font-medium" style={{ color: "color-mix(in srgb, var(--status-info) 70%, transparent)" }}>2</span>
+                              </div>
+                              <div
+                                className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
+                                style={{
+                                  backgroundColor: "var(--selection-bg)",
+                                  border: "1px solid color-mix(in srgb, var(--status-info) 70%, transparent)",
+                                }}
+                              >
+                                <span className="text-xl leading-none">🎬</span>
+                                <span className="text-sm font-medium" style={{ color: "color-mix(in srgb, var(--status-info) 70%, transparent)" }}>1</span>
+                              </div>
+                              <div
+                                className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
+                                style={{
+                                  backgroundColor: "var(--selection-bg)",
+                                  border: "1px solid color-mix(in srgb, var(--accent-secondary) 70%, transparent)",
+                                }}
+                              >
+                                <span className="text-xl leading-none">🏷️</span>
+                                <span className="text-sm font-medium" style={{ color: "color-mix(in srgb, var(--accent-secondary) 70%, transparent)" }}>5</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Rating Controls */}
+                          <div className="py-2 flex justify-center">
+                            <div className="flex items-center gap-2">
+                              <span style={{ color: "var(--accent-warning)", fontSize: "18px" }}>★★★★★</span>
+                              <span style={{ color: "var(--accent-secondary)", fontSize: "18px", marginLeft: "0.5rem" }}>♥</span>
+                            </div>
+                          </div>
+
+                          {/* Resolution and File Size - Bottom row */}
+                          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)', minHeight: "1rem" }}>
+                            <span>1920×1080</span>
+                            <span>2.4 GB</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </Paper.Body>
         </Paper>
@@ -327,7 +689,7 @@ const Settings = () => {
                     onChange={(e) => setMinimumPlayPercent(parseInt(e.target.value))}
                     className="range-slider"
                     style={{
-                      background: `linear-gradient(to right, var(--accent-info) 0%, var(--accent-info) ${minimumPlayPercent}%, var(--border-color) ${minimumPlayPercent}%, var(--border-color) 100%)`
+                      background: `linear-gradient(to right, var(--status-info) 0%, var(--status-info) ${minimumPlayPercent}%, var(--border-color) ${minimumPlayPercent}%, var(--border-color) 100%)`
                     }}
                   />
                   <p

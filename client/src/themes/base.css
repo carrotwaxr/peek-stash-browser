@@ -15,7 +15,12 @@ body {
 }
 
 /* Typography - Heading styles */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   font-weight: 600;
   line-height: 1.2;
@@ -27,7 +32,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Monospace text for technical content */
-code, pre, .font-mono {
+code,
+pre,
+.font-mono {
   font-family: var(--font-mono);
 }
 
@@ -197,7 +204,7 @@ code, pre, .font-mono {
 
 /* Video player specific styles */
 .video-container {
-  background-color: var(--player-bg);
+  background-color: #000000;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -212,15 +219,15 @@ code, pre, .font-mono {
 }
 
 .status-success {
-  background-color: var(--accent-success);
+  background-color: var(--status-success);
 }
 
 .status-warning {
-  background-color: var(--accent-warning);
+  background-color: var(--status-warning);
 }
 
 .status-error {
-  background-color: var(--accent-error);
+  background-color: var(--status-error);
 }
 
 /* Text truncation utilities (not provided by Tailwind by default) */

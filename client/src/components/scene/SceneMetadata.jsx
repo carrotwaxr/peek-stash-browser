@@ -189,7 +189,7 @@ const SceneMetadataEntityInfoChip = ({ count, icon, type }) => {
     type === "performer"
       ? "var(--status-info-text)"
       : type === "group"
-      ? "var(--accent-info)"
+      ? "var(--status-info)"
       : "var(--accent-secondary)";
   const fadedColor = `color-mix(in srgb, ${color} 70%, transparent)`;
   return (
