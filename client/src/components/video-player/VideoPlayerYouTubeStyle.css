@@ -163,13 +163,24 @@
   height: 48px !important;
   margin: 0 !important;
   order: 3 !important;
+  width: 48px !important;
+  overflow: visible !important;
+  transition: width 0.2s ease !important;
+}
+
+.video-js .vjs-volume-panel:hover,
+.video-js .vjs-volume-panel:focus-within,
+.video-js .vjs-volume-panel.vjs-hover {
+  width: 172px !important; /* 48px button + 124px slider (100px + 24px padding) */
 }
 
 .video-js .vjs-mute-control {
   margin: 0 !important;
+  flex-shrink: 0 !important;
 }
 
 .video-js .vjs-volume-control {
+  position: relative !important;
   width: 0 !important;
   opacity: 0 !important;
   padding: 0 !important;
