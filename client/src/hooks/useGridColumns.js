@@ -26,7 +26,7 @@ export const useGridColumns = (gridType = 'default') => {
           if (width >= 1024) return 5;  // lg
           if (width >= 768) return 4;   // md
           if (width >= 640) return 3;   // sm
-          return 2; // xs
+          return 1; // xs - minmax(320px, 1fr) only fits 1 column on typical mobile screens
 
         case 'performers':
           // Matches xs:1 sm:2 md:3 lg:4 xl:5 2xl:6
