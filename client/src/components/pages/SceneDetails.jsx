@@ -246,6 +246,62 @@ const SceneDetails = ({
                   </div>
                 )}
 
+                {/* Groups */}
+                {scene.groups && scene.groups.length > 0 && (
+                  <div className="mb-6">
+                    <h3
+                      className="text-sm font-medium mb-3"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Groups
+                    </h3>
+                    <div className="flex flex-wrap gap-3">
+                      {scene.groups.map((group) => (
+                        <Link
+                          key={group.id}
+                          to={`/group/${group.id}`}
+                          className="flex flex-col items-center rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{
+                            backgroundColor: "var(--bg-secondary)",
+                            width: "100px",
+                          }}
+                        >
+                          <div
+                            className="w-full overflow-hidden flex items-center justify-center"
+                            style={{
+                              backgroundColor: "var(--border-color)",
+                              height: "150px",
+                            }}
+                          >
+                            {group.front_image_path || group.back_image_path ? (
+                              <img
+                                src={group.front_image_path || group.back_image_path}
+                                alt={group.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span
+                                className="text-3xl"
+                                style={{ color: "var(--text-secondary)" }}
+                              >
+                                🎬
+                              </span>
+                            )}
+                          </div>
+                          <div className="w-full px-2 py-2 text-center">
+                            <span
+                              className="text-xs font-medium line-clamp-2"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              {group.name}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Tags */}
                 {(() => {
                   const allTags = mergeAllTags(scene);

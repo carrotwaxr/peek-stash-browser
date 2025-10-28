@@ -228,6 +228,37 @@ export const libraryApi = {
   getGalleryImages: async (galleryId) => {
     return apiGet(`/library/galleries/${galleryId}/images`);
   },
+
+  /**
+   * Search groups with filtering and pagination
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @param {Object} params.group_filter - Group-specific filters
+   */
+  findGroups: (params = {}) => {
+    return apiPost("/library/groups", params);
+  },
+
+  /**
+   * Find a single group by ID
+   * @param {string} id - Group ID
+   * @returns {Promise<Object|null>} Group object or null if not found
+   */
+  findGroupById: async (id) => {
+    const result = await apiPost("/library/groups", { ids: [id] });
+    return result?.findGroups?.groups?.[0] || null;
+  },
+
+  /**
+   * Find groups with minimal data (id + name only)
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @returns {Promise<Array>} Array of {id, name} objects
+   */
+  findGroupsMinimal: async (params = {}) => {
+    const result = await apiPost("/library/groups/minimal", params);
+    return result?.groups || [];
+  },
 };
 
 // Valid sort field mappings for Stash GraphQL API
@@ -504,4 +535,14 @@ export const ratingsApi = {
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
   updateGalleryRating: (galleryId, data) => apiPut(`/ratings/gallery/${galleryId}`, data),
+
+  /**
+   * Update rating and/or favorite for a group
+   * @param {string} groupId - Group ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateGroupRating: (groupId, data) => apiPut(`/ratings/group/${groupId}`, data),
 };

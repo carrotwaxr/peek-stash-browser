@@ -39,6 +39,13 @@ export const NAV_DEFINITIONS = [
     description: "Browse tags in your library",
   },
   {
+    key: "groups",
+    name: "Groups",
+    path: "/groups",
+    icon: "film",
+    description: "Browse groups and movies in your library",
+  },
+  {
     key: "galleries",
     name: "Galleries",
     path: "/galleries",
