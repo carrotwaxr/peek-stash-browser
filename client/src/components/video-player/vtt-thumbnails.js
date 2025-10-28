@@ -72,12 +72,6 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
 
     this.getVttFile(url).then((data) => {
       this.vttData = this.processVtt(data);
-      console.log('[VTT Debug] VTT data loaded:', {
-        url,
-        spriteUrl: this.spriteUrl,
-        vttDataLength: this.vttData?.length,
-        firstEntry: this.vttData?.[0]
-      });
       this.setupThumbnailElement();
     }).catch((err) => {
       console.error('[VTT Thumbnails] Failed to load VTT file:', err);
@@ -223,18 +217,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     const time = percent * duration;
     const currentStyle = this.getStyleForTime(time);
 
-    console.log('[VTT Debug] Updating thumbnail:', {
-      percent,
-      time,
-      duration,
-      currentStyle,
-      spriteUrl: this.spriteUrl,
-      hasVttData: !!this.vttData,
-      vttDataLength: this.vttData?.length
-    });
-
     if (!currentStyle) {
-      console.log('[VTT Debug] No style found for time:', time);
       this.hideThumbnailHolder();
       return;
     }

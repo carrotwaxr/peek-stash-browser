@@ -118,14 +118,15 @@
 /* VTT Thumbnails - matching Stash's styling */
 .video-js .vjs-vtt-thumbnail-display {
   position: absolute !important;
+  left: 0 !important;
+  bottom: 20px !important;
   border: 2px solid white !important;
   border-radius: 2px !important;
-  bottom: 20px !important;
   box-shadow: 0 0 7px rgba(0, 0, 0, 0.6) !important;
-  opacity: 0 !important;
+  opacity: 0; /* No !important - allow JS to override */
   transition: opacity 0.1s ease !important;
   pointer-events: none !important;
-  background-size: cover !important;
+  /* background-size removed - sprite sheets use background-position, not cover */
 }
 
 /* Ensure thumbnails show on touch/mobile interaction */
@@ -563,16 +564,29 @@
     gap: 4px !important;
   }
 
-  /* All control buttons - smaller */
+  /* All control buttons - smaller and properly aligned */
   .video-js .vjs-control {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    line-height: 36px !important;
+  }
+
+  /* Playlist buttons - override desktop 48px height */
+  .video-js .vjs-playlist-prev,
+  .video-js .vjs-playlist-next {
     width: 36px !important;
     height: 36px !important;
     min-width: 36px !important;
   }
 
-  /* Button icons - smaller */
-  .video-js .vjs-icon-placeholder {
-    font-size: 16px !important;
+  /* Volume panel - override desktop 48px height */
+  .video-js .vjs-volume-panel {
+    height: 36px !important;
+  }
+
+  .video-js .vjs-icon-placeholder:before {
+    line-height: 1 !important;
   }
 
   /* Big play button - smaller */
