@@ -475,12 +475,12 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
 /**
  * Sort scenes
  */
-function sortScenes(scenes: NormalizedScene[], sortField: string, direction: string): NormalizedScene[] {
+function sortScenes(scenes: NormalizedScene[], sortField: string, direction: string, groupId?: number): NormalizedScene[] {
   const sorted = [...scenes];
 
   sorted.sort((a, b) => {
-    const aValue = getFieldValue(a, sortField);
-    const bValue = getFieldValue(b, sortField);
+    const aValue = getFieldValue(a, sortField, groupId);
+    const bValue = getFieldValue(b, sortField, groupId);
 
     let comparison = 0;
     if (typeof aValue === 'string' && typeof bValue === 'string') {
@@ -511,7 +511,16 @@ function sortScenes(scenes: NormalizedScene[], sortField: string, direction: str
 /**
  * Get field value from scene for sorting
  */
-function getFieldValue(scene: any, field: string): any {
+function getFieldValue(scene: any, field: string, groupId?: number): any {
+  // Scene index in group (requires groupId context)
+  if (field === 'scene_index') {
+    if (!groupId || !scene.groups || !Array.isArray(scene.groups)) {
+      return 999999; // Put scenes without scene_index at the end
+    }
+    const group = scene.groups.find((g: any) => String(g.id) === String(groupId));
+    return group?.scene_index ?? 999999; // Put scenes without scene_index at the end
+  }
+
   // Watch history fields
   if (field === 'o_counter') return scene.o_counter || 0;
   if (field === 'play_count') return scene.play_count || 0;
@@ -597,7 +606,9 @@ export const findScenes = async (req: Request, res: Response) => {
     scenes = applySceneFilters(scenes, mergedFilter);
 
     // Step 5: Sort
-    scenes = sortScenes(scenes, sortField, sortDirection);
+    // Extract group_id for scene_index sorting (use first group if filtering by groups)
+    const groupIdForSort = scene_filter?.groups?.value?.[0];
+    scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
 
     // Step 6: Paginate
     const total = scenes.length;
