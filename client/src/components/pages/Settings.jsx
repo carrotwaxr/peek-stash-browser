@@ -6,6 +6,7 @@ import { useTheme } from "../../themes/useTheme.js";
 import { PageLayout } from "../ui/index.js";
 import CarouselSettings from "../settings/CarouselSettings.jsx";
 import NavigationSettings from "../settings/NavigationSettings.jsx";
+import CustomThemeManager from "../settings/CustomThemeManager.jsx";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
 import SuccessMessage from "../ui/SuccessMessage.jsx";
@@ -196,10 +197,10 @@ const Settings = () => {
 
         {/* Theme */}
         <Paper className="mb-6">
-          <Paper.Header title="Theme" />
+          <Paper.Header title="Built-in Themes" />
           <Paper.Body>
             <div className="space-y-2">
-              {availableThemes.map((theme) => (
+              {availableThemes.filter(theme => !theme.isCustom).map((theme) => (
                 <Button
                   key={theme.key}
                   type="button"
@@ -216,7 +217,7 @@ const Settings = () => {
               ))}
             </div>
             <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
-              Choose your preferred color theme (changes apply immediately)
+              Choose from our built-in color themes (changes apply immediately)
             </p>
             <div className="mt-8 pt-6 border-t" style={{ borderColor: "var(--border-color)" }}>
               <button
@@ -594,6 +595,13 @@ const Settings = () => {
                 </div>
               )}
             </div>
+          </Paper.Body>
+        </Paper>
+
+        {/* Custom Themes */}
+        <Paper className="mb-6">
+          <Paper.Body>
+            <CustomThemeManager />
           </Paper.Body>
         </Paper>
 
