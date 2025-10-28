@@ -489,11 +489,17 @@
   justify-content: center !important;
 }
 
-/* Hide big play button when video has started */
-.video-js.vjs-has-started .vjs-big-play-button,
+/* Hide big play button when video has started - only show on initial load */
+.video-js.vjs-has-started .vjs-big-play-button {
+  display: none !important;
+}
+
+/* Never show during these states */
 .video-js.vjs-playing .vjs-big-play-button,
 .video-js.vjs-seeking .vjs-big-play-button,
-.video-js.vjs-scrubbing .vjs-big-play-button {
+.video-js.vjs-scrubbing .vjs-big-play-button,
+.video-js.vjs-waiting.vjs-has-started .vjs-big-play-button,
+.video-js.vjs-paused.vjs-has-started .vjs-big-play-button {
   display: none !important;
 }
 
@@ -542,10 +548,8 @@
   margin: 0 !important;
 }
 
-/* Show big play button when buffering (not seeking - let spinner handle that) */
-.video-js.vjs-waiting .vjs-big-play-button {
-  display: flex !important;
-}
+/* Big play button only shows before video has started (initial load) */
+/* Loading spinner handles all buffering/waiting states after that */
 
 /* ============================================================================
    MOBILE OPTIMIZATIONS

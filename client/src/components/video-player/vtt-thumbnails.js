@@ -52,6 +52,9 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
       this.progressBar.removeEventListener("pointerenter", this.onBarPointerEnter);
       this.progressBar.removeEventListener("pointermove", this.onBarPointerMove);
       this.progressBar.removeEventListener("pointerleave", this.onBarPointerLeave);
+      this.progressBar.removeEventListener("touchstart", this.onTouchStart);
+      this.progressBar.removeEventListener("touchmove", this.onTouchMove);
+      this.progressBar.removeEventListener("touchend", this.onTouchEnd);
       this.progressBar = null;
     }
 
@@ -120,6 +123,11 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
 
     progressBar.addEventListener("pointerover", this.onBarPointerEnter);
     progressBar.addEventListener("pointerout", this.onBarPointerLeave);
+
+    // Touch support - show thumbnails while dragging on touch devices
+    progressBar.addEventListener("touchstart", this.onTouchStart);
+    progressBar.addEventListener("touchmove", this.onTouchMove);
+    progressBar.addEventListener("touchend", this.onTouchEnd);
   }
 
   onBarPointerEnter = () => {
@@ -145,6 +153,35 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     if (this.progressBar) {
       this.progressBar.removeEventListener("pointermove", this.onBarPointerMove);
     }
+  };
+
+  onTouchStart = (e) => {
+    this.isTouching = true;
+    this.showThumbnailHolder();
+    this.onTouchMove(e);
+  };
+
+  onTouchMove = (e) => {
+    const { progressBar } = this;
+    if (!progressBar || !this.isTouching) return;
+
+    const touch = e.touches[0];
+    const rect = progressBar.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const percent = x / rect.width;
+
+    this.showThumbnailHolder();
+    this.updateThumbnailStyle(percent, progressBar.offsetWidth);
+  };
+
+  onTouchEnd = () => {
+    this.isTouching = false;
+    // Delay hiding to allow user to see final position
+    setTimeout(() => {
+      if (!this.isTouching) {
+        this.hideThumbnailHolder();
+      }
+    }, 500);
   };
 
   getStyleForTime(time) {
