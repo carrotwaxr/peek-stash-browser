@@ -104,6 +104,7 @@ const GroupDetail = () => {
         {/* Scenes Section */}
         <div className="mt-8">
           <SceneSearch
+            initialSort="scene_index"
             permanentFilters={{
               groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" },
             }}

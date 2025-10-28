@@ -19,6 +19,7 @@ export const SCENE_SORT_OPTIONS = [
   { value: "play_duration", label: "Play Duration" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
+  { value: "scene_index", label: "Scene Number" },
   { value: "tag_count", label: "Tag Count" },
   { value: "title", label: "Title" },
   { value: "updated_at", label: "Updated At" },
@@ -202,6 +203,15 @@ export const SCENE_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select tags...",
+  },
+  {
+    key: "groupIds",
+    label: "Groups",
+    type: "searchable-select",
+    entityType: "groups",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select groups...",
   },
   {
     key: "rating",
