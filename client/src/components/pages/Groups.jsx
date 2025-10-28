@@ -179,14 +179,14 @@ const GroupCard = forwardRef(
       >
         {/* DVD Cover Image - Portrait Orientation */}
         <div
-          className="w-full aspect-[2/3] overflow-hidden"
+          className="w-full aspect-[2/3] p-3"
           style={{ backgroundColor: "var(--bg-secondary)" }}
         >
           {imagePath ? (
             <img
               src={imagePath}
               alt={group.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain rounded"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-6xl">
