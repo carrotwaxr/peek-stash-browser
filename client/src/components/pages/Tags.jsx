@@ -195,26 +195,45 @@ const TagCard = forwardRef(
             </h3>
 
             {/* Entity Counts */}
-            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+            <div
+              className="text-xs mb-2"
+              style={{ color: "var(--text-muted)" }}
+            >
               {(() => {
                 const counts = [];
                 if (tag.scene_count > 0) {
-                  counts.push(`${tag.scene_count} Scene${tag.scene_count !== 1 ? "s" : ""}`);
+                  counts.push(
+                    `${tag.scene_count} Scene${
+                      tag.scene_count !== 1 ? "s" : ""
+                    }`
+                  );
                 }
                 if (tag.performer_count > 0) {
-                  counts.push(`${tag.performer_count} Performer${tag.performer_count !== 1 ? "s" : ""}`);
+                  counts.push(
+                    `${tag.performer_count} Performer${
+                      tag.performer_count !== 1 ? "s" : ""
+                    }`
+                  );
                 }
                 if (tag.studio_count > 0) {
-                  counts.push(`${tag.studio_count} Studio${tag.studio_count !== 1 ? "s" : ""}`);
+                  counts.push(
+                    `${tag.studio_count} Studio${
+                      tag.studio_count !== 1 ? "s" : ""
+                    }`
+                  );
                 }
                 return counts.length > 0 ? counts.join(", ") : "No content";
               })()}
             </div>
 
             {/* Status Icons */}
-            <div className="flex flex-wrap items-center gap-2 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+            <div
+              className="flex flex-wrap items-center gap-2 text-xs mb-2"
+              style={{ color: "var(--text-muted)" }}
+            >
               <span>
-                <span style={{ color: "var(--icon-play-count)" }}>▶</span> {tag.play_count || 0}
+                <span style={{ color: "var(--status-success)" }}>▶</span>{" "}
+                {tag.play_count || 0}
               </span>
               <OCounterButton
                 initialCount={tag.o_counter || 0}
@@ -224,7 +243,10 @@ const TagCard = forwardRef(
             </div>
 
             {/* Rating and Favorite */}
-            <div className="flex items-center mb-2" onClick={(e) => e.preventDefault()}>
+            <div
+              className="flex items-center mb-2"
+              onClick={(e) => e.preventDefault()}
+            >
               <RatingControls
                 entityType="tag"
                 entityId={tag.id}

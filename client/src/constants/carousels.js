@@ -26,49 +26,67 @@ export const CAROUSEL_DEFINITIONS = [
   {
     title: "Recently Added",
     iconComponent: Clock,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-info)" } },
+    iconProps: { className: "w-6 h-6", style: { color: "var(--status-info)" } },
     fetchKey: "recentlyAddedScenes",
   },
   {
     title: "High Rated",
     iconComponent: Star,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--icon-rating)" } },
+    iconProps: {
+      className: "w-6 h-6",
+      style: { color: "var(--status-warning)" },
+    },
     fetchKey: "highRatedScenes",
   },
   {
     title: "Favorite Performers",
     iconComponent: Heart,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-error)" } },
+    iconProps: {
+      className: "w-6 h-6",
+      style: { color: "var(--status-error)" },
+    },
     fetchKey: "favoritePerformerScenes",
   },
   {
     title: "Favorite Tags",
     iconComponent: Tag,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-primary)" } },
+    iconProps: {
+      className: "w-6 h-6",
+      style: { color: "var(--accent-primary)" },
+    },
     fetchKey: "favoriteTagScenes",
   },
   {
     title: "Favorite Studios",
     iconComponent: Video,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-info)" } },
+    iconProps: { className: "w-6 h-6", style: { color: "var(--status-info)" } },
     fetchKey: "favoriteStudioScenes",
   },
   {
     title: "Barely Legal",
     iconComponent: Calendar,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-warning)" } },
+    iconProps: {
+      className: "w-6 h-6",
+      style: { color: "var(--status-warning)" },
+    },
     fetchKey: "barelyLegalScenes",
   },
   {
     title: "Feature Length",
     iconComponent: Film,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-secondary)" } },
+    iconProps: {
+      className: "w-6 h-6",
+      style: { color: "var(--accent-secondary)" },
+    },
     fetchKey: "longScenes",
   },
   {
     title: "High Bitrate",
     iconComponent: Zap,
-    iconProps: { className: "w-6 h-6", style: { color: "var(--accent-success)" } },
+    iconProps: {
+      className: "w-6 h-6",
+      style: { color: "var(--status-success)" },
+    },
     fetchKey: "highBitrateScenes",
   },
 ];

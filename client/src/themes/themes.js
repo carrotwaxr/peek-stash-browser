@@ -1,329 +1,244 @@
 // Theme definitions for the media application
 import {
-  generateBackgroundScale,
+  adjustLightness,
   generateTextScale,
   generateShadows,
   generateFocusRing,
+  generateStatusColors,
+  generateToastColors,
 } from "../utils/colorScale.js";
+
+export const generateThemeCSSVars = (config) => {
+  // Calculate tertiary as lighter/darker than card for skeleton placeholder contrast
+  const tertiaryAdjustment = config.mode === "dark" ? 6 : -6;
+  const bgTertiary = adjustLightness(
+    config.colors.backgroundCard,
+    tertiaryAdjustment
+  );
+
+  return {
+    "--font-brand": config.fonts.brand,
+    "--font-heading": config.fonts.heading,
+    "--font-body": config.fonts.body,
+    "--font-mono": config.fonts.mono,
+
+    /** Base background color, used for page background */
+    "--bg-primary": config.colors.background,
+    /** Secondary background color, used by Nav menu, buttons, form controls, and icon placeholders */
+    "--bg-secondary": config.colors.backgroundSecondary,
+    /** Card background color, used by Cards/Papers and Modals */
+    "--bg-card": config.colors.backgroundCard,
+    /** Tertiary background color, auto-generated for skeleton loading placeholders (needs contrast with card) */
+    "--bg-tertiary": bgTertiary,
+
+    /** Generates 2 steps of either light or darker text colors for secondary and muted text */
+    ...generateTextScale(config.colors.text, config.mode),
+
+    "--accent-primary": config.accents.primary,
+    "--accent-secondary": config.accents.secondary,
+
+    "--border-color": config.colors.border,
+    ...generateShadows(config.accents.primary, config.mode),
+    ...generateFocusRing(config.accents.primary),
+
+    ...generateStatusColors(config.status),
+    ...generateToastColors(config.status, config.mode),
+  };
+};
 
 export const themes = {
   peek: {
     name: "Peek",
-    properties: {
-      // Typography
-      "--font-brand": "'Lilita One', cursive",
-      "--font-heading":
-        "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body":
-        "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      "--font-mono": "'JetBrains Mono', 'Courier New', monospace",
+    properties: (() => {
+      // ============================================
+      // THEME CONFIGURATION - Single source of truth
+      // ============================================
+      const config = {
+        mode: "dark",
 
-      // Background colors - Generated from base color
-      ...generateBackgroundScale("#0a0a0b", "dark"),
+        fonts: {
+          brand: "'Lilita One', cursive",
+          heading:
+            "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif",
+          body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          mono: "'JetBrains Mono', 'Courier New', monospace",
+        },
 
-      // Text colors - Generated from base color
-      ...generateTextScale("#ffffff", "dark"),
+        colors: {
+          background: "#0a0a0b",
+          backgroundSecondary: "#1d1d20",
+          backgroundCard: "#19191b",
+          text: "#ffffff",
+          border: "#2a2a32",
+        },
 
-      // Accent colors - Your logo palette
-      "--accent-primary": "#6D2CE3", // Purple - Primary brand
-      "--accent-secondary": "#FD6B86", // Pink - Secondary actions
-      "--accent-success": "#0F7173", // Teal - Success states
-      "--accent-info": "#3993DD", // Blue - Info/links
-      "--accent-warning": "#FA8C2A", // Orange - Warnings
-      "--accent-error": "#FD6B86", // Pink - Errors (softer than red)
+        accents: {
+          primary: "#6D2CE3", // Purple - Primary brand
+          secondary: "#FD6B86", // Pink - Secondary actions
+        },
 
-      // Interactive states - Generated from accent color
-      "--border-color": "#2a2a32",
-      ...generateShadows("#6D2CE3", "dark"),
-      ...generateFocusRing("#6D2CE3"),
+        status: {
+          success: "#0F7173", // Teal - Success states
+          error: "#FD6B86", // Pink - Errors (softer than red)
+          info: "#3993DD", // Blue - Info/links
+          warning: "#FA8C2A", // Orange - Warnings
+        },
+      };
 
-      // Media specific
-      "--player-bg": "#000000",
-      "--controls-bg": "rgba(10, 10, 11, 0.8)",
-      "--progress-bg": "#2a2a32",
-
-      // Role badges
-      "--role-admin-bg": "rgba(168, 85, 247, 0.1)",
-      "--role-admin-text": "#a855f7",
-      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
-      "--role-user-text": "#64748b",
-
-      // Status states
-      "--status-error-bg": "rgba(239, 68, 68, 0.1)",
-      "--status-error-border": "rgba(239, 68, 68, 0.3)",
-      "--status-error-text": "#ef4444",
-      "--status-info-bg": "rgba(59, 130, 246, 0.1)",
-      "--status-info-border": "rgba(59, 130, 246, 0.3)",
-      "--status-info-text": "#3b82f6",
-
-      // Toast notifications
-      "--toast-error-bg": "#dc2626",
-      "--toast-error-border": "#f87171",
-      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
-      "--toast-info-bg": "#1d4ed8",
-      "--toast-info-border": "#60a5fa",
-      "--toast-info-shadow": "rgba(29, 78, 216, 0.4)",
-
-      // Icon colors (for stats and indicators)
-      "--icon-play-count": "#0F7173", // Teal - matches accent-success
-      "--icon-rating": "#FA8C2A", // Orange for rating stars
-      "--icon-organized": "#22c55e", // Green
-    },
+      return generateThemeCSSVars(config);
+    })(),
   },
 
   light: {
     name: "Light",
-    properties: {
-      // Typography
-      "--font-brand": "'Lilita One', cursive",
-      "--font-heading":
-        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body":
-        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      "--font-mono": "'Fira Code', 'Courier New', monospace",
+    properties: (() => {
+      const config = {
+        mode: "light",
 
-      // Background colors - Generated from base color (off white)
-      ...generateBackgroundScale("#fcfaf9", "light"),
+        fonts: {
+          brand: "'Lilita One', cursive",
+          heading: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+          body: "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          mono: "'Fira Code', 'Courier New', monospace",
+        },
 
-      // Text colors - Generated from base color
-      ...generateTextScale("#333333", "light"),
+        colors: {
+          background: "#fcfaf9",
+          backgroundSecondary: "#CDB7F5",
+          backgroundCard: "#F2EDFD",
+          text: "#32385B",
+          border: "#e5e7eb",
+        },
 
-      // Accent colors
-      "--accent-primary": "#6D2CE3",
-      "--accent-secondary": "#DA4167",
-      "--accent-success": "#059669",
-      "--accent-info": "#2563eb", // Bright blue for links/info
-      "--accent-warning": "#d97706",
-      "--accent-error": "#dc2626",
+        accents: {
+          primary: "#6D2CE3",
+          secondary: "#DA4167",
+        },
 
-      // Interactive states - Generated from accent color
-      "--border-color": "#e5e7eb",
-      ...generateShadows("#6D2CE3", "light"),
-      ...generateFocusRing("#6D2CE3"),
+        status: {
+          success: "#059669",
+          error: "#dc2626",
+          info: "#2563eb",
+          warning: "#d97706",
+        },
+      };
 
-      // Media specific
-      "--player-bg": "#000000",
-      "--controls-bg": "rgba(0, 0, 0, 0.7)",
-      "--progress-bg": "#e5e7eb",
-
-      // Role badges
-      "--role-admin-bg": "rgba(109, 44, 227, 0.1)", // Purple tint to match primary
-      "--role-admin-text": "#6D2CE3", // Match primary
-      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
-      "--role-user-text": "#64748b",
-
-      // Status states
-      "--status-error-bg": "rgba(220, 38, 38, 0.1)",
-      "--status-error-border": "rgba(220, 38, 38, 0.3)",
-      "--status-error-text": "#dc2626",
-      "--status-info-bg": "rgba(37, 99, 235, 0.1)",
-      "--status-info-border": "rgba(37, 99, 235, 0.3)",
-      "--status-info-text": "#2563eb",
-
-      // Toast notifications
-      "--toast-error-bg": "#dc2626",
-      "--toast-error-border": "#f87171",
-      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
-      "--toast-info-bg": "#2563eb",
-      "--toast-info-border": "#60a5fa",
-      "--toast-info-shadow": "rgba(37, 99, 235, 0.4)",
-
-      // Icon colors (for stats and indicators)
-      "--icon-play-count": "#059669", // Green - matches accent-success
-      "--icon-rating": "#d97706", // Orange - matches accent-warning
-      "--icon-organized": "#059669", // Green - matches success
-    },
+      return generateThemeCSSVars(config);
+    })(),
   },
 
   midnight: {
     name: "Midnight Blue",
-    properties: {
-      // Typography
-      "--font-brand": "'Lilita One', cursive",
-      "--font-heading":
-        "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body":
-        "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      "--font-mono": "'Space Mono', 'Courier New', monospace",
+    properties: (() => {
+      const config = {
+        mode: "dark",
 
-      // Background colors - Generated from base color
-      ...generateBackgroundScale("#0c1427", "dark"),
+        fonts: {
+          brand: "'Lilita One', cursive",
+          heading: "'Outfit', -apple-system, BlinkMacSystemFont, sans-serif",
+          body: "'Work Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          mono: "'Space Mono', 'Courier New', monospace",
+        },
 
-      // Text colors - Generated from base color
-      ...generateTextScale("#f1f5f9", "dark"),
+        colors: {
+          background: "#0c1427",
+          backgroundSecondary: "#162446",
+          backgroundCard: "#13203e",
+          text: "#f1f5f9",
+          border: "#475569",
+        },
 
-      // Accent colors
-      "--accent-primary": "#0ea5e9",
-      "--accent-secondary": "#8b5cf6",
-      "--accent-success": "#22c55e",
-      "--accent-warning": "#f59e0b",
-      "--accent-error": "#ef4444",
+        accents: {
+          primary: "#0ea5e9",
+          secondary: "#8b5cf6",
+        },
 
-      // Interactive states - Generated from accent color
-      "--border-color": "#475569",
-      ...generateShadows("#0ea5e9", "dark"),
-      ...generateFocusRing("#0ea5e9"),
+        status: {
+          success: "#22c55e",
+          error: "#ef4444",
+          info: "#0ea5e9",
+          warning: "#f59e0b",
+        },
+      };
 
-      // Media specific
-      "--player-bg": "#000000",
-      "--controls-bg": "rgba(30, 41, 59, 0.8)",
-      "--progress-bg": "#475569",
-
-      // Role badges
-      "--role-admin-bg": "rgba(139, 92, 246, 0.1)",
-      "--role-admin-text": "#8b5cf6",
-      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
-      "--role-user-text": "#64748b",
-
-      // Status states
-      "--status-error-bg": "rgba(239, 68, 68, 0.1)",
-      "--status-error-border": "rgba(239, 68, 68, 0.3)",
-      "--status-error-text": "#ef4444",
-      "--status-info-bg": "rgba(14, 165, 233, 0.1)",
-      "--status-info-border": "rgba(14, 165, 233, 0.3)",
-      "--status-info-text": "#0ea5e9",
-
-      // Toast notifications
-      "--toast-error-bg": "#dc2626",
-      "--toast-error-border": "#f87171",
-      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
-      "--toast-info-bg": "#0369a1",
-      "--toast-info-border": "#38bdf8",
-      "--toast-info-shadow": "rgba(3, 105, 161, 0.4)",
-
-      // Icon colors (for stats and indicators)
-      "--icon-play-count": "#22c55e", // Green - matches accent-success
-      "--icon-rating": "#f59e0b", // Orange - matches accent-warning
-      "--icon-organized": "#22c55e", // Green
-    },
+      return generateThemeCSSVars(config);
+    })(),
   },
 
   deepPurple: {
     name: "Deep Purple",
-    properties: {
-      // Typography
-      "--font-brand": "'Lilita One', cursive",
-      "--font-heading":
-        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body":
-        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      "--font-mono": "'Fira Code', 'Courier New', monospace",
+    properties: (() => {
+      const config = {
+        mode: "dark",
 
-      // Background colors - Generated from base color (soft pink)
-      ...generateBackgroundScale("#230C33", "dark"),
+        fonts: {
+          brand: "'Lilita One', cursive",
+          heading: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+          body: "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          mono: "'Fira Code', 'Courier New', monospace",
+        },
 
-      // Text colors - Generated from base color
-      ...generateTextScale("#EBEDE3", "dark"),
+        colors: {
+          background: "#230C33",
+          backgroundSecondary: "#3a1454",
+          backgroundCard: "#34124c",
+          text: "#fbf7ff",
+          border: "#672395",
+        },
 
-      // Accent colors
-      "--accent-primary": "#5C538B",
-      "--accent-secondary": "#9984D4",
-      "--accent-success": "#4ade80", // Brighter green for dark purple bg
-      "--accent-info": "#a78bfa", // Purple-tinted info color
-      "--accent-warning": "#fbbf24", // Brighter yellow for visibility
-      "--accent-error": "#f87171", // Softer red for dark bg
+        accents: {
+          primary: "#2E86AB",
+          secondary: "#FFBC42",
+        },
 
-      // Interactive states - Generated from accent color
-      "--border-color": "#381353",
-      ...generateShadows("#230C33", "dark"),
-      ...generateFocusRing("#230C33"),
+        status: {
+          success: "#4ade80",
+          error: "#f87171",
+          info: "#a78bfa",
+          warning: "#FA8023",
+        },
+      };
 
-      // Media specific
-      "--player-bg": "#000000",
-      "--controls-bg": "rgba(0, 0, 0, 0.7)",
-      "--progress-bg": "#4F1B74",
-
-      // Role badges
-      "--role-admin-bg": "rgba(153, 132, 212, 0.15)", // Purple tint matching secondary
-      "--role-admin-text": "#9984D4", // Match secondary color
-      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
-      "--role-user-text": "#94a3b8", // Lighter for dark bg
-
-      // Status states
-      "--status-error-bg": "rgba(248, 113, 113, 0.1)",
-      "--status-error-border": "rgba(248, 113, 113, 0.3)",
-      "--status-error-text": "#f87171",
-      "--status-info-bg": "rgba(167, 139, 250, 0.1)", // Purple-tinted
-      "--status-info-border": "rgba(167, 139, 250, 0.3)",
-      "--status-info-text": "#a78bfa",
-
-      // Toast notifications
-      "--toast-error-bg": "#dc2626",
-      "--toast-error-border": "#f87171",
-      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
-      "--toast-info-bg": "#7c3aed", // Purple for info toasts
-      "--toast-info-border": "#a78bfa",
-      "--toast-info-shadow": "rgba(124, 58, 237, 0.4)",
-
-      // Icon colors (for stats and indicators)
-      "--icon-play-count": "#4ade80", // Bright green
-      "--icon-rating": "#fbbf24", // Yellow
-      "--icon-organized": "#4ade80", // Bright green
-    },
+      return generateThemeCSSVars(config);
+    })(),
   },
 
   theHub: {
     name: "The Hub",
-    properties: {
-      // Typography
-      "--font-brand": "'Lilita One', cursive",
-      "--font-heading":
-        "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
-      "--font-body":
-        "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      "--font-mono": "'Fira Code', 'Courier New', monospace",
+    properties: (() => {
+      const config = {
+        mode: "dark",
 
-      // Background colors - Generated from base color (soft pink)
-      ...generateBackgroundScale("#000000", "dark"),
+        fonts: {
+          brand: "'Lilita One', cursive",
+          heading: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+          body: "'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          mono: "'Fira Code', 'Courier New', monospace",
+        },
 
-      // Text colors - Generated from base color
-      ...generateTextScale("#ffffff", "dark"),
+        colors: {
+          background: "#000000",
+          backgroundSecondary: "#141414",
+          backgroundCard: "#0f0f0f",
+          text: "#ffffff",
+          border: "#3D3D3D",
+        },
 
-      // Accent colors
-      "--accent-primary": "#ffa31a",
-      "--accent-secondary": "#7c3aed",
-      "--accent-success": "#22c55e", // Warmer green
-      "--accent-info": "#fb923c", // Orange-tinted info to match Hub theme
-      "--accent-warning": "#fbbf24", // Bright yellow
-      "--accent-error": "#f87171", // Softer red
+        accents: {
+          primary: "#ffa31a",
+          secondary: "#7c3aed",
+        },
 
-      // Interactive states - Generated from accent color
-      "--border-color": "#3D3D3D",
-      ...generateShadows("#ffa31a", "dark"),
-      ...generateFocusRing("#ffa31a"),
+        status: {
+          success: "#22c55e",
+          error: "#f87171",
+          info: "#fb923c",
+          warning: "#fbbf24",
+        },
+      };
 
-      // Media specific
-      "--player-bg": "#000000",
-      "--controls-bg": "rgba(0, 0, 0, 0.7)",
-      "--progress-bg": "#2a2a32",
-
-      // Role badges
-      "--role-admin-bg": "rgba(255, 163, 26, 0.15)", // Orange tint matching primary
-      "--role-admin-text": "#ffa31a", // Match primary orange
-      "--role-user-bg": "rgba(100, 116, 139, 0.1)",
-      "--role-user-text": "#94a3b8", // Lighter for black bg
-
-      // Status states
-      "--status-error-bg": "rgba(248, 113, 113, 0.1)",
-      "--status-error-border": "rgba(248, 113, 113, 0.3)",
-      "--status-error-text": "#f87171",
-      "--status-info-bg": "rgba(251, 146, 60, 0.1)", // Orange-tinted info
-      "--status-info-border": "rgba(251, 146, 60, 0.3)",
-      "--status-info-text": "#fb923c",
-
-      // Toast notifications
-      "--toast-error-bg": "#dc2626",
-      "--toast-error-border": "#f87171",
-      "--toast-error-shadow": "rgba(220, 38, 38, 0.4)",
-      "--toast-info-bg": "#ea580c", // Orange info toast to match Hub theme
-      "--toast-info-border": "#fb923c",
-      "--toast-info-shadow": "rgba(234, 88, 12, 0.4)",
-
-      // Icon colors (for stats and indicators)
-      "--icon-play-count": "#22c55e", // Green
-      "--icon-rating": "#ffa31a", // Orange matching primary
-      "--icon-organized": "#22c55e", // Green
-    },
+      return generateThemeCSSVars(config);
+    })(),
   },
 };
 

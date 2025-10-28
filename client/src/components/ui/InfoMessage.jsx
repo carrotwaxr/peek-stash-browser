@@ -26,7 +26,7 @@ const InfoMessage = ({
       }
     : {
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--accent-info)",
+        borderColor: "var(--status-info)",
         color: "var(--text-primary)",
       };
 
@@ -41,7 +41,7 @@ const InfoMessage = ({
           {/* Info Icon */}
           <svg
             className="w-5 h-5 flex-shrink-0 mt-0.5"
-            style={{ color: mode === "toast" ? "white" : "var(--accent-info)" }}
+            style={{ color: mode === "toast" ? "white" : "var(--status-info)" }}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -53,7 +53,7 @@ const InfoMessage = ({
           </svg>
           <div>
             {mode === "inline" && (
-              <strong className="font-semibold" style={{ color: "var(--accent-info)" }}>
+              <strong className="font-semibold" style={{ color: "var(--status-info)" }}>
                 {title}:{" "}
               </strong>
             )}

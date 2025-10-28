@@ -251,7 +251,7 @@ const WatchHistory = () => {
               border: "1px solid var(--border-color)",
             }}
           >
-            <p style={{ color: "var(--accent-error)" }}>
+            <p style={{ color: "var(--status-error)" }}>
               Error loading watch history: {error}
             </p>
           </div>
@@ -319,8 +319,7 @@ const WatchHistory = () => {
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: "var(--bg-overlay)" }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
           onClick={() => setShowConfirmDialog(false)}
         >
           <div

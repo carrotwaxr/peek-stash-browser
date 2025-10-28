@@ -367,8 +367,8 @@ const PlaylistDetail = () => {
                   className="p-1.5 sm:p-2"
                   {...(shuffle && {
                     style: {
-                      border: "2px solid var(--accent-info)",
-                      color: "var(--accent-info)",
+                      border: "2px solid var(--status-info)",
+                      color: "var(--status-info)",
                     },
                   })}
                   icon={<Shuffle size={16} className="sm:w-5 sm:h-5" />}
@@ -382,8 +382,8 @@ const PlaylistDetail = () => {
                   className="p-1.5 sm:p-2"
                   {...(repeat !== "none" && {
                     style: {
-                      border: "2px solid var(--accent-info)",
-                      color: "var(--accent-info)",
+                      border: "2px solid var(--status-info)",
+                      color: "var(--status-info)",
                     },
                   })}
                   icon={

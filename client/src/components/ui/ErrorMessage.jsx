@@ -32,7 +32,7 @@ const ErrorMessage = ({
       }
     : {
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--accent-error)",
+        borderColor: "var(--status-error)",
         color: "var(--text-primary)",
       };
 
@@ -47,7 +47,7 @@ const ErrorMessage = ({
           {/* Error Icon */}
           <svg
             className="w-5 h-5 flex-shrink-0 mt-0.5"
-            style={{ color: mode === "toast" ? "white" : "var(--accent-error)" }}
+            style={{ color: mode === "toast" ? "white" : "var(--status-error)" }}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -59,7 +59,7 @@ const ErrorMessage = ({
           </svg>
           <div>
             {mode === "inline" && (
-              <strong className="font-semibold" style={{ color: "var(--accent-error)" }}>
+              <strong className="font-semibold" style={{ color: "var(--status-error)" }}>
                 {title}:{" "}
               </strong>
             )}

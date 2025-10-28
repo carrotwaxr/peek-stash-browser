@@ -94,40 +94,10 @@ function hslToHex(h, s, l) {
  * @param {number} amount - Amount to adjust (-100 to +100)
  * @returns {string} Adjusted hex color
  */
-function adjustLightness(hex, amount) {
+export function adjustLightness(hex, amount) {
   const [h, s, l] = hexToHSL(hex);
   const newL = Math.max(0, Math.min(100, l + amount));
   return hslToHex(h, s, newL);
-}
-
-/**
- * Generate background color scale for themes
- * @param {string} baseColor - Base background color (hex)
- * @param {'dark'|'light'} mode - Theme mode
- * @returns {Object} Background color scale
- */
-export function generateBackgroundScale(baseColor, mode = "dark") {
-  if (mode === "dark") {
-    // Dark mode: start dark, go lighter
-    return {
-      "--bg-primary": baseColor, // Darkest
-      "--bg-secondary": adjustLightness(baseColor, 8), // +8% lighter
-      "--bg-card": adjustLightness(baseColor, 6), // +6% lighter
-      "--bg-tertiary": adjustLightness(baseColor, 12), // +12% lighter
-      "--bg-hover": adjustLightness(baseColor, 14), // +14% lighter
-      "--bg-overlay": "rgba(0, 0, 0, 0.85)", // Fixed dark overlay
-    };
-  } else {
-    // Light mode: start light, go darker
-    return {
-      "--bg-primary": baseColor, // Lightest
-      "--bg-secondary": adjustLightness(baseColor, -8), // -6% darker
-      "--bg-card": adjustLightness(baseColor, -6), // -4% darker
-      "--bg-tertiary": adjustLightness(baseColor, -12), // -10% darker
-      "--bg-hover": adjustLightness(baseColor, -14), // -12% darker
-      "--bg-overlay": "rgba(255, 255, 255, 0.9)", // Fixed light overlay
-    };
-  }
 }
 
 /**
@@ -209,4 +179,72 @@ export function generateFocusRing(accentColor) {
     "--selection-bg": `rgba(${r}, ${g}, ${b}, 0.1)`,
     "--border-focus": accentColor,
   };
+}
+
+/**
+ * Convert hex to RGB object
+ * @param {string} hex - Hex color
+ * @returns {Object} RGB values { r, g, b }
+ */
+function hexToRgb(hex) {
+  const h = hex.replace(/^#/, "");
+  return {
+    r: parseInt(h.substr(0, 2), 16),
+    g: parseInt(h.substr(2, 2), 16),
+    b: parseInt(h.substr(4, 2), 16),
+  };
+}
+
+/**
+ * Generate status colors from base status colors
+ * Creates base color + background/border variants with alpha
+ * @param {Object} status - Status colors { success, error, info, warning }
+ * @returns {Object} Complete status color definitions
+ */
+export function generateStatusColors(status) {
+  const colors = {};
+
+  // Generate for each status type
+  Object.entries(status).forEach(([type, baseColor]) => {
+    const rgb = hexToRgb(baseColor);
+
+    colors[`--status-${type}`] = baseColor; // Base color
+    colors[`--status-${type}-bg`] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`; // Background with alpha
+    colors[
+      `--status-${type}-border`
+    ] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
+  });
+
+  return colors;
+}
+
+/**
+ * Generate toast notification colors from base status colors
+ * Creates darker/lighter variants for toast backgrounds, borders, and shadows
+ * @param {Object} status - Status colors { success, error, info, warning }
+ * @param {'dark'|'light'} mode - Theme mode
+ * @returns {Object} Toast color definitions
+ */
+export function generateToastColors(status, mode = "dark") {
+  const colors = {};
+
+  // Generate for each status type
+  Object.entries(status).forEach(([type, baseColor]) => {
+    // Toast backgrounds are slightly darker/more saturated versions
+    const toastBg = adjustLightness(baseColor, mode === "dark" ? -8 : -12);
+
+    // Borders are lighter versions
+    const toastBorder = adjustLightness(baseColor, mode === "dark" ? 10 : 8);
+
+    // Shadows use the background color with alpha
+    const bgRgb = hexToRgb(toastBg);
+
+    colors[`--toast-${type}-bg`] = toastBg;
+    colors[`--toast-${type}-border`] = toastBorder;
+    colors[
+      `--toast-${type}-shadow`
+    ] = `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
+  });
+
+  return colors;
 }

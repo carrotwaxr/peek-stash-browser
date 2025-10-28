@@ -66,7 +66,7 @@ export default function Button({
       case "tertiary":
         return "transparent";
       case "destructive":
-        return "var(--accent-error)";
+        return "var(--status-error)";
       default:
         return "var(--bg-secondary)";
     }
@@ -97,7 +97,7 @@ export default function Button({
       case "tertiary":
         return "transparent";
       case "destructive":
-        return "var(--accent-error)";
+        return "var(--status-error)";
       default:
         return "var(--border-color)";
     }

@@ -108,7 +108,7 @@ const OCounterButton = ({
             right: '-10px',
             fontSize: '12px',
             fontWeight: 'bold',
-            color: 'var(--accent-success)',
+            color: 'var(--status-success)',
             animation: 'fadeOut 1s ease-out',
           }}
         >
@@ -124,7 +124,7 @@ const OCounterButton = ({
             bottom: '-20px',
             left: '0',
             fontSize: '10px',
-            color: 'var(--accent-error)',
+            color: 'var(--status-error)',
             whiteSpace: 'nowrap',
           }}
         >

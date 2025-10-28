@@ -15,7 +15,12 @@ body {
 }
 
 /* Typography - Heading styles */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   font-weight: 600;
   line-height: 1.2;
@@ -27,7 +32,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Monospace text for technical content */
-code, pre, .font-mono {
+code,
+pre,
+.font-mono {
   font-family: var(--font-mono);
 }
 
@@ -97,38 +104,6 @@ code, pre, .font-mono {
   margin: 0;
 }
 
-/* Card components */
-.card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.card:hover {
-  background-color: var(--bg-hover);
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-focus);
-}
-
-.card-header {
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-secondary);
-}
-
-.card-body {
-  padding: 1rem;
-}
-
-.card-footer {
-  padding: 1rem;
-  border-top: 1px solid var(--border-color);
-  background-color: var(--bg-secondary);
-}
-
 /* Text utilities */
 .text-primary {
   color: var(--text-primary);
@@ -164,8 +139,7 @@ code, pre, .font-mono {
 }
 
 .btn:hover {
-  background-color: var(--bg-hover);
-  border-color: var(--border-focus);
+  opacity: 0.9;
 }
 
 .btn-primary {
@@ -197,7 +171,7 @@ code, pre, .font-mono {
 
 /* Video player specific styles */
 .video-container {
-  background-color: var(--player-bg);
+  background-color: #000000;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -212,15 +186,15 @@ code, pre, .font-mono {
 }
 
 .status-success {
-  background-color: var(--accent-success);
+  background-color: var(--status-success);
 }
 
 .status-warning {
-  background-color: var(--accent-warning);
+  background-color: var(--status-warning);
 }
 
 .status-error {
-  background-color: var(--accent-error);
+  background-color: var(--status-error);
 }
 
 /* Text truncation utilities (not provided by Tailwind by default) */

@@ -201,20 +201,31 @@ const StudioCard = forwardRef(
 
             {/* URL */}
             {studio.url && (
-              <p className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              <p
+                className="text-xs mb-2"
+                style={{ color: "var(--text-muted)" }}
+              >
                 {truncateText(studio.url, 40)}
               </p>
             )}
 
             {/* Scene Count */}
-            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-              {studio.scene_count || 0} scene{studio.scene_count !== 1 ? "s" : ""}
+            <div
+              className="text-xs mb-2"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {studio.scene_count || 0} scene
+              {studio.scene_count !== 1 ? "s" : ""}
             </div>
 
             {/* Status Icons */}
-            <div className="flex flex-wrap items-center gap-2 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+            <div
+              className="flex flex-wrap items-center gap-2 text-xs mb-2"
+              style={{ color: "var(--text-muted)" }}
+            >
               <span>
-                <span style={{ color: "var(--icon-play-count)" }}>▶</span> {studio.play_count || 0}
+                <span style={{ color: "var(--status-success)" }}>▶</span>{" "}
+                {studio.play_count || 0}
               </span>
               <OCounterButton
                 initialCount={studio.o_counter || 0}
@@ -224,7 +235,10 @@ const StudioCard = forwardRef(
             </div>
 
             {/* Rating and Favorite */}
-            <div className="flex items-center" onClick={(e) => e.preventDefault()}>
+            <div
+              className="flex items-center"
+              onClick={(e) => e.preventDefault()}
+            >
               <RatingControls
                 entityType="studio"
                 entityId={studio.id}

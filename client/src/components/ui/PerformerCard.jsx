@@ -70,13 +70,18 @@ const PerformerCard = forwardRef(
 
           {/* Scene Count */}
           <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-            {performer.scene_count || 0} scene{performer.scene_count !== 1 ? "s" : ""}
+            {performer.scene_count || 0} scene
+            {performer.scene_count !== 1 ? "s" : ""}
           </div>
 
           {/* Status Icons */}
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+          <div
+            className="flex flex-wrap items-center justify-center gap-2 text-xs mb-2"
+            style={{ color: "var(--text-muted)" }}
+          >
             <span>
-              <span style={{ color: "var(--icon-play-count)" }}>▶</span> {performer.play_count || 0}
+              <span style={{ color: "var(--status-success)" }}>▶</span>{" "}
+              {performer.play_count || 0}
             </span>
             <OCounterButton
               initialCount={performer.o_counter || 0}
@@ -86,7 +91,10 @@ const PerformerCard = forwardRef(
           </div>
 
           {/* Rating and Favorite */}
-          <div className="flex items-center justify-center" onClick={(e) => e.preventDefault()}>
+          <div
+            className="flex items-center justify-center"
+            onClick={(e) => e.preventDefault()}
+          >
             <RatingControls
               entityType="performer"
               entityId={performer.id}

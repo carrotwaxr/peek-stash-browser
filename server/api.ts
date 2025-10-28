@@ -41,6 +41,7 @@ import playlistRoutes from "./routes/playlist.js";
 import watchHistoryRoutes from "./routes/watchHistory.js";
 import ratingsRoutes from "./routes/ratings.js";
 import setupRoutes from "./routes/setup.js";
+import customThemeRoutes from "./routes/customTheme.js";
 import { authenticateToken, requireCacheReady } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
 
@@ -115,6 +116,9 @@ export const setupAPI = () => {
 
   // Rating and favorite routes (protected)
   app.use("/api/ratings", ratingsRoutes);
+
+  // Custom theme routes (protected)
+  app.use("/api/themes/custom", customThemeRoutes);
 
   // New filtered search endpoints (protected + require cache ready)
   app.post("/api/library/scenes", authenticateToken, requireCacheReady, findScenes);

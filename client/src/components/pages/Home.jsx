@@ -107,7 +107,7 @@ const Home = () => {
           className="mb-6 px-6 py-4 rounded-lg border-l-4"
           style={{
             backgroundColor: 'var(--status-info-bg)',
-            borderLeftColor: 'var(--accent-info)',
+            borderLeftColor: 'var(--status-info)',
             border: '1px solid var(--status-info-border)',
           }}
         >
