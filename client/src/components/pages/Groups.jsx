@@ -9,7 +9,6 @@ import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import EntityImage from "../ui/EntityImage.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
@@ -162,13 +161,15 @@ const Groups = () => {
 
 const GroupCard = forwardRef(
   ({ group, tabIndex, className = "", isTVMode = false, referrerUrl }, ref) => {
+    const imagePath = group.front_image_path || group.back_image_path;
+
     return (
       <Link
         ref={ref}
         state={{ referrerUrl }}
         to={`/group/${group.id}`}
         tabIndex={isTVMode ? tabIndex : -1}
-        className={`group-card block rounded-lg border p-6 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
+        className={`group-card block rounded-lg border overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
@@ -176,66 +177,67 @@ const GroupCard = forwardRef(
         role="button"
         aria-label={`Group: ${group.name}`}
       >
-        <div className="flex items-start space-x-4">
-          <EntityImage
-            imagePath={group.front_image_path || group.back_image_path}
-            name={group.name}
-            fallbackIcon="🎬"
-          />
+        {/* DVD Cover Image - Portrait Orientation */}
+        <div
+          className="w-full aspect-[2/3] overflow-hidden"
+          style={{ backgroundColor: "var(--bg-secondary)" }}
+        >
+          {imagePath ? (
+            <img
+              src={imagePath}
+              alt={group.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-6xl">
+              🎬
+            </div>
+          )}
+        </div>
 
-          <div className="flex-1 min-w-0">
-            {/* Name */}
-            <h3
-              className="font-semibold mb-2"
-              style={{ color: "var(--text-primary)" }}
-              title={group.name}
-            >
-              {truncateText(group.name, 30)}
-            </h3>
+        {/* Content Section */}
+        <div className="p-4">
+          {/* Name */}
+          <h3
+            className="font-semibold mb-2 line-clamp-2"
+            style={{ color: "var(--text-primary)" }}
+            title={group.name}
+          >
+            {group.name}
+          </h3>
 
-            {/* Studio and Date */}
-            {(group.studio || group.date) && (
-              <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-                {group.studio && <span>{group.studio.name}</span>}
-                {group.studio && group.date && <span> • </span>}
-                {group.date && <span>{group.date}</span>}
-              </div>
-            )}
+          {/* Studio and Date */}
+          {(group.studio || group.date) && (
+            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+              {group.studio && <span>{group.studio.name}</span>}
+              {group.studio && group.date && <span> • </span>}
+              {group.date && <span>{group.date}</span>}
+            </div>
+          )}
 
-            {/* Scene Count and Sub-Groups */}
-            <div className="text-xs mb-2 space-y-1">
+          {/* Scene Count and Sub-Groups */}
+          <div className="text-xs mb-2 space-y-1">
+            <div style={{ color: "var(--text-muted)" }}>
+              {group.scene_count > 0
+                ? `${group.scene_count} Scene${group.scene_count !== 1 ? "s" : ""}`
+                : "No scenes"}
+            </div>
+            {group.sub_group_count > 0 && (
               <div style={{ color: "var(--text-muted)" }}>
-                {group.scene_count > 0
-                  ? `${group.scene_count} Scene${group.scene_count !== 1 ? "s" : ""}`
-                  : "No scenes"}
+                {group.sub_group_count} Sub-group{group.sub_group_count !== 1 ? "s" : ""}
               </div>
-              {group.sub_group_count > 0 && (
-                <div style={{ color: "var(--text-muted)" }}>
-                  {group.sub_group_count} Sub-group{group.sub_group_count !== 1 ? "s" : ""}
-                </div>
-              )}
-            </div>
-
-            {/* Rating and Favorite */}
-            <div className="flex items-center mb-2" onClick={(e) => e.preventDefault()}>
-              <RatingControls
-                entityType="group"
-                entityId={group.id}
-                initialRating={group.rating}
-                initialFavorite={group.favorite || false}
-                size={16}
-              />
-            </div>
-
-            {/* Synopsis (optional) */}
-            {group.synopsis && (
-              <p
-                className="text-sm mt-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {truncateText(group.synopsis, 80)}
-              </p>
             )}
+          </div>
+
+          {/* Rating and Favorite */}
+          <div className="flex items-center" onClick={(e) => e.preventDefault()}>
+            <RatingControls
+              entityType="group"
+              entityId={group.id}
+              initialRating={group.rating}
+              initialFavorite={group.favorite || false}
+              size={16}
+            />
           </div>
         </div>
       </Link>
