@@ -53,15 +53,15 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Only autoplay when fully visible (100%) with extra clearance from viewport edges
-          // Negative rootMargin shrinks viewport by 10%, requiring card to be fully within that zone
-          const newIsInView = entry.isIntersecting && entry.intersectionRatio >= 1.0;
+          // Only autoplay when thumbnail is mostly visible (90%) with clearance from viewport edges
+          // The 5% rootMargin shrink ensures thumbnail isn't right at viewport edge
+          const newIsInView = entry.isIntersecting && entry.intersectionRatio >= 0.9;
           setIsInView(newIsInView);
         });
       },
       {
-        threshold: [0, 0.5, 1.0],
-        rootMargin: "-10%", // Shrink viewport by 10%, requiring 10% clearance from edges
+        threshold: [0, 0.5, 0.9, 1.0],
+        rootMargin: "-5%", // Shrink viewport by 5% for modest clearance
       }
     );
     observer.observe(containerElement);
