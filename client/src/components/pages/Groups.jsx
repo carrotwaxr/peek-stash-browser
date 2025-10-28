@@ -178,15 +178,12 @@ const GroupCard = forwardRef(
         aria-label={`Group: ${group.name}`}
       >
         {/* DVD Cover Image - Portrait Orientation */}
-        <div
-          className="w-full aspect-[2/3] p-3"
-          style={{ backgroundColor: "var(--bg-secondary)" }}
-        >
+        <div className="w-full aspect-[2/3] p-3">
           {imagePath ? (
             <img
               src={imagePath}
               alt={group.name}
-              className="w-full h-full object-contain rounded"
+              className="w-full h-full object-contain rounded-md"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-6xl">
