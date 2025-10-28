@@ -193,6 +193,7 @@
   position: relative !important;
   width: 156px !important; /* 48px button + 108px slider space */
   min-width: 156px !important;
+  overflow: visible !important;
 }
 
 .video-js .vjs-mute-control {
@@ -209,7 +210,7 @@
   left: 48px !important;
   width: 0 !important;
   opacity: 0 !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   transition: width 0.2s ease, opacity 0.2s ease !important;
 }
 
@@ -218,6 +219,7 @@
 .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control {
   width: 108px !important; /* 100px slider + 8px padding */
   opacity: 1 !important;
+  overflow: visible !important;
 }
 
 .video-js .vjs-volume-bar {
@@ -242,6 +244,17 @@
 .video-js .vjs-volume-level:before {
   font-size: 10px !important;
   top: -3px !important;
+}
+
+/* Volume tooltip */
+.video-js .vjs-volume-tooltip {
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  font-family: var(--font-body) !important;
+  font-weight: 500 !important;
+  background: rgba(28, 28, 28, 0.95) !important;
+  border-radius: 4px !important;
+  pointer-events: none !important;
 }
 
 /* ============================================================================
