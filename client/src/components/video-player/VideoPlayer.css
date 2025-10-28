@@ -134,8 +134,7 @@
 }
 
 /* Time tooltip (appears on hover over progress bar) */
-.video-js .vjs-mouse-display .vjs-time-tooltip,
-.video-js .vjs-play-progress .vjs-time-tooltip {
+.video-js .vjs-mouse-display .vjs-time-tooltip {
   font-size: 13px !important;
   padding: 6px 10px !important;
   line-height: 1.4 !important;
@@ -143,6 +142,11 @@
   font-weight: 500 !important;
   background: rgba(28, 28, 28, 0.95) !important;
   border-radius: 4px !important;
+}
+
+/* Hide tooltip on play progress (current position) - only show on hover */
+.video-js .vjs-play-progress .vjs-time-tooltip {
+  display: none !important;
 }
 
 /* ============================================================================
@@ -627,7 +631,7 @@
    ============================================================================ */
 
 .video-js .vjs-control:focus {
-  outline: 2px solid #3ea6ff !important;
+  outline: 2px solid var(--accent-primary) !important;
   outline-offset: 2px !important;
 }
 
@@ -636,5 +640,5 @@
 }
 
 .video-js .vjs-slider:focus {
-  box-shadow: 0 0 0 2px #3ea6ff !important;
+  box-shadow: 0 0 0 2px var(--accent-primary) !important;
 }
