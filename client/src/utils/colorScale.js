@@ -115,7 +115,6 @@ export function generateBackgroundScale(baseColor, mode = "dark") {
       "--bg-card": adjustLightness(baseColor, 6), // +6% lighter
       "--bg-tertiary": adjustLightness(baseColor, 12), // +12% lighter
       "--bg-hover": adjustLightness(baseColor, 14), // +14% lighter
-      "--bg-overlay": "rgba(0, 0, 0, 0.85)", // Fixed dark overlay
     };
   } else {
     // Light mode: start light, go darker
@@ -125,7 +124,6 @@ export function generateBackgroundScale(baseColor, mode = "dark") {
       "--bg-card": adjustLightness(baseColor, -6), // -4% darker
       "--bg-tertiary": adjustLightness(baseColor, -12), // -10% darker
       "--bg-hover": adjustLightness(baseColor, -14), // -12% darker
-      "--bg-overlay": "rgba(255, 255, 255, 0.9)", // Fixed light overlay
     };
   }
 }

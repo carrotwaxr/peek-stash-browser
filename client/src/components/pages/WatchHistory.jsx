@@ -319,8 +319,7 @@ const WatchHistory = () => {
       {/* Confirmation Dialog */}
       {showConfirmDialog && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ backgroundColor: "var(--bg-overlay)" }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
           onClick={() => setShowConfirmDialog(false)}
         >
           <div

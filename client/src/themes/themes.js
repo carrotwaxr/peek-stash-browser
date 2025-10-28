@@ -52,6 +52,7 @@ export const themes = {
         "--font-mono": config.fonts.mono,
 
         ...generateBackgroundScale(config.colors.background, config.mode),
+        /** Generates 2 steps of either light or darker text colors for secondary and muted text */
         ...generateTextScale(config.colors.text, config.mode),
 
         "--accent-primary": config.accents.primary,
