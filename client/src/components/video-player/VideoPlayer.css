@@ -130,8 +130,11 @@
 
 /* Ensure thumbnails show on touch/mobile interaction */
 .video-js .vjs-progress-control:active .vjs-vtt-thumbnail-display,
-.video-js .vjs-slider:active .vjs-vtt-thumbnail-display {
+.video-js .vjs-slider:active .vjs-vtt-thumbnail-display,
+.video-js.vjs-scrubbing .vjs-vtt-thumbnail-display,
+.video-js .vjs-mouse-display:hover .vjs-vtt-thumbnail-display {
   opacity: 1 !important;
+  transition: opacity 0s !important; /* Instant show, no fade delay */
 }
 
 /* Time tooltip (appears on hover over progress bar) */
@@ -488,7 +491,9 @@
 
 /* Hide big play button when video has started */
 .video-js.vjs-has-started .vjs-big-play-button,
-.video-js.vjs-playing .vjs-big-play-button {
+.video-js.vjs-playing .vjs-big-play-button,
+.video-js.vjs-seeking .vjs-big-play-button,
+.video-js.vjs-scrubbing .vjs-big-play-button {
   display: none !important;
 }
 
