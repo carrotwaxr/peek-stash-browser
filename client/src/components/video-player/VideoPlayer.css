@@ -225,8 +225,9 @@
 }
 
 /* Always show volume slider on touch devices (no hover) */
-@media (pointer: coarse) {
-  .video-js .vjs-volume-control {
+@media (hover: none) and (pointer: coarse) {
+  .video-js .vjs-volume-panel .vjs-volume-control,
+  .video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
     width: 108px !important;
     opacity: 1 !important;
   }
@@ -605,8 +606,9 @@
   }
 
   /* Touch devices on small screens - always show slider */
-  @media (pointer: coarse) {
-    .video-js .vjs-volume-control {
+  @media (hover: none) and (pointer: coarse) {
+    .video-js .vjs-volume-panel .vjs-volume-control,
+    .video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
       width: 84px !important;
     }
   }
