@@ -237,7 +237,7 @@ const Settings = () => {
               </button>
 
               {uiExamplesExpanded && (
-                <div className="space-y-8">
+                <div className="p-6 rounded-lg space-y-8" style={{ backgroundColor: "var(--bg-primary)" }}>
                   {/* Typography */}
                   <div>
                     <h4 className="text-sm font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Typography</h4>
@@ -333,7 +333,8 @@ const Settings = () => {
                         borderColor: "var(--border-color)",
                         color: "var(--text-primary)"
                       }}>
-                        Tertiary Background (--bg-tertiary)
+                        Tertiary Background (--bg-tertiary)<br/>
+                        <span className="text-xs opacity-70">Auto-generated for skeleton placeholders</span>
                       </div>
                       <div className="p-4 rounded-lg border" style={{
                         backgroundColor: "var(--bg-card)",
@@ -356,7 +357,7 @@ const Settings = () => {
                         Admin
                       </span>
                       <span className="px-3 py-1 rounded-full text-sm font-medium" style={{
-                        backgroundColor: "var(--bg-tertiary)",
+                        backgroundColor: "var(--bg-secondary)",
                         color: "var(--text-secondary)"
                       }}>
                         User

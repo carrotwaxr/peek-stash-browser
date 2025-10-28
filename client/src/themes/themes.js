@@ -1,12 +1,50 @@
 // Theme definitions for the media application
 import {
-  generateBackgroundScale,
+  adjustLightness,
   generateTextScale,
   generateShadows,
   generateFocusRing,
   generateStatusColors,
   generateToastColors,
 } from "../utils/colorScale.js";
+
+const generateThemeCSSVars = (config) => {
+  // Calculate tertiary as lighter/darker than card for skeleton placeholder contrast
+  const tertiaryAdjustment = config.mode === "dark" ? 6 : -6;
+  const bgTertiary = adjustLightness(
+    config.colors.backgroundCard,
+    tertiaryAdjustment
+  );
+
+  return {
+    "--font-brand": config.fonts.brand,
+    "--font-heading": config.fonts.heading,
+    "--font-body": config.fonts.body,
+    "--font-mono": config.fonts.mono,
+
+    /** Base background color, used for page background */
+    "--bg-primary": config.colors.background,
+    /** Secondary background color, used by Nav menu, buttons, form controls, and icon placeholders */
+    "--bg-secondary": config.colors.backgroundSecondary,
+    /** Card background color, used by Cards/Papers and Modals */
+    "--bg-card": config.colors.backgroundCard,
+    /** Tertiary background color, auto-generated for skeleton loading placeholders (needs contrast with card) */
+    "--bg-tertiary": bgTertiary,
+
+    /** Generates 2 steps of either light or darker text colors for secondary and muted text */
+    ...generateTextScale(config.colors.text, config.mode),
+
+    "--accent-primary": config.accents.primary,
+    "--accent-secondary": config.accents.secondary,
+
+    "--border-color": config.colors.border,
+    ...generateShadows(config.accents.primary, config.mode),
+    ...generateFocusRing(config.accents.primary),
+
+    ...generateStatusColors(config.status),
+    ...generateToastColors(config.status, config.mode),
+  };
+};
 
 export const themes = {
   peek: {
@@ -28,6 +66,8 @@ export const themes = {
 
         colors: {
           background: "#0a0a0b",
+          backgroundSecondary: "#1d1d20",
+          backgroundCard: "#19191b",
           text: "#ffffff",
           border: "#2a2a32",
         },
@@ -45,26 +85,7 @@ export const themes = {
         },
       };
 
-      return {
-        "--font-brand": config.fonts.brand,
-        "--font-heading": config.fonts.heading,
-        "--font-body": config.fonts.body,
-        "--font-mono": config.fonts.mono,
-
-        ...generateBackgroundScale(config.colors.background, config.mode),
-        /** Generates 2 steps of either light or darker text colors for secondary and muted text */
-        ...generateTextScale(config.colors.text, config.mode),
-
-        "--accent-primary": config.accents.primary,
-        "--accent-secondary": config.accents.secondary,
-
-        "--border-color": config.colors.border,
-        ...generateShadows(config.accents.primary, config.mode),
-        ...generateFocusRing(config.accents.primary),
-
-        ...generateStatusColors(config.status),
-        ...generateToastColors(config.status, config.mode),
-      };
+      return generateThemeCSSVars(config);
     })(),
   },
 
@@ -83,7 +104,9 @@ export const themes = {
 
         colors: {
           background: "#fcfaf9",
-          text: "#333333",
+          backgroundSecondary: "#CDB7F5",
+          backgroundCard: "#F2EDFD",
+          text: "#32385B",
           border: "#e5e7eb",
         },
 
@@ -100,25 +123,7 @@ export const themes = {
         },
       };
 
-      return {
-        "--font-brand": config.fonts.brand,
-        "--font-heading": config.fonts.heading,
-        "--font-body": config.fonts.body,
-        "--font-mono": config.fonts.mono,
-
-        ...generateBackgroundScale(config.colors.background, config.mode),
-        ...generateTextScale(config.colors.text, config.mode),
-
-        "--accent-primary": config.accents.primary,
-        "--accent-secondary": config.accents.secondary,
-
-        "--border-color": config.colors.border,
-        ...generateShadows(config.accents.primary, config.mode),
-        ...generateFocusRing(config.accents.primary),
-
-        ...generateStatusColors(config.status),
-        ...generateToastColors(config.status, config.mode),
-      };
+      return generateThemeCSSVars(config);
     })(),
   },
 
@@ -137,6 +142,8 @@ export const themes = {
 
         colors: {
           background: "#0c1427",
+          backgroundSecondary: "#162446",
+          backgroundCard: "#13203e",
           text: "#f1f5f9",
           border: "#475569",
         },
@@ -154,25 +161,7 @@ export const themes = {
         },
       };
 
-      return {
-        "--font-brand": config.fonts.brand,
-        "--font-heading": config.fonts.heading,
-        "--font-body": config.fonts.body,
-        "--font-mono": config.fonts.mono,
-
-        ...generateBackgroundScale(config.colors.background, config.mode),
-        ...generateTextScale(config.colors.text, config.mode),
-
-        "--accent-primary": config.accents.primary,
-        "--accent-secondary": config.accents.secondary,
-
-        "--border-color": config.colors.border,
-        ...generateShadows(config.accents.primary, config.mode),
-        ...generateFocusRing(config.accents.primary),
-
-        ...generateStatusColors(config.status),
-        ...generateToastColors(config.status, config.mode),
-      };
+      return generateThemeCSSVars(config);
     })(),
   },
 
@@ -191,42 +180,26 @@ export const themes = {
 
         colors: {
           background: "#230C33",
-          text: "#EBEDE3",
-          border: "#381353",
+          backgroundSecondary: "#3a1454",
+          backgroundCard: "#34124c",
+          text: "#fbf7ff",
+          border: "#672395",
         },
 
         accents: {
-          primary: "#5C538B",
-          secondary: "#9984D4",
+          primary: "#2E86AB",
+          secondary: "#FFBC42",
         },
 
         status: {
           success: "#4ade80",
           error: "#f87171",
           info: "#a78bfa",
-          warning: "#fbbf24",
+          warning: "#FA8023",
         },
       };
 
-      return {
-        "--font-brand": config.fonts.brand,
-        "--font-heading": config.fonts.heading,
-        "--font-body": config.fonts.body,
-        "--font-mono": config.fonts.mono,
-
-        ...generateBackgroundScale(config.colors.background, config.mode),
-        ...generateTextScale(config.colors.text, config.mode),
-
-        "--accent-primary": config.accents.primary,
-        "--accent-secondary": config.accents.secondary,
-
-        "--border-color": config.colors.border,
-        ...generateShadows(config.colors.background, config.mode),
-        ...generateFocusRing(config.colors.background),
-
-        ...generateStatusColors(config.status),
-        ...generateToastColors(config.status, config.mode),
-      };
+      return generateThemeCSSVars(config);
     })(),
   },
 
@@ -245,6 +218,8 @@ export const themes = {
 
         colors: {
           background: "#000000",
+          backgroundSecondary: "#141414",
+          backgroundCard: "#0f0f0f",
           text: "#ffffff",
           border: "#3D3D3D",
         },
@@ -262,25 +237,7 @@ export const themes = {
         },
       };
 
-      return {
-        "--font-brand": config.fonts.brand,
-        "--font-heading": config.fonts.heading,
-        "--font-body": config.fonts.body,
-        "--font-mono": config.fonts.mono,
-
-        ...generateBackgroundScale(config.colors.background, config.mode),
-        ...generateTextScale(config.colors.text, config.mode),
-
-        "--accent-primary": config.accents.primary,
-        "--accent-secondary": config.accents.secondary,
-
-        "--border-color": config.colors.border,
-        ...generateShadows(config.accents.primary, config.mode),
-        ...generateFocusRing(config.accents.primary),
-
-        ...generateStatusColors(config.status),
-        ...generateToastColors(config.status, config.mode),
-      };
+      return generateThemeCSSVars(config);
     })(),
   },
 };

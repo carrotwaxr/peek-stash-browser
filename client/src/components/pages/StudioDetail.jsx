@@ -72,7 +72,10 @@ const StudioDetail = () => {
 
             {/* Aliases */}
             {studio?.aliases && studio.aliases.length > 0 && (
-              <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
+              <p
+                className="text-xl mb-3"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Also known as: {studio.aliases.join(", ")}
               </p>
             )}
@@ -105,7 +108,10 @@ const StudioDetail = () => {
         <div className="mt-8">
           <SceneSearch
             permanentFilters={{
-              studios: { value: [parseInt(studioId, 10)], modifier: "INCLUDES" },
+              studios: {
+                value: [parseInt(studioId, 10)],
+                modifier: "INCLUDES",
+              },
             }}
             permanentFiltersMetadata={{
               studios: [
@@ -325,7 +331,6 @@ const StudioDetails = ({ studio }) => {
                 to={`/studio/${child.id}`}
                 className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
                 style={{
-                  backgroundColor: "var(--bg-hover)",
                   color: "var(--text-primary)",
                 }}
               >

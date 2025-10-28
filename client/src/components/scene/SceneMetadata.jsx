@@ -56,7 +56,7 @@ const SceneMetadata = ({ scene, className = "" }) => {
             ) : (
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: "var(--bg-tertiary)" }}
+                style={{ backgroundColor: "var(--bg-secondary)" }}
               >
                 <span className="text-lg">👤</span>
               </div>
@@ -94,7 +94,7 @@ const SceneMetadata = ({ scene, className = "" }) => {
             ) : (
               <div
                 className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: "var(--bg-tertiary)" }}
+                style={{ backgroundColor: "var(--bg-secondary)" }}
               >
                 <span className="text-lg">🏷️</span>
               </div>
@@ -132,7 +132,7 @@ const SceneMetadata = ({ scene, className = "" }) => {
             ) : (
               <div
                 className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: "var(--bg-tertiary)" }}
+                style={{ backgroundColor: "var(--bg-secondary)" }}
               >
                 <span className="text-lg">🎬</span>
               </div>

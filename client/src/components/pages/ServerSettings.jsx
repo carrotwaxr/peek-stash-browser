@@ -576,7 +576,7 @@ const ServerSettings = () => {
                               backgroundColor:
                                 user.role === "ADMIN"
                                   ? "var(--accent-primary)"
-                                  : "var(--bg-tertiary)",
+                                  : "var(--bg-secondary)",
                               color:
                                 user.role === "ADMIN"
                                   ? "white"

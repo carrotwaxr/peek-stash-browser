@@ -94,38 +94,10 @@ function hslToHex(h, s, l) {
  * @param {number} amount - Amount to adjust (-100 to +100)
  * @returns {string} Adjusted hex color
  */
-function adjustLightness(hex, amount) {
+export function adjustLightness(hex, amount) {
   const [h, s, l] = hexToHSL(hex);
   const newL = Math.max(0, Math.min(100, l + amount));
   return hslToHex(h, s, newL);
-}
-
-/**
- * Generate background color scale for themes
- * @param {string} baseColor - Base background color (hex)
- * @param {'dark'|'light'} mode - Theme mode
- * @returns {Object} Background color scale
- */
-export function generateBackgroundScale(baseColor, mode = "dark") {
-  if (mode === "dark") {
-    // Dark mode: start dark, go lighter
-    return {
-      "--bg-primary": baseColor, // Darkest
-      "--bg-secondary": adjustLightness(baseColor, 8), // +8% lighter
-      "--bg-card": adjustLightness(baseColor, 6), // +6% lighter
-      "--bg-tertiary": adjustLightness(baseColor, 12), // +12% lighter
-      "--bg-hover": adjustLightness(baseColor, 14), // +14% lighter
-    };
-  } else {
-    // Light mode: start light, go darker
-    return {
-      "--bg-primary": baseColor, // Lightest
-      "--bg-secondary": adjustLightness(baseColor, -8), // -6% darker
-      "--bg-card": adjustLightness(baseColor, -6), // -4% darker
-      "--bg-tertiary": adjustLightness(baseColor, -12), // -10% darker
-      "--bg-hover": adjustLightness(baseColor, -14), // -12% darker
-    };
-  }
 }
 
 /**
@@ -238,7 +210,9 @@ export function generateStatusColors(status) {
 
     colors[`--status-${type}`] = baseColor; // Base color
     colors[`--status-${type}-bg`] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`; // Background with alpha
-    colors[`--status-${type}-border`] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
+    colors[
+      `--status-${type}-border`
+    ] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
   });
 
   return colors;
@@ -267,7 +241,9 @@ export function generateToastColors(status, mode = "dark") {
 
     colors[`--toast-${type}-bg`] = toastBg;
     colors[`--toast-${type}-border`] = toastBorder;
-    colors[`--toast-${type}-shadow`] = `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
+    colors[
+      `--toast-${type}-shadow`
+    ] = `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
   });
 
   return colors;
