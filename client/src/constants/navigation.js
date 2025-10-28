@@ -78,20 +78,32 @@ export const migrateNavPreferences = (savedPreferences) => {
     }));
   }
 
-  // Add any new nav items that don't exist in saved preferences
+  // Find any new nav items that don't exist in saved preferences
   const existingIds = new Set(prefs.map((p) => p.id));
   const missingNavItems = NAV_DEFINITIONS.filter(
     (def) => !existingIds.has(def.key)
   );
 
-  missingNavItems.forEach((def) => {
-    const newPref = {
-      id: def.key,
-      enabled: true,
-      order: prefs.length, // Add to end
-    };
-    prefs.push(newPref);
-  });
+  // Insert new nav items at their proper position from NAV_DEFINITIONS
+  if (missingNavItems.length > 0) {
+    // Create a map of existing prefs for quick lookup
+    const prefsMap = new Map(prefs.map(p => [p.id, p]));
+
+    // Rebuild prefs array in NAV_DEFINITIONS order
+    prefs = NAV_DEFINITIONS.map((def, definitionIndex) => {
+      if (prefsMap.has(def.key)) {
+        // Keep existing preference
+        return prefsMap.get(def.key);
+      } else {
+        // Add new item at its proper position, enabled by default
+        return {
+          id: def.key,
+          enabled: true,
+          order: definitionIndex,
+        };
+      }
+    });
+  }
 
   // Re-normalize order values (ensure sequential 0, 1, 2, ...)
   prefs.sort((a, b) => a.order - b.order);
