@@ -1,7 +1,7 @@
 import getStash from '../stash.js';
 import { logger } from '../utils/logger.js';
-import { transformScene, transformPerformer, transformStudio, transformTag, transformGallery } from '../utils/pathMapping.js';
-import type { Scene, Performer, Studio, Tag, Gallery } from 'stashapp-api';
+import { transformScene, transformPerformer, transformStudio, transformTag, transformGallery, transformGroup } from '../utils/pathMapping.js';
+import type { Scene, Performer, Studio, Tag, Gallery, Group } from 'stashapp-api';
 
 /**
  * Normalized scene with default per-user fields
@@ -62,6 +62,14 @@ export type NormalizedGallery = Gallery & {
 }
 
 /**
+ * Normalized group with default per-user fields
+ */
+export type NormalizedGroup = Group & {
+  rating: number | null;
+  favorite: boolean;
+}
+
+/**
  * Server-wide cache state
  */
 interface CacheState {
@@ -70,6 +78,7 @@ interface CacheState {
   studios: Map<string, NormalizedStudio>;
   tags: Map<string, NormalizedTag>;
   galleries: Map<string, NormalizedGallery>;
+  groups: Map<string, NormalizedGroup>;
   lastRefreshed: Date | null;
   isInitialized: boolean;
   isRefreshing: boolean;
@@ -88,6 +97,7 @@ class StashCacheManager {
     studios: new Map(),
     tags: new Map(),
     galleries: new Map(),
+    groups: new Map(),
     lastRefreshed: null,
     isInitialized: false,
     isRefreshing: false,
@@ -136,12 +146,13 @@ class StashCacheManager {
 
       // Fetch all entities in parallel
       // Use compact query for scenes to reduce bandwidth (trimmed nested objects)
-      const [scenesResult, performersResult, studiosResult, tagsResult, galleriesResult] = await Promise.all([
+      const [scenesResult, performersResult, studiosResult, tagsResult, galleriesResult, groupsResult] = await Promise.all([
         stash.findScenesCompact({ filter: { per_page: -1 } }),
         stash.findPerformers({ filter: { per_page: -1 } }),
         stash.findStudios({ filter: { per_page: -1 } }),
         stash.findTags({ filter: { per_page: -1 } }),
         stash.findGalleries({ filter: { per_page: -1 } }),
+        stash.findGroups({ filter: { per_page: -1 } }),
       ]);
 
       // Create new Maps (double-buffering for atomic swap)
@@ -150,6 +161,7 @@ class StashCacheManager {
       const newStudios = new Map<string, NormalizedStudio>();
       const newTags = new Map<string, NormalizedTag>();
       const newGalleries = new Map<string, NormalizedGallery>();
+      const newGroups = new Map<string, NormalizedGroup>();
 
       // Normalize scenes with default per-user fields AND transform URLs to use Peek proxy
       scenesResult.findScenes.scenes.forEach((scene: Scene) => {
@@ -218,12 +230,23 @@ class StashCacheManager {
         });
       });
 
+      // Normalize groups with default per-user fields AND transform image URLs
+      groupsResult.findGroups.groups.forEach((group: Group) => {
+        const transformed = transformGroup(group);
+        newGroups.set(group.id, {
+          ...transformed,
+          rating: null,
+          favorite: false,
+        });
+      });
+
       // Atomic swap
       this.cache.scenes = newScenes;
       this.cache.performers = newPerformers;
       this.cache.studios = newStudios;
       this.cache.tags = newTags;
       this.cache.galleries = newGalleries;
+      this.cache.groups = newGroups;
       this.cache.lastRefreshed = new Date();
 
       const duration = Date.now() - startTime;
@@ -235,6 +258,7 @@ class StashCacheManager {
           studios: newStudios.size,
           tags: newTags.size,
           galleries: newGalleries.size,
+          groups: newGroups.size,
         },
       });
     } catch (error) {
@@ -313,6 +337,20 @@ class StashCacheManager {
    */
   getGallery(id: string): NormalizedGallery | undefined {
     return this.cache.galleries.get(id);
+  }
+
+  /**
+   * Get all groups as array
+   */
+  getAllGroups(): NormalizedGroup[] {
+    return Array.from(this.cache.groups.values());
+  }
+
+  /**
+   * Get group by ID
+   */
+  getGroup(id: string): NormalizedGroup | undefined {
+    return this.cache.groups.get(id);
   }
 
   /**

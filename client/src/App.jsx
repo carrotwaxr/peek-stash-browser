@@ -22,8 +22,10 @@ const Recommended = lazy(() => import("./components/pages/Recommended.jsx"));
 const Performers = lazy(() => import("./components/pages/Performers.jsx"));
 const Studios = lazy(() => import("./components/pages/Studios.jsx"));
 const Tags = lazy(() => import("./components/pages/Tags.jsx"));
+const Groups = lazy(() => import("./components/pages/Groups.jsx"));
 const Galleries = lazy(() => import("./components/pages/Galleries.jsx"));
 const GalleryDetail = lazy(() => import("./components/pages/GalleryDetail.jsx"));
+const GroupDetail = lazy(() => import("./components/pages/GroupDetail.jsx"));
 const Scene = lazy(() => import("./components/pages/Scene.jsx"));
 const PerformerDetail = lazy(() => import("./components/pages/PerformerDetail.jsx"));
 const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
@@ -140,6 +142,14 @@ const AppContent = () => {
             }
           />
           <Route
+            path="/groups"
+            element={
+              <GlobalLayout>
+                <Groups />
+              </GlobalLayout>
+            }
+          />
+          <Route
             path="/galleries"
             element={
               <GlobalLayout>
@@ -176,6 +186,14 @@ const AppContent = () => {
             element={
               <GlobalLayout>
                 <TagDetail />
+              </GlobalLayout>
+            }
+          />
+          <Route
+            path="/group/:groupId"
+            element={
+              <GlobalLayout>
+                <GroupDetail />
               </GlobalLayout>
             }
           />

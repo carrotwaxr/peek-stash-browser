@@ -111,6 +111,44 @@ const SceneMetadata = ({ scene, className = "" }) => {
     </div>
   );
 
+  // Groups tooltip content with images in a grid
+  const groupsContent = scene.groups && scene.groups.length > 0 && (
+    <div>
+      <div className="font-semibold mb-3 text-base">Groups</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
+        {scene.groups.slice(0, 8).map((group) => (
+          <Link
+            key={group.id}
+            to={`/group/${group.id}`}
+            className="flex items-center gap-2 p-2 rounded hover:bg-white/10 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {group.front_image_path || group.back_image_path ? (
+              <img
+                src={group.front_image_path || group.back_image_path}
+                alt={group.name}
+                className="w-10 h-10 rounded object-cover flex-shrink-0"
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: "var(--bg-tertiary)" }}
+              >
+                <span className="text-lg">🎬</span>
+              </div>
+            )}
+            <span className="text-sm truncate flex-1">{group.name}</span>
+          </Link>
+        ))}
+      </div>
+      {scene.groups.length > 8 && (
+        <div className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
+          +{scene.groups.length - 8} more
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div
       className={`flex items-center justify-center gap-3 md:gap-4 ${className}`}
@@ -121,6 +159,15 @@ const SceneMetadata = ({ scene, className = "" }) => {
             count={scene.performers.length}
             icon="👥"
             type="performer"
+          />
+        </Tooltip>
+      )}
+      {scene.groups && scene.groups.length > 0 && (
+        <Tooltip content={groupsContent} clickable={true} position="bottom">
+          <SceneMetadataEntityInfoChip
+            count={scene.groups.length}
+            icon="🎬"
+            type="group"
           />
         </Tooltip>
       )}
@@ -141,6 +188,8 @@ const SceneMetadataEntityInfoChip = ({ count, icon, type }) => {
   const color =
     type === "performer"
       ? "var(--status-info-text)"
+      : type === "group"
+      ? "var(--accent-info)"
       : "var(--accent-secondary)";
   const fadedColor = `color-mix(in srgb, ${color} 70%, transparent)`;
   return (

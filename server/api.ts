@@ -19,11 +19,13 @@ import {
   findPerformers,
   findStudios,
   findTags,
+  findGroups,
   findGalleries,
   findGalleryById,
   findPerformersMinimal,
   findStudiosMinimal,
   findTagsMinimal,
+  findGroupsMinimal,
   updateScene,
   updatePerformer,
   updateStudio,
@@ -120,6 +122,7 @@ export const setupAPI = () => {
   app.post("/api/library/performers", authenticateToken, requireCacheReady, findPerformers);
   app.post("/api/library/studios", authenticateToken, requireCacheReady, findStudios);
   app.post("/api/library/tags", authenticateToken, requireCacheReady, findTags);
+  app.post("/api/library/groups", authenticateToken, requireCacheReady, findGroups);
   app.post("/api/library/galleries", authenticateToken, requireCacheReady, findGalleries);
   app.get("/api/library/galleries/:id", authenticateToken, requireCacheReady, findGalleryById);
   app.get("/api/library/galleries/:galleryId/images", authenticateToken, requireCacheReady, getGalleryImages);
@@ -128,6 +131,7 @@ export const setupAPI = () => {
   app.post("/api/library/performers/minimal", authenticateToken, requireCacheReady, findPerformersMinimal);
   app.post("/api/library/studios/minimal", authenticateToken, requireCacheReady, findStudiosMinimal);
   app.post("/api/library/tags/minimal", authenticateToken, requireCacheReady, findTagsMinimal);
+  app.post("/api/library/groups/minimal", authenticateToken, requireCacheReady, findGroupsMinimal);
 
   // Update endpoints for CRUD operations
   app.put("/api/library/scenes/:id", authenticateToken, updateScene);

@@ -362,6 +362,19 @@ export const transformScene = (scene: any) => {
       mutated.studio = transformStudio(scene.studio);
     }
 
+    // Transform groups - flatten nested structure and add API keys to images
+    if (scene.groups && Array.isArray(scene.groups)) {
+      mutated.groups = scene.groups.map((g: any) => {
+        // Stash returns groups as: { group: { id, name, ... }, scene_index: 2 }
+        // We need to flatten and transform, preserving scene_index
+        const group = g.group || g;
+        return {
+          ...transformGroup(group),
+          scene_index: g.scene_index, // Preserve scene_index from SceneGroup
+        };
+      });
+    }
+
     return mutated;
   } catch (error) {
     logger.error("Error transforming scene", { error });
@@ -401,5 +414,36 @@ export const transformGallery = (gallery: any) => {
   } catch (error) {
     logger.error("Error transforming gallery", { error });
     return gallery; // Return original gallery if transformation fails
+  }
+};
+
+export const transformGroup = (group: any) => {
+  try {
+    const mutated: Record<string, any> = {
+      ...group,
+    };
+
+    // Transform front and back image paths
+    if (group.front_image_path) {
+      mutated.front_image_path = appendApiKeyToUrl(group.front_image_path);
+    }
+    if (group.back_image_path) {
+      mutated.back_image_path = appendApiKeyToUrl(group.back_image_path);
+    }
+
+    // Transform studio to add API key to image_path
+    if (group.studio) {
+      mutated.studio = transformStudio(group.studio);
+    }
+
+    // Transform tags to add API key to image_path
+    if (group.tags && Array.isArray(group.tags)) {
+      mutated.tags = group.tags.map((t: any) => transformTag(t));
+    }
+
+    return mutated;
+  } catch (error) {
+    logger.error("Error transforming group", { error });
+    return group; // Return original group if transformation fails
   }
 };

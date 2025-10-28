@@ -323,3 +323,62 @@ export async function updateGalleryRating(req: AuthenticatedRequest, res: Respon
     res.status(500).json({ error: 'Failed to update gallery rating' });
   }
 }
+
+/**
+ * Update rating and/or favorite for a group
+ * PEEK-ONLY: Does not sync to Stash
+ */
+export async function updateGroupRating(req: AuthenticatedRequest, res: Response) {
+  try {
+    const userId = req.user?.id;
+    const { groupId } = req.params;
+    const { rating, favorite } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!groupId) {
+      return res.status(400).json({ error: 'Missing groupId' });
+    }
+
+    // Validate rating if provided
+    if (rating !== undefined && rating !== null) {
+      if (typeof rating !== 'number' || rating < 0 || rating > 100) {
+        return res.status(400).json({ error: 'Rating must be a number between 0 and 100' });
+      }
+    }
+
+    // Validate favorite if provided
+    if (favorite !== undefined && typeof favorite !== 'boolean') {
+      return res.status(400).json({ error: 'Favorite must be a boolean' });
+    }
+
+    // Upsert rating record
+    const groupRating = await prisma.groupRating.upsert({
+      where: {
+        userId_groupId: { userId, groupId },
+      },
+      update: {
+        ...(rating !== undefined && { rating }),
+        ...(favorite !== undefined && { favorite }),
+      },
+      create: {
+        userId,
+        groupId,
+        rating: rating ?? null,
+        favorite: favorite ?? false,
+      },
+    });
+
+    logger.info('Group rating updated', { userId, groupId, rating, favorite });
+
+    res.json({
+      success: true,
+      rating: groupRating,
+    });
+  } catch (error) {
+    logger.error('Error updating group rating', { error });
+    res.status(500).json({ error: 'Failed to update group rating' });
+  }
+}
