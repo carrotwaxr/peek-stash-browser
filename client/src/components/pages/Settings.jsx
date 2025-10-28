@@ -176,8 +176,8 @@ const Settings = () => {
         .scene-card-demo:hover {
           transform: scale(1.03);
           z-index: 10;
-          box-shadow: var(--shadow-lg), 0 0 0 3px color-mix(in srgb, var(--focus-ring-color) 60%, transparent);
-          border-color: var(--border-focus);
+          outline: 2px solid var(--selection-color);
+          outline-offset: 2px;
         }
       `}</style>
       <div className="max-w-3xl mx-auto">
