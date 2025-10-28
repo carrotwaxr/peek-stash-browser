@@ -790,6 +790,12 @@ export const findPerformers = async (req: Request, res: Response) => {
     const mergedFilter = { ...performer_filter, ids: ids || performer_filter?.ids };
     performers = applyPerformerFilters(performers, mergedFilter);
 
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      performers = await userRestrictionService.filterPerformersForUser(performers, userId);
+    }
+
     // Step 5: Sort
     performers = sortPerformers(performers, sortField, sortDirection);
 
@@ -1124,6 +1130,12 @@ export const findStudios = async (req: Request, res: Response) => {
     const mergedFilter = { ...studio_filter, ids: ids || studio_filter?.ids };
     studios = applyStudioFilters(studios, mergedFilter);
 
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      studios = await userRestrictionService.filterStudiosForUser(studios, userId);
+    }
+
     // Step 5: Sort
     studios = sortStudios(studios, sortField, sortDirection);
 
@@ -1445,6 +1457,12 @@ export const findTags = async (req: Request, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with tag_filter)
     const mergedFilter = { ...tag_filter, ids: ids || tag_filter?.ids };
     tags = applyTagFilters(tags, mergedFilter);
+
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      tags = await userRestrictionService.filterTagsForUser(tags, userId);
+    }
 
     // Step 5: Sort
     tags = sortTags(tags, sortField, sortDirection);
@@ -2462,6 +2480,12 @@ export const findGalleries = async (req: Request, res: Response) => {
     const mergedFilter = { ...gallery_filter, ids: ids || gallery_filter?.ids };
     galleries = applyGalleryFilters(galleries, mergedFilter);
 
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      galleries = await userRestrictionService.filterGalleriesForUser(galleries, userId);
+    }
+
     // Step 5: Sort
     galleries = sortGalleries(galleries, sortField, sortDirection);
 
@@ -2788,6 +2812,12 @@ export const findGroups = async (req: Request, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with group_filter)
     const mergedFilter = { ...group_filter, ids: ids || group_filter?.ids };
     groups = applyGroupFilters(groups, mergedFilter);
+
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      groups = await userRestrictionService.filterGroupsForUser(groups, userId);
+    }
 
     // Step 5: Sort
     groups = sortGroups(groups, sortField, sortDirection);
