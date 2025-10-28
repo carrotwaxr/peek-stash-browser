@@ -224,12 +224,10 @@
   overflow: visible !important;
 }
 
-/* Always show volume slider on touch devices (no hover) */
+/* Hide volume controls on touch devices (use device volume buttons) */
 @media (hover: none) and (pointer: coarse) {
-  .video-js .vjs-volume-panel .vjs-volume-control,
-  .video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
-    width: 108px !important;
-    opacity: 1 !important;
+  .video-js .vjs-volume-panel {
+    display: none !important;
   }
 }
 
@@ -578,39 +576,9 @@
     font-size: 40px !important;
   }
 
-  /* Volume panel - narrower on small screens */
-  .video-js .vjs-volume-panel {
-    width: 120px !important;
-    min-width: 120px !important;
-    height: 36px !important;
-  }
-
-  .video-js .vjs-mute-control {
-    width: 36px !important;
-    height: 36px !important;
-  }
-
-  /* Smaller volume slider on small screens */
-  .video-js .vjs-volume-panel:hover .vjs-volume-control,
-  .video-js .vjs-volume-panel:focus-within .vjs-volume-control,
-  .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control {
-    width: 84px !important;
-  }
-
-  .video-js .vjs-volume-bar {
-    width: 76px !important;
-  }
-
-  .video-js .vjs-volume-control .vjs-volume-horizontal {
-    width: 76px !important;
-  }
-
-  /* Touch devices on small screens - always show slider */
-  @media (hover: none) and (pointer: coarse) {
-    .video-js .vjs-volume-panel .vjs-volume-control,
-    .video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control {
-      width: 84px !important;
-    }
+  /* Hide playback speed on mobile - not enough room */
+  .video-js .vjs-playback-rate {
+    display: none !important;
   }
 
   /* Time display - smaller font */
