@@ -163,43 +163,44 @@
   height: 48px !important;
   margin: 0 !important;
   order: 3 !important;
-  width: 48px !important;
-  overflow: visible !important;
-  transition: width 0.2s ease !important;
-}
-
-.video-js .vjs-volume-panel:hover,
-.video-js .vjs-volume-panel:focus-within,
-.video-js .vjs-volume-panel.vjs-hover {
-  width: 156px !important; /* 48px button + 8px margin + 100px slider */
+  position: relative !important;
 }
 
 .video-js .vjs-mute-control {
   margin: 0 !important;
-  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 2 !important;
 }
 
+/* Horizontal volume slider - often has class vjs-volume-panel-horizontal */
+.video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control,
 .video-js .vjs-volume-control {
-  position: static !important;
+  position: absolute !important;
+  left: 48px !important;
   width: 0 !important;
   opacity: 0 !important;
-  margin: 0 !important;
-  transition: width 0.2s ease, opacity 0.2s ease, margin 0.2s ease !important;
+  overflow: hidden !important;
+  transition: width 0.2s ease, opacity 0.2s ease !important;
 }
 
 .video-js .vjs-volume-panel:hover .vjs-volume-control,
 .video-js .vjs-volume-panel:focus-within .vjs-volume-control,
 .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control {
-  width: 100px !important;
+  width: 108px !important; /* 100px slider + 8px padding */
   opacity: 1 !important;
-  margin-left: 8px !important;
 }
 
 .video-js .vjs-volume-bar {
   background: rgba(255, 255, 255, 0.2) !important;
   height: 4px !important;
   border-radius: 2px !important;
-  margin: 0 8px !important;
+  margin: 0 !important;
+  width: 100px !important;
+}
+
+.video-js .vjs-volume-control .vjs-volume-horizontal {
+  width: 100px !important;
+  padding: 0 8px !important;
 }
 
 .video-js .vjs-volume-level {
