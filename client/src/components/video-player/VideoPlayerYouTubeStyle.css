@@ -164,6 +164,8 @@
   margin: 0 !important;
   order: 3 !important;
   position: relative !important;
+  width: 156px !important; /* 48px button + 108px slider space */
+  min-width: 156px !important;
 }
 
 .video-js .vjs-mute-control {
