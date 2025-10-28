@@ -20,10 +20,11 @@
     rgba(0, 0, 0, 0.6) 50%,
     rgba(0, 0, 0, 0) 100%
   ) !important;
-  height: 48px !important;
+  height: 52px !important;
   padding: 0 12px !important;
   display: flex !important;
   align-items: center !important;
+  gap: 8px !important;
 }
 
 /* Hide control bar when user is inactive (YouTube behavior) */
@@ -48,18 +49,20 @@
    ============================================================================ */
 
 .video-js .vjs-progress-control {
-  position: absolute !important;
-  top: -6px !important;
-  left: 0 !important;
-  right: 0 !important;
-  width: 100% !important;
+  position: relative !important;
+  flex: 1 !important;
   height: 6px !important;
   pointer-events: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  order: 8 !important;
 }
 
 .video-js .vjs-progress-holder {
   height: 6px !important;
   margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
   font-size: inherit !important;
 }
 
@@ -118,32 +121,52 @@
 }
 
 /* ============================================================================
-   CONTROL BUTTONS - Larger, better spaced
+   CONTROL BUTTONS - Consistent sizing and alignment
    ============================================================================ */
 
 .video-js .vjs-control {
-  width: 42px !important;
-  height: 42px !important;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  padding: 0 !important;
 }
 
 /* Button icons */
 .video-js .vjs-icon-placeholder {
-  font-size: 24px !important;
-  line-height: 42px !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Button icons - specific sizing */
+.video-js .vjs-icon-placeholder:before {
+  line-height: 1 !important;
 }
 
 /* Play/Pause button */
 .video-js .vjs-play-control {
-  margin-right: 4px !important;
+  margin: 0 !important;
+  order: 1 !important;
 }
 
 /* Volume control */
 .video-js .vjs-volume-panel {
   display: flex !important;
   align-items: center !important;
+  height: 48px !important;
+  margin: 0 !important;
+  order: 3 !important;
+}
+
+.video-js .vjs-mute-control {
+  margin: 0 !important;
 }
 
 .video-js .vjs-volume-control {
@@ -182,22 +205,39 @@
 
 .video-js .vjs-time-control {
   min-width: auto !important;
-  padding: 0 6px !important;
+  height: 48px !important;
+  padding: 0 8px !important;
+  margin: 0 !important;
   font-size: 13px !important;
   font-weight: 500 !important;
-  line-height: 42px !important;
+  line-height: 48px !important;
   font-family: 'Roboto', 'YouTube Sans', sans-serif !important;
+  display: flex !important;
+  align-items: center !important;
 }
 
-.video-js .vjs-current-time,
-.video-js .vjs-duration {
-  display: block !important;
+.video-js .vjs-current-time {
+  display: flex !important;
+  align-items: center !important;
+  height: 48px !important;
+  order: 4 !important;
 }
 
 .video-js .vjs-time-divider {
   min-width: auto !important;
-  padding: 0 2px !important;
-  line-height: 42px !important;
+  padding: 0 4px !important;
+  height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+  line-height: 1 !important;
+  order: 5 !important;
+}
+
+.video-js .vjs-duration {
+  display: flex !important;
+  align-items: center !important;
+  height: 48px !important;
+  order: 6 !important;
 }
 
 /* ============================================================================
@@ -207,6 +247,8 @@
 .video-js .vjs-quality-selector {
   font-size: 13px !important;
   font-weight: 500 !important;
+  margin: 0 !important;
+  order: 7 !important;
 }
 
 .video-js .vjs-quality-selector .vjs-menu {
@@ -247,11 +289,19 @@
 }
 
 /* ============================================================================
-   FULLSCREEN BUTTON - Right aligned
+   RIGHT-ALIGNED CONTROLS - Playback speed and fullscreen
    ============================================================================ */
 
+/* Playback speed comes after progress bar */
+.video-js .vjs-playback-rate {
+  margin: 0 !important;
+  order: 9 !important;
+}
+
+/* Fullscreen at the far right */
 .video-js .vjs-fullscreen-control {
-  margin-left: auto !important;
+  margin: 0 !important;
+  order: 10 !important;
 }
 
 /* ============================================================================
@@ -299,17 +349,26 @@
    PLAYLIST NAVIGATION BUTTONS - Custom styling
    ============================================================================ */
 
-.video-js .vjs-playlist-prev,
+.video-js .vjs-playlist-prev {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  margin: 0 !important;
+  order: 0 !important;
+}
+
 .video-js .vjs-playlist-next {
-  width: 42px !important;
-  height: 42px !important;
-  font-size: 24px !important;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  margin: 0 !important;
+  order: 2 !important;
 }
 
 .video-js .vjs-playlist-prev .vjs-icon-placeholder,
 .video-js .vjs-playlist-next .vjs-icon-placeholder {
-  font-size: 24px !important;
-  line-height: 42px !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
 }
 
 .video-js .vjs-playlist-prev:disabled,
@@ -339,12 +398,42 @@
   border-radius: 50% !important;
   background: rgba(0, 0, 0, 0.8) !important;
   border: none !important;
-  font-size: 48px !important;
-  line-height: 80px !important;
   left: 50% !important;
   top: 50% !important;
   transform: translate(-50%, -50%) !important;
   margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Hide big play button when video has started */
+.video-js.vjs-has-started .vjs-big-play-button,
+.video-js.vjs-playing .vjs-big-play-button {
+  display: none !important;
+}
+
+/* Override VideoJS's icon placeholder height only for big play button */
+.video-js .vjs-big-play-button > .vjs-icon-placeholder {
+  font-size: 56px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  height: auto !important;
+  position: static !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.video-js .vjs-big-play-button > .vjs-icon-placeholder:before {
+  line-height: 1 !important;
+  position: static !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 .video-js:hover .vjs-big-play-button,
@@ -355,7 +444,7 @@
 }
 
 /* ============================================================================
-   LOADING SPINNER - YouTube style
+   LOADING SPINNER - YouTube style, properly centered
    ============================================================================ */
 
 .video-js .vjs-loading-spinner {
@@ -364,7 +453,16 @@
   width: 60px !important;
   height: 60px !important;
   border-width: 4px !important;
-  margin: -30px 0 0 -30px !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+}
+
+/* Match big play button style when video is waiting/loading */
+.video-js.vjs-waiting .vjs-big-play-button,
+.video-js.vjs-seeking .vjs-big-play-button {
+  display: flex !important;
 }
 
 /* ============================================================================
@@ -373,24 +471,32 @@
 
 @media (max-width: 768px) {
   .video-js .vjs-control-bar {
-    height: 44px !important;
+    height: 48px !important;
     padding: 0 8px !important;
+    gap: 6px !important;
   }
 
   .video-js .vjs-control {
-    width: 38px !important;
-    height: 38px !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
   }
 
   .video-js .vjs-icon-placeholder {
-    font-size: 20px !important;
-    line-height: 38px !important;
+    font-size: 18px !important;
   }
 
   .video-js .vjs-time-control {
     font-size: 12px !important;
-    line-height: 38px !important;
-    padding: 0 4px !important;
+    height: 44px !important;
+    line-height: 44px !important;
+    padding: 0 6px !important;
+  }
+
+  .video-js .vjs-current-time,
+  .video-js .vjs-duration,
+  .video-js .vjs-time-divider {
+    height: 44px !important;
   }
 
   /* Hide time divider and duration on very small screens */
@@ -400,6 +506,59 @@
       display: none !important;
     }
   }
+}
+
+/* ============================================================================
+   HIDE UNSUPPORTED/UNWANTED CONTROLS
+   ============================================================================ */
+
+/* Hide live display (we only do VOD) */
+.video-js .vjs-live-control,
+.video-js .vjs-seek-to-live-control {
+  display: none !important;
+}
+
+/* Hide captions/subtitles button (not implemented) */
+.video-js .vjs-subs-caps-button,
+.video-js .vjs-captions-button,
+.video-js .vjs-subtitles-button {
+  display: none !important;
+}
+
+/* Hide chapters button (not supported) */
+.video-js .vjs-chapters-button {
+  display: none !important;
+}
+
+/* Hide audio track button (not needed) */
+.video-js .vjs-audio-button {
+  display: none !important;
+}
+
+/* Hide descriptions button (accessibility feature we don't use) */
+.video-js .vjs-descriptions-button {
+  display: none !important;
+}
+
+/* Hide picture-in-picture (already disabled in config but extra safety) */
+.video-js .vjs-picture-in-picture-control {
+  display: none !important;
+}
+
+/* Hide remaining time display (we only show current time / duration) */
+.video-js .vjs-remaining-time {
+  display: none !important;
+}
+
+/* Hide spacer element */
+.video-js .vjs-custom-control-spacer {
+  display: none !important;
+}
+
+/* Hide skip buttons (not used) */
+.video-js .vjs-skip-backward-undefined,
+.video-js .vjs-skip-forward-undefined {
+  display: none !important;
 }
 
 /* ============================================================================
