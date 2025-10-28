@@ -158,7 +158,7 @@ const GroupImageFlipper = ({ group }) => {
   return (
     <div className="relative">
       <div
-        className="rounded-lg w-full aspect-[2/3] overflow-hidden shadow-lg"
+        className="rounded-lg w-full aspect-[2/3] p-3 shadow-lg"
         style={{
           backgroundColor: "var(--bg-card)",
         }}
@@ -167,7 +167,7 @@ const GroupImageFlipper = ({ group }) => {
           <img
             src={displayImage}
             alt={`${group?.name} - ${showFront ? "Front" : "Back"} Cover`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
