@@ -30,12 +30,34 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
   const [containerElement, setContainerElement] = useState(null);
   const intervalRef = useRef(null);
 
+  // Log initial props
+  useEffect(() => {
+    console.log('[SceneCardPreview] Component mounted', {
+      sceneId: scene?.id,
+      autoplayOnScroll,
+      hasVTT: !!scene?.paths?.vtt,
+      hasSprite: !!scene?.paths?.sprite,
+    });
+  }, []);
+
   // Detect hover capability (mouse/trackpad vs touch-only)
   useEffect(() => {
     const mediaQuery = window.matchMedia('(hover: hover)');
-    setHasHoverCapability(mediaQuery.matches);
+    const hasHover = mediaQuery.matches;
+    console.log('[SceneCardPreview] Hover capability detected', {
+      sceneId: scene?.id,
+      hasHover,
+      userAgent: navigator.userAgent,
+    });
+    setHasHoverCapability(hasHover);
 
-    const handleChange = (e) => setHasHoverCapability(e.matches);
+    const handleChange = (e) => {
+      console.log('[SceneCardPreview] Hover capability changed', {
+        sceneId: scene?.id,
+        hasHover: e.matches,
+      });
+      setHasHoverCapability(e.matches);
+    };
     mediaQuery.addEventListener('change', handleChange);
 
     return () => mediaQuery.removeEventListener('change', handleChange);
@@ -45,13 +67,32 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
   useEffect(() => {
     // When autoplayOnScroll is enabled, use intersection observer regardless of hover capability
     // This fixes mobile devices that incorrectly report hover support
-    if (!autoplayOnScroll || !containerElement) return;
+    if (!autoplayOnScroll || !containerElement) {
+      console.log('[SceneCardPreview] IntersectionObserver not starting', {
+        sceneId: scene?.id,
+        autoplayOnScroll,
+        hasContainerElement: !!containerElement,
+      });
+      return;
+    }
+
+    console.log('[SceneCardPreview] Setting up IntersectionObserver', {
+      sceneId: scene?.id,
+      autoplayOnScroll,
+    });
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           // Only autoplay if at least 60% visible to avoid "all at once" on multi-column
-          setIsInView(entry.isIntersecting && entry.intersectionRatio >= 0.6);
+          const newIsInView = entry.isIntersecting && entry.intersectionRatio >= 0.6;
+          console.log('[SceneCardPreview] Intersection change', {
+            sceneId: scene?.id,
+            isIntersecting: entry.isIntersecting,
+            intersectionRatio: entry.intersectionRatio,
+            newIsInView,
+          });
+          setIsInView(newIsInView);
         });
       },
       {
@@ -62,6 +103,9 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
     observer.observe(containerElement);
 
     return () => {
+      console.log('[SceneCardPreview] Disconnecting IntersectionObserver', {
+        sceneId: scene?.id,
+      });
       observer.disconnect();
     };
   }, [autoplayOnScroll, containerElement]);
@@ -69,15 +113,31 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
   // Load and parse VTT file
   useEffect(() => {
     if (!scene?.paths?.vtt) {
+      console.log('[SceneCardPreview] No VTT path, skipping sprite loading', {
+        sceneId: scene?.id,
+      });
       setIsLoading(false);
       return;
     }
 
+    console.log('[SceneCardPreview] Loading VTT file', {
+      sceneId: scene?.id,
+      vttPath: scene.paths.vtt,
+    });
+
     setIsLoading(true);
     fetchAndParseVTT(scene.paths.vtt)
       .then((parsedCues) => {
+        console.log('[SceneCardPreview] VTT loaded', {
+          sceneId: scene?.id,
+          cuesCount: parsedCues.length,
+        });
         if (parsedCues.length > 0) {
           const evenlySpaced = getEvenlySpacedSprites(parsedCues, spriteCount);
+          console.log('[SceneCardPreview] Sprites extracted', {
+            sceneId: scene?.id,
+            spritesCount: evenlySpaced.length,
+          });
           setSprites(evenlySpaced);
         }
         setIsLoading(false);
