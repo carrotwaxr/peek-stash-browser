@@ -20,7 +20,7 @@
     rgba(0, 0, 0, 0.6) 50%,
     rgba(0, 0, 0, 0) 100%
   ) !important;
-  height: 52px !important;
+  height: 44px !important;
   padding: 0 12px !important;
   display: flex !important;
   align-items: center !important;
@@ -83,7 +83,7 @@
 
 /* Play progress (watched portion) */
 .video-js .vjs-play-progress {
-  background-color: #ff0000 !important; /* YouTube red */
+  background-color: var(--accent-primary) !important;
   border-radius: 0 !important;
 }
 
@@ -103,7 +103,7 @@
   transform: translateY(-50%) !important;
   width: 12px !important;
   height: 12px !important;
-  background-color: #ff0000 !important;
+  background-color: var(--accent-primary) !important;
   border-radius: 50% !important;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.4) !important;
 }
@@ -133,14 +133,23 @@
   bottom: 2.8em !important;
 }
 
+/* Time tooltip (appears on hover over progress bar) */
+.video-js .vjs-mouse-display .vjs-time-tooltip,
+.video-js .vjs-play-progress .vjs-time-tooltip {
+  font-size: 13px !important;
+  padding: 6px 10px !important;
+  line-height: 1.4 !important;
+  font-family: var(--font-body) !important;
+  font-weight: 500 !important;
+  background: rgba(28, 28, 28, 0.95) !important;
+  border-radius: 4px !important;
+}
+
 /* ============================================================================
    CONTROL BUTTONS - Consistent sizing and alignment
    ============================================================================ */
 
 .video-js .vjs-control {
-  width: 48px !important;
-  height: 48px !important;
-  min-width: 48px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -243,7 +252,7 @@
   font-size: 13px !important;
   font-weight: 500 !important;
   line-height: 48px !important;
-  font-family: 'Roboto', 'YouTube Sans', sans-serif !important;
+  font-family: "Roboto", "YouTube Sans", sans-serif !important;
   display: flex !important;
   align-items: center !important;
 }
