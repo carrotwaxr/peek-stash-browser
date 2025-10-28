@@ -539,33 +539,80 @@
    ============================================================================ */
 
 @media (max-width: 768px) {
+  /* Control bar - smaller height and padding */
   .video-js .vjs-control-bar {
-    height: 48px !important;
-    padding: 0 8px !important;
-    gap: 6px !important;
-  }
-
-  .video-js .vjs-control {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-  }
-
-  .video-js .vjs-icon-placeholder {
-    font-size: 18px !important;
-  }
-
-  .video-js .vjs-time-control {
-    font-size: 12px !important;
-    height: 44px !important;
-    line-height: 44px !important;
+    height: 40px !important;
     padding: 0 6px !important;
+    gap: 4px !important;
+  }
+
+  /* All control buttons - smaller */
+  .video-js .vjs-control {
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+  }
+
+  /* Button icons - smaller */
+  .video-js .vjs-icon-placeholder {
+    font-size: 16px !important;
+  }
+
+  /* Big play button - smaller */
+  .video-js .vjs-big-play-button {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  .video-js .vjs-big-play-button > .vjs-icon-placeholder {
+    font-size: 40px !important;
+  }
+
+  /* Volume panel - narrower */
+  .video-js .vjs-volume-panel {
+    width: 120px !important;
+    min-width: 120px !important;
+    height: 36px !important;
+  }
+
+  .video-js .vjs-mute-control {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .video-js .vjs-volume-panel:hover .vjs-volume-control,
+  .video-js .vjs-volume-panel:focus-within .vjs-volume-control,
+  .video-js .vjs-volume-panel.vjs-hover .vjs-volume-control {
+    width: 84px !important;
+  }
+
+  .video-js .vjs-volume-bar {
+    width: 76px !important;
+  }
+
+  .video-js .vjs-volume-control .vjs-volume-horizontal {
+    width: 76px !important;
+  }
+
+  /* Time display - smaller font */
+  .video-js .vjs-time-control {
+    font-size: 11px !important;
+    height: 36px !important;
+    line-height: 36px !important;
+    padding: 0 4px !important;
   }
 
   .video-js .vjs-current-time,
   .video-js .vjs-duration,
   .video-js .vjs-time-divider {
-    height: 44px !important;
+    height: 36px !important;
+  }
+
+  /* Loading spinner - smaller */
+  .video-js .vjs-loading-spinner {
+    width: 48px !important;
+    height: 48px !important;
+    border-width: 3px !important;
   }
 
   /* Hide time divider and duration on very small screens */
