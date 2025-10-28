@@ -310,6 +310,62 @@ const GroupDetails = ({ group }) => {
         </Card>
       )}
 
+      {group?.containing_groups && group.containing_groups.length > 0 && (
+        <Card title="Part Of">
+          <div className="space-y-2">
+            {group.containing_groups.map((cg) => (
+              <Link
+                key={cg.group.id}
+                to={`/group/${cg.group.id}`}
+                className="block p-2 rounded hover:bg-white/5 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className="font-medium"
+                    style={{ color: "var(--accent-primary)" }}
+                  >
+                    {cg.group.name}
+                  </span>
+                </div>
+                {cg.description && (
+                  <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                    {cg.description}
+                  </p>
+                )}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {group?.sub_groups && group.sub_groups.length > 0 && (
+        <Card title="Sub-Groups">
+          <div className="space-y-2">
+            {group.sub_groups.map((sg) => (
+              <Link
+                key={sg.group.id}
+                to={`/group/${sg.group.id}`}
+                className="block p-2 rounded hover:bg-white/5 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <span
+                    className="font-medium"
+                    style={{ color: "var(--accent-primary)" }}
+                  >
+                    {sg.group.name}
+                  </span>
+                </div>
+                {sg.description && (
+                  <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                    {sg.description}
+                  </p>
+                )}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {group?.tags && group.tags.length > 0 && (
         <Card title="Tags">
           <div className="flex flex-wrap gap-2">

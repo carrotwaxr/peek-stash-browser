@@ -202,11 +202,18 @@ const GroupCard = forwardRef(
               </div>
             )}
 
-            {/* Scene Count */}
-            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-              {group.scene_count > 0
-                ? `${group.scene_count} Scene${group.scene_count !== 1 ? "s" : ""}`
-                : "No scenes"}
+            {/* Scene Count and Sub-Groups */}
+            <div className="text-xs mb-2 space-y-1">
+              <div style={{ color: "var(--text-muted)" }}>
+                {group.scene_count > 0
+                  ? `${group.scene_count} Scene${group.scene_count !== 1 ? "s" : ""}`
+                  : "No scenes"}
+              </div>
+              {group.sub_group_count > 0 && (
+                <div style={{ color: "var(--text-muted)" }}>
+                  {group.sub_group_count} Sub-group{group.sub_group_count !== 1 ? "s" : ""}
+                </div>
+              )}
             </div>
 
             {/* Rating and Favorite */}

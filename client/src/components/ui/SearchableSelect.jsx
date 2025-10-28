@@ -37,6 +37,7 @@ const SearchableSelect = ({
     performers: libraryApi.findPerformersMinimal,
     studios: libraryApi.findStudiosMinimal,
     tags: libraryApi.findTagsMinimal,
+    groups: libraryApi.findGroupsMinimal,
   };
 
   // Load selected items' names when value changes
