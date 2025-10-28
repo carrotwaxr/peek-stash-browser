@@ -4,6 +4,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { PageLayout } from "../ui/index.js";
 import CarouselSettings from "../settings/CarouselSettings.jsx";
+import NavigationSettings from "../settings/NavigationSettings.jsx";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
 import SuccessMessage from "../ui/SuccessMessage.jsx";
@@ -12,6 +13,7 @@ import ErrorMessage from "../ui/ErrorMessage.jsx";
 import InfoMessage from "../ui/InfoMessage.jsx";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 import { migrateCarouselPreferences } from "../../constants/carousels.js";
+import { migrateNavPreferences } from "../../constants/navigation.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -29,6 +31,7 @@ const Settings = () => {
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
   const [carouselPreferences, setCarouselPreferences] = useState([]);
+  const [navPreferences, setNavPreferences] = useState([]);
   const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
 
   // Password change state
@@ -52,8 +55,12 @@ const Settings = () => {
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
 
       // Migrate carousel preferences to include any new carousels
-      const migratedPrefs = migrateCarouselPreferences(settings.carouselPreferences);
-      setCarouselPreferences(migratedPrefs);
+      const migratedCarouselPrefs = migrateCarouselPreferences(settings.carouselPreferences);
+      setCarouselPreferences(migratedCarouselPrefs);
+
+      // Migrate navigation preferences to include any new nav items
+      const migratedNavPrefs = migrateNavPreferences(settings.navPreferences);
+      setNavPreferences(migratedNavPrefs);
 
       setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
     } catch {
@@ -75,6 +82,24 @@ const Settings = () => {
       showSuccess("Carousel preferences saved successfully!");
     } catch (err) {
       showError(err.response?.data?.error || "Failed to save carousel preferences");
+    }
+  };
+
+  const saveNavPreferences = async (newPreferences) => {
+    try {
+      setError(null);
+
+      await api.put("/user/settings", {
+        navPreferences: newPreferences,
+      });
+
+      setNavPreferences(newPreferences);
+      showSuccess("Navigation preferences saved successfully!");
+
+      // Reload the page to apply nav changes immediately
+      window.location.reload();
+    } catch (err) {
+      showError(err.response?.data?.error || "Failed to save navigation preferences");
     }
   };
 
@@ -336,6 +361,16 @@ const Settings = () => {
             <CarouselSettings
               carouselPreferences={carouselPreferences}
               onSave={saveCarouselPreferences}
+            />
+          </Paper.Body>
+        </Paper>
+
+        {/* Navigation Settings */}
+        <Paper className="mb-6">
+          <Paper.Body>
+            <NavigationSettings
+              navPreferences={navPreferences}
+              onSave={saveNavPreferences}
             />
           </Paper.Body>
         </Paper>

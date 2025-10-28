@@ -39,6 +39,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         theme: true,
         customTheme: true,
         carouselPreferences: true,
+        navPreferences: true,
         filterPresets: true,
         minimumPlayPercent: true,
         syncToStash: true,
@@ -56,6 +57,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         theme: user.theme,
         customTheme: user.customTheme,
         carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
+        navPreferences: user.navPreferences || null,
         minimumPlayPercent: user.minimumPlayPercent,
         syncToStash: user.syncToStash,
       },
@@ -90,7 +92,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       targetUserId = parseInt(req.params.userId);
     }
 
-    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences, minimumPlayPercent, syncToStash } = req.body;
+    const { preferredQuality, preferredPlaybackMode, theme, customTheme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
@@ -130,6 +132,20 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       }
     }
 
+    // Validate navigation preferences if provided
+    if (navPreferences !== undefined) {
+      if (!Array.isArray(navPreferences)) {
+        return res.status(400).json({ error: "Navigation preferences must be an array" });
+      }
+
+      // Validate each navigation preference
+      for (const pref of navPreferences) {
+        if (typeof pref.id !== 'string' || typeof pref.enabled !== 'boolean' || typeof pref.order !== 'number') {
+          return res.status(400).json({ error: "Invalid navigation preference format" });
+        }
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: {
@@ -138,6 +154,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         ...(theme !== undefined && { theme }),
         ...(customTheme !== undefined && { customTheme }),
         ...(carouselPreferences !== undefined && { carouselPreferences }),
+        ...(navPreferences !== undefined && { navPreferences }),
         ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
         ...(syncToStash !== undefined && { syncToStash }),
       },
@@ -150,6 +167,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         theme: true,
         customTheme: true,
         carouselPreferences: true,
+        navPreferences: true,
         minimumPlayPercent: true,
         syncToStash: true,
       },
@@ -163,6 +181,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         theme: updatedUser.theme,
         customTheme: updatedUser.customTheme,
         carouselPreferences: updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
+        navPreferences: updatedUser.navPreferences || null,
         minimumPlayPercent: updatedUser.minimumPlayPercent,
         syncToStash: updatedUser.syncToStash,
       },
