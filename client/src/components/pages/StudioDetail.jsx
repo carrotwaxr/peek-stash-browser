@@ -256,7 +256,7 @@ const StudioStats = ({ studio }) => {
           valueColor="var(--accent-primary)"
         />
         <StatField
-          label="Groups:"
+          label="Collections:"
           value={studio?.group_count}
           valueColor="var(--accent-primary)"
         />
@@ -382,7 +382,7 @@ const StudioDetails = ({ studio }) => {
       )}
 
       {studio?.groups && studio.groups.length > 0 && (
-        <Card title="Groups">
+        <Card title="Collections">
           <div className="space-y-1">
             {studio.groups.map((group) => (
               <div

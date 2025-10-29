@@ -17,7 +17,7 @@ const GroupDetail = () => {
   const [group, setGroup] = useState(null);
 
   // Set page title to group name
-  usePageTitle(group?.name || "Group");
+  usePageTitle(group?.name || "Collection");
 
   useEffect(() => {
     const fetchGroup = async () => {
@@ -49,12 +49,14 @@ const GroupDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Button
-            onClick={() => navigate(location.state?.referrerUrl || "/groups")}
+            onClick={() =>
+              navigate(location.state?.referrerUrl || "/collections")
+            }
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-            title="Back to Groups"
+            title="Back to Collections"
           >
-            <span className="hidden sm:inline">Back to Groups</span>
+            <span className="hidden sm:inline">Back to Collections</span>
           </Button>
         </div>
 
@@ -65,12 +67,15 @@ const GroupDetail = () => {
               className="text-5xl font-bold"
               style={{ color: "var(--text-primary)" }}
             >
-              {group?.name || `Group ${groupId}`}
+              {group?.name || `Collection ${groupId}`}
             </h1>
           </div>
 
           {group?.aliases && group.aliases.length > 0 && (
-            <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
+            <p
+              className="text-xl mb-3"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Also known as: {group.aliases.join(", ")}
             </p>
           )}
@@ -109,9 +114,11 @@ const GroupDetail = () => {
               groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" },
             }}
             permanentFiltersMetadata={{
-              groups: [{ id: groupId, name: group?.name || "Unknown Group" }],
+              groups: [
+                { id: groupId, name: group?.name || "Unknown Collection" },
+              ],
             }}
-            title={`Scenes in ${group?.name || "this group"}`}
+            title={`Scenes in ${group?.name || "this collection"}`}
             captureReferrer={false}
           />
         </div>
@@ -151,8 +158,12 @@ const GroupImageFlipper = ({ group }) => {
   const hasBackImage = group?.back_image_path;
   const hasBothImages = hasFrontImage && hasBackImage;
 
-  const currentImage = showFront ? group?.front_image_path : group?.back_image_path;
-  const fallbackImage = !showFront ? group?.front_image_path : group?.back_image_path;
+  const currentImage = showFront
+    ? group?.front_image_path
+    : group?.back_image_path;
+  const fallbackImage = !showFront
+    ? group?.front_image_path
+    : group?.back_image_path;
   const displayImage = currentImage || fallbackImage;
 
   return (
@@ -177,7 +188,15 @@ const GroupImageFlipper = ({ group }) => {
               fill="currentColor"
               viewBox="0 0 24 24"
             >
-              <text x="50%" y="50%" dominantBaseline="middle" textAnchor="middle" fontSize="12">🎬</text>
+              <text
+                x="50%"
+                y="50%"
+                dominantBaseline="middle"
+                textAnchor="middle"
+                fontSize="12"
+              >
+                🎬
+              </text>
             </svg>
           </div>
         )}
@@ -189,14 +208,16 @@ const GroupImageFlipper = ({ group }) => {
           <button
             onClick={() => setShowFront(true)}
             className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
-              showFront
-                ? "shadow-lg"
-                : "opacity-70 hover:opacity-100"
+              showFront ? "shadow-lg" : "opacity-70 hover:opacity-100"
             }`}
             style={{
-              backgroundColor: showFront ? "var(--accent-primary)" : "var(--bg-card)",
+              backgroundColor: showFront
+                ? "var(--accent-primary)"
+                : "var(--bg-card)",
               color: showFront ? "white" : "var(--text-primary)",
-              border: `1px solid ${showFront ? "var(--accent-primary)" : "var(--border-color)"}`,
+              border: `1px solid ${
+                showFront ? "var(--accent-primary)" : "var(--border-color)"
+              }`,
             }}
             title="Show front cover"
           >
@@ -205,14 +226,16 @@ const GroupImageFlipper = ({ group }) => {
           <button
             onClick={() => setShowFront(false)}
             className={`px-3 py-2 rounded-lg font-medium text-sm transition-all ${
-              !showFront
-                ? "shadow-lg"
-                : "opacity-70 hover:opacity-100"
+              !showFront ? "shadow-lg" : "opacity-70 hover:opacity-100"
             }`}
             style={{
-              backgroundColor: !showFront ? "var(--accent-primary)" : "var(--bg-card)",
+              backgroundColor: !showFront
+                ? "var(--accent-primary)"
+                : "var(--bg-card)",
               color: !showFront ? "white" : "var(--text-primary)",
-              border: `1px solid ${!showFront ? "var(--accent-primary)" : "var(--border-color)"}`,
+              border: `1px solid ${
+                !showFront ? "var(--accent-primary)" : "var(--border-color)"
+              }`,
             }}
             title="Show back cover"
           >
@@ -316,7 +339,7 @@ const GroupDetails = ({ group }) => {
             {group.containing_groups.map((cg) => (
               <Link
                 key={cg.group.id}
-                to={`/group/${cg.group.id}`}
+                to={`/collection/${cg.group.id}`}
                 className="block p-2 rounded hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center justify-between">
@@ -328,7 +351,10 @@ const GroupDetails = ({ group }) => {
                   </span>
                 </div>
                 {cg.description && (
-                  <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                  <p
+                    className="text-sm mt-1"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {cg.description}
                   </p>
                 )}
@@ -339,12 +365,12 @@ const GroupDetails = ({ group }) => {
       )}
 
       {group?.sub_groups && group.sub_groups.length > 0 && (
-        <Card title="Sub-Groups">
+        <Card title="Sub-Collections">
           <div className="space-y-2">
             {group.sub_groups.map((sg) => (
               <Link
                 key={sg.group.id}
-                to={`/group/${sg.group.id}`}
+                to={`/collection/${sg.group.id}`}
                 className="block p-2 rounded hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center justify-between">
@@ -356,7 +382,10 @@ const GroupDetails = ({ group }) => {
                   </span>
                 </div>
                 {sg.description && (
-                  <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+                  <p
+                    className="text-sm mt-1"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {sg.description}
                   </p>
                 )}

@@ -206,12 +206,12 @@ export const SCENE_FILTER_OPTIONS = [
   },
   {
     key: "groupIds",
-    label: "Groups",
+    label: "Collections",
     type: "searchable-select",
     entityType: "groups",
     multi: true,
     defaultValue: [],
-    placeholder: "Select groups...",
+    placeholder: "Select collections...",
   },
   {
     key: "rating",
@@ -862,7 +862,7 @@ export const GROUP_FILTER_OPTIONS = [
   },
   {
     key: "favorite",
-    label: "Favorite Groups",
+    label: "Favorite Collections",
     type: "checkbox",
     defaultValue: false,
     placeholder: "Favorites Only",
@@ -949,7 +949,7 @@ export const buildSceneFilter = (filters) => {
     };
   }
 
-  // Groups: Merge permanent + UI filters
+  // Collections/Groups: Merge permanent + UI filters
   const groupIds = [];
   if (filters.groups?.value) {
     groupIds.push(...filters.groups.value);
@@ -968,7 +968,10 @@ export const buildSceneFilter = (filters) => {
   if (filters.favorite === true || filters.favorite === "TRUE") {
     sceneFilter.favorite = true;
   }
-  if (filters.performerFavorite === true || filters.performerFavorite === "TRUE") {
+  if (
+    filters.performerFavorite === true ||
+    filters.performerFavorite === "TRUE"
+  ) {
     sceneFilter.performer_favorite = true;
   }
   if (filters.studioFavorite === true || filters.studioFavorite === "TRUE") {
@@ -984,8 +987,10 @@ export const buildSceneFilter = (filters) => {
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
     sceneFilter.rating100 = {};
-    const hasMin = filters.rating.min !== undefined && filters.rating.min !== '';
-    const hasMax = filters.rating.max !== undefined && filters.rating.max !== '';
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.rating100.modifier = "BETWEEN";
@@ -1010,10 +1015,15 @@ export const buildSceneFilter = (filters) => {
   }
 
   // Range filters
-  if (filters.duration?.min !== undefined || filters.duration?.max !== undefined) {
+  if (
+    filters.duration?.min !== undefined ||
+    filters.duration?.max !== undefined
+  ) {
     sceneFilter.duration = {};
-    const hasMin = filters.duration.min !== undefined && filters.duration.min !== '';
-    const hasMax = filters.duration.max !== undefined && filters.duration.max !== '';
+    const hasMin =
+      filters.duration.min !== undefined && filters.duration.min !== "";
+    const hasMax =
+      filters.duration.max !== undefined && filters.duration.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.duration.modifier = "BETWEEN";
@@ -1021,35 +1031,45 @@ export const buildSceneFilter = (filters) => {
       sceneFilter.duration.value2 = parseInt(filters.duration.max) * 60;
     } else if (hasMin) {
       sceneFilter.duration.modifier = "GREATER_THAN";
-      sceneFilter.duration.value = (parseInt(filters.duration.min) * 60) - 1;
+      sceneFilter.duration.value = parseInt(filters.duration.min) * 60 - 1;
     } else if (hasMax) {
       sceneFilter.duration.modifier = "LESS_THAN";
-      sceneFilter.duration.value = (parseInt(filters.duration.max) * 60) + 1;
+      sceneFilter.duration.value = parseInt(filters.duration.max) * 60 + 1;
     }
   }
 
-  if (filters.playDuration?.min !== undefined || filters.playDuration?.max !== undefined) {
+  if (
+    filters.playDuration?.min !== undefined ||
+    filters.playDuration?.max !== undefined
+  ) {
     sceneFilter.play_duration = {};
-    const hasMin = filters.playDuration.min !== undefined && filters.playDuration.min !== '';
-    const hasMax = filters.playDuration.max !== undefined && filters.playDuration.max !== '';
+    const hasMin =
+      filters.playDuration.min !== undefined && filters.playDuration.min !== "";
+    const hasMax =
+      filters.playDuration.max !== undefined && filters.playDuration.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.play_duration.modifier = "BETWEEN";
       sceneFilter.play_duration.value = parseInt(filters.playDuration.min) * 60;
-      sceneFilter.play_duration.value2 = parseInt(filters.playDuration.max) * 60;
+      sceneFilter.play_duration.value2 =
+        parseInt(filters.playDuration.max) * 60;
     } else if (hasMin) {
       sceneFilter.play_duration.modifier = "GREATER_THAN";
-      sceneFilter.play_duration.value = (parseInt(filters.playDuration.min) * 60) - 1;
+      sceneFilter.play_duration.value =
+        parseInt(filters.playDuration.min) * 60 - 1;
     } else if (hasMax) {
       sceneFilter.play_duration.modifier = "LESS_THAN";
-      sceneFilter.play_duration.value = (parseInt(filters.playDuration.max) * 60) + 1;
+      sceneFilter.play_duration.value =
+        parseInt(filters.playDuration.max) * 60 + 1;
     }
   }
 
   if (filters.oCount?.min !== undefined || filters.oCount?.max !== undefined) {
     sceneFilter.o_counter = {};
-    const hasMin = filters.oCount.min !== undefined && filters.oCount.min !== '';
-    const hasMax = filters.oCount.max !== undefined && filters.oCount.max !== '';
+    const hasMin =
+      filters.oCount.min !== undefined && filters.oCount.min !== "";
+    const hasMax =
+      filters.oCount.max !== undefined && filters.oCount.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.o_counter.modifier = "BETWEEN";
@@ -1064,10 +1084,15 @@ export const buildSceneFilter = (filters) => {
     }
   }
 
-  if (filters.playCount?.min !== undefined || filters.playCount?.max !== undefined) {
+  if (
+    filters.playCount?.min !== undefined ||
+    filters.playCount?.max !== undefined
+  ) {
     sceneFilter.play_count = {};
-    const hasMin = filters.playCount.min !== undefined && filters.playCount.min !== '';
-    const hasMax = filters.playCount.max !== undefined && filters.playCount.max !== '';
+    const hasMin =
+      filters.playCount.min !== undefined && filters.playCount.min !== "";
+    const hasMax =
+      filters.playCount.max !== undefined && filters.playCount.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.play_count.modifier = "BETWEEN";
@@ -1082,10 +1107,15 @@ export const buildSceneFilter = (filters) => {
     }
   }
 
-  if (filters.bitrate?.min !== undefined || filters.bitrate?.max !== undefined) {
+  if (
+    filters.bitrate?.min !== undefined ||
+    filters.bitrate?.max !== undefined
+  ) {
     sceneFilter.bitrate = {};
-    const hasMin = filters.bitrate.min !== undefined && filters.bitrate.min !== '';
-    const hasMax = filters.bitrate.max !== undefined && filters.bitrate.max !== '';
+    const hasMin =
+      filters.bitrate.min !== undefined && filters.bitrate.min !== "";
+    const hasMax =
+      filters.bitrate.max !== undefined && filters.bitrate.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.bitrate.modifier = "BETWEEN";
@@ -1093,17 +1123,22 @@ export const buildSceneFilter = (filters) => {
       sceneFilter.bitrate.value2 = parseInt(filters.bitrate.max) * 1000000;
     } else if (hasMin) {
       sceneFilter.bitrate.modifier = "GREATER_THAN";
-      sceneFilter.bitrate.value = (parseInt(filters.bitrate.min) * 1000000) - 1;
+      sceneFilter.bitrate.value = parseInt(filters.bitrate.min) * 1000000 - 1;
     } else if (hasMax) {
       sceneFilter.bitrate.modifier = "LESS_THAN";
-      sceneFilter.bitrate.value = (parseInt(filters.bitrate.max) * 1000000) + 1;
+      sceneFilter.bitrate.value = parseInt(filters.bitrate.max) * 1000000 + 1;
     }
   }
 
-  if (filters.framerate?.min !== undefined || filters.framerate?.max !== undefined) {
+  if (
+    filters.framerate?.min !== undefined ||
+    filters.framerate?.max !== undefined
+  ) {
     sceneFilter.framerate = {};
-    const hasMin = filters.framerate.min !== undefined && filters.framerate.min !== '';
-    const hasMax = filters.framerate.max !== undefined && filters.framerate.max !== '';
+    const hasMin =
+      filters.framerate.min !== undefined && filters.framerate.min !== "";
+    const hasMax =
+      filters.framerate.max !== undefined && filters.framerate.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.framerate.modifier = "BETWEEN";
@@ -1118,10 +1153,17 @@ export const buildSceneFilter = (filters) => {
     }
   }
 
-  if (filters.performerCount?.min !== undefined || filters.performerCount?.max !== undefined) {
+  if (
+    filters.performerCount?.min !== undefined ||
+    filters.performerCount?.max !== undefined
+  ) {
     sceneFilter.performer_count = {};
-    const hasMin = filters.performerCount.min !== undefined && filters.performerCount.min !== '';
-    const hasMax = filters.performerCount.max !== undefined && filters.performerCount.max !== '';
+    const hasMin =
+      filters.performerCount.min !== undefined &&
+      filters.performerCount.min !== "";
+    const hasMax =
+      filters.performerCount.max !== undefined &&
+      filters.performerCount.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.performer_count.modifier = "BETWEEN";
@@ -1129,17 +1171,24 @@ export const buildSceneFilter = (filters) => {
       sceneFilter.performer_count.value2 = parseInt(filters.performerCount.max);
     } else if (hasMin) {
       sceneFilter.performer_count.modifier = "GREATER_THAN";
-      sceneFilter.performer_count.value = parseInt(filters.performerCount.min) - 1;
+      sceneFilter.performer_count.value =
+        parseInt(filters.performerCount.min) - 1;
     } else if (hasMax) {
       sceneFilter.performer_count.modifier = "LESS_THAN";
-      sceneFilter.performer_count.value = parseInt(filters.performerCount.max) + 1;
+      sceneFilter.performer_count.value =
+        parseInt(filters.performerCount.max) + 1;
     }
   }
 
-  if (filters.performerAge?.min !== undefined || filters.performerAge?.max !== undefined) {
+  if (
+    filters.performerAge?.min !== undefined ||
+    filters.performerAge?.max !== undefined
+  ) {
     sceneFilter.performer_age = {};
-    const hasMin = filters.performerAge.min !== undefined && filters.performerAge.min !== '';
-    const hasMax = filters.performerAge.max !== undefined && filters.performerAge.max !== '';
+    const hasMin =
+      filters.performerAge.min !== undefined && filters.performerAge.min !== "";
+    const hasMax =
+      filters.performerAge.max !== undefined && filters.performerAge.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.performer_age.modifier = "BETWEEN";
@@ -1154,10 +1203,15 @@ export const buildSceneFilter = (filters) => {
     }
   }
 
-  if (filters.tagCount?.min !== undefined || filters.tagCount?.max !== undefined) {
+  if (
+    filters.tagCount?.min !== undefined ||
+    filters.tagCount?.max !== undefined
+  ) {
     sceneFilter.tag_count = {};
-    const hasMin = filters.tagCount.min !== undefined && filters.tagCount.min !== '';
-    const hasMax = filters.tagCount.max !== undefined && filters.tagCount.max !== '';
+    const hasMin =
+      filters.tagCount.min !== undefined && filters.tagCount.min !== "";
+    const hasMax =
+      filters.tagCount.max !== undefined && filters.tagCount.max !== "";
 
     if (hasMin && hasMax) {
       sceneFilter.tag_count.modifier = "BETWEEN";
@@ -1182,23 +1236,35 @@ export const buildSceneFilter = (filters) => {
 
   if (filters.createdAt?.start || filters.createdAt?.end) {
     sceneFilter.created_at = {};
-    if (filters.createdAt.start) sceneFilter.created_at.value = filters.createdAt.start;
-    sceneFilter.created_at.modifier = filters.createdAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.createdAt.end) sceneFilter.created_at.value2 = filters.createdAt.end;
+    if (filters.createdAt.start)
+      sceneFilter.created_at.value = filters.createdAt.start;
+    sceneFilter.created_at.modifier = filters.createdAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.createdAt.end)
+      sceneFilter.created_at.value2 = filters.createdAt.end;
   }
 
   if (filters.updatedAt?.start || filters.updatedAt?.end) {
     sceneFilter.updated_at = {};
-    if (filters.updatedAt.start) sceneFilter.updated_at.value = filters.updatedAt.start;
-    sceneFilter.updated_at.modifier = filters.updatedAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.updatedAt.end) sceneFilter.updated_at.value2 = filters.updatedAt.end;
+    if (filters.updatedAt.start)
+      sceneFilter.updated_at.value = filters.updatedAt.start;
+    sceneFilter.updated_at.modifier = filters.updatedAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.updatedAt.end)
+      sceneFilter.updated_at.value2 = filters.updatedAt.end;
   }
 
   if (filters.lastPlayedAt?.start || filters.lastPlayedAt?.end) {
     sceneFilter.last_played_at = {};
-    if (filters.lastPlayedAt.start) sceneFilter.last_played_at.value = filters.lastPlayedAt.start;
-    sceneFilter.last_played_at.modifier = filters.lastPlayedAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.lastPlayedAt.end) sceneFilter.last_played_at.value2 = filters.lastPlayedAt.end;
+    if (filters.lastPlayedAt.start)
+      sceneFilter.last_played_at.value = filters.lastPlayedAt.start;
+    sceneFilter.last_played_at.modifier = filters.lastPlayedAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.lastPlayedAt.end)
+      sceneFilter.last_played_at.value2 = filters.lastPlayedAt.end;
   }
 
   // Text search filters
@@ -1252,8 +1318,10 @@ export const buildPerformerFilter = (filters) => {
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
     performerFilter.rating100 = {};
-    const hasMin = filters.rating.min !== undefined && filters.rating.min !== '';
-    const hasMax = filters.rating.max !== undefined && filters.rating.max !== '';
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
 
     if (hasMin && hasMax) {
       performerFilter.rating100.modifier = "BETWEEN";
@@ -1306,50 +1374,79 @@ export const buildPerformerFilter = (filters) => {
 
   if (filters.birthYear?.min || filters.birthYear?.max) {
     performerFilter.birth_year = {};
-    if (filters.birthYear.min) performerFilter.birth_year.value = parseInt(filters.birthYear.min);
-    performerFilter.birth_year.modifier = filters.birthYear.max ? "BETWEEN" : "GREATER_THAN";
-    if (filters.birthYear.max) performerFilter.birth_year.value2 = parseInt(filters.birthYear.max);
+    if (filters.birthYear.min)
+      performerFilter.birth_year.value = parseInt(filters.birthYear.min);
+    performerFilter.birth_year.modifier = filters.birthYear.max
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.birthYear.max)
+      performerFilter.birth_year.value2 = parseInt(filters.birthYear.max);
   }
 
   if (filters.deathYear?.min || filters.deathYear?.max) {
     performerFilter.death_year = {};
-    if (filters.deathYear.min) performerFilter.death_year.value = parseInt(filters.deathYear.min);
-    performerFilter.death_year.modifier = filters.deathYear.max ? "BETWEEN" : "GREATER_THAN";
-    if (filters.deathYear.max) performerFilter.death_year.value2 = parseInt(filters.deathYear.max);
+    if (filters.deathYear.min)
+      performerFilter.death_year.value = parseInt(filters.deathYear.min);
+    performerFilter.death_year.modifier = filters.deathYear.max
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.deathYear.max)
+      performerFilter.death_year.value2 = parseInt(filters.deathYear.max);
   }
 
   if (filters.careerLength?.min || filters.careerLength?.max) {
     performerFilter.career_length = {};
-    if (filters.careerLength.min) performerFilter.career_length.value = parseInt(filters.careerLength.min);
-    performerFilter.career_length.modifier = filters.careerLength.max ? "BETWEEN" : "GREATER_THAN";
-    if (filters.careerLength.max) performerFilter.career_length.value2 = parseInt(filters.careerLength.max);
+    if (filters.careerLength.min)
+      performerFilter.career_length.value = parseInt(filters.careerLength.min);
+    performerFilter.career_length.modifier = filters.careerLength.max
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.careerLength.max)
+      performerFilter.career_length.value2 = parseInt(filters.careerLength.max);
   }
 
   if (filters.height?.min || filters.height?.max) {
     performerFilter.height_cm = {};
-    if (filters.height.min) performerFilter.height_cm.value = parseInt(filters.height.min);
-    performerFilter.height_cm.modifier = filters.height.max ? "BETWEEN" : "GREATER_THAN";
-    if (filters.height.max) performerFilter.height_cm.value2 = parseInt(filters.height.max);
+    if (filters.height.min)
+      performerFilter.height_cm.value = parseInt(filters.height.min);
+    performerFilter.height_cm.modifier = filters.height.max
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.height.max)
+      performerFilter.height_cm.value2 = parseInt(filters.height.max);
   }
 
   if (filters.weight?.min || filters.weight?.max) {
     performerFilter.weight = {};
-    if (filters.weight.min) performerFilter.weight.value = parseInt(filters.weight.min);
-    performerFilter.weight.modifier = filters.weight.max ? "BETWEEN" : "GREATER_THAN";
-    if (filters.weight.max) performerFilter.weight.value2 = parseInt(filters.weight.max);
+    if (filters.weight.min)
+      performerFilter.weight.value = parseInt(filters.weight.min);
+    performerFilter.weight.modifier = filters.weight.max
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.weight.max)
+      performerFilter.weight.value2 = parseInt(filters.weight.max);
   }
 
   if (filters.penisLength?.min || filters.penisLength?.max) {
     performerFilter.penis_length = {};
-    if (filters.penisLength.min) performerFilter.penis_length.value = parseInt(filters.penisLength.min);
-    performerFilter.penis_length.modifier = filters.penisLength.max ? "BETWEEN" : "GREATER_THAN";
-    if (filters.penisLength.max) performerFilter.penis_length.value2 = parseInt(filters.penisLength.max);
+    if (filters.penisLength.min)
+      performerFilter.penis_length.value = parseInt(filters.penisLength.min);
+    performerFilter.penis_length.modifier = filters.penisLength.max
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.penisLength.max)
+      performerFilter.penis_length.value2 = parseInt(filters.penisLength.max);
   }
 
-  if (filters.oCounter?.min !== undefined || filters.oCounter?.max !== undefined) {
+  if (
+    filters.oCounter?.min !== undefined ||
+    filters.oCounter?.max !== undefined
+  ) {
     performerFilter.o_counter = {};
-    const hasMin = filters.oCounter.min !== undefined && filters.oCounter.min !== '';
-    const hasMax = filters.oCounter.max !== undefined && filters.oCounter.max !== '';
+    const hasMin =
+      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
+    const hasMax =
+      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
 
     if (hasMin && hasMax) {
       performerFilter.o_counter.modifier = "BETWEEN";
@@ -1364,10 +1461,15 @@ export const buildPerformerFilter = (filters) => {
     }
   }
 
-  if (filters.playCount?.min !== undefined || filters.playCount?.max !== undefined) {
+  if (
+    filters.playCount?.min !== undefined ||
+    filters.playCount?.max !== undefined
+  ) {
     performerFilter.play_count = {};
-    const hasMin = filters.playCount.min !== undefined && filters.playCount.min !== '';
-    const hasMax = filters.playCount.max !== undefined && filters.playCount.max !== '';
+    const hasMin =
+      filters.playCount.min !== undefined && filters.playCount.min !== "";
+    const hasMax =
+      filters.playCount.max !== undefined && filters.playCount.max !== "";
 
     if (hasMin && hasMax) {
       performerFilter.play_count.modifier = "BETWEEN";
@@ -1382,10 +1484,15 @@ export const buildPerformerFilter = (filters) => {
     }
   }
 
-  if (filters.sceneCount?.min !== undefined || filters.sceneCount?.max !== undefined) {
+  if (
+    filters.sceneCount?.min !== undefined ||
+    filters.sceneCount?.max !== undefined
+  ) {
     performerFilter.scene_count = {};
-    const hasMin = filters.sceneCount.min !== undefined && filters.sceneCount.min !== '';
-    const hasMax = filters.sceneCount.max !== undefined && filters.sceneCount.max !== '';
+    const hasMin =
+      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
+    const hasMax =
+      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
 
     if (hasMin && hasMax) {
       performerFilter.scene_count.modifier = "BETWEEN";
@@ -1403,30 +1510,46 @@ export const buildPerformerFilter = (filters) => {
   // Date-range filters
   if (filters.birthdate?.start || filters.birthdate?.end) {
     performerFilter.birthdate = {};
-    if (filters.birthdate.start) performerFilter.birthdate.value = filters.birthdate.start;
-    performerFilter.birthdate.modifier = filters.birthdate.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.birthdate.end) performerFilter.birthdate.value2 = filters.birthdate.end;
+    if (filters.birthdate.start)
+      performerFilter.birthdate.value = filters.birthdate.start;
+    performerFilter.birthdate.modifier = filters.birthdate.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.birthdate.end)
+      performerFilter.birthdate.value2 = filters.birthdate.end;
   }
 
   if (filters.deathDate?.start || filters.deathDate?.end) {
     performerFilter.death_date = {};
-    if (filters.deathDate.start) performerFilter.death_date.value = filters.deathDate.start;
-    performerFilter.death_date.modifier = filters.deathDate.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.deathDate.end) performerFilter.death_date.value2 = filters.deathDate.end;
+    if (filters.deathDate.start)
+      performerFilter.death_date.value = filters.deathDate.start;
+    performerFilter.death_date.modifier = filters.deathDate.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.deathDate.end)
+      performerFilter.death_date.value2 = filters.deathDate.end;
   }
 
   if (filters.createdAt?.start || filters.createdAt?.end) {
     performerFilter.created_at = {};
-    if (filters.createdAt.start) performerFilter.created_at.value = filters.createdAt.start;
-    performerFilter.created_at.modifier = filters.createdAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.createdAt.end) performerFilter.created_at.value2 = filters.createdAt.end;
+    if (filters.createdAt.start)
+      performerFilter.created_at.value = filters.createdAt.start;
+    performerFilter.created_at.modifier = filters.createdAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.createdAt.end)
+      performerFilter.created_at.value2 = filters.createdAt.end;
   }
 
   if (filters.updatedAt?.start || filters.updatedAt?.end) {
     performerFilter.updated_at = {};
-    if (filters.updatedAt.start) performerFilter.updated_at.value = filters.updatedAt.start;
-    performerFilter.updated_at.modifier = filters.updatedAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.updatedAt.end) performerFilter.updated_at.value2 = filters.updatedAt.end;
+    if (filters.updatedAt.start)
+      performerFilter.updated_at.value = filters.updatedAt.start;
+    performerFilter.updated_at.modifier = filters.updatedAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.updatedAt.end)
+      performerFilter.updated_at.value2 = filters.updatedAt.end;
   }
 
   // Text search filters
@@ -1479,8 +1602,10 @@ export const buildStudioFilter = (filters) => {
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
     studioFilter.rating100 = {};
-    const hasMin = filters.rating.min !== undefined && filters.rating.min !== '';
-    const hasMax = filters.rating.max !== undefined && filters.rating.max !== '';
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
 
     if (hasMin && hasMax) {
       studioFilter.rating100.modifier = "BETWEEN";
@@ -1496,10 +1621,15 @@ export const buildStudioFilter = (filters) => {
   }
 
   // Range filter
-  if (filters.sceneCount?.min !== undefined || filters.sceneCount?.max !== undefined) {
+  if (
+    filters.sceneCount?.min !== undefined ||
+    filters.sceneCount?.max !== undefined
+  ) {
     studioFilter.scene_count = {};
-    const hasMin = filters.sceneCount.min !== undefined && filters.sceneCount.min !== '';
-    const hasMax = filters.sceneCount.max !== undefined && filters.sceneCount.max !== '';
+    const hasMin =
+      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
+    const hasMax =
+      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
 
     if (hasMin && hasMax) {
       studioFilter.scene_count.modifier = "BETWEEN";
@@ -1514,10 +1644,15 @@ export const buildStudioFilter = (filters) => {
     }
   }
 
-  if (filters.oCounter?.min !== undefined || filters.oCounter?.max !== undefined) {
+  if (
+    filters.oCounter?.min !== undefined ||
+    filters.oCounter?.max !== undefined
+  ) {
     studioFilter.o_counter = {};
-    const hasMin = filters.oCounter.min !== undefined && filters.oCounter.min !== '';
-    const hasMax = filters.oCounter.max !== undefined && filters.oCounter.max !== '';
+    const hasMin =
+      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
+    const hasMax =
+      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
 
     if (hasMin && hasMax) {
       studioFilter.o_counter.modifier = "BETWEEN";
@@ -1532,10 +1667,15 @@ export const buildStudioFilter = (filters) => {
     }
   }
 
-  if (filters.playCount?.min !== undefined || filters.playCount?.max !== undefined) {
+  if (
+    filters.playCount?.min !== undefined ||
+    filters.playCount?.max !== undefined
+  ) {
     studioFilter.play_count = {};
-    const hasMin = filters.playCount.min !== undefined && filters.playCount.min !== '';
-    const hasMax = filters.playCount.max !== undefined && filters.playCount.max !== '';
+    const hasMin =
+      filters.playCount.min !== undefined && filters.playCount.min !== "";
+    const hasMax =
+      filters.playCount.max !== undefined && filters.playCount.max !== "";
 
     if (hasMin && hasMax) {
       studioFilter.play_count.modifier = "BETWEEN";
@@ -1553,16 +1693,24 @@ export const buildStudioFilter = (filters) => {
   // Date-range filters
   if (filters.createdAt?.start || filters.createdAt?.end) {
     studioFilter.created_at = {};
-    if (filters.createdAt.start) studioFilter.created_at.value = filters.createdAt.start;
-    studioFilter.created_at.modifier = filters.createdAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.createdAt.end) studioFilter.created_at.value2 = filters.createdAt.end;
+    if (filters.createdAt.start)
+      studioFilter.created_at.value = filters.createdAt.start;
+    studioFilter.created_at.modifier = filters.createdAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.createdAt.end)
+      studioFilter.created_at.value2 = filters.createdAt.end;
   }
 
   if (filters.updatedAt?.start || filters.updatedAt?.end) {
     studioFilter.updated_at = {};
-    if (filters.updatedAt.start) studioFilter.updated_at.value = filters.updatedAt.start;
-    studioFilter.updated_at.modifier = filters.updatedAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.updatedAt.end) studioFilter.updated_at.value2 = filters.updatedAt.end;
+    if (filters.updatedAt.start)
+      studioFilter.updated_at.value = filters.updatedAt.start;
+    studioFilter.updated_at.modifier = filters.updatedAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.updatedAt.end)
+      studioFilter.updated_at.value2 = filters.updatedAt.end;
   }
 
   // Text search filters
@@ -1594,8 +1742,10 @@ export const buildTagFilter = (filters) => {
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
     tagFilter.rating100 = {};
-    const hasMin = filters.rating.min !== undefined && filters.rating.min !== '';
-    const hasMax = filters.rating.max !== undefined && filters.rating.max !== '';
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
 
     if (hasMin && hasMax) {
       tagFilter.rating100.modifier = "BETWEEN";
@@ -1611,10 +1761,15 @@ export const buildTagFilter = (filters) => {
   }
 
   // Range filter
-  if (filters.sceneCount?.min !== undefined || filters.sceneCount?.max !== undefined) {
+  if (
+    filters.sceneCount?.min !== undefined ||
+    filters.sceneCount?.max !== undefined
+  ) {
     tagFilter.scene_count = {};
-    const hasMin = filters.sceneCount.min !== undefined && filters.sceneCount.min !== '';
-    const hasMax = filters.sceneCount.max !== undefined && filters.sceneCount.max !== '';
+    const hasMin =
+      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
+    const hasMax =
+      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
 
     if (hasMin && hasMax) {
       tagFilter.scene_count.modifier = "BETWEEN";
@@ -1629,10 +1784,15 @@ export const buildTagFilter = (filters) => {
     }
   }
 
-  if (filters.oCounter?.min !== undefined || filters.oCounter?.max !== undefined) {
+  if (
+    filters.oCounter?.min !== undefined ||
+    filters.oCounter?.max !== undefined
+  ) {
     tagFilter.o_counter = {};
-    const hasMin = filters.oCounter.min !== undefined && filters.oCounter.min !== '';
-    const hasMax = filters.oCounter.max !== undefined && filters.oCounter.max !== '';
+    const hasMin =
+      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
+    const hasMax =
+      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
 
     if (hasMin && hasMax) {
       tagFilter.o_counter.modifier = "BETWEEN";
@@ -1647,10 +1807,15 @@ export const buildTagFilter = (filters) => {
     }
   }
 
-  if (filters.playCount?.min !== undefined || filters.playCount?.max !== undefined) {
+  if (
+    filters.playCount?.min !== undefined ||
+    filters.playCount?.max !== undefined
+  ) {
     tagFilter.play_count = {};
-    const hasMin = filters.playCount.min !== undefined && filters.playCount.min !== '';
-    const hasMax = filters.playCount.max !== undefined && filters.playCount.max !== '';
+    const hasMin =
+      filters.playCount.min !== undefined && filters.playCount.min !== "";
+    const hasMax =
+      filters.playCount.max !== undefined && filters.playCount.max !== "";
 
     if (hasMin && hasMax) {
       tagFilter.play_count.modifier = "BETWEEN";
@@ -1668,16 +1833,24 @@ export const buildTagFilter = (filters) => {
   // Date-range filters
   if (filters.createdAt?.start || filters.createdAt?.end) {
     tagFilter.created_at = {};
-    if (filters.createdAt.start) tagFilter.created_at.value = filters.createdAt.start;
-    tagFilter.created_at.modifier = filters.createdAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.createdAt.end) tagFilter.created_at.value2 = filters.createdAt.end;
+    if (filters.createdAt.start)
+      tagFilter.created_at.value = filters.createdAt.start;
+    tagFilter.created_at.modifier = filters.createdAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.createdAt.end)
+      tagFilter.created_at.value2 = filters.createdAt.end;
   }
 
   if (filters.updatedAt?.start || filters.updatedAt?.end) {
     tagFilter.updated_at = {};
-    if (filters.updatedAt.start) tagFilter.updated_at.value = filters.updatedAt.start;
-    tagFilter.updated_at.modifier = filters.updatedAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.updatedAt.end) tagFilter.updated_at.value2 = filters.updatedAt.end;
+    if (filters.updatedAt.start)
+      tagFilter.updated_at.value = filters.updatedAt.start;
+    tagFilter.updated_at.modifier = filters.updatedAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.updatedAt.end)
+      tagFilter.updated_at.value2 = filters.updatedAt.end;
   }
 
   // Text search filters
@@ -1709,8 +1882,10 @@ export const buildGroupFilter = (filters) => {
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
     groupFilter.rating100 = {};
-    const hasMin = filters.rating.min !== undefined && filters.rating.min !== '';
-    const hasMax = filters.rating.max !== undefined && filters.rating.max !== '';
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
 
     if (hasMin && hasMax) {
       groupFilter.rating100.modifier = "BETWEEN";
@@ -1726,10 +1901,15 @@ export const buildGroupFilter = (filters) => {
   }
 
   // Range filters
-  if (filters.sceneCount?.min !== undefined || filters.sceneCount?.max !== undefined) {
+  if (
+    filters.sceneCount?.min !== undefined ||
+    filters.sceneCount?.max !== undefined
+  ) {
     groupFilter.scene_count = {};
-    const hasMin = filters.sceneCount.min !== undefined && filters.sceneCount.min !== '';
-    const hasMax = filters.sceneCount.max !== undefined && filters.sceneCount.max !== '';
+    const hasMin =
+      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
+    const hasMax =
+      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
 
     if (hasMin && hasMax) {
       groupFilter.scene_count.modifier = "BETWEEN";
@@ -1744,10 +1924,15 @@ export const buildGroupFilter = (filters) => {
     }
   }
 
-  if (filters.duration?.min !== undefined || filters.duration?.max !== undefined) {
+  if (
+    filters.duration?.min !== undefined ||
+    filters.duration?.max !== undefined
+  ) {
     groupFilter.duration = {};
-    const hasMin = filters.duration.min !== undefined && filters.duration.min !== '';
-    const hasMax = filters.duration.max !== undefined && filters.duration.max !== '';
+    const hasMin =
+      filters.duration.min !== undefined && filters.duration.min !== "";
+    const hasMax =
+      filters.duration.max !== undefined && filters.duration.max !== "";
 
     if (hasMin && hasMax) {
       groupFilter.duration.modifier = "BETWEEN";
@@ -1755,10 +1940,10 @@ export const buildGroupFilter = (filters) => {
       groupFilter.duration.value2 = parseInt(filters.duration.max) * 60;
     } else if (hasMin) {
       groupFilter.duration.modifier = "GREATER_THAN";
-      groupFilter.duration.value = (parseInt(filters.duration.min) * 60) - 1;
+      groupFilter.duration.value = parseInt(filters.duration.min) * 60 - 1;
     } else if (hasMax) {
       groupFilter.duration.modifier = "LESS_THAN";
-      groupFilter.duration.value = (parseInt(filters.duration.max) * 60) + 1;
+      groupFilter.duration.value = parseInt(filters.duration.max) * 60 + 1;
     }
   }
 
@@ -1772,16 +1957,24 @@ export const buildGroupFilter = (filters) => {
 
   if (filters.createdAt?.start || filters.createdAt?.end) {
     groupFilter.created_at = {};
-    if (filters.createdAt.start) groupFilter.created_at.value = filters.createdAt.start;
-    groupFilter.created_at.modifier = filters.createdAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.createdAt.end) groupFilter.created_at.value2 = filters.createdAt.end;
+    if (filters.createdAt.start)
+      groupFilter.created_at.value = filters.createdAt.start;
+    groupFilter.created_at.modifier = filters.createdAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.createdAt.end)
+      groupFilter.created_at.value2 = filters.createdAt.end;
   }
 
   if (filters.updatedAt?.start || filters.updatedAt?.end) {
     groupFilter.updated_at = {};
-    if (filters.updatedAt.start) groupFilter.updated_at.value = filters.updatedAt.start;
-    groupFilter.updated_at.modifier = filters.updatedAt.end ? "BETWEEN" : "GREATER_THAN";
-    if (filters.updatedAt.end) groupFilter.updated_at.value2 = filters.updatedAt.end;
+    if (filters.updatedAt.start)
+      groupFilter.updated_at.value = filters.updatedAt.start;
+    groupFilter.updated_at.modifier = filters.updatedAt.end
+      ? "BETWEEN"
+      : "GREATER_THAN";
+    if (filters.updatedAt.end)
+      groupFilter.updated_at.value2 = filters.updatedAt.end;
   }
 
   // Text search filters

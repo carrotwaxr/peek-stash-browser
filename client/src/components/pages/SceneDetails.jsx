@@ -40,21 +40,21 @@ const mergeAllTags = (scene) => {
 
   // Add scene tags
   if (scene.tags) {
-    scene.tags.forEach(tag => tagMap.set(tag.id, tag));
+    scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
   }
 
   // Add performer tags
   if (scene.performers) {
-    scene.performers.forEach(performer => {
+    scene.performers.forEach((performer) => {
       if (performer.tags) {
-        performer.tags.forEach(tag => tagMap.set(tag.id, tag));
+        performer.tags.forEach((tag) => tagMap.set(tag.id, tag));
       }
     });
   }
 
   // Add studio tags
   if (scene.studio?.tags) {
-    scene.studio.tags.forEach(tag => tagMap.set(tag.id, tag));
+    scene.studio.tags.forEach((tag) => tagMap.set(tag.id, tag));
   }
 
   return Array.from(tagMap.values());
@@ -253,13 +253,13 @@ const SceneDetails = ({
                       className="text-sm font-medium mb-3"
                       style={{ color: "var(--text-secondary)" }}
                     >
-                      Groups
+                      Collections
                     </h3>
                     <div className="flex flex-wrap gap-3">
                       {scene.groups.map((group) => (
                         <Link
                           key={group.id}
-                          to={`/group/${group.id}`}
+                          to={`/collection/${group.id}`}
                           className="flex flex-col items-center rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
                           style={{
                             backgroundColor: "var(--bg-secondary)",
@@ -275,7 +275,10 @@ const SceneDetails = ({
                           >
                             {group.front_image_path || group.back_image_path ? (
                               <img
-                                src={group.front_image_path || group.back_image_path}
+                                src={
+                                  group.front_image_path ||
+                                  group.back_image_path
+                                }
                                 alt={group.name}
                                 className="w-full h-full object-cover"
                               />
@@ -305,34 +308,36 @@ const SceneDetails = ({
                 {/* Tags */}
                 {(() => {
                   const allTags = mergeAllTags(scene);
-                  return allTags.length > 0 && (
-                    <div>
-                      <h3
-                        className="text-sm font-medium mb-3"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        Tags
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {allTags.map((tag) => {
-                          // Generate a color based on tag ID for consistency
-                          const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-                          return (
-                            <Link
-                              key={tag.id}
-                              to={`/tag/${tag.id}`}
-                              className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                              style={{
-                                backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                                color: "white",
-                              }}
-                            >
-                              {tag.name}
-                            </Link>
-                          );
-                        })}
+                  return (
+                    allTags.length > 0 && (
+                      <div>
+                        <h3
+                          className="text-sm font-medium mb-3"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          Tags
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {allTags.map((tag) => {
+                            // Generate a color based on tag ID for consistency
+                            const hue = (parseInt(tag.id, 10) * 137.5) % 360;
+                            return (
+                              <Link
+                                key={tag.id}
+                                to={`/tag/${tag.id}`}
+                                className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                                style={{
+                                  backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                                  color: "white",
+                                }}
+                              >
+                                {tag.name}
+                              </Link>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    )
                   );
                 })()}
               </Paper.Body>

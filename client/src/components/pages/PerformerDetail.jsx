@@ -458,7 +458,7 @@ const PerformerStats = ({ performer }) => {
           valueColor="var(--text-secondary)"
         />
         <StatField
-          label="Groups:"
+          label="Collections:"
           value={performer?.group_count || 0}
           valueColor="var(--text-secondary)"
         />
