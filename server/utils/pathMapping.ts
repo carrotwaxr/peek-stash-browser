@@ -288,12 +288,22 @@ export const appendApiKeyToUrl = convertToProxyUrl;
  */
 export const transformPerformer = (performer: any) => {
   try {
-    return {
+    const mutated: any = {
       ...performer,
       image_path: performer.image_path
         ? appendApiKeyToUrl(performer.image_path)
         : performer.image_path,
     };
+
+    // Transform nested tags
+    if (performer.tags && Array.isArray(performer.tags)) {
+      mutated.tags = performer.tags.map((t: any) => ({
+        ...t,
+        image_path: t.image_path ? appendApiKeyToUrl(t.image_path) : t.image_path,
+      }));
+    }
+
+    return mutated;
   } catch (error) {
     logger.error("Error transforming performer", { error });
     return performer;
@@ -305,12 +315,22 @@ export const transformPerformer = (performer: any) => {
  */
 export const transformStudio = (studio: any) => {
   try {
-    return {
+    const mutated: any = {
       ...studio,
       image_path: studio.image_path
         ? appendApiKeyToUrl(studio.image_path)
         : studio.image_path,
     };
+
+    // Transform nested tags
+    if (studio.tags && Array.isArray(studio.tags)) {
+      mutated.tags = studio.tags.map((t: any) => ({
+        ...t,
+        image_path: t.image_path ? appendApiKeyToUrl(t.image_path) : t.image_path,
+      }));
+    }
+
+    return mutated;
   } catch (error) {
     logger.error("Error transforming studio", { error });
     return studio;
