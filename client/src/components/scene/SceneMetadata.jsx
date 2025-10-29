@@ -9,21 +9,21 @@ const mergeAllTags = (scene) => {
 
   // Add scene tags
   if (scene.tags) {
-    scene.tags.forEach(tag => tagMap.set(tag.id, tag));
+    scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
   }
 
   // Add performer tags
   if (scene.performers) {
-    scene.performers.forEach(performer => {
+    scene.performers.forEach((performer) => {
       if (performer.tags) {
-        performer.tags.forEach(tag => tagMap.set(tag.id, tag));
+        performer.tags.forEach((tag) => tagMap.set(tag.id, tag));
       }
     });
   }
 
   // Add studio tags
   if (scene.studio?.tags) {
-    scene.studio.tags.forEach(tag => tagMap.set(tag.id, tag));
+    scene.studio.tags.forEach((tag) => tagMap.set(tag.id, tag));
   }
 
   return Array.from(tagMap.values());
@@ -39,37 +39,32 @@ const SceneMetadata = ({ scene, className = "" }) => {
   const performersContent = scene.performers && scene.performers.length > 0 && (
     <div>
       <div className="font-semibold mb-3 text-base">Performers</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
-        {scene.performers.slice(0, 8).map((performer) => (
+      <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+        {scene.performers.map((performer) => (
           <Link
             key={performer.id}
             to={`/performer/${performer.id}`}
-            className="flex items-center gap-2 p-2 rounded hover:bg-white/10 transition-colors"
+            className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             {performer.image_path ? (
               <img
                 src={performer.image_path}
                 alt={performer.name}
-                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                className="w-16 h-16 rounded-full object-cover flex-shrink-0"
               />
             ) : (
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: "var(--bg-secondary)" }}
               >
-                <span className="text-lg">👤</span>
+                <span className="text-2xl">👤</span>
               </div>
             )}
             <span className="text-sm truncate flex-1">{performer.name}</span>
           </Link>
         ))}
       </div>
-      {scene.performers.length > 8 && (
-        <div className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-          +{scene.performers.length - 8} more
-        </div>
-      )}
     </div>
   );
 
@@ -77,75 +72,65 @@ const SceneMetadata = ({ scene, className = "" }) => {
   const tagsContent = allTags && allTags.length > 0 && (
     <div>
       <div className="font-semibold mb-3 text-base">Tags</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
-        {allTags.slice(0, 8).map((tag) => (
+      <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+        {allTags.map((tag) => (
           <Link
             key={tag.id}
             to={`/tag/${tag.id}`}
-            className="flex items-center gap-2 p-2 rounded hover:bg-white/10 transition-colors"
+            className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             {tag.image_path ? (
               <img
                 src={tag.image_path}
                 alt={tag.name}
-                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                className="w-16 h-16 rounded object-cover flex-shrink-0"
               />
             ) : (
               <div
-                className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
+                className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: "var(--bg-secondary)" }}
               >
-                <span className="text-lg">🏷️</span>
+                <span className="text-2xl">🏷️</span>
               </div>
             )}
             <span className="text-sm truncate flex-1">{tag.name}</span>
           </Link>
         ))}
       </div>
-      {allTags.length > 8 && (
-        <div className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-          +{allTags.length - 8} more
-        </div>
-      )}
     </div>
   );
 
   // Groups tooltip content with images in a grid
   const groupsContent = scene.groups && scene.groups.length > 0 && (
     <div>
-      <div className="font-semibold mb-3 text-base">Groups</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
-        {scene.groups.slice(0, 8).map((group) => (
+      <div className="font-semibold mb-3 text-base">Collections</div>
+      <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+        {scene.groups.map((group) => (
           <Link
             key={group.id}
-            to={`/group/${group.id}`}
-            className="flex items-center gap-2 p-2 rounded hover:bg-white/10 transition-colors"
+            to={`/collection/${group.id}`}
+            className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             {group.front_image_path || group.back_image_path ? (
               <img
                 src={group.front_image_path || group.back_image_path}
                 alt={group.name}
-                className="w-10 h-10 rounded object-cover flex-shrink-0"
+                className="w-16 h-16 rounded object-cover flex-shrink-0"
               />
             ) : (
               <div
-                className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
+                className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: "var(--bg-secondary)" }}
               >
-                <span className="text-lg">🎬</span>
+                <span className="text-2xl">🎬</span>
               </div>
             )}
             <span className="text-sm truncate flex-1">{group.name}</span>
           </Link>
         ))}
       </div>
-      {scene.groups.length > 8 && (
-        <div className="text-xs mt-2" style={{ color: "var(--text-muted)" }}>
-          +{scene.groups.length - 8} more
-        </div>
-      )}
     </div>
   );
 
