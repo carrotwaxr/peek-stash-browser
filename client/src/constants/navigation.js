@@ -40,10 +40,10 @@ export const NAV_DEFINITIONS = [
   },
   {
     key: "groups",
-    name: "Groups",
-    path: "/groups",
+    name: "Collections",
+    path: "/collections",
     icon: "film",
-    description: "Browse groups and movies in your library",
+    description: "Browse collections and movies in your library",
   },
   {
     key: "galleries",
@@ -87,7 +87,7 @@ export const migrateNavPreferences = (savedPreferences) => {
   // Insert new nav items at their proper position from NAV_DEFINITIONS
   if (missingNavItems.length > 0) {
     // Create a map of existing prefs for quick lookup
-    const prefsMap = new Map(prefs.map(p => [p.id, p]));
+    const prefsMap = new Map(prefs.map((p) => [p.id, p]));
 
     // Rebuild prefs array in NAV_DEFINITIONS order
     prefs = NAV_DEFINITIONS.map((def, definitionIndex) => {

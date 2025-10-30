@@ -69,7 +69,10 @@ const TagDetail = () => {
           </div>
 
           {tag?.aliases && tag.aliases.length > 0 && (
-            <p className="text-xl mb-3" style={{ color: "var(--text-secondary)" }}>
+            <p
+              className="text-xl mb-3"
+              style={{ color: "var(--text-secondary)" }}
+            >
               Also known as: {tag.aliases.join(", ")}
             </p>
           )}
@@ -225,7 +228,7 @@ const TagStats = ({ tag }) => {
           valueColor="var(--accent-primary)"
         />
         <StatField
-          label="Groups:"
+          label="Collections:"
           value={tag?.group_count}
           valueColor="var(--accent-primary)"
         />

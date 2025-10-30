@@ -12,7 +12,7 @@ const api = axios.create({
 /**
  * Content Restrictions Modal
  *
- * Allows admins to configure per-user content restrictions for Groups, Tags, Studios, and Galleries.
+ * Allows admins to configure per-user content restrictions for Collections, Tags, Studios, and Galleries.
  * Supports INCLUDE (show only) and EXCLUDE (hide) modes with "restrict empty" option.
  */
 const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
@@ -121,7 +121,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
 
   const getEntityLabel = (entityType) => {
     const labels = {
-      groups: "Groups",
+      groups: "Collections",
       tags: "Tags",
       studios: "Studios",
       galleries: "Galleries",
@@ -131,9 +131,11 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
 
   const getEntityDescription = (entityType) => {
     const descriptions = {
-      groups: "Most reliable for content organization as groups are typically static and manually curated.",
+      groups:
+        "Most reliable for content organization as groups are typically static and manually curated.",
       tags: "May change frequently if using Stash plugins. Use with caution for dynamic tagging systems.",
-      studios: "Useful for limiting content by production company or studio name.",
+      studios:
+        "Useful for limiting content by production company or studio name.",
       galleries: "Restrict access to specific gallery content.",
     };
     return descriptions[entityType] || "";
@@ -162,7 +164,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
       >
         {/* Entity Type Header */}
         <div className="mb-3">
-          <h4 className="font-medium mb-1" style={{ color: "var(--text-primary)" }}>
+          <h4
+            className="font-medium mb-1"
+            style={{ color: "var(--text-primary)" }}
+          >
             {getEntityLabel(entityType)}
           </h4>
           <p className="text-xs" style={{ color: "var(--text-muted)" }}>
@@ -172,7 +177,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
 
         {/* Mode Selection */}
         <div className="mb-3">
-          <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: "var(--text-secondary)" }}
+          >
             Restriction Mode
           </label>
           <div className="space-y-2">
@@ -181,7 +189,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                 key={mode}
                 className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-opacity-50"
                 style={{
-                  backgroundColor: config.mode === mode ? "rgba(59, 130, 246, 0.1)" : "transparent",
+                  backgroundColor:
+                    config.mode === mode
+                      ? "rgba(59, 130, 246, 0.1)"
+                      : "transparent",
                 }}
               >
                 <input
@@ -194,10 +205,16 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                   style={{ accentColor: "var(--primary-color)" }}
                 />
                 <div className="flex-1">
-                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                  <span
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     {mode}
                   </span>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ color: "var(--text-muted)" }}
+                  >
                     {getModeDescription(mode)}
                   </p>
                 </div>
@@ -210,7 +227,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
         {config.mode !== "NONE" && (
           <>
             <div className="mb-3">
-              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Select {getEntityLabel(entityType)}
               </label>
               <SearchableSelect
@@ -218,9 +238,14 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                 value={config.entityIds}
                 onChange={(ids) => handleEntityIdsChange(entityType, ids)}
                 multi={true}
-                placeholder={`Select ${getEntityLabel(entityType).toLowerCase()}...`}
+                placeholder={`Select ${getEntityLabel(
+                  entityType
+                ).toLowerCase()}...`}
               />
-              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+              <p
+                className="text-xs mt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
                 {config.mode === "EXCLUDE"
                   ? "Selected items will be hidden from this user"
                   : "User will ONLY see selected items"}
@@ -233,17 +258,27 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                 <input
                   type="checkbox"
                   checked={config.restrictEmpty}
-                  onChange={(e) => handleRestrictEmptyChange(entityType, e.target.checked)}
+                  onChange={(e) =>
+                    handleRestrictEmptyChange(entityType, e.target.checked)
+                  }
                   className="w-4 h-4 rounded cursor-pointer mt-0.5"
                   style={{ accentColor: "var(--primary-color)" }}
                 />
                 <div className="flex-1">
-                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                    Restrict items with no {getEntityLabel(entityType).toLowerCase()}
+                  <span
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    Restrict items with no{" "}
+                    {getEntityLabel(entityType).toLowerCase()}
                   </span>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    When enabled, hides scenes that have no {getEntityLabel(entityType).toLowerCase()} assigned.
-                    Useful for preventing unorganized content from appearing.
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    When enabled, hides scenes that have no{" "}
+                    {getEntityLabel(entityType).toLowerCase()} assigned. Useful
+                    for preventing unorganized content from appearing.
                   </p>
                 </div>
               </label>
@@ -281,32 +316,44 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                 color: "var(--text-secondary)",
               }}
             >
-              <p className="mb-2 font-medium" style={{ color: "rgb(59, 130, 246)" }}>
+              <p
+                className="mb-2 font-medium"
+                style={{ color: "rgb(59, 130, 246)" }}
+              >
                 How Content Restrictions Work
               </p>
-              <ul className="list-disc list-inside space-y-1 text-xs" style={{ color: "var(--text-muted)" }}>
+              <ul
+                className="list-disc list-inside space-y-1 text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
                 <li>
-                  <strong>EXCLUDE mode:</strong> Hides selected items and any scenes/content associated with them.
-                  Most users will primarily use this mode as it's the most predictable.
+                  <strong>EXCLUDE mode:</strong> Hides selected items and any
+                  scenes/content associated with them. Most users will primarily
+                  use this mode as it's the most predictable.
                 </li>
                 <li>
-                  <strong>INCLUDE mode:</strong> Shows ONLY selected items. Multiple INCLUDE filters work together
-                  (scenes must match ALL include filters).
+                  <strong>INCLUDE mode:</strong> Shows ONLY selected items.
+                  Multiple INCLUDE filters work together (scenes must match ALL
+                  include filters).
                 </li>
                 <li>
-                  <strong>Restrict empty:</strong> Hides items with no metadata for that type, preventing unorganized
-                  content from leaking through restrictions.
+                  <strong>Restrict empty:</strong> Hides items with no metadata
+                  for that type, preventing unorganized content from leaking
+                  through restrictions.
                 </li>
                 <li>
-                  <strong>Cascading filters:</strong> Restricted tags/studios/groups won't show in dropdowns, detail
-                  pages, or cards anywhere in the UI.
+                  <strong>Cascading filters:</strong> Restricted
+                  tags/studios/groups won't show in dropdowns, detail pages, or
+                  cards anywhere in the UI.
                 </li>
                 <li>
-                  <strong>Recommended:</strong> Use Groups as your primary filtering mechanism since they're most
-                  reliable and static.
+                  <strong>Recommended:</strong> Use Collections (Groups) as your
+                  primary filtering mechanism since they're most reliable and
+                  static.
                 </li>
                 <li>
-                  <strong>Admin users</strong> always see all content regardless of restrictions.
+                  <strong>Admin users</strong> always see all content regardless
+                  of restrictions.
                 </li>
               </ul>
             </div>
@@ -321,7 +368,10 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                     borderTopColor: "transparent",
                   }}
                 ></div>
-                <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   Loading restrictions...
                 </p>
               </div>
@@ -352,14 +402,21 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
                   }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-medium px-2 py-0.5 rounded" style={{
-                      backgroundColor: "rgba(34, 197, 94, 0.2)",
-                      color: "rgb(34, 197, 94)",
-                    }}>
+                    <span
+                      className="text-xs font-medium px-2 py-0.5 rounded"
+                      style={{
+                        backgroundColor: "rgba(34, 197, 94, 0.2)",
+                        color: "rgb(34, 197, 94)",
+                      }}
+                    >
                       RECOMMENDED
                     </span>
-                    <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      Groups are the most reliable organizational unit for content restrictions
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Collections are the most reliable organizational unit for
+                      content restrictions
                     </p>
                   </div>
                   {renderEntitySection("groups")}
@@ -383,11 +440,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
               >
                 Save Restrictions
               </Button>
-              <Button
-                onClick={onClose}
-                disabled={saving}
-                variant="secondary"
-              >
+              <Button onClick={onClose} disabled={saving} variant="secondary">
                 Cancel
               </Button>
             </div>

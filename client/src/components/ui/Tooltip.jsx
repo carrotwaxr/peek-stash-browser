@@ -239,7 +239,8 @@ const Tooltip = ({
         color: "var(--text-tooltip, white)",
         border: "1px solid var(--border-color)",
         minWidth: "200px",
-        maxWidth: "min(400px, calc(100vw - 32px))", // Responsive max-width
+        maxWidth: "calc(100vw - 32px)", // Use nearly full width on all screens
+        width: "max-content", // Grow to content size up to maxWidth
         lineHeight: "1.4",
         wordWrap: "break-word",
         top: `${tooltipPosition.top || 0}px`,

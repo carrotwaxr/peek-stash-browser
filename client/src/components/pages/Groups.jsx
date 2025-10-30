@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
-import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -19,7 +18,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
 
 const Groups = () => {
-  usePageTitle("Groups");
+  usePageTitle("Collections");
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -76,7 +75,7 @@ const Groups = () => {
     items: currentGroups,
     columns,
     enabled: !isLoading && isTVMode,
-    onSelect: (group) => navigate(`/group/${group.id}`),
+    onSelect: (group) => navigate(`/collection/${group.id}`),
     onPageUp: () =>
       urlPage > 1 &&
       handleQueryChange({
@@ -101,7 +100,7 @@ const Groups = () => {
   if (error) {
     return (
       <PageLayout>
-        <PageHeader title="Groups" />
+        <PageHeader title="Collections" />
         <ErrorMessage error={error} />
       </PageLayout>
     );
@@ -110,7 +109,10 @@ const Groups = () => {
   return (
     <PageLayout>
       <div ref={pageRef}>
-        <PageHeader title="Groups" subtitle="Browse groups and movies in your library" />
+        <PageHeader
+          title="Collections"
+          subtitle="Browse collections and movies in your library"
+        />
 
         {/* Controls Section */}
         <SearchControls
@@ -167,7 +169,7 @@ const GroupCard = forwardRef(
       <Link
         ref={ref}
         state={{ referrerUrl }}
-        to={`/group/${group.id}`}
+        to={`/collection/${group.id}`}
         tabIndex={isTVMode ? tabIndex : -1}
         className={`group-card block rounded-lg border overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
         style={{
@@ -175,7 +177,7 @@ const GroupCard = forwardRef(
           borderColor: "var(--border-color)",
         }}
         role="button"
-        aria-label={`Group: ${group.name}`}
+        aria-label={`Collection: ${group.name}`}
       >
         {/* DVD Cover Image - Portrait Orientation */}
         <div className="w-full aspect-[2/3] p-3">
@@ -205,7 +207,10 @@ const GroupCard = forwardRef(
 
           {/* Studio and Date */}
           {(group.studio || group.date) && (
-            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+            <div
+              className="text-xs mb-2"
+              style={{ color: "var(--text-muted)" }}
+            >
               {group.studio && <span>{group.studio.name}</span>}
               {group.studio && group.date && <span> • </span>}
               {group.date && <span>{group.date}</span>}
@@ -216,18 +221,24 @@ const GroupCard = forwardRef(
           <div className="text-xs mb-2 space-y-1">
             <div style={{ color: "var(--text-muted)" }}>
               {group.scene_count > 0
-                ? `${group.scene_count} Scene${group.scene_count !== 1 ? "s" : ""}`
+                ? `${group.scene_count} Scene${
+                    group.scene_count !== 1 ? "s" : ""
+                  }`
                 : "No scenes"}
             </div>
             {group.sub_group_count > 0 && (
               <div style={{ color: "var(--text-muted)" }}>
-                {group.sub_group_count} Sub-group{group.sub_group_count !== 1 ? "s" : ""}
+                {group.sub_group_count} Sub-group
+                {group.sub_group_count !== 1 ? "s" : ""}
               </div>
             )}
           </div>
 
           {/* Rating and Favorite */}
-          <div className="flex items-center" onClick={(e) => e.preventDefault()}>
+          <div
+            className="flex items-center"
+            onClick={(e) => e.preventDefault()}
+          >
             <RatingControls
               entityType="group"
               entityId={group.id}

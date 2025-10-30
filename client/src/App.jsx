@@ -1,9 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-} from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import GlobalLayout from "./components/ui/GlobalLayout.jsx";
 import Login from "./components/pages/Login.jsx";
@@ -24,16 +20,24 @@ const Studios = lazy(() => import("./components/pages/Studios.jsx"));
 const Tags = lazy(() => import("./components/pages/Tags.jsx"));
 const Groups = lazy(() => import("./components/pages/Groups.jsx"));
 const Galleries = lazy(() => import("./components/pages/Galleries.jsx"));
-const GalleryDetail = lazy(() => import("./components/pages/GalleryDetail.jsx"));
+const GalleryDetail = lazy(() =>
+  import("./components/pages/GalleryDetail.jsx")
+);
 const GroupDetail = lazy(() => import("./components/pages/GroupDetail.jsx"));
 const Scene = lazy(() => import("./components/pages/Scene.jsx"));
-const PerformerDetail = lazy(() => import("./components/pages/PerformerDetail.jsx"));
+const PerformerDetail = lazy(() =>
+  import("./components/pages/PerformerDetail.jsx")
+);
 const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
 const TagDetail = lazy(() => import("./components/pages/TagDetail.jsx"));
 const Settings = lazy(() => import("./components/pages/Settings.jsx"));
 const Playlists = lazy(() => import("./components/pages/Playlists.jsx"));
-const PlaylistDetail = lazy(() => import("./components/pages/PlaylistDetail.jsx"));
-const ServerSettings = lazy(() => import("./components/pages/ServerSettings.jsx"));
+const PlaylistDetail = lazy(() =>
+  import("./components/pages/PlaylistDetail.jsx")
+);
+const ServerSettings = lazy(() =>
+  import("./components/pages/ServerSettings.jsx")
+);
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
 
 // Loading fallback component
@@ -142,7 +146,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/groups"
+            path="/collections"
             element={
               <GlobalLayout>
                 <Groups />
@@ -190,7 +194,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/group/:groupId"
+            path="/collection/:groupId"
             element={
               <GlobalLayout>
                 <GroupDetail />
@@ -258,7 +262,7 @@ function App() {
             toastOptions={{
               duration: 3000,
               style: {
-                padding: '0',
+                padding: "0",
               },
             }}
           />
