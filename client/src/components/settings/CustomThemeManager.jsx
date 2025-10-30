@@ -127,7 +127,7 @@ const CustomThemeManager = () => {
   // Show theme list
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <h3 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
             Custom Themes
@@ -136,7 +136,7 @@ const CustomThemeManager = () => {
             Create and manage your own custom themes
           </p>
         </div>
-        <Button variant="primary" onClick={handleCreate}>
+        <Button variant="primary" onClick={handleCreate} className="w-full md:w-auto">
           <Plus size={16} className="mr-2" />
           Create Theme
         </Button>
