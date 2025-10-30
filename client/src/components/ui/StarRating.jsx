@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Star, X } from 'lucide-react';
+import { useState } from "react";
+import { Star, X } from "lucide-react";
 
 /**
  * Star rating component
@@ -11,7 +11,7 @@ export default function StarRating({
   onChange,
   readonly = false,
   size = 20,
-  className = '',
+  className = "",
   showValue = false,
 }) {
   const [hoverRating, setHoverRating] = useState(null);
@@ -84,24 +84,25 @@ export default function StarRating({
         disabled={readonly || !onChange}
         className={`
           relative
-          ${readonly || !onChange ? 'cursor-default' : 'cursor-pointer hover:scale-110'}
+          ${
+            readonly || !onChange
+              ? "cursor-default"
+              : "cursor-pointer hover:scale-110"
+          }
           transition-transform
           ${className}
         `}
-        aria-label={`Rate ${starNumber} star${starNumber > 1 ? 's' : ''}`}
+        aria-label={`Rate ${starNumber} star${starNumber > 1 ? "s" : ""}`}
       >
         {isHalf ? (
           // Half-filled star using gradient
           <>
-            <Star
-              size={size}
-              className="text-gray-400"
-            />
+            <Star size={size} className="text-gray-400" />
             <Star
               size={size}
               className="fill-yellow-400 text-yellow-400 absolute inset-0"
               style={{
-                clipPath: 'inset(0 50% 0 0)',
+                clipPath: "inset(0 50% 0 0)",
               }}
             />
           </>
@@ -110,7 +111,7 @@ export default function StarRating({
           <Star
             size={size}
             className={`
-              ${isFilled ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}
+              ${isFilled ? "fill-yellow-400 text-yellow-400" : "text-gray-400"}
               transition-colors
             `}
           />
@@ -133,7 +134,7 @@ export default function StarRating({
           <X
             size={size * 0.8}
             className="transition-colors"
-            style={{ color: 'var(--status-error-text)' }}
+            style={{ color: "var(--status-error)" }}
           />
         </button>
       )}
@@ -141,9 +142,7 @@ export default function StarRating({
         {[0, 1, 2, 3, 4].map(renderStar)}
       </div>
       {showValue && rating !== null && rating !== undefined && (
-        <span className="ml-2 text-sm text-gray-400">
-          {rating}
-        </span>
+        <span className="ml-2 text-sm text-gray-400">{rating}</span>
       )}
     </div>
   );
