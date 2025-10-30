@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import "video.js/dist/video-js.css";
@@ -14,6 +14,7 @@ import { usePlaylistPlayer } from "./usePlaylistPlayer.js";
 
 const api = axios.create({
   baseURL: "/api",
+  withCredentials: true,
 });
 
 /**
@@ -52,6 +53,25 @@ const VideoPlayer = () => {
   const playerRef = useRef(null); // Video.js player instance
   const hasResumedRef = useRef(false); // Prevent double-resume
   const initialResumeTimeRef = useRef(null); // Capture resume time once
+
+  // ============================================================================
+  // USER SETTINGS
+  // ============================================================================
+  const [enableCast, setEnableCast] = useState(true); // Default to true
+
+  // Fetch user settings for cast preference
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await api.get("/user/settings");
+        setEnableCast(response.data.settings.enableCast !== false);
+      } catch (error) {
+        // If error, default to true (enabled)
+        console.error("Failed to fetch user settings:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // ============================================================================
   // CONTEXT
@@ -109,6 +129,7 @@ const VideoPlayer = () => {
     playerRef,
     stopTracking,
     scene,
+    enableCast,
   });
 
   // Hook 2: Manage playlist navigation and controls

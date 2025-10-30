@@ -32,6 +32,7 @@ const Settings = () => {
   // Settings state
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
+  const [enableCast, setEnableCast] = useState(true);
   const [carouselPreferences, setCarouselPreferences] = useState([]);
   const [navPreferences, setNavPreferences] = useState([]);
   const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
@@ -58,6 +59,7 @@ const Settings = () => {
 
       setPreferredQuality(settings.preferredQuality || "auto");
       setPreferredPlaybackMode(settings.preferredPlaybackMode || "auto");
+      setEnableCast(settings.enableCast !== false); // Default to true
 
       // Migrate carousel preferences to include any new carousels
       const migratedCarouselPrefs = migrateCarouselPreferences(
@@ -123,6 +125,7 @@ const Settings = () => {
       await api.put("/user/settings", {
         preferredQuality,
         preferredPlaybackMode,
+        enableCast,
         minimumPlayPercent,
       });
 
@@ -1008,6 +1011,41 @@ const Settings = () => {
                     Auto uses direct play when supported, otherwise transcodes.
                     Direct play offers best quality but limited codec support.
                   </p>
+                </div>
+
+                {/* Enable Cast */}
+                <div>
+                  <label
+                    htmlFor="enableCast"
+                    className="flex items-center justify-between cursor-pointer"
+                  >
+                    <div>
+                      <span
+                        className="block text-sm font-medium mb-1"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        Enable Chromecast/AirPlay
+                      </span>
+                      <p
+                        className="text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        Allow casting videos to Chromecast devices and AirPlay.
+                        Disable if you don't use these features or experience
+                        playback issues.
+                      </p>
+                    </div>
+                    <input
+                      id="enableCast"
+                      type="checkbox"
+                      checked={enableCast}
+                      onChange={(e) => setEnableCast(e.target.checked)}
+                      className="ml-4 w-5 h-5 cursor-pointer"
+                      style={{
+                        accentColor: "var(--accent-primary)",
+                      }}
+                    />
+                  </label>
                 </div>
 
                 {/* Minimum Play Percent */}
