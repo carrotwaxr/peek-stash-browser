@@ -6,7 +6,12 @@ import {
   useLocation,
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
+import {
+  PageHeader,
+  PageLayout,
+  ErrorMessage,
+  CardCountsIcons,
+} from "../ui/index.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -123,7 +128,7 @@ const Groups = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
@@ -139,7 +144,7 @@ const Groups = () => {
             <>
               <div
                 ref={gridRef}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
               >
                 {currentGroups.map((group, index) => (
                   <GroupCard
@@ -179,72 +184,66 @@ const GroupCard = forwardRef(
         role="button"
         aria-label={`Collection: ${group.name}`}
       >
-        {/* DVD Cover Image - Portrait Orientation */}
-        <div className="w-full aspect-[2/3] p-3">
-          {imagePath ? (
-            <img
-              src={imagePath}
-              alt={group.name}
-              className="w-full h-full object-contain rounded-md"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl">
-              🎬
-            </div>
-          )}
-        </div>
-
-        {/* Content Section */}
-        <div className="p-4">
-          {/* Name */}
-          <h3
-            className="font-semibold mb-2 line-clamp-2"
-            style={{ color: "var(--text-primary)" }}
-            title={group.name}
-          >
-            {group.name}
-          </h3>
-
-          {/* Studio and Date */}
-          {(group.studio || group.date) && (
-            <div
-              className="text-xs mb-2"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {group.studio && <span>{group.studio.name}</span>}
-              {group.studio && group.date && <span> • </span>}
-              {group.date && <span>{group.date}</span>}
-            </div>
-          )}
-
-          {/* Scene Count and Sub-Groups */}
-          <div className="text-xs mb-2 space-y-1">
-            <div style={{ color: "var(--text-muted)" }}>
-              {group.scene_count > 0
-                ? `${group.scene_count} Scene${
-                    group.scene_count !== 1 ? "s" : ""
-                  }`
-                : "No scenes"}
-            </div>
-            {group.sub_group_count > 0 && (
-              <div style={{ color: "var(--text-muted)" }}>
-                {group.sub_group_count} Sub-group
-                {group.sub_group_count !== 1 ? "s" : ""}
+        <div className="text-center">
+          {/* DVD Cover Image - Portrait Orientation */}
+          <div className="w-full aspect-[2/3] p-2">
+            {imagePath ? (
+              <img
+                src={imagePath}
+                alt={group.name}
+                className="w-full h-full object-contain rounded-md"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-6xl">
+                🎬
               </div>
             )}
           </div>
 
-          {/* Rating and Favorite */}
-          <div
-            className="flex items-center"
-            onClick={(e) => e.preventDefault()}
-          >
-            <RatingControls
-              entityType="group"
-              entityId={group.id}
-              initialRating={group.rating}
-              initialFavorite={group.favorite || false}
+          {/* Content Section */}
+          <div className="p-3">
+            {/* Name */}
+            <h3
+              className="font-semibold mb-2 line-clamp-2"
+              style={{ color: "var(--text-primary)" }}
+              title={group.name}
+            >
+              {group.name}
+            </h3>
+
+            {/* Studio and Date - Always rendered to maintain alignment */}
+            <div
+              className="text-xs mb-2"
+              style={{
+                color: "var(--text-muted)",
+                minHeight: "1.25rem" // Maintains space even when empty
+              }}
+            >
+              {group.studio && <span>{group.studio.name}</span>}
+              {group.studio && group.date && <span> • </span>}
+              {group.date && <span>{group.date}</span>}
+              {!group.studio && !group.date && <span>&nbsp;</span>}
+            </div>
+
+            {/* Entity Counts */}
+            <CardCountsIcons
+              className="mb-2 justify-center"
+              sceneCount={group.scene_count}
+              groupCount={group.sub_group_count}
             />
+
+            {/* Rating and Favorite */}
+            <div
+              className="flex items-center justify-center"
+              onClick={(e) => e.preventDefault()}
+            >
+              <RatingControls
+                entityType="group"
+                entityId={group.id}
+                initialRating={group.rating}
+                initialFavorite={group.favorite || false}
+              />
+            </div>
           </div>
         </div>
       </Link>

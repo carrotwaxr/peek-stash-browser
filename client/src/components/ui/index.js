@@ -18,5 +18,6 @@ export { default as ActiveFilterChips } from "./ActiveFilterChips.jsx";
 export { default as FilterPresets } from "./FilterPresets.jsx";
 export { default as PlayCountIndicator } from "./PlayCountIndicator.jsx";
 export { default as CardStatusIcons } from "./CardStatusIcons.jsx";
+export { default as CardCountsIcons } from "./CardCountsIcons.jsx";
 export { SortControl, FilterControl, FilterPanel } from "./FilterControls.jsx";
 export { default as UserMenu } from "./UserMenu.jsx";

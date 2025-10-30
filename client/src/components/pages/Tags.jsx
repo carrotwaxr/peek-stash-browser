@@ -8,13 +8,13 @@ import {
 import deepEqual from "fast-deep-equal";
 import {
   CardStatusIcons,
+  CardCountsIcons,
   PageHeader,
   PageLayout,
   ErrorMessage,
 } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import EntityImage from "../ui/EntityImage.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
@@ -23,7 +23,6 @@ import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
-import { Video, Image, FolderOpen, Building2, Users } from "lucide-react";
 
 const Tags = () => {
   usePageTitle("Tags");
@@ -128,14 +127,14 @@ const Tags = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
                   className="rounded-lg animate-pulse"
                   style={{
                     backgroundColor: "var(--bg-tertiary)",
-                    height: "8rem",
+                    height: "18rem",
                   }}
                 />
               ))}
@@ -144,7 +143,7 @@ const Tags = () => {
             <>
               <div
                 ref={gridRef}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
               >
                 {currentTags.map((tag, index) => (
                   <TagCard
@@ -174,7 +173,7 @@ const TagCard = forwardRef(
         state={{ referrerUrl }}
         to={`/tag/${tag.id}`}
         tabIndex={isTVMode ? tabIndex : -1}
-        className={`tag-card block rounded-lg border p-6 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
+        className={`tag-card block rounded-lg border overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
@@ -182,96 +181,61 @@ const TagCard = forwardRef(
         role="button"
         aria-label={`Tag: ${tag.name}`}
       >
-        <div className="flex items-start space-x-4">
-          <EntityImage
-            imagePath={tag.image_path}
-            name={tag.name}
-            fallbackIcon="#"
-          />
+        <div className="text-center">
+          {/* Tag Image */}
+          <div className="w-full aspect-video overflow-hidden mb-3">
+            {tag.image_path ? (
+              <img
+                src={tag.image_path}
+                alt={tag.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-5xl"
+                style={{ backgroundColor: "var(--bg-secondary)" }}
+              >
+                #
+              </div>
+            )}
+          </div>
 
-          <div className="flex-1 min-w-0">
+          {/* Content Section */}
+          <div className="px-4 pb-4">
             {/* Name */}
             <h3
-              className="font-semibold mb-1"
+              className="font-semibold mb-2"
               style={{ color: "var(--text-primary)" }}
               title={tag.name}
             >
               {truncateText(tag.name, 30)}
             </h3>
 
-            {/* Subtags count */}
-            {tag.child_count > 0 && (
-              <div
-                className="text-xs mb-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {tag.child_count} subtag{tag.child_count !== 1 ? "s" : ""}
-              </div>
-            )}
-
-            {/* Entity Counts with Icons */}
-            <div className="flex items-center gap-3 mb-2 flex-wrap">
-              {tag.scene_count > 0 && (
-                <div
-                  className="flex items-center gap-1 text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  title={`${tag.scene_count} Scene${tag.scene_count !== 1 ? "s" : ""}`}
-                >
-                  <Video size={14} />
-                  <span>{tag.scene_count}</span>
-                </div>
-              )}
-              {tag.image_count > 0 && (
-                <div
-                  className="flex items-center gap-1 text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  title={`${tag.image_count} Image${tag.image_count !== 1 ? "s" : ""}`}
-                >
-                  <Image size={14} />
-                  <span>{tag.image_count}</span>
-                </div>
-              )}
-              {tag.gallery_count > 0 && (
-                <div
-                  className="flex items-center gap-1 text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  title={`${tag.gallery_count} Galler${tag.gallery_count !== 1 ? "ies" : "y"}`}
-                >
-                  <FolderOpen size={14} />
-                  <span>{tag.gallery_count}</span>
-                </div>
-              )}
-              {tag.group_count > 0 && (
-                <div
-                  className="flex items-center gap-1 text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  title={`${tag.group_count} Group${tag.group_count !== 1 ? "s" : ""}`}
-                >
-                  <FolderOpen size={14} />
-                  <span>{tag.group_count}</span>
-                </div>
-              )}
-              {tag.studio_count > 0 && (
-                <div
-                  className="flex items-center gap-1 text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  title={`${tag.studio_count} Studio${tag.studio_count !== 1 ? "s" : ""}`}
-                >
-                  <Building2 size={14} />
-                  <span>{tag.studio_count}</span>
-                </div>
-              )}
-              {tag.performer_count > 0 && (
-                <div
-                  className="flex items-center gap-1 text-xs"
-                  style={{ color: "var(--text-muted)" }}
-                  title={`${tag.performer_count} Performer${tag.performer_count !== 1 ? "s" : ""}`}
-                >
-                  <Users size={14} />
-                  <span>{tag.performer_count}</span>
-                </div>
+            {/* Subtags count - Always rendered to maintain alignment */}
+            <div
+              className="text-xs mb-2"
+              style={{
+                color: "var(--text-muted)",
+                minHeight: "1.25rem"
+              }}
+            >
+              {tag.child_count > 0 ? (
+                <span>{tag.child_count} subtag{tag.child_count !== 1 ? "s" : ""}</span>
+              ) : (
+                <span>&nbsp;</span>
               )}
             </div>
+
+            {/* Entity Counts with Icons */}
+            <CardCountsIcons
+              className="mb-2 justify-center"
+              sceneCount={tag.scene_count}
+              imageCount={tag.image_count}
+              galleryCount={tag.gallery_count}
+              groupCount={tag.group_count}
+              studioCount={tag.studio_count}
+              performerCount={tag.performer_count}
+            />
 
             {/* Status Icons */}
             <CardStatusIcons
@@ -282,7 +246,7 @@ const TagCard = forwardRef(
 
             {/* Rating and Favorite */}
             <div
-              className="flex items-center mb-2"
+              className="flex items-center justify-center mb-2"
               onClick={(e) => e.preventDefault()}
             >
               <RatingControls

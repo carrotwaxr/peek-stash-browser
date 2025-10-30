@@ -11,10 +11,10 @@ import {
   PageLayout,
   ErrorMessage,
   CardStatusIcons,
+  CardCountsIcons,
 } from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import EntityImage from "../ui/EntityImage.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
@@ -129,14 +129,14 @@ const Studios = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
                   className="rounded-lg animate-pulse"
                   style={{
                     backgroundColor: "var(--bg-tertiary)",
-                    height: "8rem",
+                    height: "18rem",
                   }}
                 />
               ))}
@@ -145,7 +145,7 @@ const Studios = () => {
             <>
               <div
                 ref={gridRef}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
               >
                 {currentStudios.map((studio, index) => (
                   <StudioCard
@@ -178,7 +178,7 @@ const StudioCard = forwardRef(
         state={{ referrerUrl }}
         to={`/studio/${studio.id}`}
         tabIndex={isTVMode ? tabIndex : -1}
-        className={`studio-card block rounded-lg border p-6 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
+        className={`studio-card block rounded-lg border overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
@@ -186,31 +186,45 @@ const StudioCard = forwardRef(
         role="button"
         aria-label={`Studio: ${studio.name}`}
       >
-        <div className="flex items-start space-x-4">
-          <EntityImage
-            imagePath={studio.image_path}
-            name={studio.name}
-            fallbackIcon="🏢"
-          />
+        <div className="text-center">
+          {/* Studio Image */}
+          <div className="w-full aspect-video overflow-hidden mb-3 p-4">
+            {studio.image_path ? (
+              <img
+                src={studio.image_path}
+                alt={studio.name}
+                className="w-full h-full object-contain"
+                style={{ backgroundColor: "transparent" }}
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-5xl"
+                style={{ backgroundColor: "var(--bg-secondary)" }}
+              >
+                🏢
+              </div>
+            )}
+          </div>
 
-          <div className="flex-1 min-w-0">
+          {/* Content Section */}
+          <div className="px-4 pb-4">
             {/* Name */}
             <h3
-              className="font-semibold mb-1"
+              className="font-semibold mb-2"
               style={{ color: "var(--text-primary)" }}
               title={studio.name}
             >
               {truncateText(studio.name, 30)}
             </h3>
 
-            {/* Scene Count */}
-            <div
-              className="text-xs mb-2"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {studio.scene_count || 0} scene
-              {studio.scene_count !== 1 ? "s" : ""}
-            </div>
+            {/* Entity Counts */}
+            <CardCountsIcons
+              className="mb-2 justify-center"
+              sceneCount={studio.scene_count}
+              imageCount={studio.image_count}
+              galleryCount={studio.gallery_count}
+              performerCount={studio.performer_count}
+            />
 
             {/* Status Icons */}
             <CardStatusIcons
@@ -221,7 +235,7 @@ const StudioCard = forwardRef(
 
             {/* Rating and Favorite */}
             <div
-              className="flex items-center"
+              className="flex items-center justify-center"
               onClick={(e) => e.preventDefault()}
             >
               <RatingControls

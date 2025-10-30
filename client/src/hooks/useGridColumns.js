@@ -39,12 +39,17 @@ export const useGridColumns = (gridType = 'default') => {
           if (width >= 640) return 2;  // sm
           return 1; // xs
 
-        case 'studios':
         case 'tags':
-          // Matches grid-cols-1 md:2 lg:3
-          if (width >= 1024) return 3; // lg
-          if (width >= 768) return 2;  // md
-          return 1; // base
+        case 'galleries':
+        case 'groups':
+        case 'studios':
+          // Matches xs:1 sm:2 md:3 lg:4 xl:5 2xl:6
+          if (width >= 1536) return 6; // 2xl
+          if (width >= 1280) return 5; // xl
+          if (width >= 1024) return 4; // lg
+          if (width >= 768) return 3;  // md
+          if (width >= 640) return 2;  // sm
+          return 1; // xs
 
         default:
           // Generic responsive grid
