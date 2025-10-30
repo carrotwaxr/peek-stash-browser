@@ -14,6 +14,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@silvermine/videojs-airplay": "^1.2.0",
+    "@silvermine/videojs-chromecast": "^1.4.1",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "axios": "^1.12.2",
     "class-variance-authority": "^0.7.1",
