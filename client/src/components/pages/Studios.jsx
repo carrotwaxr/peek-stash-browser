@@ -203,16 +203,6 @@ const StudioCard = forwardRef(
               {truncateText(studio.name, 30)}
             </h3>
 
-            {/* URL */}
-            {studio.url && (
-              <p
-                className="text-xs mb-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {truncateText(studio.url, 40)}
-              </p>
-            )}
-
             {/* Scene Count */}
             <div
               className="text-xs mb-2"
