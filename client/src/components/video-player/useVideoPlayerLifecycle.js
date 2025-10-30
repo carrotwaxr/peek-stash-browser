@@ -1,6 +1,14 @@
 import { useEffect } from "react";
 import videojs from "video.js";
+import airplay from "@silvermine/videojs-airplay";
+import chromecast from "@silvermine/videojs-chromecast";
 import "./vtt-thumbnails.js";
+import "@silvermine/videojs-airplay/dist/silvermine-videojs-airplay.css";
+import "@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css";
+
+// Register Video.js plugins
+airplay(videojs);
+chromecast(videojs);
 
 /**
  * useVideoPlayerLifecycle
@@ -42,6 +50,7 @@ export function useVideoPlayerLifecycle({
       preload: "none", // Match Stash - don't load until user interacts
       liveui: false,
       playsinline: true, // Match Stash
+      techOrder: ["chromecast", "html5"], // Enable Chromecast and AirPlay
       html5: {
         vhs: {
           overrideNative: !videojs.browser.IS_SAFARI,
@@ -55,6 +64,8 @@ export function useVideoPlayerLifecycle({
         nativeVideoTracks: false,
       },
       plugins: {
+        airPlay: {},
+        chromecast: {},
         qualityLevels: {},
         vttThumbnails: {
           showTimestamp: true,
