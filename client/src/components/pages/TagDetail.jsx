@@ -43,6 +43,38 @@ const TagDetail = () => {
     );
   }
 
+  // If tag not found after loading, show error and back button
+  if (!tag) {
+    return (
+      <div className="min-h-screen px-4 lg:px-6 xl:px-8">
+        <div className="max-w-none">
+          <div className="mt-6 mb-6">
+            <Button
+              onClick={() => navigate(location.state?.referrerUrl || "/tags")}
+              variant="secondary"
+              icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
+              title="Back to Tags"
+            >
+              <span className="hidden sm:inline">Back to Tags</span>
+            </Button>
+          </div>
+          <div className="flex flex-col items-center justify-center py-16">
+            <h2
+              className="text-2xl font-bold mb-4"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Tag Not Found
+            </h2>
+            <p className="text-center mb-6" style={{ color: "var(--text-muted)" }}>
+              The tag you're looking for could not be found or you don't have
+              permission to view it.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen px-4 lg:px-6 xl:px-8">
       <div className="max-w-none">

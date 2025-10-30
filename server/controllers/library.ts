@@ -1494,7 +1494,9 @@ export const findTags = async (req: Request, res: Response) => {
     }
 
     // Step 4.6: Filter empty tags (non-admins only)
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    // Skip filtering when fetching by specific IDs (detail page requests)
+    const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
+    if (requestingUser && requestingUser.role !== 'ADMIN' && !isFetchingByIds) {
       // Get visibility sets for all entity types
       const allGalleries = stashCacheManager.getAllGalleries();
       const allGroups = stashCacheManager.getAllGroups();
