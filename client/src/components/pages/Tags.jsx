@@ -23,6 +23,7 @@ import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import { Video, Image, FolderOpen, Building2, Users } from "lucide-react";
 
 const Tags = () => {
   usePageTitle("Tags");
@@ -191,43 +192,85 @@ const TagCard = forwardRef(
           <div className="flex-1 min-w-0">
             {/* Name */}
             <h3
-              className="font-semibold mb-2"
+              className="font-semibold mb-1"
               style={{ color: "var(--text-primary)" }}
               title={tag.name}
             >
               {truncateText(tag.name, 30)}
             </h3>
 
-            {/* Entity Counts */}
-            <div
-              className="text-xs mb-2"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {(() => {
-                const counts = [];
-                if (tag.scene_count > 0) {
-                  counts.push(
-                    `${tag.scene_count} Scene${
-                      tag.scene_count !== 1 ? "s" : ""
-                    }`
-                  );
-                }
-                if (tag.performer_count > 0) {
-                  counts.push(
-                    `${tag.performer_count} Performer${
-                      tag.performer_count !== 1 ? "s" : ""
-                    }`
-                  );
-                }
-                if (tag.studio_count > 0) {
-                  counts.push(
-                    `${tag.studio_count} Studio${
-                      tag.studio_count !== 1 ? "s" : ""
-                    }`
-                  );
-                }
-                return counts.length > 0 ? counts.join(", ") : "No content";
-              })()}
+            {/* Subtags count */}
+            {tag.child_count > 0 && (
+              <div
+                className="text-xs mb-2"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {tag.child_count} subtag{tag.child_count !== 1 ? "s" : ""}
+              </div>
+            )}
+
+            {/* Entity Counts with Icons */}
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              {tag.scene_count > 0 && (
+                <div
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                  title={`${tag.scene_count} Scene${tag.scene_count !== 1 ? "s" : ""}`}
+                >
+                  <Video size={14} />
+                  <span>{tag.scene_count}</span>
+                </div>
+              )}
+              {tag.image_count > 0 && (
+                <div
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                  title={`${tag.image_count} Image${tag.image_count !== 1 ? "s" : ""}`}
+                >
+                  <Image size={14} />
+                  <span>{tag.image_count}</span>
+                </div>
+              )}
+              {tag.gallery_count > 0 && (
+                <div
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                  title={`${tag.gallery_count} Galler${tag.gallery_count !== 1 ? "ies" : "y"}`}
+                >
+                  <FolderOpen size={14} />
+                  <span>{tag.gallery_count}</span>
+                </div>
+              )}
+              {tag.group_count > 0 && (
+                <div
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                  title={`${tag.group_count} Group${tag.group_count !== 1 ? "s" : ""}`}
+                >
+                  <FolderOpen size={14} />
+                  <span>{tag.group_count}</span>
+                </div>
+              )}
+              {tag.studio_count > 0 && (
+                <div
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                  title={`${tag.studio_count} Studio${tag.studio_count !== 1 ? "s" : ""}`}
+                >
+                  <Building2 size={14} />
+                  <span>{tag.studio_count}</span>
+                </div>
+              )}
+              {tag.performer_count > 0 && (
+                <div
+                  className="flex items-center gap-1 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                  title={`${tag.performer_count} Performer${tag.performer_count !== 1 ? "s" : ""}`}
+                >
+                  <Users size={14} />
+                  <span>{tag.performer_count}</span>
+                </div>
+              )}
             </div>
 
             {/* Status Icons */}
