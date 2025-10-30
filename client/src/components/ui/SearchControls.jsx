@@ -77,6 +77,7 @@ const SearchControls = ({
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const lastSyncedUrl = useRef(""); // Empty initially so first URL sync always runs
+  const topPaginationRef = useRef(null); // Ref for top pagination element
 
   // Get filter options for this artifact type
   const filterOptions = useMemo(() => {
@@ -342,6 +343,22 @@ const SearchControls = ({
     };
 
     onQueryChange(query);
+
+    // Scroll to top pagination if it's not in view
+    setTimeout(() => {
+      if (topPaginationRef.current) {
+        const rect = topPaginationRef.current.getBoundingClientRect();
+        const isInView = rect.top >= 0 && rect.bottom <= window.innerHeight;
+
+        // Only scroll if not already in view
+        if (!isInView) {
+          topPaginationRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }
+      }
+    }, 50);
   };
 
   const handleChangeSearchText = (searchStr) => {
@@ -531,7 +548,7 @@ const SearchControls = ({
 
       {/* Top Pagination */}
       {totalPages >= 1 && (
-        <div className="mt-4 mb-4">
+        <div ref={topPaginationRef} className="mt-4 mb-4">
           <Pagination
             currentPage={currentPage}
             onPageChange={handlePageChange}
