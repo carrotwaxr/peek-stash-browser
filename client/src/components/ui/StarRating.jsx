@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star } from 'lucide-react';
+import { Star, X } from 'lucide-react';
 
 /**
  * Star rating component
@@ -18,8 +18,10 @@ export default function StarRating({
 
   // Convert 0-100 rating to 0-5 stars (with half-star accuracy)
   // 10 = 0.5 stars, 20 = 1 star, 30 = 1.5 stars, etc.
-  const starsValue = rating ? rating / 20 : 0;
+  // Note: rating of 0 is valid (0 stars), null/undefined means unrated
+  const starsValue = rating !== null && rating !== undefined ? rating / 20 : 0;
   const displayValue = hoverRating !== null ? hoverRating : starsValue;
+  const isRated = rating !== null && rating !== undefined;
 
   const handleClick = (starIndex, isHalf = false) => {
     if (readonly || !onChange) return;
@@ -58,6 +60,11 @@ export default function StarRating({
   const handleMouseLeave = () => {
     if (readonly || !onChange) return;
     setHoverRating(null);
+  };
+
+  const handleReset = () => {
+    if (readonly || !onChange) return;
+    onChange(null); // Set to null (unrated)
   };
 
   const renderStar = (index) => {
@@ -114,6 +121,22 @@ export default function StarRating({
 
   return (
     <div className="flex items-center gap-1">
+      {/* Reset button - only show if rated and not readonly */}
+      {!readonly && onChange && isRated && (
+        <button
+          type="button"
+          onClick={handleReset}
+          className="p-0.5 rounded hover:bg-red-500/20 transition-colors"
+          title="Clear rating"
+          aria-label="Clear rating"
+        >
+          <X
+            size={size * 0.8}
+            className="transition-colors"
+            style={{ color: 'var(--status-error-text)' }}
+          />
+        </button>
+      )}
       <div className="flex items-center gap-0.5">
         {[0, 1, 2, 3, 4].map(renderStar)}
       </div>
