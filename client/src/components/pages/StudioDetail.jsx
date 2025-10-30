@@ -58,44 +58,41 @@ const StudioDetail = () => {
           </Button>
         </div>
 
-        {/* Studio Header with Logo Floating Right on Large Screens */}
-        <div className="mb-8 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-          {/* Studio Name and Aliases */}
-          <div className="flex-1">
-            <PageHeader title={studio?.name || `Studio ${studioId}`} />
+        {/* Studio Header */}
+        <div className="mb-8">
+          <PageHeader
+            title={studio?.name || `Studio ${studioId}`}
+            subtitle={
+              studio?.aliases?.length
+                ? `Also known as: ${studio.aliases.join(", ")}`
+                : null
+            }
+          />
 
-            {/* Aliases */}
-            {studio?.aliases && studio.aliases.length > 0 && (
-              <p
-                className="text-xl mb-3"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Also known as: {studio.aliases.join(", ")}
-              </p>
-            )}
-
-            {/* Rating Controls */}
-            <div className="mt-4">
-              <RatingControls
-                entityType="studio"
-                entityId={studio.id}
-                initialRating={studio.rating}
-                initialFavorite={studio.favorite || false}
-                size={24}
-              />
-            </div>
-          </div>
-
-          {/* Studio Logo - Below name on mobile, floats right on large screens */}
-          <div className="w-full lg:w-48 flex-shrink-0">
-            <StudioImage studio={studio} />
+          {/* Rating Controls */}
+          <div className="mt-4">
+            <RatingControls
+              entityType="studio"
+              entityId={studio.id}
+              initialRating={studio.rating}
+              initialFavorite={studio.favorite || false}
+              size={24}
+            />
           </div>
         </div>
 
-        {/* Content Section */}
-        <div className="space-y-6 mb-8">
-          <StudioStats studio={studio} />
-          <StudioDetails studio={studio} />
+        {/* Two Column Layout - Image on left, content on right (lg+) */}
+        <div className="flex flex-col lg:flex-row gap-6 mb-8">
+          {/* Left Column: Studio Image */}
+          <div className="w-full lg:w-2/5 flex-shrink-0">
+            <StudioImage studio={studio} />
+          </div>
+
+          {/* Right Column: Stats and Details */}
+          <div className="flex-1 space-y-6">
+            <StudioStats studio={studio} />
+            <StudioDetails studio={studio} />
+          </div>
         </div>
 
         {/* Scenes Section */}
