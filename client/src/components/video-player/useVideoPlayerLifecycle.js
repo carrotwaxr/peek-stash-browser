@@ -21,6 +21,7 @@ export function useVideoPlayerLifecycle({
   playerRef,
   stopTracking,
   scene,
+  enableCast = true,
 }) {
   // Initialize Video.js player once (Stash's pattern - programmatic element creation)
   useEffect(() => {
@@ -50,7 +51,7 @@ export function useVideoPlayerLifecycle({
       preload: "none", // Match Stash - don't load until user interacts
       liveui: false,
       playsinline: true, // Match Stash
-      techOrder: ["chromecast", "html5"], // Enable Chromecast and AirPlay
+      techOrder: enableCast ? ["chromecast", "html5"] : ["html5"], // Conditionally enable Chromecast
       html5: {
         vhs: {
           overrideNative: !videojs.browser.IS_SAFARI,
@@ -64,8 +65,8 @@ export function useVideoPlayerLifecycle({
         nativeVideoTracks: false,
       },
       plugins: {
-        airPlay: {},
-        chromecast: {},
+        ...(enableCast && { airPlay: {} }),
+        ...(enableCast && { chromecast: {} }),
         qualityLevels: {},
         vttThumbnails: {
           showTimestamp: true,

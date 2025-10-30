@@ -11,6 +11,7 @@ import {
   PageLayout,
   ErrorMessage,
   CardStatusIcons,
+  CardCountsIcons,
 } from "../ui/index.js";
 import { getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
@@ -232,11 +233,14 @@ const PerformerCard = forwardRef(
             <PerformerGenderIcon gender={performer.gender} size={16} />
           </div>
 
-          {/* Scene Count */}
-          <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-            {performer.scene_count || 0} scene
-            {performer.scene_count !== 1 ? "s" : ""}
-          </div>
+          {/* Entity Counts */}
+          <CardCountsIcons
+            className="mb-2 justify-center"
+            sceneCount={performer.scene_count}
+            imageCount={performer.image_count}
+            galleryCount={performer.gallery_count}
+            groupCount={performer.group_count}
+          />
 
           {/* Status Icons */}
           <CardStatusIcons

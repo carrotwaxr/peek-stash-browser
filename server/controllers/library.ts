@@ -11,6 +11,7 @@ import type { NormalizedScene } from '../services/StashCacheManager.js';
 import getStash from '../stash.js';
 import { convertToProxyUrl } from '../utils/pathMapping.js';
 import { userRestrictionService } from '../services/UserRestrictionService.js';
+import { emptyEntityFilterService } from '../services/EmptyEntityFilterService.js';
 
 /**
  * Merge user-specific data into scenes
@@ -796,6 +797,20 @@ export const findPerformers = async (req: Request, res: Response) => {
       performers = await userRestrictionService.filterPerformersForUser(performers, userId);
     }
 
+    // Step 4.6: Filter empty performers (non-admins only)
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      // Get visibility sets for groups and galleries
+      const allGalleries = stashCacheManager.getAllGalleries();
+      const allGroups = stashCacheManager.getAllGroups();
+      const visibleGalleries = new Set(
+        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+      );
+      const visibleGroups = new Set(
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+      );
+      performers = emptyEntityFilterService.filterEmptyPerformers(performers, visibleGroups, visibleGalleries);
+    }
+
     // Step 5: Sort
     performers = sortPerformers(performers, sortField, sortDirection);
 
@@ -1136,6 +1151,20 @@ export const findStudios = async (req: Request, res: Response) => {
       studios = await userRestrictionService.filterStudiosForUser(studios, userId);
     }
 
+    // Step 4.6: Filter empty studios (non-admins only)
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      // Get visibility sets for groups and galleries
+      const allGalleries = stashCacheManager.getAllGalleries();
+      const allGroups = stashCacheManager.getAllGroups();
+      const visibleGalleries = new Set(
+        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+      );
+      const visibleGroups = new Set(
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+      );
+      studios = emptyEntityFilterService.filterEmptyStudios(studios, visibleGroups, visibleGalleries);
+    }
+
     // Step 5: Sort
     studios = sortStudios(studios, sortField, sortDirection);
 
@@ -1464,6 +1493,39 @@ export const findTags = async (req: Request, res: Response) => {
       tags = await userRestrictionService.filterTagsForUser(tags, userId);
     }
 
+    // Step 4.6: Filter empty tags (non-admins only)
+    // Skip filtering when fetching by specific IDs (detail page requests)
+    const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
+    if (requestingUser && requestingUser.role !== 'ADMIN' && !isFetchingByIds) {
+      // Get visibility sets for all entity types
+      const allGalleries = stashCacheManager.getAllGalleries();
+      const allGroups = stashCacheManager.getAllGroups();
+      const allStudios = stashCacheManager.getAllStudios();
+      const allPerformers = stashCacheManager.getAllPerformers();
+
+      const visibleGalleries = new Set(
+        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+      );
+      const visibleGroups = new Set(
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+      );
+      const visibleStudios = new Set(
+        emptyEntityFilterService.filterEmptyStudios(allStudios, visibleGroups, visibleGalleries).map(s => s.id)
+      );
+      const visiblePerformers = new Set(
+        emptyEntityFilterService.filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries).map(p => p.id)
+      );
+
+      const visibilitySet = {
+        galleries: visibleGalleries,
+        groups: visibleGroups,
+        studios: visibleStudios,
+        performers: visiblePerformers,
+      };
+
+      tags = emptyEntityFilterService.filterEmptyTags(tags, visibilitySet);
+    }
+
     // Step 5: Sort
     tags = sortTags(tags, sortField, sortDirection);
 
@@ -1699,6 +1761,20 @@ export const findPerformersMinimal = async (req: Request, res: Response) => {
       });
     }
 
+    // Filter empty performers (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      const allGalleries = stashCacheManager.getAllGalleries();
+      const allGroups = stashCacheManager.getAllGroups();
+      const visibleGalleries = new Set(
+        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+      );
+      const visibleGroups = new Set(
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+      );
+      performers = emptyEntityFilterService.filterEmptyPerformers(performers, visibleGroups, visibleGalleries);
+    }
+
     // Sort
     performers.sort((a, b) => {
       const aValue = (a as any)[sortField] || '';
@@ -1752,6 +1828,20 @@ export const findStudiosMinimal = async (req: Request, res: Response) => {
       });
     }
 
+    // Filter empty studios (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      const allGalleries = stashCacheManager.getAllGalleries();
+      const allGroups = stashCacheManager.getAllGroups();
+      const visibleGalleries = new Set(
+        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+      );
+      const visibleGroups = new Set(
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+      );
+      studios = emptyEntityFilterService.filterEmptyStudios(studios, visibleGroups, visibleGalleries);
+    }
+
     // Sort
     studios.sort((a, b) => {
       const aValue = (a as any)[sortField] || '';
@@ -1803,6 +1893,37 @@ export const findTagsMinimal = async (req: Request, res: Response) => {
         const description = t.description || '';
         return name.toLowerCase().includes(lowerQuery) || description.toLowerCase().includes(lowerQuery);
       });
+    }
+
+    // Filter empty tags (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      const allGalleries = stashCacheManager.getAllGalleries();
+      const allGroups = stashCacheManager.getAllGroups();
+      const allStudios = stashCacheManager.getAllStudios();
+      const allPerformers = stashCacheManager.getAllPerformers();
+
+      const visibleGalleries = new Set(
+        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+      );
+      const visibleGroups = new Set(
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+      );
+      const visibleStudios = new Set(
+        emptyEntityFilterService.filterEmptyStudios(allStudios, visibleGroups, visibleGalleries).map(s => s.id)
+      );
+      const visiblePerformers = new Set(
+        emptyEntityFilterService.filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries).map(p => p.id)
+      );
+
+      const visibilitySet = {
+        galleries: visibleGalleries,
+        groups: visibleGroups,
+        studios: visibleStudios,
+        performers: visiblePerformers,
+      };
+
+      tags = emptyEntityFilterService.filterEmptyTags(tags, visibilitySet);
     }
 
     // Sort
@@ -2486,6 +2607,11 @@ export const findGalleries = async (req: Request, res: Response) => {
       galleries = await userRestrictionService.filterGalleriesForUser(galleries, userId);
     }
 
+    // Step 4.6: Filter empty galleries (non-admins only)
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      galleries = emptyEntityFilterService.filterEmptyGalleries(galleries);
+    }
+
     // Step 5: Sort
     galleries = sortGalleries(galleries, sortField, sortDirection);
 
@@ -2612,6 +2738,12 @@ export const findGalleriesMinimal = async (req: Request, res: Response) => {
         const title = g.title || '';
         return title.toLowerCase().includes(lowerQuery);
       });
+    }
+
+    // Step 3.5: Filter empty galleries (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      galleries = emptyEntityFilterService.filterEmptyGalleries(galleries);
     }
 
     // Step 4: Sort by title
@@ -2876,6 +3008,11 @@ export const findGroups = async (req: Request, res: Response) => {
       groups = await userRestrictionService.filterGroupsForUser(groups, userId);
     }
 
+    // Step 4.6: Filter empty groups (non-admins only)
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      groups = emptyEntityFilterService.filterEmptyGroups(groups);
+    }
+
     // Step 5: Sort
     groups = sortGroups(groups, sortField, sortDirection);
 
@@ -2929,6 +3066,12 @@ export const findGroupsMinimal = async (req: Request, res: Response) => {
         const name = g.name || '';
         return name.toLowerCase().includes(lowerQuery);
       });
+    }
+
+    // Step 3.5: Filter empty groups (non-admins only)
+    const requestingUser = (req as any).user;
+    if (requestingUser && requestingUser.role !== 'ADMIN') {
+      groups = emptyEntityFilterService.filterEmptyGroups(groups);
     }
 
     // Step 4: Sort by name

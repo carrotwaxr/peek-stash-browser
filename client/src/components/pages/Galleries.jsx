@@ -6,7 +6,12 @@ import {
   useLocation,
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
+import {
+  PageHeader,
+  PageLayout,
+  ErrorMessage,
+  CardCountsIcons,
+} from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import SearchControls from "../ui/SearchControls.jsx";
@@ -205,10 +210,10 @@ const GalleryCard = forwardRef(
           </h3>
 
           {/* Image Count */}
-          <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-            {gallery.image_count || 0} image
-            {gallery.image_count !== 1 ? "s" : ""}
-          </div>
+          <CardCountsIcons
+            className="mb-2 justify-center"
+            imageCount={gallery.image_count}
+          />
 
           {/* Date */}
           {gallery.date && (

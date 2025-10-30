@@ -36,6 +36,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         role: true,
         preferredQuality: true,
         preferredPlaybackMode: true,
+        enableCast: true,
         theme: true,
         carouselPreferences: true,
         navPreferences: true,
@@ -53,6 +54,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
       settings: {
         preferredQuality: user.preferredQuality,
         preferredPlaybackMode: user.preferredPlaybackMode,
+        enableCast: user.enableCast,
         theme: user.theme,
         carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
         navPreferences: user.navPreferences || null,
@@ -90,7 +92,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       targetUserId = parseInt(req.params.userId);
     }
 
-    const { preferredQuality, preferredPlaybackMode, theme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
+    const { preferredQuality, preferredPlaybackMode, enableCast, theme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
@@ -149,6 +151,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       data: {
         ...(preferredQuality !== undefined && { preferredQuality }),
         ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
+        ...(enableCast !== undefined && { enableCast }),
         ...(theme !== undefined && { theme }),
         ...(carouselPreferences !== undefined && { carouselPreferences }),
         ...(navPreferences !== undefined && { navPreferences }),
@@ -161,6 +164,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         role: true,
         preferredQuality: true,
         preferredPlaybackMode: true,
+        enableCast: true,
         theme: true,
         carouselPreferences: true,
         navPreferences: true,

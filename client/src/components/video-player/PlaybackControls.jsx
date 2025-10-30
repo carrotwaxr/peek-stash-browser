@@ -25,81 +25,68 @@ const PlaybackControls = () => {
   return (
     <section className="container-fluid py-4 mt-6">
       <div
-        className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-lg"
+        className="p-4 rounded-lg"
         style={{
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-color)",
         }}
       >
-        {/* Playlist Indicator */}
-        {playlist && playlist.scenes && (
-          <div className="flex items-center gap-2">
-            <span
-              className="text-sm font-medium"
-              style={{ color: "var(--text-secondary)" }}
+        {/* Desktop: Three-column layout (left: quality, center: rating/counter, right: add to playlist) */}
+        {/* Mobile: Two rows (row 1: quality + add button, row 2: rating/counter centered) */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {/* Row 1 on mobile, Left column on desktop: Quality Selector */}
+          <div className="flex items-center justify-between md:justify-start gap-4 md:flex-1">
+            <select
+              value={quality}
+              onChange={(e) => setQuality(e.target.value)}
+              disabled={isLoading}
+              className="btn text-sm"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+                padding: "8px 12px",
+                opacity: isLoading ? 0.6 : 1,
+                cursor: isLoading ? "not-allowed" : "pointer",
+              }}
             >
-              Playlist:
-            </span>
-            <span className="text-sm" style={{ color: "var(--text-primary)" }}>
-              {playlist.name} ({currentIndex + 1}/{playlist.scenes.length})
-            </span>
+              <option value="direct">Direct Play</option>
+              <option value="1080p">1080p</option>
+              <option value="720p">720p</option>
+              <option value="480p">480p</option>
+              <option value="360p">360p</option>
+            </select>
+
+            {/* Add to Playlist Button - shows on mobile in row 1, hidden on desktop */}
+            <div className="md:hidden">
+              <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
+            </div>
           </div>
-        )}
 
-        {/* Quality Selector */}
-        <div className="flex items-center gap-2">
-          <label
-            className="text-sm font-medium"
-            style={{ color: "var(--text-secondary)" }}
+          {/* Row 2 on mobile (centered), Center column on desktop: Rating Controls + O Counter */}
+          <div
+            className="flex items-center justify-center gap-4 md:flex-1"
+            style={{ opacity: isLoading ? 0.6 : 1 }}
           >
-            Quality:
-          </label>
-          <select
-            value={quality}
-            onChange={(e) => setQuality(e.target.value)}
-            disabled={isLoading}
-            className="btn text-sm"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-primary)",
-              padding: "8px 12px",
-              opacity: isLoading ? 0.6 : 1,
-              cursor: isLoading ? "not-allowed" : "pointer",
-            }}
-          >
-            <option value="direct">Direct Play</option>
-            <option value="1080p">1080p</option>
-            <option value="720p">720p</option>
-            <option value="480p">480p</option>
-            <option value="360p">360p</option>
-          </select>
-        </div>
+            <RatingControls
+              entityType="scene"
+              entityId={scene?.id}
+              initialRating={scene?.rating}
+              initialFavorite={scene?.favorite || false}
+              size={20}
+            />
+            <OCounterButton
+              sceneId={scene?.id}
+              initialCount={oCounter}
+              onIncrement={setOCounter}
+              disabled={isLoading}
+            />
+          </div>
 
-        {/* Actions */}
-        <div
-          className="flex items-center gap-4"
-          style={{ opacity: isLoading ? 0.6 : 1 }}
-        >
-          {/* Rating and Favorite */}
-          <RatingControls
-            entityType="scene"
-            entityId={scene?.id}
-            initialRating={scene?.rating}
-            initialFavorite={scene?.favorite || false}
-            size={20}
-          />
-
-          {/* O Counter Button */}
-          <OCounterButton
-            sceneId={scene?.id}
-            initialCount={oCounter}
-            onIncrement={setOCounter}
-            disabled={isLoading}
-          />
-
-          {/* Add to Playlist Button */}
-          <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
+          {/* Right column on desktop: Add to Playlist Button - hidden on mobile */}
+          <div className="hidden md:flex md:justify-end md:flex-1">
+            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
+          </div>
         </div>
       </div>
     </section>
