@@ -297,7 +297,7 @@ const PlaylistDetail = () => {
       <PageLayout>
         {/* Header */}
         <div className="mb-8">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-4">
             {/* Back button */}
             <Button
               onClick={() => navigate("/playlists")}
@@ -406,14 +406,13 @@ const PlaylistDetail = () => {
                 <Button
                   onClick={playPlaylist}
                   variant="primary"
-                  className="ml-auto"
+                  className="p-1.5 sm:px-3 sm:py-2 sm:ml-auto"
                   icon={
                     <Play size={16} className="sm:w-4 sm:h-4" fill="white" />
                   }
                   title="Play Playlist"
                 >
-                  <span className="hidden sm:inline">Play Playlist</span>
-                  <span className="sm:hidden">Play</span>
+                  <span className="hidden sm:inline">Play</span>
                 </Button>
               </>
             )}

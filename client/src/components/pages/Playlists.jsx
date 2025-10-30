@@ -96,12 +96,12 @@ const Playlists = () => {
   return (
     <PageLayout>
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
         <PageHeader
           title="My Playlists"
           subtitle="Create and manage your video playlists"
         />
-        <Button onClick={() => setShowCreateModal(true)} variant="primary">
+        <Button onClick={() => setShowCreateModal(true)} variant="primary" className="w-full md:w-auto">
           + New Playlist
         </Button>
       </div>
