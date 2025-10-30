@@ -5,11 +5,11 @@ const PageHeader = ({ title, subtitle, className = "" }) => {
   if (!title) return null;
 
   return (
-    <div className={`mb-8 ${className}`}>
-      <div className="flex items-center justify-between mb-4">
+    <div className={`mb-6 ${className}`}>
+      <div className="flex items-center justify-between mb-3">
         <div>
           <h1
-            className="text-4xl font-bold mb-2"
+            className="text-3xl sm:text-4xl font-bold mb-2"
             style={{ color: "var(--text-primary)" }}
           >
             {title}

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Star } from 'lucide-react';
+import { useState } from "react";
+import { Star, X } from "lucide-react";
 
 /**
  * Star rating component
@@ -11,15 +11,17 @@ export default function StarRating({
   onChange,
   readonly = false,
   size = 20,
-  className = '',
+  className = "",
   showValue = false,
 }) {
   const [hoverRating, setHoverRating] = useState(null);
 
   // Convert 0-100 rating to 0-5 stars (with half-star accuracy)
   // 10 = 0.5 stars, 20 = 1 star, 30 = 1.5 stars, etc.
-  const starsValue = rating ? rating / 20 : 0;
+  // Note: rating of 0 is valid (0 stars), null/undefined means unrated
+  const starsValue = rating !== null && rating !== undefined ? rating / 20 : 0;
   const displayValue = hoverRating !== null ? hoverRating : starsValue;
+  const isRated = rating !== null && rating !== undefined;
 
   const handleClick = (starIndex, isHalf = false) => {
     if (readonly || !onChange) return;
@@ -60,6 +62,11 @@ export default function StarRating({
     setHoverRating(null);
   };
 
+  const handleReset = () => {
+    if (readonly || !onChange) return;
+    onChange(null); // Set to null (unrated)
+  };
+
   const renderStar = (index) => {
     const starNumber = index + 1;
     // Check if star should be fully filled
@@ -77,24 +84,25 @@ export default function StarRating({
         disabled={readonly || !onChange}
         className={`
           relative
-          ${readonly || !onChange ? 'cursor-default' : 'cursor-pointer hover:scale-110'}
+          ${
+            readonly || !onChange
+              ? "cursor-default"
+              : "cursor-pointer hover:scale-110"
+          }
           transition-transform
           ${className}
         `}
-        aria-label={`Rate ${starNumber} star${starNumber > 1 ? 's' : ''}`}
+        aria-label={`Rate ${starNumber} star${starNumber > 1 ? "s" : ""}`}
       >
         {isHalf ? (
           // Half-filled star using gradient
           <>
-            <Star
-              size={size}
-              className="text-gray-400"
-            />
+            <Star size={size} className="text-gray-400" />
             <Star
               size={size}
               className="fill-yellow-400 text-yellow-400 absolute inset-0"
               style={{
-                clipPath: 'inset(0 50% 0 0)',
+                clipPath: "inset(0 50% 0 0)",
               }}
             />
           </>
@@ -103,7 +111,7 @@ export default function StarRating({
           <Star
             size={size}
             className={`
-              ${isFilled ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}
+              ${isFilled ? "fill-yellow-400 text-yellow-400" : "text-gray-400"}
               transition-colors
             `}
           />
@@ -114,13 +122,27 @@ export default function StarRating({
 
   return (
     <div className="flex items-center gap-1">
+      {/* Reset button - only show if rated and not readonly */}
+      {!readonly && onChange && isRated && (
+        <button
+          type="button"
+          onClick={handleReset}
+          className="p-0.5 rounded hover:bg-red-500/20 transition-colors"
+          title="Clear rating"
+          aria-label="Clear rating"
+        >
+          <X
+            size={size * 0.8}
+            className="transition-colors"
+            style={{ color: "var(--status-error)" }}
+          />
+        </button>
+      )}
       <div className="flex items-center gap-0.5">
         {[0, 1, 2, 3, 4].map(renderStar)}
       </div>
       {showValue && rating !== null && rating !== undefined && (
-        <span className="ml-2 text-sm text-gray-400">
-          {rating}
-        </span>
+        <span className="ml-2 text-sm text-gray-400">{rating}</span>
       )}
     </div>
   );

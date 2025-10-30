@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { PageLayout } from "../ui/index.js";
+import { PageHeader, PageLayout } from "../ui/index.js";
 import { setupApi } from "../../services/api.js";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
@@ -425,7 +425,9 @@ const ServerSettings = () => {
 
   // Handle restrictions save success
   const handleRestrictionsSaved = () => {
-    setMessage(`Content restrictions updated for ${restrictionsTargetUser?.username}!`);
+    setMessage(
+      `Content restrictions updated for ${restrictionsTargetUser?.username}!`
+    );
     setTimeout(() => setMessage(null), 3000);
   };
 
@@ -444,17 +446,10 @@ const ServerSettings = () => {
       <PageLayout>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1
-              className="text-3xl font-bold mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Server Settings
-            </h1>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Manage server configuration and user accounts
-            </p>
-          </div>
+          <PageHeader
+            title="Server Settings"
+            subtitle="Manage server configuration and user accounts"
+          />
 
           {/* Messages */}
           {message && (
@@ -486,7 +481,7 @@ const ServerSettings = () => {
           {/* User Management Section */}
           <Paper className="mb-6">
             <Paper.Header>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <Paper.Title>User Management</Paper.Title>
                   <Paper.Subtitle className="mt-1">
@@ -496,6 +491,7 @@ const ServerSettings = () => {
                 <Button
                   onClick={() => setShowCreateModal(true)}
                   variant="primary"
+                  className="w-full md:w-auto"
                 >
                   + Create User
                 </Button>
@@ -503,7 +499,10 @@ const ServerSettings = () => {
             </Paper.Header>
             <Paper.Body padding="none">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <div className="md:hidden px-4 py-3 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                  ← Swipe to see more →
+                </div>
+                <table className="w-full" style={{ minWidth: "800px" }}>
                   <thead>
                     <tr
                       style={{
@@ -615,12 +614,12 @@ const ServerSettings = () => {
                           {formatDate(user.createdAt)}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex justify-end gap-2 flex-wrap">
                             <Button
                               onClick={() => openSyncModal(user)}
                               variant="tertiary"
                               size="sm"
-                              className="px-3 py-1 text-sm"
+                              className="px-3 py-1 text-sm whitespace-nowrap"
                             >
                               Sync from Stash
                             </Button>
@@ -628,7 +627,7 @@ const ServerSettings = () => {
                               onClick={() => openRestrictionsModal(user)}
                               variant="tertiary"
                               size="sm"
-                              className="px-3 py-1 text-sm"
+                              className="px-3 py-1 text-sm whitespace-nowrap"
                               title="Manage content restrictions for this user"
                             >
                               Content Restrictions
@@ -644,7 +643,7 @@ const ServerSettings = () => {
                               disabled={user.id === currentUser?.id}
                               variant="secondary"
                               size="sm"
-                              className="px-3 py-1 text-sm"
+                              className="px-3 py-1 text-sm whitespace-nowrap"
                             >
                               Change Role
                             </Button>
@@ -653,7 +652,7 @@ const ServerSettings = () => {
                               disabled={user.id === currentUser?.id}
                               variant="destructive"
                               size="sm"
-                              className="px-3 py-1 text-sm"
+                              className="px-3 py-1 text-sm whitespace-nowrap"
                             >
                               Delete
                             </Button>
@@ -670,20 +669,21 @@ const ServerSettings = () => {
           {/* Path Mappings Section */}
           <Paper className="mb-6">
             <Paper.Header>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <Paper.Title>Path Mappings</Paper.Title>
                   <Paper.Subtitle className="mt-1">
                     Configure path translations between Stash and Peek
                   </Paper.Subtitle>
                 </div>
-                <div className="flex gap-2">
-                  <Button onClick={discoverLibraries} variant="secondary">
+                <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                  <Button onClick={discoverLibraries} variant="secondary" className="w-full sm:w-auto">
                     Discover Libraries
                   </Button>
                   <Button
                     onClick={() => setShowAddMappingModal(true)}
                     variant="primary"
+                    className="w-full sm:w-auto"
                   >
                     + Add Mapping
                   </Button>
@@ -703,7 +703,10 @@ const ServerSettings = () => {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <div className="md:hidden px-4 py-3 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                    ← Swipe to see more →
+                  </div>
+                  <table className="w-full" style={{ minWidth: "700px" }}>
                     <thead>
                       <tr
                         style={{
@@ -777,7 +780,7 @@ const ServerSettings = () => {
           {/* Version Information Section */}
           <Paper className="mb-6">
             <Paper.Header>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <Paper.Title>Version Information</Paper.Title>
                   <Paper.Subtitle className="mt-1">
@@ -789,6 +792,7 @@ const ServerSettings = () => {
                   disabled={checkingUpdate}
                   variant="secondary"
                   loading={checkingUpdate}
+                  className="w-full md:w-auto"
                 >
                   Check for Updates
                 </Button>
@@ -1159,7 +1163,9 @@ const ServerSettings = () => {
                               border: "1px solid rgba(245, 158, 11, 0.3)",
                             }}
                           >
-                            ⚠️ Warning: Only the total O Counter value will be synced. Individual timestamps (last O at) from Stash history will not be imported.
+                            ⚠️ Warning: Only the total O Counter value will be
+                            synced. Individual timestamps (last O at) from Stash
+                            history will not be imported.
                           </p>
                         )}
                         <p

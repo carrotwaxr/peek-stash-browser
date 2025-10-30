@@ -161,8 +161,9 @@ const SceneListItem = ({
 
           {/* Details */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1 min-w-0 pr-4">
+            <div className="mb-2">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 min-w-0 md:pr-4">
                 {exists && scene ? (
                   <>
                     {/* Title and Date */}
@@ -253,11 +254,23 @@ const SceneListItem = ({
                     </p>
                   </>
                 )}
-              </div>
+                </div>
 
-              {/* Action Buttons */}
-              {actionButtons}
+                {/* Action Buttons - Desktop only */}
+                {actionButtons && (
+                  <div className="hidden md:block">
+                    {actionButtons}
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Action Buttons - Mobile only at bottom */}
+            {actionButtons && (
+              <div className="flex justify-center mt-4 mb-2 md:hidden">
+                {actionButtons}
+              </div>
+            )}
           </div>
         </div>
       </div>

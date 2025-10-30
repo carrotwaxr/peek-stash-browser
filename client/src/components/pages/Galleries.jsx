@@ -206,24 +206,30 @@ const GalleryCard = forwardRef(
 
           {/* Image Count */}
           <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-            {gallery.image_count || 0} image{gallery.image_count !== 1 ? "s" : ""}
+            {gallery.image_count || 0} image
+            {gallery.image_count !== 1 ? "s" : ""}
           </div>
 
           {/* Date */}
           {gallery.date && (
-            <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
+            <div
+              className="text-xs mb-2"
+              style={{ color: "var(--text-muted)" }}
+            >
               {new Date(gallery.date).toLocaleDateString()}
             </div>
           )}
 
           {/* Rating and Favorite */}
-          <div className="flex items-center justify-center" onClick={(e) => e.preventDefault()}>
+          <div
+            className="flex items-center justify-center"
+            onClick={(e) => e.preventDefault()}
+          >
             <RatingControls
               entityType="gallery"
               entityId={gallery.id}
               initialRating={gallery.rating}
               initialFavorite={gallery.favorite || false}
-              size={16}
             />
           </div>
         </div>

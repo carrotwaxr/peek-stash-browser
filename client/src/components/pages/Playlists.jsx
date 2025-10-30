@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
-import { PageLayout } from "../ui/index.js";
+import { PageHeader, PageLayout } from "../ui/index.js";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
@@ -96,19 +96,12 @@ const Playlists = () => {
   return (
     <PageLayout>
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1
-            className="text-3xl font-bold mb-2"
-            style={{ color: "var(--text-primary)" }}
-          >
-            My Playlists
-          </h1>
-          <p style={{ color: "var(--text-secondary)" }}>
-            Create and manage your video playlists
-          </p>
-        </div>
-        <Button onClick={() => setShowCreateModal(true)} variant="primary">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
+        <PageHeader
+          title="My Playlists"
+          subtitle="Create and manage your video playlists"
+        />
+        <Button onClick={() => setShowCreateModal(true)} variant="primary" className="w-full md:w-auto">
           + New Playlist
         </Button>
       </div>

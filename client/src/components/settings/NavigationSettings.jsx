@@ -99,8 +99,7 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
             <div
               key={pref.id}
               className={`
-                flex items-center justify-between p-4 rounded-lg border
-                transition-all duration-200
+                p-4 rounded-lg border transition-all duration-200
                 ${pref.enabled ? "" : "opacity-60"}
               `}
               style={{
@@ -108,34 +107,15 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
                 borderColor: "var(--border-color)",
               }}
             >
-              <div className="flex items-center space-x-3 flex-1">
-                {/* Reorder buttons */}
-                <div className="flex flex-col space-y-1">
-                  <Button
-                    onClick={() => moveUp(index)}
-                    disabled={index === 0}
-                    variant="secondary"
-                    className="p-1"
-                    icon={<ChevronUp className="w-4 h-4" />}
-                    title="Move up"
-                  />
-                  <Button
-                    onClick={() => moveDown(index)}
-                    disabled={index === preferences.length - 1}
-                    variant="secondary"
-                    className="p-1"
-                    icon={<ChevronDown className="w-4 h-4" />}
-                    title="Move down"
-                  />
-                </div>
-
+              {/* Top row: Icon, Name/Description */}
+              <div className="flex items-start gap-3 mb-3">
                 {/* Icon */}
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 mt-1">
                   <ThemedIcon name={definition.icon} size={24} />
                 </div>
 
                 {/* Name and description */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div
                     className="font-medium"
                     style={{ color: "var(--text-primary)" }}
@@ -143,7 +123,7 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
                     {definition.name}
                   </div>
                   <div
-                    className="text-sm"
+                    className="text-sm mt-1"
                     style={{ color: "var(--text-secondary)" }}
                   >
                     {definition.description}
@@ -151,20 +131,43 @@ const NavigationSettings = ({ navPreferences, onSave }) => {
                 </div>
               </div>
 
-              {/* Toggle visibility */}
-              <Button
-                onClick={() => toggleEnabled(pref.id)}
-                variant={pref.enabled ? "primary" : "secondary"}
-                className="p-2"
-                icon={
-                  pref.enabled ? (
-                    <Eye className="w-5 h-5" />
-                  ) : (
-                    <EyeOff className="w-5 h-5" />
-                  )
-                }
-                title={pref.enabled ? "Hide from menu" : "Show in menu"}
-              />
+              {/* Bottom row: Reorder buttons and Toggle visibility */}
+              <div className="flex items-center justify-between">
+                {/* Reorder buttons */}
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => moveUp(index)}
+                    disabled={index === 0}
+                    variant="secondary"
+                    className="p-1.5"
+                    icon={<ChevronUp className="w-4 h-4" />}
+                    title="Move up"
+                  />
+                  <Button
+                    onClick={() => moveDown(index)}
+                    disabled={index === preferences.length - 1}
+                    variant="secondary"
+                    className="p-1.5"
+                    icon={<ChevronDown className="w-4 h-4" />}
+                    title="Move down"
+                  />
+                </div>
+
+                {/* Toggle visibility */}
+                <Button
+                  onClick={() => toggleEnabled(pref.id)}
+                  variant={pref.enabled ? "primary" : "secondary"}
+                  className="p-2"
+                  icon={
+                    pref.enabled ? (
+                      <Eye className="w-5 h-5" />
+                    ) : (
+                      <EyeOff className="w-5 h-5" />
+                    )
+                  }
+                  title={pref.enabled ? "Hide from menu" : "Show in menu"}
+                />
+              </div>
             </div>
           );
         })}

@@ -21,6 +21,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import PageHeader from "../ui/PageHeader.jsx";
 
 // Helper to detect and map URLs to known sites with colors
 const getSiteInfo = (url) => {
@@ -133,24 +134,19 @@ const PerformerDetail = () => {
 
         {/* Performer Header - Hero Treatment */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <h1
-              className="text-5xl font-bold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {performer.name}
-            </h1>
-            <PerformerGenderIcon gender={performer.gender} size={32} />
-          </div>
-
-          {performer?.alias_list?.length > 0 && (
-            <p
-              className="text-xl mb-3"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Also known as: {performer.alias_list.join(", ")}
-            </p>
-          )}
+          <PageHeader
+            title={
+              <div className="flex gap-4">
+                <span>{performer.name}</span>
+                <PerformerGenderIcon gender={performer.gender} size={32} />
+              </div>
+            }
+            subtitle={
+              performer?.alias_list?.length
+                ? `Also known as: ${performer.alias_list.join(", ")}`
+                : null
+            }
+          />
 
           {/* Rating Controls */}
           <div className="mt-4">
