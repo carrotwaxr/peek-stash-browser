@@ -136,26 +136,37 @@ const SearchControls = ({
 
     lastSyncedUrl.current = currentUrl;
 
+    // Parse URL to get values (don't use urlState memo to avoid re-renders)
+    const parsedState = parseSearchParams(searchParams, filterOptions, {
+      sortField: initialSort,
+      sortDirection: "DESC",
+      searchText: "",
+      filters: { ...permanentFilters },
+    });
+
     // Update state from URL
-    setCurrentPage(urlState.currentPage);
-    setPerPage(urlState.perPage);
-    setSearchText(urlState.searchText);
-    setSort([urlState.sortField, urlState.sortDirection]);
-    setFilters(urlState.filters);
+    setCurrentPage(parsedState.currentPage);
+    setPerPage(parsedState.perPage);
+    setSearchText(parsedState.searchText);
+    setSort([parsedState.sortField, parsedState.sortDirection]);
+    setFilters(parsedState.filters);
 
     // Trigger query with new URL values
     const query = {
       filter: {
-        direction: urlState.sortDirection,
-        page: urlState.currentPage,
-        per_page: urlState.perPage,
-        q: urlState.searchText,
-        sort: urlState.sortField,
+        direction: parsedState.sortDirection,
+        page: parsedState.currentPage,
+        per_page: parsedState.perPage,
+        q: parsedState.searchText,
+        sort: parsedState.sortField,
       },
-      ...buildFilter(artifactType, urlState.filters),
+      ...buildFilter(artifactType, parsedState.filters),
     };
     onQueryChange(query);
-  }, [searchParams, isInitialized, urlState, artifactType, onQueryChange]);
+    // Note: urlState is intentionally NOT in deps to prevent loop
+    // We parse searchParams directly inside the effect instead
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, isInitialized]);
 
   // Update URL params whenever state changes (only if syncToUrl is true)
   useEffect(() => {
@@ -181,6 +192,9 @@ const SearchControls = ({
       lastSyncedUrl.current = newUrl;
       setSearchParams(params, { replace: true });
     }
+    // Note: searchParams is intentionally NOT in deps to prevent infinite loop
+    // We only want this to run when state changes, not when URL changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     searchText,
     sortField,
@@ -191,7 +205,6 @@ const SearchControls = ({
     filterOptions,
     setSearchParams,
     syncToUrl,
-    searchParams,
   ]);
 
   // Trigger initial query from URL params
