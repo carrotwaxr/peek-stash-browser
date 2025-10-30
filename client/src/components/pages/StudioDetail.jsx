@@ -7,6 +7,7 @@ import Button from "../ui/Button.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import PageHeader from "../ui/PageHeader.jsx";
 
 const StudioDetail = () => {
   const { studioId } = useParams();
@@ -61,14 +62,7 @@ const StudioDetail = () => {
         <div className="mb-8 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
           {/* Studio Name and Aliases */}
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-3">
-              <h1
-                className="text-5xl font-bold"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {studio?.name || `Studio ${studioId}`}
-              </h1>
-            </div>
+            <PageHeader title={studio?.name || `Studio ${studioId}`} />
 
             {/* Aliases */}
             {studio?.aliases && studio.aliases.length > 0 && (

@@ -18,7 +18,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import Button from "../ui/Button.jsx";
-import { PageLayout } from "../ui/index.js";
+import { PageHeader, PageLayout } from "../ui/index.js";
 import Paper from "../ui/Paper.jsx";
 
 const api = axios.create({
@@ -488,17 +488,10 @@ const PlaylistDetail = () => {
             </form>
           ) : (
             <>
-              <h1
-                className="text-3xl font-bold mb-2"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {playlist.name}
-              </h1>
-              {playlist.description && (
-                <p style={{ color: "var(--text-secondary)" }}>
-                  {playlist.description}
-                </p>
-              )}
+              <PageHeader
+                title={playlist.name}
+                subtitle={playlist.description}
+              />
               <p
                 className="text-sm mt-2"
                 style={{ color: "var(--text-muted)" }}

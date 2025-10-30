@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { PageLayout } from "../ui/index.js";
+import { PageHeader, PageLayout } from "../ui/index.js";
 import { setupApi } from "../../services/api.js";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
@@ -425,7 +425,9 @@ const ServerSettings = () => {
 
   // Handle restrictions save success
   const handleRestrictionsSaved = () => {
-    setMessage(`Content restrictions updated for ${restrictionsTargetUser?.username}!`);
+    setMessage(
+      `Content restrictions updated for ${restrictionsTargetUser?.username}!`
+    );
     setTimeout(() => setMessage(null), 3000);
   };
 
@@ -444,17 +446,10 @@ const ServerSettings = () => {
       <PageLayout>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1
-              className="text-3xl font-bold mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
-              Server Settings
-            </h1>
-            <p style={{ color: "var(--text-secondary)" }}>
-              Manage server configuration and user accounts
-            </p>
-          </div>
+          <PageHeader
+            title="Server Settings"
+            subtitle="Manage server configuration and user accounts"
+          />
 
           {/* Messages */}
           {message && (
@@ -1159,7 +1154,9 @@ const ServerSettings = () => {
                               border: "1px solid rgba(245, 158, 11, 0.3)",
                             }}
                           >
-                            ⚠️ Warning: Only the total O Counter value will be synced. Individual timestamps (last O at) from Stash history will not be imported.
+                            ⚠️ Warning: Only the total O Counter value will be
+                            synced. Individual timestamps (last O at) from Stash
+                            history will not be imported.
                           </p>
                         )}
                         <p

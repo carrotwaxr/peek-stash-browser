@@ -244,7 +244,6 @@ const GroupCard = forwardRef(
               entityId={group.id}
               initialRating={group.rating}
               initialFavorite={group.favorite || false}
-              size={16}
             />
           </div>
         </div>

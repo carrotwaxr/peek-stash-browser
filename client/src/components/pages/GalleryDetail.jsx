@@ -9,6 +9,7 @@ import PerformerCard from "../ui/PerformerCard.jsx";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { galleryTitle } from "../../utils/gallery.js";
+import PageHeader from "../ui/PageHeader.jsx";
 
 const GalleryDetail = () => {
   const { galleryId } = useParams();
@@ -94,30 +95,23 @@ const GalleryDetail = () => {
 
         {/* Gallery Header */}
         <div className="mb-8">
-          <h1
-            className="text-5xl font-bold mb-3"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {galleryTitle(gallery)}
-          </h1>
+          <PageHeader title={galleryTitle(gallery)} />
 
           {/* Gallery metadata */}
-          <div className="flex flex-wrap gap-4 mb-4 text-lg" style={{ color: "var(--text-secondary)" }}>
+          <div
+            className="flex flex-wrap gap-4 mb-4 text-lg"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {gallery.image_count && (
               <span>
-                {gallery.image_count} image{gallery.image_count !== 1 ? "s" : ""}
+                {gallery.image_count} image
+                {gallery.image_count !== 1 ? "s" : ""}
               </span>
             )}
             {gallery.date && (
-              <span>
-                {new Date(gallery.date).toLocaleDateString()}
-              </span>
+              <span>{new Date(gallery.date).toLocaleDateString()}</span>
             )}
-            {gallery.photographer && (
-              <span>
-                by {gallery.photographer}
-              </span>
-            )}
+            {gallery.photographer && <span>by {gallery.photographer}</span>}
           </div>
 
           {/* Rating Controls */}
@@ -174,7 +168,6 @@ const GalleryDetail = () => {
 
           {/* Images Grid */}
           <div>
-
             {imagesLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {[...Array(gallery.image_count || 12)].map((_, index) => (
@@ -211,7 +204,10 @@ const GalleryDetail = () => {
                         loading="lazy"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-sm" style={{ color: "var(--text-muted)" }}>
+                      <div
+                        className="w-full h-full flex items-center justify-center text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         No Preview
                       </div>
                     )}
@@ -219,7 +215,10 @@ const GalleryDetail = () => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="text-center py-12"
+                style={{ color: "var(--text-muted)" }}
+              >
                 No images found in this gallery
               </div>
             )}

@@ -6,12 +6,16 @@ import {
   useLocation,
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
+import {
+  CardStatusIcons,
+  PageHeader,
+  PageLayout,
+  ErrorMessage,
+} from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import EntityImage from "../ui/EntityImage.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
-import OCounterButton from "../ui/OCounterButton.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -227,20 +231,11 @@ const TagCard = forwardRef(
             </div>
 
             {/* Status Icons */}
-            <div
-              className="flex flex-wrap items-center gap-2 text-xs mb-2"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <span>
-                <span style={{ color: "var(--status-success)" }}>▶</span>{" "}
-                {tag.play_count || 0}
-              </span>
-              <OCounterButton
-                initialCount={tag.o_counter || 0}
-                readOnly={true}
-                className="text-xs"
-              />
-            </div>
+            <CardStatusIcons
+              isReadOnly={true}
+              oCount={tag.o_counter}
+              playCount={tag.play_count}
+            />
 
             {/* Rating and Favorite */}
             <div
@@ -252,7 +247,6 @@ const TagCard = forwardRef(
                 entityId={tag.id}
                 initialRating={tag.rating}
                 initialFavorite={tag.favorite || false}
-                size={16}
               />
             </div>
 

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { apiPost } from '../../services/api.js';
+import { useState, useEffect } from "react";
+import { apiPost } from "../../services/api.js";
 
 /**
  * Interactive O Counter button component
@@ -8,30 +8,29 @@ import { apiPost } from '../../services/api.js';
  * @param {string} sceneId - Stash scene ID
  * @param {number} initialCount - Initial O counter value
  * @param {Function} onIncrement - Optional callback after successful increment (receives new count)
- * @param {string} className - Optional additional CSS classes
  * @param {boolean} disabled - Whether button is disabled
- * @param {boolean} readOnly - Display-only mode (no click functionality)
+ * @param {boolean} isReadOnly - Display-only mode (no click functionality)
  */
 const OCounterButton = ({
   sceneId,
   initialCount = 0,
   onIncrement,
-  className = '',
   disabled = false,
-  readOnly = false
+  isReadOnly = false,
+  size = "base",
 }) => {
-  const [count, setCount] = useState(initialCount);
+  const [count, setCount] = useState(initialCount ?? 0);
   const [isIncrementing, setIsIncrementing] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [error, setError] = useState(null);
 
   // Sync count when initialCount changes (e.g., from parent callback)
   useEffect(() => {
-    setCount(initialCount);
+    setCount(initialCount ?? 0);
   }, [initialCount]);
 
   const handleClick = async (e) => {
-    if (readOnly || disabled || isIncrementing || !sceneId) {
+    if (isReadOnly || disabled || isIncrementing || !sceneId) {
       return;
     }
 
@@ -43,7 +42,7 @@ const OCounterButton = ({
       setIsIncrementing(true);
       setError(null);
 
-      const response = await apiPost('/watch-history/increment-o', { sceneId });
+      const response = await apiPost("/watch-history/increment-o", { sceneId });
 
       if (response.success) {
         const newCount = response.oCount;
@@ -59,8 +58,8 @@ const OCounterButton = ({
         }
       }
     } catch (err) {
-      console.error('Error incrementing O counter:', err);
-      setError('Failed to increment');
+      console.error("Error incrementing O counter:", err);
+      setError("Failed to increment");
 
       // Clear error after 2 seconds
       setTimeout(() => setError(null), 2000);
@@ -71,45 +70,60 @@ const OCounterButton = ({
   };
 
   // Render as plain span when readOnly (allows clicks to bubble to parent Link)
-  const Element = readOnly ? 'span' : 'button';
+  const Element = isReadOnly ? "span" : "button";
 
   return (
     <Element
-      onClick={readOnly ? undefined : handleClick}
-      disabled={readOnly ? undefined : (disabled || isIncrementing)}
-      className={`flex items-center gap-1 transition-all ${className}`}
+      onClick={isReadOnly ? undefined : handleClick}
+      disabled={isReadOnly ? undefined : disabled || isIncrementing}
+      className={`flex items-center gap-1 transition-all text-${size}`}
       style={{
-        cursor: readOnly ? 'inherit' : (disabled || isIncrementing ? 'not-allowed' : 'pointer'),
+        cursor: isReadOnly
+          ? "inherit"
+          : disabled || isIncrementing
+          ? "not-allowed"
+          : "pointer",
         opacity: disabled ? 0.5 : 1,
-        position: 'relative',
+        position: "relative",
       }}
-      title={error || (readOnly ? `O counter: ${count}` : (isIncrementing ? 'Incrementing...' : 'Click to increment O counter'))}
-      aria-label={readOnly ? `O counter: ${count}` : `O counter: ${count}. Click to increment.`}
+      title={
+        error ||
+        (isReadOnly
+          ? `O counter: ${count}`
+          : isIncrementing
+          ? "Incrementing..."
+          : "Click to increment O counter")
+      }
+      aria-label={
+        isReadOnly
+          ? `O counter: ${count}`
+          : `O counter: ${count}. Click to increment.`
+      }
     >
       <span
-        className={`transition-transform ${showFeedback ? 'scale-125' : 'scale-100'}`}
+        className={`transition-transform ${
+          showFeedback ? "scale-125" : "scale-100"
+        }`}
         style={{
-          display: 'inline-block',
-          transitionDuration: '200ms',
+          display: "inline-block",
+          transitionDuration: "200ms",
         }}
       >
         💦
       </span>
-      <span className={showFeedback ? 'font-bold' : ''}>
-        {count}
-      </span>
+      <span className={showFeedback ? "font-bold" : ""}>{count}</span>
 
       {/* Visual feedback animation */}
       {showFeedback && (
         <span
           style={{
-            position: 'absolute',
-            top: '-10px',
-            right: '-10px',
-            fontSize: '12px',
-            fontWeight: 'bold',
-            color: 'var(--status-success)',
-            animation: 'fadeOut 1s ease-out',
+            position: "absolute",
+            top: "-10px",
+            right: "-10px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            color: "var(--status-success)",
+            animation: "fadeOut 1s ease-out",
           }}
         >
           +1
@@ -120,12 +134,12 @@ const OCounterButton = ({
       {error && (
         <span
           style={{
-            position: 'absolute',
-            bottom: '-20px',
-            left: '0',
-            fontSize: '10px',
-            color: 'var(--status-error)',
-            whiteSpace: 'nowrap',
+            position: "absolute",
+            bottom: "-20px",
+            left: "0",
+            fontSize: "10px",
+            color: "var(--status-error)",
+            whiteSpace: "nowrap",
           }}
         >
           {error}

@@ -8,6 +8,7 @@ import RatingControls from "../ui/RatingControls.jsx";
 import { ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { formatDuration } from "../../utils/format.js";
+import PageHeader from "../ui/PageHeader.jsx";
 
 const GroupDetail = () => {
   const { groupId } = useParams();
@@ -62,23 +63,14 @@ const GroupDetail = () => {
 
         {/* Group Header - Hero Treatment */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <h1
-              className="text-5xl font-bold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {group?.name || `Collection ${groupId}`}
-            </h1>
-          </div>
-
-          {group?.aliases && group.aliases.length > 0 && (
-            <p
-              className="text-xl mb-3"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Also known as: {group.aliases.join(", ")}
-            </p>
-          )}
+          <PageHeader
+            title={group?.name || `Collection ${groupId}`}
+            subtitle={
+              group?.aliases?.length
+                ? `Also known as: ${group.aliases.join(", ")}`
+                : null
+            }
+          />
 
           {/* Rating Controls */}
           <div className="mt-4">

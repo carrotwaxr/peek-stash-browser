@@ -95,7 +95,6 @@ const PlaybackControls = () => {
             sceneId={scene?.id}
             initialCount={oCounter}
             onIncrement={setOCounter}
-            className="text-base"
             disabled={isLoading}
           />
 

@@ -7,6 +7,7 @@ import Button from "../ui/Button.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import PageHeader from "../ui/PageHeader.jsx";
 
 const TagDetail = () => {
   const { tagId } = useParams();
@@ -59,23 +60,14 @@ const TagDetail = () => {
 
         {/* Tag Header - Hero Treatment */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <h1
-              className="text-5xl font-bold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {tag?.name || `Tag ${tagId}`}
-            </h1>
-          </div>
-
-          {tag?.aliases && tag.aliases.length > 0 && (
-            <p
-              className="text-xl mb-3"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Also known as: {tag.aliases.join(", ")}
-            </p>
-          )}
+          <PageHeader
+            title={tag?.name || `Tag ${tagId}`}
+            subtitle={
+              tag?.aliases?.length
+                ? `Also known as: ${tag?.aliases.join(", ")}`
+                : null
+            }
+          />
 
           {/* Rating Controls */}
           <div className="mt-4">

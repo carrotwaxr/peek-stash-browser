@@ -6,12 +6,16 @@ import {
   useLocation,
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
+import {
+  PageHeader,
+  PageLayout,
+  ErrorMessage,
+  CardStatusIcons,
+} from "../ui/index.js";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import EntityImage from "../ui/EntityImage.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
-import OCounterButton from "../ui/OCounterButton.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -219,20 +223,11 @@ const StudioCard = forwardRef(
             </div>
 
             {/* Status Icons */}
-            <div
-              className="flex flex-wrap items-center gap-2 text-xs mb-2"
-              style={{ color: "var(--text-muted)" }}
-            >
-              <span>
-                <span style={{ color: "var(--status-success)" }}>▶</span>{" "}
-                {studio.play_count || 0}
-              </span>
-              <OCounterButton
-                initialCount={studio.o_counter || 0}
-                readOnly={true}
-                className="text-xs"
-              />
-            </div>
+            <CardStatusIcons
+              isReadOnly={true}
+              oCount={studio.o_counter}
+              playCount={studio.play_count}
+            />
 
             {/* Rating and Favorite */}
             <div
@@ -244,7 +239,6 @@ const StudioCard = forwardRef(
                 entityId={studio.id}
                 initialRating={studio.rating}
                 initialFavorite={studio.favorite || false}
-                size={16}
               />
             </div>
           </div>

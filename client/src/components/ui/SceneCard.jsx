@@ -40,11 +40,11 @@ const SceneCard = forwardRef(
       const target = e.target;
 
       // Find the closest button element (but not the card itself)
-      const closestButton = target.closest('button');
+      const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
 
       // Check for links
-      const isLink = target.closest('a');
+      const isLink = target.closest("a");
 
       const isInteractive = isButton || isLink;
 
@@ -73,11 +73,11 @@ const SceneCard = forwardRef(
       const target = e.target;
 
       // Find the closest button element (but not the card itself)
-      const closestButton = target.closest('button');
+      const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
 
       // Check for links
-      const isLink = target.closest('a');
+      const isLink = target.closest("a");
 
       const isInteractive = isButton || isLink;
 
@@ -103,11 +103,11 @@ const SceneCard = forwardRef(
       const target = e.target;
 
       // Find the closest button element (but not the card itself)
-      const closestButton = target.closest('button');
+      const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
 
       // Check for links
-      const isLink = target.closest('a');
+      const isLink = target.closest("a");
 
       const isInteractive = isButton || isLink;
 
@@ -190,202 +190,231 @@ const SceneCard = forwardRef(
 
     return (
       <>
-      <div
-        ref={ref}
-        className={`
+        <div
+          ref={ref}
+          className={`
         scene-card
         relative bg-card rounded-lg border overflow-hidden
         transition-all duration-300 cursor-pointer
         hover:shadow-2xl hover:scale-[1.03] hover:z-10
         hover:border-opacity-80
-        ${isSelected ? 'scene-card-selected' : ''}
+        ${isSelected ? "scene-card-selected" : ""}
         ${className}
       `}
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: isSelected ? "var(--selection-color)" : "var(--border-color)",
-          borderWidth: isSelected ? "2px" : "1px",
-        }}
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        onKeyDown={handleKeyDown}
-        onFocus={onFocus}
-        tabIndex={isTVMode ? tabIndex : -1}
-        role="button"
-        aria-label={`Scene ${scene.id}`}
-      >
-        {/* Thumbnail */}
-        <div className="relative aspect-video overflow-hidden" style={{backgroundColor: "var(--bg-secondary)"}}>
-          {/* Selection Checkbox - Always shown, larger touchpoint on mobile */}
-          <div className="absolute top-2 left-2 z-20">
-            <button
-              onClick={handleCheckboxClick}
-              className="w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
-              style={{
-                backgroundColor: isSelected ? "var(--selection-color)" : "rgba(0, 0, 0, 0.5)",
-                borderColor: isSelected ? "var(--selection-color)" : "rgba(255, 255, 255, 0.7)",
-              }}
-              onMouseEnter={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 1)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected) {
-                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.7)";
-                }
-              }}
-              aria-label={isSelected ? "Deselect scene" : "Select scene"}
-            >
-              {isSelected && (
+          style={{
+            backgroundColor: "var(--bg-card)",
+            borderColor: isSelected
+              ? "var(--selection-color)"
+              : "var(--border-color)",
+            borderWidth: isSelected ? "2px" : "1px",
+          }}
+          onClick={handleClick}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          onKeyDown={handleKeyDown}
+          onFocus={onFocus}
+          tabIndex={isTVMode ? tabIndex : -1}
+          role="button"
+          aria-label={`Scene ${scene.id}`}
+        >
+          {/* Thumbnail */}
+          <div
+            className="relative aspect-video overflow-hidden"
+            style={{ backgroundColor: "var(--bg-secondary)" }}
+          >
+            {/* Selection Checkbox - Always shown, larger touchpoint on mobile */}
+            <div className="absolute top-2 left-2 z-20">
+              <button
+                onClick={handleCheckboxClick}
+                className="w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
+                style={{
+                  backgroundColor: isSelected
+                    ? "var(--selection-color)"
+                    : "rgba(0, 0, 0, 0.5)",
+                  borderColor: isSelected
+                    ? "var(--selection-color)"
+                    : "rgba(255, 255, 255, 0.7)",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor =
+                      "rgba(255, 255, 255, 1)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor =
+                      "rgba(255, 255, 255, 0.7)";
+                  }
+                }}
+                aria-label={isSelected ? "Deselect scene" : "Select scene"}
+              >
+                {isSelected && (
+                  <svg
+                    className="w-5 h-5 sm:w-4 sm:h-4 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={3}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {scene.paths?.screenshot ? (
+              <SceneCardPreview
+                scene={scene}
+                autoplayOnScroll={autoplayOnScroll}
+                cycleInterval={600}
+                spriteCount={10}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
                 <svg
-                  className="w-5 h-5 sm:w-4 sm:h-4 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                  className="w-12 h-12 text-gray-400"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
                 >
                   <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={3}
-                    d="M5 13l4 4L19 7"
+                    fillRule="evenodd"
+                    d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+                    clipRule="evenodd"
                   />
                 </svg>
+              </div>
+            )}
+
+            {/* Overlay gradient - non-interactive */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
+
+            {/* Studio in top-right */}
+            {scene.studio && (
+              <div className="absolute top-2 right-2 z-10">
+                <Link
+                  to={`/studio/${scene.studio.id}`}
+                  className="px-2 py-1 bg-black/70 text-white text-xs rounded inline-block hover:bg-black/90 transition-colors"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {scene.studio.name}
+                </Link>
+              </div>
+            )}
+
+            {/* Duration in bottom-right - non-interactive */}
+            <div className="absolute bottom-2 right-2 pointer-events-none z-10">
+              {scene.files?.[0]?.duration && (
+                <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
+                  {Math.floor(scene.files[0].duration / 60)}m
+                </span>
               )}
-            </button>
-          </div>
+            </div>
 
-          {scene.paths?.screenshot ? (
-            <SceneCardPreview scene={scene} autoplayOnScroll={autoplayOnScroll} cycleInterval={600} spriteCount={10} />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <svg
-                className="w-12 h-12 text-gray-400"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
-                  clipRule="evenodd"
+            {/* Watch Progress Bar */}
+            {scene.resumeTime && scene.files?.[0]?.duration && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 pointer-events-none">
+                <div
+                  className="h-full transition-all pointer-events-none"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (scene.resumeTime / scene.files[0].duration) * 100
+                    )}%`,
+                    backgroundColor: "var(--status-success)",
+                  }}
+                  title={`Resume from ${Math.floor(
+                    scene.resumeTime / 60
+                  )}:${String(Math.floor(scene.resumeTime % 60)).padStart(
+                    2,
+                    "0"
+                  )}`}
                 />
-              </svg>
-            </div>
-          )}
-
-          {/* Overlay gradient - non-interactive */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
-
-          {/* Studio in top-right */}
-          {scene.studio && (
-            <div className="absolute top-2 right-2 z-10">
-              <Link
-                to={`/studio/${scene.studio.id}`}
-                className="px-2 py-1 bg-black/70 text-white text-xs rounded inline-block hover:bg-black/90 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {scene.studio.name}
-              </Link>
-            </div>
-          )}
-
-          {/* Duration in bottom-right - non-interactive */}
-          <div className="absolute bottom-2 right-2 pointer-events-none z-10">
-            {scene.files?.[0]?.duration && (
-              <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                {Math.floor(scene.files[0].duration / 60)}m
-              </span>
+              </div>
             )}
           </div>
 
-          {/* Watch Progress Bar */}
-          {scene.resumeTime && scene.files?.[0]?.duration && (
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 pointer-events-none">
-              <div
-                className="h-full transition-all pointer-events-none"
-                style={{
-                  width: `${Math.min(100, (scene.resumeTime / scene.files[0].duration) * 100)}%`,
-                  backgroundColor: "var(--status-success)"
-                }}
-                title={`Resume from ${Math.floor(scene.resumeTime / 60)}:${String(Math.floor(scene.resumeTime % 60)).padStart(2, '0')}`}
+          {/* Content */}
+          <div className="pt-4 px-4 pb-2">
+            {/* Title and Date - Fixed height for carousel consistency */}
+            <div
+              className="flex flex-col"
+              style={{ minHeight: "4rem", maxHeight: "4rem" }}
+            >
+              <SceneTitle
+                scene={scene}
+                titleClassName="font-semibold mb-1 leading-tight"
+                dateClassName="text-xs mt-1"
+                maxLines={2}
               />
             </div>
-          )}
+
+            {/* Stats - Fixed height row, no wrapping, centered */}
+            <div
+              style={{
+                minHeight: "1.5rem",
+                maxHeight: "1.5rem",
+                overflow: "hidden",
+              }}
+            >
+              <SceneStats scene={scene} centered={true} />
+            </div>
+
+            {/* Description - Fixed height for carousel consistency */}
+            <div
+              style={{
+                minHeight: "3.75rem",
+                maxHeight: "3.75rem",
+                overflow: "hidden",
+              }}
+            >
+              <SceneDescription scene={scene} lineClamp={3} />
+            </div>
+
+            {/* Performers, Tags - More space, less cramped */}
+            <div
+              className="py-2"
+              style={{ minHeight: "3.5rem", maxHeight: "3.5rem" }}
+            >
+              <SceneMetadata scene={scene} />
+            </div>
+
+            {/* Rating Controls */}
+            <div className="py-2 flex justify-center">
+              <RatingControls
+                entityType="scene"
+                entityId={scene.id}
+                initialRating={scene.rating}
+                initialFavorite={scene.favorite || false}
+              />
+            </div>
+
+            {/* Resolution and File Size - Bottom row */}
+            <div
+              className="flex items-center justify-between text-xs"
+              style={{ color: "var(--text-muted)", minHeight: "1rem" }}
+            >
+              <span>
+                {scene.files?.[0]?.width && scene.files?.[0]?.height
+                  ? `${scene.files[0].width}×${scene.files[0].height}`
+                  : "—"}
+              </span>
+              <span>
+                {scene.files?.[0]?.size && formatFileSize(scene.files[0].size)}
+              </span>
+            </div>
+          </div>
         </div>
-
-        {/* Content */}
-        <div className="pt-4 px-4 pb-2">
-          {/* Title and Date - Fixed height for carousel consistency */}
-          <div className="flex flex-col" style={{ minHeight: "4rem", maxHeight: "4rem" }}>
-            <SceneTitle
-              scene={scene}
-              titleClassName="font-semibold mb-1 leading-tight"
-              dateClassName="text-xs mt-1"
-              maxLines={2}
-            />
-          </div>
-
-          {/* Stats - Fixed height row, no wrapping, centered */}
-          <div style={{ minHeight: "1.5rem", maxHeight: "1.5rem", overflow: "hidden" }}>
-            <SceneStats
-              scene={scene}
-              noWrap={true}
-              hideFileInfo={true}
-              centered={true}
-            />
-          </div>
-
-          {/* Description - Fixed height for carousel consistency */}
-          <div style={{ minHeight: "3.75rem", maxHeight: "3.75rem", overflow: "hidden" }}>
-            <SceneDescription
-              scene={scene}
-              lineClamp={3}
-            />
-          </div>
-
-          {/* Performers, Tags - More space, less cramped */}
-          <div className="py-2" style={{ minHeight: "3.5rem", maxHeight: "3.5rem" }}>
-            <SceneMetadata
-              scene={scene}
-            />
-          </div>
-
-          {/* Rating Controls */}
-          <div className="py-2 flex justify-center">
-            <RatingControls
-              entityType="scene"
-              entityId={scene.id}
-              initialRating={scene.rating}
-              initialFavorite={scene.favorite || false}
-              size={18}
-            />
-          </div>
-
-          {/* Resolution and File Size - Bottom row */}
-          <div className="flex items-center justify-between text-xs" style={{ color: 'var(--text-muted)', minHeight: "1rem" }}>
-            <span>
-              {scene.files?.[0]?.width && scene.files?.[0]?.height ? (
-                `${scene.files[0].width}×${scene.files[0].height}`
-              ) : (
-                '—'
-              )}
-            </span>
-            <span>
-              {scene.files?.[0]?.size && (
-                formatFileSize(scene.files[0].size)
-              )}
-            </span>
-          </div>
-
-        </div>
-      </div>
-    </>
+      </>
     );
   }
 );

@@ -6,11 +6,15 @@ import {
   useLocation,
 } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
+import {
+  PageHeader,
+  PageLayout,
+  ErrorMessage,
+  CardStatusIcons,
+} from "../ui/index.js";
 import { getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
-import OCounterButton from "../ui/OCounterButton.jsx";
 import { LucideVenus, LucideMars, LucideUser } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
@@ -235,20 +239,11 @@ const PerformerCard = forwardRef(
           </div>
 
           {/* Status Icons */}
-          <div
-            className="flex flex-wrap items-center justify-center gap-2 text-xs mb-2"
-            style={{ color: "var(--text-muted)" }}
-          >
-            <span>
-              <span style={{ color: "var(--status-success)" }}>▶</span>{" "}
-              {performer.play_count || 0}
-            </span>
-            <OCounterButton
-              initialCount={performer.o_counter || 0}
-              readOnly={true}
-              className="text-xs"
-            />
-          </div>
+          <CardStatusIcons
+            isReadOnly={true}
+            oCount={performer.o_counter}
+            playCount={performer.play_count}
+          />
 
           {/* Rating and Favorite */}
           <div
@@ -260,7 +255,6 @@ const PerformerCard = forwardRef(
               entityId={performer.id}
               initialRating={performer.rating}
               initialFavorite={performer.favorite || false}
-              size={16}
             />
           </div>
         </div>
