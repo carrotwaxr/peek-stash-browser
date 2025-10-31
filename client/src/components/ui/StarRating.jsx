@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Star, X } from "lucide-react";
 
 /**
  * Star rating component
  * Displays a 5-star rating based on 0-100 value
  * Optionally allows user interaction to set rating
+ * Supports click-and-drag interaction for easier rating selection
  */
 export default function StarRating({
   rating,
@@ -15,6 +16,9 @@ export default function StarRating({
   showValue = false,
 }) {
   const [hoverRating, setHoverRating] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef(null);
+  const justDraggedRef = useRef(false);
 
   // Convert 0-100 rating to 0-5 stars (with half-star accuracy)
   // 10 = 0.5 stars, 20 = 1 star, 30 = 1.5 stars, etc.
@@ -37,6 +41,12 @@ export default function StarRating({
   const handleStarClick = (e, starNumber) => {
     if (readonly || !onChange) return;
 
+    // Don't handle click if we just finished dragging
+    if (justDraggedRef.current) {
+      justDraggedRef.current = false;
+      return;
+    }
+
     // Determine if clicking left half (half star) or right half (full star)
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -46,7 +56,7 @@ export default function StarRating({
   };
 
   const handleMouseMove = (e, starIndex) => {
-    if (readonly || !onChange) return;
+    if (readonly || !onChange || isDragging) return;
 
     // Determine if hovering over left half (half star) or right half (full star)
     const rect = e.currentTarget.getBoundingClientRect();
@@ -58,7 +68,7 @@ export default function StarRating({
   };
 
   const handleMouseLeave = () => {
-    if (readonly || !onChange) return;
+    if (readonly || !onChange || isDragging) return;
     setHoverRating(null);
   };
 
@@ -66,6 +76,101 @@ export default function StarRating({
     if (readonly || !onChange) return;
     onChange(null); // Set to null (unrated)
   };
+
+  // Calculate rating based on mouse/touch position within the stars container
+  const getRatingFromPosition = (clientX) => {
+    if (!containerRef.current) return null;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const width = rect.width;
+
+    // Calculate which star and which half based on position
+    // Each star takes up 1/5 of the width, plus gaps
+    const relativePosition = Math.max(0, Math.min(1, x / width));
+    const starValue = relativePosition * 5;
+
+    // Round to nearest 0.5 (half-star precision)
+    const roundedValue = Math.round(starValue * 2) / 2;
+
+    // Clamp between 0.5 and 5 (minimum half star, maximum 5 stars)
+    return Math.max(0.5, Math.min(5, roundedValue));
+  };
+
+  // Handle drag start (mouse or touch)
+  const handleDragStart = (e) => {
+    if (readonly || !onChange) return;
+
+    setIsDragging(true);
+    justDraggedRef.current = false;
+
+    // Get initial position and set hover rating
+    const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+    const newRating = getRatingFromPosition(clientX);
+    if (newRating !== null) {
+      setHoverRating(newRating);
+    }
+  };
+
+  // Add global event listeners for drag operations
+  useEffect(() => {
+    if (!isDragging) return;
+
+    // Handle drag move (mouse or touch)
+    const handleDragMove = (e) => {
+      if (readonly || !onChange) return;
+
+      const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+      const newRating = getRatingFromPosition(clientX);
+      if (newRating !== null) {
+        setHoverRating(newRating);
+      }
+    };
+
+    // Handle drag end (mouse or touch)
+    const handleDragEnd = () => {
+      if (readonly || !onChange) return;
+
+      if (hoverRating !== null) {
+        // Convert star value (0.5-5) to 0-100 rating
+        const newRating = Math.round(hoverRating * 20);
+        onChange(newRating);
+        justDraggedRef.current = true; // Prevent click handler from firing
+      }
+
+      setIsDragging(false);
+      setHoverRating(null);
+    };
+
+    const handleGlobalMove = (e) => {
+      if (e.type === 'mousemove') {
+        handleDragMove(e);
+      } else if (e.type === 'touchmove') {
+        e.preventDefault(); // Prevent scrolling while dragging
+        handleDragMove(e);
+      }
+    };
+
+    const handleGlobalEnd = () => {
+      handleDragEnd();
+    };
+
+    // Add listeners
+    document.addEventListener('mousemove', handleGlobalMove);
+    document.addEventListener('mouseup', handleGlobalEnd);
+    document.addEventListener('touchmove', handleGlobalMove, { passive: false });
+    document.addEventListener('touchend', handleGlobalEnd);
+    document.addEventListener('touchcancel', handleGlobalEnd);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMove);
+      document.removeEventListener('mouseup', handleGlobalEnd);
+      document.removeEventListener('touchmove', handleGlobalMove);
+      document.removeEventListener('touchend', handleGlobalEnd);
+      document.removeEventListener('touchcancel', handleGlobalEnd);
+    };
+  }, [isDragging, hoverRating, readonly, onChange]);
 
   const renderStar = (index) => {
     const starNumber = index + 1;
@@ -138,7 +243,18 @@ export default function StarRating({
           />
         </button>
       )}
-      <div className="flex items-center gap-0.5">
+      <div
+        ref={containerRef}
+        className="flex items-center gap-0.5"
+        onMouseDown={handleDragStart}
+        onTouchStart={handleDragStart}
+        style={{
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          touchAction: 'none',
+          cursor: readonly || !onChange ? 'default' : 'pointer',
+        }}
+      >
         {[0, 1, 2, 3, 4].map(renderStar)}
       </div>
       {showValue && rating !== null && rating !== undefined && (
