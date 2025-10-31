@@ -163,13 +163,18 @@ const ServerStatsSection = () => {
                 <button
                   onClick={refreshCache}
                   disabled={refreshingCache || stats.cache?.isRefreshing}
-                  className="p-1 rounded hover:bg-opacity-10 hover:bg-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: refreshingCache || stats.cache?.isRefreshing ? 'transparent' : 'transparent',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-info)'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   title="Refresh cache now"
                   aria-label="Refresh cache"
                 >
                   <RefreshCw
                     className={`w-3 h-3 ${refreshingCache || stats.cache?.isRefreshing ? "animate-spin" : ""}`}
-                    style={{ color: "var(--text-secondary)" }}
+                    style={{ color: "var(--status-info)" }}
                   />
                 </button>
               </div>
