@@ -42,7 +42,7 @@ import watchHistoryRoutes from "./routes/watchHistory.js";
 import ratingsRoutes from "./routes/ratings.js";
 import setupRoutes from "./routes/setup.js";
 import customThemeRoutes from "./routes/customTheme.js";
-import { authenticateToken, requireCacheReady } from "./middleware/auth.js";
+import { authenticateToken, requireCacheReady, requireAdmin } from "./middleware/auth.js";
 import { logger } from "./utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -95,6 +95,9 @@ export const setupAPI = () => {
 
   // Server stats endpoint (admin only - authenticated)
   app.get("/api/stats", authenticateToken, statsController.getStats);
+
+  // Refresh cache endpoint (admin only)
+  app.post("/api/stats/refresh-cache", authenticateToken, requireAdmin, statsController.refreshCache);
 
   // Media proxy (public - no auth required for images)
   app.get("/api/proxy/stash", proxyStashMedia);

@@ -13,6 +13,7 @@ const ServerStatsSection = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshingCache, setRefreshingCache] = useState(false);
 
   const loadStats = async () => {
     try {
@@ -25,6 +26,20 @@ const ServerStatsSection = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const refreshCache = async () => {
+    try {
+      setRefreshingCache(true);
+      await api.post("/stats/refresh-cache");
+      // Wait a moment then reload stats to show refreshing status
+      setTimeout(loadStats, 500);
+    } catch (err) {
+      console.error("Failed to refresh cache:", err);
+      // Silently fail - will show error in console
+    } finally {
+      setRefreshingCache(false);
     }
   };
 
@@ -141,9 +156,23 @@ const ServerStatsSection = () => {
               {stats.cache?.isRefreshing && " (Refreshing...)"}
             </span>
             {stats.cache?.lastRefreshed && (
-              <span>
-                Last refreshed: {new Date(stats.cache.lastRefreshed).toLocaleTimeString()}
-              </span>
+              <div className="flex items-center gap-2">
+                <span>
+                  Last refreshed: {new Date(stats.cache.lastRefreshed).toLocaleTimeString()}
+                </span>
+                <button
+                  onClick={refreshCache}
+                  disabled={refreshingCache || stats.cache?.isRefreshing}
+                  className="p-1 rounded hover:bg-opacity-10 hover:bg-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Refresh cache now"
+                  aria-label="Refresh cache"
+                >
+                  <RefreshCw
+                    className={`w-3 h-3 ${refreshingCache || stats.cache?.isRefreshing ? "animate-spin" : ""}`}
+                    style={{ color: "var(--text-secondary)" }}
+                  />
+                </button>
+              </div>
             )}
           </div>
         </div>
