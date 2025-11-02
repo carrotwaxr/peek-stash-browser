@@ -236,3 +236,29 @@ function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   return formatUptime(seconds);
 }
+
+/**
+ * Manually refresh the Stash cache
+ * Admin-only endpoint to trigger cache refresh on demand
+ */
+export const refreshCache = async (req: Request, res: Response) => {
+  try {
+    logger.info('Manual cache refresh triggered by admin');
+    await stashCacheManager.refreshCache();
+
+    res.json({
+      success: true,
+      message: 'Cache refresh initiated'
+    });
+  } catch (error) {
+    logger.error('Error refreshing cache', {
+      error: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to refresh cache'
+    });
+  }
+};
