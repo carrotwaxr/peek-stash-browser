@@ -14,6 +14,14 @@ import {
  * Note: autoplayOnScroll takes priority over hover detection to fix issues where mobile browsers
  * incorrectly report hover capability (e.g., Chrome on Android).
  *
+ * TODO: PERFORMANCE - This component has 6 useEffects managing various state synchronizations
+ * Consider refactoring into smaller custom hooks:
+ * - useHoverCapability() - Detect hover capability
+ * - useInViewport() - Intersection observer logic
+ * - useSpriteLoader() - VTT loading and parsing
+ * - useContainerDimensions() - Width measurement
+ * - useSpriteAnimation() - Animation cycling (currently has 6 dependencies)
+ *
  * @param {Object} scene - Scene object with paths.sprite and paths.vtt
  * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (typically for 1-column mobile layouts)
  * @param {number} cycleInterval - Milliseconds between sprite changes (default: 800ms)
@@ -118,6 +126,9 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
     }
   }, [isHovering, containerWidth, containerElement]);
 
+  // TODO: REFACTOR - This useEffect has 6 dependencies and complex logic
+  // Consider extracting animation logic into a custom hook or memoizing the shouldAnimate calculation
+  // Dependencies: [isHovering, isInView, hasHoverCapability, autoplayOnScroll, sprites.length, cycleInterval]
   // Cycle through sprites based on input method and layout
   useEffect(() => {
     // Determine if we should animate based on hover capability and autoplayOnScroll setting
