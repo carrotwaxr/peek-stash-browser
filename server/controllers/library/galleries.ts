@@ -11,6 +11,7 @@ import {
 } from "../../types/index.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import { mergeTagsWithUserData } from "./tags.js";
 import { mergePerformersWithUserData } from "./performers.js";
@@ -223,6 +224,49 @@ export const findGalleries = async (
     // Step 2: Merge with user data
     galleries = await mergeGalleriesWithUserData(galleries, userId);
 
+    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    const requestingUser = req.user;
+    const cacheVersion = stashCacheManager.getCacheVersion();
+
+    // Try to get filtered galleries from cache
+    let filteredGalleries = filteredEntityCacheService.get(
+      userId,
+      "galleries",
+      cacheVersion
+    ) as NormalizedGallery[] | null;
+
+    if (filteredGalleries === null) {
+      // Cache miss - compute filtered galleries
+      logger.debug("Galleries cache miss", { userId, cacheVersion });
+      filteredGalleries = galleries;
+
+      // Apply content restrictions (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        filteredGalleries = await userRestrictionService.filterGalleriesForUser(
+          filteredGalleries,
+          userId
+        );
+      }
+
+      // Filter empty galleries (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        filteredGalleries = emptyEntityFilterService.filterEmptyGalleries(filteredGalleries);
+      }
+
+      // Store in cache
+      filteredEntityCacheService.set(
+        userId,
+        "galleries",
+        filteredGalleries,
+        cacheVersion
+      );
+    } else {
+      logger.debug("Galleries cache hit", { userId, entityCount: filteredGalleries.length });
+    }
+
+    // Use cached/filtered galleries for remaining operations
+    galleries = filteredGalleries;
+
     // Step 3: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -241,20 +285,6 @@ export const findGalleries = async (
     // Step 4: Apply filters (merge root-level ids with gallery_filter)
     const mergedFilter = { ...gallery_filter, ids: ids || gallery_filter?.ids };
     galleries = applyGalleryFilters(galleries, mergedFilter);
-
-    // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      galleries = await userRestrictionService.filterGalleriesForUser(
-        galleries,
-        userId
-      );
-    }
-
-    // Step 4.6: Filter empty galleries (non-admins only)
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      galleries = emptyEntityFilterService.filterEmptyGalleries(galleries);
-    }
 
     // Step 5: Sort
     galleries = sortGalleries(galleries, sortField, sortDirection);

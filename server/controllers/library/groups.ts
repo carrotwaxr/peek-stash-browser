@@ -5,6 +5,7 @@ import { logger } from "../../utils/logger.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 
 /**
@@ -179,6 +180,46 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Merge with user data
     groups = await mergeGroupsWithUserData(groups, userId);
 
+    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    const requestingUser = req.user;
+    const cacheVersion = stashCacheManager.getCacheVersion();
+
+    // Try to get filtered groups from cache
+    let filteredGroups = filteredEntityCacheService.get(
+      userId,
+      "groups",
+      cacheVersion
+    ) as NormalizedGroup[] | null;
+
+    if (filteredGroups === null) {
+      // Cache miss - compute filtered groups
+      logger.debug("Groups cache miss", { userId, cacheVersion });
+      filteredGroups = groups;
+
+      // Apply content restrictions (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        filteredGroups = await userRestrictionService.filterGroupsForUser(filteredGroups, userId);
+      }
+
+      // Filter empty groups (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        filteredGroups = emptyEntityFilterService.filterEmptyGroups(filteredGroups);
+      }
+
+      // Store in cache
+      filteredEntityCacheService.set(
+        userId,
+        "groups",
+        filteredGroups,
+        cacheVersion
+      );
+    } else {
+      logger.debug("Groups cache hit", { userId, entityCount: filteredGroups.length });
+    }
+
+    // Use cached/filtered groups for remaining operations
+    groups = filteredGroups;
+
     // Step 3: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -195,17 +236,6 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with group_filter)
     const mergedFilter = { ...group_filter, ids: ids || group_filter?.ids };
     groups = applyGroupFilters(groups, mergedFilter);
-
-    // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      groups = await userRestrictionService.filterGroupsForUser(groups, userId);
-    }
-
-    // Step 4.6: Filter empty groups (non-admins only)
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      groups = emptyEntityFilterService.filterEmptyGroups(groups);
-    }
 
     // Step 5: Sort
     groups = sortGroups(groups, sortField, sortDirection);
@@ -258,6 +288,41 @@ export const findGroupsMinimal = async (
     // Step 2: Merge with user data (for favorites)
     groups = await mergeGroupsWithUserData(groups, userId);
 
+    // Step 2.5: Apply empty entity filtering with caching
+    const requestingUser = req.user;
+    const cacheVersion = stashCacheManager.getCacheVersion();
+
+    // Try to get filtered groups from cache
+    let filteredGroups = filteredEntityCacheService.get(
+      userId,
+      "groups",
+      cacheVersion
+    ) as NormalizedGroup[] | null;
+
+    if (filteredGroups === null) {
+      // Cache miss - compute filtered groups
+      logger.debug("Groups minimal cache miss", { userId, cacheVersion });
+      filteredGroups = groups;
+
+      // Filter empty groups (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        filteredGroups = emptyEntityFilterService.filterEmptyGroups(filteredGroups);
+      }
+
+      // Store in cache
+      filteredEntityCacheService.set(
+        userId,
+        "groups",
+        filteredGroups,
+        cacheVersion
+      );
+    } else {
+      logger.debug("Groups minimal cache hit", { userId, entityCount: filteredGroups.length });
+    }
+
+    // Use cached/filtered groups
+    groups = filteredGroups;
+
     // Step 3: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -265,12 +330,6 @@ export const findGroupsMinimal = async (
         const name = g.name || "";
         return name.toLowerCase().includes(lowerQuery);
       });
-    }
-
-    // Step 3.5: Filter empty groups (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      groups = emptyEntityFilterService.filterEmptyGroups(groups);
     }
 
     // Step 4: Sort by name

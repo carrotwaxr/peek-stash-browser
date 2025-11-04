@@ -6,6 +6,7 @@ import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import getStash from "../../stash.js";
 
@@ -79,6 +80,72 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Merge with user data
     studios = await mergeStudiosWithUserData(studios, userId);
 
+    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    const requestingUser = req.user;
+    const cacheVersion = stashCacheManager.getCacheVersion();
+
+    // Try to get filtered studios from cache
+    let filteredStudios = filteredEntityCacheService.get(
+      userId,
+      "studios",
+      cacheVersion
+    ) as NormalizedStudio[] | null;
+
+    if (filteredStudios === null) {
+      // Cache miss - compute filtered studios
+      logger.debug("Studios cache miss", { userId, cacheVersion });
+      filteredStudios = studios;
+
+      // Apply content restrictions (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        filteredStudios = await userRestrictionService.filterStudiosForUser(
+          filteredStudios,
+          userId
+        );
+      }
+
+      // Filter empty studios (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        // Get all entities from cache
+        let allGalleries = stashCacheManager.getAllGalleries();
+        let allGroups = stashCacheManager.getAllGroups();
+
+        // Apply user restrictions to groups/galleries FIRST
+        allGalleries = await userRestrictionService.filterGalleriesForUser(
+          allGalleries,
+          userId
+        );
+        allGroups = await userRestrictionService.filterGroupsForUser(
+          allGroups,
+          userId
+        );
+
+        // Then filter for empty entities
+        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+
+        // Finally filter studios using properly restricted visibility sets
+        filteredStudios = emptyEntityFilterService.filterEmptyStudios(
+          filteredStudios,
+          visibleGroups,
+          visibleGalleries
+        );
+      }
+
+      // Store in cache
+      filteredEntityCacheService.set(
+        userId,
+        "studios",
+        filteredStudios,
+        cacheVersion
+      );
+    } else {
+      logger.debug("Studios cache hit", { userId, entityCount: filteredStudios.length });
+    }
+
+    // Use cached/filtered studios for remaining operations
+    studios = filteredStudios;
+
     // Step 3: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -95,43 +162,6 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with studio_filter)
     const mergedFilter = { ...studio_filter, ids: ids || studio_filter?.ids };
     studios = applyStudioFilters(studios, mergedFilter);
-
-    // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      studios = await userRestrictionService.filterStudiosForUser(
-        studios,
-        userId
-      );
-    }
-
-    // Step 4.6: Filter empty studios (non-admins only)
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      // Get all entities from cache
-      let allGalleries = stashCacheManager.getAllGalleries();
-      let allGroups = stashCacheManager.getAllGroups();
-
-      // Apply user restrictions to groups/galleries FIRST
-      allGalleries = await userRestrictionService.filterGalleriesForUser(
-        allGalleries,
-        userId
-      );
-      allGroups = await userRestrictionService.filterGroupsForUser(
-        allGroups,
-        userId
-      );
-
-      // Then filter for empty entities
-      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
-
-      // Finally filter studios using properly restricted visibility sets
-      studios = emptyEntityFilterService.filterEmptyStudios(
-        studios,
-        visibleGroups,
-        visibleGalleries
-      );
-    }
 
     // Step 5: Sort
     studios = sortStudios(studios, sortField, sortDirection);
@@ -411,6 +441,65 @@ export const findStudiosMinimal = async (
 
     let studios = stashCacheManager.getAllStudios();
 
+    // Apply content restrictions & empty entity filtering with caching
+    const requestingUser = req.user;
+    const userId = req.user?.id;
+    const cacheVersion = stashCacheManager.getCacheVersion();
+
+    // Try to get filtered studios from cache
+    let filteredStudios = filteredEntityCacheService.get(
+      userId,
+      "studios",
+      cacheVersion
+    ) as NormalizedStudio[] | null;
+
+    if (filteredStudios === null) {
+      // Cache miss - compute filtered studios
+      logger.debug("Studios minimal cache miss", { userId, cacheVersion });
+      filteredStudios = studios;
+
+      // Filter empty studios (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        // Get all entities from cache
+        let allGalleries = stashCacheManager.getAllGalleries();
+        let allGroups = stashCacheManager.getAllGroups();
+
+        // Apply user restrictions to groups/galleries FIRST
+        allGalleries = await userRestrictionService.filterGalleriesForUser(
+          allGalleries,
+          userId
+        );
+        allGroups = await userRestrictionService.filterGroupsForUser(
+          allGroups,
+          userId
+        );
+
+        // Then filter for empty entities
+        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+
+        // Finally filter studios using properly restricted visibility sets
+        filteredStudios = emptyEntityFilterService.filterEmptyStudios(
+          filteredStudios,
+          visibleGroups,
+          visibleGalleries
+        );
+      }
+
+      // Store in cache
+      filteredEntityCacheService.set(
+        userId,
+        "studios",
+        filteredStudios,
+        cacheVersion
+      );
+    } else {
+      logger.debug("Studios minimal cache hit", { userId, entityCount: filteredStudios.length });
+    }
+
+    // Use cached/filtered studios
+    studios = filteredStudios;
+
     // Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -422,36 +511,6 @@ export const findStudiosMinimal = async (
           details.toLowerCase().includes(lowerQuery)
         );
       });
-    }
-
-    // Filter empty studios (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      // Get all entities from cache
-      let allGalleries = stashCacheManager.getAllGalleries();
-      let allGroups = stashCacheManager.getAllGroups();
-
-      // Apply user restrictions to groups/galleries FIRST
-      const userId = req.user?.id;
-      allGalleries = await userRestrictionService.filterGalleriesForUser(
-        allGalleries,
-        userId
-      );
-      allGroups = await userRestrictionService.filterGroupsForUser(
-        allGroups,
-        userId
-      );
-
-      // Then filter for empty entities
-      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
-
-      // Finally filter studios using properly restricted visibility sets
-      studios = emptyEntityFilterService.filterEmptyStudios(
-        studios,
-        visibleGroups,
-        visibleGalleries
-      );
     }
 
     // Sort

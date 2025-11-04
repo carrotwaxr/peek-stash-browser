@@ -8,6 +8,7 @@ import {
   transformGallery,
   transformGroup,
 } from "../utils/pathMapping.js";
+import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
 import type { Scene, Performer, Studio, Tag, Gallery, Group } from "stashapp-api";
 import type {
   NormalizedScene,
@@ -31,6 +32,7 @@ interface CacheState {
   lastRefreshed: Date | null;
   isInitialized: boolean;
   isRefreshing: boolean;
+  cacheVersion: number; // Increments on each refresh for cache invalidation
 }
 
 /**
@@ -50,6 +52,7 @@ class StashCacheManager {
     lastRefreshed: null,
     isInitialized: false,
     isRefreshing: false,
+    cacheVersion: 0,
   };
 
   private refreshInterval: NodeJS.Timeout | null = null;
@@ -295,6 +298,11 @@ class StashCacheManager {
       this.cache.galleries = newGalleries;
       this.cache.groups = newGroups;
       this.cache.lastRefreshed = new Date();
+      this.cache.cacheVersion++; // Increment version to invalidate filtered entity caches
+
+      // Invalidate all filtered entity caches (they depend on this data)
+      filteredEntityCacheService.invalidateAll();
+      logger.info("Invalidated all filtered entity caches due to Stash cache refresh");
 
       const duration = Date.now() - startTime;
       logger.info("✓ Cache refreshed successfully", {
@@ -444,6 +452,14 @@ class StashCacheManager {
    */
   isReady(): boolean {
     return this.cache.isInitialized;
+  }
+
+  /**
+   * Get current cache version
+   * Used for filtered entity cache invalidation
+   */
+  getCacheVersion(): number {
+    return this.cache.cacheVersion;
   }
 
   /**
