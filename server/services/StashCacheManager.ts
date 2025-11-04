@@ -1,73 +1,22 @@
-import getStash from '../stash.js';
-import { logger } from '../utils/logger.js';
-import { transformScene, transformPerformer, transformStudio, transformTag, transformGallery, transformGroup } from '../utils/pathMapping.js';
-import type { Scene, Performer, Studio, Tag, Gallery, Group } from 'stashapp-api';
-
-/**
- * Normalized scene with default per-user fields
- */
-export type NormalizedScene = Scene & {
-  // Per-user fields that default to null/0
-  rating: number | null;
-  rating100: number | null;
-  favorite: boolean;
-  o_counter: number;
-  play_count: number;
-  play_duration: number;
-  resume_time: number;
-  play_history: string[];
-  o_history: any[]; // Match Stash's Scene type
-  last_played_at: string | null;
-  last_o_at: string | null;
-}
-
-/**
- * Normalized performer with default per-user fields
- */
-export type NormalizedPerformer = Performer & {
-  rating: number | null;
-  favorite: boolean;
-  o_counter: number;
-  play_count: number;
-  last_played_at: string | null;
-  last_o_at: string | null;
-}
-
-/**
- * Normalized studio with default per-user fields
- */
-export type NormalizedStudio = Studio & {
-  rating: number | null;
-  favorite: boolean;
-  o_counter: number;
-  play_count: number;
-}
-
-/**
- * Normalized tag with default per-user fields
- */
-export type NormalizedTag = Tag & {
-  rating: number | null;
-  favorite: boolean;
-  o_counter: number;
-  play_count: number;
-}
-
-/**
- * Normalized gallery with default per-user fields
- */
-export type NormalizedGallery = Gallery & {
-  rating: number | null;
-  favorite: boolean;
-}
-
-/**
- * Normalized group with default per-user fields
- */
-export type NormalizedGroup = Group & {
-  rating: number | null;
-  favorite: boolean;
-}
+import getStash from "../stash.js";
+import { logger } from "../utils/logger.js";
+import {
+  transformScene,
+  transformPerformer,
+  transformStudio,
+  transformTag,
+  transformGallery,
+  transformGroup,
+} from "../utils/pathMapping.js";
+import type { Scene, Performer, Studio, Tag, Gallery, Group } from "stashapp-api";
+import type {
+  NormalizedScene,
+  NormalizedPerformer,
+  NormalizedStudio,
+  NormalizedTag,
+  NormalizedGallery,
+  NormalizedGroup,
+} from "../types/index.js";
 
 /**
  * Server-wide cache state
@@ -111,22 +60,22 @@ class StashCacheManager {
    */
   async initialize(): Promise<void> {
     if (this.cache.isInitialized) {
-      logger.warn('StashCacheManager already initialized');
+      logger.warn("StashCacheManager already initialized");
       return;
     }
 
-    logger.info('Initializing Stash cache...');
+    logger.info("Initializing Stash cache...");
     await this.refreshCache();
 
     // Set up hourly refresh job
     this.refreshInterval = setInterval(() => {
-      this.refreshCache().catch(err => {
-        logger.error('Scheduled cache refresh failed', { error: err.message });
+      this.refreshCache().catch((err) => {
+        logger.error("Scheduled cache refresh failed", { error: err.message });
       });
     }, this.REFRESH_INTERVAL_MS);
 
     this.cache.isInitialized = true;
-    logger.info('StashCacheManager initialized successfully');
+    logger.info("StashCacheManager initialized successfully");
   }
 
   /**
@@ -134,7 +83,7 @@ class StashCacheManager {
    */
   async refreshCache(): Promise<void> {
     if (this.cache.isRefreshing) {
-      logger.warn('Cache refresh already in progress, skipping');
+      logger.warn("Cache refresh already in progress, skipping");
       return;
     }
 
@@ -146,7 +95,14 @@ class StashCacheManager {
 
       // Fetch all entities in parallel
       // Use compact query for scenes to reduce bandwidth (trimmed nested objects)
-      const [scenesResult, performersResult, studiosResult, tagsResult, galleriesResult, groupsResult] = await Promise.all([
+      const [
+        scenesResult,
+        performersResult,
+        studiosResult,
+        tagsResult,
+        galleriesResult,
+        groupsResult,
+      ] = await Promise.all([
         stash.findScenesCompact({ filter: { per_page: -1 } }),
         stash.findPerformers({ filter: { per_page: -1 } }),
         stash.findStudios({ filter: { per_page: -1 } }),
@@ -164,8 +120,9 @@ class StashCacheManager {
       const newGroups = new Map<string, NormalizedGroup>();
 
       // Normalize scenes with default per-user fields AND transform URLs to use Peek proxy
-      scenesResult.findScenes.scenes.forEach((scene: Scene) => {
-        const transformed = transformScene(scene);
+      // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
+      scenesResult.findScenes.scenes.forEach((scene) => {
+        const transformed = transformScene(scene as Scene);
         newScenes.set(scene.id, {
           ...transformed,
           rating: null,
@@ -183,22 +140,26 @@ class StashCacheManager {
       });
 
       // Normalize performers with default per-user fields AND transform image URLs
-      performersResult.findPerformers.performers.forEach((performer: Performer) => {
-        const transformed = transformPerformer(performer);
-        newPerformers.set(performer.id, {
-          ...transformed,
-          rating: null,
-          favorite: false,
-          o_counter: 0,
-          play_count: 0,
-          last_played_at: null,
-          last_o_at: null,
-        });
-      });
+      // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
+      performersResult.findPerformers.performers.forEach(
+        (performer) => {
+          const transformed = transformPerformer(performer as Performer);
+          newPerformers.set(performer.id, {
+            ...transformed,
+            rating: null,
+            favorite: false,
+            o_counter: 0,
+            play_count: 0,
+            last_played_at: null,
+            last_o_at: null,
+          });
+        }
+      );
 
       // Normalize studios with default per-user fields AND transform image URLs
-      studiosResult.findStudios.studios.forEach((studio: Studio) => {
-        const transformed = transformStudio(studio);
+      // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
+      studiosResult.findStudios.studios.forEach((studio) => {
+        const transformed = transformStudio(studio as Studio);
         newStudios.set(studio.id, {
           ...transformed,
           rating: null,
@@ -209,11 +170,13 @@ class StashCacheManager {
       });
 
       // Normalize tags with default per-user fields AND transform image URLs
-      tagsResult.findTags.tags.forEach((tag: Tag) => {
-        const transformed = transformTag(tag);
+      // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
+      tagsResult.findTags.tags.forEach((tag) => {
+        const transformed = transformTag(tag as Tag);
         newTags.set(tag.id, {
           ...transformed,
           rating: null,
+          rating100: null,
           favorite: false,
           o_counter: 0,
           play_count: 0,
@@ -221,8 +184,9 @@ class StashCacheManager {
       });
 
       // Normalize galleries with default per-user fields AND transform image URLs
-      galleriesResult.findGalleries.galleries.forEach((gallery: Gallery) => {
-        const transformed = transformGallery(gallery);
+      // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
+      galleriesResult.findGalleries.galleries.forEach((gallery) => {
+        const transformed = transformGallery(gallery as Gallery);
         newGalleries.set(gallery.id, {
           ...transformed,
           rating: null,
@@ -231,8 +195,9 @@ class StashCacheManager {
       });
 
       // Normalize groups with default per-user fields AND transform image URLs
-      groupsResult.findGroups.groups.forEach((group: Group) => {
-        const transformed = transformGroup(group);
+      // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
+      groupsResult.findGroups.groups.forEach((group) => {
+        const transformed = transformGroup(group as Group);
         newGroups.set(group.id, {
           ...transformed,
           rating: null,
@@ -250,7 +215,7 @@ class StashCacheManager {
       this.cache.lastRefreshed = new Date();
 
       const duration = Date.now() - startTime;
-      logger.info('Cache refreshed successfully', {
+      logger.info("Cache refreshed successfully", {
         duration: `${duration}ms`,
         counts: {
           scenes: newScenes.size,
@@ -262,7 +227,9 @@ class StashCacheManager {
         },
       });
     } catch (error) {
-      logger.error('Cache refresh failed', { error: error instanceof Error ? error.message : 'Unknown error' });
+      logger.error("Cache refresh failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       throw error;
     } finally {
       this.cache.isRefreshing = false;
@@ -382,7 +349,10 @@ class StashCacheManager {
         external: `${(memUsage.external / 1024 / 1024).toFixed(2)} MB`,
         rss: `${(memUsage.rss / 1024 / 1024).toFixed(2)} MB`,
       },
-      estimatedCacheSize: `${((this.cache.scenes.size * 3 + this.cache.galleries.size * 1) / 1024).toFixed(2)} MB`, // Rough estimate: 3KB per scene, 1KB per gallery
+      estimatedCacheSize: `${(
+        (this.cache.scenes.size * 3 + this.cache.galleries.size * 1) /
+        1024
+      ).toFixed(2)} MB`, // Rough estimate: 3KB per scene, 1KB per gallery
     };
   }
 
@@ -394,7 +364,7 @@ class StashCacheManager {
       clearInterval(this.refreshInterval);
       this.refreshInterval = null;
     }
-    logger.info('StashCacheManager cleanup complete');
+    logger.info("StashCacheManager cleanup complete");
   }
 }
 

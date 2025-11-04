@@ -1,5 +1,5 @@
-import NodeCache from 'node-cache';
-import { logger } from './logger.js';
+import NodeCache from "node-cache";
+import { logger } from "./logger.js";
 
 // Cache configuration
 const CACHE_TTL_SECONDS = 3600; // 1 hour
@@ -20,10 +20,10 @@ const userRatingCache = new NodeCache({
 
 // Cache keys
 export const CACHE_KEYS = {
-  SCENES_ALL: 'stash:scenes:all',
-  PERFORMERS_ALL: 'stash:performers:all',
-  STUDIOS_ALL: 'stash:studios:all',
-  TAGS_ALL: 'stash:tags:all',
+  SCENES_ALL: "stash:scenes:all",
+  PERFORMERS_ALL: "stash:performers:all",
+  STUDIOS_ALL: "stash:studios:all",
+  TAGS_ALL: "stash:tags:all",
 
   userSceneRatings: (userId: number) => `user:${userId}:scene-ratings`,
   userPerformerRatings: (userId: number) => `user:${userId}:performer-ratings`,
@@ -36,17 +36,18 @@ export const stashCache = {
   get: <T>(key: string): T | undefined => {
     const value = stashEntityCache.get<T>(key);
     if (value !== undefined) {
-      logger.debug('Cache hit', { key });
+      logger.debug("Cache hit", { key });
     }
     return value;
   },
 
   set: <T>(key: string, value: T, ttl?: number): boolean => {
-    const success = ttl !== undefined
-      ? stashEntityCache.set(key, value, ttl)
-      : stashEntityCache.set(key, value);
+    const success =
+      ttl !== undefined
+        ? stashEntityCache.set(key, value, ttl)
+        : stashEntityCache.set(key, value);
     if (success) {
-      logger.debug('Cache set', { key, ttl: ttl || CACHE_TTL_SECONDS });
+      logger.debug("Cache set", { key, ttl: ttl || CACHE_TTL_SECONDS });
     }
     return success;
   },
@@ -57,7 +58,7 @@ export const stashCache = {
 
   flush: (): void => {
     stashEntityCache.flushAll();
-    logger.info('Stash entity cache flushed');
+    logger.info("Stash entity cache flushed");
   },
 
   getStats: () => {
@@ -70,17 +71,18 @@ export const ratingCache = {
   get: <T>(key: string): T | undefined => {
     const value = userRatingCache.get<T>(key);
     if (value !== undefined) {
-      logger.debug('Cache hit', { key });
+      logger.debug("Cache hit", { key });
     }
     return value;
   },
 
   set: <T>(key: string, value: T, ttl?: number): boolean => {
-    const success = ttl !== undefined
-      ? userRatingCache.set(key, value, ttl)
-      : userRatingCache.set(key, value);
+    const success =
+      ttl !== undefined
+        ? userRatingCache.set(key, value, ttl)
+        : userRatingCache.set(key, value);
     if (success) {
-      logger.debug('Cache set', { key, ttl: ttl || CACHE_TTL_SECONDS });
+      logger.debug("Cache set", { key, ttl: ttl || CACHE_TTL_SECONDS });
     }
     return success;
   },
@@ -98,12 +100,12 @@ export const ratingCache = {
       CACHE_KEYS.userTagRatings(userId),
     ];
     userRatingCache.del(keys);
-    logger.info('User rating caches invalidated', { userId });
+    logger.info("User rating caches invalidated", { userId });
   },
 
   flush: (): void => {
     userRatingCache.flushAll();
-    logger.info('User rating cache flushed');
+    logger.info("User rating cache flushed");
   },
 
   getStats: () => {
@@ -112,12 +114,12 @@ export const ratingCache = {
 };
 
 // Event listeners for cache stats logging
-stashEntityCache.on('expired', (key, value) => {
-  logger.debug('Cache entry expired', { key });
+stashEntityCache.on("expired", (key, _value) => {
+  logger.debug("Cache entry expired", { key });
 });
 
-userRatingCache.on('expired', (key, value) => {
-  logger.debug('Cache entry expired', { key });
+userRatingCache.on("expired", (key, _value) => {
+  logger.debug("Cache entry expired", { key });
 });
 
 // Log cache stats periodically (every 30 minutes)
@@ -125,7 +127,7 @@ setInterval(() => {
   const stashStats = stashCache.getStats();
   const ratingStats = ratingCache.getStats();
 
-  logger.info('Cache statistics', {
+  logger.info("Cache statistics", {
     stash: {
       keys: stashStats.keys,
       hits: stashStats.hits,

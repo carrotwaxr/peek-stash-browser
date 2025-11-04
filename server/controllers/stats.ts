@@ -7,6 +7,22 @@ import { transcodingManager } from '../services/TranscodingManager.js';
 import { logger } from '../utils/logger.js';
 
 /**
+ * Transcoding session information from TranscodingManager.getStats()
+ */
+interface TranscodingSessionInfo {
+  sessionId: string;
+  sceneId: string;
+  quality: string;
+  status?: string;
+  startTime: string;
+  lastAccess?: string;
+  currentSegment?: number;
+  totalSegments?: number;
+  completedSegments?: number;
+  ffmpegProcess?: { pid?: number; killed?: boolean } | null;
+}
+
+/**
  * Get comprehensive server statistics
  * Includes system metrics, cache stats, transcoding info, and database size
  */
@@ -130,7 +146,7 @@ export const getStats = async (req: Request, res: Response) => {
         cacheSize: formatBytes(transcodingCacheSize),
         cacheSizeBytes: transcodingCacheSize,
         cacheFileCount: transcodingFileCount,
-        sessions: (transcodingStats.sessions || []).map((session: any) => {
+        sessions: (transcodingStats.sessions || []).map((session: TranscodingSessionInfo) => {
           try {
             return {
               sessionId: session.sessionId || 'unknown',

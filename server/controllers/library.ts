@@ -3,15 +3,45 @@
  * This replaces the complex conditional logic with straightforward array operations
  */
 
-import type { Request, Response } from 'express';
-import prisma from '../prisma/singleton.js';
-import { stashCacheManager } from '../services/StashCacheManager.js';
-import { logger } from '../utils/logger.js';
-import type { NormalizedScene } from '../services/StashCacheManager.js';
-import getStash from '../stash.js';
-import { convertToProxyUrl } from '../utils/pathMapping.js';
-import { userRestrictionService } from '../services/UserRestrictionService.js';
-import { emptyEntityFilterService } from '../services/EmptyEntityFilterService.js';
+import type { Request, Response } from "express";
+import prisma from "../prisma/singleton.js";
+import { stashCacheManager } from "../services/StashCacheManager.js";
+import { logger } from "../utils/logger.js";
+import type {
+  NormalizedScene,
+  NormalizedPerformer,
+  NormalizedStudio,
+  NormalizedTag,
+  NormalizedGallery,
+  NormalizedGroup,
+  PeekSceneFilter,
+  PeekPerformerFilter,
+  PeekStudioFilter,
+  PeekTagFilter,
+  PeekGalleryFilter,
+  PeekGroupFilter,
+} from "../types/index.js";
+import { CriterionModifier } from "../types/index.js";
+import getStash from "../stash.js";
+import { convertToProxyUrl } from "../utils/pathMapping.js";
+import { userRestrictionService } from "../services/UserRestrictionService.js";
+import { emptyEntityFilterService } from "../services/EmptyEntityFilterService.js";
+
+/**
+ * User information attached to request by auth middleware
+ */
+interface RequestUser {
+  id: number;
+  username: string;
+  role: string;
+}
+
+/**
+ * Express Request with authenticated user
+ */
+interface AuthenticatedRequest extends Request {
+  user: RequestUser;
+}
 
 /**
  * Merge user-specific data into scenes
@@ -21,7 +51,13 @@ export async function mergeScenesWithUserData(
   userId: number
 ): Promise<NormalizedScene[]> {
   // Fetch user data in parallel
-  const [watchHistory, sceneRatings, performerRatings, studioRatings, tagRatings] = await Promise.all([
+  const [
+    watchHistory,
+    sceneRatings,
+    performerRatings,
+    studioRatings,
+    tagRatings,
+  ] = await Promise.all([
     prisma.watchHistory.findMany({ where: { userId } }),
     prisma.sceneRating.findMany({ where: { userId } }),
     prisma.performerRating.findMany({ where: { userId } }),
@@ -34,10 +70,10 @@ export async function mergeScenesWithUserData(
     watchHistory.map((wh) => {
       const oHistory = Array.isArray(wh.oHistory)
         ? wh.oHistory
-        : JSON.parse((wh.oHistory as string) || '[]');
+        : JSON.parse((wh.oHistory as string) || "[]");
       const playHistory = Array.isArray(wh.playHistory)
         ? wh.playHistory
-        : JSON.parse((wh.playHistory as string) || '[]');
+        : JSON.parse((wh.playHistory as string) || "[]");
 
       return [
         wh.sceneId,
@@ -48,7 +84,8 @@ export async function mergeScenesWithUserData(
           resume_time: wh.resumeTime || 0,
           play_history: playHistory,
           o_history: oHistory,
-          last_played_at: playHistory.length > 0 ? playHistory[playHistory.length - 1] : null,
+          last_played_at:
+            playHistory.length > 0 ? playHistory[playHistory.length - 1] : null,
           last_o_at: oHistory.length > 0 ? oHistory[oHistory.length - 1] : null,
         },
       ];
@@ -87,7 +124,7 @@ export async function mergeScenesWithUserData(
 
     // Update favorite status for nested performers
     if (mergedScene.performers && Array.isArray(mergedScene.performers)) {
-      mergedScene.performers = mergedScene.performers.map((p: any) => ({
+      mergedScene.performers = mergedScene.performers.map((p) => ({
         ...p,
         favorite: performerFavorites.has(p.id),
       }));
@@ -103,7 +140,7 @@ export async function mergeScenesWithUserData(
 
     // Update favorite status for nested tags
     if (mergedScene.tags && Array.isArray(mergedScene.tags)) {
-      mergedScene.tags = mergedScene.tags.map((t: any) => ({
+      mergedScene.tags = mergedScene.tags.map((t) => ({
         ...t,
         favorite: tagFavorites.has(t.id),
       }));
@@ -116,7 +153,10 @@ export async function mergeScenesWithUserData(
 /**
  * Apply scene filters
  */
-function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedScene[] {
+function applySceneFilters(
+  scenes: NormalizedScene[],
+  filters: PeekSceneFilter | null | undefined
+): NormalizedScene[] {
   if (!filters) return scenes;
 
   let filtered = scenes;
@@ -137,11 +177,11 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((s) => {
       const rating = s.rating100 || 0;
-      if (modifier === 'GREATER_THAN') return rating > value;
-      if (modifier === 'LESS_THAN') return rating < value;
-      if (modifier === 'EQUALS') return rating === value;
-      if (modifier === 'NOT_EQUALS') return rating !== value;
-      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN") return value !== undefined && value2 !== null && value2 !== undefined && rating >= value && rating <= value2;
       return true;
     });
   }
@@ -149,17 +189,26 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   // Filter by performers
   if (filters.performers) {
     const { value: performerIds, modifier } = filters.performers;
+    if (!performerIds) return filtered;
     filtered = filtered.filter((s) => {
-      const scenePerformerIds = (s.performers || []).map((p: any) => String(p.id));
-      const filterPerformerIds = performerIds.map((id: any) => String(id));
-      if (modifier === 'INCLUDES') {
-        return filterPerformerIds.some((id: string) => scenePerformerIds.includes(id));
+      const scenePerformerIds = (s.performers || []).map((p) =>
+        String(p.id)
+      );
+      const filterPerformerIds = performerIds.map((id) => String(id));
+      if (modifier === "INCLUDES") {
+        return filterPerformerIds.some((id: string) =>
+          scenePerformerIds.includes(id)
+        );
       }
-      if (modifier === 'INCLUDES_ALL') {
-        return filterPerformerIds.every((id: string) => scenePerformerIds.includes(id));
+      if (modifier === "INCLUDES_ALL") {
+        return filterPerformerIds.every((id: string) =>
+          scenePerformerIds.includes(id)
+        );
       }
-      if (modifier === 'EXCLUDES') {
-        return !filterPerformerIds.some((id: string) => scenePerformerIds.includes(id));
+      if (modifier === "EXCLUDES") {
+        return !filterPerformerIds.some((id: string) =>
+          scenePerformerIds.includes(id)
+        );
       }
       return true;
     });
@@ -168,32 +217,33 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   // Filter by tags (squashed: scene + performers + studio tags)
   if (filters.tags) {
     const { value: tagIds, modifier } = filters.tags;
+    if (!tagIds) return filtered;
     filtered = filtered.filter((s) => {
       // Collect all tag IDs from scene, performers, and studio
       const allTagIds = new Set<string>();
 
       // Add scene tags
-      (s.tags || []).forEach((t: any) => allTagIds.add(String(t.id)));
+      (s.tags || []).forEach((t) => allTagIds.add(String(t.id)));
 
       // Add performer tags
-      (s.performers || []).forEach((p: any) => {
-        (p.tags || []).forEach((t: any) => allTagIds.add(String(t.id)));
+      (s.performers || []).forEach((p) => {
+        (p.tags || []).forEach((t) => allTagIds.add(String(t.id)));
       });
 
       // Add studio tags
       if (s.studio?.tags) {
-        s.studio.tags.forEach((t: any) => allTagIds.add(String(t.id)));
+        s.studio.tags.forEach((t) => allTagIds.add(String(t.id)));
       }
 
-      const filterTagIds = tagIds.map((id: any) => String(id));
+      const filterTagIds = tagIds.map((id) => String(id));
 
-      if (modifier === 'INCLUDES') {
+      if (modifier === "INCLUDES") {
         return filterTagIds.some((id: string) => allTagIds.has(id));
       }
-      if (modifier === 'INCLUDES_ALL') {
+      if (modifier === "INCLUDES_ALL") {
         return filterTagIds.every((id: string) => allTagIds.has(id));
       }
-      if (modifier === 'EXCLUDES') {
+      if (modifier === "EXCLUDES") {
         return !filterTagIds.some((id: string) => allTagIds.has(id));
       }
       return true;
@@ -203,14 +253,15 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   // Filter by studios
   if (filters.studios) {
     const { value: studioIds, modifier } = filters.studios;
+    if (!studioIds) return filtered;
     filtered = filtered.filter((s) => {
-      if (!s.studio) return modifier === 'EXCLUDES';
-      const filterStudioIds = studioIds.map((id: any) => String(id));
+      if (!s.studio) return modifier === "EXCLUDES";
+      const filterStudioIds = studioIds.map((id) => String(id));
       const studioId = String(s.studio.id);
-      if (modifier === 'INCLUDES') {
+      if (modifier === "INCLUDES") {
         return filterStudioIds.includes(studioId);
       }
-      if (modifier === 'EXCLUDES') {
+      if (modifier === "EXCLUDES") {
         return !filterStudioIds.includes(studioId);
       }
       return true;
@@ -220,16 +271,17 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   // Filter by groups
   if (filters.groups) {
     const { value: groupIds, modifier } = filters.groups;
+    if (!groupIds) return filtered;
     filtered = filtered.filter((s) => {
-      const sceneGroupIds = (s.groups || []).map((g: any) => String(g.id));
-      const filterGroupIds = groupIds.map((id: any) => String(id));
-      if (modifier === 'INCLUDES') {
+      const sceneGroupIds = (s.groups || []).map((g) => String(g.group?.id));
+      const filterGroupIds = groupIds.map((id) => String(id));
+      if (modifier === "INCLUDES") {
         return filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
       }
-      if (modifier === 'INCLUDES_ALL') {
+      if (modifier === "INCLUDES_ALL") {
         return filterGroupIds.every((id: string) => sceneGroupIds.includes(id));
       }
-      if (modifier === 'EXCLUDES') {
+      if (modifier === "EXCLUDES") {
         return !filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
       }
       return true;
@@ -241,10 +293,10 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.bitrate;
     filtered = filtered.filter((s) => {
       const bitrate = s.files?.[0]?.bit_rate || 0;
-      if (modifier === 'GREATER_THAN') return bitrate > value;
-      if (modifier === 'LESS_THAN') return bitrate < value;
-      if (modifier === 'EQUALS') return bitrate === value;
-      if (modifier === 'BETWEEN') return bitrate >= value && bitrate <= value2;
+      if (modifier === "GREATER_THAN") return bitrate > value;
+      if (modifier === "LESS_THAN") return bitrate < value;
+      if (modifier === "EQUALS") return bitrate === value;
+      if (modifier === "BETWEEN") return value2 !== null && value2 !== undefined && bitrate >= value && bitrate <= value2;
       return true;
     });
   }
@@ -254,10 +306,11 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.duration;
     filtered = filtered.filter((s) => {
       const duration = s.files?.[0]?.duration || 0;
-      if (modifier === 'GREATER_THAN') return duration > value;
-      if (modifier === 'LESS_THAN') return duration < value;
-      if (modifier === 'EQUALS') return duration === value;
-      if (modifier === 'BETWEEN') return duration >= value && duration <= value2;
+      if (modifier === "GREATER_THAN") return duration > value;
+      if (modifier === "LESS_THAN") return duration < value;
+      if (modifier === "EQUALS") return duration === value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && duration >= value && duration <= value2;
       return true;
     });
   }
@@ -268,13 +321,15 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     filtered = filtered.filter((s) => {
       if (!s.created_at) return false;
       const sceneDate = new Date(s.created_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return sceneDate > filterDate;
-      if (modifier === 'LESS_THAN') return sceneDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return sceneDate > filterDate;
+      if (modifier === "LESS_THAN") return sceneDate < filterDate;
+      if (modifier === "EQUALS") {
         return sceneDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return sceneDate >= filterDate && sceneDate <= filterDate2;
       }
@@ -288,13 +343,15 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     filtered = filtered.filter((s) => {
       if (!s.updated_at) return false;
       const sceneDate = new Date(s.updated_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return sceneDate > filterDate;
-      if (modifier === 'LESS_THAN') return sceneDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return sceneDate > filterDate;
+      if (modifier === "LESS_THAN") return sceneDate < filterDate;
+      if (modifier === "EQUALS") {
         return sceneDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return sceneDate >= filterDate && sceneDate <= filterDate2;
       }
@@ -307,11 +364,12 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.o_counter;
     filtered = filtered.filter((s) => {
       const oCounter = s.o_counter || 0;
-      if (modifier === 'GREATER_THAN') return oCounter > value;
-      if (modifier === 'LESS_THAN') return oCounter < value;
-      if (modifier === 'EQUALS') return oCounter === value;
-      if (modifier === 'NOT_EQUALS') return oCounter !== value;
-      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && oCounter > value;
+      if (modifier === "LESS_THAN") return value !== undefined && oCounter < value;
+      if (modifier === "EQUALS") return oCounter === value;
+      if (modifier === "NOT_EQUALS") return oCounter !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && oCounter >= value && oCounter <= value2;
       return true;
     });
   }
@@ -321,11 +379,12 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.play_count;
     filtered = filtered.filter((s) => {
       const playCount = s.play_count || 0;
-      if (modifier === 'GREATER_THAN') return playCount > value;
-      if (modifier === 'LESS_THAN') return playCount < value;
-      if (modifier === 'EQUALS') return playCount === value;
-      if (modifier === 'NOT_EQUALS') return playCount !== value;
-      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && playCount > value;
+      if (modifier === "LESS_THAN") return value !== undefined && playCount < value;
+      if (modifier === "EQUALS") return playCount === value;
+      if (modifier === "NOT_EQUALS") return playCount !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && playCount >= value && playCount <= value2;
       return true;
     });
   }
@@ -335,10 +394,11 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.play_duration;
     filtered = filtered.filter((s) => {
       const playDuration = s.play_duration || 0;
-      if (modifier === 'GREATER_THAN') return playDuration > value;
-      if (modifier === 'LESS_THAN') return playDuration < value;
-      if (modifier === 'EQUALS') return playDuration === value;
-      if (modifier === 'BETWEEN') return playDuration >= value && playDuration <= value2;
+      if (modifier === "GREATER_THAN") return playDuration > value;
+      if (modifier === "LESS_THAN") return playDuration < value;
+      if (modifier === "EQUALS") return playDuration === value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && playDuration >= value && playDuration <= value2;
       return true;
     });
   }
@@ -348,10 +408,11 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.performer_count;
     filtered = filtered.filter((s) => {
       const performerCount = s.performers?.length || 0;
-      if (modifier === 'GREATER_THAN') return performerCount > value;
-      if (modifier === 'LESS_THAN') return performerCount < value;
-      if (modifier === 'EQUALS') return performerCount === value;
-      if (modifier === 'BETWEEN') return performerCount >= value && performerCount <= value2;
+      if (modifier === "GREATER_THAN") return performerCount > value;
+      if (modifier === "LESS_THAN") return performerCount < value;
+      if (modifier === "EQUALS") return performerCount === value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && performerCount >= value && performerCount <= value2;
       return true;
     });
   }
@@ -361,10 +422,11 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.tag_count;
     filtered = filtered.filter((s) => {
       const tagCount = s.tags?.length || 0;
-      if (modifier === 'GREATER_THAN') return tagCount > value;
-      if (modifier === 'LESS_THAN') return tagCount < value;
-      if (modifier === 'EQUALS') return tagCount === value;
-      if (modifier === 'BETWEEN') return tagCount >= value && tagCount <= value2;
+      if (modifier === "GREATER_THAN") return tagCount > value;
+      if (modifier === "LESS_THAN") return tagCount < value;
+      if (modifier === "EQUALS") return tagCount === value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && tagCount >= value && tagCount <= value2;
       return true;
     });
   }
@@ -374,10 +436,11 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.framerate;
     filtered = filtered.filter((s) => {
       const framerate = s.files?.[0]?.frame_rate || 0;
-      if (modifier === 'GREATER_THAN') return framerate > value;
-      if (modifier === 'LESS_THAN') return framerate < value;
-      if (modifier === 'EQUALS') return framerate === value;
-      if (modifier === 'BETWEEN') return framerate >= value && framerate <= value2;
+      if (modifier === "GREATER_THAN") return framerate > value;
+      if (modifier === "LESS_THAN") return framerate < value;
+      if (modifier === "EQUALS") return framerate === value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && framerate >= value && framerate <= value2;
       return true;
     });
   }
@@ -388,13 +451,15 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     filtered = filtered.filter((s) => {
       if (!s.last_played_at) return false;
       const lastPlayedDate = new Date(s.last_played_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return lastPlayedDate > filterDate;
-      if (modifier === 'LESS_THAN') return lastPlayedDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return lastPlayedDate > filterDate;
+      if (modifier === "LESS_THAN") return lastPlayedDate < filterDate;
+      if (modifier === "EQUALS") {
         return lastPlayedDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return lastPlayedDate >= filterDate && lastPlayedDate <= filterDate2;
       }
@@ -407,14 +472,17 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { modifier, value, value2 } = filters.last_o_at;
     filtered = filtered.filter((s) => {
       if (!s.last_o_at) return false;
+      if (!s.last_o_at) return false;
       const lastODate = new Date(s.last_o_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return lastODate > filterDate;
-      if (modifier === 'LESS_THAN') return lastODate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return lastODate > filterDate;
+      if (modifier === "LESS_THAN") return lastODate < filterDate;
+      if (modifier === "EQUALS") {
         return lastODate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return lastODate >= filterDate && lastODate <= filterDate2;
       }
@@ -427,10 +495,10 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { value, modifier } = filters.title;
     const searchValue = value.toLowerCase();
     filtered = filtered.filter((s) => {
-      const title = (s.title || '').toLowerCase();
-      if (modifier === 'INCLUDES') return title.includes(searchValue);
-      if (modifier === 'EXCLUDES') return !title.includes(searchValue);
-      if (modifier === 'EQUALS') return title === searchValue;
+      const title = (s.title || "").toLowerCase();
+      if (modifier === "INCLUDES") return title.includes(searchValue);
+      if (modifier === "EXCLUDES") return !title.includes(searchValue);
+      if (modifier === "EQUALS") return title === searchValue;
       return true;
     });
   }
@@ -440,10 +508,10 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
     const { value, modifier } = filters.details;
     const searchValue = value.toLowerCase();
     filtered = filtered.filter((s) => {
-      const details = (s.details || '').toLowerCase();
-      if (modifier === 'INCLUDES') return details.includes(searchValue);
-      if (modifier === 'EXCLUDES') return !details.includes(searchValue);
-      if (modifier === 'EQUALS') return details === searchValue;
+      const details = (s.details || "").toLowerCase();
+      if (modifier === "INCLUDES") return details.includes(searchValue);
+      if (modifier === "EXCLUDES") return !details.includes(searchValue);
+      if (modifier === "EQUALS") return details === searchValue;
       return true;
     });
   }
@@ -452,7 +520,7 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   if (filters.performer_favorite) {
     filtered = filtered.filter((s) => {
       const performers = s.performers || [];
-      return performers.some((p: any) => p.favorite === true);
+      return performers.some((p) => p.favorite === true);
     });
   }
 
@@ -467,7 +535,7 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
   if (filters.tag_favorite) {
     filtered = filtered.filter((s) => {
       const tags = s.tags || [];
-      return tags.some((t: any) => t.favorite === true);
+      return tags.some((t) => t.favorite === true);
     });
   }
 
@@ -477,7 +545,12 @@ function applySceneFilters(scenes: NormalizedScene[], filters: any): NormalizedS
 /**
  * Sort scenes
  */
-function sortScenes(scenes: NormalizedScene[], sortField: string, direction: string, groupId?: number): NormalizedScene[] {
+function sortScenes(
+  scenes: NormalizedScene[],
+  sortField: string,
+  direction: string,
+  groupId?: number
+): NormalizedScene[] {
   const sorted = [...scenes];
 
   sorted.sort((a, b) => {
@@ -485,7 +558,7 @@ function sortScenes(scenes: NormalizedScene[], sortField: string, direction: str
     const bValue = getFieldValue(b, sortField, groupId);
 
     let comparison = 0;
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
+    if (typeof aValue === "string" && typeof bValue === "string") {
       comparison = aValue.localeCompare(bValue);
     } else {
       const aNum = aValue || 0;
@@ -493,14 +566,14 @@ function sortScenes(scenes: NormalizedScene[], sortField: string, direction: str
       comparison = aNum > bNum ? 1 : aNum < bNum ? -1 : 0;
     }
 
-    if (direction.toUpperCase() === 'DESC') {
+    if (direction.toUpperCase() === "DESC") {
       comparison = -comparison;
     }
 
     // Secondary sort by title
     if (comparison === 0) {
-      const aTitle = a.title || '';
-      const bTitle = b.title || '';
+      const aTitle = a.title || "";
+      const bTitle = b.title || "";
       return aTitle.localeCompare(bTitle);
     }
 
@@ -513,44 +586,50 @@ function sortScenes(scenes: NormalizedScene[], sortField: string, direction: str
 /**
  * Get field value from scene for sorting
  */
-function getFieldValue(scene: any, field: string, groupId?: number): any {
+function getFieldValue(
+  scene: NormalizedScene,
+  field: string,
+  groupId?: number
+): string | number {
   // Scene index in group (requires groupId context)
-  if (field === 'scene_index') {
+  if (field === "scene_index") {
     if (!groupId || !scene.groups || !Array.isArray(scene.groups)) {
       return 999999; // Put scenes without scene_index at the end
     }
-    const group = scene.groups.find((g: any) => String(g.id) === String(groupId));
+    const group = scene.groups.find((g) => String(g.group?.id) === String(groupId));
     return group?.scene_index ?? 999999; // Put scenes without scene_index at the end
   }
 
   // Watch history fields
-  if (field === 'o_counter') return scene.o_counter || 0;
-  if (field === 'play_count') return scene.play_count || 0;
-  if (field === 'last_played_at') return scene.last_played_at || '';
-  if (field === 'last_o_at') return scene.last_o_at || '';
+  if (field === "o_counter") return scene.o_counter || 0;
+  if (field === "play_count") return scene.play_count || 0;
+  if (field === "last_played_at") return scene.last_played_at || "";
+  if (field === "last_o_at") return scene.last_o_at || "";
 
   // Rating fields
-  if (field === 'rating') return scene.rating || 0;
-  if (field === 'rating100') return scene.rating100 || 0;
+  if (field === "rating") return scene.rating || 0;
+  if (field === "rating100") return scene.rating100 || 0;
 
   // Standard Stash fields
-  if (field === 'date') return scene.date || '';
-  if (field === 'created_at') return scene.created_at || '';
-  if (field === 'updated_at') return scene.updated_at || '';
-  if (field === 'title') return scene.title || '';
-  if (field === 'random') return Math.random();
+  if (field === "date") return scene.date || "";
+  if (field === "created_at") return scene.created_at || "";
+  if (field === "updated_at") return scene.updated_at || "";
+  if (field === "title") return scene.title || "";
+  if (field === "random") return Math.random();
 
   // Count fields
-  if (field === 'performer_count') return scene.performers?.length || 0;
-  if (field === 'tag_count') return scene.tags?.length || 0;
+  if (field === "performer_count") return scene.performers?.length || 0;
+  if (field === "tag_count") return scene.tags?.length || 0;
 
   // File fields
-  if (field === 'bitrate') return scene.files?.[0]?.bit_rate || 0;
-  if (field === 'duration') return scene.files?.[0]?.duration || 0;
-  if (field === 'filesize') return scene.files?.[0]?.size || 0;
-  if (field === 'framerate') return scene.files?.[0]?.frame_rate || 0;
+  if (field === "bitrate") return scene.files?.[0]?.bit_rate || 0;
+  if (field === "duration") return scene.files?.[0]?.duration || 0;
+  if (field === "filesize") return scene.files?.[0]?.size || 0;
+  if (field === "framerate") return scene.files?.[0]?.frame_rate || 0;
 
-  return scene[field] || 0;
+  // Fallback for dynamic field access (safe as function is only called with known fields)
+  const value = (scene as Record<string, unknown>)[field];
+  return (typeof value === 'string' || typeof value === 'number') ? value : 0;
 }
 
 /**
@@ -558,11 +637,11 @@ function getFieldValue(scene: any, field: string, groupId?: number): any {
  */
 export const findScenes = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter, scene_filter, ids } = req.body;
 
-    const sortField = filter?.sort || 'created_at';
-    const sortDirection = filter?.direction || 'DESC';
+    const sortField = filter?.sort || "created_at";
+    const sortDirection = filter?.direction || "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
 
@@ -570,7 +649,7 @@ export const findScenes = async (req: Request, res: Response) => {
     let scenes = stashCacheManager.getAllScenes();
 
     if (scenes.length === 0) {
-      logger.warn('Cache not initialized, returning empty result');
+      logger.warn("Cache not initialized, returning empty result");
       return res.json({
         findScenes: {
           count: 0,
@@ -583,15 +662,17 @@ export const findScenes = async (req: Request, res: Response) => {
     scenes = await mergeScenesWithUserData(scenes, userId);
 
     // Step 3: Apply search query if provided
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       scenes = scenes.filter((s) => {
-        const title = s.title || '';
-        const details = s.details || '';
-        const performers = (s.performers || []).map((p: any) => p.name || '').join(' ');
-        const studio = s.studio?.name || '';
-        const tags = (s.tags || []).map((t: any) => t.name || '').join(' ');
+        const title = s.title || "";
+        const details = s.details || "";
+        const performers = (s.performers || [])
+          .map((p) => p.name || "")
+          .join(" ");
+        const studio = s.studio?.name || "";
+        const tags = (s.tags || []).map((t) => t.name || "").join(" ");
 
         return (
           title.toLowerCase().includes(lowerQuery) ||
@@ -608,8 +689,8 @@ export const findScenes = async (req: Request, res: Response) => {
     scenes = applySceneFilters(scenes, mergedFilter);
 
     // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
     }
 
@@ -631,10 +712,12 @@ export const findScenes = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Error in findScenes', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findScenes", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find scenes',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find scenes",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -643,24 +726,40 @@ export const findScenes = async (req: Request, res: Response) => {
  * Calculate per-user performer statistics from watch history
  * For each performer, aggregate stats from scenes they appear in
  */
-async function calculatePerformerStats(userId: number): Promise<Map<string, { o_counter: number; play_count: number; last_played_at: string | null; last_o_at: string | null }>> {
+async function calculatePerformerStats(
+  userId: number
+): Promise<
+  Map<
+    string,
+    {
+      o_counter: number;
+      play_count: number;
+      last_played_at: string | null;
+      last_o_at: string | null;
+    }
+  >
+> {
   // Get all scenes from cache
   const scenes = stashCacheManager.getAllScenes();
 
   // Get all watch history for this user
-  const watchHistory = await prisma.watchHistory.findMany({ where: { userId } });
+  const watchHistory = await prisma.watchHistory.findMany({
+    where: { userId },
+  });
 
   const watchMap = new Map(
     watchHistory.map((wh) => {
       const oHistory = Array.isArray(wh.oHistory)
         ? wh.oHistory
-        : JSON.parse((wh.oHistory as string) || '[]');
+        : JSON.parse((wh.oHistory as string) || "[]");
       const playHistory = Array.isArray(wh.playHistory)
         ? wh.playHistory
-        : JSON.parse((wh.playHistory as string) || '[]');
+        : JSON.parse((wh.playHistory as string) || "[]");
 
-      const lastPlayedAt = playHistory.length > 0 ? playHistory[playHistory.length - 1] : null;
-      const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
+      const lastPlayedAt =
+        playHistory.length > 0 ? playHistory[playHistory.length - 1] : null;
+      const lastOAt =
+        oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
 
       return [
         wh.sceneId,
@@ -669,13 +768,21 @@ async function calculatePerformerStats(userId: number): Promise<Map<string, { o_
           play_count: wh.playCount || 0,
           last_played_at: lastPlayedAt,
           last_o_at: lastOAt,
-        }
+        },
       ];
     })
   );
 
   // Aggregate stats by performer
-  const performerStatsMap = new Map<string, { o_counter: number; play_count: number; last_played_at: string | null; last_o_at: string | null }>();
+  const performerStatsMap = new Map<
+    string,
+    {
+      o_counter: number;
+      play_count: number;
+      last_played_at: string | null;
+      last_o_at: string | null;
+    }
+  >();
 
   scenes.forEach((scene) => {
     // Normalize scene ID to string for lookup
@@ -696,13 +803,18 @@ async function calculatePerformerStats(userId: number): Promise<Map<string, { o_
         o_counter: existing.o_counter + watchData.o_counter,
         play_count: existing.play_count + watchData.play_count,
         // Update last_played_at to the most recent timestamp
-        last_played_at: !existing.last_played_at || (watchData.last_played_at && watchData.last_played_at > existing.last_played_at)
-          ? watchData.last_played_at
-          : existing.last_played_at,
+        last_played_at:
+          !existing.last_played_at ||
+          (watchData.last_played_at &&
+            watchData.last_played_at > existing.last_played_at)
+            ? watchData.last_played_at
+            : existing.last_played_at,
         // Update last_o_at to the most recent timestamp
-        last_o_at: !existing.last_o_at || (watchData.last_o_at && watchData.last_o_at > existing.last_o_at)
-          ? watchData.last_o_at
-          : existing.last_o_at,
+        last_o_at:
+          !existing.last_o_at ||
+          (watchData.last_o_at && watchData.last_o_at > existing.last_o_at)
+            ? watchData.last_o_at
+            : existing.last_o_at,
       };
 
       performerStatsMap.set(performer.id, updatedStats);
@@ -716,9 +828,9 @@ async function calculatePerformerStats(userId: number): Promise<Map<string, { o_
  * Merge user-specific data into performers
  */
 async function mergePerformersWithUserData(
-  performers: any[],
+  performers: NormalizedPerformer[],
   userId: number
-): Promise<any[]> {
+): Promise<NormalizedPerformer[]> {
   // Fetch user ratings and stats in parallel
   const [ratings, performerStats] = await Promise.all([
     prisma.performerRating.findMany({ where: { userId } }),
@@ -738,7 +850,12 @@ async function mergePerformersWithUserData(
 
   // Merge data
   return performers.map((performer) => {
-    const stats = performerStats.get(performer.id) || { o_counter: 0, play_count: 0, last_played_at: null, last_o_at: null };
+    const stats = performerStats.get(performer.id) || {
+      o_counter: 0,
+      play_count: 0,
+      last_played_at: null,
+      last_o_at: null,
+    };
     return {
       ...performer,
       ...ratingMap.get(performer.id),
@@ -752,20 +869,20 @@ async function mergePerformersWithUserData(
  */
 export const findPerformers = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter, performer_filter, ids } = req.body;
 
-    const sortField = filter?.sort || 'name';
-    const sortDirection = filter?.direction || 'ASC';
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all performers from cache
     let performers = stashCacheManager.getAllPerformers();
 
     if (performers.length === 0) {
-      logger.warn('Cache not initialized, returning empty result');
+      logger.warn("Cache not initialized, returning empty result");
       return res.json({
         findPerformers: {
           count: 0,
@@ -781,34 +898,49 @@ export const findPerformers = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       performers = performers.filter((p) => {
-        const name = p.name || '';
-        const aliases = p.alias_list?.join(' ') || '';
-        return name.toLowerCase().includes(lowerQuery) || aliases.toLowerCase().includes(lowerQuery);
+        const name = p.name || "";
+        const aliases = p.alias_list?.join(" ") || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          aliases.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
     // Step 4: Apply filters (merge root-level ids with performer_filter)
-    const mergedFilter = { ...performer_filter, ids: ids || performer_filter?.ids };
+    const mergedFilter = {
+      ...performer_filter,
+      ids: ids || performer_filter?.ids,
+    };
     performers = applyPerformerFilters(performers, mergedFilter);
 
     // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
-      performers = await userRestrictionService.filterPerformersForUser(performers, userId);
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
+      performers = await userRestrictionService.filterPerformersForUser(
+        performers,
+        userId
+      );
     }
 
     // Step 4.6: Filter empty performers (non-admins only)
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       // Get visibility sets for groups and galleries
       const allGalleries = stashCacheManager.getAllGalleries();
       const allGroups = stashCacheManager.getAllGroups();
       const visibleGalleries = new Set(
-        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+        emptyEntityFilterService
+          .filterEmptyGalleries(allGalleries)
+          .map((g) => g.id)
       );
       const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
       );
-      performers = emptyEntityFilterService.filterEmptyPerformers(performers, visibleGroups, visibleGalleries);
+      performers = emptyEntityFilterService.filterEmptyPerformers(
+        performers,
+        visibleGroups,
+        visibleGalleries
+      );
     }
 
     // Step 5: Sort
@@ -827,10 +959,12 @@ export const findPerformers = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Error in findPerformers', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findPerformers", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find performers',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find performers",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -838,7 +972,10 @@ export const findPerformers = async (req: Request, res: Response) => {
 /**
  * Apply performer filters
  */
-function applyPerformerFilters(performers: any[], filters: any): any[] {
+function applyPerformerFilters(
+  performers: NormalizedPerformer[],
+  filters: PeekPerformerFilter | null | undefined
+): NormalizedPerformer[] {
   if (!filters) return performers;
 
   let filtered = performers;
@@ -858,8 +995,8 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
   if (filters.gender) {
     const { modifier, value } = filters.gender;
     filtered = filtered.filter((p) => {
-      if (modifier === 'EQUALS') return p.gender === value;
-      if (modifier === 'NOT_EQUALS') return p.gender !== value;
+      if (modifier === "EQUALS") return p.gender === value;
+      if (modifier === "NOT_EQUALS") return p.gender !== value;
       return true;
     });
   }
@@ -869,11 +1006,11 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((p) => {
       const rating = p.rating100 || 0;
-      if (modifier === 'GREATER_THAN') return rating > value;
-      if (modifier === 'LESS_THAN') return rating < value;
-      if (modifier === 'EQUALS') return rating === value;
-      if (modifier === 'NOT_EQUALS') return rating !== value;
-      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN") return value !== undefined && value2 !== null && value2 !== undefined && rating >= value && rating <= value2;
       return true;
     });
   }
@@ -883,11 +1020,12 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.o_counter;
     filtered = filtered.filter((p) => {
       const oCounter = p.o_counter || 0;
-      if (modifier === 'GREATER_THAN') return oCounter > value;
-      if (modifier === 'LESS_THAN') return oCounter < value;
-      if (modifier === 'EQUALS') return oCounter === value;
-      if (modifier === 'NOT_EQUALS') return oCounter !== value;
-      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && oCounter > value;
+      if (modifier === "LESS_THAN") return value !== undefined && oCounter < value;
+      if (modifier === "EQUALS") return oCounter === value;
+      if (modifier === "NOT_EQUALS") return oCounter !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && oCounter >= value && oCounter <= value2;
       return true;
     });
   }
@@ -897,11 +1035,12 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.play_count;
     filtered = filtered.filter((p) => {
       const playCount = p.play_count || 0;
-      if (modifier === 'GREATER_THAN') return playCount > value;
-      if (modifier === 'LESS_THAN') return playCount < value;
-      if (modifier === 'EQUALS') return playCount === value;
-      if (modifier === 'NOT_EQUALS') return playCount !== value;
-      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && playCount > value;
+      if (modifier === "LESS_THAN") return value !== undefined && playCount < value;
+      if (modifier === "EQUALS") return playCount === value;
+      if (modifier === "NOT_EQUALS") return playCount !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && playCount >= value && playCount <= value2;
       return true;
     });
   }
@@ -911,11 +1050,12 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.scene_count;
     filtered = filtered.filter((p) => {
       const sceneCount = p.scene_count || 0;
-      if (modifier === 'GREATER_THAN') return sceneCount > value;
-      if (modifier === 'LESS_THAN') return sceneCount < value;
-      if (modifier === 'EQUALS') return sceneCount === value;
-      if (modifier === 'NOT_EQUALS') return sceneCount !== value;
-      if (modifier === 'BETWEEN') return sceneCount >= value && sceneCount <= value2;
+      if (modifier === "GREATER_THAN") return sceneCount > value;
+      if (modifier === "LESS_THAN") return sceneCount < value;
+      if (modifier === "EQUALS") return sceneCount === value;
+      if (modifier === "NOT_EQUALS") return sceneCount !== value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && sceneCount >= value && sceneCount <= value2;
       return true;
     });
   }
@@ -926,13 +1066,15 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
     filtered = filtered.filter((p) => {
       if (!p.created_at) return false;
       const performerDate = new Date(p.created_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return performerDate > filterDate;
-      if (modifier === 'LESS_THAN') return performerDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return performerDate > filterDate;
+      if (modifier === "LESS_THAN") return performerDate < filterDate;
+      if (modifier === "EQUALS") {
         return performerDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return performerDate >= filterDate && performerDate <= filterDate2;
       }
@@ -946,13 +1088,15 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
     filtered = filtered.filter((p) => {
       if (!p.updated_at) return false;
       const performerDate = new Date(p.updated_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return performerDate > filterDate;
-      if (modifier === 'LESS_THAN') return performerDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return performerDate > filterDate;
+      if (modifier === "LESS_THAN") return performerDate < filterDate;
+      if (modifier === "EQUALS") {
         return performerDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return performerDate >= filterDate && performerDate <= filterDate2;
       }
@@ -966,7 +1110,11 @@ function applyPerformerFilters(performers: any[], filters: any): any[] {
 /**
  * Sort performers
  */
-function sortPerformers(performers: any[], sortField: string, direction: string): any[] {
+function sortPerformers(
+  performers: NormalizedPerformer[],
+  sortField: string,
+  direction: string
+): NormalizedPerformer[] {
   const sorted = [...performers];
 
   sorted.sort((a, b) => {
@@ -974,7 +1122,8 @@ function sortPerformers(performers: any[], sortField: string, direction: string)
     const bValue = getPerformerFieldValue(b, sortField);
 
     // Handle null values for timestamp fields
-    const isTimestampField = sortField === 'last_played_at' || sortField === 'last_o_at';
+    const isTimestampField =
+      sortField === "last_played_at" || sortField === "last_o_at";
     if (isTimestampField) {
       const aIsNull = aValue === null || aValue === undefined;
       const bIsNull = bValue === null || bValue === undefined;
@@ -983,17 +1132,17 @@ function sortPerformers(performers: any[], sortField: string, direction: string)
       if (aIsNull && bIsNull) return 0;
 
       // One is null - nulls go to end for DESC, start for ASC
-      if (aIsNull) return direction.toUpperCase() === 'DESC' ? 1 : -1;
-      if (bIsNull) return direction.toUpperCase() === 'DESC' ? -1 : 1;
+      if (aIsNull) return direction.toUpperCase() === "DESC" ? 1 : -1;
+      if (bIsNull) return direction.toUpperCase() === "DESC" ? -1 : 1;
 
-      // Both non-null - compare as strings
-      const comparison = aValue.localeCompare(bValue);
-      return direction.toUpperCase() === 'DESC' ? -comparison : comparison;
+      // Both non-null - compare as strings (safely convert to string first)
+      const comparison = String(aValue).localeCompare(String(bValue));
+      return direction.toUpperCase() === "DESC" ? -comparison : comparison;
     }
 
     // Normal sorting for other fields
     let comparison = 0;
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
+    if (typeof aValue === "string" && typeof bValue === "string") {
       comparison = aValue.localeCompare(bValue);
     } else {
       const aNum = aValue || 0;
@@ -1001,14 +1150,14 @@ function sortPerformers(performers: any[], sortField: string, direction: string)
       comparison = aNum > bNum ? 1 : aNum < bNum ? -1 : 0;
     }
 
-    if (direction.toUpperCase() === 'DESC') {
+    if (direction.toUpperCase() === "DESC") {
       comparison = -comparison;
     }
 
     // Secondary sort by name
     if (comparison === 0) {
-      const aName = a.name || '';
-      const bName = b.name || '';
+      const aName = a.name || "";
+      const bName = b.name || "";
       return aName.localeCompare(bName);
     }
 
@@ -1021,37 +1170,50 @@ function sortPerformers(performers: any[], sortField: string, direction: string)
 /**
  * Get field value from performer for sorting
  */
-function getPerformerFieldValue(performer: any, field: string): any {
-  if (field === 'rating') return performer.rating || 0;
-  if (field === 'rating100') return performer.rating100 || 0;
-  if (field === 'o_counter') return performer.o_counter || 0;
-  if (field === 'play_count') return performer.play_count || 0;
-  if (field === 'scene_count' || field === 'scenes_count') return performer.scene_count || 0;
-  if (field === 'name') return performer.name || '';
-  if (field === 'created_at') return performer.created_at || '';
-  if (field === 'updated_at') return performer.updated_at || '';
-  if (field === 'last_played_at') return performer.last_played_at; // Return null as-is for timestamps
-  if (field === 'last_o_at') return performer.last_o_at; // Return null as-is for timestamps
-  if (field === 'random') return Math.random();
-  return performer[field] || 0;
+function getPerformerFieldValue(performer: NormalizedPerformer, field: string): number | string | boolean | null {
+  if (field === "rating") return performer.rating || 0;
+  if (field === "rating100") return performer.rating100 || 0;
+  if (field === "o_counter") return performer.o_counter || 0;
+  if (field === "play_count") return performer.play_count || 0;
+  if (field === "scene_count" || field === "scenes_count")
+    return performer.scene_count || 0;
+  if (field === "name") return performer.name || "";
+  if (field === "created_at") return performer.created_at || "";
+  if (field === "updated_at") return performer.updated_at || "";
+  if (field === "last_played_at") return performer.last_played_at; // Return null as-is for timestamps
+  if (field === "last_o_at") return performer.last_o_at; // Return null as-is for timestamps
+  if (field === "random") return Math.random();
+  // Fallback for dynamic field access (safe as function is only called with known fields)
+  const value = (performer as Record<string, unknown>)[field];
+  return (typeof value === 'string' || typeof value === 'number') ? value : 0;
 }
 
 /**
  * Calculate per-user studio statistics from watch history
  * For each studio, aggregate stats from scenes they produced
  */
-async function calculateStudioStats(userId: number): Promise<Map<string, { o_counter: number; play_count: number }>> {
+async function calculateStudioStats(
+  userId: number
+): Promise<Map<string, { o_counter: number; play_count: number }>> {
   // Get all scenes from cache
   const scenes = stashCacheManager.getAllScenes();
 
   // Get all watch history for this user
-  const watchHistory = await prisma.watchHistory.findMany({ where: { userId } });
+  const watchHistory = await prisma.watchHistory.findMany({
+    where: { userId },
+  });
   const watchMap = new Map(
-    watchHistory.map((wh) => [wh.sceneId, { o_counter: wh.oCount || 0, play_count: wh.playCount || 0 }])
+    watchHistory.map((wh) => [
+      wh.sceneId,
+      { o_counter: wh.oCount || 0, play_count: wh.playCount || 0 },
+    ])
   );
 
   // Aggregate stats by studio
-  const studioStatsMap = new Map<string, { o_counter: number; play_count: number }>();
+  const studioStatsMap = new Map<
+    string,
+    { o_counter: number; play_count: number }
+  >();
 
   scenes.forEach((scene) => {
     const watchData = watchMap.get(scene.id);
@@ -1059,7 +1221,10 @@ async function calculateStudioStats(userId: number): Promise<Map<string, { o_cou
 
     // Aggregate to studio
     const studioId = scene.studio.id;
-    const existing = studioStatsMap.get(studioId) || { o_counter: 0, play_count: 0 };
+    const existing = studioStatsMap.get(studioId) || {
+      o_counter: 0,
+      play_count: 0,
+    };
     studioStatsMap.set(studioId, {
       o_counter: existing.o_counter + watchData.o_counter,
       play_count: existing.play_count + watchData.play_count,
@@ -1073,9 +1238,9 @@ async function calculateStudioStats(userId: number): Promise<Map<string, { o_cou
  * Merge user-specific data into studios
  */
 async function mergeStudiosWithUserData(
-  studios: any[],
+  studios: NormalizedStudio[],
   userId: number
-): Promise<any[]> {
+): Promise<NormalizedStudio[]> {
   // Fetch user ratings and stats in parallel
   const [ratings, studioStats] = await Promise.all([
     prisma.studioRating.findMany({ where: { userId } }),
@@ -1106,20 +1271,20 @@ async function mergeStudiosWithUserData(
  */
 export const findStudios = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter, studio_filter, ids } = req.body;
 
-    const sortField = filter?.sort || 'name';
-    const sortDirection = filter?.direction || 'ASC';
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all studios from cache
     let studios = stashCacheManager.getAllStudios();
 
     if (studios.length === 0) {
-      logger.warn('Cache not initialized, returning empty result');
+      logger.warn("Cache not initialized, returning empty result");
       return res.json({
         findStudios: {
           count: 0,
@@ -1135,9 +1300,12 @@ export const findStudios = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       studios = studios.filter((s) => {
-        const name = s.name || '';
-        const details = s.details || '';
-        return name.toLowerCase().includes(lowerQuery) || details.toLowerCase().includes(lowerQuery);
+        const name = s.name || "";
+        const details = s.details || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          details.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
@@ -1146,23 +1314,32 @@ export const findStudios = async (req: Request, res: Response) => {
     studios = applyStudioFilters(studios, mergedFilter);
 
     // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
-      studios = await userRestrictionService.filterStudiosForUser(studios, userId);
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
+      studios = await userRestrictionService.filterStudiosForUser(
+        studios,
+        userId
+      );
     }
 
     // Step 4.6: Filter empty studios (non-admins only)
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       // Get visibility sets for groups and galleries
       const allGalleries = stashCacheManager.getAllGalleries();
       const allGroups = stashCacheManager.getAllGroups();
       const visibleGalleries = new Set(
-        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+        emptyEntityFilterService
+          .filterEmptyGalleries(allGalleries)
+          .map((g) => g.id)
       );
       const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
       );
-      studios = emptyEntityFilterService.filterEmptyStudios(studios, visibleGroups, visibleGalleries);
+      studios = emptyEntityFilterService.filterEmptyStudios(
+        studios,
+        visibleGroups,
+        visibleGalleries
+      );
     }
 
     // Step 5: Sort
@@ -1181,10 +1358,12 @@ export const findStudios = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Error in findStudios', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findStudios", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find studios',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find studios",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -1192,7 +1371,10 @@ export const findStudios = async (req: Request, res: Response) => {
 /**
  * Apply studio filters
  */
-function applyStudioFilters(studios: any[], filters: any): any[] {
+function applyStudioFilters(
+  studios: NormalizedStudio[],
+  filters: PeekStudioFilter | null | undefined
+): NormalizedStudio[] {
   if (!filters) return studios;
 
   let filtered = studios;
@@ -1213,11 +1395,11 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((s) => {
       const rating = s.rating100 || 0;
-      if (modifier === 'GREATER_THAN') return rating > value;
-      if (modifier === 'LESS_THAN') return rating < value;
-      if (modifier === 'EQUALS') return rating === value;
-      if (modifier === 'NOT_EQUALS') return rating !== value;
-      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN") return value !== undefined && value2 !== null && value2 !== undefined && rating >= value && rating <= value2;
       return true;
     });
   }
@@ -1227,11 +1409,12 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.o_counter;
     filtered = filtered.filter((s) => {
       const oCounter = s.o_counter || 0;
-      if (modifier === 'GREATER_THAN') return oCounter > value;
-      if (modifier === 'LESS_THAN') return oCounter < value;
-      if (modifier === 'EQUALS') return oCounter === value;
-      if (modifier === 'NOT_EQUALS') return oCounter !== value;
-      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && oCounter > value;
+      if (modifier === "LESS_THAN") return value !== undefined && oCounter < value;
+      if (modifier === "EQUALS") return oCounter === value;
+      if (modifier === "NOT_EQUALS") return oCounter !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && oCounter >= value && oCounter <= value2;
       return true;
     });
   }
@@ -1241,11 +1424,12 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.play_count;
     filtered = filtered.filter((s) => {
       const playCount = s.play_count || 0;
-      if (modifier === 'GREATER_THAN') return playCount > value;
-      if (modifier === 'LESS_THAN') return playCount < value;
-      if (modifier === 'EQUALS') return playCount === value;
-      if (modifier === 'NOT_EQUALS') return playCount !== value;
-      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && playCount > value;
+      if (modifier === "LESS_THAN") return value !== undefined && playCount < value;
+      if (modifier === "EQUALS") return playCount === value;
+      if (modifier === "NOT_EQUALS") return playCount !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && playCount >= value && playCount <= value2;
       return true;
     });
   }
@@ -1255,11 +1439,12 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.scene_count;
     filtered = filtered.filter((s) => {
       const sceneCount = s.scene_count || 0;
-      if (modifier === 'GREATER_THAN') return sceneCount > value;
-      if (modifier === 'LESS_THAN') return sceneCount < value;
-      if (modifier === 'EQUALS') return sceneCount === value;
-      if (modifier === 'NOT_EQUALS') return sceneCount !== value;
-      if (modifier === 'BETWEEN') return sceneCount >= value && sceneCount <= value2;
+      if (modifier === "GREATER_THAN") return sceneCount > value;
+      if (modifier === "LESS_THAN") return sceneCount < value;
+      if (modifier === "EQUALS") return sceneCount === value;
+      if (modifier === "NOT_EQUALS") return sceneCount !== value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && sceneCount >= value && sceneCount <= value2;
       return true;
     });
   }
@@ -1268,7 +1453,7 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
   if (filters.name) {
     const searchValue = filters.name.value.toLowerCase();
     filtered = filtered.filter((s) => {
-      const name = s.name || '';
+      const name = s.name || "";
       return name.toLowerCase().includes(searchValue);
     });
   }
@@ -1277,7 +1462,7 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
   if (filters.details) {
     const searchValue = filters.details.value.toLowerCase();
     filtered = filtered.filter((s) => {
-      const details = s.details || '';
+      const details = s.details || "";
       return details.toLowerCase().includes(searchValue);
     });
   }
@@ -1288,13 +1473,15 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
     filtered = filtered.filter((s) => {
       if (!s.created_at) return false;
       const studioDate = new Date(s.created_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return studioDate > filterDate;
-      if (modifier === 'LESS_THAN') return studioDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return studioDate > filterDate;
+      if (modifier === "LESS_THAN") return studioDate < filterDate;
+      if (modifier === "EQUALS") {
         return studioDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return studioDate >= filterDate && studioDate <= filterDate2;
       }
@@ -1308,13 +1495,15 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
     filtered = filtered.filter((s) => {
       if (!s.updated_at) return false;
       const studioDate = new Date(s.updated_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return studioDate > filterDate;
-      if (modifier === 'LESS_THAN') return studioDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return studioDate > filterDate;
+      if (modifier === "LESS_THAN") return studioDate < filterDate;
+      if (modifier === "EQUALS") {
         return studioDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return studioDate >= filterDate && studioDate <= filterDate2;
       }
@@ -1328,7 +1517,11 @@ function applyStudioFilters(studios: any[], filters: any): any[] {
 /**
  * Sort studios
  */
-function sortStudios(studios: any[], sortField: string, direction: string): any[] {
+function sortStudios(
+  studios: NormalizedStudio[],
+  sortField: string,
+  direction: string
+): NormalizedStudio[] {
   const sorted = [...studios];
 
   sorted.sort((a, b) => {
@@ -1336,7 +1529,7 @@ function sortStudios(studios: any[], sortField: string, direction: string): any[
     const bValue = getStudioFieldValue(b, sortField);
 
     let comparison = 0;
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
+    if (typeof aValue === "string" && typeof bValue === "string") {
       comparison = aValue.localeCompare(bValue);
     } else {
       const aNum = aValue || 0;
@@ -1344,14 +1537,14 @@ function sortStudios(studios: any[], sortField: string, direction: string): any[
       comparison = aNum > bNum ? 1 : aNum < bNum ? -1 : 0;
     }
 
-    if (direction.toUpperCase() === 'DESC') {
+    if (direction.toUpperCase() === "DESC") {
       comparison = -comparison;
     }
 
     // Secondary sort by name
     if (comparison === 0) {
-      const aName = a.name || '';
-      const bName = b.name || '';
+      const aName = a.name || "";
+      const bName = b.name || "";
       return aName.localeCompare(bName);
     }
 
@@ -1364,35 +1557,48 @@ function sortStudios(studios: any[], sortField: string, direction: string): any[
 /**
  * Get field value from studio for sorting
  */
-function getStudioFieldValue(studio: any, field: string): any {
-  if (field === 'rating') return studio.rating || 0;
-  if (field === 'rating100') return studio.rating100 || 0;
-  if (field === 'o_counter') return studio.o_counter || 0;
-  if (field === 'play_count') return studio.play_count || 0;
-  if (field === 'scene_count' || field === 'scenes_count') return studio.scene_count || 0;
-  if (field === 'name') return studio.name || '';
-  if (field === 'created_at') return studio.created_at || '';
-  if (field === 'updated_at') return studio.updated_at || '';
-  if (field === 'random') return Math.random();
-  return studio[field] || 0;
+function getStudioFieldValue(studio: NormalizedStudio, field: string): number | string | boolean | null {
+  if (field === "rating") return studio.rating || 0;
+  if (field === "rating100") return studio.rating100 || 0;
+  if (field === "o_counter") return studio.o_counter || 0;
+  if (field === "play_count") return studio.play_count || 0;
+  if (field === "scene_count" || field === "scenes_count")
+    return studio.scene_count || 0;
+  if (field === "name") return studio.name || "";
+  if (field === "created_at") return studio.created_at || "";
+  if (field === "updated_at") return studio.updated_at || "";
+  if (field === "random") return Math.random();
+  // Fallback for dynamic field access (safe as function is only called with known fields)
+  const value = (studio as Record<string, unknown>)[field];
+  return (typeof value === 'string' || typeof value === 'number') ? value : 0;
 }
 
 /**
  * Calculate per-user tag statistics from watch history
  * For each tag, aggregate stats from scenes tagged with it
  */
-async function calculateTagStats(userId: number): Promise<Map<string, { o_counter: number; play_count: number }>> {
+async function calculateTagStats(
+  userId: number
+): Promise<Map<string, { o_counter: number; play_count: number }>> {
   // Get all scenes from cache
   const scenes = stashCacheManager.getAllScenes();
 
   // Get all watch history for this user
-  const watchHistory = await prisma.watchHistory.findMany({ where: { userId } });
+  const watchHistory = await prisma.watchHistory.findMany({
+    where: { userId },
+  });
   const watchMap = new Map(
-    watchHistory.map((wh) => [wh.sceneId, { o_counter: wh.oCount || 0, play_count: wh.playCount || 0 }])
+    watchHistory.map((wh) => [
+      wh.sceneId,
+      { o_counter: wh.oCount || 0, play_count: wh.playCount || 0 },
+    ])
   );
 
   // Aggregate stats by tag
-  const tagStatsMap = new Map<string, { o_counter: number; play_count: number }>();
+  const tagStatsMap = new Map<
+    string,
+    { o_counter: number; play_count: number }
+  >();
 
   scenes.forEach((scene) => {
     const watchData = watchMap.get(scene.id);
@@ -1400,7 +1606,10 @@ async function calculateTagStats(userId: number): Promise<Map<string, { o_counte
 
     // Aggregate to all tags in this scene
     (scene.tags || []).forEach((tag) => {
-      const existing = tagStatsMap.get(tag.id) || { o_counter: 0, play_count: 0 };
+      const existing = tagStatsMap.get(tag.id) || {
+        o_counter: 0,
+        play_count: 0,
+      };
       tagStatsMap.set(tag.id, {
         o_counter: existing.o_counter + watchData.o_counter,
         play_count: existing.play_count + watchData.play_count,
@@ -1415,9 +1624,9 @@ async function calculateTagStats(userId: number): Promise<Map<string, { o_counte
  * Merge user-specific data into tags
  */
 async function mergeTagsWithUserData(
-  tags: any[],
+  tags: NormalizedTag[],
   userId: number
-): Promise<any[]> {
+): Promise<NormalizedTag[]> {
   // Fetch user ratings and stats in parallel
   const [ratings, tagStats] = await Promise.all([
     prisma.tagRating.findMany({ where: { userId } }),
@@ -1448,20 +1657,20 @@ async function mergeTagsWithUserData(
  */
 export const findTags = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter, tag_filter, ids } = req.body;
 
-    const sortField = filter?.sort || 'name';
-    const sortDirection = filter?.direction || 'ASC';
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all tags from cache
     let tags = stashCacheManager.getAllTags();
 
     if (tags.length === 0) {
-      logger.warn('Cache not initialized, returning empty result');
+      logger.warn("Cache not initialized, returning empty result");
       return res.json({
         findTags: {
           count: 0,
@@ -1477,9 +1686,12 @@ export const findTags = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       tags = tags.filter((t) => {
-        const name = t.name || '';
-        const description = t.description || '';
-        return name.toLowerCase().includes(lowerQuery) || description.toLowerCase().includes(lowerQuery);
+        const name = t.name || "";
+        const description = t.description || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          description.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
@@ -1488,15 +1700,15 @@ export const findTags = async (req: Request, res: Response) => {
     tags = applyTagFilters(tags, mergedFilter);
 
     // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       tags = await userRestrictionService.filterTagsForUser(tags, userId);
     }
 
     // Step 4.6: Filter empty tags (non-admins only)
     // Skip filtering when fetching by specific IDs (detail page requests)
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
-    if (requestingUser && requestingUser.role !== 'ADMIN' && !isFetchingByIds) {
+    if (requestingUser && requestingUser.role !== "ADMIN" && !isFetchingByIds) {
       // Get visibility sets for all entity types
       const allGalleries = stashCacheManager.getAllGalleries();
       const allGroups = stashCacheManager.getAllGroups();
@@ -1504,16 +1716,22 @@ export const findTags = async (req: Request, res: Response) => {
       const allPerformers = stashCacheManager.getAllPerformers();
 
       const visibleGalleries = new Set(
-        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+        emptyEntityFilterService
+          .filterEmptyGalleries(allGalleries)
+          .map((g) => g.id)
       );
       const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
       );
       const visibleStudios = new Set(
-        emptyEntityFilterService.filterEmptyStudios(allStudios, visibleGroups, visibleGalleries).map(s => s.id)
+        emptyEntityFilterService
+          .filterEmptyStudios(allStudios, visibleGroups, visibleGalleries)
+          .map((s) => s.id)
       );
       const visiblePerformers = new Set(
-        emptyEntityFilterService.filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries).map(p => p.id)
+        emptyEntityFilterService
+          .filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries)
+          .map((p) => p.id)
       );
 
       const visibilitySet = {
@@ -1542,10 +1760,12 @@ export const findTags = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Error in findTags', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findTags", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find tags',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find tags",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -1553,7 +1773,10 @@ export const findTags = async (req: Request, res: Response) => {
 /**
  * Apply tag filters
  */
-function applyTagFilters(tags: any[], filters: any): any[] {
+function applyTagFilters(
+  tags: NormalizedTag[],
+  filters: PeekTagFilter | null | undefined
+): NormalizedTag[] {
   if (!filters) return tags;
 
   let filtered = tags;
@@ -1574,11 +1797,11 @@ function applyTagFilters(tags: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((t) => {
       const rating = t.rating100 || 0;
-      if (modifier === 'GREATER_THAN') return rating > value;
-      if (modifier === 'LESS_THAN') return rating < value;
-      if (modifier === 'EQUALS') return rating === value;
-      if (modifier === 'NOT_EQUALS') return rating !== value;
-      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && rating > value;
+      if (modifier === "LESS_THAN") return value !== undefined && rating < value;
+      if (modifier === "EQUALS") return value !== undefined && rating === value;
+      if (modifier === "NOT_EQUALS") return value !== undefined && rating !== value;
+      if (modifier === "BETWEEN") return value !== undefined && value2 !== null && value2 !== undefined && rating >= value && rating <= value2;
       return true;
     });
   }
@@ -1588,11 +1811,12 @@ function applyTagFilters(tags: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.o_counter;
     filtered = filtered.filter((t) => {
       const oCounter = t.o_counter || 0;
-      if (modifier === 'GREATER_THAN') return oCounter > value;
-      if (modifier === 'LESS_THAN') return oCounter < value;
-      if (modifier === 'EQUALS') return oCounter === value;
-      if (modifier === 'NOT_EQUALS') return oCounter !== value;
-      if (modifier === 'BETWEEN') return oCounter >= value && oCounter <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && oCounter > value;
+      if (modifier === "LESS_THAN") return value !== undefined && oCounter < value;
+      if (modifier === "EQUALS") return oCounter === value;
+      if (modifier === "NOT_EQUALS") return oCounter !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && oCounter >= value && oCounter <= value2;
       return true;
     });
   }
@@ -1602,11 +1826,12 @@ function applyTagFilters(tags: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.play_count;
     filtered = filtered.filter((t) => {
       const playCount = t.play_count || 0;
-      if (modifier === 'GREATER_THAN') return playCount > value;
-      if (modifier === 'LESS_THAN') return playCount < value;
-      if (modifier === 'EQUALS') return playCount === value;
-      if (modifier === 'NOT_EQUALS') return playCount !== value;
-      if (modifier === 'BETWEEN') return playCount >= value && playCount <= value2;
+      if (modifier === "GREATER_THAN") return value !== undefined && playCount > value;
+      if (modifier === "LESS_THAN") return value !== undefined && playCount < value;
+      if (modifier === "EQUALS") return playCount === value;
+      if (modifier === "NOT_EQUALS") return playCount !== value;
+      if (modifier === "BETWEEN")
+        return value !== undefined && value2 !== null && value2 !== undefined && playCount >= value && playCount <= value2;
       return true;
     });
   }
@@ -1616,11 +1841,12 @@ function applyTagFilters(tags: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.scene_count;
     filtered = filtered.filter((t) => {
       const sceneCount = t.scene_count || 0;
-      if (modifier === 'GREATER_THAN') return sceneCount > value;
-      if (modifier === 'LESS_THAN') return sceneCount < value;
-      if (modifier === 'EQUALS') return sceneCount === value;
-      if (modifier === 'NOT_EQUALS') return sceneCount !== value;
-      if (modifier === 'BETWEEN') return sceneCount >= value && sceneCount <= value2;
+      if (modifier === "GREATER_THAN") return sceneCount > value;
+      if (modifier === "LESS_THAN") return sceneCount < value;
+      if (modifier === "EQUALS") return sceneCount === value;
+      if (modifier === "NOT_EQUALS") return sceneCount !== value;
+      if (modifier === "BETWEEN")
+        return value2 !== null && value2 !== undefined && sceneCount >= value && sceneCount <= value2;
       return true;
     });
   }
@@ -1629,7 +1855,7 @@ function applyTagFilters(tags: any[], filters: any): any[] {
   if (filters.name) {
     const searchValue = filters.name.value.toLowerCase();
     filtered = filtered.filter((t) => {
-      const name = t.name || '';
+      const name = t.name || "";
       return name.toLowerCase().includes(searchValue);
     });
   }
@@ -1638,7 +1864,7 @@ function applyTagFilters(tags: any[], filters: any): any[] {
   if (filters.description) {
     const searchValue = filters.description.value.toLowerCase();
     filtered = filtered.filter((t) => {
-      const description = t.description || '';
+      const description = t.description || "";
       return description.toLowerCase().includes(searchValue);
     });
   }
@@ -1649,13 +1875,15 @@ function applyTagFilters(tags: any[], filters: any): any[] {
     filtered = filtered.filter((t) => {
       if (!t.created_at) return false;
       const tagDate = new Date(t.created_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return tagDate > filterDate;
-      if (modifier === 'LESS_THAN') return tagDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return tagDate > filterDate;
+      if (modifier === "LESS_THAN") return tagDate < filterDate;
+      if (modifier === "EQUALS") {
         return tagDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return tagDate >= filterDate && tagDate <= filterDate2;
       }
@@ -1669,13 +1897,15 @@ function applyTagFilters(tags: any[], filters: any): any[] {
     filtered = filtered.filter((t) => {
       if (!t.updated_at) return false;
       const tagDate = new Date(t.updated_at);
+      if (!value) return false;
       const filterDate = new Date(value);
-      if (modifier === 'GREATER_THAN') return tagDate > filterDate;
-      if (modifier === 'LESS_THAN') return tagDate < filterDate;
-      if (modifier === 'EQUALS') {
+      if (modifier === "GREATER_THAN") return tagDate > filterDate;
+      if (modifier === "LESS_THAN") return tagDate < filterDate;
+      if (modifier === "EQUALS") {
         return tagDate.toDateString() === filterDate.toDateString();
       }
-      if (modifier === 'BETWEEN') {
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
         const filterDate2 = new Date(value2);
         return tagDate >= filterDate && tagDate <= filterDate2;
       }
@@ -1689,7 +1919,11 @@ function applyTagFilters(tags: any[], filters: any): any[] {
 /**
  * Sort tags
  */
-function sortTags(tags: any[], sortField: string, direction: string): any[] {
+function sortTags(
+  tags: NormalizedTag[],
+  sortField: string,
+  direction: string
+): NormalizedTag[] {
   const sorted = [...tags];
 
   sorted.sort((a, b) => {
@@ -1697,7 +1931,7 @@ function sortTags(tags: any[], sortField: string, direction: string): any[] {
     const bValue = getTagFieldValue(b, sortField);
 
     let comparison = 0;
-    if (typeof aValue === 'string' && typeof bValue === 'string') {
+    if (typeof aValue === "string" && typeof bValue === "string") {
       comparison = aValue.localeCompare(bValue);
     } else {
       const aNum = aValue || 0;
@@ -1705,14 +1939,14 @@ function sortTags(tags: any[], sortField: string, direction: string): any[] {
       comparison = aNum > bNum ? 1 : aNum < bNum ? -1 : 0;
     }
 
-    if (direction.toUpperCase() === 'DESC') {
+    if (direction.toUpperCase() === "DESC") {
       comparison = -comparison;
     }
 
     // Secondary sort by name
     if (comparison === 0) {
-      const aName = a.name || '';
-      const bName = b.name || '';
+      const aName = a.name || "";
+      const bName = b.name || "";
       return aName.localeCompare(bName);
     }
 
@@ -1725,17 +1959,20 @@ function sortTags(tags: any[], sortField: string, direction: string): any[] {
 /**
  * Get field value from tag for sorting
  */
-function getTagFieldValue(tag: any, field: string): any {
-  if (field === 'rating') return tag.rating || 0;
-  if (field === 'rating100') return tag.rating100 || 0;
-  if (field === 'o_counter') return tag.o_counter || 0;
-  if (field === 'play_count') return tag.play_count || 0;
-  if (field === 'scene_count' || field === 'scenes_count') return tag.scene_count || 0;
-  if (field === 'name') return tag.name || '';
-  if (field === 'created_at') return tag.created_at || '';
-  if (field === 'updated_at') return tag.updated_at || '';
-  if (field === 'random') return Math.random();
-  return tag[field] || 0;
+function getTagFieldValue(tag: NormalizedTag, field: string): number | string | boolean | null {
+  if (field === "rating") return tag.rating || 0;
+  if (field === "rating100") return tag.rating100 || 0;
+  if (field === "o_counter") return tag.o_counter || 0;
+  if (field === "play_count") return tag.play_count || 0;
+  if (field === "scene_count" || field === "scenes_count")
+    return tag.scene_count || 0;
+  if (field === "name") return tag.name || "";
+  if (field === "created_at") return tag.created_at || "";
+  if (field === "updated_at") return tag.updated_at || "";
+  if (field === "random") return Math.random();
+  // Fallback for dynamic field access (safe as function is only called with known fields)
+  const value = (tag as Record<string, unknown>)[field];
+  return (typeof value === 'string' || typeof value === 'number') ? value : 0;
 }
 
 /**
@@ -1744,9 +1981,9 @@ function getTagFieldValue(tag: any, field: string): any {
 export const findPerformersMinimal = async (req: Request, res: Response) => {
   try {
     const { filter } = req.body;
-    const searchQuery = filter?.q || '';
-    const sortField = filter?.sort || 'name';
-    const sortDirection = filter?.direction || 'ASC';
+    const searchQuery = filter?.q || "";
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
     let performers = stashCacheManager.getAllPerformers();
@@ -1755,34 +1992,48 @@ export const findPerformersMinimal = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       performers = performers.filter((p) => {
-        const name = p.name || '';
-        const aliases = p.alias_list?.join(' ') || '';
-        return name.toLowerCase().includes(lowerQuery) || aliases.toLowerCase().includes(lowerQuery);
+        const name = p.name || "";
+        const aliases = p.alias_list?.join(" ") || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          aliases.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
     // Filter empty performers (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       const allGalleries = stashCacheManager.getAllGalleries();
       const allGroups = stashCacheManager.getAllGroups();
       const visibleGalleries = new Set(
-        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+        emptyEntityFilterService
+          .filterEmptyGalleries(allGalleries)
+          .map((g) => g.id)
       );
       const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
       );
-      performers = emptyEntityFilterService.filterEmptyPerformers(performers, visibleGroups, visibleGalleries);
+      performers = emptyEntityFilterService.filterEmptyPerformers(
+        performers,
+        visibleGroups,
+        visibleGalleries
+      );
     }
 
     // Sort
     performers.sort((a, b) => {
-      const aValue = (a as any)[sortField] || '';
-      const bValue = (b as any)[sortField] || '';
-      const comparison = typeof aValue === 'string'
-        ? aValue.localeCompare(bValue)
-        : aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-      return sortDirection.toUpperCase() === 'DESC' ? -comparison : comparison;
+      const aValue = (a as Record<string, unknown>)[sortField] || "";
+      const bValue = (b as Record<string, unknown>)[sortField] || "";
+      const comparison =
+        typeof aValue === "string" && typeof bValue === "string"
+          ? aValue.localeCompare(bValue)
+          : aValue > bValue
+          ? 1
+          : aValue < bValue
+          ? -1
+          : 0;
+      return sortDirection.toUpperCase() === "DESC" ? -comparison : comparison;
     });
 
     // Paginate (if per_page !== -1)
@@ -1791,16 +2042,21 @@ export const findPerformersMinimal = async (req: Request, res: Response) => {
       paginatedPerformers = performers.slice(0, perPage);
     }
 
-    const minimal = paginatedPerformers.map((p) => ({ id: p.id, name: p.name }));
+    const minimal = paginatedPerformers.map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
 
     res.json({
       performers: minimal,
     });
   } catch (error) {
-    logger.error('Error in findPerformersMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findPerformersMinimal", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find performers',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find performers",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -1811,9 +2067,9 @@ export const findPerformersMinimal = async (req: Request, res: Response) => {
 export const findStudiosMinimal = async (req: Request, res: Response) => {
   try {
     const { filter } = req.body;
-    const searchQuery = filter?.q || '';
-    const sortField = filter?.sort || 'name';
-    const sortDirection = filter?.direction || 'ASC';
+    const searchQuery = filter?.q || "";
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
     let studios = stashCacheManager.getAllStudios();
@@ -1822,34 +2078,48 @@ export const findStudiosMinimal = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       studios = studios.filter((s) => {
-        const name = s.name || '';
-        const details = s.details || '';
-        return name.toLowerCase().includes(lowerQuery) || details.toLowerCase().includes(lowerQuery);
+        const name = s.name || "";
+        const details = s.details || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          details.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
     // Filter empty studios (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       const allGalleries = stashCacheManager.getAllGalleries();
       const allGroups = stashCacheManager.getAllGroups();
       const visibleGalleries = new Set(
-        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+        emptyEntityFilterService
+          .filterEmptyGalleries(allGalleries)
+          .map((g) => g.id)
       );
       const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
       );
-      studios = emptyEntityFilterService.filterEmptyStudios(studios, visibleGroups, visibleGalleries);
+      studios = emptyEntityFilterService.filterEmptyStudios(
+        studios,
+        visibleGroups,
+        visibleGalleries
+      );
     }
 
     // Sort
     studios.sort((a, b) => {
-      const aValue = (a as any)[sortField] || '';
-      const bValue = (b as any)[sortField] || '';
-      const comparison = typeof aValue === 'string'
-        ? aValue.localeCompare(bValue)
-        : aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-      return sortDirection.toUpperCase() === 'DESC' ? -comparison : comparison;
+      const aValue = (a as Record<string, unknown>)[sortField] || "";
+      const bValue = (b as Record<string, unknown>)[sortField] || "";
+      const comparison =
+        typeof aValue === "string" && typeof bValue === "string"
+          ? aValue.localeCompare(bValue)
+          : aValue > bValue
+          ? 1
+          : aValue < bValue
+          ? -1
+          : 0;
+      return sortDirection.toUpperCase() === "DESC" ? -comparison : comparison;
     });
 
     // Paginate (if per_page !== -1)
@@ -1864,10 +2134,12 @@ export const findStudiosMinimal = async (req: Request, res: Response) => {
       studios: minimal,
     });
   } catch (error) {
-    logger.error('Error in findStudiosMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findStudiosMinimal", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find studios',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find studios",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -1878,9 +2150,9 @@ export const findStudiosMinimal = async (req: Request, res: Response) => {
 export const findTagsMinimal = async (req: Request, res: Response) => {
   try {
     const { filter } = req.body;
-    const searchQuery = filter?.q || '';
-    const sortField = filter?.sort || 'name';
-    const sortDirection = filter?.direction || 'ASC';
+    const searchQuery = filter?.q || "";
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
     let tags = stashCacheManager.getAllTags();
@@ -1889,31 +2161,40 @@ export const findTagsMinimal = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       tags = tags.filter((t) => {
-        const name = t.name || '';
-        const description = t.description || '';
-        return name.toLowerCase().includes(lowerQuery) || description.toLowerCase().includes(lowerQuery);
+        const name = t.name || "";
+        const description = t.description || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          description.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
     // Filter empty tags (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       const allGalleries = stashCacheManager.getAllGalleries();
       const allGroups = stashCacheManager.getAllGroups();
       const allStudios = stashCacheManager.getAllStudios();
       const allPerformers = stashCacheManager.getAllPerformers();
 
       const visibleGalleries = new Set(
-        emptyEntityFilterService.filterEmptyGalleries(allGalleries).map(g => g.id)
+        emptyEntityFilterService
+          .filterEmptyGalleries(allGalleries)
+          .map((g) => g.id)
       );
       const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map(g => g.id)
+        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
       );
       const visibleStudios = new Set(
-        emptyEntityFilterService.filterEmptyStudios(allStudios, visibleGroups, visibleGalleries).map(s => s.id)
+        emptyEntityFilterService
+          .filterEmptyStudios(allStudios, visibleGroups, visibleGalleries)
+          .map((s) => s.id)
       );
       const visiblePerformers = new Set(
-        emptyEntityFilterService.filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries).map(p => p.id)
+        emptyEntityFilterService
+          .filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries)
+          .map((p) => p.id)
       );
 
       const visibilitySet = {
@@ -1928,12 +2209,17 @@ export const findTagsMinimal = async (req: Request, res: Response) => {
 
     // Sort
     tags.sort((a, b) => {
-      const aValue = (a as any)[sortField] || '';
-      const bValue = (b as any)[sortField] || '';
-      const comparison = typeof aValue === 'string'
-        ? aValue.localeCompare(bValue)
-        : aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-      return sortDirection.toUpperCase() === 'DESC' ? -comparison : comparison;
+      const aValue = (a as Record<string, unknown>)[sortField] || "";
+      const bValue = (b as Record<string, unknown>)[sortField] || "";
+      const comparison =
+        typeof aValue === "string" && typeof bValue === "string"
+          ? aValue.localeCompare(bValue)
+          : aValue > bValue
+          ? 1
+          : aValue < bValue
+          ? -1
+          : 0;
+      return sortDirection.toUpperCase() === "DESC" ? -comparison : comparison;
     });
 
     // Paginate (if per_page !== -1)
@@ -1948,10 +2234,12 @@ export const findTagsMinimal = async (req: Request, res: Response) => {
       tags: minimal,
     });
   } catch (error) {
-    logger.error('Error in findTagsMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findTagsMinimal", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find tags',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find tags",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -1963,7 +2251,7 @@ export const findTagsMinimal = async (req: Request, res: Response) => {
 export const updateScene = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const updateData = req.body;
 
     const stash = getStash();
@@ -1974,9 +2262,13 @@ export const updateScene = async (req: Request, res: Response) => {
       },
     });
 
+    if (!updatedScene.sceneUpdate) {
+      return res.status(500).json({ error: "Scene update returned null" });
+    }
+
     // Override with per-user watch history
     const sceneWithUserHistory = await mergeScenesWithUserData(
-      [updatedScene.sceneUpdate],
+      [updatedScene.sceneUpdate] as unknown as NormalizedScene[],
       userId
     );
 
@@ -2058,10 +2350,10 @@ export const findSimilarScenes = async (req: Request, res: Response) => {
     const { id } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const perPage = 12; // Fixed at 12 scenes per page
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
+      return res.status(401).json({ error: "User not authenticated" });
     }
 
     // Get all scenes from cache
@@ -2070,7 +2362,7 @@ export const findSimilarScenes = async (req: Request, res: Response) => {
     // Find the current scene
     const currentScene = allScenes.find((s: NormalizedScene) => s.id === id);
     if (!currentScene) {
-      return res.status(404).json({ error: 'Scene not found' });
+      return res.status(404).json({ error: "Scene not found" });
     }
 
     // Helper to get squashed tags (scene + performers + studio)
@@ -2078,16 +2370,16 @@ export const findSimilarScenes = async (req: Request, res: Response) => {
       const tagIds = new Set<string>();
 
       // Scene tags
-      (scene.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+      (scene.tags || []).forEach((t) => tagIds.add(String(t.id)));
 
       // Performer tags
-      (scene.performers || []).forEach((p: any) => {
-        (p.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+      (scene.performers || []).forEach((p) => {
+        (p.tags || []).forEach((t) => tagIds.add(String(t.id)));
       });
 
       // Studio tags
       if (scene.studio?.tags) {
-        scene.studio.tags.forEach((t: any) => tagIds.add(String(t.id)));
+        scene.studio.tags.forEach((t) => tagIds.add(String(t.id)));
       }
 
       return tagIds;
@@ -2113,9 +2405,11 @@ export const findSimilarScenes = async (req: Request, res: Response) => {
 
     // Get current scene's metadata
     const currentPerformerIds = new Set(
-      (currentScene.performers || []).map((p: any) => String(p.id))
+      (currentScene.performers || []).map((p) => String(p.id))
     );
-    const currentStudioId = currentScene.studio?.id ? String(currentScene.studio.id) : null;
+    const currentStudioId = currentScene.studio?.id
+      ? String(currentScene.studio.id)
+      : null;
     const currentTagIds = getSquashedTagIds(currentScene);
 
     // Calculate similarity scores for all other scenes
@@ -2177,10 +2471,15 @@ export const findSimilarScenes = async (req: Request, res: Response) => {
     // Paginate results
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedScenes = scoredScenes.slice(startIndex, endIndex).map(s => s.scene);
+    const paginatedScenes = scoredScenes
+      .slice(startIndex, endIndex)
+      .map((s) => s.scene);
 
     // Merge with user data
-    const scenesWithUserData = await mergeScenesWithUserData(paginatedScenes, userId);
+    const scenesWithUserData = await mergeScenesWithUserData(
+      paginatedScenes,
+      userId
+    );
 
     res.json({
       scenes: scenesWithUserData,
@@ -2188,9 +2487,9 @@ export const findSimilarScenes = async (req: Request, res: Response) => {
       page,
       perPage,
     });
-  } catch (error: any) {
-    logger.error('Error finding similar scenes:', error);
-    res.status(500).json({ error: 'Failed to find similar scenes' });
+  } catch (error) {
+    logger.error("Error finding similar scenes:", { error: error as Error });
+    res.status(500).json({ error: "Failed to find similar scenes" });
   }
 };
 
@@ -2202,45 +2501,55 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const perPage = parseInt(req.query.per_page as string) || 24;
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
+      return res.status(401).json({ error: "User not authenticated" });
     }
 
     // Fetch user ratings and watch history
-    const [performerRatings, studioRatings, tagRatings, watchHistory] = await Promise.all([
-      prisma.performerRating.findMany({ where: { userId } }),
-      prisma.studioRating.findMany({ where: { userId } }),
-      prisma.tagRating.findMany({ where: { userId } }),
-      prisma.watchHistory.findMany({ where: { userId } }),
-    ]);
+    const [performerRatings, studioRatings, tagRatings, watchHistory] =
+      await Promise.all([
+        prisma.performerRating.findMany({ where: { userId } }),
+        prisma.studioRating.findMany({ where: { userId } }),
+        prisma.tagRating.findMany({ where: { userId } }),
+        prisma.watchHistory.findMany({ where: { userId } }),
+      ]);
 
     // Build sets of favorite and highly-rated entities
     const favoritePerformers = new Set(
-      performerRatings.filter(r => r.favorite).map(r => r.performerId)
+      performerRatings.filter((r) => r.favorite).map((r) => r.performerId)
     );
     const highlyRatedPerformers = new Set(
-      performerRatings.filter(r => r.rating !== null && r.rating >= 80).map(r => r.performerId)
+      performerRatings
+        .filter((r) => r.rating !== null && r.rating >= 80)
+        .map((r) => r.performerId)
     );
     const favoriteStudios = new Set(
-      studioRatings.filter(r => r.favorite).map(r => r.studioId)
+      studioRatings.filter((r) => r.favorite).map((r) => r.studioId)
     );
     const highlyRatedStudios = new Set(
-      studioRatings.filter(r => r.rating !== null && r.rating >= 80).map(r => r.studioId)
+      studioRatings
+        .filter((r) => r.rating !== null && r.rating >= 80)
+        .map((r) => r.studioId)
     );
     const favoriteTags = new Set(
-      tagRatings.filter(r => r.favorite).map(r => r.tagId)
+      tagRatings.filter((r) => r.favorite).map((r) => r.tagId)
     );
     const highlyRatedTags = new Set(
-      tagRatings.filter(r => r.rating !== null && r.rating >= 80).map(r => r.tagId)
+      tagRatings
+        .filter((r) => r.rating !== null && r.rating >= 80)
+        .map((r) => r.tagId)
     );
 
     // Check if user has any favorites or highly-rated entities
     const hasCriteria =
-      favoritePerformers.size > 0 || highlyRatedPerformers.size > 0 ||
-      favoriteStudios.size > 0 || highlyRatedStudios.size > 0 ||
-      favoriteTags.size > 0 || highlyRatedTags.size > 0;
+      favoritePerformers.size > 0 ||
+      highlyRatedPerformers.size > 0 ||
+      favoriteStudios.size > 0 ||
+      highlyRatedStudios.size > 0 ||
+      favoriteTags.size > 0 ||
+      highlyRatedTags.size > 0;
 
     if (!hasCriteria) {
       return res.json({
@@ -2248,19 +2557,21 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
         count: 0,
         page,
         perPage,
-        message: 'Rate or favorite some performers, studios, or tags to get recommendations',
+        message:
+          "Rate or favorite some performers, studios, or tags to get recommendations",
       });
     }
 
     // Build watch history map
     const watchMap = new Map(
-      watchHistory.map(wh => {
+      watchHistory.map((wh) => {
         const playHistory = Array.isArray(wh.playHistory)
           ? wh.playHistory
-          : JSON.parse((wh.playHistory as string) || '[]');
-        const lastPlayedAt = playHistory.length > 0
-          ? new Date(playHistory[playHistory.length - 1])
-          : null;
+          : JSON.parse((wh.playHistory as string) || "[]");
+        const lastPlayedAt =
+          playHistory.length > 0
+            ? new Date(playHistory[playHistory.length - 1])
+            : null;
 
         return [
           wh.sceneId,
@@ -2278,12 +2589,12 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
     // Helper to get squashed tags
     const getSquashedTagIds = (scene: NormalizedScene): Set<string> => {
       const tagIds = new Set<string>();
-      (scene.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
-      (scene.performers || []).forEach((p: any) => {
-        (p.tags || []).forEach((t: any) => tagIds.add(String(t.id)));
+      (scene.tags || []).forEach((t) => tagIds.add(String(t.id)));
+      (scene.performers || []).forEach((p) => {
+        (p.tags || []).forEach((t) => tagIds.add(String(t.id)));
       });
       if (scene.studio?.tags) {
-        scene.studio.tags.forEach((t: any) => tagIds.add(String(t.id)));
+        scene.studio.tags.forEach((t) => tagIds.add(String(t.id)));
       }
       return tagIds;
     };
@@ -2296,8 +2607,6 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
 
     const scoredScenes: ScoredScene[] = [];
     const now = new Date();
-    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     for (const scene of allScenes) {
       let baseScore = 0;
@@ -2343,7 +2652,9 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
         // Never watched
         baseScore += 100;
       } else if (watchData.lastPlayedAt) {
-        const daysSinceWatched = (now.getTime() - watchData.lastPlayedAt.getTime()) / (24 * 60 * 60 * 1000);
+        const daysSinceWatched =
+          (now.getTime() - watchData.lastPlayedAt.getTime()) /
+          (24 * 60 * 60 * 1000);
 
         if (daysSinceWatched > 14) {
           // Not recently watched
@@ -2359,7 +2670,7 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
 
       // Engagement quality multiplier
       const oCounter = scene.o_counter || 0;
-      const engagementMultiplier = 1.0 + (Math.min(oCounter, 10) * 0.03);
+      const engagementMultiplier = 1.0 + Math.min(oCounter, 10) * 0.03;
       const finalScore = baseScore * engagementMultiplier;
 
       // Only include scenes with positive final scores
@@ -2377,10 +2688,15 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
     // Paginate
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedScenes = cappedScenes.slice(startIndex, endIndex).map(s => s.scene);
+    const paginatedScenes = cappedScenes
+      .slice(startIndex, endIndex)
+      .map((s) => s.scene);
 
     // Merge with user data
-    const scenesWithUserData = await mergeScenesWithUserData(paginatedScenes, userId);
+    const scenesWithUserData = await mergeScenesWithUserData(
+      paginatedScenes,
+      userId
+    );
 
     res.json({
       scenes: scenesWithUserData,
@@ -2388,9 +2704,9 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
       page,
       perPage,
     });
-  } catch (error: any) {
-    logger.error('Error getting recommended scenes:', error);
-    res.status(500).json({ error: 'Failed to get recommended scenes' });
+  } catch (error) {
+    logger.error("Error getting recommended scenes:", { error: error as Error });
+    res.status(500).json({ error: "Failed to get recommended scenes" });
   }
 };
 
@@ -2404,9 +2720,9 @@ export const getRecommendedScenes = async (req: Request, res: Response) => {
  * Merge galleries with user rating/favorite data
  */
 async function mergeGalleriesWithUserData(
-  galleries: any[],
+  galleries: NormalizedGallery[],
   userId: number
-): Promise<any[]> {
+): Promise<NormalizedGallery[]> {
   const ratings = await prisma.galleryRating.findMany({ where: { userId } });
 
   const ratingMap = new Map(
@@ -2429,7 +2745,10 @@ async function mergeGalleriesWithUserData(
 /**
  * Apply gallery filters
  */
-function applyGalleryFilters(galleries: any[], filters: any): any[] {
+function applyGalleryFilters(
+  galleries: NormalizedGallery[],
+  filters: PeekGalleryFilter | null | undefined
+): NormalizedGallery[] {
   if (!filters) return galleries;
 
   let filtered = galleries;
@@ -2450,11 +2769,11 @@ function applyGalleryFilters(galleries: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((g) => {
       const rating = g.rating100 || 0;
-      if (modifier === 'GREATER_THAN') return rating > value;
-      if (modifier === 'LESS_THAN') return rating < value;
-      if (modifier === 'EQUALS') return rating === value;
-      if (modifier === 'NOT_EQUALS') return rating !== value;
-      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN") return value !== undefined && value2 !== null && value2 !== undefined && rating >= value && rating <= value2;
       return true;
     });
   }
@@ -2464,11 +2783,11 @@ function applyGalleryFilters(galleries: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.image_count;
     filtered = filtered.filter((g) => {
       const count = g.image_count || 0;
-      if (modifier === 'GREATER_THAN') return count > value;
-      if (modifier === 'LESS_THAN') return count < value;
-      if (modifier === 'EQUALS') return count === value;
-      if (modifier === 'NOT_EQUALS') return count !== value;
-      if (modifier === 'BETWEEN') return count >= value && count <= value2;
+      if (modifier === "GREATER_THAN") return count > value;
+      if (modifier === "LESS_THAN") return count < value;
+      if (modifier === "EQUALS") return count === value;
+      if (modifier === "NOT_EQUALS") return count !== value;
+      if (modifier === "BETWEEN") return value2 !== null && value2 !== undefined && count >= value && count <= value2;
       return true;
     });
   }
@@ -2477,7 +2796,7 @@ function applyGalleryFilters(galleries: any[], filters: any): any[] {
   if (filters.title) {
     const searchValue = filters.title.value.toLowerCase();
     filtered = filtered.filter((g) => {
-      const title = g.title || '';
+      const title = g.title || "";
       return title.toLowerCase().includes(searchValue);
     });
   }
@@ -2492,14 +2811,16 @@ function applyGalleryFilters(galleries: any[], filters: any): any[] {
   if (filters.performers) {
     const performerIds = new Set(filters.performers.value);
     filtered = filtered.filter((g) =>
-      g.performers?.some((p: any) => performerIds.has(p.id))
+      g.performers?.some((p) => performerIds.has(p.id))
     );
   }
 
   // Filter by tags
   if (filters.tags) {
     const tagIds = new Set(filters.tags.value);
-    filtered = filtered.filter((g) => g.tags?.some((t: any) => tagIds.has(t.id)));
+    filtered = filtered.filter((g) =>
+      g.tags?.some((t) => tagIds.has(t.id))
+    );
   }
 
   return filtered;
@@ -2508,42 +2829,46 @@ function applyGalleryFilters(galleries: any[], filters: any): any[] {
 /**
  * Sort galleries
  */
-function sortGalleries(galleries: any[], sortField: string, sortDirection: string): any[] {
-  const direction = sortDirection === 'DESC' ? -1 : 1;
+function sortGalleries(
+  galleries: NormalizedGallery[],
+  sortField: string,
+  sortDirection: string
+): NormalizedGallery[] {
+  const direction = sortDirection === "DESC" ? -1 : 1;
 
   return galleries.sort((a, b) => {
     let aVal, bVal;
 
     switch (sortField) {
-      case 'title':
-        aVal = (a.title || '').toLowerCase();
-        bVal = (b.title || '').toLowerCase();
+      case "title":
+        aVal = (a.title || "").toLowerCase();
+        bVal = (b.title || "").toLowerCase();
         break;
-      case 'date':
-        aVal = a.date || '';
-        bVal = b.date || '';
+      case "date":
+        aVal = a.date || "";
+        bVal = b.date || "";
         break;
-      case 'rating100':
+      case "rating100":
         aVal = a.rating100 || 0;
         bVal = b.rating100 || 0;
         break;
-      case 'image_count':
+      case "image_count":
         aVal = a.image_count || 0;
         bVal = b.image_count || 0;
         break;
-      case 'created_at':
-        aVal = a.created_at || '';
-        bVal = b.created_at || '';
+      case "created_at":
+        aVal = a.created_at || "";
+        bVal = b.created_at || "";
         break;
-      case 'updated_at':
-        aVal = a.updated_at || '';
-        bVal = b.updated_at || '';
+      case "updated_at":
+        aVal = a.updated_at || "";
+        bVal = b.updated_at || "";
         break;
-      case 'random':
+      case "random":
         return Math.random() - 0.5;
       default:
-        aVal = (a.title || '').toLowerCase();
-        bVal = (b.title || '').toLowerCase();
+        aVal = (a.title || "").toLowerCase();
+        bVal = (b.title || "").toLowerCase();
     }
 
     if (aVal < bVal) return -1 * direction;
@@ -2557,20 +2882,20 @@ function sortGalleries(galleries: any[], sortField: string, sortDirection: strin
  */
 export const findGalleries = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter, gallery_filter, ids } = req.body;
 
-    const sortField = filter?.sort || 'title';
-    const sortDirection = filter?.direction || 'ASC';
+    const sortField = filter?.sort || "title";
+    const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
     let galleries = stashCacheManager.getAllGalleries();
 
     if (galleries.length === 0) {
-      logger.warn('Gallery cache not initialized, returning empty result');
+      logger.warn("Gallery cache not initialized, returning empty result");
       return res.json({
         findGalleries: {
           count: 0,
@@ -2586,9 +2911,9 @@ export const findGalleries = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       galleries = galleries.filter((g) => {
-        const title = g.title || '';
-        const details = g.details || '';
-        const photographer = g.photographer || '';
+        const title = g.title || "";
+        const details = g.details || "";
+        const photographer = g.photographer || "";
         return (
           title.toLowerCase().includes(lowerQuery) ||
           details.toLowerCase().includes(lowerQuery) ||
@@ -2602,13 +2927,16 @@ export const findGalleries = async (req: Request, res: Response) => {
     galleries = applyGalleryFilters(galleries, mergedFilter);
 
     // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
-      galleries = await userRestrictionService.filterGalleriesForUser(galleries, userId);
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
+      galleries = await userRestrictionService.filterGalleriesForUser(
+        galleries,
+        userId
+      );
     }
 
     // Step 4.6: Filter empty galleries (non-admins only)
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       galleries = emptyEntityFilterService.filterEmptyGalleries(galleries);
     }
 
@@ -2628,10 +2956,12 @@ export const findGalleries = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Error in findGalleries', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findGalleries", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find galleries',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find galleries",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -2641,13 +2971,13 @@ export const findGalleries = async (req: Request, res: Response) => {
  */
 export const findGalleryById = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { id } = req.params;
 
     let gallery = stashCacheManager.getGallery(id);
 
     if (!gallery) {
-      return res.status(404).json({ error: 'Gallery not found' });
+      return res.status(404).json({ error: "Gallery not found" });
     }
 
     // Merge with user data
@@ -2655,39 +2985,51 @@ export const findGalleryById = async (req: Request, res: Response) => {
     const mergedGallery = galleries[0];
 
     if (!mergedGallery) {
-      return res.status(404).json({ error: 'Gallery not found after merge' });
+      return res.status(404).json({ error: "Gallery not found after merge" });
     }
 
     // Hydrate performers with full cached data
     if (mergedGallery.performers && mergedGallery.performers.length > 0) {
-      mergedGallery.performers = mergedGallery.performers.map((performer: any) => {
-        const cachedPerformer = stashCacheManager.getPerformer(performer.id);
-        if (cachedPerformer) {
-          // Return full performer data from cache
-          return cachedPerformer;
+      mergedGallery.performers = mergedGallery.performers.map(
+        (performer) => {
+          const cachedPerformer = stashCacheManager.getPerformer(performer.id);
+          if (cachedPerformer) {
+            // Return full performer data from cache
+            return cachedPerformer;
+          }
+          // Fallback to basic performer data if not in cache
+          return performer;
         }
-        // Fallback to basic performer data if not in cache
-        return performer;
-      });
+      );
 
       // Merge performers with user data (ratings/favorites)
-      mergedGallery.performers = await mergePerformersWithUserData(mergedGallery.performers, userId);
+      // Type assertion safe: performers from API are compatible with Normalized type structure
+      mergedGallery.performers = await mergePerformersWithUserData(
+        mergedGallery.performers as NormalizedPerformer[],
+        userId
+      );
     }
 
     // Hydrate studio with full cached data
     if (mergedGallery.studio && mergedGallery.studio.id) {
       const cachedStudio = stashCacheManager.getStudio(mergedGallery.studio.id);
       if (cachedStudio) {
-        mergedGallery.studio = cachedStudio;
+        // Type assertion: Gallery.studio typed as Studio, but we hydrate with NormalizedStudio
+        mergedGallery.studio = cachedStudio as unknown as typeof mergedGallery.studio;
         // Merge studio with user data
-        const studios = await mergeStudiosWithUserData([mergedGallery.studio], userId);
-        mergedGallery.studio = studios[0];
+        const studios = await mergeStudiosWithUserData(
+          [cachedStudio],
+          userId
+        );
+        if (studios[0]) {
+          mergedGallery.studio = studios[0];
+        }
       }
     }
 
     // Hydrate tags with full cached data
     if (mergedGallery.tags && mergedGallery.tags.length > 0) {
-      mergedGallery.tags = mergedGallery.tags.map((tag: any) => {
+      mergedGallery.tags = mergedGallery.tags.map((tag) => {
         const cachedTag = stashCacheManager.getTag(tag.id);
         if (cachedTag) {
           return cachedTag;
@@ -2696,15 +3038,21 @@ export const findGalleryById = async (req: Request, res: Response) => {
       });
 
       // Merge tags with user data
-      mergedGallery.tags = await mergeTagsWithUserData(mergedGallery.tags, userId);
+      // Type assertion safe: tags from API are compatible with Normalized type structure
+      mergedGallery.tags = await mergeTagsWithUserData(
+        mergedGallery.tags as NormalizedTag[],
+        userId
+      );
     }
 
     res.json(mergedGallery);
   } catch (error) {
-    logger.error('Error in findGalleryById', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findGalleryById", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find gallery',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find gallery",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -2714,15 +3062,15 @@ export const findGalleryById = async (req: Request, res: Response) => {
  */
 export const findGalleriesMinimal = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter } = req.body;
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
     let galleries = stashCacheManager.getAllGalleries();
 
     if (galleries.length === 0) {
-      logger.warn('Gallery cache not initialized, returning empty result');
+      logger.warn("Gallery cache not initialized, returning empty result");
       return res.json({
         galleries: [],
       });
@@ -2735,21 +3083,21 @@ export const findGalleriesMinimal = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       galleries = galleries.filter((g) => {
-        const title = g.title || '';
+        const title = g.title || "";
         return title.toLowerCase().includes(lowerQuery);
       });
     }
 
     // Step 3.5: Filter empty galleries (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       galleries = emptyEntityFilterService.filterEmptyGalleries(galleries);
     }
 
     // Step 4: Sort by title
     galleries = galleries.sort((a, b) => {
-      const aTitle = (a.title || '').toLowerCase();
-      const bTitle = (b.title || '').toLowerCase();
+      const aTitle = (a.title || "").toLowerCase();
+      const bTitle = (b.title || "").toLowerCase();
       return aTitle.localeCompare(bTitle);
     });
 
@@ -2764,10 +3112,12 @@ export const findGalleriesMinimal = async (req: Request, res: Response) => {
       galleries: minimalGalleries,
     });
   } catch (error) {
-    logger.error('Error in findGalleriesMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findGalleriesMinimal", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find galleries',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find galleries",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -2779,11 +3129,10 @@ export const findGalleriesMinimal = async (req: Request, res: Response) => {
 export const getGalleryImages = async (req: Request, res: Response) => {
   try {
     const { galleryId } = req.params;
-    // @ts-ignore - user is added by authenticateToken middleware
-    const userId = req.user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     // Query images filtered by gallery
@@ -2791,13 +3140,14 @@ export const getGalleryImages = async (req: Request, res: Response) => {
     const result = await stash.findImages({
       filter: {
         per_page: -1, // Get all images
-        sort: 'path', // Sort by path for consistent ordering
-        direction: 'ASC' as any,
+        sort: "path", // Sort by path for consistent ordering
+        // Type assertion: SortDirectionEnum not exported from stashapp-api, but "ASC" is valid enum value
+        direction: "ASC" as any,
       },
       image_filter: {
         galleries: {
           value: [galleryId],
-          modifier: 'INCLUDES' as any,
+          modifier: CriterionModifier.Includes,
         },
       },
     });
@@ -2805,11 +3155,15 @@ export const getGalleryImages = async (req: Request, res: Response) => {
     const images = result?.findImages?.images || [];
 
     // Transform image URLs to use proxy
-    const transformedImages = images.map((image: any) => ({
+    const transformedImages = images.map((image) => ({
       ...image,
       paths: {
-        thumbnail: image.paths?.thumbnail ? convertToProxyUrl(image.paths.thumbnail) : null,
-        preview: image.paths?.preview ? convertToProxyUrl(image.paths.preview) : null,
+        thumbnail: image.paths?.thumbnail
+          ? convertToProxyUrl(image.paths.thumbnail)
+          : null,
+        preview: image.paths?.preview
+          ? convertToProxyUrl(image.paths.preview)
+          : null,
         image: image.paths?.image ? convertToProxyUrl(image.paths.image) : null,
       },
     }));
@@ -2819,13 +3173,13 @@ export const getGalleryImages = async (req: Request, res: Response) => {
       count: result?.findImages?.count || 0,
     });
   } catch (error) {
-    logger.error('Error fetching gallery images', {
+    logger.error("Error fetching gallery images", {
       galleryId: req.params.galleryId,
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : "Unknown error",
     });
     res.status(500).json({
-      error: 'Failed to fetch gallery images',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to fetch gallery images",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -2834,9 +3188,9 @@ export const getGalleryImages = async (req: Request, res: Response) => {
  * Merge user-specific data into groups
  */
 async function mergeGroupsWithUserData(
-  groups: any[],
+  groups: NormalizedGroup[],
   userId: number | undefined
-): Promise<any[]> {
+): Promise<NormalizedGroup[]> {
   if (!userId) return groups;
 
   try {
@@ -2861,8 +3215,8 @@ async function mergeGroupsWithUserData(
       };
     });
   } catch (error) {
-    logger.error('Error merging groups with user data', {
-      error: error instanceof Error ? error.message : 'Unknown error',
+    logger.error("Error merging groups with user data", {
+      error: error instanceof Error ? error.message : "Unknown error",
     });
     return groups;
   }
@@ -2871,7 +3225,10 @@ async function mergeGroupsWithUserData(
 /**
  * Apply group filters
  */
-function applyGroupFilters(groups: any[], filters: any): any[] {
+function applyGroupFilters(
+  groups: NormalizedGroup[],
+  filters: PeekGroupFilter | null | undefined
+): NormalizedGroup[] {
   if (!filters) return groups;
 
   let filtered = groups;
@@ -2892,11 +3249,11 @@ function applyGroupFilters(groups: any[], filters: any): any[] {
     const { modifier, value, value2 } = filters.rating100;
     filtered = filtered.filter((g) => {
       const rating = g.rating100 || 0;
-      if (modifier === 'GREATER_THAN') return rating > value;
-      if (modifier === 'LESS_THAN') return rating < value;
-      if (modifier === 'EQUALS') return rating === value;
-      if (modifier === 'NOT_EQUALS') return rating !== value;
-      if (modifier === 'BETWEEN') return rating >= value && rating <= value2;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN") return value !== undefined && value2 !== null && value2 !== undefined && rating >= value && rating <= value2;
       return true;
     });
   }
@@ -2907,52 +3264,56 @@ function applyGroupFilters(groups: any[], filters: any): any[] {
 /**
  * Sort groups
  */
-function sortGroups(groups: any[], sortField: string, sortDirection: string): any[] {
+function sortGroups(
+  groups: NormalizedGroup[],
+  sortField: string,
+  sortDirection: string
+): NormalizedGroup[] {
   const sortedGroups = [...groups];
 
   sortedGroups.sort((a, b) => {
-    let aVal: any;
-    let bVal: any;
+    let aVal: number | string | boolean | null;
+    let bVal: number | string | boolean | null;
 
     switch (sortField) {
-      case 'name':
-        aVal = (a.name || '').toLowerCase();
-        bVal = (b.name || '').toLowerCase();
+      case "name":
+        aVal = (a.name || "").toLowerCase();
+        bVal = (b.name || "").toLowerCase();
         break;
-      case 'date':
-        aVal = a.date || '';
-        bVal = b.date || '';
+      case "date":
+        aVal = a.date || "";
+        bVal = b.date || "";
         break;
-      case 'rating100':
+      case "rating100":
         aVal = a.rating100 || 0;
         bVal = b.rating100 || 0;
         break;
-      case 'scene_count':
+      case "scene_count":
         aVal = a.scene_count || 0;
         bVal = b.scene_count || 0;
         break;
-      case 'duration':
+      case "duration":
         aVal = a.duration || 0;
         bVal = b.duration || 0;
         break;
-      case 'created_at':
-        aVal = a.created_at || '';
-        bVal = b.created_at || '';
+      case "created_at":
+        aVal = a.created_at || "";
+        bVal = b.created_at || "";
         break;
-      case 'updated_at':
-        aVal = a.updated_at || '';
-        bVal = b.updated_at || '';
+      case "updated_at":
+        aVal = a.updated_at || "";
+        bVal = b.updated_at || "";
         break;
       default:
-        aVal = (a.name || '').toLowerCase();
-        bVal = (b.name || '').toLowerCase();
+        aVal = (a.name || "").toLowerCase();
+        bVal = (b.name || "").toLowerCase();
     }
 
     let comparison = 0;
-    if (aVal < bVal) comparison = -1;
-    if (aVal > bVal) comparison = 1;
+    if ((aVal as string | number) < (bVal as string | number)) comparison = -1;
+    if ((aVal as string | number) > (bVal as string | number)) comparison = 1;
 
-    return sortDirection === 'DESC' ? -comparison : comparison;
+    return sortDirection === "DESC" ? -comparison : comparison;
   });
 
   return sortedGroups;
@@ -2963,20 +3324,20 @@ function sortGroups(groups: any[], sortField: string, sortDirection: string): an
  */
 export const findGroups = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter, group_filter, ids } = req.body;
 
-    const sortField = filter?.sort || 'name';
-    const sortDirection = filter?.direction || 'ASC';
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
     let groups = stashCacheManager.getAllGroups();
 
     if (groups.length === 0) {
-      logger.warn('Cache not initialized, returning empty result');
+      logger.warn("Cache not initialized, returning empty result");
       return res.json({
         findGroups: {
           count: 0,
@@ -2992,9 +3353,12 @@ export const findGroups = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       groups = groups.filter((g) => {
-        const name = g.name || '';
-        const synopsis = g.synopsis || '';
-        return name.toLowerCase().includes(lowerQuery) || synopsis.toLowerCase().includes(lowerQuery);
+        const name = g.name || "";
+        const synopsis = g.synopsis || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          synopsis.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
@@ -3003,13 +3367,13 @@ export const findGroups = async (req: Request, res: Response) => {
     groups = applyGroupFilters(groups, mergedFilter);
 
     // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       groups = await userRestrictionService.filterGroupsForUser(groups, userId);
     }
 
     // Step 4.6: Filter empty groups (non-admins only)
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       groups = emptyEntityFilterService.filterEmptyGroups(groups);
     }
 
@@ -3029,10 +3393,12 @@ export const findGroups = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    logger.error('Error in findGroups', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findGroups", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find groups',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find groups",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
@@ -3042,15 +3408,15 @@ export const findGroups = async (req: Request, res: Response) => {
  */
 export const findGroupsMinimal = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = (req as AuthenticatedRequest).user?.id;
     const { filter } = req.body;
-    const searchQuery = filter?.q || '';
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
     let groups = stashCacheManager.getAllGroups();
 
     if (groups.length === 0) {
-      logger.warn('Cache not initialized, returning empty result');
+      logger.warn("Cache not initialized, returning empty result");
       return res.json({
         groups: [],
       });
@@ -3063,21 +3429,21 @@ export const findGroupsMinimal = async (req: Request, res: Response) => {
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       groups = groups.filter((g) => {
-        const name = g.name || '';
+        const name = g.name || "";
         return name.toLowerCase().includes(lowerQuery);
       });
     }
 
     // Step 3.5: Filter empty groups (non-admins only)
-    const requestingUser = (req as any).user;
-    if (requestingUser && requestingUser.role !== 'ADMIN') {
+    const requestingUser = (req as AuthenticatedRequest).user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
       groups = emptyEntityFilterService.filterEmptyGroups(groups);
     }
 
     // Step 4: Sort by name
     groups = groups.sort((a, b) => {
-      const aName = (a.name || '').toLowerCase();
-      const bName = (b.name || '').toLowerCase();
+      const aName = (a.name || "").toLowerCase();
+      const bName = (b.name || "").toLowerCase();
       return aName.localeCompare(bName);
     });
 
@@ -3092,10 +3458,12 @@ export const findGroupsMinimal = async (req: Request, res: Response) => {
       groups: minimalGroups,
     });
   } catch (error) {
-    logger.error('Error in findGroupsMinimal', { error: error instanceof Error ? error.message : 'Unknown error' });
+    logger.error("Error in findGroupsMinimal", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
     res.status(500).json({
-      error: 'Failed to find groups',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      error: "Failed to find groups",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };

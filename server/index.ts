@@ -38,7 +38,7 @@ const main = async () => {
   await pathMapper.initialize();
 
   // Start API server immediately so /api/setup/status is available
-  const app = setupAPI();
+  setupAPI();
   logger.info("Server started - accepting connections during cache load");
 
   // Initialize Stash cache (fetch all entities from Stash)
@@ -50,7 +50,9 @@ const main = async () => {
     logger.error("Failed to initialize Stash cache", {
       error: error instanceof Error ? error.message : String(error),
     });
-    logger.warn("Server will continue without cache - performance may be degraded");
+    logger.warn(
+      "Server will continue without cache - performance may be degraded"
+    );
   }
 };
 

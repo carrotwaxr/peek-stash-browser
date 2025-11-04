@@ -1,9 +1,9 @@
-import { Request, Response } from 'express';
-import prisma from '../prisma/singleton.js';
-import { logger } from '../utils/logger.js';
-import getStash from '../stash.js';
-
-const MINIMUM_WATCH_DURATION = 300; // 5 minutes in seconds
+import { Response } from "express";
+import prisma from "../prisma/singleton.js";
+import { logger } from "../utils/logger.js";
+import getStash from "../stash.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import { WatchHistory } from "@prisma/client";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
 // Key format: "userId:sceneId"
@@ -17,16 +17,26 @@ function getSessionKey(userId: number, sceneId: string): string {
  * Update watch history with periodic ping from video player
  * Tracks playback progress matching Stash's pattern with per-user tracking
  */
-export async function pingWatchHistory(req: Request, res: Response) {
+export async function pingWatchHistory(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   try {
-    const { sceneId, currentTime, quality, sessionStart, seekEvents } = req.body;
-    const userId = (req as any).user?.id;
+    const { sceneId, currentTime, quality, sessionStart, seekEvents } =
+      req.body;
+    const userId = req.user?.id;
 
-    if (!sceneId || typeof currentTime !== 'number') {
-      return res.status(400).json({ error: 'Missing required fields: sceneId, currentTime' });
+    if (!userId) {
+      return res.status(401).json({ error: "User not found" });
     }
 
-    logger.info('Watch history ping', {
+    if (!sceneId || typeof currentTime !== "number") {
+      return res
+        .status(400)
+        .json({ error: "Missing required fields: sceneId, currentTime" });
+    }
+
+    logger.info("Watch history ping", {
       userId,
       sceneId,
       currentTime: currentTime.toFixed(2),
@@ -40,7 +50,7 @@ export async function pingWatchHistory(req: Request, res: Response) {
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(401).json({ error: "User not found" });
     }
 
     // Get scene duration from Stash
@@ -50,7 +60,10 @@ export async function pingWatchHistory(req: Request, res: Response) {
       const sceneData = await stash.findScenes({ ids: [sceneId] });
       sceneDuration = sceneData.findScenes.scenes[0]?.files?.[0]?.duration || 0;
     } catch (error) {
-      logger.error('Failed to fetch scene duration from Stash', { sceneId, error });
+      logger.error("Failed to fetch scene duration from Stash", {
+        sceneId,
+        error,
+      });
       // Continue without duration - won't be able to calculate percentages
     }
 
@@ -78,18 +91,11 @@ export async function pingWatchHistory(req: Request, res: Response) {
       });
     }
 
-    // Parse existing play history
-    const playHistory = Array.isArray(watchHistory.playHistory)
-      ? watchHistory.playHistory
-      : JSON.parse(watchHistory.playHistory as string || '[]');
-
     // Calculate actual playback duration delta
     let playbackDelta = 0;
-    let totalSessionDuration = 0;
 
     if (sessionStart) {
       const sessionStartTime = new Date(sessionStart);
-      totalSessionDuration = (now.getTime() - sessionStartTime.getTime()) / 1000;
 
       // Detect if this is a new session vs continuing an existing session
       // If lastPlayedAt is >2 minutes before sessionStart, treat as new session
@@ -97,14 +103,16 @@ export async function pingWatchHistory(req: Request, res: Response) {
       let lastPingTime = sessionStartTime;
 
       if (watchHistory.lastPlayedAt) {
-        const timeSinceLastPlayed = (sessionStartTime.getTime() - watchHistory.lastPlayedAt.getTime()) / 1000;
+        const timeSinceLastPlayed =
+          (sessionStartTime.getTime() - watchHistory.lastPlayedAt.getTime()) /
+          1000;
 
         if (timeSinceLastPlayed <= SESSION_BOUNDARY_SECONDS) {
           // Continuing recent session, use lastPlayedAt
           lastPingTime = watchHistory.lastPlayedAt;
         } else {
           // New session after significant gap, use sessionStart
-          logger.info('New viewing session detected', {
+          logger.info("New viewing session detected", {
             userId,
             sceneId,
             timeSinceLastPlayed: timeSinceLastPlayed.toFixed(2),
@@ -129,7 +137,7 @@ export async function pingWatchHistory(req: Request, res: Response) {
         // Don't let seek distance exceed the time delta (prevent negative values)
         playbackDelta = Math.max(0, timeSinceLastPing - totalSeekDistance);
 
-        logger.info('Adjusted playback delta for seeks', {
+        logger.info("Adjusted playback delta for seeks", {
           userId,
           sceneId,
           timeSinceLastPing: timeSinceLastPing.toFixed(2),
@@ -142,7 +150,7 @@ export async function pingWatchHistory(req: Request, res: Response) {
       // Pings happen every ~10 seconds, so >60s indicates tab was backgrounded/sleeping
       const MAX_PING_DELTA = 60;
       if (playbackDelta > MAX_PING_DELTA) {
-        logger.warn('Capping excessive playback delta', {
+        logger.warn("Capping excessive playback delta", {
           userId,
           sceneId,
           originalDelta: playbackDelta.toFixed(2),
@@ -157,21 +165,27 @@ export async function pingWatchHistory(req: Request, res: Response) {
     const newPlayDuration = watchHistory.playDuration + playbackDelta;
 
     // Calculate percentages (Stash's pattern)
-    const percentPlayed = sceneDuration > 0 ? (newPlayDuration / sceneDuration) * 100 : 0;
-    const percentCompleted = sceneDuration > 0 ? (currentTime / sceneDuration) * 100 : 0;
+    const percentPlayed =
+      sceneDuration > 0 ? (newPlayDuration / sceneDuration) * 100 : 0;
+    const percentCompleted =
+      sceneDuration > 0 ? (currentTime / sceneDuration) * 100 : 0;
 
     // Session tracking: check if we've already incremented play_count for this session
     const sessionKey = getSessionKey(userId, sceneId);
-    const hasIncrementedThisSession = sessionPlayCountIncrements.get(sessionKey) || false;
+    const hasIncrementedThisSession =
+      sessionPlayCountIncrements.get(sessionKey) || false;
 
     // Increment play count ONCE per session when threshold is met
     let newPlayCount = watchHistory.playCount;
     let playCountIncremented = false;
     const playHistoryArray = Array.isArray(watchHistory.playHistory)
       ? watchHistory.playHistory
-      : JSON.parse(watchHistory.playHistory as string || '[]');
+      : JSON.parse((watchHistory.playHistory as string) || "[]");
 
-    if (!hasIncrementedThisSession && percentPlayed >= user.minimumPlayPercent) {
+    if (
+      !hasIncrementedThisSession &&
+      percentPlayed >= user.minimumPlayPercent
+    ) {
       newPlayCount++;
       playCountIncremented = true;
       sessionPlayCountIncrements.set(sessionKey, true);
@@ -179,7 +193,7 @@ export async function pingWatchHistory(req: Request, res: Response) {
       // Append timestamp to play history (Stash's pattern)
       playHistoryArray.push(now.toISOString());
 
-      logger.info('Play count incremented (percentage threshold met)', {
+      logger.info("Play count incremented (percentage threshold met)", {
         userId,
         sceneId,
         newPlayCount,
@@ -210,37 +224,37 @@ export async function pingWatchHistory(req: Request, res: Response) {
         await stash.sceneSaveActivity({
           id: sceneId,
           resume_time: resumeTime,
-          playDuration: playbackDelta
+          playDuration: playbackDelta,
         });
 
         // Add play history timestamp if play_count was incremented
         if (playCountIncremented) {
           const addPlayResult = await stash.sceneAddPlay({
             id: sceneId,
-            times: [now.toISOString()]
+            times: [now.toISOString()],
           });
 
-          logger.info('Added play timestamp to Stash', {
+          logger.info("Added play timestamp to Stash", {
             userId,
             sceneId,
             stashPlayCount: addPlayResult.sceneAddPlay.count,
             stashPlayHistory: addPlayResult.sceneAddPlay.history,
-            peekPlayCount: newPlayCount
+            peekPlayCount: newPlayCount,
           });
         }
 
-        logger.info('Synced activity to Stash', {
+        logger.info("Synced activity to Stash", {
           userId,
           sceneId,
           resumeTime,
           playbackDelta,
-          playCountIncremented
+          playCountIncremented,
         });
       } catch (stashError) {
         // Don't fail the request if Stash sync fails - Peek DB is source of truth
-        logger.error('Failed to sync activity to Stash', {
+        logger.error("Failed to sync activity to Stash", {
           sceneId,
-          error: stashError
+          error: stashError,
         });
       }
     }
@@ -255,24 +269,31 @@ export async function pingWatchHistory(req: Request, res: Response) {
       },
     });
   } catch (error) {
-    logger.error('Error updating watch history', { error });
-    res.status(500).json({ error: 'Failed to update watch history' });
+    logger.error("Error updating watch history", { error });
+    res.status(500).json({ error: "Failed to update watch history" });
   }
 }
 
 /**
  * Increment O counter for a scene
  */
-export async function incrementOCounter(req: Request, res: Response) {
+export async function incrementOCounter(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   try {
     const { sceneId } = req.body;
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
 
-    if (!sceneId) {
-      return res.status(400).json({ error: 'Missing required field: sceneId' });
+    if (!userId) {
+      return res.status(401).json({ error: "User not found" });
     }
 
-    logger.info('Incrementing O counter', { userId, sceneId });
+    if (!sceneId) {
+      return res.status(400).json({ error: "Missing required field: sceneId" });
+    }
+
+    logger.info("Incrementing O counter", { userId, sceneId });
 
     // Get user settings for syncToStash
     const user = await prisma.user.findUnique({
@@ -281,7 +302,7 @@ export async function incrementOCounter(req: Request, res: Response) {
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(401).json({ error: "User not found" });
     }
 
     // Get or create watch history record
@@ -309,7 +330,7 @@ export async function incrementOCounter(req: Request, res: Response) {
       // Parse existing O history
       const oHistory = Array.isArray(watchHistory.oHistory)
         ? watchHistory.oHistory
-        : JSON.parse(watchHistory.oHistory as string || '[]');
+        : JSON.parse((watchHistory.oHistory as string) || "[]");
 
       // Update with incremented O counter
       watchHistory = await prisma.watchHistory.update({
@@ -324,21 +345,21 @@ export async function incrementOCounter(req: Request, res: Response) {
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
-        logger.info('Syncing O counter increment to Stash', { sceneId });
+        logger.info("Syncing O counter increment to Stash", { sceneId });
         const stash = getStash();
         const result = await stash.sceneIncrementO({ id: sceneId });
-        logger.info('Successfully incremented O counter in Stash', {
+        logger.info("Successfully incremented O counter in Stash", {
           sceneId,
           stashGlobalCount: result.sceneIncrementO,
-          peekUserCount: watchHistory.oCount
+          peekUserCount: watchHistory.oCount,
         });
       } catch (stashError) {
         // Don't fail the request if Stash sync fails - Peek DB is source of truth
-        logger.error('Failed to sync O counter increment to Stash', {
+        logger.error("Failed to sync O counter increment to Stash", {
           sceneId,
           error: stashError,
           errorMessage: (stashError as Error).message,
-          errorStack: (stashError as Error).stack
+          errorStack: (stashError as Error).stack,
         });
       }
     }
@@ -350,25 +371,30 @@ export async function incrementOCounter(req: Request, res: Response) {
       timestamp: now.toISOString(),
     });
   } catch (error) {
-    logger.error('Error incrementing O counter', { error });
-    res.status(500).json({ error: 'Failed to increment O counter' });
+    logger.error("Error incrementing O counter", { error });
+    res.status(500).json({ error: "Failed to increment O counter" });
   }
 }
 
 /**
  * Get watch history for a specific scene
  */
-export async function getWatchHistory(req: Request, res: Response) {
+export async function getWatchHistory(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   try {
     const { sceneId } = req.params;
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
 
     if (!sceneId) {
-      return res.status(400).json({ error: 'Missing required parameter: sceneId' });
+      return res
+        .status(400)
+        .json({ error: "Missing required parameter: sceneId" });
     }
 
     if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
+      return res.status(401).json({ error: "User not authenticated" });
     }
 
     const watchHistory = await prisma.watchHistory.findUnique({
@@ -387,11 +413,11 @@ export async function getWatchHistory(req: Request, res: Response) {
     // Parse JSON fields
     const oHistory = Array.isArray(watchHistory.oHistory)
       ? watchHistory.oHistory
-      : JSON.parse(watchHistory.oHistory as string || '[]');
+      : JSON.parse((watchHistory.oHistory as string) || "[]");
 
     const playHistory = Array.isArray(watchHistory.playHistory)
       ? watchHistory.playHistory
-      : JSON.parse(watchHistory.playHistory as string || '[]');
+      : JSON.parse((watchHistory.playHistory as string) || "[]");
 
     res.json({
       exists: true,
@@ -404,22 +430,32 @@ export async function getWatchHistory(req: Request, res: Response) {
       playHistory,
     });
   } catch (error) {
-    logger.error('Error getting watch history', { error });
-    logger.error('Error details', { message: (error as Error).message, stack: (error as Error).stack });
-    res.status(500).json({ error: 'Failed to get watch history' });
+    logger.error("Error getting watch history", { error });
+    logger.error("Error details", {
+      message: (error as Error).message,
+      stack: (error as Error).stack,
+    });
+    res.status(500).json({ error: "Failed to get watch history" });
   }
 }
 
 /**
  * Get all watch history for current user (for Continue Watching carousel)
  */
-export async function getAllWatchHistory(req: Request, res: Response) {
+export async function getAllWatchHistory(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 20;
-    const onlyInProgress = req.query.inProgress === 'true';
+    const onlyInProgress = req.query.inProgress === "true";
 
-    let where: any = { userId };
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    let where: { userId: number; resumeTime?: { not: null } } = { userId };
 
     if (onlyInProgress) {
       // Only return scenes with resume time (partially watched)
@@ -428,46 +464,52 @@ export async function getAllWatchHistory(req: Request, res: Response) {
 
     const watchHistory = await prisma.watchHistory.findMany({
       where,
-      orderBy: { lastPlayedAt: 'desc' },
+      orderBy: { lastPlayedAt: "desc" },
       take: limit,
     });
 
     // Parse JSON fields for each record
-    const parsed = watchHistory.map((record: any) => ({
+    const parsed = watchHistory.map((record: WatchHistory) => ({
       ...record,
       oHistory: Array.isArray(record.oHistory)
         ? record.oHistory
-        : JSON.parse(record.oHistory as string || '[]'),
+        : JSON.parse((record.oHistory as string) || "[]"),
       playHistory: Array.isArray(record.playHistory)
         ? record.playHistory
-        : JSON.parse(record.playHistory as string || '[]'),
+        : JSON.parse((record.playHistory as string) || "[]"),
     }));
 
     res.json({ watchHistory: parsed });
   } catch (error) {
-    logger.error('Error getting all watch history', { error });
-    res.status(500).json({ error: 'Failed to get watch history' });
+    logger.error("Error getting all watch history", { error });
+    res.status(500).json({ error: "Failed to get watch history" });
   }
 }
 
 /**
  * Clear all watch history for current user
  */
-export async function clearAllWatchHistory(req: Request, res: Response) {
+export async function clearAllWatchHistory(
+  req: AuthenticatedRequest,
+  res: Response
+) {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ error: 'User not authenticated' });
+      return res.status(401).json({ error: "User not authenticated" });
     }
 
-    logger.info('Clearing all watch history', { userId });
+    logger.info("Clearing all watch history", { userId });
 
     const result = await prisma.watchHistory.deleteMany({
       where: { userId },
     });
 
-    logger.info('Watch history cleared', { userId, deletedCount: result.count });
+    logger.info("Watch history cleared", {
+      userId,
+      deletedCount: result.count,
+    });
 
     res.json({
       success: true,
@@ -475,7 +517,7 @@ export async function clearAllWatchHistory(req: Request, res: Response) {
       message: `Cleared ${result.count} watch history records`,
     });
   } catch (error) {
-    logger.error('Error clearing watch history', { error });
-    res.status(500).json({ error: 'Failed to clear watch history' });
+    logger.error("Error clearing watch history", { error });
+    res.status(500).json({ error: "Failed to clear watch history" });
   }
 }
