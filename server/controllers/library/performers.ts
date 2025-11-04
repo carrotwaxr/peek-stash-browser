@@ -8,111 +8,13 @@ import type {
 } from "../../types/index.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import getStash from "../../stash.js";
 
 /**
- * Calculate per-user performer statistics from watch history
- * For each performer, aggregate stats from scenes they appear in
- */
-async function calculatePerformerStats(userId: number): Promise<
-  Map<
-    string,
-    {
-      o_counter: number;
-      play_count: number;
-      last_played_at: string | null;
-      last_o_at: string | null;
-    }
-  >
-> {
-  // Get all scenes from cache
-  const scenes = stashCacheManager.getAllScenes();
-
-  // Get all watch history for this user
-  const watchHistory = await prisma.watchHistory.findMany({
-    where: { userId },
-  });
-
-  const watchMap = new Map(
-    watchHistory.map((wh) => {
-      const oHistory = Array.isArray(wh.oHistory)
-        ? wh.oHistory
-        : JSON.parse((wh.oHistory as string) || "[]");
-      const playHistory = Array.isArray(wh.playHistory)
-        ? wh.playHistory
-        : JSON.parse((wh.playHistory as string) || "[]");
-
-      const lastPlayedAt =
-        playHistory.length > 0 ? playHistory[playHistory.length - 1] : null;
-      const lastOAt =
-        oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
-
-      return [
-        wh.sceneId,
-        {
-          o_counter: wh.oCount || 0,
-          play_count: wh.playCount || 0,
-          last_played_at: lastPlayedAt,
-          last_o_at: lastOAt,
-        },
-      ];
-    })
-  );
-
-  // Aggregate stats by performer
-  const performerStatsMap = new Map<
-    string,
-    {
-      o_counter: number;
-      play_count: number;
-      last_played_at: string | null;
-      last_o_at: string | null;
-    }
-  >();
-
-  scenes.forEach((scene) => {
-    // Normalize scene ID to string for lookup
-    const sceneIdStr = String(scene.id);
-    const watchData = watchMap.get(sceneIdStr);
-    if (!watchData) return; // Skip scenes not watched by this user
-
-    // Aggregate to all performers in this scene
-    (scene.performers || []).forEach((performer) => {
-      const existing = performerStatsMap.get(performer.id) || {
-        o_counter: 0,
-        play_count: 0,
-        last_played_at: null,
-        last_o_at: null,
-      };
-
-      const updatedStats = {
-        o_counter: existing.o_counter + watchData.o_counter,
-        play_count: existing.play_count + watchData.play_count,
-        // Update last_played_at to the most recent timestamp
-        last_played_at:
-          !existing.last_played_at ||
-          (watchData.last_played_at &&
-            watchData.last_played_at > existing.last_played_at)
-            ? watchData.last_played_at
-            : existing.last_played_at,
-        // Update last_o_at to the most recent timestamp
-        last_o_at:
-          !existing.last_o_at ||
-          (watchData.last_o_at && watchData.last_o_at > existing.last_o_at)
-            ? watchData.last_o_at
-            : existing.last_o_at,
-      };
-
-      performerStatsMap.set(performer.id, updatedStats);
-    });
-  });
-
-  return performerStatsMap;
-}
-
-/**
  * Merge user-specific data into performers
+ * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
  */
 export async function mergePerformersWithUserData(
   performers: NormalizedPerformer[],
@@ -121,7 +23,7 @@ export async function mergePerformersWithUserData(
   // Fetch user ratings and stats in parallel
   const [ratings, performerStats] = await Promise.all([
     prisma.performerRating.findMany({ where: { userId } }),
-    calculatePerformerStats(userId),
+    userStatsService.getPerformerStats(userId),
   ]);
 
   const ratingMap = new Map(
@@ -138,15 +40,18 @@ export async function mergePerformersWithUserData(
   // Merge data
   return performers.map((performer) => {
     const stats = performerStats.get(performer.id) || {
-      o_counter: 0,
-      play_count: 0,
-      last_played_at: null,
-      last_o_at: null,
+      oCounter: 0,
+      playCount: 0,
+      lastPlayedAt: null,
+      lastOAt: null,
     };
     return {
       ...performer,
       ...ratingMap.get(performer.id),
-      ...stats,
+      o_counter: stats.oCounter,
+      play_count: stats.playCount,
+      last_played_at: stats.lastPlayedAt,
+      last_o_at: stats.lastOAt,
     };
   });
 }
