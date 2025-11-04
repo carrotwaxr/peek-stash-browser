@@ -6,57 +6,12 @@ import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import getStash from "../../stash.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 
 /**
- * Calculate per-user tag statistics from watch history
- * For each tag, aggregate stats from scenes tagged with it
- */
-async function calculateTagStats(
-  userId: number
-): Promise<Map<string, { o_counter: number; play_count: number }>> {
-  // Get all scenes from cache
-  const scenes = stashCacheManager.getAllScenes();
-
-  // Get all watch history for this user
-  const watchHistory = await prisma.watchHistory.findMany({
-    where: { userId },
-  });
-  const watchMap = new Map(
-    watchHistory.map((wh) => [
-      wh.sceneId,
-      { o_counter: wh.oCount || 0, play_count: wh.playCount || 0 },
-    ])
-  );
-
-  // Aggregate stats by tag
-  const tagStatsMap = new Map<
-    string,
-    { o_counter: number; play_count: number }
-  >();
-
-  scenes.forEach((scene) => {
-    const watchData = watchMap.get(scene.id);
-    if (!watchData) return; // Skip scenes not watched by this user
-
-    // Aggregate to all tags in this scene
-    (scene.tags || []).forEach((tag) => {
-      const existing = tagStatsMap.get(tag.id) || {
-        o_counter: 0,
-        play_count: 0,
-      };
-      tagStatsMap.set(tag.id, {
-        o_counter: existing.o_counter + watchData.o_counter,
-        play_count: existing.play_count + watchData.play_count,
-      });
-    });
-  });
-
-  return tagStatsMap;
-}
-
-/**
  * Merge user-specific data into tags
+ * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
  */
 export async function mergeTagsWithUserData(
   tags: NormalizedTag[],
@@ -65,7 +20,7 @@ export async function mergeTagsWithUserData(
   // Fetch user ratings and stats in parallel
   const [ratings, tagStats] = await Promise.all([
     prisma.tagRating.findMany({ where: { userId } }),
-    calculateTagStats(userId),
+    userStatsService.getTagStats(userId),
   ]);
 
   const ratingMap = new Map(
@@ -80,11 +35,18 @@ export async function mergeTagsWithUserData(
   );
 
   // Merge data
-  return tags.map((tag) => ({
-    ...tag,
-    ...ratingMap.get(tag.id),
-    ...(tagStats.get(tag.id) || { o_counter: 0, play_count: 0 }),
-  }));
+  return tags.map((tag) => {
+    const stats = tagStats.get(tag.id) || {
+      oCounter: 0,
+      playCount: 0,
+    };
+    return {
+      ...tag,
+      ...ratingMap.get(tag.id),
+      o_counter: stats.oCounter,
+      play_count: stats.playCount,
+    };
+  });
 }
 
 /**

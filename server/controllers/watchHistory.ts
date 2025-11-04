@@ -4,6 +4,7 @@ import { logger } from "../utils/logger.js";
 import getStash from "../stash.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { WatchHistory } from "@prisma/client";
+import { userStatsService } from "../services/UserStatsService.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
 // Key format: "userId:sceneId"
@@ -217,6 +218,19 @@ export async function pingWatchHistory(
       },
     });
 
+    // Update pre-computed stats if playCount was incremented
+    if (playCountIncremented) {
+      // Increment playCount for all entities in this scene (performers, studio, tags)
+      await userStatsService.updateStatsForScene(
+        userId,
+        sceneId,
+        0, // oCountDelta (not changed in ping)
+        1, // playCountDelta (increased by 1)
+        now, // lastPlayedAt
+        undefined // lastOAt (not changed)
+      );
+    }
+
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
@@ -340,6 +354,29 @@ export async function incrementOCounter(
           oHistory: JSON.stringify([...oHistory, now.toISOString()]),
         },
       });
+
+      // Update pre-computed stats (existing record updated)
+      await userStatsService.updateStatsForScene(
+        userId,
+        sceneId,
+        1, // oCountDelta (increased by 1)
+        0, // playCountDelta (not changed)
+        undefined, // lastPlayedAt (not changed)
+        now // lastOAt
+      );
+    }
+
+    // Update pre-computed stats for new records
+    if (watchHistory.playCount === 0 && watchHistory.oCount === 1) {
+      // This was a new record created above (lines 316-328)
+      await userStatsService.updateStatsForScene(
+        userId,
+        sceneId,
+        1, // oCountDelta
+        0, // playCountDelta
+        undefined, // lastPlayedAt (set above but not relevant here)
+        now // lastOAt
+      );
     }
 
     // Sync to Stash if user has sync enabled

@@ -5,57 +5,13 @@ import { logger } from "../../utils/logger.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import getStash from "../../stash.js";
 
 /**
- * Calculate per-user studio statistics from watch history
- * For each studio, aggregate stats from scenes they produced
- */
-async function calculateStudioStats(
-  userId: number
-): Promise<Map<string, { o_counter: number; play_count: number }>> {
-  // Get all scenes from cache
-  const scenes = stashCacheManager.getAllScenes();
-
-  // Get all watch history for this user
-  const watchHistory = await prisma.watchHistory.findMany({
-    where: { userId },
-  });
-  const watchMap = new Map(
-    watchHistory.map((wh) => [
-      wh.sceneId,
-      { o_counter: wh.oCount || 0, play_count: wh.playCount || 0 },
-    ])
-  );
-
-  // Aggregate stats by studio
-  const studioStatsMap = new Map<
-    string,
-    { o_counter: number; play_count: number }
-  >();
-
-  scenes.forEach((scene) => {
-    const watchData = watchMap.get(scene.id);
-    if (!watchData || !scene.studio) return; // Skip scenes not watched or without studio
-
-    // Aggregate to studio
-    const studioId = scene.studio.id;
-    const existing = studioStatsMap.get(studioId) || {
-      o_counter: 0,
-      play_count: 0,
-    };
-    studioStatsMap.set(studioId, {
-      o_counter: existing.o_counter + watchData.o_counter,
-      play_count: existing.play_count + watchData.play_count,
-    });
-  });
-
-  return studioStatsMap;
-}
-
-/**
  * Merge user-specific data into studios
+ * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
  */
 export async function mergeStudiosWithUserData(
   studios: NormalizedStudio[],
@@ -64,7 +20,7 @@ export async function mergeStudiosWithUserData(
   // Fetch user ratings and stats in parallel
   const [ratings, studioStats] = await Promise.all([
     prisma.studioRating.findMany({ where: { userId } }),
-    calculateStudioStats(userId),
+    userStatsService.getStudioStats(userId),
   ]);
 
   const ratingMap = new Map(
@@ -79,11 +35,18 @@ export async function mergeStudiosWithUserData(
   );
 
   // Merge data
-  return studios.map((studio) => ({
-    ...studio,
-    ...ratingMap.get(studio.id),
-    ...(studioStats.get(studio.id) || { o_counter: 0, play_count: 0 }),
-  }));
+  return studios.map((studio) => {
+    const stats = studioStats.get(studio.id) || {
+      oCounter: 0,
+      playCount: 0,
+    };
+    return {
+      ...studio,
+      ...ratingMap.get(studio.id),
+      o_counter: stats.oCounter,
+      play_count: stats.playCount,
+    };
+  });
 }
 
 /**
