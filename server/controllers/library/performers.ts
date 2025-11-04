@@ -215,17 +215,25 @@ export const findPerformers = async (
 
     // Step 4.6: Filter empty performers (non-admins only)
     if (requestingUser && requestingUser.role !== "ADMIN") {
-      // Get visibility sets for groups and galleries
-      const allGalleries = stashCacheManager.getAllGalleries();
-      const allGroups = stashCacheManager.getAllGroups();
-      const visibleGalleries = new Set(
-        emptyEntityFilterService
-          .filterEmptyGalleries(allGalleries)
-          .map((g) => g.id)
+      // Get all entities from cache
+      let allGalleries = stashCacheManager.getAllGalleries();
+      let allGroups = stashCacheManager.getAllGroups();
+
+      // Apply user restrictions to groups/galleries FIRST
+      allGalleries = await userRestrictionService.filterGalleriesForUser(
+        allGalleries,
+        userId
       );
-      const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
+      allGroups = await userRestrictionService.filterGroupsForUser(
+        allGroups,
+        userId
       );
+
+      // Then filter for empty entities
+      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+
+      // Finally filter performers using properly restricted visibility sets
       performers = emptyEntityFilterService.filterEmptyPerformers(
         performers,
         visibleGroups,
@@ -540,16 +548,26 @@ export const findPerformersMinimal = async (
     // Filter empty performers (non-admins only)
     const requestingUser = req.user;
     if (requestingUser && requestingUser.role !== "ADMIN") {
-      const allGalleries = stashCacheManager.getAllGalleries();
-      const allGroups = stashCacheManager.getAllGroups();
-      const visibleGalleries = new Set(
-        emptyEntityFilterService
-          .filterEmptyGalleries(allGalleries)
-          .map((g) => g.id)
+      // Get all entities from cache
+      let allGalleries = stashCacheManager.getAllGalleries();
+      let allGroups = stashCacheManager.getAllGroups();
+
+      // Apply user restrictions to groups/galleries FIRST
+      const userId = req.user?.id;
+      allGalleries = await userRestrictionService.filterGalleriesForUser(
+        allGalleries,
+        userId
       );
-      const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
+      allGroups = await userRestrictionService.filterGroupsForUser(
+        allGroups,
+        userId
       );
+
+      // Then filter for empty entities
+      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+
+      // Finally filter performers using properly restricted visibility sets
       performers = emptyEntityFilterService.filterEmptyPerformers(
         performers,
         visibleGroups,
