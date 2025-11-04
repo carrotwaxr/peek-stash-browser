@@ -9,6 +9,13 @@
  * - VERBOSE: Very detailed/noisy debugging information
  */
 
+/**
+ * Log context - arbitrary data to include with log messages
+ * Can contain any JSON-serializable values or objects
+ * Accepts any object with string keys for maximum flexibility
+ */
+export type LogContext = { [key: string]: unknown };
+
 export enum LogLevel {
   ERROR = 0,
   WARN = 1,
@@ -69,7 +76,7 @@ class Logger {
   private format(
     level: LogLevel,
     message: string,
-    context?: Record<string, any>
+    context?: LogContext
   ): string {
     const timestamp = new Date().toISOString();
     const levelName = LOG_LEVEL_NAMES[level];
@@ -80,7 +87,7 @@ class Logger {
   /**
    * Log error message (always logged)
    */
-  error(message: string, context?: Record<string, any>): void {
+  error(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.ERROR)) {
       console.error(this.format(LogLevel.ERROR, message, context));
     }
@@ -89,7 +96,7 @@ class Logger {
   /**
    * Log warning message
    */
-  warn(message: string, context?: Record<string, any>): void {
+  warn(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.WARN)) {
       console.warn(this.format(LogLevel.WARN, message, context));
     }
@@ -98,7 +105,7 @@ class Logger {
   /**
    * Log info message (default level)
    */
-  info(message: string, context?: Record<string, any>): void {
+  info(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.INFO)) {
       console.log(this.format(LogLevel.INFO, message, context));
     }
@@ -107,7 +114,7 @@ class Logger {
   /**
    * Log debug message (detailed debugging)
    */
-  debug(message: string, context?: Record<string, any>): void {
+  debug(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.DEBUG)) {
       console.log(this.format(LogLevel.DEBUG, message, context));
     }
@@ -116,7 +123,7 @@ class Logger {
   /**
    * Log verbose message (very detailed/noisy)
    */
-  verbose(message: string, context?: Record<string, any>): void {
+  verbose(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.VERBOSE)) {
       console.log(this.format(LogLevel.VERBOSE, message, context));
     }

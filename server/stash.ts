@@ -1,8 +1,8 @@
 import { StashApp } from "stashapp-api";
 
-let stashInstance: any = null;
+let stashInstance: StashApp | null = null;
 
-const getStash = () => {
+const getStash = (): StashApp => {
   if (!stashInstance) {
     console.log("Initializing Stash - STASH_URL:", process.env.STASH_URL);
     console.log(

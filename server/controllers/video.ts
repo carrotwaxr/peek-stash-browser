@@ -284,10 +284,11 @@ const getSceneData = async (sceneId: string): Promise<Scene> => {
   }
 
   const stash = getStash();
+  // Type assertion needed: GraphQL response type doesn't exactly match Scene type structure
   const response = (await withTimeout(
     stash.findScenes({ ids: [sceneId] }),
     5000 // 5 second timeout
-  )) as any;
+  )) as unknown as { findScenes: { scenes: Scene[] } };
 
   const scene = response.findScenes.scenes[0] as Scene;
   if (scene) {

@@ -1,4 +1,3 @@
-import { stashCacheManager } from './StashCacheManager.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -22,6 +21,84 @@ import { logger } from '../utils/logger.js';
  * 5. Tags (needs: ALL entities)
  */
 
+/**
+ * Minimal gallery structure for filtering (only fields used by this service)
+ */
+interface FilterableGallery {
+  id: string;
+  image_count?: number | null;
+}
+
+/**
+ * Minimal group structure for filtering
+ * Groups can have parent/child relationships forming a tree
+ */
+interface FilterableGroup {
+  id: string;
+  scene_count?: number | null;
+  sub_groups?: Array<{ group?: FilterableGroup; id?: string }>;
+}
+
+/**
+ * Minimal performer structure for filtering
+ */
+interface FilterablePerformer {
+  id: string;
+  scene_count?: number | null;
+  image_count?: number | null;
+  group_count?: number | null;
+  gallery_count?: number | null;
+}
+
+/**
+ * Minimal studio structure for filtering
+ */
+interface FilterableStudio {
+  id: string;
+  scene_count?: number | null;
+  image_count?: number | null;
+  gallery_count?: number | null;
+  groups?: Array<{ id: string }>;
+}
+
+/**
+ * Minimal tag structure for filtering
+ * Tags can have parent/child relationships forming a DAG (directed acyclic graph)
+ */
+interface FilterableTag {
+  id: string;
+  scene_count?: number | null;
+  image_count?: number | null;
+  gallery_count?: number | null;
+  group_count?: number | null;
+  performer_count?: number | null;
+  studio_count?: number | null;
+  children?: Array<{ id: string }>;
+}
+
+/**
+ * Entities that can be filtered by this service
+ */
+export interface FilterableEntities {
+  galleries?: FilterableGallery[];
+  groups?: FilterableGroup[];
+  studios?: FilterableStudio[];
+  performers?: FilterablePerformer[];
+  tags?: FilterableTag[];
+}
+
+/**
+ * Result of filtering all entities
+ */
+export interface FilteredEntities {
+  galleries?: FilterableGallery[];
+  groups?: FilterableGroup[];
+  studios?: FilterableStudio[];
+  performers?: FilterablePerformer[];
+  tags?: FilterableTag[];
+  visibilitySets: VisibleEntitySets;
+}
+
 interface VisibleEntitySets {
   scenes?: Set<string>;
   images?: Set<string>;
@@ -36,7 +113,7 @@ class EmptyEntityFilterService {
    * Filter galleries with no images
    * Simple case - just check image_count
    */
-  filterEmptyGalleries(galleries: any[]): any[] {
+  filterEmptyGalleries<T extends FilterableGallery>(galleries: T[]): T[] {
     return galleries.filter(gallery => {
       return gallery.image_count && gallery.image_count > 0;
     });
@@ -47,7 +124,7 @@ class EmptyEntityFilterService {
    * Complex case - must trace parent/child relationships
    * Remove "dead branches" where entire subtrees have no content
    */
-  filterEmptyGroups(groups: any[]): any[] {
+  filterEmptyGroups<T extends FilterableGroup>(groups: T[]): T[] {
     if (groups.length === 0) return [];
 
     // Create a map for quick lookups
@@ -67,7 +144,8 @@ class EmptyEntityFilterService {
 
       // Check cache first
       if (hasContent.has(groupId)) {
-        return hasContent.get(groupId)!;
+        const cached = hasContent.get(groupId);
+        return cached !== undefined ? cached : false;
       }
 
       const group = groupMap.get(groupId);
@@ -83,7 +161,7 @@ class EmptyEntityFilterService {
       const subGroups = group.sub_groups || [];
       for (const subGroupRel of subGroups) {
         const childGroup = subGroupRel.group || subGroupRel;
-        if (checkHasContent(childGroup.id, visited)) {
+        if (childGroup.id && checkHasContent(childGroup.id, visited)) {
           hasContent.set(groupId, true);
           return true;
         }
@@ -119,11 +197,11 @@ class EmptyEntityFilterService {
    * - Not in any visible group
    * - No visible gallery
    */
-  filterEmptyPerformers(
-    performers: any[],
-    visibleGroups: Set<string>,
-    visibleGalleries: Set<string>
-  ): any[] {
+  filterEmptyPerformers<T extends FilterablePerformer>(
+    performers: T[],
+    _visibleGroups: Set<string>,
+    _visibleGalleries: Set<string>
+  ): T[] {
     return performers.filter(performer => {
       // Has scenes? Keep
       if (performer.scene_count && performer.scene_count > 0) {
@@ -168,11 +246,11 @@ class EmptyEntityFilterService {
    * - No images
    * - No visible galleries
    */
-  filterEmptyStudios(
-    studios: any[],
+  filterEmptyStudios<T extends FilterableStudio>(
+    studios: T[],
     visibleGroups: Set<string>,
-    visibleGalleries: Set<string>
-  ): any[] {
+    _visibleGalleries: Set<string>
+  ): T[] {
     return studios.filter(studio => {
       // Has scenes? Keep
       if (studio.scene_count && studio.scene_count > 0) {
@@ -186,7 +264,7 @@ class EmptyEntityFilterService {
 
       // Has visible groups? Keep
       if (studio.groups && Array.isArray(studio.groups)) {
-        const hasVisibleGroup = studio.groups.some((g: any) =>
+        const hasVisibleGroup = studio.groups.some(g =>
           visibleGroups.has(g.id)
         );
         if (hasVisibleGroup) {
@@ -213,10 +291,10 @@ class EmptyEntityFilterService {
    * - Not attached to any: Scenes, Images, Galleries, Groups, Performers, Studios
    * - Must trace and trim the parent/child tree
    */
-  filterEmptyTags(
-    tags: any[],
-    visibleEntities: VisibleEntitySets
-  ): any[] {
+  filterEmptyTags<T extends FilterableTag>(
+    tags: T[],
+    _visibleEntities: VisibleEntitySets
+  ): T[] {
     if (tags.length === 0) return [];
 
     // Create a map for quick lookups
@@ -233,7 +311,7 @@ class EmptyEntityFilterService {
      * So we need to actually check if the tag appears on any visible entity
      * This is expensive but necessary for accuracy
      */
-    const checkDirectContent = (tag: any): boolean => {
+    const checkDirectContent = (tag: FilterableTag): boolean => {
       // For now, use the counts as a heuristic
       // A more accurate implementation would query the cache for each entity type
       // and check if the tag appears on any visible entities
@@ -289,7 +367,8 @@ class EmptyEntityFilterService {
 
       // Check cache first
       if (hasContent.has(tagId)) {
-        return hasContent.get(tagId)!;
+        const cached = hasContent.get(tagId);
+        return cached !== undefined ? cached : false;
       }
 
       const tag = tagMap.get(tagId);
@@ -338,18 +417,24 @@ class EmptyEntityFilterService {
    * Filters all entity types in the correct dependency order
    * Returns visibility sets for use by other filters
    */
-  filterAllEntities(entities: {
-    galleries?: any[];
-    groups?: any[];
-    studios?: any[];
-    performers?: any[];
-    tags?: any[];
+  filterAllEntities<
+    TGallery extends FilterableGallery = FilterableGallery,
+    TGroup extends FilterableGroup = FilterableGroup,
+    TStudio extends FilterableStudio = FilterableStudio,
+    TPerformer extends FilterablePerformer = FilterablePerformer,
+    TTag extends FilterableTag = FilterableTag
+  >(entities: {
+    galleries?: TGallery[];
+    groups?: TGroup[];
+    studios?: TStudio[];
+    performers?: TPerformer[];
+    tags?: TTag[];
   }): {
-    galleries?: any[];
-    groups?: any[];
-    studios?: any[];
-    performers?: any[];
-    tags?: any[];
+    galleries?: TGallery[];
+    groups?: TGroup[];
+    studios?: TStudio[];
+    performers?: TPerformer[];
+    tags?: TTag[];
     visibilitySets: VisibleEntitySets;
   } {
     // Step 1: Filter galleries (no dependencies)

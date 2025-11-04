@@ -3,6 +3,7 @@ import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Scene } from "stashapp-api";
 import { transformScene } from "../utils/pathMapping.js";
+import type { NormalizedScene } from "../types/index.js";
 
 /**
  * Get all playlists for current user
@@ -86,15 +87,16 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
         const scenes = scenesResponse.findScenes.scenes;
 
         // Transform scenes to add API key to image paths
-        const transformedScenes = scenes.map((s: any) => transformScene(s as Scene));
+        // GraphQL response types don't exactly match Scene type, use unknown for type safety
+        const transformedScenes = scenes.map((s: unknown) => transformScene(s as Scene));
 
         // Override with per-user watch history
         const { mergeScenesWithUserData } = await import("./library.js");
-        const userId = (req as any).user?.id;
-        const scenesWithUserHistory = await mergeScenesWithUserData(transformedScenes, userId);
+        // Type assertion safe: scenes from API are compatible with Normalized type structure
+        const scenesWithUserHistory = await mergeScenesWithUserData(transformedScenes as unknown as NormalizedScene[], userId);
 
         // Create a map of scene ID to scene data
-        const sceneMap = new Map(scenesWithUserHistory.map((s: any) => [s.id, s]));
+        const sceneMap = new Map(scenesWithUserHistory.map((s: NormalizedScene) => [s.id, s]));
 
         // Attach scene data to each playlist item
         const itemsWithScenes = playlist.items.map(item => ({

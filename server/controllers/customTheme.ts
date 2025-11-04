@@ -1,5 +1,4 @@
 import { Response } from "express";
-import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 
@@ -43,7 +42,7 @@ const isValidHexColor = (color: string): boolean => {
 /**
  * Validate theme config structure and values
  */
-const validateThemeConfig = (config: any): config is ThemeConfig => {
+const validateThemeConfig = (config: ThemeConfig): config is ThemeConfig => {
   if (!config || typeof config !== "object") return false;
 
   // Validate mode
@@ -51,22 +50,45 @@ const validateThemeConfig = (config: any): config is ThemeConfig => {
 
   // Validate fonts
   if (!config.fonts || typeof config.fonts !== "object") return false;
-  const requiredFonts = ["brand", "heading", "body", "mono"];
-  if (!requiredFonts.every((f) => typeof config.fonts[f] === "string")) return false;
+  const requiredFonts: (keyof ThemeConfig["fonts"])[] = [
+    "brand",
+    "heading",
+    "body",
+    "mono",
+  ];
+  if (!requiredFonts.every((f) => typeof config.fonts[f] === "string"))
+    return false;
 
   // Validate colors
   if (!config.colors || typeof config.colors !== "object") return false;
-  const requiredColors = ["background", "backgroundSecondary", "backgroundCard", "text", "border"];
-  if (!requiredColors.every((c) => isValidHexColor(config.colors[c]))) return false;
+  const requiredColors: (keyof ThemeConfig["colors"])[] = [
+    "background",
+    "backgroundSecondary",
+    "backgroundCard",
+    "text",
+    "border",
+  ];
+  if (!requiredColors.every((c) => isValidHexColor(config.colors[c])))
+    return false;
 
   // Validate accents
   if (!config.accents || typeof config.accents !== "object") return false;
-  if (!isValidHexColor(config.accents.primary) || !isValidHexColor(config.accents.secondary)) return false;
+  if (
+    !isValidHexColor(config.accents.primary) ||
+    !isValidHexColor(config.accents.secondary)
+  )
+    return false;
 
   // Validate status colors
   if (!config.status || typeof config.status !== "object") return false;
-  const requiredStatus = ["success", "error", "info", "warning"];
-  if (!requiredStatus.every((s) => isValidHexColor(config.status[s]))) return false;
+  const requiredStatus: (keyof ThemeConfig["status"])[] = [
+    "success",
+    "error",
+    "info",
+    "warning",
+  ];
+  if (!requiredStatus.every((s) => isValidHexColor(config.status[s])))
+    return false;
 
   return true;
 };
@@ -74,7 +96,10 @@ const validateThemeConfig = (config: any): config is ThemeConfig => {
 /**
  * Get all custom themes for current user
  */
-export const getUserCustomThemes = async (req: AuthenticatedRequest, res: Response) => {
+export const getUserCustomThemes = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -104,7 +129,10 @@ export const getUserCustomThemes = async (req: AuthenticatedRequest, res: Respon
 /**
  * Get single custom theme
  */
-export const getCustomTheme = async (req: AuthenticatedRequest, res: Response) => {
+export const getCustomTheme = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const themeId = parseInt(req.params.id);
@@ -138,7 +166,10 @@ export const getCustomTheme = async (req: AuthenticatedRequest, res: Response) =
 /**
  * Create new custom theme
  */
-export const createCustomTheme = async (req: AuthenticatedRequest, res: Response) => {
+export const createCustomTheme = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const { name, config } = req.body;
@@ -153,7 +184,9 @@ export const createCustomTheme = async (req: AuthenticatedRequest, res: Response
     }
 
     if (name.length > 50) {
-      return res.status(400).json({ error: "Theme name must be 50 characters or less" });
+      return res
+        .status(400)
+        .json({ error: "Theme name must be 50 characters or less" });
     }
 
     // Validate config
@@ -170,7 +203,9 @@ export const createCustomTheme = async (req: AuthenticatedRequest, res: Response
     });
 
     if (existing) {
-      return res.status(409).json({ error: "A theme with this name already exists" });
+      return res
+        .status(409)
+        .json({ error: "A theme with this name already exists" });
     }
 
     // Create theme
@@ -178,7 +213,7 @@ export const createCustomTheme = async (req: AuthenticatedRequest, res: Response
       data: {
         userId,
         name: name.trim(),
-        config: config as any,
+        config: config as object,
       },
     });
 
@@ -192,7 +227,10 @@ export const createCustomTheme = async (req: AuthenticatedRequest, res: Response
 /**
  * Update custom theme
  */
-export const updateCustomTheme = async (req: AuthenticatedRequest, res: Response) => {
+export const updateCustomTheme = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const themeId = parseInt(req.params.id);
@@ -219,14 +257,16 @@ export const updateCustomTheme = async (req: AuthenticatedRequest, res: Response
     }
 
     // Validate updates
-    const updates: any = {};
+    const updates: { name?: string; config?: object } = {};
 
     if (name !== undefined) {
       if (typeof name !== "string" || name.trim().length === 0) {
         return res.status(400).json({ error: "Theme name cannot be empty" });
       }
       if (name.length > 50) {
-        return res.status(400).json({ error: "Theme name must be 50 characters or less" });
+        return res
+          .status(400)
+          .json({ error: "Theme name must be 50 characters or less" });
       }
 
       // Check for duplicate name (excluding current theme)
@@ -239,7 +279,9 @@ export const updateCustomTheme = async (req: AuthenticatedRequest, res: Response
       });
 
       if (duplicate) {
-        return res.status(409).json({ error: "A theme with this name already exists" });
+        return res
+          .status(409)
+          .json({ error: "A theme with this name already exists" });
       }
 
       updates.name = name.trim();
@@ -249,7 +291,7 @@ export const updateCustomTheme = async (req: AuthenticatedRequest, res: Response
       if (!validateThemeConfig(config)) {
         return res.status(400).json({ error: "Invalid theme configuration" });
       }
-      updates.config = config;
+      updates.config = config as object;
     }
 
     // Update theme
@@ -268,7 +310,10 @@ export const updateCustomTheme = async (req: AuthenticatedRequest, res: Response
 /**
  * Delete custom theme
  */
-export const deleteCustomTheme = async (req: AuthenticatedRequest, res: Response) => {
+export const deleteCustomTheme = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const themeId = parseInt(req.params.id);
@@ -308,7 +353,10 @@ export const deleteCustomTheme = async (req: AuthenticatedRequest, res: Response
 /**
  * Duplicate custom theme
  */
-export const duplicateCustomTheme = async (req: AuthenticatedRequest, res: Response) => {
+export const duplicateCustomTheme = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const themeId = parseInt(req.params.id);
@@ -337,9 +385,11 @@ export const duplicateCustomTheme = async (req: AuthenticatedRequest, res: Respo
     let newName = `${original.name} (Copy)`;
     let counter = 1;
 
-    while (await prisma.customTheme.findFirst({
-      where: { userId, name: newName },
-    })) {
+    while (
+      await prisma.customTheme.findFirst({
+        where: { userId, name: newName },
+      })
+    ) {
       counter++;
       newName = `${original.name} (Copy ${counter})`;
     }
@@ -349,7 +399,7 @@ export const duplicateCustomTheme = async (req: AuthenticatedRequest, res: Respo
       data: {
         userId,
         name: newName,
-        config: original.config as any,
+        config: original.config as object,
       },
     });
 

@@ -3,10 +3,67 @@ import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import type { NormalizedGallery } from "../types/index.js";
 // import { getDefaultCarouselPreferences } from "../utils/carouselDefaults.js";
 
+/**
+ * Carousel preference configuration
+ */
+interface CarouselPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
+/**
+ * Filter preset for scene/performer/studio/tag filtering
+ */
+interface FilterPreset {
+  id: string;
+  name: string;
+  filters: unknown;
+  sort?: string;
+  direction?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * User filter presets collection
+ */
+interface FilterPresets {
+  scenes?: FilterPreset[];
+  performers?: FilterPreset[];
+  studios?: FilterPreset[];
+  tags?: FilterPreset[];
+  [key: string]: FilterPreset[] | undefined;
+}
+
+/**
+ * Sync updates for entity ratings/favorites
+ */
+interface SyncUpdates {
+  rating?: number | null;
+  rating100?: number | null;
+  favorite?: boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * User content restriction from database
+ */
+interface UserRestriction {
+  id?: number;
+  userId?: string;
+  entityType: string;
+  mode: string;
+  entityIds: string[] | string;
+  restrictEmpty?: boolean;
+  [key: string]: unknown;
+}
+
 // Inline the default carousel preferences to avoid ESM loading issues
-const getDefaultCarouselPreferences = () => [
+const getDefaultCarouselPreferences = (): CarouselPreference[] => [
   { id: "highRatedScenes", enabled: true, order: 0 },
   { id: "recentlyAddedScenes", enabled: true, order: 1 },
   { id: "longScenes", enabled: true, order: 2 },
@@ -316,7 +373,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         username,
         password: hashedPassword,
         role: role || "USER",
-        carouselPreferences: getDefaultCarouselPreferences() as any,
+        carouselPreferences: getDefaultCarouselPreferences() as never,
       },
       select: {
         id: true,
@@ -489,7 +546,7 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
       select: { filterPresets: true },
     });
 
-    const currentPresets = (user?.filterPresets as any) || {
+    const currentPresets = (user?.filterPresets as FilterPresets | null) || {
       scene: [],
       performer: [],
       studio: [],
@@ -513,7 +570,7 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
     await prisma.user.update({
       where: { id: userId },
       data: {
-        filterPresets: currentPresets,
+        filterPresets: currentPresets as never,
       },
     });
 
@@ -553,7 +610,7 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
       return res.status(404).json({ error: "User not found" });
     }
 
-    const currentPresets = (user.filterPresets as any) || {
+    const currentPresets = (user.filterPresets as FilterPresets) || {
       scene: [],
       performer: [],
       studio: [],
@@ -562,14 +619,14 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
 
     // Remove preset from the appropriate artifact type array
     currentPresets[artifactType] = (currentPresets[artifactType] || []).filter(
-      (preset: any) => preset.id !== presetId
+      (preset: FilterPreset) => preset.id !== presetId
     );
 
     // Update user
     await prisma.user.update({
       where: { id: userId },
       data: {
-        filterPresets: currentPresets,
+        filterPresets: currentPresets as never,
       },
     });
 
@@ -628,7 +685,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
     // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
     if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
-      let sceneFilter: any = {};
+      let sceneFilter: Record<string, unknown> = {};
 
       // Determine which filter to use
       if (syncOptions.scenes.rating && !syncOptions.scenes.oCounter) {
@@ -646,7 +703,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Filter in code only if both options are selected
       const filteredScenes = (syncOptions.scenes.rating && syncOptions.scenes.oCounter)
-        ? scenes.filter((s: any) => (s.rating100 !== null && s.rating100 > 0) || (s.o_counter !== null && s.o_counter > 0))
+        ? scenes.filter((s: { rating100?: number | null; o_counter?: number | null }) => ((s.rating100 !== null && s.rating100 !== undefined && s.rating100 > 0)) || ((s.o_counter !== null && s.o_counter !== undefined && s.o_counter > 0)))
         : scenes;
 
       stats.scenes.checked = filteredScenes.length;
@@ -730,7 +787,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
     // 2. Sync Performers
     if (syncOptions.performers.rating || syncOptions.performers.favorite) {
-      let performerFilter: any = {};
+      let performerFilter: Record<string, unknown> = {};
 
       // Use GraphQL filter when only one option is selected
       if (syncOptions.performers.rating && !syncOptions.performers.favorite) {
@@ -748,7 +805,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Filter in code only if both options are selected
       const filteredPerformers = (syncOptions.performers.rating && syncOptions.performers.favorite)
-        ? performers.filter((p: any) => (p.rating100 !== null && p.rating100 > 0) || p.favorite)
+        ? performers.filter((p: { rating100?: number | null; favorite?: boolean }) => ((p.rating100 !== null && p.rating100 !== undefined && p.rating100 > 0)) || p.favorite)
         : performers;
 
       stats.performers.checked = filteredPerformers.length;
@@ -762,7 +819,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
           where: { userId_performerId: { userId: targetUserId, performerId: performer.id } }
         });
 
-        const updates: any = {};
+        const updates: SyncUpdates = {};
         if (syncOptions.performers.rating) updates.rating = stashRating;
         if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
 
@@ -793,7 +850,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
     // 3. Sync Studios
     if (syncOptions.studios.rating || syncOptions.studios.favorite) {
-      let studioFilter: any = {};
+      let studioFilter: Record<string, unknown> = {};
 
       // Use GraphQL filter when only one option is selected
       if (syncOptions.studios.rating && !syncOptions.studios.favorite) {
@@ -811,7 +868,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Filter in code only if both options are selected
       const filteredStudios = (syncOptions.studios.rating && syncOptions.studios.favorite)
-        ? studios.filter((s: any) => (s.rating100 !== null && s.rating100 > 0) || s.favorite)
+        ? studios.filter((s: { rating100?: number | null; favorite?: boolean }) => ((s.rating100 !== null && s.rating100 !== undefined && s.rating100 > 0)) || s.favorite)
         : studios;
 
       stats.studios.checked = filteredStudios.length;
@@ -825,7 +882,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
           where: { userId_studioId: { userId: targetUserId, studioId: studio.id } }
         });
 
-        const updates: any = {};
+        const updates: SyncUpdates = {};
         if (syncOptions.studios.rating) updates.rating = stashRating;
         if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
 
@@ -892,7 +949,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
     // 5. Sync Galleries
     if (syncOptions.galleries.rating || syncOptions.galleries.favorite) {
-      let galleryFilter: any = {};
+      let galleryFilter: Record<string, unknown> = {};
 
       // Use GraphQL filter when only one option is selected
       if (syncOptions.galleries.rating && !syncOptions.galleries.favorite) {
@@ -910,21 +967,21 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Filter in code only if both options are selected
       const filteredGalleries = (syncOptions.galleries.rating && syncOptions.galleries.favorite)
-        ? galleries.filter((g: any) => (g.rating100 !== null && g.rating100 > 0) || g.favorite)
+        ? galleries.filter((g: { rating100?: number | null; favorite?: boolean }) => ((g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0)) || g.favorite)
         : galleries;
 
       stats.galleries.checked = filteredGalleries.length;
 
       for (const gallery of filteredGalleries) {
         const stashRating = syncOptions.galleries.rating ? gallery.rating100 : null;
-        const stashFavorite = syncOptions.galleries.favorite ? (gallery.favorite || false) : false;
+        const stashFavorite = syncOptions.galleries.favorite ? ((gallery as NormalizedGallery).favorite || false) : false;
 
         // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.galleryRating.findUnique({
           where: { userId_galleryId: { userId: targetUserId, galleryId: gallery.id } }
         });
 
-        const updates: any = {};
+        const updates: SyncUpdates = {};
         if (syncOptions.galleries.rating) updates.rating = stashRating;
         if (syncOptions.galleries.favorite) updates.favorite = stashFavorite;
 
@@ -1040,7 +1097,7 @@ export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Res
 
     // Create new restrictions
     const created = await Promise.all(
-      restrictions.map((r: any) =>
+      restrictions.map((r: UserRestriction) =>
         prisma.userContentRestriction.create({
           data: {
             userId: targetUserId,

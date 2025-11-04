@@ -8,8 +8,24 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+/**
+ * Stash library configuration from Stash GraphQL API
+ */
+interface StashLibrary {
+  path: string;
+}
+
+/**
+ * Carousel preference configuration for user home page
+ */
+interface CarouselPreference {
+  id: string;
+  enabled: boolean;
+  order: number;
+}
+
 // Default carousel preferences for new users
-const getDefaultCarouselPreferences = () => [
+const getDefaultCarouselPreferences = (): CarouselPreference[] => [
   { id: "highRatedScenes", enabled: true, order: 0 },
   { id: "recentlyAddedScenes", enabled: true, order: 1 },
   { id: "longScenes", enabled: true, order: 2 },
@@ -131,7 +147,7 @@ export const discoverStashLibraries = async (req: Request, res: Response) => {
     // Peek needs access to all Stash content (videos, images, screenshots, etc.)
     const libraries = stashes;
 
-    const libraryPaths = libraries.map((s: any) => s.path);
+    const libraryPaths = libraries.map((s: StashLibrary) => s.path);
 
     logger.info("Discovered Stash library paths", { paths: libraryPaths });
 
@@ -179,7 +195,7 @@ export const testPath = async (req: Request, res: Response) => {
     try {
       fs.accessSync(testPath, fs.constants.R_OK);
       readable = true;
-    } catch (error) {
+    } catch {
       readable = false;
     }
 
@@ -194,7 +210,7 @@ export const testPath = async (req: Request, res: Response) => {
         const files = fs.readdirSync(testPath);
         fileCount = files.length;
       }
-    } catch (error) {
+    } catch {
       // Not a directory or can't read
     }
 
@@ -262,7 +278,8 @@ export const createFirstAdmin = async (req: Request, res: Response) => {
 
     if (userCount > 0) {
       return res.status(403).json({
-        error: "Users already exist. Use the regular user management to create additional users.",
+        error:
+          "Users already exist. Use the regular user management to create additional users.",
       });
     }
 
@@ -289,7 +306,7 @@ export const createFirstAdmin = async (req: Request, res: Response) => {
         username,
         password: hashedPassword,
         role: "ADMIN",
-        carouselPreferences: getDefaultCarouselPreferences() as any,
+        carouselPreferences: getDefaultCarouselPreferences() as never,
       },
       select: {
         id: true,
