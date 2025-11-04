@@ -7,6 +7,7 @@ import getStash from "../../stash.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 
 /**
@@ -79,6 +80,90 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Merge with user data
     tags = await mergeTagsWithUserData(tags, userId);
 
+    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    const requestingUser = req.user;
+    const cacheVersion = stashCacheManager.getCacheVersion();
+    const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
+
+    // Try to get filtered tags from cache
+    let filteredTags = filteredEntityCacheService.get(
+      userId,
+      "tags",
+      cacheVersion
+    ) as NormalizedTag[] | null;
+
+    if (filteredTags === null) {
+      // Cache miss - compute filtered tags
+      logger.debug("Tags cache miss", { userId, cacheVersion });
+      filteredTags = tags;
+
+      // Apply content restrictions (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        filteredTags = await userRestrictionService.filterTagsForUser(filteredTags, userId);
+      }
+
+      // Filter empty tags (non-admins only)
+      // Skip filtering when fetching by specific IDs (detail page requests)
+      if (requestingUser && requestingUser.role !== "ADMIN" && !isFetchingByIds) {
+        // Get all entities from cache
+        let allGalleries = stashCacheManager.getAllGalleries();
+        let allGroups = stashCacheManager.getAllGroups();
+        let allStudios = stashCacheManager.getAllStudios();
+        let allPerformers = stashCacheManager.getAllPerformers();
+
+        // Apply user restrictions to all entity types FIRST
+        allGalleries = await userRestrictionService.filterGalleriesForUser(
+          allGalleries,
+          userId
+        );
+        allGroups = await userRestrictionService.filterGroupsForUser(
+          allGroups,
+          userId
+        );
+        allStudios = await userRestrictionService.filterStudiosForUser(
+          allStudios,
+          userId
+        );
+        // No direct performer restrictions, but we still process them
+
+        // Then filter for empty entities in dependency order
+        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
+          allStudios,
+          visibleGroups,
+          visibleGalleries
+        );
+        const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
+          allPerformers,
+          visibleGroups,
+          visibleGalleries
+        );
+
+        const visibilitySet = {
+          galleries: new Set(visibleGalleries.map((g) => g.id)),
+          groups: new Set(visibleGroups.map((g) => g.id)),
+          studios: new Set(visibleStudios.map((s) => s.id)),
+          performers: new Set(visiblePerformers.map((p) => p.id)),
+        };
+
+        filteredTags = emptyEntityFilterService.filterEmptyTags(filteredTags, visibilitySet);
+      }
+
+      // Store in cache
+      filteredEntityCacheService.set(
+        userId,
+        "tags",
+        filteredTags,
+        cacheVersion
+      );
+    } else {
+      logger.debug("Tags cache hit", { userId, entityCount: filteredTags.length });
+    }
+
+    // Use cached/filtered tags for remaining operations
+    tags = filteredTags;
+
     // Step 3: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -95,61 +180,6 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     // Step 4: Apply filters (merge root-level ids with tag_filter)
     const mergedFilter = { ...tag_filter, ids: ids || tag_filter?.ids };
     tags = applyTagFilters(tags, mergedFilter);
-
-    // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      tags = await userRestrictionService.filterTagsForUser(tags, userId);
-    }
-
-    // Step 4.6: Filter empty tags (non-admins only)
-    // Skip filtering when fetching by specific IDs (detail page requests)
-    const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
-    if (requestingUser && requestingUser.role !== "ADMIN" && !isFetchingByIds) {
-      // Get all entities from cache
-      let allGalleries = stashCacheManager.getAllGalleries();
-      let allGroups = stashCacheManager.getAllGroups();
-      let allStudios = stashCacheManager.getAllStudios();
-      let allPerformers = stashCacheManager.getAllPerformers();
-
-      // Apply user restrictions to all entity types FIRST
-      allGalleries = await userRestrictionService.filterGalleriesForUser(
-        allGalleries,
-        userId
-      );
-      allGroups = await userRestrictionService.filterGroupsForUser(
-        allGroups,
-        userId
-      );
-      allStudios = await userRestrictionService.filterStudiosForUser(
-        allStudios,
-        userId
-      );
-      // No direct performer restrictions, but we still process them
-
-      // Then filter for empty entities in dependency order
-      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
-      const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
-        allStudios,
-        visibleGroups,
-        visibleGalleries
-      );
-      const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
-        allPerformers,
-        visibleGroups,
-        visibleGalleries
-      );
-
-      const visibilitySet = {
-        galleries: new Set(visibleGalleries.map((g) => g.id)),
-        groups: new Set(visibleGroups.map((g) => g.id)),
-        studios: new Set(visibleStudios.map((s) => s.id)),
-        performers: new Set(visiblePerformers.map((p) => p.id)),
-      };
-
-      tags = emptyEntityFilterService.filterEmptyTags(tags, visibilitySet);
-    }
 
     // Step 5: Sort
     tags = sortTags(tags, sortField, sortDirection);
@@ -432,6 +462,84 @@ export const findTagsMinimal = async (
 
     let tags = stashCacheManager.getAllTags();
 
+    // Apply content restrictions & empty entity filtering with caching
+    const requestingUser = req.user;
+    const userId = req.user?.id;
+    const cacheVersion = stashCacheManager.getCacheVersion();
+
+    // Try to get filtered tags from cache
+    let filteredTags = filteredEntityCacheService.get(
+      userId,
+      "tags",
+      cacheVersion
+    ) as NormalizedTag[] | null;
+
+    if (filteredTags === null) {
+      // Cache miss - compute filtered tags
+      logger.debug("Tags minimal cache miss", { userId, cacheVersion });
+      filteredTags = tags;
+
+      // Filter empty tags (non-admins only)
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        // Get all entities from cache
+        let allGalleries = stashCacheManager.getAllGalleries();
+        let allGroups = stashCacheManager.getAllGroups();
+        let allStudios = stashCacheManager.getAllStudios();
+        let allPerformers = stashCacheManager.getAllPerformers();
+
+        // Apply user restrictions to all entity types FIRST
+        allGalleries = await userRestrictionService.filterGalleriesForUser(
+          allGalleries,
+          userId
+        );
+        allGroups = await userRestrictionService.filterGroupsForUser(
+          allGroups,
+          userId
+        );
+        allStudios = await userRestrictionService.filterStudiosForUser(
+          allStudios,
+          userId
+        );
+        // No direct performer restrictions, but we still process them
+
+        // Then filter for empty entities in dependency order
+        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
+          allStudios,
+          visibleGroups,
+          visibleGalleries
+        );
+        const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
+          allPerformers,
+          visibleGroups,
+          visibleGalleries
+        );
+
+        const visibilitySet = {
+          galleries: new Set(visibleGalleries.map((g) => g.id)),
+          groups: new Set(visibleGroups.map((g) => g.id)),
+          studios: new Set(visibleStudios.map((s) => s.id)),
+          performers: new Set(visiblePerformers.map((p) => p.id)),
+        };
+
+        filteredTags = emptyEntityFilterService.filterEmptyTags(filteredTags, visibilitySet);
+      }
+
+      // Store in cache
+      filteredEntityCacheService.set(
+        userId,
+        "tags",
+        filteredTags,
+        cacheVersion
+      );
+    } else {
+      logger.debug("Tags minimal cache hit", { userId, entityCount: filteredTags.length });
+    }
+
+    // Use cached/filtered tags
+    tags = filteredTags;
+
     // Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -443,55 +551,6 @@ export const findTagsMinimal = async (
           description.toLowerCase().includes(lowerQuery)
         );
       });
-    }
-
-    // Filter empty tags (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      // Get all entities from cache
-      let allGalleries = stashCacheManager.getAllGalleries();
-      let allGroups = stashCacheManager.getAllGroups();
-      let allStudios = stashCacheManager.getAllStudios();
-      let allPerformers = stashCacheManager.getAllPerformers();
-
-      // Apply user restrictions to all entity types FIRST
-      const userId = req.user?.id;
-      allGalleries = await userRestrictionService.filterGalleriesForUser(
-        allGalleries,
-        userId
-      );
-      allGroups = await userRestrictionService.filterGroupsForUser(
-        allGroups,
-        userId
-      );
-      allStudios = await userRestrictionService.filterStudiosForUser(
-        allStudios,
-        userId
-      );
-      // No direct performer restrictions, but we still process them
-
-      // Then filter for empty entities in dependency order
-      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
-      const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
-        allStudios,
-        visibleGroups,
-        visibleGalleries
-      );
-      const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
-        allPerformers,
-        visibleGroups,
-        visibleGalleries
-      );
-
-      const visibilitySet = {
-        galleries: new Set(visibleGalleries.map((g) => g.id)),
-        groups: new Set(visibleGroups.map((g) => g.id)),
-        studios: new Set(visibleStudios.map((s) => s.id)),
-        performers: new Set(visiblePerformers.map((p) => p.id)),
-      };
-
-      tags = emptyEntityFilterService.filterEmptyTags(tags, visibilitySet);
     }
 
     // Sort
