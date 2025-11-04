@@ -115,9 +115,10 @@ export async function mergeScenesWithUserData(
 }
 
 /**
- * Apply scene filters
+ * Apply quick scene filters (don't require merged user data)
+ * These filters only access data already present in the scene object from cache
  */
-function applySceneFilters(
+function applyQuickSceneFilters(
   scenes: NormalizedScene[],
   filters: PeekSceneFilter | null | undefined
 ): NormalizedScene[] {
@@ -129,32 +130,6 @@ function applySceneFilters(
   if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
     const idSet = new Set(filters.ids);
     filtered = filtered.filter((s) => idSet.has(s.id));
-  }
-
-  // Filter by favorite
-  if (filters.favorite !== undefined) {
-    filtered = filtered.filter((s) => s.favorite === filters.favorite);
-  }
-
-  // Filter by rating100
-  if (filters.rating100) {
-    const { modifier, value, value2 } = filters.rating100;
-    filtered = filtered.filter((s) => {
-      const rating = s.rating100 || 0;
-      if (modifier === "GREATER_THAN") return rating > value;
-      if (modifier === "LESS_THAN") return rating < value;
-      if (modifier === "EQUALS") return rating === value;
-      if (modifier === "NOT_EQUALS") return rating !== value;
-      if (modifier === "BETWEEN")
-        return (
-          value !== undefined &&
-          value2 !== null &&
-          value2 !== undefined &&
-          rating >= value &&
-          rating <= value2
-        );
-      return true;
-    });
   }
 
   // Filter by performers
@@ -339,6 +314,130 @@ function applySceneFilters(
     });
   }
 
+  // Filter by performer_count
+  if (filters.performer_count) {
+    const { modifier, value, value2 } = filters.performer_count;
+    filtered = filtered.filter((s) => {
+      const performerCount = s.performers?.length || 0;
+      if (modifier === "GREATER_THAN") return performerCount > value;
+      if (modifier === "LESS_THAN") return performerCount < value;
+      if (modifier === "EQUALS") return performerCount === value;
+      if (modifier === "BETWEEN")
+        return (
+          value2 !== null &&
+          value2 !== undefined &&
+          performerCount >= value &&
+          performerCount <= value2
+        );
+      return true;
+    });
+  }
+
+  // Filter by tag_count
+  if (filters.tag_count) {
+    const { modifier, value, value2 } = filters.tag_count;
+    filtered = filtered.filter((s) => {
+      const tagCount = s.tags?.length || 0;
+      if (modifier === "GREATER_THAN") return tagCount > value;
+      if (modifier === "LESS_THAN") return tagCount < value;
+      if (modifier === "EQUALS") return tagCount === value;
+      if (modifier === "BETWEEN")
+        return (
+          value2 !== null &&
+          value2 !== undefined &&
+          tagCount >= value &&
+          tagCount <= value2
+        );
+      return true;
+    });
+  }
+
+  // Filter by framerate
+  if (filters.framerate) {
+    const { modifier, value, value2 } = filters.framerate;
+    filtered = filtered.filter((s) => {
+      const framerate = s.files?.[0]?.frame_rate || 0;
+      if (modifier === "GREATER_THAN") return framerate > value;
+      if (modifier === "LESS_THAN") return framerate < value;
+      if (modifier === "EQUALS") return framerate === value;
+      if (modifier === "BETWEEN")
+        return (
+          value2 !== null &&
+          value2 !== undefined &&
+          framerate >= value &&
+          framerate <= value2
+        );
+      return true;
+    });
+  }
+
+  // Filter by title
+  if (filters.title) {
+    const { value, modifier } = filters.title;
+    const searchValue = value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const title = (s.title || "").toLowerCase();
+      if (modifier === "INCLUDES") return title.includes(searchValue);
+      if (modifier === "EXCLUDES") return !title.includes(searchValue);
+      if (modifier === "EQUALS") return title === searchValue;
+      return true;
+    });
+  }
+
+  // Filter by details
+  if (filters.details) {
+    const { value, modifier } = filters.details;
+    const searchValue = value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const details = (s.details || "").toLowerCase();
+      if (modifier === "INCLUDES") return details.includes(searchValue);
+      if (modifier === "EXCLUDES") return !details.includes(searchValue);
+      if (modifier === "EQUALS") return details === searchValue;
+      return true;
+    });
+  }
+
+  return filtered;
+}
+
+/**
+ * Apply expensive scene filters (require merged user data)
+ * These filters access user-specific data (ratings, watch history, favorites)
+ */
+function applyExpensiveSceneFilters(
+  scenes: NormalizedScene[],
+  filters: PeekSceneFilter | null | undefined
+): NormalizedScene[] {
+  if (!filters) return scenes;
+
+  let filtered = scenes;
+
+  // Filter by favorite
+  if (filters.favorite !== undefined) {
+    filtered = filtered.filter((s) => s.favorite === filters.favorite);
+  }
+
+  // Filter by rating100
+  if (filters.rating100) {
+    const { modifier, value, value2 } = filters.rating100;
+    filtered = filtered.filter((s) => {
+      const rating = s.rating100 || 0;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN")
+        return (
+          value !== undefined &&
+          value2 !== null &&
+          value2 !== undefined &&
+          rating >= value &&
+          rating <= value2
+        );
+      return true;
+    });
+  }
+
   // Filter by o_counter
   if (filters.o_counter) {
     const { modifier, value, value2 } = filters.o_counter;
@@ -404,63 +503,6 @@ function applySceneFilters(
     });
   }
 
-  // Filter by performer_count
-  if (filters.performer_count) {
-    const { modifier, value, value2 } = filters.performer_count;
-    filtered = filtered.filter((s) => {
-      const performerCount = s.performers?.length || 0;
-      if (modifier === "GREATER_THAN") return performerCount > value;
-      if (modifier === "LESS_THAN") return performerCount < value;
-      if (modifier === "EQUALS") return performerCount === value;
-      if (modifier === "BETWEEN")
-        return (
-          value2 !== null &&
-          value2 !== undefined &&
-          performerCount >= value &&
-          performerCount <= value2
-        );
-      return true;
-    });
-  }
-
-  // Filter by tag_count
-  if (filters.tag_count) {
-    const { modifier, value, value2 } = filters.tag_count;
-    filtered = filtered.filter((s) => {
-      const tagCount = s.tags?.length || 0;
-      if (modifier === "GREATER_THAN") return tagCount > value;
-      if (modifier === "LESS_THAN") return tagCount < value;
-      if (modifier === "EQUALS") return tagCount === value;
-      if (modifier === "BETWEEN")
-        return (
-          value2 !== null &&
-          value2 !== undefined &&
-          tagCount >= value &&
-          tagCount <= value2
-        );
-      return true;
-    });
-  }
-
-  // Filter by framerate
-  if (filters.framerate) {
-    const { modifier, value, value2 } = filters.framerate;
-    filtered = filtered.filter((s) => {
-      const framerate = s.files?.[0]?.frame_rate || 0;
-      if (modifier === "GREATER_THAN") return framerate > value;
-      if (modifier === "LESS_THAN") return framerate < value;
-      if (modifier === "EQUALS") return framerate === value;
-      if (modifier === "BETWEEN")
-        return (
-          value2 !== null &&
-          value2 !== undefined &&
-          framerate >= value &&
-          framerate <= value2
-        );
-      return true;
-    });
-  }
-
   // Filter by last_played_at
   if (filters.last_played_at) {
     const { modifier, value, value2 } = filters.last_played_at;
@@ -488,7 +530,6 @@ function applySceneFilters(
     const { modifier, value, value2 } = filters.last_o_at;
     filtered = filtered.filter((s) => {
       if (!s.last_o_at) return false;
-      if (!s.last_o_at) return false;
       const lastODate = new Date(s.last_o_at);
       if (!value) return false;
       const filterDate = new Date(value);
@@ -502,32 +543,6 @@ function applySceneFilters(
         const filterDate2 = new Date(value2);
         return lastODate >= filterDate && lastODate <= filterDate2;
       }
-      return true;
-    });
-  }
-
-  // Filter by title
-  if (filters.title) {
-    const { value, modifier } = filters.title;
-    const searchValue = value.toLowerCase();
-    filtered = filtered.filter((s) => {
-      const title = (s.title || "").toLowerCase();
-      if (modifier === "INCLUDES") return title.includes(searchValue);
-      if (modifier === "EXCLUDES") return !title.includes(searchValue);
-      if (modifier === "EQUALS") return title === searchValue;
-      return true;
-    });
-  }
-
-  // Filter by details
-  if (filters.details) {
-    const { value, modifier } = filters.details;
-    const searchValue = value.toLowerCase();
-    filtered = filtered.filter((s) => {
-      const details = (s.details || "").toLowerCase();
-      if (modifier === "INCLUDES") return details.includes(searchValue);
-      if (modifier === "EXCLUDES") return !details.includes(searchValue);
-      if (modifier === "EQUALS") return details === searchValue;
       return true;
     });
   }
@@ -651,7 +666,7 @@ function getFieldValue(
 }
 
 /**
- * Simplified findScenes using cache
+ * Simplified findScenes using cache with pagination-aware filtering
  */
 export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -662,6 +677,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     const sortDirection = filter?.direction || "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
+    const searchQuery = filter?.q || "";
 
     // Step 1: Get all scenes from cache
     let scenes = stashCacheManager.getAllScenes();
@@ -676,59 +692,158 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Step 2: Merge with user data
-    scenes = await mergeScenesWithUserData(scenes, userId);
+    // Determine if we can use optimized pipeline
+    // Expensive sort fields require user data, so we must merge all scenes first
+    const expensiveSortFields = new Set([
+      "o_counter",
+      "play_count",
+      "last_played_at",
+      "last_o_at",
+      "rating",
+      "rating100",
+    ]);
+    const requiresUserDataForSort = expensiveSortFields.has(sortField);
 
-    // Step 3: Apply search query if provided
-    const searchQuery = filter?.q || "";
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      scenes = scenes.filter((s) => {
-        const title = s.title || "";
-        const details = s.details || "";
-        const performers = (s.performers || [])
-          .map((p) => p.name || "")
-          .join(" ");
-        const studio = s.studio?.name || "";
-        const tags = (s.tags || []).map((t) => t.name || "").join(" ");
+    // Check if any expensive filters are being used
+    const hasExpensiveFilters =
+      scene_filter?.favorite !== undefined ||
+      scene_filter?.rating100 !== undefined ||
+      scene_filter?.o_counter !== undefined ||
+      scene_filter?.play_count !== undefined ||
+      scene_filter?.play_duration !== undefined ||
+      scene_filter?.last_played_at !== undefined ||
+      scene_filter?.last_o_at !== undefined ||
+      scene_filter?.performer_favorite !== undefined ||
+      scene_filter?.studio_favorite !== undefined ||
+      scene_filter?.tag_favorite !== undefined;
 
-        return (
-          title.toLowerCase().includes(lowerQuery) ||
-          details.toLowerCase().includes(lowerQuery) ||
-          performers.toLowerCase().includes(lowerQuery) ||
-          studio.toLowerCase().includes(lowerQuery) ||
-          tags.toLowerCase().includes(lowerQuery)
+    const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
+    const requestingUser = req.user;
+
+    if (requiresUserDataForSort || hasExpensiveFilters) {
+      // OLD PIPELINE: Merge all → filter → sort → paginate
+      // (Required when sorting/filtering by user-specific data)
+
+      // Step 2: Merge with user data (all scenes)
+      scenes = await mergeScenesWithUserData(scenes, userId);
+
+      // Step 3: Apply search query
+      if (searchQuery) {
+        const lowerQuery = searchQuery.toLowerCase();
+        scenes = scenes.filter((s) => {
+          const title = s.title || "";
+          const details = s.details || "";
+          const performers = (s.performers || [])
+            .map((p) => p.name || "")
+            .join(" ");
+          const studio = s.studio?.name || "";
+          const tags = (s.tags || []).map((t) => t.name || "").join(" ");
+
+          return (
+            title.toLowerCase().includes(lowerQuery) ||
+            details.toLowerCase().includes(lowerQuery) ||
+            performers.toLowerCase().includes(lowerQuery) ||
+            studio.toLowerCase().includes(lowerQuery) ||
+            tags.toLowerCase().includes(lowerQuery)
+          );
+        });
+      }
+
+      // Step 4: Apply all filters (quick + expensive)
+      scenes = applyQuickSceneFilters(scenes, mergedFilter);
+      scenes = applyExpensiveSceneFilters(scenes, mergedFilter);
+
+      // Step 5: Apply content restrictions
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        scenes = await userRestrictionService.filterScenesForUser(
+          scenes,
+          userId
         );
+      }
+
+      // Step 6: Sort
+      const groupIdForSort = scene_filter?.groups?.value?.[0];
+      scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
+
+      // Step 7: Paginate
+      const total = scenes.length;
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedScenes = scenes.slice(startIndex, endIndex);
+
+      return res.json({
+        findScenes: {
+          count: total,
+          scenes: paginatedScenes,
+        },
+      });
+    } else {
+      // NEW OPTIMIZED PIPELINE: Filter → sort → paginate → merge only paginated scenes
+      // (99% reduction: merge only 40 scenes instead of 20k)
+
+      // Step 2: Apply search query
+      if (searchQuery) {
+        const lowerQuery = searchQuery.toLowerCase();
+        scenes = scenes.filter((s) => {
+          const title = s.title || "";
+          const details = s.details || "";
+          const performers = (s.performers || [])
+            .map((p) => p.name || "")
+            .join(" ");
+          const studio = s.studio?.name || "";
+          const tags = (s.tags || []).map((t) => t.name || "").join(" ");
+
+          return (
+            title.toLowerCase().includes(lowerQuery) ||
+            details.toLowerCase().includes(lowerQuery) ||
+            performers.toLowerCase().includes(lowerQuery) ||
+            studio.toLowerCase().includes(lowerQuery) ||
+            tags.toLowerCase().includes(lowerQuery)
+          );
+        });
+      }
+
+      // Step 3: Apply quick filters (don't need user data)
+      scenes = applyQuickSceneFilters(scenes, mergedFilter);
+
+      // Step 4: Apply content restrictions
+      if (requestingUser && requestingUser.role !== "ADMIN") {
+        scenes = await userRestrictionService.filterScenesForUser(
+          scenes,
+          userId
+        );
+      }
+
+      // Step 5: Sort (using quick sort fields only)
+      const groupIdForSort = scene_filter?.groups?.value?.[0];
+      scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
+
+      // Step 6: Paginate BEFORE merging user data
+      const total = scenes.length;
+      const startIndex = (page - 1) * perPage;
+      const endIndex = startIndex + perPage;
+      const paginatedScenes = scenes.slice(startIndex, endIndex);
+
+      // Step 7: Merge user data (ONLY for paginated scenes - huge win!)
+      const scenesWithUserData = await mergeScenesWithUserData(
+        paginatedScenes,
+        userId
+      );
+
+      // Step 8: Apply expensive filters (shouldn't match anything since no expensive filters)
+      // Included for completeness, will be no-op
+      const finalScenes = applyExpensiveSceneFilters(
+        scenesWithUserData,
+        mergedFilter
+      );
+
+      return res.json({
+        findScenes: {
+          count: total,
+          scenes: finalScenes,
+        },
       });
     }
-
-    // Step 4: Apply filters (merge root-level ids with scene_filter)
-    const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
-    scenes = applySceneFilters(scenes, mergedFilter);
-
-    // Step 4.5: Apply content restrictions (non-admins only)
-    const requestingUser = req.user;
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
-    }
-
-    // Step 5: Sort
-    // Extract group_id for scene_index sorting (use first group if filtering by groups)
-    const groupIdForSort = scene_filter?.groups?.value?.[0];
-    scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
-
-    // Step 6: Paginate
-    const total = scenes.length;
-    const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    const paginatedScenes = scenes.slice(startIndex, endIndex);
-
-    res.json({
-      findScenes: {
-        count: total,
-        scenes: paginatedScenes,
-      },
-    });
   } catch (error) {
     logger.error("Error in findScenes", {
       error: error instanceof Error ? error.message : "Unknown error",
