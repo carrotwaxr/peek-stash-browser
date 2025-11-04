@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Button from "../ui/Button.jsx";
 import Paper from "../ui/Paper.jsx";
 import { fontOptions } from "../../themes/themes.js";

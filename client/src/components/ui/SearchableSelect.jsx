@@ -108,7 +108,8 @@ const SearchableSelect = ({
     } finally {
       setLoading(false);
     }
-  }, [entityType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entityType]); // apiMethods is a constant object, doesn't need to be in dependencies
 
   // Debounced search
   useEffect(() => {

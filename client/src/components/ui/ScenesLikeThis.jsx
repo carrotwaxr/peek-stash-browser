@@ -8,7 +8,6 @@ const ScenesLikeThis = ({ sceneId }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const perPage = 12;
@@ -37,7 +36,6 @@ const ScenesLikeThis = ({ sceneId }) => {
         setScenes((prev) => [...prev, ...newScenes]);
       }
 
-      setTotalCount(count);
       setHasMore((pageNum * perPage) < count);
     } catch (err) {
       console.error("Error fetching similar scenes:", err);
@@ -53,7 +51,8 @@ const ScenesLikeThis = ({ sceneId }) => {
     setPage(1);
     setScenes([]);
     fetchSimilarScenes(1);
-  }, [sceneId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sceneId]); // Only fetch when sceneId changes, fetchSimilarScenes is stable
 
   const handleLoadMore = () => {
     const nextPage = page + 1;

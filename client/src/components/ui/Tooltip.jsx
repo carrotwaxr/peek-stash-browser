@@ -41,8 +41,6 @@ const Tooltip = ({
     // Calculate available space on each side
     const spaceAbove = triggerRect.top;
     const spaceBelow = viewport.height - triggerRect.bottom;
-    const spaceLeft = triggerRect.left;
-    const spaceRight = viewport.width - triggerRect.right;
 
     // Determine best vertical position
     let finalPosition = position;

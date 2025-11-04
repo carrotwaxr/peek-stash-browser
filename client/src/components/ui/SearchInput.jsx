@@ -20,7 +20,8 @@ const SearchInput = ({
     if (value !== undefined && value !== query) {
       setQuery(value);
     }
-  }, [value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]); // Only sync when external value changes, not when query changes (would cause loop)
 
   useEffect(() => {
     if (!query.trim()) {

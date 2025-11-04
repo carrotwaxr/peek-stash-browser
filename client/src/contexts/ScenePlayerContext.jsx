@@ -119,11 +119,11 @@ export function ScenePlayerProvider({
 
   const nextScene = useCallback(() => {
     dispatch({ type: 'NEXT_SCENE' });
-  }, [state.currentIndex]);
+  }, []);
 
   const prevScene = useCallback(() => {
     dispatch({ type: 'PREV_SCENE' });
-  }, [state.currentIndex]);
+  }, []);
 
   const gotoSceneIndex = useCallback((index) => {
     dispatch({ type: 'GOTO_SCENE_INDEX', payload: index });
@@ -247,6 +247,7 @@ export function ScenePlayerProvider({
 // CUSTOM HOOK
 // ============================================================================
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useScenePlayer() {
   const context = useContext(ScenePlayerContext);
   if (!context) {
