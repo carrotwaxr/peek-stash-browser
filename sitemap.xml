@@ -2,34 +2,38 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/beta-testing/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/getting-started/configuration/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/getting-started/installation/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/getting-started/quick-start/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/faq/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
+    </url>
+    <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/stash-entity-relationships/</loc>
+         <lastmod>2025-11-04</lastmod>
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/theming/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/troubleshooting/</loc>
-         <lastmod>2025-10-22</lastmod>
+         <lastmod>2025-11-04</lastmod>
     </url>
 </urlset>
