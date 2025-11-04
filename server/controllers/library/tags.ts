@@ -462,25 +462,33 @@ export const findTagsMinimal = async (
 
     let tags = stashCacheManager.getAllTags();
 
-    // Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
     const userId = req.user?.id;
     const cacheVersion = stashCacheManager.getCacheVersion();
 
-    // Try to get filtered tags from cache
-    let filteredTags = filteredEntityCacheService.get(
-      userId,
-      "tags",
-      cacheVersion
-    ) as NormalizedTag[] | null;
+    // OPTIMIZATION: Skip expensive filtering only if user has NO content restrictions
+    // Check if user has any restrictions configured
+    const userRestrictions = requestingUser && requestingUser.role !== "ADMIN"
+      ? await prisma.userContentRestriction.findMany({ where: { userId } })
+      : [];
 
-    if (filteredTags === null) {
-      // Cache miss - compute filtered tags
-      logger.debug("Tags minimal cache miss", { userId, cacheVersion });
-      filteredTags = tags;
+    // Early return: If no restrictions, just return all tags (safe, nothing to leak)
+    if (userRestrictions.length === 0) {
+      // No restrictions - skip expensive filtering entirely (all tags visible)
+    } else {
+      // User has restrictions - must do full filtering for security
+      // Use cached filtering from Priority 2
+      let filteredTags = filteredEntityCacheService.get(
+        userId,
+        "tags",
+        cacheVersion
+      ) as NormalizedTag[] | null;
 
-      // Filter empty tags (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
+      if (filteredTags === null) {
+        // Cache miss - compute filtered tags
+        logger.debug("Tags minimal cache miss", { userId, cacheVersion });
+        filteredTags = tags;
+
         // Get all entities from cache
         let allGalleries = stashCacheManager.getAllGalleries();
         let allGroups = stashCacheManager.getAllGroups();
@@ -500,7 +508,6 @@ export const findTagsMinimal = async (
           allStudios,
           userId
         );
-        // No direct performer restrictions, but we still process them
 
         // Then filter for empty entities in dependency order
         const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
@@ -524,21 +531,20 @@ export const findTagsMinimal = async (
         };
 
         filteredTags = emptyEntityFilterService.filterEmptyTags(filteredTags, visibilitySet);
+
+        // Store in cache
+        filteredEntityCacheService.set(
+          userId,
+          "tags",
+          filteredTags,
+          cacheVersion
+        );
+      } else {
+        logger.debug("Tags minimal cache hit", { userId, entityCount: filteredTags.length });
       }
 
-      // Store in cache
-      filteredEntityCacheService.set(
-        userId,
-        "tags",
-        filteredTags,
-        cacheVersion
-      );
-    } else {
-      logger.debug("Tags minimal cache hit", { userId, entityCount: filteredTags.length });
+      tags = filteredTags;
     }
-
-    // Use cached/filtered tags
-    tags = filteredTags;
 
     // Apply search query if provided
     if (searchQuery) {
