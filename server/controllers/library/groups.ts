@@ -1,0 +1,302 @@
+import type { Response } from "express";
+import prisma from "../../prisma/singleton.js";
+import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { logger } from "../../utils/logger.js";
+import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
+import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { AuthenticatedRequest } from "../../middleware/auth.js";
+
+/**
+ * Merge user-specific data into groups
+ */
+async function mergeGroupsWithUserData(
+  groups: NormalizedGroup[],
+  userId: number | undefined
+): Promise<NormalizedGroup[]> {
+  if (!userId) return groups;
+
+  try {
+    const groupRatings = await prisma.groupRating.findMany({
+      where: { userId },
+    });
+
+    const ratingsMap = new Map(
+      groupRatings.map((r) => [
+        r.groupId,
+        { rating: r.rating, rating100: r.rating, favorite: r.favorite },
+      ])
+    );
+
+    return groups.map((group) => {
+      const userRating = ratingsMap.get(group.id);
+      return {
+        ...group,
+        rating: userRating?.rating ?? null,
+        rating100: userRating?.rating100 ?? group.rating100 ?? null,
+        favorite: userRating?.favorite ?? false,
+      };
+    });
+  } catch (error) {
+    logger.error("Error merging groups with user data", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return groups;
+  }
+}
+
+/**
+ * Apply group filters
+ */
+function applyGroupFilters(
+  groups: NormalizedGroup[],
+  filters: PeekGroupFilter | null | undefined
+): NormalizedGroup[] {
+  if (!filters) return groups;
+
+  let filtered = groups;
+
+  // Filter by IDs (for detail pages)
+  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
+    const idSet = new Set(filters.ids);
+    filtered = filtered.filter((g) => idSet.has(g.id));
+  }
+
+  // Filter by favorite
+  if (filters.favorite !== undefined) {
+    filtered = filtered.filter((g) => g.favorite === filters.favorite);
+  }
+
+  // Filter by rating100
+  if (filters.rating100) {
+    const { modifier, value, value2 } = filters.rating100;
+    filtered = filtered.filter((g) => {
+      const rating = g.rating100 || 0;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN")
+        return (
+          value !== undefined &&
+          value2 !== null &&
+          value2 !== undefined &&
+          rating >= value &&
+          rating <= value2
+        );
+      return true;
+    });
+  }
+
+  return filtered;
+}
+
+/**
+ * Sort groups
+ */
+function sortGroups(
+  groups: NormalizedGroup[],
+  sortField: string,
+  sortDirection: string
+): NormalizedGroup[] {
+  const sortedGroups = [...groups];
+
+  sortedGroups.sort((a, b) => {
+    let aVal: number | string | boolean | null;
+    let bVal: number | string | boolean | null;
+
+    switch (sortField) {
+      case "name":
+        aVal = (a.name || "").toLowerCase();
+        bVal = (b.name || "").toLowerCase();
+        break;
+      case "date":
+        aVal = a.date || "";
+        bVal = b.date || "";
+        break;
+      case "rating100":
+        aVal = a.rating100 || 0;
+        bVal = b.rating100 || 0;
+        break;
+      case "scene_count":
+        aVal = a.scene_count || 0;
+        bVal = b.scene_count || 0;
+        break;
+      case "duration":
+        aVal = a.duration || 0;
+        bVal = b.duration || 0;
+        break;
+      case "created_at":
+        aVal = a.created_at || "";
+        bVal = b.created_at || "";
+        break;
+      case "updated_at":
+        aVal = a.updated_at || "";
+        bVal = b.updated_at || "";
+        break;
+      default:
+        aVal = (a.name || "").toLowerCase();
+        bVal = (b.name || "").toLowerCase();
+    }
+
+    let comparison = 0;
+    if ((aVal as string | number) < (bVal as string | number)) comparison = -1;
+    if ((aVal as string | number) > (bVal as string | number)) comparison = 1;
+
+    return sortDirection === "DESC" ? -comparison : comparison;
+  });
+
+  return sortedGroups;
+}
+
+/**
+ * Simplified findGroups using cache
+ */
+export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { filter, group_filter, ids } = req.body;
+
+    const sortField = filter?.sort || "name";
+    const sortDirection = filter?.direction || "ASC";
+    const page = filter?.page || 1;
+    const perPage = filter?.per_page || 40;
+    const searchQuery = filter?.q || "";
+
+    // Step 1: Get all groups from cache
+    let groups = stashCacheManager.getAllGroups();
+
+    if (groups.length === 0) {
+      logger.warn("Cache not initialized, returning empty result");
+      return res.json({
+        findGroups: {
+          count: 0,
+          groups: [],
+        },
+      });
+    }
+
+    // Step 2: Merge with user data
+    groups = await mergeGroupsWithUserData(groups, userId);
+
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      groups = groups.filter((g) => {
+        const name = g.name || "";
+        const synopsis = g.synopsis || "";
+        return (
+          name.toLowerCase().includes(lowerQuery) ||
+          synopsis.toLowerCase().includes(lowerQuery)
+        );
+      });
+    }
+
+    // Step 4: Apply filters (merge root-level ids with group_filter)
+    const mergedFilter = { ...group_filter, ids: ids || group_filter?.ids };
+    groups = applyGroupFilters(groups, mergedFilter);
+
+    // Step 4.5: Apply content restrictions (non-admins only)
+    const requestingUser = req.user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
+      groups = await userRestrictionService.filterGroupsForUser(groups, userId);
+    }
+
+    // Step 4.6: Filter empty groups (non-admins only)
+    if (requestingUser && requestingUser.role !== "ADMIN") {
+      groups = emptyEntityFilterService.filterEmptyGroups(groups);
+    }
+
+    // Step 5: Sort
+    groups = sortGroups(groups, sortField, sortDirection);
+
+    // Step 6: Paginate
+    const total = groups.length;
+    const startIndex = (page - 1) * perPage;
+    const endIndex = startIndex + perPage;
+    const paginatedGroups = groups.slice(startIndex, endIndex);
+
+    res.json({
+      findGroups: {
+        count: total,
+        groups: paginatedGroups,
+      },
+    });
+  } catch (error) {
+    logger.error("Error in findGroups", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    res.status(500).json({
+      error: "Failed to find groups",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+/**
+ * Minimal groups - just id and name for dropdowns
+ */
+export const findGroupsMinimal = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    const { filter } = req.body;
+    const searchQuery = filter?.q || "";
+
+    // Step 1: Get all groups from cache
+    let groups = stashCacheManager.getAllGroups();
+
+    if (groups.length === 0) {
+      logger.warn("Cache not initialized, returning empty result");
+      return res.json({
+        groups: [],
+      });
+    }
+
+    // Step 2: Merge with user data (for favorites)
+    groups = await mergeGroupsWithUserData(groups, userId);
+
+    // Step 3: Apply search query if provided
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      groups = groups.filter((g) => {
+        const name = g.name || "";
+        return name.toLowerCase().includes(lowerQuery);
+      });
+    }
+
+    // Step 3.5: Filter empty groups (non-admins only)
+    const requestingUser = req.user;
+    if (requestingUser && requestingUser.role !== "ADMIN") {
+      groups = emptyEntityFilterService.filterEmptyGroups(groups);
+    }
+
+    // Step 4: Sort by name
+    groups = groups.sort((a, b) => {
+      const aName = (a.name || "").toLowerCase();
+      const bName = (b.name || "").toLowerCase();
+      return aName.localeCompare(bName);
+    });
+
+    // Step 5: Map to minimal shape
+    const minimalGroups = groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      favorite: g.favorite,
+    }));
+
+    res.json({
+      groups: minimalGroups,
+    });
+  } catch (error) {
+    logger.error("Error in findGroupsMinimal", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    res.status(500).json({
+      error: "Failed to find groups",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
