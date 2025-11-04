@@ -7,6 +7,7 @@ import {
   getAllWatchHistory,
   clearAllWatchHistory,
 } from "../controllers/watchHistory.js";
+import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -14,18 +15,18 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Ping watch history (called every 30 seconds during playback)
-router.post("/ping", pingWatchHistory);
+router.post("/ping", authenticated(pingWatchHistory));
 
 // Increment O counter
-router.post("/increment-o", incrementOCounter);
+router.post("/increment-o", authenticated(incrementOCounter));
 
 // Get all watch history for current user (Continue Watching carousel)
-router.get("/", getAllWatchHistory);
+router.get("/", authenticated(getAllWatchHistory));
 
 // Clear all watch history for current user
-router.delete("/", clearAllWatchHistory);
+router.delete("/", authenticated(clearAllWatchHistory));
 
 // Get watch history for specific scene
-router.get("/:sceneId", getWatchHistory);
+router.get("/:sceneId", authenticated(getWatchHistory));
 
 export default router;

@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Response } from "express";
 import bcrypt from "bcryptjs";
 import {
   generateToken,
@@ -6,6 +6,7 @@ import {
   AuthenticatedRequest,
 } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -67,16 +68,24 @@ router.post("/logout", (req, res) => {
 });
 
 // Get current user
-router.get("/me", authenticateToken, (req: AuthenticatedRequest, res) => {
-  res.json({
-    user: req.user,
-  });
-});
+router.get(
+  "/me",
+  authenticateToken,
+  authenticated((req: AuthenticatedRequest, res: Response) => {
+    res.json({
+      user: req.user,
+    });
+  })
+);
 
 // Check if authenticated
-router.get("/check", authenticateToken, (req: AuthenticatedRequest, res) => {
-  res.json({ authenticated: true, user: req.user });
-});
+router.get(
+  "/check",
+  authenticateToken,
+  authenticated((req: AuthenticatedRequest, res: Response) => {
+    res.json({ authenticated: true, user: req.user });
+  })
+);
 
 // First-time password setup (for setup wizard)
 router.post("/first-time-password", async (req, res) => {

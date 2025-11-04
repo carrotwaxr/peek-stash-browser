@@ -1,0 +1,27 @@
+import express from "express";
+import {
+  authenticateToken,
+  requireCacheReady,
+} from "../../middleware/auth.js";
+import {
+  findTags,
+  findTagsMinimal,
+  updateTag,
+} from "../../controllers/library/tags.js";
+import { authenticated } from "../../utils/routeHelpers.js";
+
+const router = express.Router();
+
+// All tag routes require authentication
+router.use(authenticateToken);
+
+// Find tags with filters
+router.post("/tags", requireCacheReady, authenticated(findTags));
+
+// Minimal data for filter dropdowns
+router.post("/tags/minimal", requireCacheReady, authenticated(findTagsMinimal));
+
+// Update tag
+router.put("/tags/:id", authenticated(updateTag));
+
+export default router;

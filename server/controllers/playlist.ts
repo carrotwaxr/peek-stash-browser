@@ -91,7 +91,7 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
         const transformedScenes = scenes.map((s: unknown) => transformScene(s as Scene));
 
         // Override with per-user watch history
-        const { mergeScenesWithUserData } = await import("./library.js");
+        const { mergeScenesWithUserData } = await import("./library/scenes.js");
         // Type assertion safe: scenes from API are compatible with Normalized type structure
         const scenesWithUserHistory = await mergeScenesWithUserData(transformedScenes as unknown as NormalizedScene[], userId);
 

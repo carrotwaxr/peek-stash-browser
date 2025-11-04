@@ -6,12 +6,21 @@ import { stashCacheManager } from "../services/StashCacheManager.js";
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
+/**
+ * User information attached to request by auth middleware
+ */
+export interface RequestUser {
+  id: number;
+  username: string;
+  role: string;
+}
+
+/**
+ * Request type after authentication middleware has run
+ * Controllers behind authenticateToken can safely use this type
+ */
 export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    username: string;
-    role: string;
-  };
+  user: RequestUser;
 }
 
 export const generateToken = (user: {
@@ -31,7 +40,7 @@ export const verifyToken = (token: string) => {
 };
 
 export const authenticateToken = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
@@ -53,7 +62,8 @@ export const authenticateToken = async (
       return res.status(401).json({ error: "Invalid token. User not found." });
     }
 
-    req.user = user;
+    // Cast to AuthenticatedRequest to set user property
+    (req as AuthenticatedRequest).user = user;
     next();
   } catch {
     res.status(403).json({ error: "Invalid token." });
@@ -61,18 +71,19 @@ export const authenticateToken = async (
 };
 
 export const requireAdmin = (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  if (!req.user || req.user.role !== "ADMIN") {
+  const authReq = req as AuthenticatedRequest;
+  if (!authReq.user || authReq.user.role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required." });
   }
   next();
 };
 
 export const requireCacheReady = (
-  req: Request,
+  _req: Request,
   res: Response,
   next: NextFunction
 ) => {
