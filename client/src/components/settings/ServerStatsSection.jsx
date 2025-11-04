@@ -152,33 +152,33 @@ const ServerStatsSection = () => {
           <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-muted)" }}>
             <span>
               Cache size: {stats.cache?.estimatedSize || "N/A"} |{" "}
-              Status: {stats.cache?.isInitialized ? "Ready" : "Initializing"}
+              Status: {stats.cache?.isInitialized ? "Ready" : stats.cache?.lastRefreshed ? "Initializing" : "Not Loaded"}
               {stats.cache?.isRefreshing && " (Refreshing...)"}
             </span>
-            {stats.cache?.lastRefreshed && (
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {stats.cache?.lastRefreshed && (
                 <span>
                   Last refreshed: {new Date(stats.cache.lastRefreshed).toLocaleTimeString()}
                 </span>
-                <button
-                  onClick={refreshCache}
-                  disabled={refreshingCache || stats.cache?.isRefreshing}
-                  className="p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    backgroundColor: refreshingCache || stats.cache?.isRefreshing ? 'transparent' : 'transparent',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-info)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  title="Refresh cache now"
-                  aria-label="Refresh cache"
-                >
-                  <RefreshCw
-                    className={`w-3 h-3 ${refreshingCache || stats.cache?.isRefreshing ? "animate-spin" : ""}`}
-                    style={{ color: "var(--status-info)" }}
-                  />
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                onClick={refreshCache}
+                disabled={refreshingCache || stats.cache?.isRefreshing}
+                className="p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: refreshingCache || stats.cache?.isRefreshing ? 'transparent' : 'transparent',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-info)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                title={stats.cache?.lastRefreshed ? "Refresh cache now" : "Initialize cache"}
+                aria-label={stats.cache?.lastRefreshed ? "Refresh cache" : "Initialize cache"}
+              >
+                <RefreshCw
+                  className={`w-3 h-3 ${refreshingCache || stats.cache?.isRefreshing ? "animate-spin" : ""}`}
+                  style={{ color: "var(--status-info)" }}
+                />
+              </button>
+            </div>
           </div>
         </div>
 
