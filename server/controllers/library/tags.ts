@@ -144,36 +144,46 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     // Skip filtering when fetching by specific IDs (detail page requests)
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
     if (requestingUser && requestingUser.role !== "ADMIN" && !isFetchingByIds) {
-      // Get visibility sets for all entity types
-      const allGalleries = stashCacheManager.getAllGalleries();
-      const allGroups = stashCacheManager.getAllGroups();
-      const allStudios = stashCacheManager.getAllStudios();
-      const allPerformers = stashCacheManager.getAllPerformers();
+      // Get all entities from cache
+      let allGalleries = stashCacheManager.getAllGalleries();
+      let allGroups = stashCacheManager.getAllGroups();
+      let allStudios = stashCacheManager.getAllStudios();
+      let allPerformers = stashCacheManager.getAllPerformers();
 
-      const visibleGalleries = new Set(
-        emptyEntityFilterService
-          .filterEmptyGalleries(allGalleries)
-          .map((g) => g.id)
+      // Apply user restrictions to all entity types FIRST
+      allGalleries = await userRestrictionService.filterGalleriesForUser(
+        allGalleries,
+        userId
       );
-      const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
+      allGroups = await userRestrictionService.filterGroupsForUser(
+        allGroups,
+        userId
       );
-      const visibleStudios = new Set(
-        emptyEntityFilterService
-          .filterEmptyStudios(allStudios, visibleGroups, visibleGalleries)
-          .map((s) => s.id)
+      allStudios = await userRestrictionService.filterStudiosForUser(
+        allStudios,
+        userId
       );
-      const visiblePerformers = new Set(
-        emptyEntityFilterService
-          .filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries)
-          .map((p) => p.id)
+      // No direct performer restrictions, but we still process them
+
+      // Then filter for empty entities in dependency order
+      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+      const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
+        allStudios,
+        visibleGroups,
+        visibleGalleries
+      );
+      const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
+        allPerformers,
+        visibleGroups,
+        visibleGalleries
       );
 
       const visibilitySet = {
-        galleries: visibleGalleries,
-        groups: visibleGroups,
-        studios: visibleStudios,
-        performers: visiblePerformers,
+        galleries: new Set(visibleGalleries.map((g) => g.id)),
+        groups: new Set(visibleGroups.map((g) => g.id)),
+        studios: new Set(visibleStudios.map((s) => s.id)),
+        performers: new Set(visiblePerformers.map((p) => p.id)),
       };
 
       tags = emptyEntityFilterService.filterEmptyTags(tags, visibilitySet);
@@ -476,35 +486,47 @@ export const findTagsMinimal = async (
     // Filter empty tags (non-admins only)
     const requestingUser = req.user;
     if (requestingUser && requestingUser.role !== "ADMIN") {
-      const allGalleries = stashCacheManager.getAllGalleries();
-      const allGroups = stashCacheManager.getAllGroups();
-      const allStudios = stashCacheManager.getAllStudios();
-      const allPerformers = stashCacheManager.getAllPerformers();
+      // Get all entities from cache
+      let allGalleries = stashCacheManager.getAllGalleries();
+      let allGroups = stashCacheManager.getAllGroups();
+      let allStudios = stashCacheManager.getAllStudios();
+      let allPerformers = stashCacheManager.getAllPerformers();
 
-      const visibleGalleries = new Set(
-        emptyEntityFilterService
-          .filterEmptyGalleries(allGalleries)
-          .map((g) => g.id)
+      // Apply user restrictions to all entity types FIRST
+      const userId = req.user?.id;
+      allGalleries = await userRestrictionService.filterGalleriesForUser(
+        allGalleries,
+        userId
       );
-      const visibleGroups = new Set(
-        emptyEntityFilterService.filterEmptyGroups(allGroups).map((g) => g.id)
+      allGroups = await userRestrictionService.filterGroupsForUser(
+        allGroups,
+        userId
       );
-      const visibleStudios = new Set(
-        emptyEntityFilterService
-          .filterEmptyStudios(allStudios, visibleGroups, visibleGalleries)
-          .map((s) => s.id)
+      allStudios = await userRestrictionService.filterStudiosForUser(
+        allStudios,
+        userId
       );
-      const visiblePerformers = new Set(
-        emptyEntityFilterService
-          .filterEmptyPerformers(allPerformers, visibleGroups, visibleGalleries)
-          .map((p) => p.id)
+      // No direct performer restrictions, but we still process them
+
+      // Then filter for empty entities in dependency order
+      const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+      const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+      const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
+        allStudios,
+        visibleGroups,
+        visibleGalleries
+      );
+      const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
+        allPerformers,
+        visibleGroups,
+        visibleGalleries
       );
 
       const visibilitySet = {
-        galleries: visibleGalleries,
-        groups: visibleGroups,
-        studios: visibleStudios,
-        performers: visiblePerformers,
+        galleries: new Set(visibleGalleries.map((g) => g.id)),
+        groups: new Set(visibleGroups.map((g) => g.id)),
+        studios: new Set(visibleStudios.map((s) => s.id)),
+        performers: new Set(visiblePerformers.map((p) => p.id)),
       };
 
       tags = emptyEntityFilterService.filterEmptyTags(tags, visibilitySet);
