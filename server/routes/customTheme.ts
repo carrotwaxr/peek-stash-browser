@@ -8,6 +8,7 @@ import {
   deleteCustomTheme,
   duplicateCustomTheme,
 } from "../controllers/customTheme.js";
+import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -15,21 +16,21 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // Get all user custom themes
-router.get("/", getUserCustomThemes);
+router.get("/", authenticated(getUserCustomThemes));
 
 // Get single custom theme
-router.get("/:id", getCustomTheme);
+router.get("/:id", authenticated(getCustomTheme));
 
 // Create new custom theme
-router.post("/", createCustomTheme);
+router.post("/", authenticated(createCustomTheme));
 
 // Update custom theme
-router.put("/:id", updateCustomTheme);
+router.put("/:id", authenticated(updateCustomTheme));
 
 // Delete custom theme
-router.delete("/:id", deleteCustomTheme);
+router.delete("/:id", authenticated(deleteCustomTheme));
 
 // Duplicate custom theme
-router.post("/:id/duplicate", duplicateCustomTheme);
+router.post("/:id/duplicate", authenticated(duplicateCustomTheme));
 
 export default router;

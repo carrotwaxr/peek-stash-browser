@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import {
   getUserSettings,
   updateUserSettings,
@@ -14,8 +14,9 @@ import {
   syncFromStash,
   getUserRestrictions,
   updateUserRestrictions,
-  deleteUserRestrictions
+  deleteUserRestrictions,
 } from "../controllers/user.js";
+import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -23,26 +24,49 @@ const router = express.Router();
 router.use(authenticateToken);
 
 // User settings routes
-router.get("/settings", getUserSettings);
-router.put("/settings", updateUserSettings);
-router.post("/change-password", changePassword);
+router.get("/settings", authenticated(getUserSettings));
+router.put("/settings", authenticated(updateUserSettings));
+router.post("/change-password", authenticated(changePassword));
 
 // Filter preset routes
-router.get("/filter-presets", getFilterPresets);
-router.post("/filter-presets", saveFilterPreset);
-router.delete("/filter-presets/:artifactType/:presetId", deleteFilterPreset);
+router.get("/filter-presets", authenticated(getFilterPresets));
+router.post("/filter-presets", authenticated(saveFilterPreset));
+router.delete(
+  "/filter-presets/:artifactType/:presetId",
+  authenticated(deleteFilterPreset)
+);
 
 // Admin-only user management routes
-router.get("/all", getAllUsers);
-router.post("/create", createUser);
-router.delete("/:userId", deleteUser);
-router.put("/:userId/role", updateUserRole);
-router.put("/:userId/settings", updateUserSettings); // Admin can update any user's settings
-router.post("/:userId/sync-from-stash", syncFromStash); // Admin can sync Stash data for any user
+router.get("/all", requireAdmin, authenticated(getAllUsers));
+router.post("/create", requireAdmin, authenticated(createUser));
+router.delete("/:userId", requireAdmin, authenticated(deleteUser));
+router.put("/:userId/role", requireAdmin, authenticated(updateUserRole));
+router.put(
+  "/:userId/settings",
+  requireAdmin,
+  authenticated(updateUserSettings)
+); // Admin can update any user's settings
+router.post(
+  "/:userId/sync-from-stash",
+  requireAdmin,
+  authenticated(syncFromStash)
+); // Admin can sync Stash data for any user
 
 // Admin-only content restriction routes
-router.get("/:userId/restrictions", getUserRestrictions); // Get user's content restrictions
-router.put("/:userId/restrictions", updateUserRestrictions); // Update user's content restrictions
-router.delete("/:userId/restrictions", deleteUserRestrictions); // Delete all user's content restrictions
+router.get(
+  "/:userId/restrictions",
+  requireAdmin,
+  authenticated(getUserRestrictions)
+); // Get user's content restrictions
+router.put(
+  "/:userId/restrictions",
+  requireAdmin,
+  authenticated(updateUserRestrictions)
+); // Update user's content restrictions
+router.delete(
+  "/:userId/restrictions",
+  requireAdmin,
+  authenticated(deleteUserRestrictions)
+); // Delete all user's content restrictions
 
 export default router;
