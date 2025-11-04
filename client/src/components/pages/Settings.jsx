@@ -27,7 +27,6 @@ const Settings = () => {
   const { changeTheme, availableThemes, currentTheme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
 
   // Settings state
   const [preferredQuality, setPreferredQuality] = useState("auto");
@@ -73,7 +72,7 @@ const Settings = () => {
 
       setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
     } catch {
-      setError("Failed to load settings");
+      // Error handling could be added here if needed
     } finally {
       setLoading(false);
     }
@@ -81,8 +80,6 @@ const Settings = () => {
 
   const saveCarouselPreferences = async (newPreferences) => {
     try {
-      setError(null);
-
       await api.put("/user/settings", {
         carouselPreferences: newPreferences,
       });
@@ -98,8 +95,6 @@ const Settings = () => {
 
   const saveNavPreferences = async (newPreferences) => {
     try {
-      setError(null);
-
       await api.put("/user/settings", {
         navPreferences: newPreferences,
       });
@@ -120,7 +115,6 @@ const Settings = () => {
     e.preventDefault();
     try {
       setSaving(true);
-      setError(null);
 
       await api.put("/user/settings", {
         preferredQuality,
@@ -152,7 +146,6 @@ const Settings = () => {
 
     try {
       setPasswordChanging(true);
-      setError(null);
 
       await api.post("/user/change-password", {
         currentPassword,

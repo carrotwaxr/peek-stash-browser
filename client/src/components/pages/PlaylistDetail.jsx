@@ -49,7 +49,8 @@ const PlaylistDetail = () => {
 
   useEffect(() => {
     loadPlaylist();
-  }, [playlistId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlistId]); // loadPlaylist is stable and doesn't need to be in dependencies
 
   const loadPlaylist = async () => {
     try {

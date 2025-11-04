@@ -87,7 +87,7 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
       window.location.pathname,
     ]
       .join("")
-      .split(/([^\/]*)$/gi)[0];
+      .split(/([^/]*)$/gi)[0];
   }
 
   getVttFile(url) {

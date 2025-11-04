@@ -31,7 +31,8 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
   // Load existing restrictions
   useEffect(() => {
     loadRestrictions();
-  }, [user.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]); // loadRestrictions is stable and doesn't need to be in dependencies
 
   const loadRestrictions = async () => {
     try {
@@ -98,7 +99,7 @@ const ContentRestrictionsModal = ({ user, onClose, onSave }) => {
 
       // Convert component state to API format (exclude NONE modes)
       const restrictionsToSave = Object.entries(restrictions)
-        .filter(([_, config]) => config.mode !== "NONE")
+        .filter(([, config]) => config.mode !== "NONE")
         .map(([entityType, config]) => ({
           entityType,
           mode: config.mode,

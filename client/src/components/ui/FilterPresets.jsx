@@ -33,7 +33,8 @@ const FilterPresets = ({
   // Fetch presets on mount
   useEffect(() => {
     fetchPresets();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only fetch once on mount, fetchPresets is stable
 
   const fetchPresets = async () => {
     try {

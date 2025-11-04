@@ -8,8 +8,6 @@ const PlaybackControls = () => {
     scene,
     sceneLoading,
     videoLoading,
-    playlist,
-    currentIndex,
     quality,
     setQuality,
     oCounter,

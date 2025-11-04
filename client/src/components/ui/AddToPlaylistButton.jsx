@@ -35,7 +35,8 @@ const AddToPlaylistButton = ({
     if (showMenu && playlists.length === 0) {
       loadPlaylists();
     }
-  }, [showMenu]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMenu]); // Only load when menu opens, not when playlists.length changes
 
   // Click outside to close
   useEffect(() => {
