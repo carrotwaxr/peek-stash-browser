@@ -12,6 +12,7 @@ import {
   ErrorMessage,
   CardCountsIcons,
 } from "../ui/index.js";
+import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import { truncateText } from "../../utils/format.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import SearchControls from "../ui/SearchControls.jsx";
@@ -39,8 +40,9 @@ const Galleries = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [initMessage, setInitMessage] = useState(null);
 
-  const handleQueryChange = async (newQuery) => {
+  const handleQueryChange = async (newQuery, retryCount = 0) => {
     if (isAuthLoading || !isAuthenticated) {
       return;
     }
@@ -53,11 +55,19 @@ const Galleries = () => {
       setIsLoading(true);
       setLastQuery(newQuery);
       setError(null);
+      setInitMessage(null);
       const result = await getGalleries(newQuery);
       setData(result);
+      setIsLoading(false);
     } catch (err) {
+      if (err.isInitializing && retryCount < 60) {
+        setInitMessage("Server is loading cache, please wait...");
+        setTimeout(() => {
+          handleQueryChange(newQuery, retryCount + 1);
+        }, 5000);
+        return;
+      }
       setError(err.message || "An error occurred");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -94,7 +104,7 @@ const Galleries = () => {
     !isLoading && currentGalleries.length > 0 && isTVMode
   );
 
-  if (error) {
+  if (error && !initMessage) {
     return (
       <PageLayout>
         <PageHeader title="Galleries" />
@@ -110,6 +120,8 @@ const Galleries = () => {
           title="Galleries"
           subtitle="Browse image galleries in your library"
         />
+
+        {initMessage && <CacheLoadingBanner message={initMessage} />}
 
         <SearchControls
           artifactType="gallery"

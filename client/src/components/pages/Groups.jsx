@@ -12,6 +12,7 @@ import {
   ErrorMessage,
   CardCountsIcons,
 } from "../ui/index.js";
+import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import SearchControls from "../ui/SearchControls.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -37,11 +38,12 @@ const Groups = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [initMessage, setInitMessage] = useState(null);
 
   // Note: We don't fetch initial data here anymore.
   // SearchControls will trigger the initial query via onQueryChange based on URL params.
 
-  const handleQueryChange = async (newQuery) => {
+  const handleQueryChange = async (newQuery, retryCount = 0) => {
     // Don't make API calls if not authenticated or still checking auth
     if (isAuthLoading || !isAuthenticated) {
       return;
@@ -56,11 +58,19 @@ const Groups = () => {
       setIsLoading(true);
       setLastQuery(newQuery);
       setError(null);
+      setInitMessage(null);
       const result = await getGroups(newQuery);
       setData(result);
+      setIsLoading(false);
     } catch (err) {
+      if (err.isInitializing && retryCount < 60) {
+        setInitMessage("Server is loading cache, please wait...");
+        setTimeout(() => {
+          handleQueryChange(newQuery, retryCount + 1);
+        }, 5000);
+        return;
+      }
       setError(err.message || "An error occurred");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -102,7 +112,8 @@ const Groups = () => {
     !isLoading && currentGroups.length > 0 && isTVMode
   );
 
-  if (error) {
+  // Only show error page for non-initializing errors
+  if (error && !initMessage) {
     return (
       <PageLayout>
         <PageHeader title="Collections" />
@@ -118,6 +129,8 @@ const Groups = () => {
           title="Collections"
           subtitle="Browse collections and movies in your library"
         />
+
+        {initMessage && <CacheLoadingBanner message={initMessage} />}
 
         {/* Controls Section */}
         <SearchControls
