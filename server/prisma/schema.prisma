@@ -90,6 +90,9 @@ model Playlist {
 
     user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
     items       PlaylistItem[]
+
+    @@index([userId])
+    @@index([updatedAt])
 }
 
 model PlaylistItem {
@@ -102,6 +105,7 @@ model PlaylistItem {
     playlist    Playlist    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
     @@unique([playlistId, sceneId])
+    @@index([playlistId, position])
 }
 
 model CustomTheme {
@@ -143,6 +147,7 @@ model SceneRating {
     @@index([userId])
     @@index([sceneId])
     @@index([favorite])
+    @@index([rating])
 }
 
 model PerformerRating {
@@ -160,6 +165,7 @@ model PerformerRating {
     @@index([userId])
     @@index([performerId])
     @@index([favorite])
+    @@index([rating])
 }
 
 model StudioRating {
@@ -177,6 +183,7 @@ model StudioRating {
     @@index([userId])
     @@index([studioId])
     @@index([favorite])
+    @@index([rating])
 }
 
 model TagRating {
@@ -194,6 +201,7 @@ model TagRating {
     @@index([userId])
     @@index([tagId])
     @@index([favorite])
+    @@index([rating])
 }
 
 model GalleryRating {
@@ -211,6 +219,7 @@ model GalleryRating {
     @@index([userId])
     @@index([galleryId])
     @@index([favorite])
+    @@index([rating])
 }
 
 model GroupRating {
@@ -228,6 +237,7 @@ model GroupRating {
     @@index([userId])
     @@index([groupId])
     @@index([favorite])
+    @@index([rating])
 }
 
 model UserContentRestriction {
