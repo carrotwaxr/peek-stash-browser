@@ -4,6 +4,7 @@ import axios from "axios";
 import { PageHeader, PageLayout } from "../ui/index.js";
 import SceneGrid from "../scene-search/SceneGrid.jsx";
 import Pagination from "../ui/Pagination.jsx";
+import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
@@ -19,6 +20,7 @@ const Recommended = () => {
   const [error, setError] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
   const [message, setMessage] = useState(null);
+  const [initMessage, setInitMessage] = useState(null);
 
   // Get pagination params from URL
   const page = parseInt(searchParams.get("page")) || 1;
@@ -29,11 +31,15 @@ const Recommended = () => {
 
   // Fetch recommended scenes
   useEffect(() => {
+    let retryCount = 0;
+    const MAX_RETRIES = 60;
+
     const fetchRecommended = async () => {
       try {
         setLoading(true);
         setError(null);
         setMessage(null);
+        setInitMessage(null);
 
         const response = await axios.get(
           `/api/library/scenes/recommended?page=${page}&per_page=${perPage}`,
@@ -47,10 +53,23 @@ const Recommended = () => {
         if (msg) {
           setMessage(msg);
         }
+        setLoading(false);
       } catch (err) {
         console.error("Error fetching recommended scenes:", err);
+
+        // Check if server is initializing cache
+        const isInitializing = err.response?.status === 503 && err.response?.data?.ready === false;
+
+        if (isInitializing && retryCount < MAX_RETRIES) {
+          setInitMessage("Server is loading cache, please wait...");
+          retryCount++;
+          setTimeout(() => {
+            fetchRecommended();
+          }, 5000);
+          return;
+        }
+
         setError(err.response?.data?.error || "Failed to load recommendations");
-      } finally {
         setLoading(false);
       }
     };
@@ -86,8 +105,10 @@ const Recommended = () => {
           subtitle="Personalized recommendations based on your favorites and ratings"
         />
 
+        {initMessage && <CacheLoadingBanner message={initMessage} />}
+
         {/* Top Pagination */}
-        {!loading && !error && !message && totalPages > 1 && (
+        {!loading && !error && !message && !initMessage && totalPages > 1 && (
           <div className="mb-6">
             <Pagination
               currentPage={page}
@@ -124,7 +145,7 @@ const Recommended = () => {
         <SceneGrid
           scenes={scenes}
           loading={loading}
-          error={error}
+          error={!initMessage ? error : null}
           currentPage={page}
           totalPages={totalPages}
           onPageChange={handlePageChange}
