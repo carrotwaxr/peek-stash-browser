@@ -97,6 +97,63 @@ const testStashConnectivity = async (): Promise<void> => {
   }
 };
 
+/**
+ * Initialize cache with retry logic and exponential backoff
+ */
+const initializeCacheWithRetry = async (): Promise<boolean> => {
+  const MAX_RETRIES = 5;
+  const INITIAL_DELAY_MS = 5000; // 5 seconds
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      logger.info("=".repeat(60));
+      logger.info(`Initializing Stash cache (attempt ${attempt}/${MAX_RETRIES})...`);
+      logger.info("=".repeat(60));
+
+      await stashCacheManager.initialize();
+
+      logger.info("=".repeat(60));
+      logger.info("✓ Stash cache initialized successfully");
+      logger.info("=".repeat(60));
+
+      return true;
+    } catch (error) {
+      logger.error("=".repeat(60));
+      logger.error(`✗ Failed to initialize Stash cache (attempt ${attempt}/${MAX_RETRIES})`);
+      logger.error("=".repeat(60));
+
+      if (error instanceof Error) {
+        logger.error("Error details:", {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
+      } else {
+        logger.error("Unknown error type:", { error: String(error) });
+      }
+
+      // If we have retries left, wait with exponential backoff
+      if (attempt < MAX_RETRIES) {
+        const delayMs = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
+        const delaySec = delayMs / 1000;
+
+        logger.warn(`Retrying in ${delaySec} seconds... (${MAX_RETRIES - attempt} attempts remaining)`);
+
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      } else {
+        // Max retries reached
+        logger.error("=".repeat(60));
+        logger.error("✗ Max retries reached - cache initialization failed");
+        logger.error("=".repeat(60));
+        logger.warn("Server will continue without cache - performance may be degraded");
+        logger.warn("Fix the issue and use the 'Refresh Cache' button in Server Settings");
+      }
+    }
+  }
+
+  return false;
+};
+
 export const initializeCache = async () => {
   // Pre-flight: Test Stash connectivity before attempting cache load
   logger.info("Testing Stash connectivity...");
@@ -110,35 +167,9 @@ export const initializeCache = async () => {
     logger.warn("Cache initialization may fail - proceeding anyway...");
   }
 
-  // Initialize Stash cache (fetch all entities from Stash)
+  // Initialize Stash cache with retry logic
   // This happens AFTER server starts listening, so setup endpoints work during cache load
-  logger.info("=".repeat(60));
-  logger.info("Initializing Stash cache...");
-  logger.info("=".repeat(60));
-  try {
-    await stashCacheManager.initialize();
-  } catch (error) {
-    logger.error("=".repeat(60));
-    logger.error("Failed to initialize Stash cache");
-    logger.error("=".repeat(60));
-
-    if (error instanceof Error) {
-      logger.error("Error details:", {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-    } else {
-      logger.error("Unknown error type:", { error: String(error) });
-    }
-
-    logger.warn(
-      "Server will continue without cache - performance may be degraded"
-    );
-    logger.warn(
-      "Fix the issue and use the 'Refresh Cache' button in Server Settings"
-    );
-  }
+  await initializeCacheWithRetry();
 
   logger.info("=".repeat(60));
   logger.info("Peek Server Ready");

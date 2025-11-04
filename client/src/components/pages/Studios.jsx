@@ -13,6 +13,7 @@ import {
   CardStatusIcons,
   CardCountsIcons,
 } from "../ui/index.js";
+import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
@@ -38,11 +39,12 @@ const Studios = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [initMessage, setInitMessage] = useState(null);
 
   // Note: We don't fetch initial data here anymore.
   // SearchControls will trigger the initial query via onQueryChange based on URL params.
 
-  const handleQueryChange = async (newQuery) => {
+  const handleQueryChange = async (newQuery, retryCount = 0) => {
     // Don't make API calls if not authenticated or still checking auth
     if (isAuthLoading || !isAuthenticated) {
       return;
@@ -57,11 +59,21 @@ const Studios = () => {
       setIsLoading(true);
       setLastQuery(newQuery);
       setError(null);
+      setInitMessage(null);
       const result = await getStudios(newQuery);
       setData(result);
+      setIsLoading(false);
     } catch (err) {
+      // If server is initializing, show a message and retry after delay
+      if (err.isInitializing && retryCount < 60) {
+        setInitMessage("Server is loading cache, please wait...");
+        setTimeout(() => {
+          handleQueryChange(newQuery, retryCount + 1);
+        }, 5000); // Retry every 5 seconds
+        return; // Don't set loading to false, keep the loading state
+      }
+
       setError(err.message || "An error occurred");
-    } finally {
       setIsLoading(false);
     }
   };
@@ -103,7 +115,8 @@ const Studios = () => {
     !isLoading && currentStudios.length > 0 && isTVMode
   );
 
-  if (error) {
+  // Only show error page for non-initializing errors
+  if (error && !initMessage) {
     return (
       <PageLayout>
         <PageHeader title="Studios" />
@@ -119,6 +132,8 @@ const Studios = () => {
           title="Studios"
           subtitle="Browse studios and production companies in your library"
         />
+
+        {initMessage && <CacheLoadingBanner message={initMessage} />}
 
         {/* Controls Section */}
         <SearchControls

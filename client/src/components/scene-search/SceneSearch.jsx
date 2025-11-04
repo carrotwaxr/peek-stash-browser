@@ -4,6 +4,7 @@ import deepEqual from "fast-deep-equal";
 import { ErrorMessage, PageHeader, PageLayout } from "../ui";
 import SceneGrid from "./SceneGrid.jsx";
 import SearchControls from "../ui/SearchControls.jsx";
+import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 
@@ -88,11 +89,12 @@ const SceneSearch = ({
       setIsLoading(false);
     } catch (err) {
       // If server is initializing, show a message and retry after delay
-      if (err.isInitializing && retryCount < 10) {
+      // Increased retry limit to 60 (5 minutes at 5s intervals) to match server retry logic
+      if (err.isInitializing && retryCount < 60) {
         setInitMessage("Server is loading cache, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
-        }, 2000); // Retry after 2 seconds
+        }, 5000); // Retry every 5 seconds
         return; // Don't set loading to false, keep the loading state
       }
 
@@ -124,6 +126,8 @@ const SceneSearch = ({
     <PageLayout>
       <PageHeader title={title} subtitle={subtitle} />
 
+      {initMessage && <CacheLoadingBanner message={initMessage} />}
+
       <SearchControls
         artifactType="scene"
         initialSort={initialSort}
@@ -134,11 +138,6 @@ const SceneSearch = ({
         totalCount={totalCount}
         syncToUrl={captureReferrer}
       >
-        {initMessage && (
-          <div className="text-center py-8 text-muted-foreground">
-            {initMessage}
-          </div>
-        )}
         <SceneGrid
           scenes={currentScenes || []}
           loading={isLoading}
