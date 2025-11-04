@@ -79,6 +79,50 @@ class StashCacheManager {
   }
 
   /**
+   * Helper to extract detailed error information from GraphQL/network errors
+   */
+  private getDetailedErrorInfo(error: unknown, context: string): Record<string, unknown> {
+    const details: Record<string, unknown> = {
+      context,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (error instanceof Error) {
+      details.name = error.name;
+      details.message = error.message;
+      details.stack = error.stack;
+
+      // GraphQL errors from graphql-request
+      const gqlError = error as any;
+      if (gqlError.response) {
+        details.httpStatus = gqlError.response.status;
+        details.httpStatusText = gqlError.response.statusText;
+        details.responseHeaders = gqlError.response.headers;
+
+        // GraphQL-specific error details
+        if (gqlError.response.errors) {
+          details.graphqlErrors = gqlError.response.errors;
+        }
+        if (gqlError.response.data) {
+          details.partialData = 'Response contained partial data';
+        }
+      }
+
+      // Network errors
+      if (gqlError.code) {
+        details.errorCode = gqlError.code;
+      }
+      if (gqlError.cause) {
+        details.cause = gqlError.cause;
+      }
+    } else {
+      details.unknownError = String(error);
+    }
+
+    return details;
+  }
+
+  /**
    * Manually trigger cache refresh (for UI "Refresh" button)
    */
   async refreshCache(): Promise<void> {
@@ -91,25 +135,63 @@ class StashCacheManager {
     const startTime = Date.now();
 
     try {
+      logger.info("Starting cache refresh - fetching entities from Stash");
       const stash = getStash();
 
-      // Fetch all entities in parallel
-      // Use compact query for scenes to reduce bandwidth (trimmed nested objects)
-      const [
-        scenesResult,
-        performersResult,
-        studiosResult,
-        tagsResult,
-        galleriesResult,
-        groupsResult,
-      ] = await Promise.all([
-        stash.findScenesCompact({ filter: { per_page: -1 } }),
-        stash.findPerformers({ filter: { per_page: -1 } }),
-        stash.findStudios({ filter: { per_page: -1 } }),
-        stash.findTags({ filter: { per_page: -1 } }),
-        stash.findGalleries({ filter: { per_page: -1 } }),
-        stash.findGroups({ filter: { per_page: -1 } }),
-      ]);
+      // Fetch entities individually with detailed progress logging
+      logger.info("Fetching scenes (compact)...");
+      const scenesStart = Date.now();
+      const scenesResult = await stash.findScenesCompact({ filter: { per_page: -1 } })
+        .catch(err => {
+          logger.error("Failed to fetch scenes", this.getDetailedErrorInfo(err, "findScenesCompact"));
+          throw new Error(`Scene fetch failed: ${err.message}`);
+        });
+      logger.info(`Scenes fetched in ${Date.now() - scenesStart}ms (${scenesResult.findScenes.scenes.length} scenes)`);
+
+      logger.info("Fetching performers...");
+      const performersStart = Date.now();
+      const performersResult = await stash.findPerformers({ filter: { per_page: -1 } })
+        .catch(err => {
+          logger.error("Failed to fetch performers", this.getDetailedErrorInfo(err, "findPerformers"));
+          throw new Error(`Performer fetch failed: ${err.message}`);
+        });
+      logger.info(`Performers fetched in ${Date.now() - performersStart}ms (${performersResult.findPerformers.performers.length} performers)`);
+
+      logger.info("Fetching studios...");
+      const studiosStart = Date.now();
+      const studiosResult = await stash.findStudios({ filter: { per_page: -1 } })
+        .catch(err => {
+          logger.error("Failed to fetch studios", this.getDetailedErrorInfo(err, "findStudios"));
+          throw new Error(`Studio fetch failed: ${err.message}`);
+        });
+      logger.info(`Studios fetched in ${Date.now() - studiosStart}ms (${studiosResult.findStudios.studios.length} studios)`);
+
+      logger.info("Fetching tags...");
+      const tagsStart = Date.now();
+      const tagsResult = await stash.findTags({ filter: { per_page: -1 } })
+        .catch(err => {
+          logger.error("Failed to fetch tags", this.getDetailedErrorInfo(err, "findTags"));
+          throw new Error(`Tag fetch failed: ${err.message}`);
+        });
+      logger.info(`Tags fetched in ${Date.now() - tagsStart}ms (${tagsResult.findTags.tags.length} tags)`);
+
+      logger.info("Fetching galleries...");
+      const galleriesStart = Date.now();
+      const galleriesResult = await stash.findGalleries({ filter: { per_page: -1 } })
+        .catch(err => {
+          logger.error("Failed to fetch galleries", this.getDetailedErrorInfo(err, "findGalleries"));
+          throw new Error(`Gallery fetch failed: ${err.message}`);
+        });
+      logger.info(`Galleries fetched in ${Date.now() - galleriesStart}ms (${galleriesResult.findGalleries.galleries.length} galleries)`);
+
+      logger.info("Fetching groups...");
+      const groupsStart = Date.now();
+      const groupsResult = await stash.findGroups({ filter: { per_page: -1 } })
+        .catch(err => {
+          logger.error("Failed to fetch groups", this.getDetailedErrorInfo(err, "findGroups"));
+          throw new Error(`Group fetch failed: ${err.message}`);
+        });
+      logger.info(`Groups fetched in ${Date.now() - groupsStart}ms (${groupsResult.findGroups.groups.length} groups)`);
 
       // Create new Maps (double-buffering for atomic swap)
       const newScenes = new Map<string, NormalizedScene>();
@@ -215,7 +297,7 @@ class StashCacheManager {
       this.cache.lastRefreshed = new Date();
 
       const duration = Date.now() - startTime;
-      logger.info("Cache refreshed successfully", {
+      logger.info("✓ Cache refreshed successfully", {
         duration: `${duration}ms`,
         counts: {
           scenes: newScenes.size,
@@ -225,11 +307,48 @@ class StashCacheManager {
           galleries: newGalleries.size,
           groups: newGroups.size,
         },
+        totalEntities: newScenes.size + newPerformers.size + newStudios.size +
+                       newTags.size + newGalleries.size + newGroups.size,
       });
     } catch (error) {
-      logger.error("Cache refresh failed", {
-        error: error instanceof Error ? error.message : "Unknown error",
+      const duration = Date.now() - startTime;
+      logger.error("✗ Cache refresh failed", {
+        ...this.getDetailedErrorInfo(error, "refreshCache"),
+        durationBeforeFailure: `${duration}ms`,
+        cacheState: {
+          wasInitialized: this.cache.isInitialized,
+          hadPreviousData: this.cache.lastRefreshed !== null,
+          previousRefresh: this.cache.lastRefreshed?.toISOString(),
+        },
       });
+
+      // Provide actionable guidance based on error type
+      // Check more specific errors first, then more general ones
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+        if (message.includes('unauthorized') || message.includes('401')) {
+          logger.error("TROUBLESHOOTING: Authentication failed");
+          logger.error("  → Verify STASH_API_KEY is correct");
+          logger.error("  → Check Stash Settings > Security > API Key");
+        } else if (message.includes('403') || message.includes('forbidden')) {
+          logger.error("TROUBLESHOOTING: Access forbidden");
+          logger.error("  → API key may not have required permissions");
+        } else if (message.includes('timeout')) {
+          logger.error("TROUBLESHOOTING: Request timed out");
+          logger.error("  → Stash may be overloaded or have large library");
+          logger.error("  → Check Stash server logs for performance issues");
+        } else if (message.includes('ssl') || message.includes('certificate')) {
+          logger.error("TROUBLESHOOTING: TLS/SSL certificate issue");
+          logger.error("  → Use http:// instead of https:// for local Stash");
+          logger.error("  → Or configure NODE_TLS_REJECT_UNAUTHORIZED=0 (not recommended for production)");
+        } else if (message.includes('fetch') && message.includes('failed')) {
+          logger.error("TROUBLESHOOTING: Network connectivity issue detected");
+          logger.error("  → Verify STASH_URL is correct and accessible from Peek container");
+          logger.error("  → Check if Stash server is running");
+          logger.error("  → Test connectivity: curl -v <STASH_URL>/graphql");
+        }
+      }
+
       throw error;
     } finally {
       this.cache.isRefreshing = false;
