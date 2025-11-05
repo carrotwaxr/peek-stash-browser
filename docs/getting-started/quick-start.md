@@ -135,6 +135,9 @@ Organize your favorite scenes into custom playlists:
 | `F` | Toggle fullscreen |
 | `M` | Mute/unmute |
 
+!!! tip "Full Keyboard Navigation"
+    Peek supports complete keyboard navigation including TV mode! See the [Keyboard Navigation Guide](../user-guide/keyboard-navigation.md) for all shortcuts.
+
 ## Troubleshooting First-Time Issues
 
 ### Can't Login

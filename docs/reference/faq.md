@@ -186,6 +186,37 @@ Playlists are fully available! Create custom playlists of your favorite scenes.
 - Use **Repeat** (all or one) for continuous playback
 - Reorder scenes by dragging them in edit mode
 
+!!! tip "Learn More"
+    See the [Complete Playlists Guide](../user-guide/playlists.md) for detailed instructions on managing and playing playlists.
+
+### Does Peek track watch history?
+
+Yes! Peek automatically tracks your viewing progress and lets you resume playback from where you left off.
+
+**Features:**
+- Automatic progress tracking during playback
+- Resume from any device (synced to your user account)
+- "Continue Watching" section on home page
+- Progress bars on scene cards
+- Clear history for individual scenes or all at once
+
+!!! tip "Learn More"
+    See the [Watch History Guide](../user-guide/watch-history.md) for complete details on managing your watch history.
+
+### Can I use keyboard navigation?
+
+Yes! Peek supports complete keyboard navigation, perfect for TV remotes or wireless keyboards.
+
+**Key features:**
+- Arrow keys navigate scene grids and lists
+- Enter to select/play
+- Video player keyboard shortcuts (Space, arrows, F for fullscreen)
+- Playlist controls (N for next, P for previous)
+- TV Mode optimized for couch browsing
+
+!!! tip "Learn More"
+    See the [Keyboard Navigation Guide](../user-guide/keyboard-navigation.md) for all keyboard shortcuts and TV mode setup.
+
 ### Can I use Peek on mobile?
 
 Yes. The web interface is responsive and works on mobile browsers. A dedicated mobile app is not currently planned.
@@ -247,4 +278,7 @@ See: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
 ## Next Steps
 
 - [Installation](../getting-started/installation.md) - Install Peek
+- [Watch History](../user-guide/watch-history.md) - Resume playback from where you left off
+- [Keyboard Navigation](../user-guide/keyboard-navigation.md) - Complete keyboard shortcuts and TV mode
+- [Playlists](../user-guide/playlists.md) - Create and manage custom playlists
 - [Troubleshooting](troubleshooting.md) - Fix common issues

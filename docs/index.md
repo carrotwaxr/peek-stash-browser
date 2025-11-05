@@ -37,10 +37,10 @@ Peek is a web-based browser for your Stash library, offering a sleek modern inte
 ### Key Features
 
 - **Adaptive Video Streaming** - Real-time HLS transcoding with multiple quality options (720p/480p/360p)
-- **Watch History Tracking** - Automatic progress tracking and resume playback
-- **Playlist Management** - Create, organize, and play custom playlists
+- **Watch History Tracking** - Automatic progress tracking and resume playback ([Learn more](user-guide/watch-history.md))
+- **Playlist Management** - Create, organize, and play custom playlists ([Learn more](user-guide/playlists.md))
 - **Modern Interface** - Responsive React UI with theme support
-- **Full Keyboard Navigation** - Complete TV remote and keyboard control support
+- **Full Keyboard Navigation** - Complete TV remote and keyboard control support ([Learn more](user-guide/keyboard-navigation.md))
 - **Mobile Ready** - Optimized for all devices
 
 ## Quick Start

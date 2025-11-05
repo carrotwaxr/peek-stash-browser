@@ -112,6 +112,8 @@ nav:
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
   - User Guide:
+      - Watch History: user-guide/watch-history.md
+      - Keyboard Navigation: user-guide/keyboard-navigation.md
       - Playlists: user-guide/playlists.md
   - Reference:
       - Troubleshooting: reference/troubleshooting.md
