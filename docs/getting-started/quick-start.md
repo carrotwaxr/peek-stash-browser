@@ -72,11 +72,26 @@ Get Peek up and running in 5 minutes!
 
 ## Step 5: Create Playlists
 
-1. Click **Playlists** in navigation
+Organize your favorite scenes into custom playlists:
+
+1. Click **Playlists** in the navigation menu
 2. Click **Create Playlist**
-3. Enter name and description
-4. Add scenes by clicking the + icon on any scene
-5. Play your playlist with shuffle/repeat options!
+3. Enter a name and optional description
+4. Click **Create**
+
+**Adding Scenes:**
+- Click the **+** icon on any scene card
+- Select your playlist from the menu
+- Scene is added instantly!
+
+**Playing Playlists:**
+- Click a playlist to view its scenes
+- Click **Play** to start playback
+- Use **Shuffle** to randomize order
+- Use **Repeat** to loop your playlist
+
+!!! tip "Learn More"
+    See the [Complete Playlists Guide](../user-guide/playlists.md) for reordering scenes, editing playlists, and more!
 
 ## Common Tasks
 

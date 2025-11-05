@@ -50,18 +50,23 @@ Transcoding is CPU-intensive. Performance depends on:
 
 For best performance, use local SSD storage and allocate 2-4 CPU cores.
 
-### Why can't I play videos directly without transcoding?
+### Can I play videos directly without transcoding?
 
-Direct play is planned but not yet implemented. Currently, all videos are transcoded to HLS for:
+Yes! Direct play is available when your browser supports the video codec. Use the quality selector and choose **Direct** to play the original file without transcoding.
 
-- Universal browser compatibility
-- Adaptive quality switching
-- Fast seeking with HLS segments
-- Consistent playback experience
+**When to use Direct:**
+- Fastest playback (no transcoding delay)
+- Highest quality (original file)
+- Browser supports the video format
+
+**When to use transcoding:**
+- Browser doesn't support the format
+- Want adaptive quality (switch between 720p/480p/360p)
+- Slower network connections
 
 ### Can I download the original video file?
 
-Original file downloads are planned but not yet implemented. Currently, only transcoded HLS streams are available for playback.
+Not yet. Video downloads are planned for a future release. Currently, you can only stream videos through Peek's player.
 
 ## Configuration
 
@@ -83,7 +88,22 @@ docker cp peek-stash-browser:/app/data/backup.db ./peek-backup.db
 
 ### Can I customize the theme?
 
-Dark and light themes are built-in. Custom themes and color schemes are planned for a future release.
+Yes! Peek includes several built-in themes and a custom theme editor.
+
+**Built-in Themes:**
+- Light Mode
+- Dark Mode (default)
+- Deep Purple
+- The Hub
+
+**Custom Theme Editor:**
+1. Go to **Settings** → **My Settings**
+2. Scroll to **Custom Themes** section
+3. Create your own theme by choosing colors
+4. Customize fonts, backgrounds, text colors, and more
+5. Save and apply your custom theme
+
+Toggle between themes using the theme icon in the navigation bar.
 
 ## Performance
 
@@ -144,9 +164,27 @@ See: [Troubleshooting Guide](troubleshooting.md)
 
 ## Features
 
-### When will playlists be available?
+### How do playlists work?
 
-Playlists are planned for a future release. Track progress on GitHub Issues.
+Playlists are fully available! Create custom playlists of your favorite scenes.
+
+**Creating a Playlist:**
+1. Click **Playlists** in the navigation
+2. Click **Create Playlist**
+3. Enter a name and description
+4. Click **Create**
+
+**Adding Scenes:**
+- Click the **+** icon on any scene card
+- Select the playlist to add it to
+- Or go to a scene's detail page and click **Add to Playlist**
+
+**Playing Playlists:**
+- Click a playlist to view its scenes
+- Click **Play** to start from the beginning
+- Use **Shuffle** to randomize playback order
+- Use **Repeat** (all or one) for continuous playback
+- Reorder scenes by dragging them in edit mode
 
 ### Can I use Peek on mobile?
 

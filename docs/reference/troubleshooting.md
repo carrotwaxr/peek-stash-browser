@@ -7,17 +7,20 @@ Common issues and solutions for Peek Stash Browser.
 ### Container Won't Start
 
 **Check logs first**:
+
 ```bash
 docker logs peek-stash-browser
 ```
 
 **Common causes**:
+
 - Missing required environment variables (`STASH_URL`, `STASH_API_KEY`)
 - Invalid `STASH_URL` (not accessible from container)
 - Port conflicts (6969 already in use)
 - Missing volume mappings
 
 **Solution**:
+
 ```bash
 # Stop container
 docker stop peek-stash-browser
@@ -32,11 +35,18 @@ docker rm peek-stash-browser
 ### Can't Connect to Stash
 
 **Test connectivity from container**:
+
 ```bash
-docker exec peek-stash-browser curl http://your-stash-ip:9999/graphql
+docker exec peek-stash-browser curl -X POST http://your-stash-ip:9999/graphql \
+  -H "Content-Type: application/json" \
+  -H "ApiKey: your-api-key-12345" \
+  -d '{
+    "query": "query FindTags { findTags(filter: { per_page: 1 }) { count tags { id name } } }"
+  }'
 ```
 
 **Solutions**:
+
 - Verify `STASH_URL` is correct and accessible
 - Check Stash API key is valid (Settings → Security → API Key)
 - Ensure Stash GraphQL endpoint is enabled
@@ -48,12 +58,14 @@ docker exec peek-stash-browser curl http://your-stash-ip:9999/graphql
 
 1. **Check FFmpeg**: `docker exec peek-stash-browser ffmpeg -version`
 2. **Check file permissions**: `docker exec peek-stash-browser ls -la /app/media`
-3. **Verify path mapping**: Check `STASH_INTERNAL_PATH` and `STASH_MEDIA_PATH`
-4. **Check backend logs**: `docker logs peek-stash-browser`
+3. **Verify path mapping**: Go to **Settings → Path Mappings** and use "Test Path" button
+4. **Check media is mounted**: `docker exec peek-stash-browser ls /app/media`
+5. **Check backend logs**: `docker logs peek-stash-browser`
 
 ### Slow Transcoding
 
 **Check I/O performance**:
+
 ```bash
 docker exec peek-stash-browser dd if=/app/media/test.mp4 of=/dev/null bs=1M count=100
 ```
@@ -61,6 +73,7 @@ docker exec peek-stash-browser dd if=/app/media/test.mp4 of=/dev/null bs=1M coun
 Expected: 50+ MB/s for good performance
 
 **Solutions**:
+
 - Move media to local storage (not network share)
 - Use SSD for media and temp files
 - Reduce quality preset
@@ -116,7 +129,7 @@ docker start peek-stash-browser
 ### Reset Database
 
 !!! danger "This Deletes All Data"
-    This will delete all users, preferences, and playlists.
+This will delete all users, preferences, and playlists.
 
 ```bash
 docker stop peek-stash-browser
@@ -142,6 +155,7 @@ docker logs --tail 100 peek-stash-browser
 ### Enable Debug Logging
 
 Add to environment variables:
+
 ```bash
 LOG_LEVEL=debug
 ```
@@ -159,11 +173,17 @@ Check browser console for frontend errors:
 
 ### "FFmpeg not found"
 
-**Solution**: Rebuild container or verify FFmpeg is installed in image
+**Solution**: FFmpeg should be included in the official image. If you see this error:
+- Pull the latest image: `docker pull carrotwaxr/peek-stash-browser:latest`
+- Rebuild your container with the latest image
 
-### "Path translation failed"
+### "Path not found" or path-related errors
 
-**Solution**: Check `STASH_INTERNAL_PATH` and `STASH_MEDIA_PATH` environment variables
+**Solution**: Check your path mappings:
+1. Go to **Settings → Path Mappings** in Peek
+2. Click **Test Path** for each mapping
+3. Verify paths are accessible
+4. Make sure media volumes are mounted to your container
 
 ### "Session not found"
 
