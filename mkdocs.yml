@@ -107,13 +107,13 @@ extra_javascript:
 # Page tree navigation
 nav:
   - Home: index.md
-  - Beta Testing: beta-testing.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
+  - User Guide:
+      - Playlists: user-guide/playlists.md
   - Reference:
-      - Theming Guide: reference/theming.md
       - Troubleshooting: reference/troubleshooting.md
       - FAQ: reference/faq.md
 

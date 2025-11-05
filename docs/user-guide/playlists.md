@@ -173,6 +173,6 @@ There's no limit to how many:
 
 ## Next Steps
 
-- [Watch History](watch-history.md) - Track your viewing progress
-- [Ratings & Favorites](ratings-and-favorites.md) - Rate scenes and mark favorites
-- [Search & Filtering](search-and-filtering.md) - Find scenes to add to playlists
+- [Troubleshooting](../reference/troubleshooting.md) - Fix common issues
+- [FAQ](../reference/faq.md) - Frequently asked questions
+- [Quick Start Guide](../getting-started/quick-start.md) - Get started with Peek
