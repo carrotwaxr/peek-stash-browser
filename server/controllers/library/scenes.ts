@@ -1143,17 +1143,21 @@ export const getRecommendedScenes = async (
     // Get all scenes
     const allScenes = stashCacheManager.getAllScenes();
 
-    // Helper to get squashed tags
-    const getSquashedTagIds = (scene: NormalizedScene): Set<string> => {
-      const tagIds = new Set<string>();
-      (scene.tags || []).forEach((t) => tagIds.add(String(t.id)));
+    // Helper to get tags by source (weighted to reduce squashing inflation)
+    const getTagsBySource = (scene: NormalizedScene) => {
+      const sceneTags = new Set<string>();
+      const performerTags = new Set<string>();
+      const studioTags = new Set<string>();
+
+      (scene.tags || []).forEach((t) => sceneTags.add(String(t.id)));
       (scene.performers || []).forEach((p) => {
-        (p.tags || []).forEach((t) => tagIds.add(String(t.id)));
+        (p.tags || []).forEach((t) => performerTags.add(String(t.id)));
       });
       if (scene.studio?.tags) {
-        scene.studio.tags.forEach((t) => tagIds.add(String(t.id)));
+        scene.studio.tags.forEach((t) => studioTags.add(String(t.id)));
       }
-      return tagIds;
+
+      return { sceneTags, performerTags, studioTags };
     };
 
     // Score all scenes
@@ -1168,19 +1172,31 @@ export const getRecommendedScenes = async (
     for (const scene of allScenes) {
       let baseScore = 0;
 
-      // Score performers
+      // Score performers with diminishing returns (sqrt scaling)
       if (scene.performers) {
+        let favoritePerformerCount = 0;
+        let highlyRatedPerformerCount = 0;
+
         for (const performer of scene.performers) {
           const performerId = String(performer.id);
           if (favoritePerformers.has(performerId)) {
-            baseScore += 5;
+            favoritePerformerCount++;
           } else if (highlyRatedPerformers.has(performerId)) {
-            baseScore += 3;
+            highlyRatedPerformerCount++;
           }
+        }
+
+        // Diminishing returns: sqrt scaling
+        // 1 performer = 5 pts, 4 = 10 pts, 9 = 15 pts (not linear)
+        if (favoritePerformerCount > 0) {
+          baseScore += 5 * Math.sqrt(favoritePerformerCount);
+        }
+        if (highlyRatedPerformerCount > 0) {
+          baseScore += 3 * Math.sqrt(highlyRatedPerformerCount);
         }
       }
 
-      // Score studio
+      // Score studio (already capped at 1 per scene)
       if (scene.studio) {
         const studioId = String(scene.studio.id);
         if (favoriteStudios.has(studioId)) {
@@ -1190,24 +1206,64 @@ export const getRecommendedScenes = async (
         }
       }
 
-      // Score tags (squashed)
-      const sceneTagIds = getSquashedTagIds(scene);
-      for (const tagId of sceneTagIds) {
-        if (favoriteTags.has(tagId)) {
-          baseScore += 1;
-        } else if (highlyRatedTags.has(tagId)) {
-          baseScore += 0.5;
+      // Score tags with source weighting and diminishing returns
+      const { sceneTags, performerTags, studioTags } = getTagsBySource(scene);
+
+      let favoriteSceneTagCount = 0;
+      let favoritePerformerTagCount = 0;
+      let favoriteStudioTagCount = 0;
+      let ratedSceneTagCount = 0;
+      let ratedPerformerTagCount = 0;
+      let ratedStudioTagCount = 0;
+
+      for (const tagId of sceneTags) {
+        if (favoriteTags.has(tagId)) favoriteSceneTagCount++;
+        else if (highlyRatedTags.has(tagId)) ratedSceneTagCount++;
+      }
+      for (const tagId of performerTags) {
+        if (!sceneTags.has(tagId)) { // Don't double-count
+          if (favoriteTags.has(tagId)) favoritePerformerTagCount++;
+          else if (highlyRatedTags.has(tagId)) ratedPerformerTagCount++;
         }
+      }
+      for (const tagId of studioTags) {
+        if (!sceneTags.has(tagId) && !performerTags.has(tagId)) { // Don't double-count
+          if (favoriteTags.has(tagId)) favoriteStudioTagCount++;
+          else if (highlyRatedTags.has(tagId)) ratedStudioTagCount++;
+        }
+      }
+
+      // Weighted tag scores with diminishing returns
+      // Scene tags: Full value (1.0x weight)
+      // Performer tags: Reduced value (0.3x weight)
+      // Studio tags: Medium value (0.5x weight)
+      if (favoriteSceneTagCount > 0) {
+        baseScore += 1.0 * Math.sqrt(favoriteSceneTagCount);
+      }
+      if (favoritePerformerTagCount > 0) {
+        baseScore += 0.3 * Math.sqrt(favoritePerformerTagCount);
+      }
+      if (favoriteStudioTagCount > 0) {
+        baseScore += 0.5 * Math.sqrt(favoriteStudioTagCount);
+      }
+      if (ratedSceneTagCount > 0) {
+        baseScore += 0.5 * Math.sqrt(ratedSceneTagCount);
+      }
+      if (ratedPerformerTagCount > 0) {
+        baseScore += 0.15 * Math.sqrt(ratedPerformerTagCount);
+      }
+      if (ratedStudioTagCount > 0) {
+        baseScore += 0.25 * Math.sqrt(ratedStudioTagCount);
       }
 
       // Skip if no base score (doesn't match any criteria)
       if (baseScore === 0) continue;
 
-      // Watch status modifier
+      // Watch status modifier (reduced dominance: was +100/-100, now +30/-30)
       const watchData = watchMap.get(scene.id);
       if (!watchData || watchData.playCount === 0) {
         // Never watched
-        baseScore += 100;
+        baseScore += 30;
       } else if (watchData.lastPlayedAt) {
         const daysSinceWatched =
           (now.getTime() - watchData.lastPlayedAt.getTime()) /
@@ -1215,13 +1271,13 @@ export const getRecommendedScenes = async (
 
         if (daysSinceWatched > 14) {
           // Not recently watched
-          baseScore += 50;
+          baseScore += 20;
         } else if (daysSinceWatched >= 1) {
           // Recently watched (1-14 days)
-          baseScore -= 50;
+          baseScore -= 10;
         } else {
           // Very recently watched (<24 hours)
-          baseScore -= 100;
+          baseScore -= 30;
         }
       }
 
@@ -1239,8 +1295,39 @@ export const getRecommendedScenes = async (
     // Sort by score descending
     scoredScenes.sort((a, b) => b.score - a.score);
 
+    // Add diversity through score tier randomization
+    // Group scenes into score tiers (10% bands) and randomize within each tier
+    // This creates variety while maintaining general quality order
+    const diversifiedScenes: ScoredScene[] = [];
+    if (scoredScenes.length > 0) {
+      const maxScore = scoredScenes[0].score;
+      const minScore = scoredScenes[scoredScenes.length - 1].score;
+      const scoreRange = maxScore - minScore;
+      const tierSize = scoreRange / 10; // 10 tiers
+
+      // Group scenes by tier
+      const tiers: ScoredScene[][] = Array.from({ length: 10 }, () => []);
+      for (const scoredScene of scoredScenes) {
+        const tierIndex = Math.min(
+          9,
+          Math.floor((maxScore - scoredScene.score) / tierSize)
+        );
+        tiers[tierIndex].push(scoredScene);
+      }
+
+      // Randomize within each tier and combine
+      for (const tier of tiers) {
+        // Fisher-Yates shuffle
+        for (let i = tier.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [tier[i], tier[j]] = [tier[j], tier[i]];
+        }
+        diversifiedScenes.push(...tier);
+      }
+    }
+
     // Cap at top 500 recommendations
-    const cappedScenes = scoredScenes.slice(0, 500);
+    const cappedScenes = diversifiedScenes.slice(0, 500);
 
     // Paginate
     const startIndex = (page - 1) * perPage;

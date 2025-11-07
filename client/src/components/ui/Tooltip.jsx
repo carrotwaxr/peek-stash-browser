@@ -48,11 +48,17 @@ const Tooltip = ({
     let left = 0;
 
     // Auto-flip vertical position if not enough space
-    if (position === "top" && spaceAbove < tooltipRect.height + GAP + EDGE_PADDING) {
+    if (
+      position === "top" &&
+      spaceAbove < tooltipRect.height + GAP + EDGE_PADDING
+    ) {
       if (spaceBelow > spaceAbove) {
         finalPosition = "bottom";
       }
-    } else if (position === "bottom" && spaceBelow < tooltipRect.height + GAP + EDGE_PADDING) {
+    } else if (
+      position === "bottom" &&
+      spaceBelow < tooltipRect.height + GAP + EDGE_PADDING
+    ) {
       if (spaceAbove > spaceBelow) {
         finalPosition = "top";
       }
@@ -144,12 +150,12 @@ const Tooltip = ({
 
     const handleReposition = () => calculatePosition();
 
-    window.addEventListener('resize', handleReposition);
-    window.addEventListener('scroll', handleReposition, true); // Use capture to catch all scroll events
+    window.addEventListener("resize", handleReposition);
+    window.addEventListener("scroll", handleReposition, true); // Use capture to catch all scroll events
 
     return () => {
-      window.removeEventListener('resize', handleReposition);
-      window.removeEventListener('scroll', handleReposition, true);
+      window.removeEventListener("resize", handleReposition);
+      window.removeEventListener("scroll", handleReposition, true);
     };
   }, [isVisible, calculatePosition]);
 
@@ -168,12 +174,12 @@ const Tooltip = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('touchstart', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
   }, [clickable, isVisible]);
 
@@ -233,8 +239,8 @@ const Tooltip = ({
       onMouseLeave={handleTooltipMouseLeave}
       className="fixed z-[9999] px-4 py-3 text-sm rounded-lg shadow-xl"
       style={{
-        backgroundColor: "var(--bg-tooltip, #1f2937)",
-        color: "var(--text-tooltip, white)",
+        backgroundColor: "var(--bg-tertiary)",
+        color: "var(--text-primary)",
         border: "1px solid var(--border-color)",
         minWidth: "200px",
         maxWidth: "calc(100vw - 32px)", // Use nearly full width on all screens
@@ -243,11 +249,12 @@ const Tooltip = ({
         wordWrap: "break-word",
         top: `${tooltipPosition.top || 0}px`,
         left: `${tooltipPosition.left || 0}px`,
-        transform: (tooltipPosition.finalPosition === "top")
-          ? "translateY(-100%)"
-          : (tooltipPosition.finalPosition === "left")
-          ? "translateX(-100%)"
-          : "none",
+        transform:
+          tooltipPosition.finalPosition === "top"
+            ? "translateY(-100%)"
+            : tooltipPosition.finalPosition === "left"
+            ? "translateX(-100%)"
+            : "none",
       }}
     >
       {typeof content === "string" ? (
@@ -259,14 +266,14 @@ const Tooltip = ({
       <div
         className={`absolute w-2 h-2 transform rotate-45`}
         style={{
-          backgroundColor: "var(--bg-tooltip, #1f2937)",
+          backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
           borderWidth:
-            (tooltipPosition.finalPosition === "top")
+            tooltipPosition.finalPosition === "top"
               ? "0 1px 1px 0"
-              : (tooltipPosition.finalPosition === "bottom")
+              : tooltipPosition.finalPosition === "bottom"
               ? "1px 0 0 1px"
-              : (tooltipPosition.finalPosition === "left")
+              : tooltipPosition.finalPosition === "left"
               ? "1px 1px 0 0"
               : "0 0 1px 1px",
           // Position arrow based on actual position
@@ -299,7 +306,7 @@ const Tooltip = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
-        style={clickable ? { cursor: 'pointer' } : undefined}
+        style={clickable ? { cursor: "pointer" } : undefined}
       >
         {children}
       </div>
