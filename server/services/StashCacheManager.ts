@@ -206,6 +206,30 @@ class StashCacheManager {
 
       // Normalize scenes with default per-user fields AND transform URLs to use Peek proxy
       // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
+
+      // Debug: Log first few scenes with groups to verify data structure
+      const scenesWithGroups = scenesResult.findScenes.scenes.filter(s => s.groups && s.groups.length > 0);
+      if (scenesWithGroups.length > 0) {
+        logger.info("Sample scenes with groups from GraphQL", {
+          count: scenesWithGroups.length,
+          samples: scenesWithGroups.slice(0, 3).map(s => ({
+            id: s.id,
+            title: s.title,
+            groups: s.groups,
+          })),
+        });
+      } else {
+        logger.warn("No scenes with groups found in GraphQL response!", {
+          totalScenes: scenesResult.findScenes.scenes.length,
+          sampleScene: scenesResult.findScenes.scenes[0] ? {
+            id: scenesResult.findScenes.scenes[0].id,
+            title: scenesResult.findScenes.scenes[0].title,
+            hasGroupsField: 'groups' in scenesResult.findScenes.scenes[0],
+            groupsValue: scenesResult.findScenes.scenes[0].groups,
+          } : null,
+        });
+      }
+
       scenesResult.findScenes.scenes.forEach((scene) => {
         const transformed = transformScene(scene as Scene);
         newScenes.set(scene.id, {
