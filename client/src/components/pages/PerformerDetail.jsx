@@ -538,9 +538,11 @@ const PerformerStats = ({ performer }) => {
 const PerformerImage = ({ performer }) => {
   return (
     <div
-      className="rounded-lg w-full aspect-[2/3] rounded-xl overflow-hidden shadow-lg p-0"
+      className="rounded-lg w-full rounded-xl overflow-hidden shadow-lg p-0"
       style={{
         backgroundColor: "var(--bg-card)",
+        aspectRatio: "2/3",
+        maxHeight: "min(70vh, 900px)", // Constrain height to viewport
       }}
     >
       {performer?.image_path ? (

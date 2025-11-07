@@ -161,9 +161,11 @@ const GroupImageFlipper = ({ group }) => {
   return (
     <div className="relative">
       <div
-        className="rounded-lg w-full aspect-[2/3] p-3 shadow-lg"
+        className="rounded-lg w-full p-3 shadow-lg"
         style={{
           backgroundColor: "var(--bg-card)",
+          aspectRatio: "2/3",
+          maxHeight: "min(70vh, 900px)", // Constrain height to viewport
         }}
       >
         {displayImage ? (
