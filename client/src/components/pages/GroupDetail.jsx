@@ -164,7 +164,7 @@ const GroupImageFlipper = ({ group }) => {
         className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
         style={{
           backgroundColor: "var(--bg-card)",
-          aspectRatio: "4/5",
+          aspectRatio: "7/10",
           width: "100%",
           maxHeight: "80vh",
         }}
