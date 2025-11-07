@@ -92,17 +92,11 @@ export const urlParamsToFilters = (searchParams, filterOptions) => {
           const value = searchParams.get(key);
           if (multi) {
             // Multi-select: deserialize comma-separated string to array
-            // Convert to integers for ID fields
-            const values = value.split(",").filter(Boolean);
-            filters[key] = key.toLowerCase().includes('id') || key.toLowerCase().includes('ids')
-              ? values.map(v => parseInt(v, 10))
-              : values;
+            // Keep as strings (Stash uses string IDs)
+            filters[key] = value.split(",").filter(Boolean);
           } else {
             // Single select: just set the value
-            // Convert to integer for ID fields
-            filters[key] = (key.toLowerCase().includes('id') && value)
-              ? parseInt(value, 10)
-              : value;
+            filters[key] = value;
           }
         }
         break;

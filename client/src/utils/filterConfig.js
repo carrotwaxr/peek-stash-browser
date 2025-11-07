@@ -154,6 +154,19 @@ export const RESOLUTION_OPTIONS = [
   { value: "2160", label: "4K" },
 ];
 
+// Multi-criterion modifier options (for tags, performers, etc.)
+export const MULTI_MODIFIER_OPTIONS = [
+  { value: "INCLUDES_ALL", label: "Has ALL of these" },
+  { value: "INCLUDES", label: "Has ANY of these" },
+  { value: "EXCLUDES", label: "Has NONE of these" },
+];
+
+// Group/Collection modifier options (simpler - just include/exclude)
+export const GROUP_MODIFIER_OPTIONS = [
+  { value: "INCLUDES", label: "In ANY of these" },
+  { value: "EXCLUDES", label: "NOT in these" },
+];
+
 export const SCENE_FILTER_OPTIONS = [
   // Common Filters
   {
@@ -185,6 +198,9 @@ export const SCENE_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select performers...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "performerIdsModifier",
+    defaultModifier: "INCLUDES",
   },
   {
     key: "studioId",
@@ -203,6 +219,9 @@ export const SCENE_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES_ALL",
   },
   {
     key: "groupIds",
@@ -212,6 +231,9 @@ export const SCENE_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select collections...",
+    modifierOptions: GROUP_MODIFIER_OPTIONS,
+    modifierKey: "groupIdsModifier",
+    defaultModifier: "INCLUDES",
   },
   {
     key: "rating",
@@ -428,6 +450,9 @@ export const PERFORMER_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES_ALL",
   },
   {
     key: "gender",
@@ -676,6 +701,9 @@ export const STUDIO_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES_ALL",
   },
   {
     key: "rating",
@@ -862,6 +890,9 @@ export const GROUP_FILTER_OPTIONS = [
     multi: true,
     defaultValue: [],
     placeholder: "Select tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES_ALL",
   },
   {
     key: "rating",
@@ -942,7 +973,7 @@ export const buildSceneFilter = (filters) => {
   if (performerIds.length > 0) {
     sceneFilter.performers = {
       value: [...new Set(performerIds)], // Remove duplicates
-      modifier: filters.performers?.modifier || "INCLUDES_ALL",
+      modifier: filters.performerIdsModifier || filters.performers?.modifier || "INCLUDES",
     };
   }
 
@@ -972,7 +1003,7 @@ export const buildSceneFilter = (filters) => {
   if (tagIds.length > 0) {
     sceneFilter.tags = {
       value: [...new Set(tagIds)], // Remove duplicates
-      modifier: filters.tags?.modifier || "INCLUDES_ALL",
+      modifier: filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
     };
   }
 
@@ -987,7 +1018,7 @@ export const buildSceneFilter = (filters) => {
   if (groupIds.length > 0) {
     sceneFilter.groups = {
       value: [...new Set(groupIds)], // Remove duplicates
-      modifier: filters.groups?.modifier || "INCLUDES",
+      modifier: filters.groupIdsModifier || filters.groups?.modifier || "INCLUDES",
     };
   }
 
@@ -1338,7 +1369,7 @@ export const buildPerformerFilter = (filters) => {
   if (filters.tagIds && filters.tagIds.length > 0) {
     performerFilter.tags = {
       value: filters.tagIds.map(String),
-      modifier: "INCLUDES_ALL",
+      modifier: filters.tagIdsModifier || "INCLUDES_ALL",
     };
   }
 
@@ -1638,7 +1669,7 @@ export const buildStudioFilter = (filters) => {
   if (filters.tagIds && filters.tagIds.length > 0) {
     studioFilter.tags = {
       value: filters.tagIds.map(String),
-      modifier: "INCLUDES_ALL",
+      modifier: filters.tagIdsModifier || "INCLUDES_ALL",
     };
   }
 
@@ -1926,7 +1957,7 @@ export const buildGroupFilter = (filters) => {
   if (filters.tagIds && filters.tagIds.length > 0) {
     groupFilter.tags = {
       value: filters.tagIds.map(String),
-      modifier: "INCLUDES_ALL",
+      modifier: filters.tagIdsModifier || "INCLUDES_ALL",
     };
   }
 

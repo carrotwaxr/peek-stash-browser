@@ -32,16 +32,56 @@ const SearchableSelect = ({
   const searchInputRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
-  // API method mapping
-  const apiMethods = {
-    performers: libraryApi.findPerformersMinimal,
-    studios: libraryApi.findStudiosMinimal,
-    tags: libraryApi.findTagsMinimal,
-    groups: libraryApi.findGroupsMinimal,
-    galleries: libraryApi.findGalleriesMinimal,
-  };
+  // Fetch items by specific IDs (use full endpoints which support ID filtering)
+  const fetchItemsByIds = useCallback(
+    async (ids) => {
+      try {
+        let results;
 
-  // Load selected items' names when value changes
+        switch (entityType) {
+          case "performers": {
+            const response = await libraryApi.findPerformers({ ids });
+            results = response?.findPerformers?.performers || [];
+            break;
+          }
+          case "studios": {
+            const response = await libraryApi.findStudios({ ids });
+            results = response?.findStudios?.studios || [];
+            break;
+          }
+          case "tags": {
+            const response = await libraryApi.findTags({ ids });
+            results = response?.findTags?.tags || [];
+            break;
+          }
+          case "groups": {
+            const response = await libraryApi.findGroups({ ids });
+            results = response?.findGroups?.groups || [];
+            break;
+          }
+          case "galleries": {
+            const response = await libraryApi.findGalleries({ ids });
+            results = response?.findGalleries?.galleries || [];
+            break;
+          }
+          default:
+            results = [];
+        }
+
+        // Extract minimal fields (id + name)
+        return results.map((item) => ({
+          id: item.id,
+          name: item.name || item.title || "Unknown",
+        }));
+      } catch (error) {
+        console.error(`Error fetching ${entityType} by IDs:`, error);
+        return [];
+      }
+    },
+    [entityType]
+  );
+
+  // Load selected items' names immediately when value exists (lazy load on page load)
   useEffect(() => {
     if (!value) {
       setSelectedItems([]);
@@ -49,67 +89,94 @@ const SearchableSelect = ({
     }
 
     const loadSelectedNames = async () => {
-      // If we have options loaded, use those
+      const valueArray = multi ? value : [value];
+
+      // First, try to find in already-loaded options
       if (options.length > 0) {
-        const valueArray = multi ? value : [value];
         const selected = options.filter((opt) => valueArray.includes(opt.id));
-        setSelectedItems(selected);
-        return;
+        if (selected.length === valueArray.length) {
+          setSelectedItems(selected);
+          return;
+        }
       }
 
-      // Otherwise try to load from cache or API
+      // Try localStorage cache
       try {
         const cached = getCache(entityType);
         if (cached?.data) {
-          const valueArray = multi ? value : [value];
-          const selected = cached.data.filter((opt) => valueArray.includes(opt.id));
-          setSelectedItems(selected);
+          const selected = cached.data.filter((opt) =>
+            valueArray.includes(opt.id)
+          );
+
+          // If we found all items in cache, use them
+          if (selected.length === valueArray.length) {
+            setSelectedItems(selected);
+            return;
+          }
+        }
+
+        // Cache miss or incomplete - fetch by IDs from API in background
+        const results = await fetchItemsByIds(valueArray);
+        if (results && results.length > 0) {
+          setSelectedItems(results);
         }
       } catch (error) {
         console.error("Error loading selected names:", error);
       }
     };
 
+    // Run immediately (lazy load in background)
     loadSelectedNames();
-  }, [value, options, entityType, multi]);
+  }, [value, options, entityType, multi, fetchItemsByIds]);
 
   // Load options from cache or API
-  const loadOptions = useCallback(async (search = "") => {
-    try {
-      setLoading(true);
+  const loadOptions = useCallback(
+    async (search = "") => {
+      try {
+        setLoading(true);
 
-      // If no search term, try cache first
-      if (!search) {
-        const cached = getCache(entityType);
-        if (cached?.data) {
-          setOptions(cached.data);
-          setLoading(false);
-          return;
+        // If no search term, try cache first
+        if (!search) {
+          const cached = getCache(entityType);
+          if (cached?.data) {
+            setOptions(cached.data);
+            setLoading(false);
+            return;
+          }
         }
+
+        // API method mapping
+        const apiMethods = {
+          performers: libraryApi.findPerformersMinimal,
+          studios: libraryApi.findStudiosMinimal,
+          tags: libraryApi.findTagsMinimal,
+          groups: libraryApi.findGroupsMinimal,
+          galleries: libraryApi.findGalleriesMinimal,
+        };
+
+        // Fetch from API
+        const apiMethod = apiMethods[entityType];
+        const filter = search
+          ? { q: search, per_page: 50 } // Limited results for search
+          : { per_page: -1, sort: "name", direction: "ASC" }; // All results, sorted
+
+        const results = await apiMethod({ filter });
+
+        // Cache if we fetched all (no search)
+        if (!search && results.length > 0) {
+          setCache(entityType, results);
+        }
+
+        setOptions(results);
+      } catch (error) {
+        console.error(`Error loading ${entityType}:`, error);
+        setOptions([]);
+      } finally {
+        setLoading(false);
       }
-
-      // Fetch from API
-      const apiMethod = apiMethods[entityType];
-      const filter = search
-        ? { q: search, per_page: 50 } // Limited results for search
-        : { per_page: -1, sort: "name", direction: "ASC" }; // All results, sorted
-
-      const results = await apiMethod({ filter });
-
-      // Cache if we fetched all (no search)
-      if (!search && results.length > 0) {
-        setCache(entityType, results);
-      }
-
-      setOptions(results);
-    } catch (error) {
-      console.error(`Error loading ${entityType}:`, error);
-      setOptions([]);
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entityType]); // apiMethods is a constant object, doesn't need to be in dependencies
+    },
+    [entityType]
+  );
 
   // Debounced search
   useEffect(() => {
@@ -201,7 +268,7 @@ const SearchableSelect = ({
       {/* Selected items display / Trigger button */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 rounded-md cursor-pointer border text-sm flex items-center justify-between gap-2"
+        className="w-full pl-3 pr-[2px] py-2 rounded-md cursor-pointer border text-sm flex items-center justify-between gap-2"
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
@@ -245,7 +312,7 @@ const SearchableSelect = ({
           )}
         </div>
         <LucideChevronDown
-          size={18}
+          size={14}
           style={{
             transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
             transition: "transform 0.2s",
@@ -293,11 +360,17 @@ const SearchableSelect = ({
           {/* Options list */}
           <div className="overflow-y-auto" style={{ maxHeight: "250px" }}>
             {loading ? (
-              <div className="p-4 text-center" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="p-4 text-center"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Loading...
               </div>
             ) : options.length === 0 ? (
-              <div className="p-4 text-center" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="p-4 text-center"
+                style={{ color: "var(--text-muted)" }}
+              >
                 No {entityType} found
               </div>
             ) : (
@@ -312,7 +385,9 @@ const SearchableSelect = ({
                     backgroundColor: isSelected(option.id)
                       ? "var(--accent-primary)"
                       : "transparent",
-                    color: isSelected(option.id) ? "white" : "var(--text-primary)",
+                    color: isSelected(option.id)
+                      ? "white"
+                      : "var(--text-primary)",
                   }}
                 >
                   <span>{option.name}</span>

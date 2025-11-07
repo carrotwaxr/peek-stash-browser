@@ -7,6 +7,8 @@ const CACHE_KEYS = {
   performers: "peek-performers-cache",
   studios: "peek-studios-cache",
   tags: "peek-tags-cache",
+  groups: "peek-groups-cache",
+  galleries: "peek-galleries-cache",
 };
 
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
