@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { proxyStashMedia } from "../controllers/proxy.js";
+import { proxyStashMedia, proxyScenePreview, proxySceneWebp } from "../controllers/proxy.js";
 import * as statsController from "../controllers/stats.js";
 import authRoutes from "../routes/auth.js";
 import userRoutes from "../routes/user.js";
@@ -89,6 +89,10 @@ export const setupAPI = () => {
 
   // Media proxy (public - no auth required for images)
   app.get("/api/proxy/stash", proxyStashMedia);
+
+  // Scene preview proxy routes (public - no auth for performance)
+  app.get("/api/proxy/scene/:id/preview", proxyScenePreview);
+  app.get("/api/proxy/scene/:id/webp", proxySceneWebp);
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
