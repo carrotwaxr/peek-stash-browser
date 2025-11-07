@@ -543,6 +543,7 @@ const PerformerImage = ({ performer }) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "4/5",
         width: "100%",
+        maxHeight: "80vh",
       }}
     >
       {performer?.image_path ? (

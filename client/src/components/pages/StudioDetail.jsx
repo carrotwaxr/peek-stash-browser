@@ -150,6 +150,7 @@ const StudioImage = ({ studio }) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "4/5",
         width: "100%",
+        maxHeight: "80vh",
       }}
     >
       {studio?.image_path ? (

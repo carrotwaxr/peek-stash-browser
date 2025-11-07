@@ -159,16 +159,14 @@ const GroupImageFlipper = ({ group }) => {
   const displayImage = currentImage || fallbackImage;
 
   return (
-    <div className="relative">
+    <div className="relative w-full" style={{ maxHeight: "80vh" }}>
       <div
-        className="rounded-lg p-3 shadow-lg"
+        className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
         style={{
           backgroundColor: "var(--bg-card)",
-          maxHeight: "min(70vh, 900px)",
-          width: "fit-content",
-          minWidth: "300px",
-          maxWidth: "100%",
-          margin: "0 auto",
+          aspectRatio: "4/5",
+          width: "100%",
+          maxHeight: "80vh",
         }}
       >
         {displayImage ? (
@@ -177,37 +175,27 @@ const GroupImageFlipper = ({ group }) => {
             alt={`${group?.name} - ${showFront ? "Front" : "Back"} Cover`}
             style={{
               width: "100%",
-              height: "auto",
-              maxHeight: "calc(min(70vh, 900px) - 24px)", // Account for padding
+              height: "100%",
               objectFit: "contain",
             }}
           />
         ) : (
-          <div
-            className="flex items-center justify-center"
-            style={{
-              aspectRatio: "2/3",
-              width: "300px",
-              maxWidth: "100%",
-            }}
+          <svg
+            className="w-24 h-24"
+            style={{ color: "var(--text-muted)" }}
+            fill="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              className="w-24 h-24"
-              style={{ color: "var(--text-muted)" }}
-              fill="currentColor"
-              viewBox="0 0 24 24"
+            <text
+              x="50%"
+              y="50%"
+              dominantBaseline="middle"
+              textAnchor="middle"
+              fontSize="12"
             >
-              <text
-                x="50%"
-                y="50%"
-                dominantBaseline="middle"
-                textAnchor="middle"
-                fontSize="12"
-              >
-                🎬
-              </text>
-            </svg>
-          </div>
+              🎬
+            </text>
+          </svg>
         )}
       </div>
 
