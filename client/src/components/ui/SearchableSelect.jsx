@@ -201,9 +201,9 @@ const SearchableSelect = ({
       {/* Selected items display / Trigger button */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 rounded-lg cursor-pointer border flex items-center justify-between gap-2"
+        className="w-full px-3 py-2 rounded-md cursor-pointer border flex items-center justify-between gap-2"
         style={{
-          backgroundColor: "var(--bg-secondary)",
+          backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
           color: "var(--text-primary)",
           minHeight: "42px",
