@@ -191,15 +191,34 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
     fetchWatchHistory();
   }, [fetchWatchHistory]);
 
-  // Cleanup on unmount
   useEffect(() => {
+    const player = playerRef.current;
+    if (!player || player.isDisposed?.()) return;
+
+    const handlePlay = () => startTracking();
+    const handlePause = () => stopTracking();
+    const handleSeeked = () => trackSeek(0, player.currentTime());
+    const handleEnded = () => stopTracking();
+
+    player.on("play", handlePlay);
+    player.on("pause", handlePause);
+    player.on("seeked", handleSeeked);
+    player.on("ended", handleEnded);
+
     return () => {
       // Send final ping and cleanup when component unmounts
       if (pingIntervalRef.current) {
         stopTracking();
       }
+
+      if (player && !player.isDisposed()) {
+        player.off("play", handlePlay);
+        player.off("pause", handlePause);
+        player.off("seeked", handleSeeked);
+        player.off("ended", handleEnded);
+      }
     };
-  }, [stopTracking]);
+  }, [playerRef, startTracking, stopTracking, trackSeek]);
 
   // Listen for page visibility changes (tab switching)
   useEffect(() => {

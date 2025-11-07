@@ -115,45 +115,6 @@ export function ScenePlayerProvider({
     }
   }, [state.scene?.id]);
 
-  const switchQuality = useCallback(async (newQuality) => {
-    if (!state.scene?.id) return;
-
-    dispatch({ type: 'SET_SWITCHING_MODE', payload: true });
-    dispatch({ type: 'SET_QUALITY', payload: newQuality });
-
-    try {
-      const isDirectPlay = newQuality === 'direct';
-
-      if (isDirectPlay) {
-        dispatch({
-          type: 'LOAD_VIDEO_SUCCESS',
-          payload: {
-            video: { directPlay: true },
-            sessionId: null,
-          },
-        });
-      } else {
-        const response = await api.get(
-          `/video/play?sceneId=${state.scene.id}&quality=${newQuality}`
-        );
-        dispatch({
-          type: 'LOAD_VIDEO_SUCCESS',
-          payload: {
-            video: response.data.scene,
-            sessionId: response.data.sessionId,
-          },
-        });
-      }
-
-      dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
-      return { success: true };
-    } catch (error) {
-      console.error('Error switching quality:', error);
-      dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
-      return { success: false, error };
-    }
-  }, [state.scene?.id]);
-
   const enableAutoFallback = useCallback(async () => {
     if (!state.scene?.id) return;
 
@@ -251,7 +212,6 @@ export function ScenePlayerProvider({
     loadScene,
     loadVideo,
     incrementOCounter,
-    switchQuality,
     enableAutoFallback,
 
     // Playlist navigation helpers (kept for convenience)

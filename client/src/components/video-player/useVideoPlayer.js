@@ -155,6 +155,19 @@ export function useVideoPlayer({
   }, [scene?.paths?.vtt, scene?.paths?.sprite, playerRef]);
 
   // ============================================================================
+  // ASPECT RATIO UPDATES (fix layout when switching scenes)
+  // ============================================================================
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !scene) return;
+
+    // Force Video.js to recalculate dimensions when aspect ratio changes
+    // This fixes layout issues with 1:1 videos and when switching between different aspect ratios
+    player.trigger('playerresize');
+  }, [scene?.id, playerRef]);
+
+  // ============================================================================
   // RESUME PLAYBACK CAPTURE (from useResumePlayback)
   // ============================================================================
 
@@ -295,7 +308,7 @@ export function useVideoPlayer({
   }, [video, sessionId, quality]);
 
   // ============================================================================
-  // QUALITY SWITCHING (from useVideoPlayerSources, simplified)
+  // QUALITY SWITCHING (from useVideoPlayerSources)
   // ============================================================================
 
   // Track quality changes for watch history
@@ -305,9 +318,73 @@ export function useVideoPlayer({
     }
   }, [quality, updateQuality]);
 
-  // Note: Quality switching is now handled by PlaybackControls calling
-  // switchQuality() context action, which updates state and triggers
-  // the video sources effect above
+  // Handle user-initiated quality changes (preserve playback position)
+  useEffect(() => {
+    const player = playerRef.current;
+    const firstFile = scene?.files?.[0];
+
+    // Guard: Need player, scene, and actual quality change (not auto-fallback)
+    if (
+      !player ||
+      !scene ||
+      isAutoFallback ||
+      prevQualityRef.current === null ||
+      prevQualityRef.current === quality
+    ) {
+      prevQualityRef.current = quality;
+      return;
+    }
+
+    const isDirectPlay = quality === "direct";
+    const currentTime = player.currentTime(); // Capture current position
+
+    dispatch({ type: 'SET_SWITCHING_MODE', payload: true });
+    player.pause();
+
+    api
+      .get(`/video/play?sceneId=${scene.id}&quality=${quality}`)
+      .then((response) => {
+        if (!playerRef.current) return;
+
+        if (isDirectPlay) {
+          player.src({
+            src: `/api/video/play?sceneId=${scene.id}&quality=direct`,
+            type: `video/${firstFile?.format}`,
+            duration: firstFile?.duration,
+          });
+          dispatch({ type: 'SET_SESSION_ID', payload: null });
+          dispatch({ type: 'SET_VIDEO', payload: { directPlay: true } });
+        } else {
+          player.src({
+            src: response.data.playlistUrl,
+            type: "application/x-mpegURL",
+            duration: firstFile?.duration,
+          });
+          dispatch({ type: 'SET_SESSION_ID', payload: response.data.sessionId });
+          dispatch({ type: 'SET_VIDEO', payload: response.data.scene });
+          setupTranscodedSeeking(player, response.data.sessionId, api);
+        }
+
+        togglePlaybackRateControl(player, isDirectPlay);
+
+        // Restore playback position after metadata loads
+        player.one("loadedmetadata", () => {
+          if (playerRef.current && currentTime > 0) {
+            player.currentTime(currentTime);
+          }
+        });
+
+        player.play().catch(() => {});
+        dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
+      })
+      .catch((error) => {
+        console.error('[QUALITY] Quality switch failed:', error);
+        dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
+      });
+
+    prevQualityRef.current = quality;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quality, scene?.id, isAutoFallback]);
 
   // ============================================================================
   // AUTOPLAY AND RESUME (from useVideoPlayerSources)

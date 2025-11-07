@@ -11,7 +11,6 @@ const PlaybackControls = () => {
     quality,
     oCounter,
     dispatch,
-    switchQuality,
   } = useScenePlayer();
 
   // Don't render if no scene data yet
@@ -36,7 +35,7 @@ const PlaybackControls = () => {
           <div className="flex items-center justify-between md:justify-start gap-4 md:flex-1">
             <select
               value={quality}
-              onChange={(e) => switchQuality(e.target.value)}
+              onChange={(e) => dispatch({ type: 'SET_QUALITY', payload: e.target.value })}
               disabled={isLoading}
               className="btn text-sm"
               style={{
