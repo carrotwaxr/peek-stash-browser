@@ -216,6 +216,19 @@ function applyQuickSceneFilters(
   if (filters.groups) {
     const { value: groupIds, modifier } = filters.groups;
     if (!groupIds) return filtered;
+
+    // Debug logging
+    logger.info("Filtering by groups", {
+      requestedGroupIds: groupIds,
+      modifier,
+      totalScenesBeforeFilter: filtered.length,
+      sampleSceneGroups: filtered.slice(0, 3).map(s => ({
+        sceneId: s.id,
+        title: s.title,
+        groups: s.groups,
+      })),
+    });
+
     filtered = filtered.filter((s) => {
       const sceneGroupIds = (s.groups || []).map((g) => String(g.group?.id));
       const filterGroupIds = groupIds.map((id) => String(id));
@@ -229,6 +242,10 @@ function applyQuickSceneFilters(
         return !filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
       }
       return true;
+    });
+
+    logger.info("After groups filter", {
+      totalScenesAfterFilter: filtered.length,
     });
   }
 
