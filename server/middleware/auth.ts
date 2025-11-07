@@ -13,6 +13,11 @@ export interface RequestUser {
   id: number;
   username: string;
   role: string;
+  preferredQuality?: string | null;
+  preferredPlaybackMode?: string | null;
+  preferredPreviewQuality?: string | null;
+  enableCast?: boolean;
+  theme?: string | null;
 }
 
 /**
@@ -55,7 +60,16 @@ export const authenticateToken = async (
     const decoded = verifyToken(token);
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, username: true, role: true },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        preferredQuality: true,
+        preferredPlaybackMode: true,
+        preferredPreviewQuality: true,
+        enableCast: true,
+        theme: true,
+      },
     });
 
     if (!user) {

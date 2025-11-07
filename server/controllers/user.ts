@@ -107,6 +107,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         role: true,
         preferredQuality: true,
         preferredPlaybackMode: true,
+        preferredPreviewQuality: true,
         enableCast: true,
         theme: true,
         carouselPreferences: true,
@@ -125,6 +126,7 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
       settings: {
         preferredQuality: user.preferredQuality,
         preferredPlaybackMode: user.preferredPlaybackMode,
+        preferredPreviewQuality: user.preferredPreviewQuality,
         enableCast: user.enableCast,
         theme: user.theme,
         carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
@@ -163,11 +165,12 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       targetUserId = parseInt(req.params.userId);
     }
 
-    const { preferredQuality, preferredPlaybackMode, enableCast, theme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
+    const { preferredQuality, preferredPlaybackMode, preferredPreviewQuality, enableCast, theme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
     const validPlaybackModes = ["auto", "direct", "transcode"];
+    const validPreviewQualities = ["sprite", "webp", "mp4"];
 
     if (preferredQuality && !validQualities.includes(preferredQuality)) {
       return res.status(400).json({ error: "Invalid quality setting" });
@@ -175,6 +178,10 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
 
     if (preferredPlaybackMode && !validPlaybackModes.includes(preferredPlaybackMode)) {
       return res.status(400).json({ error: "Invalid playback mode setting" });
+    }
+
+    if (preferredPreviewQuality && !validPreviewQualities.includes(preferredPreviewQuality)) {
+      return res.status(400).json({ error: "Invalid preview quality setting" });
     }
 
     // Validate minimumPlayPercent if provided
@@ -222,6 +229,7 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       data: {
         ...(preferredQuality !== undefined && { preferredQuality }),
         ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
+        ...(preferredPreviewQuality !== undefined && { preferredPreviewQuality }),
         ...(enableCast !== undefined && { enableCast }),
         ...(theme !== undefined && { theme }),
         ...(carouselPreferences !== undefined && { carouselPreferences }),
