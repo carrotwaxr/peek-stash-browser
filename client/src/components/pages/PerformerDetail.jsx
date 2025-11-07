@@ -538,14 +538,11 @@ const PerformerStats = ({ performer }) => {
 const PerformerImage = ({ performer }) => {
   return (
     <div
-      className="rounded-xl overflow-hidden shadow-lg"
+      className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
       style={{
         backgroundColor: "var(--bg-card)",
-        maxHeight: "min(70vh, 900px)",
-        width: "fit-content",
-        minWidth: "300px",
-        maxWidth: "100%",
-        margin: "0 auto",
+        aspectRatio: "4/5",
+        width: "100%",
       }}
     >
       {performer?.image_path ? (
@@ -554,33 +551,23 @@ const PerformerImage = ({ performer }) => {
           alt={performer.name}
           style={{
             width: "100%",
-            height: "auto",
-            maxHeight: "min(70vh, 900px)",
+            height: "100%",
             objectFit: "contain",
           }}
         />
       ) : (
-        <div
-          className="flex items-center justify-center"
-          style={{
-            aspectRatio: "2/3",
-            width: "300px",
-            maxWidth: "100%",
-          }}
+        <svg
+          className="w-24 h-24"
+          style={{ color: "var(--text-muted)" }}
+          fill="currentColor"
+          viewBox="0 0 20 20"
         >
-          <svg
-            className="w-24 h-24"
-            style={{ color: "var(--text-muted)" }}
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
+          <path
+            fillRule="evenodd"
+            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+            clipRule="evenodd"
+          />
+        </svg>
       )}
     </div>
   );
