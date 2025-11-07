@@ -101,54 +101,7 @@ export function ScenePlayerProvider({
     }
   }, [state.quality, state.scene]);
 
-  const setQuality = useCallback((newQuality) => {
-    dispatch({ type: 'SET_QUALITY', payload: newQuality });
-  }, []);
-
-  const setVideo = useCallback((videoData) => {
-    dispatch({ type: 'SET_VIDEO', payload: videoData });
-  }, []);
-
-  const setSessionId = useCallback((sessionId) => {
-    dispatch({ type: 'SET_SESSION_ID', payload: sessionId });
-  }, []);
-
-  const clearVideo = useCallback(() => {
-    dispatch({ type: 'CLEAR_VIDEO' });
-  }, []);
-
-  const nextScene = useCallback(() => {
-    dispatch({ type: 'NEXT_SCENE' });
-  }, []);
-
-  const prevScene = useCallback(() => {
-    dispatch({ type: 'PREV_SCENE' });
-  }, []);
-
-  const gotoSceneIndex = useCallback((index) => {
-    dispatch({ type: 'GOTO_SCENE_INDEX', payload: index });
-  }, []);
-
-  const setIsInitializing = useCallback((value) => {
-    dispatch({ type: 'SET_INITIALIZING', payload: value });
-  }, []);
-
-  const setIsAutoFallback = useCallback((value) => {
-    dispatch({ type: 'SET_AUTO_FALLBACK', payload: value });
-  }, []);
-
-  const setSwitchingMode = useCallback((value) => {
-    dispatch({ type: 'SET_SWITCHING_MODE', payload: value });
-  }, []);
-
-  const setReady = useCallback((value) => {
-    dispatch({ type: 'SET_READY', payload: value });
-  }, []);
-
-  const setShouldAutoplay = useCallback((value) => {
-    dispatch({ type: 'SET_SHOULD_AUTOPLAY', payload: value });
-  }, []);
-
+  // Complex action creators (with side effects or logic)
   const incrementOCounter = useCallback(async () => {
     if (!state.scene?.id) return;
 
@@ -162,8 +115,82 @@ export function ScenePlayerProvider({
     }
   }, [state.scene?.id]);
 
-  const setOCounter = useCallback((newCount) => {
-    dispatch({ type: 'SET_O_COUNTER', payload: newCount });
+  const switchQuality = useCallback(async (newQuality) => {
+    if (!state.scene?.id) return;
+
+    dispatch({ type: 'SET_SWITCHING_MODE', payload: true });
+    dispatch({ type: 'SET_QUALITY', payload: newQuality });
+
+    try {
+      const isDirectPlay = newQuality === 'direct';
+
+      if (isDirectPlay) {
+        dispatch({
+          type: 'LOAD_VIDEO_SUCCESS',
+          payload: {
+            video: { directPlay: true },
+            sessionId: null,
+          },
+        });
+      } else {
+        const response = await api.get(
+          `/video/play?sceneId=${state.scene.id}&quality=${newQuality}`
+        );
+        dispatch({
+          type: 'LOAD_VIDEO_SUCCESS',
+          payload: {
+            video: response.data.scene,
+            sessionId: response.data.sessionId,
+          },
+        });
+      }
+
+      dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
+      return { success: true };
+    } catch (error) {
+      console.error('Error switching quality:', error);
+      dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
+      return { success: false, error };
+    }
+  }, [state.scene?.id]);
+
+  const enableAutoFallback = useCallback(async () => {
+    if (!state.scene?.id) return;
+
+    dispatch({ type: 'SET_AUTO_FALLBACK', payload: true });
+    dispatch({ type: 'SET_QUALITY', payload: '480p' });
+
+    try {
+      const response = await api.get(`/video/play?sceneId=${state.scene.id}&quality=480p`);
+
+      dispatch({
+        type: 'LOAD_VIDEO_SUCCESS',
+        payload: {
+          video: response.data.scene,
+          sessionId: response.data.sessionId,
+        },
+      });
+
+      dispatch({ type: 'SET_AUTO_FALLBACK', payload: false });
+      return { success: true, sessionId: response.data.sessionId };
+    } catch (error) {
+      console.error('Error enabling auto-fallback:', error);
+      dispatch({ type: 'SET_AUTO_FALLBACK', payload: false });
+      return { success: false, error };
+    }
+  }, [state.scene?.id]);
+
+  // Playlist navigation helpers (kept for convenience)
+  const nextScene = useCallback(() => {
+    dispatch({ type: 'NEXT_SCENE' });
+  }, []);
+
+  const prevScene = useCallback(() => {
+    dispatch({ type: 'PREV_SCENE' });
+  }, []);
+
+  const gotoSceneIndex = useCallback((index) => {
+    dispatch({ type: 'GOTO_SCENE_INDEX', payload: index });
   }, []);
 
   // ============================================================================
@@ -217,23 +244,20 @@ export function ScenePlayerProvider({
     ...state,
     shouldResume, // Pass through from props
 
-    // Actions
+    // Direct dispatch access (for simple state updates)
+    dispatch,
+
+    // Complex actions (with side effects)
     loadScene,
     loadVideo,
-    setQuality,
-    setVideo,
-    setSessionId,
-    clearVideo,
+    incrementOCounter,
+    switchQuality,
+    enableAutoFallback,
+
+    // Playlist navigation helpers (kept for convenience)
     nextScene,
     prevScene,
     gotoSceneIndex,
-    setIsInitializing,
-    setIsAutoFallback,
-    setSwitchingMode,
-    setReady,
-    setShouldAutoplay,
-    incrementOCounter,
-    setOCounter,
   };
 
   return (

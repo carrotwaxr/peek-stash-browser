@@ -6,11 +6,7 @@ import "./VideoPlayer.css";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
-//import { useOrientationFullscreen } from "../../hooks/useOrientationFullscreen.js";
-import { useVideoPlayerLifecycle } from "./useVideoPlayerLifecycle.js";
-import { useVideoPlayerSources } from "./useVideoPlayerSources.js";
-import { useResumePlayback } from "./useResumePlayback.js";
-import { usePlaylistPlayer } from "./usePlaylistPlayer.js";
+import { useVideoPlayer } from "./useVideoPlayer.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -82,14 +78,8 @@ const VideoPlayer = () => {
     shouldAutoplay,
     playlist,
     currentIndex,
-    setQuality,
-    setVideo,
-    setSessionId,
-    setIsInitializing,
-    setIsAutoFallback,
-    setSwitchingMode,
-    setReady,
-    setShouldAutoplay,
+    dispatch,
+    enableAutoFallback,
     nextScene,
     prevScene,
   } = useScenePlayer();
@@ -107,9 +97,7 @@ const VideoPlayer = () => {
   const {
     watchHistory,
     loading: loadingWatchHistory,
-    startTracking,
     stopTracking,
-    trackSeek,
     updateQuality,
   } = useWatchHistory(scene?.id, playerRef);
 
@@ -117,39 +105,9 @@ const VideoPlayer = () => {
   // CUSTOM HOOKS: VIDEO PLAYER LOGIC
   // ============================================================================
 
-  // Hook 1: Manage player lifecycle (init + cleanup)
-  useVideoPlayerLifecycle({
+  // Consolidated hook: Manages all Video.js player operations
+  const { playNextInPlaylist, playPreviousInPlaylist } = useVideoPlayer({
     videoRef,
-    playerRef,
-    stopTracking,
-    scene,
-    enableCast,
-  });
-
-  // Hook 2: Manage playlist navigation and controls
-  const { playNextInPlaylist, playPreviousInPlaylist } = usePlaylistPlayer({
-    playerRef,
-    playlist,
-    currentIndex,
-    video,
-    nextScene,
-    prevScene,
-    setShouldAutoplay,
-  });
-
-  // Hook 3: Capture resume time from watch history
-  useResumePlayback({
-    scene,
-    watchHistory,
-    loadingWatchHistory,
-    location,
-    hasResumedRef,
-    initialResumeTimeRef,
-    setShouldAutoplay,
-  });
-
-  // Hook 4: Manage video sources, poster, and quality switching
-  useVideoPlayerSources({
     playerRef,
     scene,
     video,
@@ -158,23 +116,23 @@ const VideoPlayer = () => {
     isAutoFallback,
     ready,
     shouldAutoplay,
-    setIsInitializing,
-    setIsAutoFallback,
-    setSwitchingMode,
-    setVideo,
-    setSessionId,
-    setQuality,
-    setReady,
-    setShouldAutoplay,
+    playlist,
+    currentIndex,
+    dispatch,
+    enableAutoFallback,
+    nextScene,
+    prevScene,
     updateQuality,
+    stopTracking,
     location,
     hasResumedRef,
     initialResumeTimeRef,
-    firstFile,
-    api,
+    watchHistory,
+    loadingWatchHistory,
+    enableCast,
   });
 
-  // Hook 5: Media keys for playlist navigation
+  // Media keys for playlist navigation
   usePlaylistMediaKeys({
     playerRef,
     playlist,
@@ -183,45 +141,6 @@ const VideoPlayer = () => {
     enabled: !!video,
   });
 
-  // Hook 6: Auto-fullscreen on orientation change (mobile)
-  //useOrientationFullscreen(playerRef, !!video);
-
-  // ============================================================================
-  // WATCH HISTORY EVENT LISTENERS
-  // ============================================================================
-  // WHY: Wire up watch history tracking functions to player events
-  // RUNS: When watch history functions change (they shouldn't, but dependencies required)
-  // DEPS: [startTracking, stopTracking, trackSeek]
-  //
-  // This is kept in the main component because it's simple event wiring.
-  // Creating a separate hook for this would be over-abstraction.
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player || player.isDisposed?.()) return;
-
-    const handlePlay = () => startTracking();
-    const handlePause = () => stopTracking();
-    const handleSeeked = () => trackSeek(0, player.currentTime());
-    const handleEnded = () => stopTracking();
-
-    player.on("play", handlePlay);
-    player.on("pause", handlePause);
-    player.on("seeked", handleSeeked);
-    player.on("ended", handleEnded);
-
-    return () => {
-      if (player && !player.isDisposed()) {
-        player.off("play", handlePlay);
-        player.off("pause", handlePause);
-        player.off("seeked", handleSeeked);
-        player.off("ended", handleEnded);
-      }
-    };
-  }, [startTracking, stopTracking, trackSeek]);
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
   return (
     <section className="video-container">
       {/*

@@ -9,9 +9,9 @@ const PlaybackControls = () => {
     sceneLoading,
     videoLoading,
     quality,
-    setQuality,
     oCounter,
-    setOCounter,
+    dispatch,
+    switchQuality,
   } = useScenePlayer();
 
   // Don't render if no scene data yet
@@ -36,7 +36,7 @@ const PlaybackControls = () => {
           <div className="flex items-center justify-between md:justify-start gap-4 md:flex-1">
             <select
               value={quality}
-              onChange={(e) => setQuality(e.target.value)}
+              onChange={(e) => switchQuality(e.target.value)}
               disabled={isLoading}
               className="btn text-sm"
               style={{
@@ -76,7 +76,7 @@ const PlaybackControls = () => {
             <OCounterButton
               sceneId={scene?.id}
               initialCount={oCounter}
-              onIncrement={setOCounter}
+              onIncrement={(newCount) => dispatch({ type: 'SET_O_COUNTER', payload: newCount })}
               disabled={isLoading}
             />
           </div>
