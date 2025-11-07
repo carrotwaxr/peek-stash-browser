@@ -161,21 +161,35 @@ const GroupImageFlipper = ({ group }) => {
   return (
     <div className="relative">
       <div
-        className="rounded-lg w-full p-3 shadow-lg"
+        className="rounded-lg p-3 shadow-lg"
         style={{
           backgroundColor: "var(--bg-card)",
-          aspectRatio: "2/3",
-          maxHeight: "min(70vh, 900px)", // Constrain height to viewport
+          maxHeight: "min(70vh, 900px)",
+          width: "fit-content",
+          maxWidth: "100%",
+          margin: "0 auto",
         }}
       >
         {displayImage ? (
           <img
             src={displayImage}
             alt={`${group?.name} - ${showFront ? "Front" : "Back"} Cover`}
-            className="w-full h-full object-contain"
+            style={{
+              width: "100%",
+              height: "auto",
+              maxHeight: "calc(min(70vh, 900px) - 24px)", // Account for padding
+              objectFit: "contain",
+            }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div
+            className="flex items-center justify-center"
+            style={{
+              aspectRatio: "2/3",
+              width: "300px",
+              maxWidth: "100%",
+            }}
+          >
             <svg
               className="w-24 h-24"
               style={{ color: "var(--text-muted)" }}

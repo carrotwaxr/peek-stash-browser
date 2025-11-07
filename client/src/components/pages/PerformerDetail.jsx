@@ -538,21 +538,35 @@ const PerformerStats = ({ performer }) => {
 const PerformerImage = ({ performer }) => {
   return (
     <div
-      className="rounded-lg w-full rounded-xl overflow-hidden shadow-lg p-0"
+      className="rounded-xl overflow-hidden shadow-lg"
       style={{
         backgroundColor: "var(--bg-card)",
-        aspectRatio: "2/3",
-        maxHeight: "min(70vh, 900px)", // Constrain height to viewport
+        maxHeight: "min(70vh, 900px)",
+        width: "fit-content",
+        maxWidth: "100%",
+        margin: "0 auto",
       }}
     >
       {performer?.image_path ? (
         <img
           src={performer.image_path}
           alt={performer.name}
-          className="w-full h-full object-cover"
+          style={{
+            width: "100%",
+            height: "auto",
+            maxHeight: "min(70vh, 900px)",
+            objectFit: "contain",
+          }}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
+        <div
+          className="flex items-center justify-center"
+          style={{
+            aspectRatio: "2/3",
+            width: "300px",
+            maxWidth: "100%",
+          }}
+        >
           <svg
             className="w-24 h-24"
             style={{ color: "var(--text-muted)" }}
