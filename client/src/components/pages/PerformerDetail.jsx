@@ -543,6 +543,7 @@ const PerformerImage = ({ performer }) => {
         backgroundColor: "var(--bg-card)",
         maxHeight: "min(70vh, 900px)",
         width: "fit-content",
+        minWidth: "300px",
         maxWidth: "100%",
         margin: "0 auto",
       }}
