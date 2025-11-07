@@ -6,7 +6,7 @@ import "./VideoPlayer.css";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
-import { useOrientationFullscreen } from "../../hooks/useOrientationFullscreen.js";
+//import { useOrientationFullscreen } from "../../hooks/useOrientationFullscreen.js";
 import { useVideoPlayerLifecycle } from "./useVideoPlayerLifecycle.js";
 import { useVideoPlayerSources } from "./useVideoPlayerSources.js";
 import { useResumePlayback } from "./useResumePlayback.js";
@@ -46,17 +46,11 @@ const api = axios.create({
 const VideoPlayer = () => {
   const location = useLocation();
 
-  // ============================================================================
-  // REFS
-  // ============================================================================
   const videoRef = useRef(null); // Container div (Video.js element appended here)
   const playerRef = useRef(null); // Video.js player instance
   const hasResumedRef = useRef(false); // Prevent double-resume
   const initialResumeTimeRef = useRef(null); // Capture resume time once
 
-  // ============================================================================
-  // USER SETTINGS
-  // ============================================================================
   const [enableCast, setEnableCast] = useState(true); // Default to true
 
   // Fetch user settings for cast preference
@@ -190,7 +184,7 @@ const VideoPlayer = () => {
   });
 
   // Hook 6: Auto-fullscreen on orientation change (mobile)
-  useOrientationFullscreen(playerRef, !!video);
+  //useOrientationFullscreen(playerRef, !!video);
 
   // ============================================================================
   // WATCH HISTORY EVENT LISTENERS
@@ -229,67 +223,62 @@ const VideoPlayer = () => {
   // RENDER
   // ============================================================================
   return (
-    <section>
-      {/* Max-width wrapper for centering on large displays */}
-      <div style={{
-        maxWidth: "1920px",
-        margin: "0 auto",
-        width: "100%"
-      }}>
-        <div className="video-container" style={{ position: "relative" }}>
-          {/*
+    <section className="video-container">
+      {/*
             Container div - Video.js element will be programmatically appended here
             This prevents React/Video.js DOM conflicts by keeping the video element
             outside of React's management (following Stash's pattern)
 
             NOTE: No key={scene?.id} here - that was destroying the container on scene changes
           */}
-          <div
-            data-vjs-player
-            style={{
-              position: "relative",
-              aspectRatio: aspectRatio,
-              overflow: "hidden",
-              width: "100%",
-              backgroundColor: "#000"
-            }}
-          >
-          <div ref={videoRef} style={{
+      <div
+        data-vjs-player
+        style={{
+          position: "relative",
+          aspectRatio,
+          overflow: "hidden",
+          width: "100%",
+          maxHeight: "min(75vh, 100%)", // Constrain to 75% viewport height
+          backgroundColor: "#000",
+        }}
+      >
+        <div
+          ref={videoRef}
+          style={{
             position: "absolute",
             width: "100%",
-            height: "100%"
-          }} />
+            height: "100%",
+          }}
+        />
 
-          {/* Loading overlay for scene or video data */}
-          {(!scene || videoLoading || isInitializing || isAutoFallback) && (
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "rgba(0, 0, 0, 0.5)",
-                zIndex: 10,
-              }}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-                <span style={{ color: "white", fontSize: "14px" }}>
-                  {!scene
-                    ? "Loading scene..."
-                    : isAutoFallback
-                    ? "Switching to transcoded playback..."
-                    : "Loading video..."}
-                </span>
-              </div>
+        {/* Loading overlay for scene or video data */}
+        {(!scene || videoLoading || isInitializing || isAutoFallback) && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              zIndex: 10,
+            }}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+              <span style={{ color: "white", fontSize: "14px" }}>
+                {!scene
+                  ? "Loading scene..."
+                  : isAutoFallback
+                  ? "Switching to transcoded playback..."
+                  : "Loading video..."}
+              </span>
             </div>
-          )}
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

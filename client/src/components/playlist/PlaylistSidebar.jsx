@@ -1,0 +1,411 @@
+import { useRef, useState } from "react";
+import {
+  Shuffle,
+  Repeat,
+  Repeat1,
+  List,
+  Play,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
+import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+import Button from "../ui/Button.jsx";
+
+/**
+ * PlaylistSidebar - Vertical playlist controls optimized for sidebar display
+ * Similar to YouTube's playlist sidebar on desktop
+ */
+const PlaylistSidebar = () => {
+  const { playlist, currentIndex, gotoSceneIndex } = useScenePlayer();
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  // Shuffle and repeat state
+  const [shuffle, setShuffle] = useState(playlist?.shuffle || false);
+  const [repeat, setRepeat] = useState(playlist?.repeat || "none");
+
+  if (!playlist || !playlist.scenes || playlist.scenes.length === 0) {
+    return null;
+  }
+
+  const totalScenes = playlist.scenes.length;
+  const position = currentIndex + 1;
+  const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
+  const currentScene = playlist.scenes[currentIndex];
+
+  // Find next scene for "Up Next" preview
+  const nextSceneIndex = currentIndex + 1;
+  const nextScene = nextSceneIndex < totalScenes ? playlist.scenes[nextSceneIndex] : null;
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return "?:??";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+        .toString()
+        .padStart(2, "0")}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const navigateToScene = (index) => {
+    if (index < 0 || index >= totalScenes) return;
+
+    // Check if video is playing and set autoplay flag
+    const videoElements = document.querySelectorAll("video");
+    let isPlaying = false;
+
+    videoElements.forEach((video) => {
+      if (!video.paused && !video.ended && video.readyState > 2) {
+        isPlaying = true;
+      }
+    });
+
+    if (isPlaying) {
+      sessionStorage.setItem("videoPlayerAutoplay", "true");
+
+      const isFullscreen =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      if (isFullscreen) {
+        sessionStorage.setItem("videoPlayerFullscreen", "true");
+      }
+    }
+
+    gotoSceneIndex(index);
+  };
+
+  const goToPlaylist = () => {
+    window.location.href = `/playlist/${playlist.id}`;
+  };
+
+  const toggleShuffle = () => {
+    setShuffle(!shuffle);
+  };
+
+  const toggleRepeat = () => {
+    const repeatModes = ["none", "all", "one"];
+    const currentIdx = repeatModes.indexOf(repeat);
+    setRepeat(repeatModes[(currentIdx + 1) % repeatModes.length]);
+  };
+
+  return (
+    <div
+      className="rounded-lg border overflow-hidden"
+      style={{
+        backgroundColor: "var(--bg-card)",
+        borderColor: "var(--border-color)",
+      }}
+    >
+      {/* Header */}
+      <div
+        className="p-4 border-b"
+        style={{ borderColor: "var(--border-color)" }}
+      >
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <List size={18} style={{ color: "var(--text-secondary)" }} />
+            <div className="flex-1 min-w-0">
+              <h3
+                className="font-semibold text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {isVirtualPlaylist ? "Browsing" : "Playlist"}
+              </h3>
+              {isVirtualPlaylist ? (
+                <p
+                  className="text-xs truncate"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {playlist.name}
+                </p>
+              ) : (
+                <Button
+                  onClick={goToPlaylist}
+                  variant="tertiary"
+                  size="sm"
+                  className="text-xs hover:underline !p-0 truncate max-w-full"
+                  style={{ color: "var(--status-info)" }}
+                >
+                  {playlist.name}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Collapse toggle */}
+          <Button
+            onClick={() => setIsExpanded(!isExpanded)}
+            variant="tertiary"
+            size="sm"
+            className="p-1 flex-shrink-0 ml-2"
+            icon={isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            aria-label={isExpanded ? "Collapse playlist" : "Expand playlist"}
+          />
+        </div>
+
+        {/* Control buttons */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {/* Shuffle */}
+            <Button
+              onClick={toggleShuffle}
+              variant="secondary"
+              size="sm"
+              className="p-1.5"
+              {...(shuffle && {
+                style: {
+                  border: "2px solid var(--status-info)",
+                  color: "var(--status-info)",
+                },
+              })}
+              icon={<Shuffle size={14} />}
+              title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
+            />
+
+            {/* Repeat */}
+            <Button
+              onClick={toggleRepeat}
+              variant="secondary"
+              size="sm"
+              className="p-1.5"
+              {...(repeat !== "none" && {
+                style: {
+                  border: "2px solid var(--status-info)",
+                  color: "var(--status-info)",
+                },
+              })}
+              icon={
+                repeat === "one" ? <Repeat1 size={14} /> : <Repeat size={14} />
+              }
+              title={
+                repeat === "one"
+                  ? "Repeat: One"
+                  : repeat === "all"
+                  ? "Repeat: All"
+                  : "Repeat: Off"
+              }
+            />
+          </div>
+
+          <div className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+            {position} / {totalScenes}
+          </div>
+        </div>
+      </div>
+
+      {/* Expandable content */}
+      {isExpanded && (
+        <>
+          {/* Up Next Preview (if not last scene) */}
+          {nextScene && (
+            <div
+              className="p-3 border-b"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                borderColor: "var(--border-color)",
+              }}
+            >
+              <p
+                className="text-xs font-semibold uppercase tracking-wide mb-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Up Next
+              </p>
+              <div
+                onClick={() => navigateToScene(nextSceneIndex)}
+                className="group cursor-pointer rounded overflow-hidden transition-all hover:scale-[1.02]"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                }}
+              >
+                <div className="flex gap-2">
+                  {/* Thumbnail */}
+                  <div
+                    className="relative flex-shrink-0"
+                    style={{
+                      width: "120px",
+                      height: "68px",
+                      backgroundColor: "var(--border-color)",
+                    }}
+                  >
+                    {nextScene.scene?.paths?.screenshot ? (
+                      <img
+                        src={nextScene.scene.paths.screenshot}
+                        alt={nextScene.scene.title || "Next scene"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {nextSceneIndex + 1}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Play icon overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Play size={24} style={{ color: "white" }} fill="white" />
+                      </div>
+                    </div>
+
+                    {/* Duration */}
+                    {nextScene.scene?.files?.[0]?.duration && (
+                      <div
+                        className="absolute bottom-1 right-1 px-1 py-0.5 text-xs font-medium rounded"
+                        style={{
+                          backgroundColor: "rgba(0, 0, 0, 0.8)",
+                          color: "white",
+                        }}
+                      >
+                        {formatDuration(nextScene.scene.files[0].duration)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 py-1 pr-2 min-w-0">
+                    <h4
+                      className="text-sm font-medium line-clamp-2 group-hover:underline"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {nextScene.scene?.title ||
+                        nextScene.scene?.files?.[0]?.basename ||
+                        "Untitled"}
+                    </h4>
+                    {nextScene.scene?.studio && (
+                      <p
+                        className="text-xs mt-1 line-clamp-1"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {nextScene.scene.studio.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Scene List */}
+          <div
+            className="overflow-y-auto"
+            style={{ maxHeight: "calc(100vh - 400px)" }}
+          >
+            {playlist.scenes.map((item, index) => {
+              const scene = item.scene;
+              const isCurrent = index === currentIndex;
+
+              return (
+                <div
+                  key={item.sceneId}
+                  onClick={() => navigateToScene(index)}
+                  className="group cursor-pointer p-3 border-b transition-colors hover:bg-opacity-80"
+                  style={{
+                    backgroundColor: isCurrent
+                      ? "var(--bg-secondary)"
+                      : "transparent",
+                    borderColor: "var(--border-color)",
+                  }}
+                >
+                  <div className="flex gap-3">
+                    {/* Index/Current indicator */}
+                    <div
+                      className="flex-shrink-0 flex items-center justify-center"
+                      style={{ width: "24px" }}
+                    >
+                      {isCurrent ? (
+                        <Play size={16} style={{ color: "var(--accent-primary)" }} fill="var(--accent-primary)" />
+                      ) : (
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {index + 1}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Thumbnail */}
+                    <div
+                      className="relative flex-shrink-0 rounded overflow-hidden"
+                      style={{
+                        width: "80px",
+                        height: "45px",
+                        backgroundColor: "var(--border-color)",
+                      }}
+                    >
+                      {scene?.paths?.screenshot ? (
+                        <img
+                          src={scene.paths.screenshot}
+                          alt={scene.title || `Scene ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span
+                            className="text-xs"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            {index + 1}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Duration */}
+                      {scene?.files?.[0]?.duration && (
+                        <div
+                          className="absolute bottom-0.5 right-0.5 px-1 py-0.5 text-xs rounded"
+                          style={{
+                            backgroundColor: "rgba(0, 0, 0, 0.8)",
+                            color: "white",
+                            fontSize: "10px",
+                          }}
+                        >
+                          {formatDuration(scene.files[0].duration)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <h4
+                        className={`text-sm font-medium line-clamp-2 ${
+                          !isCurrent && "group-hover:underline"
+                        }`}
+                        style={{
+                          color: isCurrent
+                            ? "var(--accent-primary)"
+                            : "var(--text-primary)",
+                        }}
+                      >
+                        {scene?.title ||
+                          scene?.files?.[0]?.basename ||
+                          "Untitled"}
+                      </h4>
+                      {scene?.studio && (
+                        <p
+                          className="text-xs mt-0.5 line-clamp-1"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
+                          {scene.studio.name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default PlaylistSidebar;
