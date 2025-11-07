@@ -32,11 +32,26 @@ interface FilterPreset {
  * User filter presets collection
  */
 interface FilterPresets {
-  scenes?: FilterPreset[];
-  performers?: FilterPreset[];
-  studios?: FilterPreset[];
-  tags?: FilterPreset[];
+  scene?: FilterPreset[];
+  performer?: FilterPreset[];
+  studio?: FilterPreset[];
+  tag?: FilterPreset[];
+  group?: FilterPreset[];
+  gallery?: FilterPreset[];
   [key: string]: FilterPreset[] | undefined;
+}
+
+/**
+ * Default filter presets (preset IDs for each artifact type)
+ */
+interface DefaultFilterPresets {
+  scene?: string;
+  performer?: string;
+  studio?: string;
+  tag?: string;
+  group?: string;
+  gallery?: string;
+  [key: string]: string | undefined;
 }
 
 /**
@@ -527,7 +542,7 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { artifactType, name, filters, sort, direction } = req.body;
+    const { artifactType, name, filters, sort, direction, setAsDefault } = req.body;
 
     // Validate required fields
     if (!artifactType || !name || !filters || !sort || !direction) {
@@ -535,23 +550,19 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
     }
 
     // Validate artifact type
-    const validTypes = ["scene", "performer", "studio", "tag"];
+    const validTypes = ["scene", "performer", "studio", "tag", "group", "gallery"];
     if (!validTypes.includes(artifactType)) {
       return res.status(400).json({ error: "Invalid artifact type" });
     }
 
-    // Get current presets
+    // Get current presets and defaults
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { filterPresets: true },
+      select: { filterPresets: true, defaultFilterPresets: true },
     });
 
-    const currentPresets = (user?.filterPresets as FilterPresets | null) || {
-      scene: [],
-      performer: [],
-      studio: [],
-      tag: [],
-    };
+    const currentPresets = (user?.filterPresets as FilterPresets | null) || {};
+    const currentDefaults = (user?.defaultFilterPresets as DefaultFilterPresets | null) || {};
 
     // Create new preset
     const newPreset = {
@@ -566,11 +577,17 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
     // Add preset to the appropriate artifact type array
     currentPresets[artifactType] = [...(currentPresets[artifactType] || []), newPreset];
 
+    // If setAsDefault is true, set this preset as default
+    if (setAsDefault) {
+      currentDefaults[artifactType] = newPreset.id;
+    }
+
     // Update user
     await prisma.user.update({
       where: { id: userId },
       data: {
         filterPresets: currentPresets as never,
+        defaultFilterPresets: currentDefaults as never,
       },
     });
 
@@ -595,38 +612,40 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
     const { artifactType, presetId } = req.params;
 
     // Validate artifact type
-    const validTypes = ["scene", "performer", "studio", "tag"];
+    const validTypes = ["scene", "performer", "studio", "tag", "group", "gallery"];
     if (!validTypes.includes(artifactType)) {
       return res.status(400).json({ error: "Invalid artifact type" });
     }
 
-    // Get current presets
+    // Get current presets and defaults
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { filterPresets: true },
+      select: { filterPresets: true, defaultFilterPresets: true },
     });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const currentPresets = (user.filterPresets as FilterPresets) || {
-      scene: [],
-      performer: [],
-      studio: [],
-      tag: [],
-    };
+    const currentPresets = (user.filterPresets as FilterPresets) || {};
+    const currentDefaults = (user.defaultFilterPresets as DefaultFilterPresets) || {};
 
     // Remove preset from the appropriate artifact type array
     currentPresets[artifactType] = (currentPresets[artifactType] || []).filter(
       (preset: FilterPreset) => preset.id !== presetId
     );
 
+    // If this was the default preset, clear the default
+    if (currentDefaults[artifactType] === presetId) {
+      delete currentDefaults[artifactType];
+    }
+
     // Update user
     await prisma.user.update({
       where: { id: userId },
       data: {
         filterPresets: currentPresets as never,
+        defaultFilterPresets: currentDefaults as never,
       },
     });
 
@@ -634,6 +653,107 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
   } catch (error) {
     console.error("Error deleting filter preset:", error);
     res.status(500).json({ error: "Failed to delete filter preset" });
+  }
+};
+
+/**
+ * Get default filter presets
+ */
+export const getDefaultFilterPresets = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Get user's default presets
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        defaultFilterPresets: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Return empty object if no defaults set
+    const defaults = user.defaultFilterPresets || {};
+
+    res.json({ defaults });
+  } catch (error) {
+    console.error("Error getting default filter presets:", error);
+    res.status(500).json({ error: "Failed to get default filter presets" });
+  }
+};
+
+/**
+ * Set default filter preset for an artifact type
+ */
+export const setDefaultFilterPreset = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { artifactType, presetId } = req.body;
+
+    // Validate required fields
+    if (!artifactType) {
+      return res.status(400).json({ error: "Missing artifactType" });
+    }
+
+    // Validate artifact type
+    const validTypes = ["scene", "performer", "studio", "tag", "group", "gallery"];
+    if (!validTypes.includes(artifactType)) {
+      return res.status(400).json({ error: "Invalid artifact type" });
+    }
+
+    // Get current defaults
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { defaultFilterPresets: true, filterPresets: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const currentDefaults = (user.defaultFilterPresets as DefaultFilterPresets) || {};
+    const currentPresets = (user.filterPresets as FilterPresets) || {};
+
+    // If presetId is provided, validate it exists
+    if (presetId) {
+      const presetExists = (currentPresets[artifactType] || []).some(
+        (preset: FilterPreset) => preset.id === presetId
+      );
+
+      if (!presetExists) {
+        return res.status(400).json({ error: "Preset not found" });
+      }
+
+      currentDefaults[artifactType] = presetId;
+    } else {
+      // If presetId is null/undefined, clear the default
+      delete currentDefaults[artifactType];
+    }
+
+    // Update user
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        defaultFilterPresets: currentDefaults as never,
+      },
+    });
+
+    res.json({ success: true, defaults: currentDefaults });
+  } catch (error) {
+    console.error("Error setting default filter preset:", error);
+    res.status(500).json({ error: "Failed to set default filter preset" });
   }
 };
 
