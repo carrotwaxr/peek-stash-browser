@@ -217,20 +217,10 @@ function applyQuickSceneFilters(
     const { value: groupIds, modifier } = filters.groups;
     if (!groupIds) return filtered;
 
-    // Debug logging
-    logger.info("Filtering by groups", {
-      requestedGroupIds: groupIds,
-      modifier,
-      totalScenesBeforeFilter: filtered.length,
-      sampleSceneGroups: filtered.slice(0, 3).map(s => ({
-        sceneId: s.id,
-        title: s.title,
-        groups: s.groups,
-      })),
-    });
-
     filtered = filtered.filter((s) => {
-      const sceneGroupIds = (s.groups || []).map((g) => String(g.group?.id));
+      // After transformScene, groups are flattened: { id, name, scene_index }
+      // NOT nested: { group: { id, name }, scene_index }
+      const sceneGroupIds = (s.groups || []).map((g: any) => String(g.id));
       const filterGroupIds = groupIds.map((id) => String(id));
       if (modifier === "INCLUDES") {
         return filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
@@ -242,10 +232,6 @@ function applyQuickSceneFilters(
         return !filterGroupIds.some((id: string) => sceneGroupIds.includes(id));
       }
       return true;
-    });
-
-    logger.info("After groups filter", {
-      totalScenesAfterFilter: filtered.length,
     });
   }
 
@@ -644,8 +630,9 @@ function getFieldValue(
     if (!groupId || !scene.groups || !Array.isArray(scene.groups)) {
       return 999999; // Put scenes without scene_index at the end
     }
+    // After transformScene, groups are flattened: { id, name, scene_index }
     const group = scene.groups.find(
-      (g) => String(g.group?.id) === String(groupId)
+      (g: any) => String(g.id) === String(groupId)
     );
     return group?.scene_index ?? 999999; // Put scenes without scene_index at the end
   }
