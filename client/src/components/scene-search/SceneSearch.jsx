@@ -65,7 +65,7 @@ const SceneSearch = ({
       navigationState.referrerUrl = `${location.pathname}${location.search}`;
     }
 
-    navigate(`/video/${scene.id}`, { state: navigationState });
+    navigate(`/scene/${scene.id}`, { state: navigationState });
   };
 
   const handleQueryChange = async (newQuery, retryCount = 0) => {
