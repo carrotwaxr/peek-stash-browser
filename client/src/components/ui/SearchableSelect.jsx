@@ -201,12 +201,11 @@ const SearchableSelect = ({
       {/* Selected items display / Trigger button */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 rounded-md cursor-pointer border flex items-center justify-between gap-2"
+        className="w-full px-3 py-2 rounded-md cursor-pointer border text-sm flex items-center justify-between gap-2"
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
           color: "var(--text-primary)",
-          minHeight: "42px",
         }}
       >
         <div className="flex flex-wrap gap-1 flex-1">
@@ -257,7 +256,7 @@ const SearchableSelect = ({
       {/* Dropdown */}
       {isOpen && (
         <div
-          className="absolute z-50 w-full mt-1 rounded-lg shadow-lg border overflow-hidden"
+          className="absolute z-50 w-full mt-1 rounded-md shadow-lg border overflow-hidden"
           style={{
             backgroundColor: "var(--bg-card)",
             borderColor: "var(--border-color)",
@@ -281,7 +280,7 @@ const SearchableSelect = ({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={`Search ${entityType}...`}
-                className="w-full pl-9 pr-3 py-2 rounded border"
+                className="w-full pl-9 pr-3 py-2 rounded-md border text-sm"
                 style={{
                   backgroundColor: "var(--bg-secondary)",
                   borderColor: "var(--border-color)",
