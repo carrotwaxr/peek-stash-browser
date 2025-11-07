@@ -538,32 +538,37 @@ const PerformerStats = ({ performer }) => {
 const PerformerImage = ({ performer }) => {
   return (
     <div
-      className="rounded-lg w-full aspect-[2/3] rounded-xl overflow-hidden shadow-lg p-0"
+      className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
       style={{
         backgroundColor: "var(--bg-card)",
+        aspectRatio: "7/10",
+        width: "100%",
+        maxHeight: "80vh",
       }}
     >
       {performer?.image_path ? (
         <img
           src={performer.image_path}
           alt={performer.name}
-          className="w-full h-full object-cover"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+          }}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <svg
-            className="w-24 h-24"
-            style={{ color: "var(--text-muted)" }}
-            fill="currentColor"
-            viewBox="0 0 20 20"
-          >
-            <path
-              fillRule="evenodd"
-              d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
+        <svg
+          className="w-24 h-24"
+          style={{ color: "var(--text-muted)" }}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path
+            fillRule="evenodd"
+            d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+            clipRule="evenodd"
+          />
+        </svg>
       )}
     </div>
   );

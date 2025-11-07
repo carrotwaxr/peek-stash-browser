@@ -77,15 +77,16 @@ const SceneDetails = ({
 
   return (
     <section
-      className="container-fluid mt-6"
+      className="w-full mt-6 pb-8"
       style={{
         opacity: sceneLoading ? 0.6 : 1,
         transition: "opacity 0.2s ease-in-out",
       }}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-8">
-        {/* Primary details */}
-        <div className="lg:col-span-2">
+      {/* Clean layout inspired by YouTube - less card-based, more content-focused */}
+      <div className="space-y-6">
+        {/* Primary details section */}
+        <div>
           <Paper>
             <Paper.Header
               className="cursor-pointer"
@@ -190,7 +191,7 @@ const SceneDetails = ({
                   </p>
                 </div>
 
-                {/* Performers */}
+                {/* Performers - Horizontal scrollable with circular avatars */}
                 {scene.performers && scene.performers.length > 0 && (
                   <div className="mb-6">
                     <h3
@@ -199,22 +200,19 @@ const SceneDetails = ({
                     >
                       Performers
                     </h3>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
                       {scene.performers.map((performer) => (
                         <Link
                           key={performer.id}
                           to={`/performer/${performer.id}`}
-                          className="flex flex-col items-center rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                          style={{
-                            backgroundColor: "var(--bg-secondary)",
-                            width: "100px",
-                          }}
+                          className="flex flex-col items-center flex-shrink-0 group"
                         >
                           <div
-                            className="w-full overflow-hidden flex items-center justify-center"
+                            className="rounded-full overflow-hidden mb-2 ring-2 ring-transparent group-hover:ring-[var(--accent-primary)] transition-all"
                             style={{
                               backgroundColor: "var(--border-color)",
-                              height: "120px",
+                              width: "80px",
+                              height: "80px",
                             }}
                           >
                             {performer.image_path ? (
@@ -224,22 +222,22 @@ const SceneDetails = ({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span
-                                className="text-3xl"
-                                style={{ color: "var(--text-secondary)" }}
-                              >
-                                {performer.gender === "MALE" ? "♂" : "♀"}
-                              </span>
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span
+                                  className="text-2xl"
+                                  style={{ color: "var(--text-secondary)" }}
+                                >
+                                  {performer.gender === "MALE" ? "♂" : "♀"}
+                                </span>
+                              </div>
                             )}
                           </div>
-                          <div className="w-full px-2 py-2 text-center">
-                            <span
-                              className="text-xs font-medium line-clamp-2"
-                              style={{ color: "var(--text-primary)" }}
-                            >
-                              {performer.name}
-                            </span>
-                          </div>
+                          <span
+                            className="text-xs font-medium text-center max-w-[100px] line-clamp-2 group-hover:underline"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {performer.name}
+                          </span>
                         </Link>
                       ))}
                     </div>
@@ -305,7 +303,7 @@ const SceneDetails = ({
                   </div>
                 )}
 
-                {/* Tags */}
+                {/* Tags - Compact chips */}
                 {(() => {
                   const allTags = mergeAllTags(scene);
                   return (
@@ -325,10 +323,11 @@ const SceneDetails = ({
                               <Link
                                 key={tag.id}
                                 to={`/tag/${tag.id}`}
-                                className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                                className="px-2.5 py-1 rounded text-xs font-medium transition-all hover:scale-105"
                                 style={{
-                                  backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                                  color: "white",
+                                  backgroundColor: `hsla(${hue}, 70%, 45%, 0.15)`,
+                                  color: `hsl(${hue}, 70%, 55%)`,
+                                  border: `1px solid hsla(${hue}, 70%, 55%, 0.3)`,
                                 }}
                               >
                                 {tag.name}
@@ -345,7 +344,7 @@ const SceneDetails = ({
           </Paper>
         </div>
 
-        {/* Technical details sidebar */}
+        {/* Technical details - inline with primary details */}
         <div>
           <Paper>
             <Paper.Header

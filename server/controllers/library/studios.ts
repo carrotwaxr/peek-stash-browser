@@ -211,6 +211,28 @@ function applyStudioFilters(
     filtered = filtered.filter((s) => s.favorite === filters.favorite);
   }
 
+  // Filter by tags
+  if (filters.tags) {
+    const { modifier, value: tagIds } = filters.tags;
+    if (tagIds && tagIds.length > 0) {
+      filtered = filtered.filter((s) => {
+        const studioTagIds = (s.tags || []).map((t: any) => String(t.id));
+        const filterTagIds = tagIds.map(String);
+
+        if (modifier === "INCLUDES_ALL") {
+          return filterTagIds.every((id: string) => studioTagIds.includes(id));
+        }
+        if (modifier === "INCLUDES") {
+          return filterTagIds.some((id: string) => studioTagIds.includes(id));
+        }
+        if (modifier === "EXCLUDES") {
+          return !filterTagIds.some((id: string) => studioTagIds.includes(id));
+        }
+        return true;
+      });
+    }
+  }
+
   // Filter by rating100
   if (filters.rating100) {
     const { modifier, value, value2 } = filters.rating100;

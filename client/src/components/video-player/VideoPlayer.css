@@ -9,6 +9,13 @@
  * - Smooth animations and interactions
  */
 
+/* Video player specific styles */
+section.video-container {
+  background-color: #000000;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 /* ============================================================================
    CONTROL BAR - Transparent background with gradient
    ============================================================================ */

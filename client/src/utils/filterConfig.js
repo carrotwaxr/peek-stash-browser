@@ -421,6 +421,15 @@ export const PERFORMER_FILTER_OPTIONS = [
     placeholder: "Search name...",
   },
   {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
+  },
+  {
     key: "gender",
     label: "Gender",
     type: "select",
@@ -660,6 +669,15 @@ export const STUDIO_FILTER_OPTIONS = [
     placeholder: "Search details...",
   },
   {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
+  },
+  {
     key: "rating",
     label: "Rating (0-100)",
     type: "range",
@@ -835,6 +853,15 @@ export const GROUP_FILTER_OPTIONS = [
     type: "text",
     defaultValue: "",
     placeholder: "Search director...",
+  },
+  {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
   },
   {
     key: "rating",
@@ -1307,6 +1334,14 @@ export const buildPerformerFilter = (filters) => {
     performerFilter.favorite = true;
   }
 
+  // Tags filter
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    performerFilter.tags = {
+      value: filters.tagIds.map(String),
+      modifier: "INCLUDES_ALL",
+    };
+  }
+
   // Select filters with EQUALS modifier
   if (filters.gender) {
     performerFilter.gender = {
@@ -1599,6 +1634,14 @@ export const buildStudioFilter = (filters) => {
     studioFilter.favorite = true;
   }
 
+  // Tags filter
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    studioFilter.tags = {
+      value: filters.tagIds.map(String),
+      modifier: "INCLUDES_ALL",
+    };
+  }
+
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
     studioFilter.rating100 = {};
@@ -1877,6 +1920,14 @@ export const buildGroupFilter = (filters) => {
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
     groupFilter.favorite = true;
+  }
+
+  // Tags filter
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    groupFilter.tags = {
+      value: filters.tagIds.map(String),
+      modifier: "INCLUDES_ALL",
+    };
   }
 
   // Rating filter (0-100 scale)

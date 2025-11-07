@@ -159,38 +159,43 @@ const GroupImageFlipper = ({ group }) => {
   const displayImage = currentImage || fallbackImage;
 
   return (
-    <div className="relative">
+    <div className="relative w-full" style={{ maxHeight: "80vh" }}>
       <div
-        className="rounded-lg w-full aspect-[2/3] p-3 shadow-lg"
+        className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
         style={{
           backgroundColor: "var(--bg-card)",
+          aspectRatio: "7/10",
+          width: "100%",
+          maxHeight: "80vh",
         }}
       >
         {displayImage ? (
           <img
             src={displayImage}
             alt={`${group?.name} - ${showFront ? "Front" : "Back"} Cover`}
-            className="w-full h-full object-contain"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+            }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <svg
-              className="w-24 h-24"
-              style={{ color: "var(--text-muted)" }}
-              fill="currentColor"
-              viewBox="0 0 24 24"
+          <svg
+            className="w-24 h-24"
+            style={{ color: "var(--text-muted)" }}
+            fill="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <text
+              x="50%"
+              y="50%"
+              dominantBaseline="middle"
+              textAnchor="middle"
+              fontSize="12"
             >
-              <text
-                x="50%"
-                y="50%"
-                dominantBaseline="middle"
-                textAnchor="middle"
-                fontSize="12"
-              >
-                🎬
-              </text>
-            </svg>
-          </div>
+              🎬
+            </text>
+          </svg>
         )}
       </div>
 

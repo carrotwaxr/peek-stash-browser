@@ -10,7 +10,9 @@ import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import SceneDetails from "./SceneDetails.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
+import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
 import ScenesLikeThis from "../ui/ScenesLikeThis.jsx";
+import RecommendedSidebar from "../ui/RecommendedSidebar.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import Button from "../ui/Button.jsx";
@@ -20,6 +22,7 @@ const SceneContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const pageRef = useRef(null);
+  const leftColumnRef = useRef(null);
 
   // Read state from context
   const { scene, sceneLoading, sceneError, playlist } = useScenePlayer();
@@ -34,6 +37,32 @@ const SceneContent = () => {
   // Local UI state (not managed by context)
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [sidebarHeight, setSidebarHeight] = useState(null);
+
+  // Measure left column height and sync to sidebar
+  useEffect(() => {
+    if (!leftColumnRef.current) return;
+
+    const updateSidebarHeight = () => {
+      const height = leftColumnRef.current.offsetHeight;
+      setSidebarHeight(height);
+    };
+
+    // Initial measurement
+    updateSidebarHeight();
+
+    // Watch for size changes using ResizeObserver
+    const resizeObserver = new ResizeObserver(updateSidebarHeight);
+    resizeObserver.observe(leftColumnRef.current);
+
+    // Also update on window resize
+    window.addEventListener("resize", updateSidebarHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateSidebarHeight);
+    };
+  }, [scene, playlist]); // Re-measure when scene or playlist changes
 
   // Only show full-page error for critical failures (no scene at all)
   // Let individual components handle loading states
@@ -67,12 +96,6 @@ const SceneContent = () => {
       className="min-h-screen"
       style={{ backgroundColor: "var(--bg-primary)" }}
     >
-      {/* Full Navigation Header */}
-      <Navigation />
-
-      {/* Spacer to prevent content from going under fixed navbar */}
-      <div style={{ height: '60px' }} />
-
       {/* Video Player Header */}
       <header className="w-full py-8 px-4 lg:px-6 xl:px-8">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -103,16 +126,35 @@ const SceneContent = () => {
 
       {/* Main content area */}
       <main className="w-full px-4 lg:px-6 xl:px-8">
-        {/* Video player section */}
-        <VideoPlayer />
+        {/* Two-column layout on desktop, single column on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 mb-6">
+          {/* Left Column: Video + Controls */}
+          <div ref={leftColumnRef} className="flex flex-col gap-4">
+            <VideoPlayer />
+            <PlaybackControls />
 
-        {/* Playback Controls */}
-        <PlaybackControls />
+            {/* Mobile-only playlist card (below controls on small screens) */}
+            {playlist && (
+              <div className="lg:hidden">
+                <PlaylistStatusCard />
+              </div>
+            )}
+          </div>
 
-        {/* Playlist Status Card */}
-        {playlist && <PlaylistStatusCard />}
+          {/* Right Column: Sidebar (only visible on lg+) */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-4 space-y-4">
+              {/* Show playlist sidebar if we have a playlist, otherwise show recommendations */}
+              {playlist ? (
+                <PlaylistSidebar maxHeight={sidebarHeight} />
+              ) : (
+                scene && <RecommendedSidebar sceneId={scene.id} maxHeight={sidebarHeight} />
+              )}
+            </div>
+          </aside>
+        </div>
 
-        {/* Scene Details */}
+        {/* Full-width sections below (all screen sizes) */}
         <SceneDetails
           showDetails={showDetails}
           setShowDetails={setShowDetails}

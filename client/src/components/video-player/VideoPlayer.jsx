@@ -6,11 +6,8 @@ import "./VideoPlayer.css";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
-import { useOrientationFullscreen } from "../../hooks/useOrientationFullscreen.js";
-import { useVideoPlayerLifecycle } from "./useVideoPlayerLifecycle.js";
-import { useVideoPlayerSources } from "./useVideoPlayerSources.js";
-import { useResumePlayback } from "./useResumePlayback.js";
-import { usePlaylistPlayer } from "./usePlaylistPlayer.js";
+import { useVideoPlayer } from "./useVideoPlayer.js";
+import { useOrientationFullscreen } from "./useOrientationFullscreen.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -23,40 +20,31 @@ const api = axios.create({
  * Main video player component for scene playback.
  *
  * ARCHITECTURE:
- * This component orchestrates multiple custom hooks to manage complex video player behavior:
+ * This component orchestrates custom hooks to manage video player behavior:
  *
- * 1. useVideoPlayerLifecycle - Player initialization and cleanup
- * 2. useVideoPlayerSources - Source loading, poster updates, quality switching
- * 3. useResumePlayback - Resume playback and autoplay behavior
- * 4. usePlaylistPlayer - Playlist navigation and controls
- * 5. useWatchHistory - Watch progress tracking
- * 6. usePlaylistMediaKeys - Keyboard shortcuts for playlist navigation
- * 7. useOrientationFullscreen - Auto-fullscreen on mobile orientation change
+ * 1. useVideoPlayer - Consolidated player management (init, sources, playlist, resume)
+ * 2. useWatchHistory - Watch progress tracking
+ * 3. usePlaylistMediaKeys - Keyboard shortcuts for playlist navigation
+ * 4. useOrientationFullscreen - Auto-fullscreen on mobile orientation change
  *
- * MINIMAL COMPONENT RESPONSIBILITY:
+ * RESPONSIBILITIES:
  * - Manage refs (videoRef, playerRef, hasResumedRef, initialResumeTimeRef)
- * - Wire up watch history event listeners (play, pause, seeked, ended)
+ * - Fetch user settings (enableCast preference)
  * - Render video element and loading overlay
  *
  * DATA FLOW:
  * - ScenePlayerContext provides scene, video, quality, playlist state
- * - Custom hooks manage side effects and player lifecycle
- * - Watch history hooks into player events for progress tracking
+ * - Hooks manage side effects and player lifecycle
+ * - Watch history tracks playback progress
  */
 const VideoPlayer = () => {
   const location = useLocation();
 
-  // ============================================================================
-  // REFS
-  // ============================================================================
   const videoRef = useRef(null); // Container div (Video.js element appended here)
   const playerRef = useRef(null); // Video.js player instance
   const hasResumedRef = useRef(false); // Prevent double-resume
   const initialResumeTimeRef = useRef(null); // Capture resume time once
 
-  // ============================================================================
-  // USER SETTINGS
-  // ============================================================================
   const [enableCast, setEnableCast] = useState(true); // Default to true
 
   // Fetch user settings for cast preference
@@ -88,14 +76,8 @@ const VideoPlayer = () => {
     shouldAutoplay,
     playlist,
     currentIndex,
-    setQuality,
-    setVideo,
-    setSessionId,
-    setIsInitializing,
-    setIsAutoFallback,
-    setSwitchingMode,
-    setReady,
-    setShouldAutoplay,
+    dispatch,
+    enableAutoFallback,
     nextScene,
     prevScene,
   } = useScenePlayer();
@@ -113,9 +95,7 @@ const VideoPlayer = () => {
   const {
     watchHistory,
     loading: loadingWatchHistory,
-    startTracking,
     stopTracking,
-    trackSeek,
     updateQuality,
   } = useWatchHistory(scene?.id, playerRef);
 
@@ -123,39 +103,9 @@ const VideoPlayer = () => {
   // CUSTOM HOOKS: VIDEO PLAYER LOGIC
   // ============================================================================
 
-  // Hook 1: Manage player lifecycle (init + cleanup)
-  useVideoPlayerLifecycle({
+  // Consolidated hook: Manages all Video.js player operations
+  const { playNextInPlaylist, playPreviousInPlaylist } = useVideoPlayer({
     videoRef,
-    playerRef,
-    stopTracking,
-    scene,
-    enableCast,
-  });
-
-  // Hook 2: Manage playlist navigation and controls
-  const { playNextInPlaylist, playPreviousInPlaylist } = usePlaylistPlayer({
-    playerRef,
-    playlist,
-    currentIndex,
-    video,
-    nextScene,
-    prevScene,
-    setShouldAutoplay,
-  });
-
-  // Hook 3: Capture resume time from watch history
-  useResumePlayback({
-    scene,
-    watchHistory,
-    loadingWatchHistory,
-    location,
-    hasResumedRef,
-    initialResumeTimeRef,
-    setShouldAutoplay,
-  });
-
-  // Hook 4: Manage video sources, poster, and quality switching
-  useVideoPlayerSources({
     playerRef,
     scene,
     video,
@@ -164,23 +114,23 @@ const VideoPlayer = () => {
     isAutoFallback,
     ready,
     shouldAutoplay,
-    setIsInitializing,
-    setIsAutoFallback,
-    setSwitchingMode,
-    setVideo,
-    setSessionId,
-    setQuality,
-    setReady,
-    setShouldAutoplay,
+    playlist,
+    currentIndex,
+    dispatch,
+    enableAutoFallback,
+    nextScene,
+    prevScene,
     updateQuality,
+    stopTracking,
     location,
     hasResumedRef,
     initialResumeTimeRef,
-    firstFile,
-    api,
+    watchHistory,
+    loadingWatchHistory,
+    enableCast,
   });
 
-  // Hook 5: Media keys for playlist navigation
+  // Media keys for playlist navigation
   usePlaylistMediaKeys({
     playerRef,
     playlist,
@@ -189,107 +139,66 @@ const VideoPlayer = () => {
     enabled: !!video,
   });
 
-  // Hook 6: Auto-fullscreen on orientation change (mobile)
-  useOrientationFullscreen(playerRef, !!video);
+  // Auto-fullscreen on mobile orientation change
+  useOrientationFullscreen(playerRef, true);
 
-  // ============================================================================
-  // WATCH HISTORY EVENT LISTENERS
-  // ============================================================================
-  // WHY: Wire up watch history tracking functions to player events
-  // RUNS: When watch history functions change (they shouldn't, but dependencies required)
-  // DEPS: [startTracking, stopTracking, trackSeek]
-  //
-  // This is kept in the main component because it's simple event wiring.
-  // Creating a separate hook for this would be over-abstraction.
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player || player.isDisposed?.()) return;
-
-    const handlePlay = () => startTracking();
-    const handlePause = () => stopTracking();
-    const handleSeeked = () => trackSeek(0, player.currentTime());
-    const handleEnded = () => stopTracking();
-
-    player.on("play", handlePlay);
-    player.on("pause", handlePause);
-    player.on("seeked", handleSeeked);
-    player.on("ended", handleEnded);
-
-    return () => {
-      if (player && !player.isDisposed()) {
-        player.off("play", handlePlay);
-        player.off("pause", handlePause);
-        player.off("seeked", handleSeeked);
-        player.off("ended", handleEnded);
-      }
-    };
-  }, [startTracking, stopTracking, trackSeek]);
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
   return (
-    <section>
-      {/* Max-width wrapper for centering on large displays */}
-      <div style={{
-        maxWidth: "1920px",
-        margin: "0 auto",
-        width: "100%"
-      }}>
-        <div className="video-container" style={{ position: "relative" }}>
-          {/*
+    <section className="video-container">
+      {/*
             Container div - Video.js element will be programmatically appended here
             This prevents React/Video.js DOM conflicts by keeping the video element
             outside of React's management (following Stash's pattern)
 
             NOTE: No key={scene?.id} here - that was destroying the container on scene changes
           */}
-          <div
-            data-vjs-player
-            style={{
-              position: "relative",
-              aspectRatio: aspectRatio,
-              overflow: "hidden",
-              width: "100%",
-              backgroundColor: "#000"
-            }}
-          >
-          <div ref={videoRef} style={{
+      <div
+        data-vjs-player
+        style={{
+          position: "relative",
+          aspectRatio,
+          overflow: "hidden",
+          width: "100%",
+          maxHeight: "min(75vh, 100%)", // Constrain to 75% viewport height
+          backgroundColor: "#000",
+        }}
+      >
+        <div
+          ref={videoRef}
+          style={{
             position: "absolute",
             width: "100%",
-            height: "100%"
-          }} />
+            height: "100%",
+          }}
+        />
 
-          {/* Loading overlay for scene or video data */}
-          {(!scene || videoLoading || isInitializing || isAutoFallback) && (
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: "rgba(0, 0, 0, 0.5)",
-                zIndex: 10,
-              }}
-            >
-              <div className="flex flex-col items-center gap-2">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
-                <span style={{ color: "white", fontSize: "14px" }}>
-                  {!scene
-                    ? "Loading scene..."
-                    : isAutoFallback
-                    ? "Switching to transcoded playback..."
-                    : "Loading video..."}
-                </span>
-              </div>
+        {/* Loading overlay for scene or video data */}
+        {(!scene || videoLoading || isInitializing || isAutoFallback) && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              zIndex: 10,
+            }}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+              <span style={{ color: "white", fontSize: "14px" }}>
+                {!scene
+                  ? "Loading scene..."
+                  : isAutoFallback
+                  ? "Switching to transcoded playback..."
+                  : "Loading video..."}
+              </span>
             </div>
-          )}
           </div>
-        </div>
+        )}
       </div>
     </section>
   );

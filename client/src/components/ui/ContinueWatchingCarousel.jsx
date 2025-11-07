@@ -1,20 +1,29 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { PlayCircle } from 'lucide-react';
-import SceneCarousel from './SceneCarousel.jsx';
-import { useAllWatchHistory } from '../../hooks/useWatchHistory.js';
-import { libraryApi } from '../../services/api.js';
+import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { PlayCircle } from "lucide-react";
+import SceneCarousel from "./SceneCarousel.jsx";
+import { useAllWatchHistory } from "../../hooks/useWatchHistory.js";
+import { libraryApi } from "../../services/api.js";
 
 /**
  * Continue Watching carousel component
  * Shows scenes that have been partially watched with resume times
  */
-const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onInitializing }) => {
+const ContinueWatchingCarousel = ({
+  selectedScenes = [],
+  onToggleSelect,
+  onInitializing,
+}) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: watchHistoryList, loading: loadingHistory, error, refresh } = useAllWatchHistory({
+  const {
+    data: watchHistoryList,
+    loading: loadingHistory,
+    error,
+    refresh,
+  } = useAllWatchHistory({
     inProgress: true,
-    limit: 12
+    limit: 12,
   });
 
   const [scenes, setScenes] = useState([]);
@@ -40,15 +49,17 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
         setLoading(true);
 
         // Extract scene IDs from watch history
-        const sceneIds = watchHistoryList.map(wh => wh.sceneId);
+        const sceneIds = watchHistoryList.map((wh) => wh.sceneId);
 
         // Fetch scenes in bulk
         const response = await libraryApi.findScenes({ ids: sceneIds });
         const fetchedScenes = response?.findScenes?.scenes || [];
 
         // Match scenes with watch history data and add progress info
-        const scenesWithProgress = fetchedScenes.map(scene => {
-          const watchHistory = watchHistoryList.find(wh => wh.sceneId === scene.id);
+        const scenesWithProgress = fetchedScenes.map((scene) => {
+          const watchHistory = watchHistoryList.find(
+            (wh) => wh.sceneId === scene.id
+          );
           return {
             ...scene,
             watchHistory: watchHistory || null,
@@ -61,7 +72,7 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
         // Filter: Only show scenes where user has watched at least 2% of the video
         // This prevents accidental clicks from cluttering Continue Watching
         const MIN_WATCH_PERCENT = 2;
-        const filteredScenes = scenesWithProgress.filter(scene => {
+        const filteredScenes = scenesWithProgress.filter((scene) => {
           const duration = scene.files?.[0]?.duration;
           const playDuration = scene.watchHistory?.playDuration;
 
@@ -83,7 +94,7 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
         setScenes(filteredScenes);
         setScenesFetchError(null);
       } catch (err) {
-        console.error('Error fetching continue watching scenes:', err);
+        console.error("Error fetching continue watching scenes:", err);
         setScenesFetchError(err);
         setScenes([]);
       } finally {
@@ -103,14 +114,16 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
     if (isInitializing && retryCount < 60 && onInitializing) {
       onInitializing(true);
       const timer = setTimeout(() => {
-        setRetryCount(prev => prev + 1);
+        setRetryCount((prev) => prev + 1);
         refresh(); // Retry watch history fetch
-        setRetryTrigger(prev => prev + 1); // Trigger scenes refetch
+        setRetryTrigger((prev) => prev + 1); // Trigger scenes refetch
       }, 5000);
       return () => clearTimeout(timer);
     } else if (isInitializing && retryCount >= 60 && onInitializing) {
       onInitializing(false);
-      console.error(`[Continue Watching] Failed to load after ${retryCount} retries`);
+      console.error(
+        `[Continue Watching] Failed to load after ${retryCount} retries`
+      );
     } else if (!isInitializing && onInitializing) {
       onInitializing(false);
       setRetryCount(0);
@@ -118,12 +131,12 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
   }, [error, scenesFetchError, refresh, retryCount, onInitializing]);
 
   const handleSceneClick = (scene) => {
-    const currentIndex = scenes.findIndex(s => s.id === scene.id);
+    const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
     // Capture current URL with search params for Back button
     const referrerUrl = `${location.pathname}${location.search}`;
 
-    navigate(`/video/${scene.id}`, {
+    navigate(`/scene/${scene.id}`, {
       state: {
         scene,
         referrerUrl, // Store current URL to preserve filters when going back
@@ -136,18 +149,25 @@ const ContinueWatchingCarousel = ({ selectedScenes = [], onToggleSelect, onIniti
           scenes: scenes.map((s, idx) => ({
             sceneId: s.id,
             scene: s,
-            position: idx
+            position: idx,
           })),
-          currentIndex: currentIndex >= 0 ? currentIndex : 0
-        }
-      }
+          currentIndex: currentIndex >= 0 ? currentIndex : 0,
+        },
+      },
     });
   };
 
   // Don't show carousel if error (non-initialization) or no scenes
-  const isInitializing = error?.isInitializing || scenesFetchError?.isInitializing;
-  if ((error && !error.isInitializing) || (scenesFetchError && !scenesFetchError.isInitializing)) {
-    console.error('Continue Watching error (non-initialization):', error || scenesFetchError);
+  const isInitializing =
+    error?.isInitializing || scenesFetchError?.isInitializing;
+  if (
+    (error && !error.isInitializing) ||
+    (scenesFetchError && !scenesFetchError.isInitializing)
+  ) {
+    console.error(
+      "Continue Watching error (non-initialization):",
+      error || scenesFetchError
+    );
     return null;
   }
   if (!loading && !isInitializing && scenes.length === 0) {

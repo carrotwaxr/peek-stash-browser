@@ -10,7 +10,10 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { useAuth } from "../../hooks/useAuth.js";
-import { CAROUSEL_DEFINITIONS, migrateCarouselPreferences } from "../../constants/carousels.js";
+import {
+  CAROUSEL_DEFINITIONS,
+  migrateCarouselPreferences,
+} from "../../constants/carousels.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -52,7 +55,7 @@ const Home = () => {
   const createSceneClickHandler = (scenes, carouselTitle) => (scene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-    navigate(`/video/${scene.id}`, {
+    navigate(`/scene/${scene.id}`, {
       state: {
         scene,
         playlist: {
@@ -106,19 +109,26 @@ const Home = () => {
         <div
           className="mb-6 px-6 py-4 rounded-lg border-l-4"
           style={{
-            backgroundColor: 'var(--status-info-bg)',
-            borderLeftColor: 'var(--status-info)',
-            border: '1px solid var(--status-info-border)',
+            backgroundColor: "var(--status-info-bg)",
+            borderLeftColor: "var(--status-info)",
+            border: "1px solid var(--status-info-border)",
           }}
         >
           <div className="flex items-center gap-3">
             <LoadingSpinner size="md" />
             <div>
-              <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <p
+                className="font-semibold"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {initMessage || "Server is loading cache, please wait..."}
               </p>
-              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-                This may take a minute on first startup. Checking every 5 seconds...
+              <p
+                className="text-sm mt-1"
+                style={{ color: "var(--text-muted)" }}
+              >
+                This may take a minute on first startup. Checking every 5
+                seconds...
               </p>
             </div>
           </div>
@@ -126,7 +136,13 @@ const Home = () => {
       )}
 
       {activeCarousels.map((def) => {
-        const { title, iconComponent: IconComponent, iconProps, fetchKey, isSpecial } = def;
+        const {
+          title,
+          iconComponent: IconComponent,
+          iconProps,
+          fetchKey,
+          isSpecial,
+        } = def;
         const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
 
         // Special handling for Continue Watching carousel
@@ -206,16 +222,20 @@ const HomeCarousel = ({
   // Handle server initialization state
   useEffect(() => {
     if (error?.isInitializing) {
-      if (retryCount < 60) { // Max 60 retries (5 minutes at 5s intervals)
+      if (retryCount < 60) {
+        // Max 60 retries (5 minutes at 5s intervals)
         onInitializing(true);
         const timer = setTimeout(() => {
-          setRetryCount(prev => prev + 1);
+          setRetryCount((prev) => prev + 1);
           refetch();
         }, 5000); // Retry every 5 seconds
         return () => clearTimeout(timer);
       } else {
         onInitializing(false);
-        console.error(`[${title}] Failed to load after ${retryCount} retries:`, error);
+        console.error(
+          `[${title}] Failed to load after ${retryCount} retries:`,
+          error
+        );
       }
     } else if (!error) {
       onInitializing(false);

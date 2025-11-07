@@ -31,8 +31,8 @@ const GlobalLayout = ({ children }) => {
     <div className="layout-container">
       <Navigation navPreferences={navPreferences} />
       {/* Spacer to prevent content from going under fixed navbar */}
-      <div style={{ height: '60px' }} />
-      <main className="w-full">{children}</main>
+      <div style={{ height: "60px" }} />
+      <main className="w-full 2xl:w-5/6 m-auto">{children}</main>
     </div>
   );
 };
