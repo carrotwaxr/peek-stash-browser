@@ -97,13 +97,6 @@ pre,
   }
 }
 
-/* Full-width no padding for video and media content */
-.container-fullwidth {
-  width: 100%;
-  padding: 0;
-  margin: 0;
-}
-
 /* Text utilities */
 .text-primary {
   color: var(--text-primary);
@@ -167,13 +160,6 @@ pre,
   outline: none;
   border-color: var(--border-focus);
   box-shadow: var(--focus-ring-shadow);
-}
-
-/* Video player specific styles */
-.video-container {
-  background-color: #000000;
-  border-radius: 8px;
-  overflow: hidden;
 }
 
 /* Status indicators */

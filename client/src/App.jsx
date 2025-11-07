@@ -241,10 +241,14 @@ const AppContent = () => {
               </GlobalLayout>
             }
           />
-          <Route path="/scene/:sceneId" element={<Scene />} />
-          {/* Legacy routes for backwards compatibility */}
-          <Route path="/player/:sceneId" element={<Scene />} />
-          <Route path="/video/:sceneId" element={<Scene />} />
+          <Route
+            path="/scene/:sceneId"
+            element={
+              <GlobalLayout>
+                <Scene />
+              </GlobalLayout>
+            }
+          />
         </Routes>
       </Suspense>
     </Router>
