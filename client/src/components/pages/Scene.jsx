@@ -44,6 +44,9 @@ const SceneContent = () => {
     if (!leftColumnRef.current) return;
 
     const updateSidebarHeight = () => {
+      // Guard against ref being null (can happen during unmount)
+      if (!leftColumnRef.current) return;
+
       const height = leftColumnRef.current.offsetHeight;
       setSidebarHeight(height);
     };
