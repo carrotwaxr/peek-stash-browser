@@ -725,13 +725,25 @@ const SearchControls = ({
           }
 
           // Render regular filter control
+          const {
+            modifierOptions,
+            modifierKey,
+            defaultModifier,
+            ...filterProps
+          } = rest;
+
           return (
             <FilterControl
               key={`FilterControl-${key}`}
               onChange={(value) => handleFilterChange(key, value)}
               value={filters[key] || defaultValue}
               type={type}
-              {...rest}
+              modifierOptions={modifierOptions}
+              modifierValue={filters[modifierKey] || defaultModifier}
+              onModifierChange={(value) =>
+                modifierKey && handleFilterChange(modifierKey, value)
+              }
+              {...filterProps}
             />
           );
         })}

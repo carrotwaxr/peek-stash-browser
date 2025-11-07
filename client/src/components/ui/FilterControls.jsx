@@ -10,6 +10,14 @@ export const SortControl = ({
   onChange,
   label = "Sort by",
 }) => {
+  // Standardized styles (same as FilterControl)
+  const baseInputStyle = {
+    backgroundColor: "var(--bg-card)",
+    borderColor: "var(--border-color)",
+    color: "var(--text-primary)",
+  };
+  const inputClasses = "px-3 py-2 border rounded-md text-sm";
+
   return (
     <div className="flex">
       <label
@@ -21,12 +29,8 @@ export const SortControl = ({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2 border rounded-md text-sm"
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
-          color: "var(--text-primary)",
-        }}
+        className={inputClasses}
+        style={baseInputStyle}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -52,12 +56,19 @@ export const FilterControl = ({
   max,
   entityType, // for searchable-select
   multi, // for searchable-select
+  modifierOptions, // for multi-criterion modifiers
+  modifierValue, // current modifier value
+  onModifierChange, // modifier change handler
 }) => {
+  // Standardized styles for all inputs in the filter panel
   const baseInputStyle = {
     backgroundColor: "var(--bg-card)",
     borderColor: "var(--border-color)",
     color: "var(--text-primary)",
   };
+
+  // Standardized classes for all inputs (text, number, date, select)
+  const inputClasses = "px-3 py-2 border rounded-md text-sm w-full";
 
   const renderInput = () => {
     switch (type) {
@@ -86,7 +97,7 @@ export const FilterControl = ({
           <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="px-3 py-2 border rounded-md text-sm w-full"
+            className={inputClasses}
             style={baseInputStyle}
           >
             <option value="">{placeholder || `All ${label}`}</option>
@@ -99,13 +110,31 @@ export const FilterControl = ({
         );
       case "searchable-select":
         return (
-          <SearchableSelect
-            entityType={entityType}
-            value={value}
-            onChange={onChange}
-            multi={multi}
-            placeholder={placeholder || `Select ${label}...`}
-          />
+          <div className="space-y-2">
+            {/* Modifier dropdown (if provided) */}
+            {modifierOptions && modifierOptions.length > 0 && (
+              <select
+                value={modifierValue}
+                onChange={(e) => onModifierChange(e.target.value)}
+                className={inputClasses}
+                style={baseInputStyle}
+              >
+                {modifierOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* Main select */}
+            <SearchableSelect
+              entityType={entityType}
+              value={value}
+              onChange={onChange}
+              multi={multi}
+              placeholder={placeholder || `Select ${label}...`}
+            />
+          </div>
         );
       case "number":
         return (
@@ -116,7 +145,7 @@ export const FilterControl = ({
             placeholder={placeholder}
             min={min}
             max={max}
-            className="px-3 py-2 border rounded-md text-sm w-full"
+            className={inputClasses}
             style={baseInputStyle}
           />
         );
@@ -127,7 +156,7 @@ export const FilterControl = ({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
-            className="px-3 py-2 border rounded-md text-sm w-full"
+            className={inputClasses}
             style={baseInputStyle}
           />
         );
@@ -137,7 +166,7 @@ export const FilterControl = ({
             type="date"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="px-3 py-2 border rounded-md text-sm w-full"
+            className={inputClasses}
             style={baseInputStyle}
           />
         );
@@ -151,7 +180,7 @@ export const FilterControl = ({
               placeholder="Min"
               min={min}
               max={max}
-              className="px-3 py-2 border rounded-md text-sm w-full"
+              className={inputClasses}
               style={baseInputStyle}
             />
             <input
@@ -161,7 +190,7 @@ export const FilterControl = ({
               placeholder="Max"
               min={min}
               max={max}
-              className="px-3 py-2 border rounded-md text-sm w-full"
+              className={inputClasses}
               style={baseInputStyle}
             />
           </div>
@@ -180,7 +209,7 @@ export const FilterControl = ({
                 type="date"
                 value={value?.start || ""}
                 onChange={(e) => onChange({ ...value, start: e.target.value })}
-                className="px-3 py-2 border rounded-md text-sm w-full"
+                className={inputClasses}
                 style={baseInputStyle}
               />
             </div>
@@ -195,7 +224,7 @@ export const FilterControl = ({
                 type="date"
                 value={value?.end || ""}
                 onChange={(e) => onChange({ ...value, end: e.target.value })}
-                className="px-3 py-2 border rounded-md text-sm w-full"
+                className={inputClasses}
                 style={baseInputStyle}
               />
             </div>
