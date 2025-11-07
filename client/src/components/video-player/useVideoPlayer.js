@@ -163,8 +163,17 @@ export function useVideoPlayer({
     if (!player || !scene) return;
 
     // Force Video.js to recalculate dimensions when aspect ratio changes
-    // This fixes layout issues with 1:1 videos and when switching between different aspect ratios
-    player.trigger('playerresize');
+    // Toggling fluid mode forces a complete dimension recalculation
+    const wasFluid = player.fluid();
+    if (wasFluid) {
+      player.fluid(false);
+      // Use requestAnimationFrame to ensure DOM updates before re-enabling
+      requestAnimationFrame(() => {
+        if (playerRef.current) {
+          player.fluid(true);
+        }
+      });
+    }
   }, [scene?.id, playerRef]);
 
   // ============================================================================
