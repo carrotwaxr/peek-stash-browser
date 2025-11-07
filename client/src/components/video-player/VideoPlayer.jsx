@@ -140,7 +140,7 @@ const VideoPlayer = () => {
   });
 
   // Auto-fullscreen on mobile orientation change
-  useOrientationFullscreen(playerRef, true);
+  useOrientationFullscreen(playerRef, scene?.id, true);
 
   return (
     <section className="video-container">
