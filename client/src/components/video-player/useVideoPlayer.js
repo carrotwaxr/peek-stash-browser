@@ -162,18 +162,13 @@ export function useVideoPlayer({
     const player = playerRef.current;
     if (!player || !scene) return;
 
-    // Force Video.js to recalculate dimensions when aspect ratio changes
-    // Toggling fluid mode forces a complete dimension recalculation
-    const wasFluid = player.fluid();
-    if (wasFluid) {
-      player.fluid(false);
-      // Use requestAnimationFrame to ensure DOM updates before re-enabling
-      requestAnimationFrame(() => {
-        if (playerRef.current) {
-          player.fluid(true);
-        }
-      });
-    }
+    const firstFile = scene?.files?.[0];
+    if (!firstFile?.width || !firstFile?.height) return;
+
+    // Set Video.js's internal aspect ratio directly
+    // This ensures proper layout before metadata loads
+    const aspectRatio = `${firstFile.width}:${firstFile.height}`;
+    player.aspectRatio(aspectRatio);
   }, [scene?.id, playerRef]);
 
   // ============================================================================
