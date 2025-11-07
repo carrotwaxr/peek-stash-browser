@@ -157,8 +157,9 @@ const VideoPlayer = () => {
           position: "relative",
           aspectRatio,
           overflow: "hidden",
-          width: "100%",
-          maxHeight: "min(75vh, 100%)", // Constrain to 75% viewport height
+          maxWidth: "100%",
+          maxHeight: "90vh", // Constrain to viewport height (fit-within approach)
+          margin: "0 auto", // Center horizontally when height-constrained
           backgroundColor: "#000",
         }}
       >
