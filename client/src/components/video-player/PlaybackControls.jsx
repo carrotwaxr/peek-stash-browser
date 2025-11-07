@@ -4,14 +4,8 @@ import OCounterButton from "../ui/OCounterButton.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
 
 const PlaybackControls = () => {
-  const {
-    scene,
-    sceneLoading,
-    videoLoading,
-    quality,
-    oCounter,
-    dispatch,
-  } = useScenePlayer();
+  const { scene, sceneLoading, videoLoading, quality, oCounter, dispatch } =
+    useScenePlayer();
 
   // Don't render if no scene data yet
   if (!scene) {
@@ -20,7 +14,7 @@ const PlaybackControls = () => {
 
   const isLoading = sceneLoading || videoLoading;
   return (
-    <section className="container-fluid py-4 mt-6">
+    <section className="py-4 mt-6">
       <div
         className="p-4 rounded-lg"
         style={{
@@ -35,7 +29,9 @@ const PlaybackControls = () => {
           <div className="flex items-center justify-between md:justify-start gap-4 md:flex-1">
             <select
               value={quality}
-              onChange={(e) => dispatch({ type: 'SET_QUALITY', payload: e.target.value })}
+              onChange={(e) =>
+                dispatch({ type: "SET_QUALITY", payload: e.target.value })
+              }
               disabled={isLoading}
               className="btn text-sm"
               style={{
@@ -75,7 +71,9 @@ const PlaybackControls = () => {
             <OCounterButton
               sceneId={scene?.id}
               initialCount={oCounter}
-              onIncrement={(newCount) => dispatch({ type: 'SET_O_COUNTER', payload: newCount })}
+              onIncrement={(newCount) =>
+                dispatch({ type: "SET_O_COUNTER", payload: newCount })
+              }
               disabled={isLoading}
             />
           </div>

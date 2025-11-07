@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LucideArrowDown, LucideArrowUp } from "lucide-react";
+import { apiGet } from "../../services/api.js";
 import Pagination from "./Pagination.jsx";
 import SearchInput from "./SearchInput.jsx";
 import ActiveFilterChips from "./ActiveFilterChips.jsx";
@@ -76,8 +77,21 @@ const SearchControls = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const lastSyncedUrl = useRef(""); // Empty initially so first URL sync always runs
+  const hasInitialized = useRef(false); // Prevent double initialization
   const topPaginationRef = useRef(null); // Ref for top pagination element
+
+  // Determine if we need to load defaults (only if URL has no filter/sort params)
+  const needsDefaultPreset = useMemo(() => {
+    const params = new URLSearchParams(searchParams);
+    for (const [key] of params.entries()) {
+      if (key !== "page" && key !== "per_page") {
+        return false; // URL has params, don't need defaults
+      }
+    }
+    return true; // No params, need to fetch defaults
+  }, [searchParams]);
+
+  const [isLoadingDefaults, setIsLoadingDefaults] = useState(needsDefaultPreset);
 
   // Get filter options for this artifact type
   const filterOptions = useMemo(() => {
@@ -126,51 +140,104 @@ const SearchControls = ({
     urlState.sortDirection,
   ]);
 
-  // Sync state when URL changes externally (from navigation back with preserved filters)
+  // Initialize component: Determine initial state from URL or default preset
   useEffect(() => {
-    if (!isInitialized) return;
+    // Prevent double initialization in dev mode (React StrictMode)
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
 
-    const currentUrl = searchParams.toString();
-    // Only sync if URL actually changed (not our own update)
-    if (currentUrl === lastSyncedUrl.current) return;
+    const initializeState = async () => {
+      let initialState;
 
-    lastSyncedUrl.current = currentUrl;
+      if (!needsDefaultPreset) {
+        // Priority 1: URL has filter/sort params → Use URL params
+        initialState = urlState;
+        setIsLoadingDefaults(false);
+      } else {
+        // Priority 2: No URL params → Try to load default preset
+        try {
+          const [presetsResponse, defaultsResponse] = await Promise.all([
+            apiGet("/user/filter-presets"),
+            apiGet("/user/default-presets"),
+          ]);
 
-    // Parse URL to get values (don't use urlState memo to avoid re-renders)
-    const parsedState = parseSearchParams(searchParams, filterOptions, {
-      sortField: initialSort,
-      sortDirection: "DESC",
-      searchText: "",
-      filters: { ...permanentFilters },
-    });
+          const allPresets = presetsResponse?.presets || {};
+          const defaults = defaultsResponse?.defaults || {};
+          const defaultPresetId = defaults[artifactType];
 
-    // Update state from URL
-    setCurrentPage(parsedState.currentPage);
-    setPerPage(parsedState.perPage);
-    setSearchText(parsedState.searchText);
-    setSort([parsedState.sortField, parsedState.sortDirection]);
-    setFilters(parsedState.filters);
+          // Find the default preset for this artifact type
+          const presets = allPresets[artifactType] || [];
+          const defaultPreset = presets.find((p) => p.id === defaultPresetId);
 
-    // Trigger query with new URL values
-    const query = {
-      filter: {
-        direction: parsedState.sortDirection,
-        page: parsedState.currentPage,
-        per_page: parsedState.perPage,
-        q: parsedState.searchText,
-        sort: parsedState.sortField,
-      },
-      ...buildFilter(artifactType, parsedState.filters),
+          if (defaultPreset) {
+            // Priority 2a: User has a default preset → Use it
+            initialState = {
+              currentPage: 1,
+              perPage: urlState.perPage,
+              searchText: "",
+              filters: { ...permanentFilters, ...defaultPreset.filters },
+              sortField: defaultPreset.sort,
+              sortDirection: defaultPreset.direction,
+            };
+          } else {
+            // Priority 3: No default preset → Use hardcoded defaults
+            initialState = {
+              currentPage: urlState.currentPage,
+              perPage: urlState.perPage,
+              searchText: "",
+              filters: { ...permanentFilters },
+              sortField: initialSort,
+              sortDirection: "DESC",
+            };
+          }
+        } catch (err) {
+          console.error("Error loading default preset:", err);
+          // Fallback to hardcoded defaults on error
+          initialState = {
+            currentPage: urlState.currentPage,
+            perPage: urlState.perPage,
+            searchText: "",
+            filters: { ...permanentFilters },
+            sortField: initialSort,
+            sortDirection: "DESC",
+          };
+        } finally {
+          setIsLoadingDefaults(false);
+        }
+      }
+
+      // Set all state at once
+      setCurrentPage(initialState.currentPage);
+      setPerPage(initialState.perPage);
+      setSearchText(initialState.searchText);
+      setFilters(initialState.filters);
+      setSort([initialState.sortField, initialState.sortDirection]);
+
+      // Trigger initial query with loaded state
+      const query = {
+        filter: {
+          direction: initialState.sortDirection,
+          page: initialState.currentPage,
+          per_page: initialState.perPage,
+          q: initialState.searchText,
+          sort: initialState.sortField,
+        },
+        ...buildFilter(artifactType, initialState.filters),
+      };
+      onQueryChange(query);
+
+      // Mark as initialized (will trigger URL sync on next render)
+      setIsInitialized(true);
     };
-    onQueryChange(query);
-    // Note: urlState is intentionally NOT in deps to prevent loop
-    // We parse searchParams directly inside the effect instead
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, isInitialized]);
 
-  // Update URL params whenever state changes (only if syncToUrl is true)
+    initializeState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  // Update URL params whenever state changes (one-way: State → URL)
   useEffect(() => {
-    if (!syncToUrl) {
+    // Only sync after initialization is complete
+    if (!isInitialized || !syncToUrl) {
       return;
     }
 
@@ -189,13 +256,13 @@ const SearchControls = ({
 
     // Only update if URL would actually change
     if (newUrl !== currentUrl) {
-      lastSyncedUrl.current = newUrl;
       setSearchParams(params, { replace: true });
     }
     // Note: searchParams is intentionally NOT in deps to prevent infinite loop
     // We only want this to run when state changes, not when URL changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    isInitialized,
     searchText,
     sortField,
     sortDirection,
@@ -206,25 +273,6 @@ const SearchControls = ({
     setSearchParams,
     syncToUrl,
   ]);
-
-  // Trigger initial query from URL params
-  useEffect(() => {
-    if (!isInitialized) {
-      setIsInitialized(true);
-      const query = {
-        filter: {
-          direction: sortDirection,
-          page: currentPage,
-          per_page: perPage,
-          q: searchText,
-          sort: sortField,
-        },
-        ...buildFilter(artifactType, filters),
-      };
-      onQueryChange(query);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized]);
 
   // Clear all filters
   const clearFilters = () => {
@@ -461,6 +509,26 @@ const SearchControls = ({
     () => getSortOptions(artifactType),
     [artifactType]
   );
+
+  // Show loading state while fetching default presets
+  if (isLoadingDefaults) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div
+            className="inline-block animate-spin rounded-full h-8 w-8 border-b-2"
+            style={{ borderColor: "var(--accent-primary)" }}
+          />
+          <p
+            className="mt-2 text-sm"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Loading filters...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

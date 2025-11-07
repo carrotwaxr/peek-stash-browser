@@ -11,6 +11,8 @@ import {
   getFilterPresets,
   saveFilterPreset,
   deleteFilterPreset,
+  getDefaultFilterPresets,
+  setDefaultFilterPreset,
   syncFromStash,
   getUserRestrictions,
   updateUserRestrictions,
@@ -35,6 +37,10 @@ router.delete(
   "/filter-presets/:artifactType/:presetId",
   authenticated(deleteFilterPreset)
 );
+
+// Default filter preset routes
+router.get("/default-presets", authenticated(getDefaultFilterPresets));
+router.put("/default-preset", authenticated(setDefaultFilterPreset));
 
 // Admin-only user management routes
 router.get("/all", requireAdmin, authenticated(getAllUsers));

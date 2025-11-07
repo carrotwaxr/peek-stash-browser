@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { LucideBookmark, LucideSave, LucideTrash2, LucideChevronDown } from "lucide-react";
-import { apiGet, apiPost, apiDelete } from "../../services/api.js";
+import { LucideBookmark, LucideSave, LucideTrash2, LucideChevronDown, LucideStar } from "lucide-react";
+import { apiGet, apiPost, apiDelete, apiPut } from "../../services/api.js";
 import { InfoMessage, ErrorMessage, SuccessMessage } from "./index.js";
 import Button from "./Button.jsx";
 
@@ -23,9 +23,11 @@ const FilterPresets = ({
   onLoadPreset,
 }) => {
   const [presets, setPresets] = useState([]);
+  const [defaultPresetId, setDefaultPresetId] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const [setAsDefault, setSetAsDefault] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,9 +40,17 @@ const FilterPresets = ({
 
   const fetchPresets = async () => {
     try {
-      const response = await apiGet("/user/filter-presets");
-      const allPresets = response?.presets || {};
+      // Fetch both presets and default presets
+      const [presetsResponse, defaultsResponse] = await Promise.all([
+        apiGet("/user/filter-presets"),
+        apiGet("/user/default-presets"),
+      ]);
+
+      const allPresets = presetsResponse?.presets || {};
       setPresets(allPresets[artifactType] || []);
+
+      const defaults = defaultsResponse?.defaults || {};
+      setDefaultPresetId(defaults[artifactType] || null);
     } catch (err) {
       console.error("Error fetching filter presets:", err);
     }
@@ -62,10 +72,12 @@ const FilterPresets = ({
         filters: currentFilters,
         sort: currentSort,
         direction: currentDirection,
+        setAsDefault,
       });
 
       setSuccess(`Preset "${presetName}" saved successfully!`);
       setPresetName("");
+      setSetAsDefault(false);
       setIsSaveDialogOpen(false);
 
       // Refresh presets
@@ -89,6 +101,38 @@ const FilterPresets = ({
     setIsDropdownOpen(false);
     setSuccess(`Preset "${preset.name}" loaded!`);
     setTimeout(() => setSuccess(null), 3000);
+  };
+
+  const handleToggleDefault = async (presetId, presetName, event) => {
+    // Prevent the load preset action from triggering
+    event.stopPropagation();
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const isCurrentlyDefault = defaultPresetId === presetId;
+
+      await apiPut("/user/default-preset", {
+        artifactType,
+        presetId: isCurrentlyDefault ? null : presetId,
+      });
+
+      if (isCurrentlyDefault) {
+        setSuccess(`"${presetName}" removed as default`);
+        setDefaultPresetId(null);
+      } else {
+        setSuccess(`"${presetName}" set as default!`);
+        setDefaultPresetId(presetId);
+      }
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err.message || "Failed to update default preset");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDeletePreset = async (presetId, presetName) => {
@@ -171,29 +215,53 @@ const FilterPresets = ({
                   </div>
                 ) : (
                   <div className="py-1">
-                    {presets.map((preset) => (
-                      <div
-                        key={preset.id}
-                        className="flex items-center justify-between px-4 py-2 hover:bg-opacity-80 transition-colors group"
-                        style={{ backgroundColor: "var(--bg-secondary)" }}
-                      >
-                        <Button
-                          onClick={() => handleLoadPreset(preset)}
-                          variant="tertiary"
-                          className="flex-1 text-left text-sm !p-0"
-                          style={{ color: "var(--text-primary)" }}
+                    {presets.map((preset) => {
+                      const isDefault = defaultPresetId === preset.id;
+                      return (
+                        <div
+                          key={preset.id}
+                          className="flex items-center justify-between px-4 py-2 hover:bg-opacity-80 transition-colors group"
+                          style={{ backgroundColor: "var(--bg-secondary)" }}
                         >
-                          {preset.name}
-                        </Button>
-                        <Button
-                          onClick={() => handleDeletePreset(preset.id, preset.name)}
-                          variant="tertiary"
-                          className="ml-2 p-1 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100"
-                          icon={<LucideTrash2 className="w-3.5 h-3.5" />}
-                          title="Delete preset"
-                        />
-                      </div>
-                    ))}
+                          <Button
+                            onClick={() => handleLoadPreset(preset)}
+                            variant="tertiary"
+                            className="flex-1 text-left text-sm !p-0"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {preset.name}
+                          </Button>
+                          <div className="flex items-center gap-1 ml-2">
+                            <Button
+                              onClick={(e) => handleToggleDefault(preset.id, preset.name, e)}
+                              variant="tertiary"
+                              className={`p-1 transition-opacity ${
+                                isDefault
+                                  ? "opacity-100"
+                                  : "opacity-0 group-hover:opacity-100"
+                              }`}
+                              title={isDefault ? "Remove as default" : "Set as default"}
+                            >
+                              <LucideStar
+                                className={`w-3.5 h-3.5 ${
+                                  isDefault ? "fill-yellow-400 stroke-yellow-400" : ""
+                                }`}
+                                style={{
+                                  color: isDefault ? "rgb(250, 204, 21)" : "currentColor",
+                                }}
+                              />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeletePreset(preset.id, preset.name)}
+                              variant="tertiary"
+                              className="p-1 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100"
+                              icon={<LucideTrash2 className="w-3.5 h-3.5" />}
+                              title="Delete preset"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -258,6 +326,23 @@ const FilterPresets = ({
                   onKeyDown={(e) => e.key === "Enter" && handleSavePreset()}
                   autoFocus
                 />
+
+                {/* Set as Default checkbox */}
+                <label
+                  className="flex items-center gap-2 mb-4 cursor-pointer"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={setAsDefault}
+                    onChange={(e) => setSetAsDefault(e.target.checked)}
+                    className="w-4 h-4 rounded border cursor-pointer"
+                    style={{
+                      accentColor: "var(--accent-primary)",
+                    }}
+                  />
+                  <span className="text-sm">Set as default preset</span>
+                </label>
 
                 <div className="flex justify-end gap-3">
                   <Button
