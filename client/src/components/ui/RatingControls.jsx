@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import StarRating from './StarRating';
 import FavoriteButton from './FavoriteButton';
 import { ratingsApi } from '../../services/api';
@@ -20,6 +20,13 @@ export default function RatingControls({
   const [rating, setRating] = useState(initialRating);
   const [favorite, setFavorite] = useState(initialFavorite);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  // Sync internal state when entity or initial values change
+  // This fixes the bug where ratings don't update when navigating playlist
+  useEffect(() => {
+    setRating(initialRating);
+    setFavorite(initialFavorite);
+  }, [entityId, initialRating, initialFavorite]);
 
   const updateRating = async (entityType, entityId, data) => {
     switch (entityType) {
