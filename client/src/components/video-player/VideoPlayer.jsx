@@ -7,6 +7,7 @@ import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
 import { useVideoPlayer } from "./useVideoPlayer.js";
+import { useOrientationFullscreen } from "./useOrientationFullscreen.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -19,25 +20,22 @@ const api = axios.create({
  * Main video player component for scene playback.
  *
  * ARCHITECTURE:
- * This component orchestrates multiple custom hooks to manage complex video player behavior:
+ * This component orchestrates custom hooks to manage video player behavior:
  *
- * 1. useVideoPlayerLifecycle - Player initialization and cleanup
- * 2. useVideoPlayerSources - Source loading, poster updates, quality switching
- * 3. useResumePlayback - Resume playback and autoplay behavior
- * 4. usePlaylistPlayer - Playlist navigation and controls
- * 5. useWatchHistory - Watch progress tracking
- * 6. usePlaylistMediaKeys - Keyboard shortcuts for playlist navigation
- * 7. useOrientationFullscreen - Auto-fullscreen on mobile orientation change
+ * 1. useVideoPlayer - Consolidated player management (init, sources, playlist, resume)
+ * 2. useWatchHistory - Watch progress tracking
+ * 3. usePlaylistMediaKeys - Keyboard shortcuts for playlist navigation
+ * 4. useOrientationFullscreen - Auto-fullscreen on mobile orientation change
  *
- * MINIMAL COMPONENT RESPONSIBILITY:
+ * RESPONSIBILITIES:
  * - Manage refs (videoRef, playerRef, hasResumedRef, initialResumeTimeRef)
- * - Wire up watch history event listeners (play, pause, seeked, ended)
+ * - Fetch user settings (enableCast preference)
  * - Render video element and loading overlay
  *
  * DATA FLOW:
  * - ScenePlayerContext provides scene, video, quality, playlist state
- * - Custom hooks manage side effects and player lifecycle
- * - Watch history hooks into player events for progress tracking
+ * - Hooks manage side effects and player lifecycle
+ * - Watch history tracks playback progress
  */
 const VideoPlayer = () => {
   const location = useLocation();
@@ -140,6 +138,9 @@ const VideoPlayer = () => {
     playPrevious: playPreviousInPlaylist,
     enabled: !!video,
   });
+
+  // Auto-fullscreen on mobile orientation change
+  useOrientationFullscreen(playerRef, true);
 
   return (
     <section className="video-container">
