@@ -59,6 +59,8 @@ const ServerSettings = () => {
     performers: { rating: true, favorite: true },
     studios: { rating: true, favorite: true },
     tags: { rating: false, favorite: true }, // Tags don't have ratings in Stash
+    galleries: { rating: true }, // Galleries only have ratings, no favorites
+    groups: { rating: true }, // Groups (Collections) only have ratings, no favorites
   });
 
   // Content restrictions state
@@ -373,6 +375,8 @@ const ServerSettings = () => {
       performers: { rating: true, favorite: true },
       studios: { rating: true, favorite: true },
       tags: { rating: false, favorite: true },
+      galleries: { rating: true },
+      groups: { rating: true },
     });
   };
 
@@ -1306,6 +1310,82 @@ const ServerSettings = () => {
                         </p>
                       </div>
                     </div>
+
+                    {/* Galleries */}
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <h4
+                        className="font-medium mb-3"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Galleries
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.galleries.rating}
+                            onChange={() =>
+                              toggleSyncOption("galleries", "rating")
+                            }
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Rating
+                          </span>
+                        </label>
+                        <p
+                          className="text-xs ml-6"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Galleries do not have favorites in Stash
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Groups (Collections) */}
+                    <div
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                      }}
+                    >
+                      <h4
+                        className="font-medium mb-3"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        Groups (Collections)
+                      </h4>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={syncOptions.groups.rating}
+                            onChange={() =>
+                              toggleSyncOption("groups", "rating")
+                            }
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <span style={{ color: "var(--text-primary)" }}>
+                            Rating
+                          </span>
+                        </label>
+                        <p
+                          className="text-xs ml-6"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Groups do not have favorites in Stash
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1419,6 +1499,36 @@ const ServerSettings = () => {
                           {syncResult.tags.created} new
                           <br />
                           {syncResult.tags.updated} updated
+                        </p>
+                      </div>
+                      <div>
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          Galleries
+                        </p>
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {syncResult.galleries?.checked.toLocaleString() || 0} checked
+                          <br />
+                          {syncResult.galleries?.created || 0} new
+                          <br />
+                          {syncResult.galleries?.updated || 0} updated
+                        </p>
+                      </div>
+                      <div>
+                        <p
+                          className="font-medium mb-1"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          Groups
+                        </p>
+                        <p style={{ color: "var(--text-secondary)" }}>
+                          {syncResult.groups?.checked.toLocaleString() || 0} checked
+                          <br />
+                          {syncResult.groups?.created || 0} new
+                          <br />
+                          {syncResult.groups?.updated || 0} updated
                         </p>
                       </div>
                     </div>

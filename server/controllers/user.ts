@@ -3,7 +3,6 @@ import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
-import type { NormalizedGallery } from "../types/index.js";
 // import { getDefaultCarouselPreferences } from "../utils/carouselDefaults.js";
 
 /**
@@ -781,11 +780,12 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
     // Default options if not provided
     const syncOptions = options || {
-      scenes: { rating: true, favorite: false },
+      scenes: { rating: true, favorite: false, oCounter: false },
       performers: { rating: true, favorite: true },
       studios: { rating: true, favorite: true },
       tags: { rating: false, favorite: true },
-      galleries: { rating: true, favorite: true },
+      galleries: { rating: true },  // Galleries only have rating, no favorite
+      groups: { rating: true },      // Groups only have rating, no favorite
     };
 
     // Import stash singleton
@@ -798,6 +798,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       studios: { checked: 0, updated: 0, created: 0 },
       tags: { checked: 0, updated: 0, created: 0 },
       galleries: { checked: 0, updated: 0, created: 0 },
+      groups: { checked: 0, updated: 0, created: 0 },
     };
 
     // Fetch all entities from Stash (per_page: -1 = unlimited)
@@ -1067,65 +1068,80 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       }
     }
 
-    // 5. Sync Galleries
-    if (syncOptions.galleries.rating || syncOptions.galleries.favorite) {
-      let galleryFilter: Record<string, unknown> = {};
-
-      // Use GraphQL filter when only one option is selected
-      if (syncOptions.galleries.rating && !syncOptions.galleries.favorite) {
-        galleryFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
-      } else if (syncOptions.galleries.favorite && !syncOptions.galleries.rating) {
-        galleryFilter = { favorite: true };
-      }
-      // If both are selected, fetch all and filter in code (can't do OR in single query)
-
+    // 5. Sync Galleries (rating only - no favorite in Stash)
+    if (syncOptions.galleries && syncOptions.galleries.rating) {
       const galleriesData = await stash.findGalleries({
         filter: { per_page: -1 },
-        gallery_filter: Object.keys(galleryFilter).length > 0 ? galleryFilter : undefined
+        gallery_filter: undefined  // Fetch all galleries
       });
-      const galleries = galleriesData.findGalleries.galleries;
+      // Filter for rated galleries in code
+      const galleries = galleriesData.findGalleries.galleries.filter(
+        (g: { rating100?: number | null }) => g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
+      );
+      stats.galleries.checked = galleries.length;
 
-      // Filter in code only if both options are selected
-      const filteredGalleries = (syncOptions.galleries.rating && syncOptions.galleries.favorite)
-        ? galleries.filter((g: { rating100?: number | null; favorite?: boolean }) => ((g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0)) || g.favorite)
-        : galleries;
-
-      stats.galleries.checked = filteredGalleries.length;
-
-      for (const gallery of filteredGalleries) {
-        const stashRating = syncOptions.galleries.rating ? gallery.rating100 : null;
-        const stashFavorite = syncOptions.galleries.favorite ? ((gallery as NormalizedGallery).favorite || false) : false;
+      for (const gallery of galleries) {
+        const stashRating = gallery.rating100;
 
         // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.galleryRating.findUnique({
           where: { userId_galleryId: { userId: targetUserId, galleryId: gallery.id } }
         });
 
-        const updates: SyncUpdates = {};
-        if (syncOptions.galleries.rating) updates.rating = stashRating;
-        if (syncOptions.galleries.favorite) updates.favorite = stashFavorite;
-
         await prisma.galleryRating.upsert({
           where: { userId_galleryId: { userId: targetUserId, galleryId: gallery.id } },
-          update: updates,
+          update: { rating: stashRating },
           create: {
             userId: targetUserId,
             galleryId: gallery.id,
             rating: stashRating,
-            favorite: stashFavorite,
+            favorite: false,  // Galleries don't have favorites
           }
         });
 
         if (!existingRating) {
           stats.galleries.created++;
-        } else {
-          let needsUpdate = false;
-          if (syncOptions.galleries.rating && existingRating.rating !== stashRating) needsUpdate = true;
-          if (syncOptions.galleries.favorite && existingRating.favorite !== stashFavorite) needsUpdate = true;
+        } else if (existingRating.rating !== stashRating) {
+          stats.galleries.updated++;
+        }
+      }
+    }
 
-          if (needsUpdate) {
-            stats.galleries.updated++;
+    // 6. Sync Groups/Collections (rating only - no favorite in Stash)
+    if (syncOptions.groups && syncOptions.groups.rating) {
+      const groupsData = await stash.findGroups({
+        filter: { per_page: -1 },
+        group_filter: undefined  // Fetch all groups
+      });
+      // Filter for rated groups in code
+      const groups = groupsData.findGroups.groups.filter(
+        (g: { rating100?: number | null }) => g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
+      );
+      stats.groups.checked = groups.length;
+
+      for (const group of groups) {
+        const stashRating = group.rating100;
+
+        // Check if record exists before upsert to track created vs updated
+        const existingRating = await prisma.groupRating.findUnique({
+          where: { userId_groupId: { userId: targetUserId, groupId: group.id } }
+        });
+
+        await prisma.groupRating.upsert({
+          where: { userId_groupId: { userId: targetUserId, groupId: group.id } },
+          update: { rating: stashRating },
+          create: {
+            userId: targetUserId,
+            groupId: group.id,
+            rating: stashRating,
+            favorite: false,  // Groups don't have favorites
           }
+        });
+
+        if (!existingRating) {
+          stats.groups.created++;
+        } else if (existingRating.rating !== stashRating) {
+          stats.groups.updated++;
         }
       }
     }
