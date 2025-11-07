@@ -22,6 +22,7 @@ const SceneContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const pageRef = useRef(null);
+  const leftColumnRef = useRef(null);
 
   // Read state from context
   const { scene, sceneLoading, sceneError, playlist } = useScenePlayer();
@@ -36,6 +37,32 @@ const SceneContent = () => {
   // Local UI state (not managed by context)
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [sidebarHeight, setSidebarHeight] = useState(null);
+
+  // Measure left column height and sync to sidebar
+  useEffect(() => {
+    if (!leftColumnRef.current) return;
+
+    const updateSidebarHeight = () => {
+      const height = leftColumnRef.current.offsetHeight;
+      setSidebarHeight(height);
+    };
+
+    // Initial measurement
+    updateSidebarHeight();
+
+    // Watch for size changes using ResizeObserver
+    const resizeObserver = new ResizeObserver(updateSidebarHeight);
+    resizeObserver.observe(leftColumnRef.current);
+
+    // Also update on window resize
+    window.addEventListener("resize", updateSidebarHeight);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateSidebarHeight);
+    };
+  }, [scene, playlist]); // Re-measure when scene or playlist changes
 
   // Only show full-page error for critical failures (no scene at all)
   // Let individual components handle loading states
@@ -102,7 +129,7 @@ const SceneContent = () => {
         {/* Two-column layout on desktop, single column on mobile */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 mb-6">
           {/* Left Column: Video + Controls */}
-          <div className="flex flex-col gap-4">
+          <div ref={leftColumnRef} className="flex flex-col gap-4">
             <VideoPlayer />
             <PlaybackControls />
 
@@ -119,9 +146,9 @@ const SceneContent = () => {
             <div className="sticky top-4 space-y-4">
               {/* Show playlist sidebar if we have a playlist, otherwise show recommendations */}
               {playlist ? (
-                <PlaylistSidebar />
+                <PlaylistSidebar maxHeight={sidebarHeight} />
               ) : (
-                scene && <RecommendedSidebar sceneId={scene.id} />
+                scene && <RecommendedSidebar sceneId={scene.id} maxHeight={sidebarHeight} />
               )}
             </div>
           </aside>

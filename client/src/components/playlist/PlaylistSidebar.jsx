@@ -14,8 +14,9 @@ import Button from "../ui/Button.jsx";
 /**
  * PlaylistSidebar - Vertical playlist controls optimized for sidebar display
  * Similar to YouTube's playlist sidebar on desktop
+ * @param {number} maxHeight - Maximum height in pixels to match left column
  */
-const PlaylistSidebar = () => {
+const PlaylistSidebar = ({ maxHeight }) => {
   const { playlist, currentIndex, gotoSceneIndex } = useScenePlayer();
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -95,15 +96,16 @@ const PlaylistSidebar = () => {
 
   return (
     <div
-      className="rounded-lg border overflow-hidden"
+      className="rounded-lg border overflow-hidden flex flex-col"
       style={{
         backgroundColor: "var(--bg-card)",
         borderColor: "var(--border-color)",
+        ...(maxHeight && { height: `${maxHeight}px` }),
       }}
     >
       {/* Header */}
       <div
-        className="p-4 border-b"
+        className="p-4 border-b flex-shrink-0"
         style={{ borderColor: "var(--border-color)" }}
       >
         <div className="flex items-start justify-between mb-3">
@@ -204,7 +206,7 @@ const PlaylistSidebar = () => {
           {/* Up Next Preview (if not last scene) */}
           {nextScene && (
             <div
-              className="p-3 border-b"
+              className="p-3 border-b flex-shrink-0"
               style={{
                 backgroundColor: "var(--bg-secondary)",
                 borderColor: "var(--border-color)",
@@ -293,10 +295,7 @@ const PlaylistSidebar = () => {
           )}
 
           {/* Scene List */}
-          <div
-            className="overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 400px)" }}
-          >
+          <div className="flex-1 overflow-y-auto">
             {playlist.scenes.map((item, index) => {
               const scene = item.scene;
               const isCurrent = index === currentIndex;

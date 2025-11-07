@@ -5,8 +5,10 @@ import axios from "axios";
 /**
  * RecommendedSidebar - Compact vertical list of recommended scenes for sidebar
  * Shows 12 scenes in a scrollable vertical layout
+ * @param {string} sceneId - Current scene ID for fetching similar scenes
+ * @param {number} maxHeight - Maximum height in pixels to match left column
  */
-const RecommendedSidebar = ({ sceneId }) => {
+const RecommendedSidebar = ({ sceneId, maxHeight }) => {
   const navigate = useNavigate();
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -95,20 +97,22 @@ const RecommendedSidebar = ({ sceneId }) => {
   }
 
   return (
-    <div className="space-y-3">
+    <div
+      className="flex flex-col"
+      style={{
+        ...(maxHeight && { height: `${maxHeight}px` }),
+      }}
+    >
       {/* Header */}
       <h3
-        className="text-sm font-semibold uppercase tracking-wide mb-3"
+        className="text-sm font-semibold uppercase tracking-wide mb-3 flex-shrink-0"
         style={{ color: "var(--text-primary)" }}
       >
         Recommended
       </h3>
 
       {/* Scrollable scene list */}
-      <div
-        className="space-y-3 overflow-y-auto"
-        style={{ maxHeight: "calc(100vh - 200px)" }}
-      >
+      <div className="flex-1 space-y-3 overflow-y-auto">
         {scenes.map((scene) => {
           const thumbnail = scene.paths?.screenshot || scene.paths?.preview;
           const duration = scene.files?.[0]?.duration;
