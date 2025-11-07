@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Automatically enter fullscreen when device rotates to landscape on mobile
- * @param {Object} playerRef - Video.js player ref
- * @param {boolean} enabled - Whether the feature is enabled
+ * Automatically enter fullscreen when device rotates to landscape while video is playing
+ * Standard mobile video player behavior
  */
 export const useOrientationFullscreen = (playerRef, enabled = true) => {
-  const lastExitTimeRef = useRef(0);
+  const cooldownRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || !playerRef?.current) return;
@@ -16,49 +15,32 @@ export const useOrientationFullscreen = (playerRef, enabled = true) => {
     const handleOrientationChange = () => {
       if (!player || player.isDisposed()) return;
 
-      // Check if we're in landscape orientation
       const isLandscape = window.screen?.orientation?.type?.includes('landscape') ||
                           window.innerWidth > window.innerHeight;
+      const isPlaying = !player.paused();
+      const inCooldown = Date.now() - cooldownRef.current < 3000;
 
-      // Cooldown period: Don't auto-enter fullscreen within 3 seconds of manual exit
-      const timeSinceExit = Date.now() - lastExitTimeRef.current;
-      const inCooldown = timeSinceExit < 3000;
-
-      // Only proceed if landscape, not already in fullscreen, and not in cooldown
-      if (isLandscape && !player.isFullscreen() && !inCooldown) {
-        // Request fullscreen
-        player.requestFullscreen().catch((err) => {
-          console.log('[OrientationFullscreen] Fullscreen request failed:', err?.message || 'Fullscreen request denied');
-        });
+      // Auto-fullscreen on landscape if: playing, not fullscreen, not in cooldown
+      if (isLandscape && isPlaying && !player.isFullscreen() && !inCooldown) {
+        player.requestFullscreen().catch(() => {});
       }
     };
 
-    // Track when user manually exits fullscreen
+    // Track manual exits to prevent immediate re-entry
     const handleFullscreenChange = () => {
-      if (player && !player.isFullscreen()) {
-        lastExitTimeRef.current = Date.now();
+      if (!player.isFullscreen()) {
+        cooldownRef.current = Date.now();
       }
     };
 
-    // Listen for manual fullscreen exits
     player.on('fullscreenchange', handleFullscreenChange);
-
-    // Listen for orientation changes
-    if (window.screen?.orientation) {
-      window.screen.orientation.addEventListener('change', handleOrientationChange);
-    }
-
-    // Fallback: listen for window resize (works on older browsers)
-    window.addEventListener('resize', handleOrientationChange);
+    window.addEventListener('orientationchange', handleOrientationChange);
 
     return () => {
       if (player && !player.isDisposed()) {
         player.off('fullscreenchange', handleFullscreenChange);
       }
-      if (window.screen?.orientation) {
-        window.screen.orientation.removeEventListener('change', handleOrientationChange);
-      }
-      window.removeEventListener('resize', handleOrientationChange);
+      window.removeEventListener('orientationchange', handleOrientationChange);
     };
   }, [playerRef, enabled]);
 };
