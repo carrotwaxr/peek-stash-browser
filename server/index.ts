@@ -25,6 +25,7 @@ import { stashCacheManager } from "./services/StashCacheManager.js";
 import { logger } from "./utils/logger.js";
 import { pathMapper } from "./utils/pathMapping.js";
 import { initializeCache } from "./initializers/cache.js";
+import { dataMigrationService } from "./services/DataMigrationService.js";
 
 const main = async () => {
   logger.info("Starting Peek server");
@@ -39,7 +40,11 @@ const main = async () => {
 
   setupAPI();
 
-  initializeCache();
+  // Initialize cache FIRST (needed for data migrations that access scene data)
+  await initializeCache();
+
+  // Run one-time data migrations AFTER cache is ready (e.g., backfill stats for v1.4.x)
+  await dataMigrationService.runPendingMigrations();
 };
 
 main().catch(async (e) => {

@@ -338,8 +338,9 @@ const WatchHistory = () => {
             </h3>
             <p className="mb-6" style={{ color: "var(--text-secondary)" }}>
               This will permanently delete all watch history records including
-              resume times, play counts, and viewing statistics. This action
-              cannot be undone.
+              resume times, play counts, O counters, and all viewing statistics.
+              This will also reset O counter totals for all Performers, Studios,
+              and Tags. This action cannot be undone.
             </p>
             <div className="flex gap-3 justify-end">
               <Button
