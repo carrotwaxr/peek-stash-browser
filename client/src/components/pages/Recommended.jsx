@@ -82,7 +82,16 @@ const Recommended = () => {
     const newParams = new URLSearchParams(searchParams);
     newParams.set("page", newPage.toString());
     setSearchParams(newParams);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // Scroll to page container (always rendered, unlike pagination which unmounts during loading)
+    setTimeout(() => {
+      if (pageRef.current) {
+        pageRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }, 50);
   };
 
   // Handle per page change
@@ -91,7 +100,16 @@ const Recommended = () => {
     newParams.set("per_page", newPerPage.toString());
     newParams.set("page", "1"); // Reset to page 1 when changing per page
     setSearchParams(newParams);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // Scroll to page container (always rendered, unlike pagination which unmounts during loading)
+    setTimeout(() => {
+      if (pageRef.current) {
+        pageRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }, 50);
   };
 
   // Initial focus for TV mode
