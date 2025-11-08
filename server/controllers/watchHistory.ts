@@ -307,8 +307,6 @@ export async function incrementOCounter(
       return res.status(400).json({ error: "Missing required field: sceneId" });
     }
 
-    logger.info("Incrementing O counter", { userId, sceneId });
-
     // Get user settings for syncToStash
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -325,6 +323,9 @@ export async function incrementOCounter(
     });
 
     const now = new Date();
+
+    // Track if this is a new record to prevent double-counting stats
+    const isNewRecord = !watchHistory;
 
     if (!watchHistory) {
       // Create new watch history record
@@ -355,7 +356,7 @@ export async function incrementOCounter(
         },
       });
 
-      // Update pre-computed stats (existing record updated)
+      // Update pre-computed stats for existing records
       await userStatsService.updateStatsForScene(
         userId,
         sceneId,
@@ -366,15 +367,15 @@ export async function incrementOCounter(
       );
     }
 
-    // Update pre-computed stats for new records
-    if (watchHistory.playCount === 0 && watchHistory.oCount === 1) {
-      // This was a new record created above (lines 316-328)
+    // Update pre-computed stats for new records ONLY
+    // (prevents double-counting when existing record has playCount=0 and gets oCount incremented to 1)
+    if (isNewRecord) {
       await userStatsService.updateStatsForScene(
         userId,
         sceneId,
         1, // oCountDelta
         0, // playCountDelta
-        undefined, // lastPlayedAt (set above but not relevant here)
+        undefined, // lastPlayedAt (set above during create)
         now // lastOAt
       );
     }
@@ -525,6 +526,8 @@ export async function getAllWatchHistory(
 
 /**
  * Clear all watch history for current user
+ * Also clears all pre-computed stats (performers, studios, tags)
+ * This includes O counters, play counts, and all viewing statistics
  */
 export async function clearAllWatchHistory(
   req: AuthenticatedRequest,
@@ -537,21 +540,33 @@ export async function clearAllWatchHistory(
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    logger.info("Clearing all watch history", { userId });
+    logger.info("Clearing all watch history and stats", { userId });
 
-    const result = await prisma.watchHistory.deleteMany({
-      where: { userId },
-    });
+    // Delete watch history and all related stats in parallel
+    const [watchHistoryResult, performerStatsResult, studioStatsResult, tagStatsResult] = await Promise.all([
+      prisma.watchHistory.deleteMany({ where: { userId } }),
+      prisma.userPerformerStats.deleteMany({ where: { userId } }),
+      prisma.userStudioStats.deleteMany({ where: { userId } }),
+      prisma.userTagStats.deleteMany({ where: { userId } }),
+    ]);
 
-    logger.info("Watch history cleared", {
+    logger.info("Watch history and stats cleared", {
       userId,
-      deletedCount: result.count,
+      watchHistoryDeleted: watchHistoryResult.count,
+      performerStatsDeleted: performerStatsResult.count,
+      studioStatsDeleted: studioStatsResult.count,
+      tagStatsDeleted: tagStatsResult.count,
     });
 
     res.json({
       success: true,
-      deletedCount: result.count,
-      message: `Cleared ${result.count} watch history records`,
+      deletedCounts: {
+        watchHistory: watchHistoryResult.count,
+        performerStats: performerStatsResult.count,
+        studioStats: studioStatsResult.count,
+        tagStats: tagStatsResult.count,
+      },
+      message: `Cleared ${watchHistoryResult.count} watch history records and all associated statistics`,
     });
   } catch (error) {
     logger.error("Error clearing watch history", { error });

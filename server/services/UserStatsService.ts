@@ -181,6 +181,7 @@ class UserStatsService {
         userId,
         sceneId,
         error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       });
     }
   }

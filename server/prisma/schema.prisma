@@ -315,3 +315,10 @@ enum UserRole {
     ADMIN
     USER
 }
+
+// Track which data migrations have been applied
+model DataMigration {
+    id          Int      @id @default(autoincrement())
+    name        String   @unique  // Migration identifier (e.g., "001_rebuild_user_stats")
+    appliedAt   DateTime @default(now())
+}
