@@ -135,35 +135,15 @@ class UserStatsService {
     lastOAt?: Date
   ): Promise<void> {
     try {
-      logger.info("[UserStats] updateStatsForScene called", {
-        userId,
-        sceneId,
-        oCountDelta,
-        playCountDelta,
-      });
-
       // Get scene from cache to find all related entities
       const scene = stashCacheManager.getScene(sceneId);
       if (!scene) {
-        logger.warn("[UserStats] Scene not found in cache for stats update", { sceneId });
+        logger.warn("Scene not found in cache for stats update", { sceneId });
         return;
       }
 
-      logger.info("[UserStats] Scene found in cache", {
-        sceneId,
-        performerCount: scene.performers?.length || 0,
-        studioId: scene.studio?.id,
-        tagCount: scene.tags?.length || 0,
-      });
-
       // Update performer stats
       if (scene.performers && scene.performers.length > 0) {
-        logger.info("[UserStats] Updating performer stats", {
-          sceneId,
-          performerIds: scene.performers.map(p => p.id),
-          oCountDelta,
-        });
-
         await Promise.all(
           scene.performers.map((performer) =>
             this.updatePerformerStats(
@@ -176,62 +156,28 @@ class UserStatsService {
             )
           )
         );
-
-        logger.info("[UserStats] Performer stats updated successfully", {
-          sceneId,
-          performerCount: scene.performers.length,
-        });
-      } else {
-        logger.info("[UserStats] No performers to update", { sceneId });
       }
 
       // Update studio stats
       if (scene.studio) {
-        logger.info("[UserStats] Updating studio stats", {
-          sceneId,
-          studioId: scene.studio.id,
-          oCountDelta,
-        });
-
         await this.updateStudioStats(
           userId,
           scene.studio.id,
           oCountDelta,
           playCountDelta
         );
-
-        logger.info("[UserStats] Studio stats updated successfully", {
-          sceneId,
-          studioId: scene.studio.id,
-        });
       }
 
       // Update tag stats
       if (scene.tags && scene.tags.length > 0) {
-        logger.info("[UserStats] Updating tag stats", {
-          sceneId,
-          tagIds: scene.tags.map(t => t.id),
-          oCountDelta,
-        });
-
         await Promise.all(
           scene.tags.map((tag) =>
             this.updateTagStats(userId, tag.id, oCountDelta, playCountDelta)
           )
         );
-
-        logger.info("[UserStats] Tag stats updated successfully", {
-          sceneId,
-          tagCount: scene.tags.length,
-        });
       }
-
-      logger.info("[UserStats] updateStatsForScene completed successfully", {
-        userId,
-        sceneId,
-      });
     } catch (error) {
-      logger.error("[UserStats] Error updating stats for scene", {
+      logger.error("Error updating stats for scene", {
         userId,
         sceneId,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -251,14 +197,7 @@ class UserStatsService {
     lastPlayedAt?: Date,
     lastOAt?: Date
   ): Promise<void> {
-    logger.info("[UserStats] updatePerformerStats called", {
-      userId,
-      performerId,
-      oCountDelta,
-      playCountDelta,
-    });
-
-    const result = await prisma.userPerformerStats.upsert({
+    await prisma.userPerformerStats.upsert({
       where: {
         userId_performerId: {
           userId,
@@ -291,13 +230,6 @@ class UserStatsService {
           },
         }),
       },
-    });
-
-    logger.info("[UserStats] updatePerformerStats completed", {
-      userId,
-      performerId,
-      finalOCounter: result.oCounter,
-      finalPlayCount: result.playCount,
     });
   }
 

@@ -307,8 +307,6 @@ export async function incrementOCounter(
       return res.status(400).json({ error: "Missing required field: sceneId" });
     }
 
-    logger.info("[O Counter] START - Incrementing O counter", { userId, sceneId });
-
     // Get user settings for syncToStash
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -324,23 +322,12 @@ export async function incrementOCounter(
       where: { userId_sceneId: { userId, sceneId } },
     });
 
-    logger.info("[O Counter] Watch history lookup", {
-      userId,
-      sceneId,
-      existingRecord: !!watchHistory,
-      existingOCount: watchHistory?.oCount || 0,
-      existingPlayCount: watchHistory?.playCount || 0,
-    });
-
     const now = new Date();
-    let statsUpdateCalls = 0;
 
     // Track if this is a new record to prevent double-counting stats
     const isNewRecord = !watchHistory;
 
     if (!watchHistory) {
-      logger.info("[O Counter] Creating NEW watch history record", { userId, sceneId });
-
       // Create new watch history record
       watchHistory = await prisma.watchHistory.create({
         data: {
@@ -354,20 +341,7 @@ export async function incrementOCounter(
           lastPlayedAt: now,
         },
       });
-
-      logger.info("[O Counter] New record created", {
-        userId,
-        sceneId,
-        newOCount: watchHistory.oCount,
-      });
     } else {
-      logger.info("[O Counter] UPDATING existing watch history record", {
-        userId,
-        sceneId,
-        beforeOCount: watchHistory.oCount,
-        beforePlayCount: watchHistory.playCount,
-      });
-
       // Parse existing O history
       const oHistory = Array.isArray(watchHistory.oHistory)
         ? watchHistory.oHistory
@@ -382,20 +356,7 @@ export async function incrementOCounter(
         },
       });
 
-      logger.info("[O Counter] Record updated", {
-        userId,
-        sceneId,
-        afterOCount: watchHistory.oCount,
-      });
-
       // Update pre-computed stats for existing records
-      logger.info("[O Counter] updateStatsForScene (existing record path)", {
-        userId,
-        sceneId,
-        oCountDelta: 1,
-        playCountDelta: 0,
-      });
-
       await userStatsService.updateStatsForScene(
         userId,
         sceneId,
@@ -404,19 +365,11 @@ export async function incrementOCounter(
         undefined, // lastPlayedAt (not changed)
         now // lastOAt
       );
-      statsUpdateCalls++;
     }
 
     // Update pre-computed stats for new records ONLY
     // (prevents double-counting when existing record has playCount=0 and gets oCount incremented to 1)
     if (isNewRecord) {
-      logger.info("[O Counter] updateStatsForScene (new record path)", {
-        userId,
-        sceneId,
-        oCountDelta: 1,
-        playCountDelta: 0,
-      });
-
       await userStatsService.updateStatsForScene(
         userId,
         sceneId,
@@ -425,15 +378,7 @@ export async function incrementOCounter(
         undefined, // lastPlayedAt (set above during create)
         now // lastOAt
       );
-      statsUpdateCalls++;
     }
-
-    logger.info("[O Counter] Stats update summary", {
-      userId,
-      sceneId,
-      totalStatsUpdateCalls: statsUpdateCalls,
-      finalOCount: watchHistory.oCount,
-    });
 
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
