@@ -335,6 +335,9 @@ export async function incrementOCounter(
     const now = new Date();
     let statsUpdateCalls = 0;
 
+    // Track if this is a new record to prevent double-counting stats
+    const isNewRecord = !watchHistory;
+
     if (!watchHistory) {
       logger.info("[O Counter] Creating NEW watch history record", { userId, sceneId });
 
@@ -385,8 +388,8 @@ export async function incrementOCounter(
         afterOCount: watchHistory.oCount,
       });
 
-      // Update pre-computed stats (existing record updated)
-      logger.info("[O Counter] CALL #1 - updateStatsForScene (existing record path)", {
+      // Update pre-computed stats for existing records
+      logger.info("[O Counter] updateStatsForScene (existing record path)", {
         userId,
         sceneId,
         oCountDelta: 1,
@@ -404,31 +407,22 @@ export async function incrementOCounter(
       statsUpdateCalls++;
     }
 
-    // Update pre-computed stats for new records
-    const shouldUpdateStatsForNewRecord = watchHistory.playCount === 0 && watchHistory.oCount === 1;
-    logger.info("[O Counter] Checking new record stats update condition", {
-      userId,
-      sceneId,
-      playCount: watchHistory.playCount,
-      oCount: watchHistory.oCount,
-      shouldUpdate: shouldUpdateStatsForNewRecord,
-    });
-
-    if (shouldUpdateStatsForNewRecord) {
-      logger.info("[O Counter] CALL #2 - updateStatsForScene (new record path)", {
+    // Update pre-computed stats for new records ONLY
+    // (prevents double-counting when existing record has playCount=0 and gets oCount incremented to 1)
+    if (isNewRecord) {
+      logger.info("[O Counter] updateStatsForScene (new record path)", {
         userId,
         sceneId,
         oCountDelta: 1,
         playCountDelta: 0,
       });
 
-      // This was a new record created above (lines 316-328)
       await userStatsService.updateStatsForScene(
         userId,
         sceneId,
         1, // oCountDelta
         0, // playCountDelta
-        undefined, // lastPlayedAt (set above but not relevant here)
+        undefined, // lastPlayedAt (set above during create)
         now // lastOAt
       );
       statsUpdateCalls++;

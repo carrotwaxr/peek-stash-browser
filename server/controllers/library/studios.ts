@@ -77,10 +77,8 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Step 2: Merge with user data
-    studios = await mergeStudiosWithUserData(studios, userId);
-
-    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    // Step 2: Apply content restrictions & empty entity filtering with caching
+    // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
     const cacheVersion = stashCacheManager.getCacheVersion();
 
@@ -146,7 +144,11 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     // Use cached/filtered studios for remaining operations
     studios = filteredStudios;
 
-    // Step 3: Apply search query if provided
+    // Step 3: Merge with FRESH user data (ratings, stats)
+    // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
+    studios = await mergeStudiosWithUserData(studios, userId);
+
+    // Step 4: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       studios = studios.filter((s) => {
@@ -159,14 +161,14 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Step 4: Apply filters (merge root-level ids with studio_filter)
+    // Step 5: Apply filters (merge root-level ids with studio_filter)
     const mergedFilter = { ...studio_filter, ids: ids || studio_filter?.ids };
     studios = applyStudioFilters(studios, mergedFilter);
 
-    // Step 5: Sort
+    // Step 6: Sort
     studios = sortStudios(studios, sortField, sortDirection);
 
-    // Step 6: Paginate
+    // Step 7: Paginate
     const total = studios.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;

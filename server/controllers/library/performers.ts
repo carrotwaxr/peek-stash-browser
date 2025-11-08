@@ -87,10 +87,8 @@ export const findPerformers = async (
       });
     }
 
-    // Step 2: Merge with user data
-    performers = await mergePerformersWithUserData(performers, userId);
-
-    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    // Step 2: Apply content restrictions & empty entity filtering with caching
+    // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
     const cacheVersion = stashCacheManager.getCacheVersion();
 
@@ -156,7 +154,11 @@ export const findPerformers = async (
     // Use cached/filtered performers for remaining operations
     performers = filteredPerformers;
 
-    // Step 3: Apply search query if provided
+    // Step 3: Merge with FRESH user data (ratings, stats)
+    // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
+    performers = await mergePerformersWithUserData(performers, userId);
+
+    // Step 4: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       performers = performers.filter((p) => {
@@ -169,17 +171,17 @@ export const findPerformers = async (
       });
     }
 
-    // Step 4: Apply filters (merge root-level ids with performer_filter)
+    // Step 5: Apply filters (merge root-level ids with performer_filter)
     const mergedFilter = {
       ...performer_filter,
       ids: ids || performer_filter?.ids,
     };
     performers = applyPerformerFilters(performers, mergedFilter);
 
-    // Step 5: Sort
+    // Step 6: Sort
     performers = sortPerformers(performers, sortField, sortDirection);
 
-    // Step 6: Paginate
+    // Step 7: Paginate
     const total = performers.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;

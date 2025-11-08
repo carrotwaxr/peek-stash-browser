@@ -77,10 +77,8 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Step 2: Merge with user data
-    tags = await mergeTagsWithUserData(tags, userId);
-
-    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    // Step 2: Apply content restrictions & empty entity filtering with caching
+    // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
     const cacheVersion = stashCacheManager.getCacheVersion();
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
@@ -164,7 +162,11 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     // Use cached/filtered tags for remaining operations
     tags = filteredTags;
 
-    // Step 3: Apply search query if provided
+    // Step 3: Merge with FRESH user data (ratings, stats)
+    // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
+    tags = await mergeTagsWithUserData(tags, userId);
+
+    // Step 4: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
       tags = tags.filter((t) => {
@@ -177,14 +179,14 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Step 4: Apply filters (merge root-level ids with tag_filter)
+    // Step 5: Apply filters (merge root-level ids with tag_filter)
     const mergedFilter = { ...tag_filter, ids: ids || tag_filter?.ids };
     tags = applyTagFilters(tags, mergedFilter);
 
-    // Step 5: Sort
+    // Step 6: Sort
     tags = sortTags(tags, sortField, sortDirection);
 
-    // Step 6: Paginate
+    // Step 7: Paginate
     const total = tags.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
