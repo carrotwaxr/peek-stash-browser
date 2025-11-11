@@ -245,12 +245,14 @@ The system will check GitHub for new releases and notify you if an update is ava
 To update your Docker container to the latest version:
 
 **Step 1: Stop and remove the current container**
+
 ```bash
 docker stop peek-stash-browser
 docker rm peek-stash-browser
 ```
 
 **Step 2: Pull the latest image**
+
 ```bash
 docker pull carrotwaxr/peek-stash-browser:latest
 ```
@@ -260,6 +262,7 @@ docker pull carrotwaxr/peek-stash-browser:latest
 Use the same `docker run` command you used for initial installation. Your data persists in the `peek-data` volume.
 
 **Linux/macOS example:**
+
 ```bash
 docker run -d \
   --name peek-stash-browser \
@@ -273,6 +276,7 @@ docker run -d \
 ```
 
 **Windows example:**
+
 ```powershell
 docker run -d `
   --name peek-stash-browser `
@@ -333,7 +337,7 @@ Full documentation: **[https://carrotwaxr.github.io/peek-stash-browser](https://
 - **Documentation**: [https://carrotwaxr.github.io/peek-stash-browser](https://carrotwaxr.github.io/peek-stash-browser)
 - **Bug Reports**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
 - **Feature Requests**: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- **Community**: [Stash Discord](https://discord.gg/2TsNFKt) #third-party-integrations
+- **Community**: [Stash Discourse](https://discourse.stashapp.cc/t/peek-stash-browser/4018)
 
 ## License
 

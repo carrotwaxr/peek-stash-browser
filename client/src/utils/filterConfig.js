@@ -81,6 +81,17 @@ export const GROUP_SORT_OPTIONS = [
   { value: "updated_at", label: "Updated At" },
 ];
 
+// Gallery sorting options (alphabetically organized by label)
+export const GALLERY_SORT_OPTIONS = [
+  { value: "created_at", label: "Created At" },
+  { value: "date", label: "Date" },
+  { value: "image_count", label: "Image Count" },
+  { value: "random", label: "Random" },
+  { value: "rating100", label: "Rating" },
+  { value: "title", label: "Title" },
+  { value: "updated_at", label: "Updated At" },
+];
+
 // Filter type options for different data types
 export const RATING_OPTIONS = [
   { value: "1", label: "1 Star" },
@@ -2082,4 +2093,194 @@ export const buildGroupFilter = (filters) => {
   }
 
   return groupFilter;
+};
+
+export const GALLERY_FILTER_OPTIONS = [
+  // Common Filters
+  {
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
+  },
+  {
+    key: "title",
+    label: "Title Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search title...",
+  },
+  {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select performers...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "performerIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "studioId",
+    label: "Studio",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select studio...",
+  },
+  {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES_ALL",
+  },
+  {
+    key: "rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
+  },
+  {
+    key: "favorite",
+    label: "Favorites Only",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
+  },
+
+  // Gallery Properties
+  {
+    type: "section-header",
+    label: "Gallery Properties",
+    key: "section-properties",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "imageCount",
+    label: "Image Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+];
+
+export const buildGalleryFilter = (filters) => {
+  const galleryFilter = {};
+
+  // Boolean filters
+  if (filters.favorite === true || filters.favorite === "TRUE") {
+    galleryFilter.favorite = true;
+  }
+
+  // ID-based filters
+  const performerIds = [];
+  if (filters.performers?.value) {
+    performerIds.push(...filters.performers.value);
+  }
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    performerIds.push(...filters.performerIds);
+  }
+  if (performerIds.length > 0) {
+    galleryFilter.performers = {
+      value: [...new Set(performerIds)],
+      modifier: filters.performerIdsModifier || filters.performers?.modifier || "INCLUDES",
+    };
+  }
+
+  const studioIds = [];
+  if (filters.studios?.value) {
+    studioIds.push(...filters.studios.value);
+  }
+  if (filters.studioId && filters.studioId !== "") {
+    studioIds.push(filters.studioId);
+  }
+  if (studioIds.length > 0) {
+    galleryFilter.studios = {
+      value: [...new Set(studioIds)],
+      modifier: "INCLUDES",
+    };
+  }
+
+  const tagIds = [];
+  if (filters.tags?.value) {
+    tagIds.push(...filters.tags.value);
+  }
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    tagIds.push(...filters.tagIds);
+  }
+  if (tagIds.length > 0) {
+    galleryFilter.tags = {
+      value: [...new Set(tagIds)],
+      modifier: filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
+    };
+  }
+
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
+    galleryFilter.rating100 = {};
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
+
+    if (hasMin && hasMax) {
+      galleryFilter.rating100.modifier = "BETWEEN";
+      galleryFilter.rating100.value = parseInt(filters.rating.min);
+      galleryFilter.rating100.value2 = parseInt(filters.rating.max);
+    } else if (hasMin) {
+      galleryFilter.rating100.modifier = "GREATER_THAN";
+      galleryFilter.rating100.value = parseInt(filters.rating.min) - 1;
+    } else if (hasMax) {
+      galleryFilter.rating100.modifier = "LESS_THAN";
+      galleryFilter.rating100.value = parseInt(filters.rating.max) + 1;
+    }
+  }
+
+  // Image count filter
+  if (
+    filters.imageCount?.min !== undefined ||
+    filters.imageCount?.max !== undefined
+  ) {
+    galleryFilter.image_count = {};
+    const hasMin =
+      filters.imageCount.min !== undefined && filters.imageCount.min !== "";
+    const hasMax =
+      filters.imageCount.max !== undefined && filters.imageCount.max !== "";
+
+    if (hasMin && hasMax) {
+      galleryFilter.image_count.modifier = "BETWEEN";
+      galleryFilter.image_count.value = parseInt(filters.imageCount.min);
+      galleryFilter.image_count.value2 = parseInt(filters.imageCount.max);
+    } else if (hasMin) {
+      galleryFilter.image_count.modifier = "GREATER_THAN";
+      galleryFilter.image_count.value = parseInt(filters.imageCount.min) - 1;
+    } else if (hasMax) {
+      galleryFilter.image_count.modifier = "LESS_THAN";
+      galleryFilter.image_count.value = parseInt(filters.imageCount.max) + 1;
+    }
+  }
+
+  // Text search filter
+  if (filters.title) {
+    galleryFilter.title = {
+      value: filters.title,
+      modifier: "INCLUDES",
+    };
+  }
+
+  return galleryFilter;
 };
