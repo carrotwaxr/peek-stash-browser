@@ -1,28 +1,16 @@
 import { useState, useRef, forwardRef } from "react";
-import {
-  Link,
-  useNavigate,
-  useSearchParams,
-  useLocation,
-} from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import {
-  PageHeader,
-  PageLayout,
-  ErrorMessage,
-  CardStatusIcons,
-  CardCountsIcons,
-} from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import { GridCard } from "../ui/GridCard.jsx";
 
 const Studios = () => {
   usePageTitle("Studios");
@@ -125,6 +113,9 @@ const Studios = () => {
     );
   }
 
+  const gridClassNames =
+    "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+
   return (
     <PageLayout>
       <div ref={pageRef}>
@@ -144,7 +135,7 @@ const Studios = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            <div className={gridClassNames}>
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
@@ -158,10 +149,7 @@ const Studios = () => {
             </div>
           ) : (
             <>
-              <div
-                ref={gridRef}
-                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
-              >
+              <div ref={gridRef} className={gridClassNames}>
                 {currentStudios.map((studio, index) => (
                   <StudioCard
                     key={studio.id}
@@ -183,86 +171,32 @@ const Studios = () => {
 };
 
 const StudioCard = forwardRef(
-  (
-    { studio, tabIndex, className = "", isTVMode = false, referrerUrl },
-    ref
-  ) => {
+  ({ studio, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
     return (
-      <Link
-        ref={ref}
-        state={{ referrerUrl }}
-        to={`/studio/${studio.id}`}
-        tabIndex={isTVMode ? tabIndex : -1}
-        className={`studio-card block rounded-lg border overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
+      <GridCard
+        description={studio.description}
+        entityType="studio"
+        imagePath={studio.image_path}
+        indicators={[
+          { type: "O_COUNTER", count: studio.o_counter },
+          { type: "PLAY_COUNT", count: studio.play_count },
+          { type: "SCENES", count: studio.scene_count },
+          { type: "IMAGES", count: studio.image_count },
+          { type: "GALLERIES", count: studio.gallery_count },
+          { type: "PERFORMERS", count: studio.performer_count },
+        ]}
+        linkTo={`/studio/${studio.id}`}
+        ratingControlsProps={{
+          entityId: studio.id,
+          initialRating: studio.rating,
+          initialFavorite: studio.favorite || false,
         }}
-        role="button"
-        aria-label={`Studio: ${studio.name}`}
-      >
-        <div className="text-center">
-          {/* Studio Image */}
-          <div className="w-full aspect-video overflow-hidden mb-3 p-4">
-            {studio.image_path ? (
-              <img
-                src={studio.image_path}
-                alt={studio.name}
-                className="w-full h-full object-contain"
-                style={{ backgroundColor: "transparent" }}
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center text-5xl"
-                style={{ backgroundColor: "var(--bg-secondary)" }}
-              >
-                🏢
-              </div>
-            )}
-          </div>
-
-          {/* Content Section */}
-          <div className="px-4 pb-4">
-            {/* Name */}
-            <h3
-              className="font-semibold mb-2"
-              style={{ color: "var(--text-primary)" }}
-              title={studio.name}
-            >
-              {truncateText(studio.name, 30)}
-            </h3>
-
-            {/* Entity Counts */}
-            <CardCountsIcons
-              className="mb-2 justify-center"
-              sceneCount={studio.scene_count}
-              imageCount={studio.image_count}
-              galleryCount={studio.gallery_count}
-              performerCount={studio.performer_count}
-            />
-
-            {/* Status Icons */}
-            <CardStatusIcons
-              isReadOnly={true}
-              oCount={studio.o_counter}
-              playCount={studio.play_count}
-            />
-
-            {/* Rating and Favorite */}
-            <div
-              className="flex items-center justify-center"
-              onClick={(e) => e.preventDefault()}
-            >
-              <RatingControls
-                entityType="studio"
-                entityId={studio.id}
-                initialRating={studio.rating}
-                initialFavorite={studio.favorite || false}
-              />
-            </div>
-          </div>
-        </div>
-      </Link>
+        ref={ref}
+        referrerUrl={referrerUrl}
+        tabIndex={isTVMode ? tabIndex : -1}
+        title={studio.name}
+        {...others}
+      />
     );
   }
 );

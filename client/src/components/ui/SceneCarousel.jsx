@@ -10,7 +10,7 @@ const SceneCarousel = ({
   loading = false,
   onSceneClick,
   selectedScenes = [],
-  onToggleSelect
+  onToggleSelect,
 }) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -180,9 +180,10 @@ const SceneCarousel = ({
                 scene={scene}
                 onClick={onSceneClick}
                 enableKeyboard={false}
-                isSelected={selectedScenes.some(s => s.id === scene.id)}
+                isSelected={selectedScenes.some((s) => s.id === scene.id)}
                 onToggleSelect={onToggleSelect}
                 selectionMode={selectedScenes.length > 0}
+                hideRatingControls={true}
               />
             </div>
           ))}

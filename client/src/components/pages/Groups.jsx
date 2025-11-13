@@ -1,20 +1,9 @@
 import { useState, useRef, forwardRef } from "react";
-import {
-  Link,
-  useNavigate,
-  useSearchParams,
-  useLocation,
-} from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import {
-  PageHeader,
-  PageLayout,
-  ErrorMessage,
-  CardCountsIcons,
-} from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import SearchControls from "../ui/SearchControls.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -180,86 +169,41 @@ const Groups = () => {
 };
 
 const GroupCard = forwardRef(
-  ({ group, tabIndex, className = "", isTVMode = false, referrerUrl }, ref) => {
+  ({ group, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
     const imagePath = group.front_image_path || group.back_image_path;
+    const subtitle = (() => {
+      if (group.studio && group.date) {
+        return `${group.studio.name} • ${group.date}`;
+      } else if (group.studio) {
+        return group.studio.name;
+      } else if (group.date) {
+        return group.date;
+      }
+      return null;
+    })();
 
     return (
-      <Link
-        ref={ref}
-        state={{ referrerUrl }}
-        to={`/collection/${group.id}`}
-        tabIndex={isTVMode ? tabIndex : -1}
-        className={`group-card block rounded-lg border overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
+      <GridCard
+        description={group.description}
+        entityType="group"
+        imagePath={imagePath}
+        indicators={[
+          { type: "SCENES", count: group.scene_count },
+          { type: "GROUPS", count: group.sub_group_count },
+        ]}
+        linkTo={`/collection/${group.id}`}
+        ratingControlsProps={{
+          entityId: group.id,
+          initialRating: group.rating,
+          initialFavorite: group.favorite || false,
         }}
-        role="button"
-        aria-label={`Collection: ${group.name}`}
-      >
-        <div className="text-center">
-          {/* DVD Cover Image - Portrait Orientation */}
-          <div className="w-full aspect-[2/3] p-2">
-            {imagePath ? (
-              <img
-                src={imagePath}
-                alt={group.name}
-                className="w-full h-full object-contain rounded-md"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-6xl">
-                🎬
-              </div>
-            )}
-          </div>
-
-          {/* Content Section */}
-          <div className="p-3">
-            {/* Name */}
-            <h3
-              className="font-semibold mb-2 line-clamp-2"
-              style={{ color: "var(--text-primary)" }}
-              title={group.name}
-            >
-              {group.name}
-            </h3>
-
-            {/* Studio and Date - Always rendered to maintain alignment */}
-            <div
-              className="text-xs mb-2"
-              style={{
-                color: "var(--text-muted)",
-                minHeight: "1.25rem" // Maintains space even when empty
-              }}
-            >
-              {group.studio && <span>{group.studio.name}</span>}
-              {group.studio && group.date && <span> • </span>}
-              {group.date && <span>{group.date}</span>}
-              {!group.studio && !group.date && <span>&nbsp;</span>}
-            </div>
-
-            {/* Entity Counts */}
-            <CardCountsIcons
-              className="mb-2 justify-center"
-              sceneCount={group.scene_count}
-              groupCount={group.sub_group_count}
-            />
-
-            {/* Rating and Favorite */}
-            <div
-              className="flex items-center justify-center"
-              onClick={(e) => e.preventDefault()}
-            >
-              <RatingControls
-                entityType="group"
-                entityId={group.id}
-                initialRating={group.rating}
-                initialFavorite={group.favorite || false}
-              />
-            </div>
-          </div>
-        </div>
-      </Link>
+        ref={ref}
+        referrerUrl={referrerUrl}
+        subtitle={subtitle}
+        tabIndex={isTVMode ? tabIndex : -1}
+        title={group.name}
+        {...others}
+      />
     );
   }
 );

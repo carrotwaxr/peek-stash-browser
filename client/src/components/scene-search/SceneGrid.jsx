@@ -98,7 +98,7 @@ const SceneGrid = ({
 
   if (loading) {
     return (
-      <div className="grid gap-6 scene-grid-responsive">
+      <div className="grid gap-6 card-grid-responsive">
         {[...Array(12)].map((_, i) => (
           <SkeletonSceneCard key={i} />
         ))}
@@ -154,7 +154,7 @@ const SceneGrid = ({
       )}
 
       {/* Grid */}
-      <div ref={gridRef} className="grid gap-6 scene-grid-responsive">
+      <div ref={gridRef} className="grid gap-6 card-grid-responsive">
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}

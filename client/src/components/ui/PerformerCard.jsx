@@ -1,9 +1,6 @@
 import { forwardRef } from "react";
-import { Link } from "react-router-dom";
 import { LucideVenus, LucideMars, LucideUser } from "lucide-react";
-import RatingControls from "./RatingControls.jsx";
-import { getInitials, truncateText } from "../../utils/format.js";
-import CardStatusIcons from "./CardStatusIcons.jsx";
+import { GridCard } from "./GridCard.jsx";
 
 const PerformerGenderIcon = ({ gender, size = 16 }) => {
   if (gender === "FEMALE") {
@@ -16,85 +13,39 @@ const PerformerGenderIcon = ({ gender, size = 16 }) => {
 };
 
 const PerformerCard = forwardRef(
-  (
-    { performer, tabIndex, className = "", isTVMode = false, referrerUrl },
-    ref
-  ) => {
+  ({ performer, referrerUrl, isTVMode, tabIndex, ...others }, ref) => {
     return (
-      <Link
-        ref={ref}
-        state={{ referrerUrl }}
-        to={`/performer/${performer.id}`}
-        tabIndex={isTVMode ? tabIndex : -1}
-        className={`performer-card block rounded-lg border p-4 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
+      <GridCard
+        entityType="performer"
+        imagePath={performer.image_path}
+        hideDescription
+        hideSubtitle
+        indicators={[
+          { type: "O_COUNTER", count: performer.o_counter },
+          { type: "PLAY_COUNT", count: performer.play_count },
+          { type: "SCENES", count: performer.scene_count },
+          { type: "GROUPS", count: performer.group_count },
+          { type: "IMAGES", count: performer.image_count },
+          { type: "GALLERIES", count: performer.gallery_count },
+          { type: "TAGS", count: performer.tag_count },
+        ]}
+        linkTo={`/performer/${performer.id}`}
+        ratingControlsProps={{
+          entityId: performer.id,
+          initialRating: performer.rating,
+          initialFavorite: performer.favorite || false,
         }}
-        role="button"
-        aria-label={`Performer: ${performer.name}`}
-      >
-        <div className="text-center">
-          {/* Image */}
-          <div className="w-full aspect-[2/3] rounded mb-3 overflow-hidden">
-            {performer.image_path ? (
-              <img
-                src={performer.image_path}
-                alt={performer.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center text-lg font-semibold"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {getInitials(performer.name)}
-              </div>
-            )}
-          </div>
-
-          {/* Name with Gender Icon */}
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <h3
-              className="font-semibold"
-              style={{ color: "var(--text-primary)" }}
-              title={performer.name}
-            >
-              {truncateText(performer.name, 20)}
-            </h3>
+        ref={ref}
+        referrerUrl={referrerUrl}
+        tabIndex={isTVMode ? tabIndex : -1}
+        title={
+          <div className="flex items-center justify-center gap-2">
             <PerformerGenderIcon gender={performer.gender} size={16} />
+            {performer.name}
           </div>
-
-          {/* Scene Count */}
-          <div className="text-xs mb-2" style={{ color: "var(--text-muted)" }}>
-            {performer.scene_count || 0} scene
-            {performer.scene_count !== 1 ? "s" : ""}
-          </div>
-
-          {/* Status Icons */}
-          <CardStatusIcons
-            isReadOnly={true}
-            oCount={performer.o_counter}
-            playCount={performer.play_count}
-          />
-
-          {/* Rating and Favorite */}
-          <div
-            className="flex items-center justify-center"
-            onClick={(e) => e.preventDefault()}
-          >
-            <RatingControls
-              entityType="performer"
-              entityId={performer.id}
-              initialRating={performer.rating}
-              initialFavorite={performer.favorite || false}
-            />
-          </div>
-        </div>
-      </Link>
+        }
+        {...others}
+      />
     );
   }
 );

@@ -252,16 +252,9 @@ pre,
   }
 }
 
-/* Enhanced responsive grid for different screen sizes including 10ft mode */
-
-/* Base grid for mobile and small screens */
-.scene-grid-responsive {
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-}
-
 /* 4K and 8K display support */
 @media (min-width: 3840px) {
-  .scene-grid-responsive {
+  .card-grid-responsive {
     gap: 3rem;
   }
 
@@ -317,7 +310,7 @@ pre,
 }
 
 /* Special styling for grid navigation */
-.scene-grid-responsive .keyboard-focused {
+.card-grid-responsive .keyboard-focused {
   /* Ensure focused items are visible above neighbors */
   position: relative;
   z-index: 20;

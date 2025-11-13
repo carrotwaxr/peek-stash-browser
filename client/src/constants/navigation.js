@@ -49,7 +49,7 @@ export const NAV_DEFINITIONS = [
     key: "galleries",
     name: "Galleries",
     path: "/galleries",
-    icon: "images",
+    icon: "gallery-vertical",
     description: "Browse image galleries in your library",
   },
   {

@@ -1,15 +1,9 @@
 import { forwardRef, useRef, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
-import { formatFileSize } from "../../utils/format.js";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
 import RatingControls from "../ui/RatingControls.jsx";
-import {
-  SceneTitle,
-  SceneStats,
-  SceneDescription,
-  SceneMetadata,
-} from "../scene/index.js";
+import { SceneTitle, SceneDescription, SceneMetadata } from "../scene/index.js";
 
 /**
  * Enhanced scene card component with keyboard navigation support
@@ -26,6 +20,7 @@ const SceneCard = forwardRef(
       onToggleSelect,
       selectionMode = false,
       autoplayOnScroll = false,
+      hideRatingControls = false,
     },
     ref
   ) => {
@@ -358,17 +353,6 @@ const SceneCard = forwardRef(
               />
             </div>
 
-            {/* Stats - Fixed height row, no wrapping, centered */}
-            <div
-              style={{
-                minHeight: "1.5rem",
-                maxHeight: "1.5rem",
-                overflow: "hidden",
-              }}
-            >
-              <SceneStats scene={scene} centered={true} />
-            </div>
-
             {/* Description - Fixed height for carousel consistency */}
             <div
               style={{
@@ -380,38 +364,18 @@ const SceneCard = forwardRef(
               <SceneDescription scene={scene} lineClamp={3} />
             </div>
 
-            {/* Performers, Tags - More space, less cramped */}
-            <div
-              className="py-2"
-              style={{ minHeight: "3.5rem", maxHeight: "3.5rem" }}
-            >
-              <SceneMetadata scene={scene} />
-            </div>
+            <SceneMetadata scene={scene} />
 
-            {/* Rating Controls */}
-            <div className="py-2 flex justify-center">
-              <RatingControls
-                entityType="scene"
-                entityId={scene.id}
-                initialRating={scene.rating}
-                initialFavorite={scene.favorite || false}
-              />
-            </div>
-
-            {/* Resolution and File Size - Bottom row */}
-            <div
-              className="flex items-center justify-between text-xs"
-              style={{ color: "var(--text-muted)", minHeight: "1rem" }}
-            >
-              <span>
-                {scene.files?.[0]?.width && scene.files?.[0]?.height
-                  ? `${scene.files[0].width}×${scene.files[0].height}`
-                  : "—"}
-              </span>
-              <span>
-                {scene.files?.[0]?.size && formatFileSize(scene.files[0].size)}
-              </span>
-            </div>
+            {!hideRatingControls && (
+              <div className="py-2 flex justify-center">
+                <RatingControls
+                  entityType="scene"
+                  entityId={scene.id}
+                  initialRating={scene.rating}
+                  initialFavorite={scene.favorite || false}
+                />
+              </div>
+            )}
           </div>
         </div>
       </>
