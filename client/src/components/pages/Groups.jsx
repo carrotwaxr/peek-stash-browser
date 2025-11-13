@@ -1,7 +1,7 @@
 import { useState, useRef, forwardRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage, GridCard } from "../ui/index.js";
 import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -111,6 +111,9 @@ const Groups = () => {
     );
   }
 
+  const gridClassNames =
+    "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+
   return (
     <PageLayout>
       <div ref={pageRef}>
@@ -130,7 +133,7 @@ const Groups = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            <div className={gridClassNames}>
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
@@ -144,10 +147,7 @@ const Groups = () => {
             </div>
           ) : (
             <>
-              <div
-                ref={gridRef}
-                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
-              >
+              <div ref={gridRef} className={gridClassNames}>
                 {currentGroups.map((group, index) => (
                   <GroupCard
                     key={group.id}
@@ -192,6 +192,7 @@ const GroupCard = forwardRef(
           { type: "GROUPS", count: group.sub_group_count },
         ]}
         linkTo={`/collection/${group.id}`}
+        maxTitleLines={2}
         ratingControlsProps={{
           entityId: group.id,
           initialRating: group.rating,

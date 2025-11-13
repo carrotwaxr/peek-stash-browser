@@ -1,7 +1,7 @@
 import { useState, useRef, forwardRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage, GridCard } from "../ui/index.js";
 import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import { galleryTitle } from "../../utils/gallery.js";
 import SearchControls from "../ui/SearchControls.jsx";
@@ -101,6 +101,9 @@ const Galleries = () => {
     );
   }
 
+  const gridClassNames =
+    "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+
   return (
     <PageLayout>
       <div ref={pageRef}>
@@ -119,7 +122,7 @@ const Galleries = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            <div className={gridClassNames}>
               {[...Array(24)].map((_, i) => (
                 <div
                   key={i}
@@ -133,10 +136,7 @@ const Galleries = () => {
             </div>
           ) : (
             <>
-              <div
-                ref={gridRef}
-                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
-              >
+              <div ref={gridRef} className={gridClassNames}>
                 {currentGalleries.map((gallery, index) => (
                   <GalleryCard
                     key={gallery.id}
@@ -161,9 +161,21 @@ const GalleryCard = forwardRef(
   ({ gallery, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
     const coverImage = gallery.paths?.cover || null;
     const title = galleryTitle(gallery);
-    const subtitle = gallery.date
+    const date = gallery.date
       ? new Date(gallery.date).toLocaleDateString()
       : null;
+
+    // Build subtitle with studio and date (like Groups and Scenes)
+    const subtitle = (() => {
+      if (gallery.studio && date) {
+        return `${gallery.studio.name} • ${date}`;
+      } else if (gallery.studio) {
+        return gallery.studio.name;
+      } else if (date) {
+        return date;
+      }
+      return null;
+    })();
 
     return (
       <GridCard

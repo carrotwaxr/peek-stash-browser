@@ -1,12 +1,21 @@
 import { forwardRef, useRef, useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
-import { SceneTitle, SceneDescription, SceneMetadata } from "../scene/index.js";
+import {
+  CardImage,
+  CardTitle,
+  CardDescription,
+  CardIndicators,
+  CardRating,
+} from "./CardComponents";
+import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
+import { getSceneTitle, getSceneDescription } from "../../utils/format.js";
+import { formatRelativeTime } from "../../utils/date.js";
 
 /**
  * Enhanced scene card component with keyboard navigation support
+ * Uses shared CardComponents for visual consistency with GridCard
  */
 const SceneCard = forwardRef(
   (
@@ -25,29 +34,64 @@ const SceneCard = forwardRef(
     ref
   ) => {
     const { isTVMode } = useTVMode();
+    const navigate = useNavigate();
     const longPressTimerRef = useRef(null);
     const [isLongPressing, setIsLongPressing] = useState(false);
     const startPosRef = useRef({ x: 0, y: 0 });
     const hasMovedRef = useRef(false);
+    const aspectRatio = useEntityImageAspectRatio("scene");
+
+    const title = getSceneTitle(scene);
+    const description = getSceneDescription(scene);
+    const date = scene.date ? formatRelativeTime(scene.date) : null;
+    const duration = scene.files?.[0]?.duration
+      ? `${Math.floor(scene.files[0].duration / 60)}m`
+      : null;
+
+    // Build subtitle with studio and date (like Groups)
+    const subtitle = (() => {
+      if (scene.studio && date) {
+        return `${scene.studio.name} • ${date}`;
+      } else if (scene.studio) {
+        return scene.studio.name;
+      } else if (date) {
+        return date;
+      }
+      return null;
+    })();
+
+    // Merge and deduplicate tags
+    const getAllTags = () => {
+      const tagMap = new Map();
+      if (scene.tags) {
+        scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
+      }
+      if (scene.performers) {
+        scene.performers.forEach((performer) => {
+          if (performer.tags) {
+            performer.tags.forEach((tag) => tagMap.set(tag.id, tag));
+          }
+        });
+      }
+      if (scene.studio?.tags) {
+        scene.studio.tags.forEach((tag) => tagMap.set(tag.id, tag));
+      }
+      return Array.from(tagMap.values());
+    };
+
+    const allTags = getAllTags();
 
     const handleClick = (e) => {
-      // Don't interfere with clicks on interactive elements
       const target = e.target;
-
-      // Find the closest button element (but not the card itself)
       const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
-
-      // Check for links
       const isLink = target.closest("a");
-
       const isInteractive = isButton || isLink;
 
       if (isInteractive) {
-        return; // Let the interactive element handle the click
+        return;
       }
 
-      // If long press was triggered, don't navigate
       if (isLongPressing) {
         setIsLongPressing(false);
         return;
@@ -55,25 +99,18 @@ const SceneCard = forwardRef(
 
       e.preventDefault();
 
-      // When in selection mode (at least one card selected), toggle selection on click
       if (selectionMode) {
         onToggleSelect?.(scene);
       } else {
-        onClick?.(scene);
+        onClick?.(scene) || navigate(`/scene/${scene.id}`);
       }
     };
 
     const handleMouseDown = (e) => {
-      // Don't start long press on interactive elements
       const target = e.target;
-
-      // Find the closest button element (but not the card itself)
       const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
-
-      // Check for links
       const isLink = target.closest("a");
-
       const isInteractive = isButton || isLink;
 
       if (isInteractive) {
@@ -83,7 +120,7 @@ const SceneCard = forwardRef(
       longPressTimerRef.current = setTimeout(() => {
         setIsLongPressing(true);
         onToggleSelect?.(scene);
-      }, 500); // 500ms for long press
+      }, 500);
     };
 
     const handleMouseUp = () => {
@@ -94,46 +131,36 @@ const SceneCard = forwardRef(
     };
 
     const handleTouchStart = (e) => {
-      // Don't start long press on interactive elements
       const target = e.target;
-
-      // Find the closest button element (but not the card itself)
       const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
-
-      // Check for links
       const isLink = target.closest("a");
-
       const isInteractive = isButton || isLink;
 
       if (isInteractive) {
         return;
       }
 
-      // Track starting position
       const touch = e.touches[0];
       startPosRef.current = { x: touch.clientX, y: touch.clientY };
       hasMovedRef.current = false;
 
       longPressTimerRef.current = setTimeout(() => {
-        // Only trigger if hasn't moved (not dragging)
         if (!hasMovedRef.current) {
           setIsLongPressing(true);
           onToggleSelect?.(scene);
         }
-      }, 500); // 500ms for long press
+      }, 500);
     };
 
     const handleTouchMove = (e) => {
-      // Check if user has moved beyond threshold (indicates scrolling/dragging)
       if (longPressTimerRef.current && e.touches.length > 0) {
         const touch = e.touches[0];
         const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
         const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
-        const moveThreshold = 10; // pixels
+        const moveThreshold = 10;
 
         if (deltaX > moveThreshold || deltaY > moveThreshold) {
-          // User is dragging/scrolling, cancel long press
           hasMovedRef.current = true;
           clearTimeout(longPressTimerRef.current);
           longPressTimerRef.current = null;
@@ -149,7 +176,6 @@ const SceneCard = forwardRef(
       hasMovedRef.current = false;
     };
 
-    // Cleanup on unmount
     useEffect(() => {
       return () => {
         if (longPressTimerRef.current) {
@@ -159,7 +185,6 @@ const SceneCard = forwardRef(
     }, []);
 
     const handleKeyDown = (e) => {
-      // Prevent card navigation when typing in input fields
       const target = e.target;
       const isInputField =
         target.tagName === "INPUT" ||
@@ -168,13 +193,13 @@ const SceneCard = forwardRef(
         target.isContentEditable;
 
       if (isInputField) {
-        return; // Don't handle keyboard events from input fields
+        return;
       }
 
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         e.stopPropagation();
-        onClick?.(scene);
+        onClick?.(scene) || navigate(`/scene/${scene.id}`);
       }
     };
 
@@ -184,45 +209,38 @@ const SceneCard = forwardRef(
     };
 
     return (
-      <>
-        <div
-          ref={ref}
-          className={`
-        scene-card
-        relative bg-card rounded-lg border overflow-hidden
-        transition-all duration-300 cursor-pointer
-        hover:shadow-2xl hover:scale-[1.03] hover:z-10
-        hover:border-opacity-80
-        ${isSelected ? "scene-card-selected" : ""}
-        ${className}
-      `}
-          style={{
-            backgroundColor: "var(--bg-card)",
-            borderColor: isSelected
-              ? "var(--selection-color)"
-              : "var(--border-color)",
-            borderWidth: isSelected ? "2px" : "1px",
-          }}
-          onClick={handleClick}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
-          onKeyDown={handleKeyDown}
-          onFocus={onFocus}
-          tabIndex={isTVMode ? tabIndex : -1}
-          role="button"
-          aria-label={`Scene ${scene.id}`}
-        >
-          {/* Thumbnail */}
-          <div
-            className="relative aspect-video overflow-hidden"
-            style={{ backgroundColor: "var(--bg-secondary)" }}
-          >
-            {/* Selection Checkbox - Always shown, larger touchpoint on mobile */}
+      <div
+        ref={ref}
+        className={`flex flex-col items-center justify-between rounded-lg border p-2 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${
+          isSelected ? "scene-card-selected" : ""
+        } ${className}`}
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: isSelected
+            ? "var(--selection-color)"
+            : "var(--border-color)",
+          borderWidth: isSelected ? "2px" : "1px",
+          minHeight: "20rem",
+          maxHeight: "36rem",
+        }}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        onKeyDown={handleKeyDown}
+        onFocus={onFocus}
+        tabIndex={isTVMode ? tabIndex : -1}
+        role="button"
+        aria-label={`Scene ${scene.id}`}
+      >
+        {/* Image with preview */}
+        <CardImage aspectRatio={aspectRatio}>
+          <div className="relative w-full h-full">
+            {/* Selection Checkbox */}
             <div className="absolute top-2 left-2 z-20">
               <button
                 onClick={handleCheckboxClick}
@@ -267,6 +285,7 @@ const SceneCard = forwardRef(
               </button>
             </div>
 
+            {/* Scene Preview */}
             {scene.paths?.screenshot ? (
               <SceneCardPreview
                 scene={scene}
@@ -290,32 +309,19 @@ const SceneCard = forwardRef(
               </div>
             )}
 
-            {/* Overlay gradient - non-interactive */}
+            {/* Overlay gradient */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
 
-            {/* Studio in top-right */}
-            {scene.studio && (
-              <div className="absolute top-2 right-2 z-10">
-                <Link
-                  to={`/studio/${scene.studio.id}`}
-                  className="px-2 py-1 bg-black/70 text-white text-xs rounded inline-block hover:bg-black/90 transition-colors"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {scene.studio.name}
-                </Link>
+            {/* Duration badge */}
+            {duration && (
+              <div className="absolute bottom-2 right-2 pointer-events-none z-10">
+                <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
+                  {duration}
+                </span>
               </div>
             )}
 
-            {/* Duration in bottom-right - non-interactive */}
-            <div className="absolute bottom-2 right-2 pointer-events-none z-10">
-              {scene.files?.[0]?.duration && (
-                <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                  {Math.floor(scene.files[0].duration / 60)}m
-                </span>
-              )}
-            </div>
-
-            {/* Watch Progress Bar */}
+            {/* Watch progress bar */}
             {scene.resumeTime && scene.files?.[0]?.duration && (
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 pointer-events-none">
                 <div
@@ -327,58 +333,44 @@ const SceneCard = forwardRef(
                     )}%`,
                     backgroundColor: "var(--status-success)",
                   }}
-                  title={`Resume from ${Math.floor(
-                    scene.resumeTime / 60
-                  )}:${String(Math.floor(scene.resumeTime % 60)).padStart(
-                    2,
-                    "0"
-                  )}`}
                 />
               </div>
             )}
           </div>
+        </CardImage>
 
-          {/* Content */}
-          <div className="pt-4 px-4 pb-2">
-            {/* Title and Date - Fixed height for carousel consistency */}
-            <div
-              className="flex flex-col"
-              style={{ minHeight: "4rem", maxHeight: "4rem" }}
-            >
-              <SceneTitle
-                scene={scene}
-                titleClassName="font-semibold mb-1 leading-tight"
-                dateClassName="text-xs mt-1"
-                maxLines={2}
-              />
-            </div>
+        {/* Title with studio and date as subtitle */}
+        <CardTitle
+          title={title}
+          subtitle={subtitle}
+          hideSubtitle={false}
+          maxTitleLines={2}
+        />
 
-            {/* Description - Fixed height for carousel consistency */}
-            <div
-              style={{
-                minHeight: "3.75rem",
-                maxHeight: "3.75rem",
-                overflow: "hidden",
-              }}
-            >
-              <SceneDescription scene={scene} lineClamp={3} />
-            </div>
+        {/* Description */}
+        <CardDescription description={description} maxLines={3} />
 
-            <SceneMetadata scene={scene} />
+        {/* Indicators */}
+        <CardIndicators
+          indicators={[
+            { type: "O_COUNTER", count: scene.o_counter },
+            { type: "PLAY_COUNT", count: scene.play_count },
+            { type: "PERFORMERS", count: scene.performers?.length },
+            { type: "GROUPS", count: scene.groups?.length },
+            { type: "TAGS", count: allTags?.length },
+          ]}
+        />
 
-            {!hideRatingControls && (
-              <div className="py-2 flex justify-center">
-                <RatingControls
-                  entityType="scene"
-                  entityId={scene.id}
-                  initialRating={scene.rating}
-                  initialFavorite={scene.favorite || false}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </>
+        {/* Rating Controls */}
+        {!hideRatingControls && (
+          <CardRating
+            entityType="scene"
+            entityId={scene.id}
+            initialRating={scene.rating}
+            initialFavorite={scene.favorite || false}
+          />
+        )}
+      </div>
     );
   }
 );
