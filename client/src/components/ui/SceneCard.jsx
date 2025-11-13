@@ -86,7 +86,8 @@ const SceneCard = forwardRef(
       const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
       const isLink = target.closest("a");
-      const isInteractive = isButton || isLink;
+      const isInput = target.closest("input");
+      const isInteractive = isButton || isLink || isInput;
 
       if (isInteractive) {
         return;
@@ -111,7 +112,8 @@ const SceneCard = forwardRef(
       const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
       const isLink = target.closest("a");
-      const isInteractive = isButton || isLink;
+      const isInput = target.closest("input");
+      const isInteractive = isButton || isLink || isInput;
 
       if (isInteractive) {
         return;
@@ -135,7 +137,8 @@ const SceneCard = forwardRef(
       const closestButton = target.closest("button");
       const isButton = closestButton && closestButton !== e.currentTarget;
       const isLink = target.closest("a");
-      const isInteractive = isButton || isLink;
+      const isInput = target.closest("input");
+      const isInteractive = isButton || isLink || isInput;
 
       if (isInteractive) {
         return;
