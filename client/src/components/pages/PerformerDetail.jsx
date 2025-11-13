@@ -4,7 +4,8 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
+import RatingSlider from "../ui/RatingSlider.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
 import {
   LucideMars,
   LucideStar,
@@ -87,6 +88,8 @@ const PerformerDetail = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [performer, setPerformer] = useState(null);
+  const [rating, setRating] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Set page title to performer name
   usePageTitle(performer?.name || "Performer");
@@ -97,6 +100,8 @@ const PerformerDetail = () => {
         setIsLoading(true);
         const performerData = await getPerformer(performerId);
         setPerformer(performerData);
+        setRating(performerData.rating);
+        setIsFavorite(performerData.favorite || false);
       } catch {
         // Error loading performer - will show loading spinner
       } finally {
@@ -106,6 +111,26 @@ const PerformerDetail = () => {
 
     fetchPerformer();
   }, [performerId]);
+
+  const handleRatingChange = async (newRating) => {
+    setRating(newRating);
+    try {
+      await libraryApi.updateRating("performer", performerId, newRating);
+    } catch (error) {
+      console.error("Failed to update rating:", error);
+      setRating(performer.rating); // Revert on error
+    }
+  };
+
+  const handleFavoriteChange = async (newValue) => {
+    setIsFavorite(newValue);
+    try {
+      await libraryApi.updateFavorite("performer", performerId, newValue);
+    } catch (error) {
+      console.error("Failed to update favorite:", error);
+      setIsFavorite(performer.favorite || false); // Revert on error
+    }
+  };
 
   if (isLoading) {
     return (
@@ -136,9 +161,14 @@ const PerformerDetail = () => {
         <div className="mb-8">
           <PageHeader
             title={
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
                 <span>{performer.name}</span>
                 <PerformerGenderIcon gender={performer.gender} size={32} />
+                <FavoriteButton
+                  isFavorite={isFavorite}
+                  onChange={handleFavoriteChange}
+                  size="large"
+                />
               </div>
             }
             subtitle={
@@ -148,14 +178,12 @@ const PerformerDetail = () => {
             }
           />
 
-          {/* Rating Controls */}
-          <div className="mt-4">
-            <RatingControls
-              entityType="performer"
-              entityId={performer.id}
-              initialRating={performer.rating}
-              initialFavorite={performer.favorite || false}
-              size={24}
+          {/* Rating Slider */}
+          <div className="mt-4 max-w-md">
+            <RatingSlider
+              rating={rating}
+              onChange={handleRatingChange}
+              showClearButton={true}
             />
           </div>
         </div>

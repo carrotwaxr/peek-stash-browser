@@ -4,7 +4,8 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
+import RatingSlider from "../ui/RatingSlider.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
 import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import PageHeader from "../ui/PageHeader.jsx";
@@ -15,6 +16,8 @@ const StudioDetail = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [studio, setStudio] = useState(null);
+  const [rating, setRating] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Set page title to studio name
   usePageTitle(studio?.name || "Studio");
@@ -25,6 +28,8 @@ const StudioDetail = () => {
         setIsLoading(true);
         const studioData = await getStudio(studioId);
         setStudio(studioData);
+        setRating(studioData.rating);
+        setIsFavorite(studioData.favorite || false);
       } catch {
         // Error loading studio - will show loading spinner
       } finally {
@@ -34,6 +39,26 @@ const StudioDetail = () => {
 
     fetchStudio();
   }, [studioId]);
+
+  const handleRatingChange = async (newRating) => {
+    setRating(newRating);
+    try {
+      await libraryApi.updateRating("studio", studioId, newRating);
+    } catch (error) {
+      console.error("Failed to update rating:", error);
+      setRating(studio.rating);
+    }
+  };
+
+  const handleFavoriteChange = async (newValue) => {
+    setIsFavorite(newValue);
+    try {
+      await libraryApi.updateFavorite("studio", studioId, newValue);
+    } catch (error) {
+      console.error("Failed to update favorite:", error);
+      setIsFavorite(studio.favorite || false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -61,7 +86,16 @@ const StudioDetail = () => {
         {/* Studio Header */}
         <div className="mb-8">
           <PageHeader
-            title={studio?.name || `Studio ${studioId}`}
+            title={
+              <div className="flex gap-4 items-center">
+                <span>{studio?.name || `Studio ${studioId}`}</span>
+                <FavoriteButton
+                  isFavorite={isFavorite}
+                  onChange={handleFavoriteChange}
+                  size="large"
+                />
+              </div>
+            }
             subtitle={
               studio?.aliases?.length
                 ? `Also known as: ${studio.aliases.join(", ")}`
@@ -69,14 +103,12 @@ const StudioDetail = () => {
             }
           />
 
-          {/* Rating Controls */}
-          <div className="mt-4">
-            <RatingControls
-              entityType="studio"
-              entityId={studio.id}
-              initialRating={studio.rating}
-              initialFavorite={studio.favorite || false}
-              size={24}
+          {/* Rating Slider */}
+          <div className="mt-4 max-w-md">
+            <RatingSlider
+              rating={rating}
+              onChange={handleRatingChange}
+              showClearButton={true}
             />
           </div>
         </div>

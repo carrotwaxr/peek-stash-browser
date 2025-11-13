@@ -3,7 +3,8 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
+import RatingSlider from "../ui/RatingSlider.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
 import Lightbox from "../ui/Lightbox.jsx";
 import PerformerCard from "../ui/PerformerCard.jsx";
 import { ArrowLeft, Play } from "lucide-react";
@@ -22,6 +23,8 @@ const GalleryDetail = () => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxAutoPlay, setLightboxAutoPlay] = useState(false);
+  const [rating, setRating] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Set page title to gallery name
   usePageTitle(gallery ? galleryTitle(gallery) : "Gallery");
@@ -32,6 +35,8 @@ const GalleryDetail = () => {
         setIsLoading(true);
         const galleryData = await libraryApi.findGalleryById(galleryId);
         setGallery(galleryData);
+        setRating(galleryData.rating);
+        setIsFavorite(galleryData.favorite || false);
       } catch (error) {
         console.error("Error loading gallery:", error);
       } finally {
@@ -57,6 +62,26 @@ const GalleryDetail = () => {
 
     fetchImages();
   }, [galleryId]);
+
+  const handleRatingChange = async (newRating) => {
+    setRating(newRating);
+    try {
+      await libraryApi.updateRating("gallery", galleryId, newRating);
+    } catch (error) {
+      console.error("Failed to update rating:", error);
+      setRating(gallery.rating);
+    }
+  };
+
+  const handleFavoriteChange = async (newValue) => {
+    setIsFavorite(newValue);
+    try {
+      await libraryApi.updateFavorite("gallery", galleryId, newValue);
+    } catch (error) {
+      console.error("Failed to update favorite:", error);
+      setIsFavorite(gallery.favorite || false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -95,7 +120,18 @@ const GalleryDetail = () => {
 
         {/* Gallery Header */}
         <div className="mb-8">
-          <PageHeader title={galleryTitle(gallery)} />
+          <PageHeader
+            title={
+              <div className="flex gap-4 items-center">
+                <span>{galleryTitle(gallery)}</span>
+                <FavoriteButton
+                  isFavorite={isFavorite}
+                  onChange={handleFavoriteChange}
+                  size="large"
+                />
+              </div>
+            }
+          />
 
           {/* Gallery metadata */}
           <div
@@ -114,14 +150,12 @@ const GalleryDetail = () => {
             {gallery.photographer && <span>by {gallery.photographer}</span>}
           </div>
 
-          {/* Rating Controls */}
-          <div className="mt-4">
-            <RatingControls
-              entityType="gallery"
-              entityId={gallery.id}
-              initialRating={gallery.rating}
-              initialFavorite={gallery.favorite || false}
-              size={24}
+          {/* Rating Slider */}
+          <div className="mt-4 max-w-md">
+            <RatingSlider
+              rating={rating}
+              onChange={handleRatingChange}
+              showClearButton={true}
             />
           </div>
         </div>

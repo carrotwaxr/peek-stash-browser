@@ -4,7 +4,8 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
+import RatingSlider from "../ui/RatingSlider.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
 import { ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { formatDuration } from "../../utils/format.js";
@@ -16,6 +17,8 @@ const GroupDetail = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [group, setGroup] = useState(null);
+  const [rating, setRating] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Set page title to group name
   usePageTitle(group?.name || "Collection");
@@ -26,6 +29,8 @@ const GroupDetail = () => {
         setIsLoading(true);
         const groupData = await getGroup(groupId);
         setGroup(groupData);
+        setRating(groupData.rating);
+        setIsFavorite(groupData.favorite || false);
       } catch {
         // Error loading group - will show loading spinner
       } finally {
@@ -35,6 +40,26 @@ const GroupDetail = () => {
 
     fetchGroup();
   }, [groupId]);
+
+  const handleRatingChange = async (newRating) => {
+    setRating(newRating);
+    try {
+      await libraryApi.updateRating("group", groupId, newRating);
+    } catch (error) {
+      console.error("Failed to update rating:", error);
+      setRating(group.rating);
+    }
+  };
+
+  const handleFavoriteChange = async (newValue) => {
+    setIsFavorite(newValue);
+    try {
+      await libraryApi.updateFavorite("group", groupId, newValue);
+    } catch (error) {
+      console.error("Failed to update favorite:", error);
+      setIsFavorite(group.favorite || false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -64,7 +89,16 @@ const GroupDetail = () => {
         {/* Group Header - Hero Treatment */}
         <div className="mb-8">
           <PageHeader
-            title={group?.name || `Collection ${groupId}`}
+            title={
+              <div className="flex gap-4 items-center">
+                <span>{group?.name || `Collection ${groupId}`}</span>
+                <FavoriteButton
+                  isFavorite={isFavorite}
+                  onChange={handleFavoriteChange}
+                  size="large"
+                />
+              </div>
+            }
             subtitle={
               group?.aliases?.length
                 ? `Also known as: ${group.aliases.join(", ")}`
@@ -72,14 +106,12 @@ const GroupDetail = () => {
             }
           />
 
-          {/* Rating Controls */}
-          <div className="mt-4">
-            <RatingControls
-              entityType="group"
-              entityId={group.id}
-              initialRating={group.rating}
-              initialFavorite={group.favorite || false}
-              size={24}
+          {/* Rating Slider */}
+          <div className="mt-4 max-w-md">
+            <RatingSlider
+              rating={rating}
+              onChange={handleRatingChange}
+              showClearButton={true}
             />
           </div>
         </div>

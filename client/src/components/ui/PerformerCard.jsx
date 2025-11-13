@@ -40,8 +40,8 @@ const PerformerCard = forwardRef(
         tabIndex={isTVMode ? tabIndex : -1}
         title={
           <div className="flex items-center justify-center gap-2">
-            <PerformerGenderIcon gender={performer.gender} size={16} />
             {performer.name}
+            <PerformerGenderIcon gender={performer.gender} size={16} />
           </div>
         }
         {...others}

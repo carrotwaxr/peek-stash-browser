@@ -7,7 +7,7 @@ import {
   CardTitle,
   CardDescription,
   CardIndicators,
-  CardRating,
+  CardRatingRow,
 } from "./CardComponents";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
 import { getSceneTitle, getSceneDescription } from "../../utils/format.js";
@@ -361,13 +361,14 @@ const SceneCard = forwardRef(
           ]}
         />
 
-        {/* Rating Controls */}
+        {/* Rating and Favorite Row */}
         {!hideRatingControls && (
-          <CardRating
+          <CardRatingRow
             entityType="scene"
             entityId={scene.id}
             initialRating={scene.rating}
             initialFavorite={scene.favorite || false}
+            entityTitle={title}
           />
         )}
       </div>

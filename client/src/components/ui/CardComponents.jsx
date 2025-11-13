@@ -1,8 +1,11 @@
-import { forwardRef, useMemo } from "react";
+import { forwardRef, useMemo, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import RatingControls from "./RatingControls";
 import { CardCountIndicators } from "./CardCountIndicators";
 import Tooltip from "./Tooltip";
+import RatingBadge from "./RatingBadge";
+import RatingSliderDialog from "./RatingSliderDialog";
+import FavoriteButton from "./FavoriteButton";
+import { libraryApi } from "../../services/api";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard
@@ -218,22 +221,74 @@ export const CardIndicators = ({ indicators }) => {
 };
 
 /**
- * Card rating controls section (always fixed height for consistency)
+ * Card rating and favorite row (always fixed height for consistency)
+ * Shows rating badge (left) and favorite button (right)
  */
-export const CardRating = ({
+export const CardRatingRow = ({
   entityType,
   entityId,
   initialRating,
   initialFavorite,
+  entityTitle,
 }) => {
+  const [rating, setRating] = useState(initialRating);
+  const [isFavorite, setIsFavorite] = useState(initialFavorite);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const badgeRef = useRef(null);
+
+  const handleRatingSave = async (newRating) => {
+    setRating(newRating);
+    try {
+      await libraryApi.updateRating(entityType, entityId, newRating);
+    } catch (error) {
+      console.error("Failed to update rating:", error);
+      setRating(initialRating); // Revert on error
+    }
+  };
+
+  const handleFavoriteChange = async (newValue) => {
+    setIsFavorite(newValue);
+    try {
+      await libraryApi.updateFavorite(entityType, entityId, newValue);
+    } catch (error) {
+      console.error("Failed to update favorite:", error);
+      setIsFavorite(initialFavorite); // Revert on error
+    }
+  };
+
   return (
-    <div className="my-1" style={{ height: "1.25rem" }}>
-      <RatingControls
+    <>
+      <div
+        className="flex justify-between items-center w-full my-1"
+        style={{ height: "2rem" }}
+      >
+        <div ref={badgeRef}>
+          <RatingBadge
+            rating={rating}
+            onClick={() => setDialogOpen(true)}
+            size="small"
+          />
+        </div>
+        <FavoriteButton
+          isFavorite={isFavorite}
+          onChange={handleFavoriteChange}
+          size="small"
+          variant="card"
+        />
+      </div>
+
+      <RatingSliderDialog
+        isOpen={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        initialRating={rating}
+        onSave={handleRatingSave}
         entityType={entityType}
-        entityId={entityId}
-        initialRating={initialRating}
-        initialFavorite={initialFavorite}
+        entityTitle={entityTitle}
+        anchorEl={badgeRef.current}
       />
-    </div>
+    </>
   );
 };
+
+// Legacy export for backward compatibility (will be removed)
+export const CardRating = CardRatingRow;

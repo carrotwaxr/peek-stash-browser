@@ -270,6 +270,56 @@ export const libraryApi = {
     const result = await apiPost("/library/galleries/minimal", params);
     return result?.galleries || [];
   },
+
+  /**
+   * Update rating for any entity type
+   * @param {string} entityType - Entity type (scene, performer, tag, studio, gallery, group)
+   * @param {string} entityId - Entity ID
+   * @param {number|null} rating - Rating value (0-100) or null to clear
+   * @returns {Promise<Object>} Updated rating object
+   */
+  updateRating: async (entityType, entityId, rating) => {
+    const methodMap = {
+      scene: ratingsApi.updateSceneRating,
+      performer: ratingsApi.updatePerformerRating,
+      tag: ratingsApi.updateTagRating,
+      studio: ratingsApi.updateStudioRating,
+      gallery: ratingsApi.updateGalleryRating,
+      group: ratingsApi.updateGroupRating,
+    };
+
+    const method = methodMap[entityType.toLowerCase()];
+    if (!method) {
+      throw new Error(`Unknown entity type: ${entityType}`);
+    }
+
+    return method(entityId, { rating });
+  },
+
+  /**
+   * Update favorite status for any entity type
+   * @param {string} entityType - Entity type (scene, performer, tag, studio, gallery, group)
+   * @param {string} entityId - Entity ID
+   * @param {boolean} favorite - Favorite status
+   * @returns {Promise<Object>} Updated favorite object
+   */
+  updateFavorite: async (entityType, entityId, favorite) => {
+    const methodMap = {
+      scene: ratingsApi.updateSceneRating,
+      performer: ratingsApi.updatePerformerRating,
+      tag: ratingsApi.updateTagRating,
+      studio: ratingsApi.updateStudioRating,
+      gallery: ratingsApi.updateGalleryRating,
+      group: ratingsApi.updateGroupRating,
+    };
+
+    const method = methodMap[entityType.toLowerCase()];
+    if (!method) {
+      throw new Error(`Unknown entity type: ${entityType}`);
+    }
+
+    return method(entityId, { favorite });
+  },
 };
 
 // Valid sort field mappings for Stash GraphQL API
