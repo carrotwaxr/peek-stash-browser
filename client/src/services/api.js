@@ -286,6 +286,7 @@ export const libraryApi = {
       studio: ratingsApi.updateStudioRating,
       gallery: ratingsApi.updateGalleryRating,
       group: ratingsApi.updateGroupRating,
+      image: ratingsApi.updateImageRating,
     };
 
     const method = methodMap[entityType.toLowerCase()];
@@ -298,7 +299,7 @@ export const libraryApi = {
 
   /**
    * Update favorite status for any entity type
-   * @param {string} entityType - Entity type (scene, performer, tag, studio, gallery, group)
+   * @param {string} entityType - Entity type (scene, performer, tag, studio, gallery, group, image)
    * @param {string} entityId - Entity ID
    * @param {boolean} favorite - Favorite status
    * @returns {Promise<Object>} Updated favorite object
@@ -311,6 +312,7 @@ export const libraryApi = {
       studio: ratingsApi.updateStudioRating,
       gallery: ratingsApi.updateGalleryRating,
       group: ratingsApi.updateGroupRating,
+      image: ratingsApi.updateImageRating,
     };
 
     const method = methodMap[entityType.toLowerCase()];
@@ -606,4 +608,14 @@ export const ratingsApi = {
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
   updateGroupRating: (groupId, data) => apiPut(`/ratings/group/${groupId}`, data),
+
+  /**
+   * Update rating and/or favorite for an image
+   * @param {string} imageId - Image ID
+   * @param {Object} data - Rating data
+   * @param {number|null} data.rating - Rating value (0-100) or null
+   * @param {boolean} data.favorite - Favorite status
+   * @returns {Promise<{success: boolean, rating: Object}>}
+   */
+  updateImageRating: (imageId, data) => apiPut(`/ratings/image/${imageId}`, data),
 };

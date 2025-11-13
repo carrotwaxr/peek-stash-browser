@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Clock } from "lucide-react";
-import Button from "./Button.jsx";
+import RatingBadge from "./RatingBadge.jsx";
+import RatingSliderDialog from "./RatingSliderDialog.jsx";
+import FavoriteButton from "./FavoriteButton.jsx";
+import { libraryApi } from "../../services/api.js";
 
 const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -8,6 +11,14 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [intervalDuration, setIntervalDuration] = useState(5000); // Default 5 seconds
   const intervalRef = useRef(null);
+
+  // Rating and favorite state for current image
+  const [rating, setRating] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Rating popover state
+  const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
+  const ratingBadgeRef = useRef(null);
 
   // Reset index when initialIndex changes
   useEffect(() => {
@@ -39,6 +50,52 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false 
   const toggleSlideshow = useCallback(() => {
     setIsPlaying((prev) => !prev);
   }, []);
+
+  // Handle rating change
+  const handleRatingChange = useCallback(async (newRating) => {
+    const currentImage = images[currentIndex];
+    if (!currentImage?.id) return;
+
+    // Optimistic update
+    const previousRating = rating;
+    setRating(newRating);
+
+    try {
+      await libraryApi.updateRating("image", currentImage.id, newRating);
+    } catch (error) {
+      console.error("Failed to update image rating:", error);
+      // Revert on error
+      setRating(previousRating);
+    }
+  }, [images, currentIndex, rating]);
+
+  // Handle favorite change
+  const handleFavoriteChange = useCallback(async (newFavorite) => {
+    const currentImage = images[currentIndex];
+    if (!currentImage?.id) return;
+
+    // Optimistic update
+    const previousFavorite = isFavorite;
+    setIsFavorite(newFavorite);
+
+    try {
+      await libraryApi.updateFavorite("image", currentImage.id, newFavorite);
+    } catch (error) {
+      console.error("Failed to update image favorite:", error);
+      // Revert on error
+      setIsFavorite(previousFavorite);
+    }
+  }, [images, currentIndex, isFavorite]);
+
+  // Update rating/favorite when image changes
+  useEffect(() => {
+    const currentImage = images[currentIndex];
+    // Note: Images from Stash don't have rating/favorite fields by default
+    // We'd need to fetch them separately or include them in the query
+    // For now, set to defaults (will be updated when user interacts)
+    setRating(currentImage?.rating100 ?? null);
+    setIsFavorite(currentImage?.favorite ?? false);
+  }, [currentIndex, images]);
 
   // Auto-advance slideshow
   useEffect(() => {
@@ -128,9 +185,9 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false 
         <X size={24} />
       </button>
 
-      {/* Image counter */}
+      {/* Image counter - bottom left */}
       <div
-        className="absolute top-4 left-4 z-50 px-4 py-2 rounded-lg text-lg font-medium"
+        className="absolute bottom-4 left-4 z-50 px-4 py-2 rounded-lg text-lg font-medium"
         style={{
           backgroundColor: "rgba(0, 0, 0, 0.5)",
           color: "var(--text-primary)",
@@ -139,18 +196,23 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false 
         {currentIndex + 1} / {images.length}
       </div>
 
-      {/* Slideshow control */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-3">
-        <Button
+      {/* Compact controls - positioned to the right */}
+      <div className="absolute top-4 right-20 z-50 flex items-center gap-3">
+        {/* Play/Pause slideshow - icon only */}
+        <button
           onClick={(e) => {
             e.stopPropagation();
             toggleSlideshow();
           }}
-          variant={isPlaying ? "primary" : "secondary"}
-          icon={isPlaying ? <Pause size={20} /> : <Play size={20} />}
+          className="p-2 rounded-full transition-colors"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            color: "var(--text-primary)",
+          }}
+          aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
         >
-          {isPlaying ? "Pause" : "Play"} Slideshow
-        </Button>
+          {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+        </button>
 
         {/* Interval selector */}
         <div
@@ -182,7 +244,37 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false 
             <option value={15000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>15s</option>
           </select>
         </div>
+
+        {/* Rating Badge with Popover */}
+        <div ref={ratingBadgeRef} onClick={(e) => e.stopPropagation()}>
+          <RatingBadge
+            rating={rating}
+            onClick={() => setIsRatingPopoverOpen(true)}
+            size="medium"
+          />
+        </div>
+
+        {/* Favorite Button */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <FavoriteButton
+            isFavorite={isFavorite}
+            onChange={handleFavoriteChange}
+            size="medium"
+            variant="lightbox"
+          />
+        </div>
       </div>
+
+      {/* Rating Popover */}
+      <RatingSliderDialog
+        isOpen={isRatingPopoverOpen}
+        onClose={() => setIsRatingPopoverOpen(false)}
+        initialRating={rating}
+        onSave={handleRatingChange}
+        entityType="image"
+        entityTitle={images[currentIndex]?.title || `Image ${currentIndex + 1}`}
+        anchorEl={ratingBadgeRef.current}
+      />
 
       {/* Previous button */}
       {images.length > 1 && (

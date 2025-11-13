@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../prisma/singleton.js';
 import { logger } from '../utils/logger.js';
+import getStash from '../stash.js';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -13,25 +14,30 @@ interface AuthenticatedRequest extends Request {
 /**
  * IMPORTANT: Rating and Favorite Sync Policy
  *
- * Unlike watch history fields (play_count, o_counter, last_played_at),
- * ratings and favorites are NEVER synced back to Stash, regardless of
- * user sync settings.
+ * When user.syncToStash is enabled:
+ * - RATINGS: Will sync to Stash (OVERWRITES - last write wins)
+ * - FAVORITES: Will sync to Stash for entities that support it
+ *   (Scene, Performer, Studio, Gallery, Group support favorite in Stash)
+ *   (Tags support favorite, Images do NOT support favorite in Stash)
  *
- * Rationale:
- * - Ratings/favorites are subjective personal preferences
- * - Multiple Peek users sharing a Stash instance would constantly
- *   overwrite each other's values
- * - Watch history fields accumulate (counts increase, timestamps update)
- *   and can be meaningfully synced
- * - Ratings/favorites are Peek-only to provide true per-user experience
+ * WARNING for multi-user setups:
+ * - O Counters AGGREGATE (multiple users increment the same counter)
+ * - Ratings OVERWRITE (last user to rate wins, no aggregation)
+ * - Be cautious enabling syncToStash for multiple users
  *
- * These endpoints ONLY update Peek's local database. DO NOT add Stash
- * API calls to these functions.
+ * Entity Support Matrix:
+ * - Scene: rating100 ✓, favorite ✓ (not synced - use o_counter instead)
+ * - Performer: rating100 ✓, favorite ✓
+ * - Studio: rating100 ✓, favorite ✓
+ * - Tag: NO rating100 ✗, favorite ✓
+ * - Gallery: rating100 ✓, favorite ✗ (Stash doesn't support)
+ * - Group: rating100 ✓, favorite ✗ (Stash doesn't support)
+ * - Image: rating100 ✓, favorite ✗ (Stash doesn't support)
  */
 
 /**
  * Update rating and/or favorite for a scene
- * PEEK-ONLY: Does not sync to Stash
+ * Syncs rating to Stash if user.syncToStash is enabled (favorite NOT synced for scenes)
  */
 export async function updateSceneRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -59,7 +65,13 @@ export async function updateSceneRating(req: AuthenticatedRequest, res: Response
       return res.status(400).json({ error: 'Favorite must be a boolean' });
     }
 
-    //  Upsert rating record
+    // Get user sync settings
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    // Upsert rating record in Peek DB
     const sceneRating = await prisma.sceneRating.upsert({
       where: {
         userId_sceneId: { userId, sceneId },
@@ -78,6 +90,23 @@ export async function updateSceneRating(req: AuthenticatedRequest, res: Response
 
     logger.info('Scene rating updated', { userId, sceneId, rating, favorite });
 
+    // Sync rating to Stash if enabled (only rating, NOT favorite for scenes)
+    if (user?.syncToStash && rating !== undefined) {
+      try {
+        const stash = getStash();
+        await stash.sceneUpdate({
+          input: {
+            id: sceneId,
+            rating100: rating,
+          },
+        });
+        logger.info('Successfully synced scene rating to Stash', { sceneId, rating });
+      } catch (stashError) {
+        logger.error('Failed to sync scene rating to Stash', { sceneId, error: stashError });
+        // Don't fail the request - Peek DB is source of truth
+      }
+    }
+
     res.json({
       success: true,
       rating: sceneRating,
@@ -90,7 +119,7 @@ export async function updateSceneRating(req: AuthenticatedRequest, res: Response
 
 /**
  * Update rating and/or favorite for a performer
- * PEEK-ONLY: Does not sync to Stash
+ * Syncs both rating and favorite to Stash if user.syncToStash is enabled
  */
 export async function updatePerformerRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -118,7 +147,13 @@ export async function updatePerformerRating(req: AuthenticatedRequest, res: Resp
       return res.status(400).json({ error: 'Favorite must be a boolean' });
     }
 
-    // Upsert rating record
+    // Get user sync settings
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    // Upsert rating record in Peek DB
     const performerRating = await prisma.performerRating.upsert({
       where: {
         userId_performerId: { userId, performerId },
@@ -137,6 +172,23 @@ export async function updatePerformerRating(req: AuthenticatedRequest, res: Resp
 
     logger.info('Performer rating updated', { userId, performerId, rating, favorite });
 
+    // Sync to Stash if enabled (performer supports both rating and favorite)
+    if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
+      try {
+        const stash = getStash();
+        await stash.performerUpdate({
+          input: {
+            id: performerId,
+            ...(rating !== undefined && { rating100: rating }),
+            ...(favorite !== undefined && { favorite }),
+          },
+        });
+        logger.info('Successfully synced performer rating to Stash', { performerId, rating, favorite });
+      } catch (stashError) {
+        logger.error('Failed to sync performer rating to Stash', { performerId, error: stashError });
+      }
+    }
+
     res.json({
       success: true,
       rating: performerRating,
@@ -149,7 +201,7 @@ export async function updatePerformerRating(req: AuthenticatedRequest, res: Resp
 
 /**
  * Update rating and/or favorite for a studio
- * PEEK-ONLY: Does not sync to Stash
+ * Syncs both rating and favorite to Stash if user.syncToStash is enabled
  */
 export async function updateStudioRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -177,7 +229,13 @@ export async function updateStudioRating(req: AuthenticatedRequest, res: Respons
       return res.status(400).json({ error: 'Favorite must be a boolean' });
     }
 
-    // Upsert rating record
+    // Get user sync settings
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    // Upsert rating record in Peek DB
     const studioRating = await prisma.studioRating.upsert({
       where: {
         userId_studioId: { userId, studioId },
@@ -196,6 +254,23 @@ export async function updateStudioRating(req: AuthenticatedRequest, res: Respons
 
     logger.info('Studio rating updated', { userId, studioId, rating, favorite });
 
+    // Sync to Stash if enabled (studio supports both rating and favorite)
+    if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
+      try {
+        const stash = getStash();
+        await stash.studioUpdate({
+          input: {
+            id: studioId,
+            ...(rating !== undefined && { rating100: rating }),
+            ...(favorite !== undefined && { favorite }),
+          },
+        });
+        logger.info('Successfully synced studio rating to Stash', { studioId, rating, favorite });
+      } catch (stashError) {
+        logger.error('Failed to sync studio rating to Stash', { studioId, error: stashError });
+      }
+    }
+
     res.json({
       success: true,
       rating: studioRating,
@@ -208,7 +283,7 @@ export async function updateStudioRating(req: AuthenticatedRequest, res: Respons
 
 /**
  * Update rating and/or favorite for a tag
- * PEEK-ONLY: Does not sync to Stash
+ * Syncs favorite only to Stash if user.syncToStash is enabled (tags don't support rating in Stash)
  */
 export async function updateTagRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -236,7 +311,13 @@ export async function updateTagRating(req: AuthenticatedRequest, res: Response) 
       return res.status(400).json({ error: 'Favorite must be a boolean' });
     }
 
-    // Upsert rating record
+    // Get user sync settings
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    // Upsert rating record in Peek DB
     const tagRating = await prisma.tagRating.upsert({
       where: {
         userId_tagId: { userId, tagId },
@@ -255,6 +336,22 @@ export async function updateTagRating(req: AuthenticatedRequest, res: Response) 
 
     logger.info('Tag rating updated', { userId, tagId, rating, favorite });
 
+    // Sync favorite only to Stash if enabled (tags don't have rating100 in Stash)
+    if (user?.syncToStash && favorite !== undefined) {
+      try {
+        const stash = getStash();
+        await stash.tagUpdate({
+          input: {
+            id: tagId,
+            favorite,
+          },
+        });
+        logger.info('Successfully synced tag favorite to Stash', { tagId, favorite });
+      } catch (stashError) {
+        logger.error('Failed to sync tag favorite to Stash', { tagId, error: stashError });
+      }
+    }
+
     res.json({
       success: true,
       rating: tagRating,
@@ -267,7 +364,7 @@ export async function updateTagRating(req: AuthenticatedRequest, res: Response) 
 
 /**
  * Update rating and/or favorite for a gallery
- * PEEK-ONLY: Does not sync to Stash
+ * Syncs rating only to Stash if user.syncToStash is enabled (galleries don't support favorite in Stash)
  */
 export async function updateGalleryRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -295,7 +392,13 @@ export async function updateGalleryRating(req: AuthenticatedRequest, res: Respon
       return res.status(400).json({ error: 'Favorite must be a boolean' });
     }
 
-    // Upsert rating record
+    // Get user sync settings
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    // Upsert rating record in Peek DB
     const galleryRating = await prisma.galleryRating.upsert({
       where: {
         userId_galleryId: { userId, galleryId },
@@ -314,6 +417,22 @@ export async function updateGalleryRating(req: AuthenticatedRequest, res: Respon
 
     logger.info('Gallery rating updated', { userId, galleryId, rating, favorite });
 
+    // Sync rating only to Stash if enabled (galleries don't have favorite in Stash)
+    if (user?.syncToStash && rating !== undefined) {
+      try {
+        const stash = getStash();
+        await stash.galleryUpdate({
+          input: {
+            id: galleryId,
+            rating100: rating,
+          },
+        });
+        logger.info('Successfully synced gallery rating to Stash', { galleryId, rating });
+      } catch (stashError) {
+        logger.error('Failed to sync gallery rating to Stash', { galleryId, error: stashError });
+      }
+    }
+
     res.json({
       success: true,
       rating: galleryRating,
@@ -326,7 +445,7 @@ export async function updateGalleryRating(req: AuthenticatedRequest, res: Respon
 
 /**
  * Update rating and/or favorite for a group
- * PEEK-ONLY: Does not sync to Stash
+ * Syncs rating only to Stash if user.syncToStash is enabled (groups don't support favorite in Stash)
  */
 export async function updateGroupRating(req: AuthenticatedRequest, res: Response) {
   try {
@@ -354,7 +473,13 @@ export async function updateGroupRating(req: AuthenticatedRequest, res: Response
       return res.status(400).json({ error: 'Favorite must be a boolean' });
     }
 
-    // Upsert rating record
+    // Get user sync settings
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    // Upsert rating record in Peek DB
     const groupRating = await prisma.groupRating.upsert({
       where: {
         userId_groupId: { userId, groupId },
@@ -373,6 +498,22 @@ export async function updateGroupRating(req: AuthenticatedRequest, res: Response
 
     logger.info('Group rating updated', { userId, groupId, rating, favorite });
 
+    // Sync rating only to Stash if enabled (groups don't have favorite in Stash)
+    if (user?.syncToStash && rating !== undefined) {
+      try {
+        const stash = getStash();
+        await stash.groupUpdate({
+          input: {
+            id: groupId,
+            rating100: rating,
+          },
+        });
+        logger.info('Successfully synced group rating to Stash', { groupId, rating });
+      } catch (stashError) {
+        logger.error('Failed to sync group rating to Stash', { groupId, error: stashError });
+      }
+    }
+
     res.json({
       success: true,
       rating: groupRating,
@@ -380,5 +521,86 @@ export async function updateGroupRating(req: AuthenticatedRequest, res: Response
   } catch (error) {
     logger.error('Error updating group rating', { error });
     res.status(500).json({ error: 'Failed to update group rating' });
+  }
+}
+
+/**
+ * Update rating and/or favorite for an image
+ * Syncs rating only to Stash if user.syncToStash is enabled (images don't support favorite in Stash)
+ */
+export async function updateImageRating(req: AuthenticatedRequest, res: Response) {
+  try {
+    const userId = req.user?.id;
+    const { imageId } = req.params;
+    const { rating, favorite } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (!imageId) {
+      return res.status(400).json({ error: 'Missing imageId' });
+    }
+
+    // Validate rating if provided
+    if (rating !== undefined && rating !== null) {
+      if (typeof rating !== 'number' || rating < 0 || rating > 100) {
+        return res.status(400).json({ error: 'Rating must be a number between 0 and 100' });
+      }
+    }
+
+    // Validate favorite if provided
+    if (favorite !== undefined && typeof favorite !== 'boolean') {
+      return res.status(400).json({ error: 'Favorite must be a boolean' });
+    }
+
+    // Get user sync settings
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    // Upsert rating record in Peek DB
+    const imageRating = await prisma.imageRating.upsert({
+      where: {
+        userId_imageId: { userId, imageId },
+      },
+      update: {
+        ...(rating !== undefined && { rating }),
+        ...(favorite !== undefined && { favorite }),
+      },
+      create: {
+        userId,
+        imageId,
+        rating: rating ?? null,
+        favorite: favorite ?? false,
+      },
+    });
+
+    logger.info('Image rating updated', { userId, imageId, rating, favorite });
+
+    // Sync rating only to Stash if enabled (images don't have favorite in Stash)
+    if (user?.syncToStash && rating !== undefined) {
+      try {
+        const stash = getStash();
+        await stash.imageUpdate({
+          input: {
+            id: imageId,
+            rating100: rating,
+          },
+        });
+        logger.info('Successfully synced image rating to Stash', { imageId, rating });
+      } catch (stashError) {
+        logger.error('Failed to sync image rating to Stash', { imageId, error: stashError });
+      }
+    }
+
+    res.json({
+      success: true,
+      rating: imageRating,
+    });
+  } catch (error) {
+    logger.error('Error updating image rating', { error });
+    res.status(500).json({ error: 'Failed to update image rating' });
   }
 }

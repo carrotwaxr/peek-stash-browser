@@ -46,6 +46,32 @@ async function mergeGalleriesWithUserData(
 }
 
 /**
+ * Merge images with user rating/favorite data
+ */
+async function mergeImagesWithUserData(
+  images: any[],
+  userId: number
+): Promise<any[]> {
+  const ratings = await prisma.imageRating.findMany({ where: { userId } });
+
+  const ratingMap = new Map(
+    ratings.map((r) => [
+      r.imageId,
+      {
+        rating: r.rating,
+        rating100: r.rating,
+        favorite: r.favorite,
+      },
+    ])
+  );
+
+  return images.map((image) => ({
+    ...image,
+    ...ratingMap.get(image.id),
+  }));
+}
+
+/**
  * Apply gallery filters
  */
 function applyGalleryFilters(
@@ -520,8 +546,11 @@ export const getGalleryImages = async (
       },
     }));
 
+    // Merge images with user data (ratings/favorites)
+    const mergedImages = await mergeImagesWithUserData(transformedImages, userId);
+
     res.json({
-      images: transformedImages,
+      images: mergedImages,
       count: result?.findImages?.count || 0,
     });
   } catch (error) {
