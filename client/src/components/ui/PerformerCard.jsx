@@ -1,16 +1,6 @@
 import { forwardRef } from "react";
-import { LucideVenus, LucideMars, LucideUser } from "lucide-react";
 import { GridCard } from "./GridCard.jsx";
-
-const PerformerGenderIcon = ({ gender, size = 16 }) => {
-  if (gender === "FEMALE") {
-    return <LucideVenus size={size} color="#ff0080" />;
-  } else if (gender === "MALE") {
-    return <LucideMars size={size} color="#0561fa" />;
-  } else {
-    return <LucideUser size={size} color="#6c757d" />;
-  }
-};
+import GenderIcon from "./GenderIcon.jsx";
 
 const PerformerCard = forwardRef(
   ({ performer, referrerUrl, isTVMode, tabIndex, ...others }, ref) => {
@@ -41,7 +31,7 @@ const PerformerCard = forwardRef(
         title={
           <div className="flex items-center justify-center gap-2">
             {performer.name}
-            <PerformerGenderIcon gender={performer.gender} size={16} />
+            <GenderIcon gender={performer.gender} size={16} />
           </div>
         }
         {...others}

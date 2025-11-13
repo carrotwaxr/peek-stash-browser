@@ -6,11 +6,9 @@ import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
 import RatingSlider from "../ui/RatingSlider.jsx";
 import FavoriteButton from "../ui/FavoriteButton.jsx";
+import GenderIcon from "../ui/GenderIcon.jsx";
 import {
-  LucideMars,
   LucideStar,
-  LucideUser,
-  LucideVenus,
   LucideTwitter,
   LucideInstagram,
   LucideFilm,
@@ -163,7 +161,7 @@ const PerformerDetail = () => {
             title={
               <div className="flex gap-4 items-center">
                 <span>{performer.name}</span>
-                <PerformerGenderIcon gender={performer.gender} size={32} />
+                <GenderIcon gender={performer.gender} size={32} />
                 <FavoriteButton
                   isFavorite={isFavorite}
                   onChange={handleFavoriteChange}
@@ -672,16 +670,6 @@ const PerformerLinks = ({ performer }) => {
       )}
     </>
   );
-};
-
-const PerformerGenderIcon = ({ gender, size = 24 }) => {
-  if (gender === "FEMALE") {
-    return <LucideVenus size={size} color="#ff0080" />;
-  } else if (gender === "MALE") {
-    return <LucideMars size={size} color="#0561fa" />;
-  } else {
-    return <LucideUser size={size} color="#6c757d" />;
-  }
 };
 
 const getPerformer = async (id) => {
