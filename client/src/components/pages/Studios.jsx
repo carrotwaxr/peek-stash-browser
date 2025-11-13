@@ -178,7 +178,6 @@ const StudioCard = forwardRef(
         entityType="studio"
         imagePath={studio.image_path}
         indicators={[
-          { type: "O_COUNTER", count: studio.o_counter },
           { type: "PLAY_COUNT", count: studio.play_count },
           { type: "SCENES", count: studio.scene_count },
           { type: "IMAGES", count: studio.image_count },

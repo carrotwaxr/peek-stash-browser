@@ -181,7 +181,6 @@ const TagCard = forwardRef(
         entityType="tag"
         imagePath={tag.image_path}
         indicators={[
-          { type: "O_COUNTER", count: tag.o_counter },
           { type: "PLAY_COUNT", count: tag.play_count },
           { type: "SCENES", count: tag.scene_count },
           { type: "IMAGES", count: tag.image_count },

@@ -21,7 +21,6 @@ const PerformerCard = forwardRef(
         hideDescription
         hideSubtitle
         indicators={[
-          { type: "O_COUNTER", count: performer.o_counter },
           { type: "PLAY_COUNT", count: performer.play_count },
           { type: "SCENES", count: performer.scene_count },
           { type: "GROUPS", count: performer.group_count },

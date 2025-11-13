@@ -137,7 +137,6 @@ const SceneMetadata = ({ scene }) => {
   return (
     <CardCountIndicators
       indicators={[
-        { type: "O_COUNTER", count: scene.o_counter },
         { type: "PLAY_COUNT", count: scene.play_count },
         {
           type: "PERFORMERS",
