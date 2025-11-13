@@ -39,6 +39,7 @@ const ServerSettings = lazy(() =>
   import("./components/pages/ServerSettings.jsx")
 );
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
+const GenderIconTest = lazy(() => import("./components/pages/GenderIconTest.jsx")); // TODO: Remove after gender icon review
 
 // Loading fallback component
 const PageLoader = () => (
@@ -222,6 +223,14 @@ const AppContent = () => {
             element={
               <GlobalLayout>
                 <ServerSettings />
+              </GlobalLayout>
+            }
+          />
+          <Route
+            path="/gender-icon-test"
+            element={
+              <GlobalLayout>
+                <GenderIconTest />
               </GlobalLayout>
             }
           />
