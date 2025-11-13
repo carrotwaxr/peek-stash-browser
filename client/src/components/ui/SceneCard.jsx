@@ -10,7 +10,7 @@ import {
   CardRatingRow,
 } from "./CardComponents";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
-import { getSceneTitle, getSceneDescription } from "../../utils/format.js";
+import { getSceneTitle, getSceneDescription, formatDurationCompact, formatResolution } from "../../utils/format.js";
 import { formatRelativeTime } from "../../utils/date.js";
 
 /**
@@ -45,7 +45,10 @@ const SceneCard = forwardRef(
     const description = getSceneDescription(scene);
     const date = scene.date ? formatRelativeTime(scene.date) : null;
     const duration = scene.files?.[0]?.duration
-      ? `${Math.floor(scene.files[0].duration / 60)}m`
+      ? formatDurationCompact(scene.files[0].duration)
+      : null;
+    const resolution = scene.files?.[0]?.width && scene.files?.[0]?.height
+      ? formatResolution(scene.files[0].width, scene.files[0].height)
       : null;
 
     // Build subtitle with studio and date (like Groups)
@@ -295,6 +298,8 @@ const SceneCard = forwardRef(
                 autoplayOnScroll={autoplayOnScroll}
                 cycleInterval={600}
                 spriteCount={10}
+                duration={duration}
+                resolution={resolution}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -314,15 +319,6 @@ const SceneCard = forwardRef(
 
             {/* Overlay gradient */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
-
-            {/* Duration badge */}
-            {duration && (
-              <div className="absolute bottom-2 right-2 pointer-events-none z-10">
-                <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-                  {duration}
-                </span>
-              </div>
-            )}
 
             {/* Watch progress bar */}
             {scene.resumeTime && scene.files?.[0]?.duration && (

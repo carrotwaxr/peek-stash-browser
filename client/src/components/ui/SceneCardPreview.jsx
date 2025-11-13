@@ -32,8 +32,10 @@ import {
  * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (typically for 1-column mobile layouts)
  * @param {number} cycleInterval - Milliseconds between sprite changes for VTT previews (default: 800ms)
  * @param {number} spriteCount - Number of sprites to cycle through for VTT previews (default: 5)
+ * @param {string} duration - Formatted duration string for bottom-left overlay (e.g., "2h03m")
+ * @param {string} resolution - Formatted resolution string for top-right overlay (e.g., "1080p")
  */
-const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800, spriteCount = 5 }) => {
+const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800, spriteCount = 5, duration = null, resolution = null }) => {
   const { user } = useAuth();
   const [sprites, setSprites] = useState([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
@@ -318,6 +320,29 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
             }}
           />
         </div>
+      )}
+
+      {/* Overlays: Duration (bottom-left) and Resolution (top-right) - hidden when preview is playing */}
+      {!shouldShowAnimation && (
+        <>
+          {/* Duration badge */}
+          {duration && (
+            <div className="absolute bottom-2 left-2 pointer-events-none z-10">
+              <span className="px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
+                {duration}
+              </span>
+            </div>
+          )}
+
+          {/* Resolution badge */}
+          {resolution && (
+            <div className="absolute top-2 right-2 pointer-events-none z-10">
+              <span className="px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
+                {resolution}
+              </span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
