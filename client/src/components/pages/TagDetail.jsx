@@ -4,7 +4,8 @@ import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
+import RatingSlider from "../ui/RatingSlider.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
 import { LucideStar, ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import PageHeader from "../ui/PageHeader.jsx";
@@ -15,6 +16,8 @@ const TagDetail = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [tag, setTag] = useState(null);
+  const [rating, setRating] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   // Set page title to tag name
   usePageTitle(tag?.name || "Tag");
@@ -25,6 +28,8 @@ const TagDetail = () => {
         setIsLoading(true);
         const tagData = await getTag(tagId);
         setTag(tagData);
+        setRating(tagData.rating);
+        setIsFavorite(tagData.favorite || false);
       } catch {
         // Error loading tag - will show loading spinner
       } finally {
@@ -34,6 +39,26 @@ const TagDetail = () => {
 
     fetchTag();
   }, [tagId]);
+
+  const handleRatingChange = async (newRating) => {
+    setRating(newRating);
+    try {
+      await libraryApi.updateRating("tag", tagId, newRating);
+    } catch (error) {
+      console.error("Failed to update rating:", error);
+      setRating(tag.rating);
+    }
+  };
+
+  const handleFavoriteChange = async (newValue) => {
+    setIsFavorite(newValue);
+    try {
+      await libraryApi.updateFavorite("tag", tagId, newValue);
+    } catch (error) {
+      console.error("Failed to update favorite:", error);
+      setIsFavorite(tag.favorite || false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -93,7 +118,16 @@ const TagDetail = () => {
         {/* Tag Header - Hero Treatment */}
         <div className="mb-8">
           <PageHeader
-            title={tag?.name || `Tag ${tagId}`}
+            title={
+              <div className="flex gap-4 items-center">
+                <span>{tag?.name || `Tag ${tagId}`}</span>
+                <FavoriteButton
+                  isFavorite={isFavorite}
+                  onChange={handleFavoriteChange}
+                  size="large"
+                />
+              </div>
+            }
             subtitle={
               tag?.aliases?.length
                 ? `Also known as: ${tag?.aliases.join(", ")}`
@@ -101,14 +135,12 @@ const TagDetail = () => {
             }
           />
 
-          {/* Rating Controls */}
-          <div className="mt-4">
-            <RatingControls
-              entityType="tag"
-              entityId={tag.id}
-              initialRating={tag.rating}
-              initialFavorite={tag.favorite || false}
-              size={24}
+          {/* Rating Slider */}
+          <div className="mt-4 max-w-md">
+            <RatingSlider
+              rating={rating}
+              onChange={handleRatingChange}
+              showClearButton={true}
             />
           </div>
         </div>

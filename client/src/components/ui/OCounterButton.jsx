@@ -1,165 +1,168 @@
 import { useState, useEffect } from "react";
 import { apiPost } from "../../services/api.js";
+import { LucideDroplets } from "lucide-react";
 
 /**
  * Interactive O Counter button component
- * Displays current O counter value and increments on click
+ * Displays current O counter value and increments on click (scenes only)
+ * For non-scene entities, displays as read-only indicator
  *
- * @param {string} sceneId - Stash scene ID
+ * @param {string} sceneId - Stash scene ID (required for interactive mode)
  * @param {number} initialCount - Initial O counter value
- * @param {Function} onIncrement - Optional callback after successful increment (receives new count)
- * @param {boolean} disabled - Whether button is disabled
- * @param {boolean} isReadOnly - Display-only mode (no click functionality)
+ * @param {Function} onChange - Optional callback after successful increment (receives new count)
+ * @param {string} size - Size variant: small, medium, large
+ * @param {string} variant - Style variant: card (transparent), page (with background)
+ * @param {boolean} interactive - Enable click-to-increment (default: true if sceneId provided)
  */
 const OCounterButton = ({
   sceneId,
   initialCount = 0,
-  onIncrement,
-  disabled = false,
-  isReadOnly = false,
-  size = "base",
+  onChange,
+  size = "small",
+  variant = "card",
+  interactive = true,
 }) => {
   const [count, setCount] = useState(initialCount ?? 0);
-  const [isIncrementing, setIsIncrementing] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [error, setError] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
 
-  // Sync count when initialCount changes (e.g., from parent callback)
+  // Sync count when initialCount changes
   useEffect(() => {
     setCount(initialCount ?? 0);
   }, [initialCount]);
 
-  const handleClick = async (e) => {
-    if (isReadOnly || disabled || isIncrementing || !sceneId) {
-      return;
-    }
+  // Size configurations
+  const sizes = {
+    small: { icon: 20, text: "text-sm", padding: "p-1.5", gap: "gap-1" },
+    medium: { icon: 24, text: "text-base", padding: "p-2", gap: "gap-1.5" },
+    large: { icon: 28, text: "text-lg", padding: "p-2.5", gap: "gap-2" },
+  };
 
-    // Stop propagation to prevent triggering parent click handlers (like navigating to scene)
+  const config = sizes[size] || sizes.small;
+
+  const handleClick = async (e) => {
+    // Stop propagation to prevent triggering parent click handlers
     e.preventDefault();
     e.stopPropagation();
 
-    try {
-      setIsIncrementing(true);
-      setError(null);
+    // Only allow incrementing for scenes with interactive mode
+    if (!interactive || isUpdating || !sceneId) {
+      return;
+    }
 
+    const newCount = count + 1;
+    setCount(newCount); // Optimistic update
+    setIsAnimating(true);
+    setIsUpdating(true);
+
+    try {
       const response = await apiPost("/watch-history/increment-o", { sceneId });
 
       if (response.success) {
-        const newCount = response.oCount;
-        setCount(newCount);
-
-        // Show visual feedback
-        setShowFeedback(true);
-        setTimeout(() => setShowFeedback(false), 1000);
-
-        // Call optional callback
-        if (onIncrement) {
-          onIncrement(newCount);
-        }
+        setCount(response.oCount); // Update with server value
+        onChange?.(response.oCount);
       }
     } catch (err) {
       console.error("Error incrementing O counter:", err);
-      setError("Failed to increment");
-
-      // Clear error after 2 seconds
-      setTimeout(() => setError(null), 2000);
+      setCount(count); // Revert on error
     } finally {
-      // Keep button disabled for 1 second to prevent double-clicks
-      setTimeout(() => setIsIncrementing(false), 1000);
+      setTimeout(() => {
+        setIsAnimating(false);
+        setIsUpdating(false);
+      }, 600);
     }
   };
 
-  // Render as plain span when readOnly (allows clicks to bubble to parent Link)
-  const Element = isReadOnly ? "span" : "button";
-
   return (
-    <Element
-      onClick={isReadOnly ? undefined : handleClick}
-      disabled={isReadOnly ? undefined : disabled || isIncrementing}
-      className={`flex items-center gap-1 transition-all text-${size}`}
+    <button
+      onClick={handleClick}
+      disabled={isUpdating}
+      className={`flex items-center ${config.gap} ${config.padding} rounded transition-all hover:scale-105 active:scale-95 relative ${
+        isAnimating ? "animate-pulse" : ""
+      }`}
       style={{
-        cursor: isReadOnly
-          ? "inherit"
-          : disabled || isIncrementing
-          ? "not-allowed"
-          : "pointer",
-        opacity: disabled ? 0.5 : 1,
-        position: "relative",
+        backgroundColor: variant === "card" ? "transparent" : "var(--bg-tertiary)",
+        border: variant === "card" ? "none" : "1px solid var(--border-color)",
+        cursor: interactive && sceneId ? (isUpdating ? "not-allowed" : "pointer") : "default",
+        opacity: isUpdating ? 0.7 : 1,
       }}
-      title={
-        error ||
-        (isReadOnly
-          ? `O counter: ${count}`
-          : isIncrementing
-          ? "Incrementing..."
-          : "Click to increment O counter")
-      }
-      aria-label={
-        isReadOnly
-          ? `O counter: ${count}`
-          : `O counter: ${count}. Click to increment.`
-      }
+      aria-label={interactive && sceneId ? `Increment O counter (current: ${count})` : `O Counter: ${count}`}
+      title={interactive && sceneId ? `O Counter: ${count} (click to increment)` : `O Counter: ${count}`}
     >
+      {/* Droplet icon with bounce animation */}
       <span
-        className={`transition-transform ${
-          showFeedback ? "scale-125" : "scale-100"
+        className={`flex items-center justify-center transition-transform ${
+          isAnimating ? "scale-125" : "scale-100"
         }`}
         style={{
-          display: "inline-block",
-          transitionDuration: "200ms",
+          color: "var(--status-info)",
+          transition: "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
       >
-        💦
+        <LucideDroplets size={config.icon} />
       </span>
-      <span className={showFeedback ? "font-bold" : ""}>{count}</span>
 
-      {/* Visual feedback animation */}
-      {showFeedback && (
+      {/* Count with scale animation */}
+      <span
+        className={`${config.text} font-medium transition-all ${
+          isAnimating ? "scale-110 font-bold" : "scale-100"
+        }`}
+        style={{
+          color: "var(--text-primary)",
+          transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        }}
+      >
+        {count}
+      </span>
+
+      {/* +1 floating feedback */}
+      {isAnimating && (
         <span
+          className="absolute -top-2 -right-2 text-xs font-bold pointer-events-none"
           style={{
-            position: "absolute",
-            top: "-10px",
-            right: "-10px",
-            fontSize: "12px",
-            fontWeight: "bold",
             color: "var(--status-success)",
-            animation: "fadeOut 1s ease-out",
+            animation: "floatUp 0.6s ease-out",
           }}
         >
           +1
         </span>
       )}
 
-      {/* Error feedback */}
-      {error && (
+      {/* Ripple effect on click */}
+      {isAnimating && (
         <span
+          className="absolute inset-0 rounded pointer-events-none"
           style={{
-            position: "absolute",
-            bottom: "-20px",
-            left: "0",
-            fontSize: "10px",
-            color: "var(--status-error)",
-            whiteSpace: "nowrap",
+            animation: "ripple 0.6s ease-out",
+            background: "radial-gradient(circle, var(--status-info) 0%, transparent 70%)",
+            opacity: 0.3,
           }}
-        >
-          {error}
-        </span>
+        />
       )}
 
-      {/* CSS for fade out animation */}
       <style>{`
-        @keyframes fadeOut {
+        @keyframes ripple {
+          0% {
+            transform: scale(0.8);
+            opacity: 0.5;
+          }
+          100% {
+            transform: scale(1.5);
+            opacity: 0;
+          }
+        }
+        @keyframes floatUp {
           0% {
             opacity: 1;
             transform: translateY(0);
           }
           100% {
             opacity: 0;
-            transform: translateY(-10px);
+            transform: translateY(-16px);
           }
         }
       `}</style>
-    </Element>
+    </button>
   );
 };
 

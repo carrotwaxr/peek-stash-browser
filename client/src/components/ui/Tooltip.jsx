@@ -237,15 +237,11 @@ const Tooltip = ({
       ref={tooltipRef}
       onMouseEnter={handleTooltipMouseEnter}
       onMouseLeave={handleTooltipMouseLeave}
-      className="fixed z-[9999] px-4 py-3 text-sm rounded-lg shadow-xl"
+      className="fixed z-[9999] px-4 py-3 text-sm rounded-lg shadow-xl max-w-[80%] lg:max-w-[60%] 2xl:max-w-[40%]"
       style={{
         backgroundColor: "var(--bg-tertiary)",
         color: "var(--text-primary)",
         border: "1px solid var(--border-color)",
-        minWidth: "200px",
-        maxWidth: "calc(100vw - 32px)", // Use nearly full width on all screens
-        width: "max-content", // Grow to content size up to maxWidth
-        lineHeight: "1.4",
         wordWrap: "break-word",
         top: `${tooltipPosition.top || 0}px`,
         left: `${tooltipPosition.left || 0}px`,

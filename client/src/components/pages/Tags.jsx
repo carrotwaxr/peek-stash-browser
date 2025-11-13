@@ -1,22 +1,9 @@
 import { useState, useRef, forwardRef } from "react";
-import {
-  Link,
-  useNavigate,
-  useSearchParams,
-  useLocation,
-} from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import {
-  CardStatusIcons,
-  CardCountsIcons,
-  PageHeader,
-  PageLayout,
-  ErrorMessage,
-} from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import { truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -24,6 +11,7 @@ import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import { GridCard } from "../ui/GridCard.jsx";
 
 const Tags = () => {
   usePageTitle("Tags");
@@ -126,6 +114,9 @@ const Tags = () => {
     );
   }
 
+  const gridClassNames =
+    "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+
   return (
     <PageLayout>
       <div ref={pageRef}>
@@ -142,7 +133,7 @@ const Tags = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            <div className={gridClassNames}>
               {[...Array(12)].map((_, i) => (
                 <div
                   key={i}
@@ -156,10 +147,7 @@ const Tags = () => {
             </div>
           ) : (
             <>
-              <div
-                ref={gridRef}
-                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
-              >
+              <div ref={gridRef} className={gridClassNames}>
                 {currentTags.map((tag, index) => (
                   <TagCard
                     key={tag.id}
@@ -181,109 +169,40 @@ const Tags = () => {
 };
 
 const TagCard = forwardRef(
-  ({ tag, tabIndex, className = "", isTVMode = false, referrerUrl }, ref) => {
+  ({ tag, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
+    const subtitle =
+      tag.child_count > 0
+        ? `${tag.child_count} subtag${tag.child_count !== 1 ? "s" : ""}`
+        : null;
+
     return (
-      <Link
-        ref={ref}
-        state={{ referrerUrl }}
-        to={`/tag/${tag.id}`}
-        tabIndex={isTVMode ? tabIndex : -1}
-        className={`tag-card block rounded-lg border overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
+      <GridCard
+        description={tag.description}
+        entityType="tag"
+        imagePath={tag.image_path}
+        indicators={[
+          { type: "PLAY_COUNT", count: tag.play_count },
+          { type: "SCENES", count: tag.scene_count },
+          { type: "IMAGES", count: tag.image_count },
+          { type: "GALLERIES", count: tag.gallery_count },
+          { type: "GROUPS", count: tag.group_count },
+          { type: "STUDIOS", count: tag.studio_count },
+          { type: "PERFORMERS", count: tag.performer_count },
+        ]}
+        linkTo={`/tag/${tag.id}`}
+        ratingControlsProps={{
+          entityId: tag.id,
+          initialRating: tag.rating,
+          initialFavorite: tag.favorite || false,
+          initialOCounter: tag.o_counter,
         }}
-        role="button"
-        aria-label={`Tag: ${tag.name}`}
-      >
-        <div className="text-center">
-          {/* Tag Image */}
-          <div className="w-full aspect-video overflow-hidden mb-3">
-            {tag.image_path ? (
-              <img
-                src={tag.image_path}
-                alt={tag.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center text-5xl"
-                style={{ backgroundColor: "var(--bg-secondary)" }}
-              >
-                #
-              </div>
-            )}
-          </div>
-
-          {/* Content Section */}
-          <div className="px-4 pb-4">
-            {/* Name */}
-            <h3
-              className="font-semibold mb-2"
-              style={{ color: "var(--text-primary)" }}
-              title={tag.name}
-            >
-              {truncateText(tag.name, 30)}
-            </h3>
-
-            {/* Subtags count - Always rendered to maintain alignment */}
-            <div
-              className="text-xs mb-2"
-              style={{
-                color: "var(--text-muted)",
-                minHeight: "1.25rem"
-              }}
-            >
-              {tag.child_count > 0 ? (
-                <span>{tag.child_count} subtag{tag.child_count !== 1 ? "s" : ""}</span>
-              ) : (
-                <span>&nbsp;</span>
-              )}
-            </div>
-
-            {/* Entity Counts with Icons */}
-            <CardCountsIcons
-              className="mb-2 justify-center"
-              sceneCount={tag.scene_count}
-              imageCount={tag.image_count}
-              galleryCount={tag.gallery_count}
-              groupCount={tag.group_count}
-              studioCount={tag.studio_count}
-              performerCount={tag.performer_count}
-            />
-
-            {/* Status Icons */}
-            <CardStatusIcons
-              isReadOnly={true}
-              oCount={tag.o_counter}
-              playCount={tag.play_count}
-            />
-
-            {/* Rating and Favorite */}
-            <div
-              className="flex items-center justify-center mb-2"
-              onClick={(e) => e.preventDefault()}
-            >
-              <RatingControls
-                entityType="tag"
-                entityId={tag.id}
-                initialRating={tag.rating}
-                initialFavorite={tag.favorite || false}
-              />
-            </div>
-
-            {/* Description (optional) */}
-            {tag.description && (
-              <p
-                className="text-sm mt-2"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {truncateText(tag.description, 80)}
-              </p>
-            )}
-          </div>
-        </div>
-      </Link>
+        ref={ref}
+        referrerUrl={referrerUrl}
+        subtitle={subtitle}
+        tabIndex={isTVMode ? tabIndex : -1}
+        title={tag.name}
+        {...others}
+      />
     );
   }
 );

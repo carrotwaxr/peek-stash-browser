@@ -20,4 +20,8 @@ export { default as PlayCountIndicator } from "./PlayCountIndicator.jsx";
 export { default as CardStatusIcons } from "./CardStatusIcons.jsx";
 export { default as CardCountsIcons } from "./CardCountsIcons.jsx";
 export { SortControl, FilterControl, FilterPanel } from "./FilterControls.jsx";
+export { GridCard } from "./GridCard.jsx";
+export { default as RatingBadge } from "./RatingBadge.jsx";
+export { default as RatingSlider } from "./RatingSlider.jsx";
+export { default as FavoriteButton } from "./FavoriteButton.jsx";
 export { default as UserMenu } from "./UserMenu.jsx";

@@ -96,9 +96,12 @@ const SceneGrid = ({
     setSelectedScenes([]);
   }, [currentPage]);
 
+  const gridClassNames =
+    "card-grid-responsive grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
+
   if (loading) {
     return (
-      <div className="grid gap-6 scene-grid-responsive">
+      <div className={gridClassNames}>
         {[...Array(12)].map((_, i) => (
           <SkeletonSceneCard key={i} />
         ))}
@@ -154,7 +157,7 @@ const SceneGrid = ({
       )}
 
       {/* Grid */}
-      <div ref={gridRef} className="grid gap-6 scene-grid-responsive">
+      <div ref={gridRef} className={gridClassNames}>
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}

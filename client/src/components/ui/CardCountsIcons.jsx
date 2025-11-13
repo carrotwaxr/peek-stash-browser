@@ -4,7 +4,7 @@ import {
   GalleryHorizontal,
   Film,
   Spotlight,
-  UserStar,
+  User,
 } from "lucide-react";
 
 /**
@@ -76,9 +76,11 @@ export default function CardCountsIcons({
         <div
           className="flex items-center gap-1 text-xs"
           style={{ color: "var(--text-muted)" }}
-          title={`${performerCount} Performer${performerCount !== 1 ? "s" : ""}`}
+          title={`${performerCount} Performer${
+            performerCount !== 1 ? "s" : ""
+          }`}
         >
-          <UserStar size={14} />
+          <User size={14} />
           <span>{performerCount}</span>
         </div>
       )}

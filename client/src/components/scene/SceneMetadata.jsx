@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import Tooltip from "../ui/Tooltip.jsx";
+import { CardCountIndicators } from "../ui/CardCountIndicators.jsx";
 
 /**
  * Merge and deduplicate tags from scene, performers, and studio
@@ -32,7 +32,7 @@ const mergeAllTags = (scene) => {
 /**
  * Scene metadata: performers and tags with image-rich tooltips
  */
-const SceneMetadata = ({ scene, className = "" }) => {
+const SceneMetadata = ({ scene }) => {
   // Get merged and deduped tags
   const allTags = mergeAllTags(scene);
   // Performer tooltip content with images in a grid
@@ -135,63 +135,22 @@ const SceneMetadata = ({ scene, className = "" }) => {
   );
 
   return (
-    <div
-      className={`flex items-center justify-center gap-3 md:gap-4 ${className}`}
-    >
-      {scene.performers && scene.performers.length > 0 && (
-        <Tooltip content={performersContent} clickable={true} position="bottom">
-          <SceneMetadataEntityInfoChip
-            count={scene.performers.length}
-            icon="👥"
-            type="performer"
-          />
-        </Tooltip>
-      )}
-      {scene.groups && scene.groups.length > 0 && (
-        <Tooltip content={groupsContent} clickable={true} position="bottom">
-          <SceneMetadataEntityInfoChip
-            count={scene.groups.length}
-            icon="🎬"
-            type="group"
-          />
-        </Tooltip>
-      )}
-      {allTags && allTags.length > 0 && (
-        <Tooltip content={tagsContent} clickable={true} position="bottom">
-          <SceneMetadataEntityInfoChip
-            count={allTags.length}
-            icon="🏷️"
-            type="tag"
-          />
-        </Tooltip>
-      )}
-    </div>
-  );
-};
-
-const SceneMetadataEntityInfoChip = ({ count, icon, type }) => {
-  const color =
-    type === "performer"
-      ? "var(--status-info-text)"
-      : type === "group"
-      ? "var(--status-info)"
-      : "var(--accent-secondary)";
-  const fadedColor = `color-mix(in srgb, ${color} 70%, transparent)`;
-  return (
-    <div
-      className="flex items-center gap-2 px-3 py-2 rounded-full cursor-pointer transition-colors"
-      style={{
-        backgroundColor: "var(--selection-bg)",
-        border: `1px solid ${fadedColor}`,
-      }}
-    >
-      <span className="text-xl leading-none flex items-center justify-center">
-        {icon}
-      </span>
-      <span className="text-sm font-medium" style={{ color: fadedColor }}>
-        {count}
-      </span>
-    </div>
+    <CardCountIndicators
+      indicators={[
+        { type: "PLAY_COUNT", count: scene.play_count },
+        {
+          type: "PERFORMERS",
+          count: scene.performers?.length,
+          tooltipContent: performersContent,
+        },
+        {
+          type: "GROUPS",
+          count: scene.groups?.length,
+          tooltipContent: groupsContent,
+        },
+        { type: "TAGS", count: allTags?.length, tooltipContent: tagsContent },
+      ]}
+    />
   );
 };
 

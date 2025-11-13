@@ -206,3 +206,52 @@ export function formatDuration(seconds) {
 
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
+
+/**
+ * Format duration in seconds to compact format for overlays (max 6 characters)
+ * Examples: "32s", "1m15s", "45m12s", "2h03m"
+ */
+export function formatDurationCompact(seconds) {
+  if (!seconds) return "0s";
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  // Over 1 hour: show hours and minutes (e.g., "2h03m")
+  if (hours > 0) {
+    return `${hours}h${minutes.toString().padStart(2, "0")}m`;
+  }
+
+  // Over 1 minute: show minutes and seconds (e.g., "1m15s", "45m12s")
+  if (minutes > 0) {
+    return `${minutes}m${secs.toString().padStart(2, "0")}s`;
+  }
+
+  // Under 1 minute: show just seconds (e.g., "32s")
+  return `${secs}s`;
+}
+
+/**
+ * Format video resolution to compact display format (e.g., "1080p", "720p", "4K")
+ * @param {number} width - Video width in pixels
+ * @param {number} height - Video height in pixels
+ * @returns {string} Formatted resolution string
+ */
+export function formatResolution(width, height) {
+  if (!width || !height) return "";
+
+  // Common 4K resolutions
+  if (height >= 2160) return "4K";
+
+  // Common HD resolutions
+  if (height >= 1440) return "1440p";
+  if (height >= 1080) return "1080p";
+  if (height >= 720) return "720p";
+  if (height >= 480) return "480p";
+  if (height >= 360) return "360p";
+  if (height >= 240) return "240p";
+
+  // Fallback to height with 'p'
+  return `${height}p`;
+}

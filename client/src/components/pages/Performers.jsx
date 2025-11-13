@@ -1,23 +1,9 @@
-import { useState, useRef, forwardRef } from "react";
-import {
-  Link,
-  useNavigate,
-  useSearchParams,
-  useLocation,
-} from "react-router-dom";
+import { useState, useRef } from "react";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import {
-  PageHeader,
-  PageLayout,
-  ErrorMessage,
-  CardStatusIcons,
-  CardCountsIcons,
-} from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
 import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import { getInitials, truncateText } from "../../utils/format.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
-import { LucideVenus, LucideMars, LucideUser } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -25,6 +11,7 @@ import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import PerformerCard from "../ui/PerformerCard.jsx";
 
 const Performers = () => {
   usePageTitle("Performers");
@@ -128,6 +115,9 @@ const Performers = () => {
     );
   }
 
+  const gridClassNames =
+    "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+
   return (
     <PageLayout>
       <div ref={pageRef}>
@@ -147,7 +137,7 @@ const Performers = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            <div className={gridClassNames}>
               {[...Array(24)].map((_, i) => (
                 <div
                   key={i}
@@ -161,10 +151,7 @@ const Performers = () => {
             </div>
           ) : (
             <>
-              <div
-                ref={gridRef}
-                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
-              >
+              <div ref={gridRef} className={gridClassNames}>
                 {currentPerformers.map((performer, index) => (
                   <PerformerCard
                     key={performer.id}
@@ -184,105 +171,6 @@ const Performers = () => {
     </PageLayout>
   );
 };
-
-const PerformerGenderIcon = ({ gender, size = 16 }) => {
-  if (gender === "FEMALE") {
-    return <LucideVenus size={size} color="#ff0080" />;
-  } else if (gender === "MALE") {
-    return <LucideMars size={size} color="#0561fa" />;
-  } else {
-    return <LucideUser size={size} color="#6c757d" />;
-  }
-};
-
-const PerformerCard = forwardRef(
-  (
-    { performer, tabIndex, className = "", isTVMode = false, referrerUrl },
-    ref
-  ) => {
-    return (
-      <Link
-        ref={ref}
-        state={{ referrerUrl }}
-        to={`/performer/${performer.id}`}
-        tabIndex={isTVMode ? tabIndex : -1}
-        className={`performer-card block rounded-lg border p-4 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
-        }}
-        role="button"
-        aria-label={`Performer: ${performer.name}`}
-      >
-        <div className="text-center">
-          {/* Image */}
-          <div className="w-full aspect-[2/3] rounded mb-3 overflow-hidden">
-            {performer.image_path ? (
-              <img
-                src={performer.image_path}
-                alt={performer.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center text-lg font-semibold"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  color: "var(--text-primary)",
-                }}
-              >
-                {getInitials(performer.name)}
-              </div>
-            )}
-          </div>
-
-          {/* Name with Gender Icon */}
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <h3
-              className="font-semibold"
-              style={{ color: "var(--text-primary)" }}
-              title={performer.name}
-            >
-              {truncateText(performer.name, 20)}
-            </h3>
-            <PerformerGenderIcon gender={performer.gender} size={16} />
-          </div>
-
-          {/* Entity Counts */}
-          <CardCountsIcons
-            className="mb-2 justify-center"
-            sceneCount={performer.scene_count}
-            imageCount={performer.image_count}
-            galleryCount={performer.gallery_count}
-            groupCount={performer.group_count}
-          />
-
-          {/* Status Icons */}
-          <CardStatusIcons
-            isReadOnly={true}
-            oCount={performer.o_counter}
-            playCount={performer.play_count}
-          />
-
-          {/* Rating and Favorite */}
-          <div
-            className="flex items-center justify-center"
-            onClick={(e) => e.preventDefault()}
-          >
-            <RatingControls
-              entityType="performer"
-              entityId={performer.id}
-              initialRating={performer.rating}
-              initialFavorite={performer.favorite || false}
-            />
-          </div>
-        </div>
-      </Link>
-    );
-  }
-);
-
-PerformerCard.displayName = "PerformerCard";
 
 const getPerformers = async (query) => {
   const response = await libraryApi.findPerformers(query);

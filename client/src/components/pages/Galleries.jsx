@@ -1,22 +1,10 @@
 import { useState, useRef, forwardRef } from "react";
-import {
-  Link,
-  useNavigate,
-  useSearchParams,
-  useLocation,
-} from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import {
-  PageHeader,
-  PageLayout,
-  ErrorMessage,
-  CardCountsIcons,
-} from "../ui/index.js";
+import { PageHeader, PageLayout, ErrorMessage, GridCard } from "../ui/index.js";
 import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import { truncateText } from "../../utils/format.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import SearchControls from "../ui/SearchControls.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -113,6 +101,9 @@ const Galleries = () => {
     );
   }
 
+  const gridClassNames =
+    "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
+
   return (
     <PageLayout>
       <div ref={pageRef}>
@@ -131,7 +122,7 @@ const Galleries = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            <div className={gridClassNames}>
               {[...Array(24)].map((_, i) => (
                 <div
                   key={i}
@@ -145,10 +136,7 @@ const Galleries = () => {
             </div>
           ) : (
             <>
-              <div
-                ref={gridRef}
-                className="grid xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6"
-              >
+              <div ref={gridRef} className={gridClassNames}>
                 {currentGalleries.map((gallery, index) => (
                   <GalleryCard
                     key={gallery.id}
@@ -170,87 +158,49 @@ const Galleries = () => {
 };
 
 const GalleryCard = forwardRef(
-  (
-    { gallery, tabIndex, className = "", isTVMode = false, referrerUrl },
-    ref
-  ) => {
+  ({ gallery, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
     const coverImage = gallery.paths?.cover || null;
+    const title = galleryTitle(gallery);
+    const date = gallery.date
+      ? new Date(gallery.date).toLocaleDateString()
+      : null;
+
+    // Build subtitle with studio and date (like Groups and Scenes)
+    const subtitle = (() => {
+      if (gallery.studio && date) {
+        return `${gallery.studio.name} • ${date}`;
+      } else if (gallery.studio) {
+        return gallery.studio.name;
+      } else if (date) {
+        return date;
+      }
+      return null;
+    })();
 
     return (
-      <Link
-        ref={ref}
-        state={{ referrerUrl }}
-        to={`/gallery/${gallery.id}`}
-        tabIndex={isTVMode ? tabIndex : -1}
-        className={`gallery-card block rounded-lg border p-4 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
+      <GridCard
+        description={gallery.description}
+        entityType="gallery"
+        imagePath={coverImage}
+        indicators={[{
+          type: "IMAGES",
+          count: gallery.image_count,
+          tooltipContent: gallery.image_count === 1 ? "1 Image" : `${gallery.image_count} Images`
+        }]}
+        linkTo={`/gallery/${gallery.id}`}
+        ratingControlsProps={{
+          entityId: gallery.id,
+          initialRating: gallery.rating,
+          initialFavorite: gallery.favorite || false,
+          initialOCounter: gallery.o_counter,
         }}
-        role="button"
-        aria-label={`Gallery: ${galleryTitle(gallery)}`}
-      >
-        <div className="text-center">
-          {/* Cover Image */}
-          <div className="w-full aspect-[2/3] rounded mb-3 overflow-hidden">
-            {coverImage ? (
-              <img
-                src={coverImage}
-                alt={galleryTitle(gallery)}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center text-sm"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  color: "var(--text-muted)",
-                }}
-              >
-                No Cover
-              </div>
-            )}
-          </div>
-
-          {/* Title */}
-          <h3
-            className="font-semibold mb-2"
-            style={{ color: "var(--text-primary)" }}
-            title={galleryTitle(gallery)}
-          >
-            {truncateText(galleryTitle(gallery), 30)}
-          </h3>
-
-          {/* Image Count */}
-          <CardCountsIcons
-            className="mb-2 justify-center"
-            imageCount={gallery.image_count}
-          />
-
-          {/* Date */}
-          {gallery.date && (
-            <div
-              className="text-xs mb-2"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {new Date(gallery.date).toLocaleDateString()}
-            </div>
-          )}
-
-          {/* Rating and Favorite */}
-          <div
-            className="flex items-center justify-center"
-            onClick={(e) => e.preventDefault()}
-          >
-            <RatingControls
-              entityType="gallery"
-              entityId={gallery.id}
-              initialRating={gallery.rating}
-              initialFavorite={gallery.favorite || false}
-            />
-          </div>
-        </div>
-      </Link>
+        ref={ref}
+        referrerUrl={referrerUrl}
+        subtitle={subtitle}
+        tabIndex={isTVMode ? tabIndex : -1}
+        title={title}
+        {...others}
+      />
     );
   }
 );

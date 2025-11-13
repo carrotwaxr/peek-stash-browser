@@ -1,16 +1,25 @@
-import { Heart } from 'lucide-react';
+import { Heart } from "lucide-react";
 
 /**
- * Favorite heart button component
- * Toggles favorite status with a heart icon
+ * Standalone favorite toggle button
+ * Filled heart when favorited (theme accent-primary), outline when not
  */
-export default function FavoriteButton({
+const FavoriteButton = ({
   isFavorite,
   onChange,
-  size = 20,
-  className = '',
+  size = "small",
+  variant = "card",
+  className = "",
   disabled = false,
-}) {
+}) => {
+  const sizeMap = {
+    small: 20,
+    medium: 24,
+    large: 28,
+  };
+
+  const iconSize = sizeMap[size] || size;
+
   const handleClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -24,21 +33,25 @@ export default function FavoriteButton({
       type="button"
       onClick={handleClick}
       disabled={disabled || !onChange}
-      className={`
-        ${disabled || !onChange ? 'cursor-default' : 'cursor-pointer hover:scale-110'}
-        transition-transform
-        ${className}
-      `}
-      aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-      title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      className={`transition-all hover:scale-110 active:scale-95 ${
+        disabled || !onChange ? "cursor-default" : "cursor-pointer"
+      } ${className}`}
+      style={{
+        background: "none",
+        border: "none",
+        padding: size === "small" ? "4px" : "6px",
+      }}
+      aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+      title={isFavorite ? "Remove from favorites" : "Add to favorites"}
     >
       <Heart
-        size={size}
-        className={`
-          ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400 hover:text-red-400'}
-          transition-colors
-        `}
+        size={iconSize}
+        fill={isFavorite ? "var(--accent-primary)" : "none"}
+        stroke={isFavorite ? "var(--accent-primary)" : "var(--text-muted)"}
+        strokeWidth={isFavorite ? 2 : 1.5}
       />
     </button>
   );
-}
+};
+
+export default FavoriteButton;
