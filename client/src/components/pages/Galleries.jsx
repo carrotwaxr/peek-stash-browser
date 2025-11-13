@@ -192,6 +192,7 @@ const GalleryCard = forwardRef(
           entityId: gallery.id,
           initialRating: gallery.rating,
           initialFavorite: gallery.favorite || false,
+          initialOCounter: gallery.o_counter,
         }}
         ref={ref}
         referrerUrl={referrerUrl}

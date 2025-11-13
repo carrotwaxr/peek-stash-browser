@@ -194,6 +194,7 @@ const TagCard = forwardRef(
           entityId: tag.id,
           initialRating: tag.rating,
           initialFavorite: tag.favorite || false,
+          initialOCounter: tag.o_counter,
         }}
         ref={ref}
         referrerUrl={referrerUrl}

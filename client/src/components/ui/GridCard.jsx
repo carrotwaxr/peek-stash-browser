@@ -87,6 +87,7 @@ export const GridCard = forwardRef(
             entityId={ratingControlsProps.entityId}
             initialRating={ratingControlsProps.initialRating}
             initialFavorite={ratingControlsProps.initialFavorite}
+            initialOCounter={ratingControlsProps.initialOCounter}
             entityTitle={typeof title === 'string' ? title : undefined}
           />
         )}

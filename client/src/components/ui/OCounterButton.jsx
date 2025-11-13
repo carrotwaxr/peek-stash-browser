@@ -4,14 +4,15 @@ import { LucideDroplets } from "lucide-react";
 
 /**
  * Interactive O Counter button component
- * Displays current O counter value and increments on click
- * Works only for scenes currently
+ * Displays current O counter value and increments on click (scenes only)
+ * For non-scene entities, displays as read-only indicator
  *
- * @param {string} sceneId - Stash scene ID (required)
+ * @param {string} sceneId - Stash scene ID (required for interactive mode)
  * @param {number} initialCount - Initial O counter value
  * @param {Function} onChange - Optional callback after successful increment (receives new count)
  * @param {string} size - Size variant: small, medium, large
  * @param {string} variant - Style variant: card (transparent), page (with background)
+ * @param {boolean} interactive - Enable click-to-increment (default: true if sceneId provided)
  */
 const OCounterButton = ({
   sceneId,
@@ -19,6 +20,7 @@ const OCounterButton = ({
   onChange,
   size = "small",
   variant = "card",
+  interactive = true,
 }) => {
   const [count, setCount] = useState(initialCount ?? 0);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -43,7 +45,8 @@ const OCounterButton = ({
     e.preventDefault();
     e.stopPropagation();
 
-    if (isUpdating || !sceneId) {
+    // Only allow incrementing for scenes with interactive mode
+    if (!interactive || isUpdating || !sceneId) {
       return;
     }
 
@@ -80,11 +83,11 @@ const OCounterButton = ({
       style={{
         backgroundColor: variant === "card" ? "transparent" : "var(--bg-tertiary)",
         border: variant === "card" ? "none" : "1px solid var(--border-color)",
-        cursor: isUpdating ? "not-allowed" : "pointer",
+        cursor: interactive && sceneId ? (isUpdating ? "not-allowed" : "pointer") : "default",
         opacity: isUpdating ? 0.7 : 1,
       }}
-      aria-label={`Increment O counter (current: ${count})`}
-      title={`O Counter: ${count} (click to increment)`}
+      aria-label={interactive && sceneId ? `Increment O counter (current: ${count})` : `O Counter: ${count}`}
+      title={interactive && sceneId ? `O Counter: ${count} (click to increment)` : `O Counter: ${count}`}
     >
       {/* Droplet icon with bounce animation */}
       <span

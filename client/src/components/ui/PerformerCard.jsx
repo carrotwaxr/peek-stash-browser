@@ -33,6 +33,7 @@ const PerformerCard = forwardRef(
           entityId: performer.id,
           initialRating: performer.rating,
           initialFavorite: performer.favorite || false,
+          initialOCounter: performer.o_counter,
         }}
         ref={ref}
         referrerUrl={referrerUrl}

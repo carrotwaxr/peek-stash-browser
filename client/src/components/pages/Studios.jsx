@@ -189,6 +189,7 @@ const StudioCard = forwardRef(
           entityId: studio.id,
           initialRating: studio.rating,
           initialFavorite: studio.favorite || false,
+          initialOCounter: studio.o_counter,
         }}
         ref={ref}
         referrerUrl={referrerUrl}

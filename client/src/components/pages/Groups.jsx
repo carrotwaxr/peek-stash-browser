@@ -197,6 +197,7 @@ const GroupCard = forwardRef(
           entityId: group.id,
           initialRating: group.rating,
           initialFavorite: group.favorite || false,
+          initialOCounter: group.o_counter,
         }}
         ref={ref}
         referrerUrl={referrerUrl}

@@ -223,14 +223,15 @@ export const CardIndicators = ({ indicators }) => {
 
 /**
  * Card rating and favorite row (always fixed height for consistency)
- * Shows O counter button (left, scenes only), rating badge (center-left), and favorite button (right)
+ * Shows rating badge (left), O counter (center-right), and favorite button (right)
+ * O Counter is interactive for scenes, display-only for other entities
  */
 export const CardRatingRow = ({
   entityType,
   entityId,
   initialRating,
   initialFavorite,
-  initialOCounter, // For scenes only
+  initialOCounter,
   entityTitle,
 }) => {
   const [rating, setRating] = useState(initialRating);
@@ -263,7 +264,7 @@ export const CardRatingRow = ({
     setOCounter(newCount);
   };
 
-  // Check if this is a scene (only scenes have O counter button)
+  // Check if this is a scene (only scenes allow interactive O counter)
   const isScene = entityType === "scene";
 
   return (
@@ -281,17 +282,16 @@ export const CardRatingRow = ({
           />
         </div>
 
-        {/* Right side: O Counter (scenes only) + Favorite */}
+        {/* Right side: O Counter + Favorite */}
         <div className="flex items-center gap-2">
-          {isScene && (
-            <OCounterButton
-              sceneId={entityId}
-              initialCount={oCounter}
-              onChange={handleOCounterChange}
-              size="small"
-              variant="card"
-            />
-          )}
+          <OCounterButton
+            sceneId={isScene ? entityId : null}
+            initialCount={oCounter ?? 0}
+            onChange={handleOCounterChange}
+            size="small"
+            variant="card"
+            interactive={isScene}
+          />
           <FavoriteButton
             isFavorite={isFavorite}
             onChange={handleFavoriteChange}
