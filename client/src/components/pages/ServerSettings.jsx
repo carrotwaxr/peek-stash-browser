@@ -502,6 +502,23 @@ const ServerSettings = () => {
               </div>
             </Paper.Header>
             <Paper.Body padding="none">
+              {/* Sync to Stash Warning */}
+              <div
+                className="px-6 py-4 text-sm"
+                style={{
+                  backgroundColor: "rgba(245, 158, 11, 0.1)",
+                  borderBottom: "1px solid var(--border-color)",
+                  color: "rgb(245, 158, 11)",
+                }}
+              >
+                <div className="font-semibold mb-1">⚠️ Sync to Stash Policy</div>
+                <div className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  When enabled, user ratings and favorites will sync to Stash.<br/>
+                  <strong>O Counters AGGREGATE</strong> (multiple users increment the same counter).<br/>
+                  <strong>Ratings OVERWRITE</strong> (last user to rate wins, no aggregation).<br/>
+                  Be cautious enabling for multiple users to avoid conflicts.
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <div className="md:hidden px-4 py-3 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
                   ← Swipe to see more →

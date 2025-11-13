@@ -16,14 +16,15 @@ const RatingSliderDialog = ({
   entityTitle,
   anchorEl,
 }) => {
-  const [value, setValue] = useState((initialRating ?? 0) / 10); // Convert 0-100 to 0-10
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  // Track null separately - null means unrated, not 0
+  const [value, setValue] = useState(initialRating === null || initialRating === undefined ? null : initialRating / 10);
+  const [position, setPosition] = useState({ top: 0, left: 0, transformY: "-100%" });
   const popoverRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
-      setValue((initialRating ?? 0) / 10);
+      setValue(initialRating === null || initialRating === undefined ? null : initialRating / 10);
     }
   }, [isOpen, initialRating]);
 
@@ -31,9 +32,40 @@ const RatingSliderDialog = ({
   useEffect(() => {
     if (isOpen && anchorEl) {
       const rect = anchorEl.getBoundingClientRect();
+      const popoverWidth = 280; // Match the width in the popover style
+      const popoverHeight = 240; // Approximate height of popover
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const gap = 8;
+
+      // Calculate left position, ensuring it doesn't go off-screen
+      let left = rect.left;
+
+      // If popover would extend beyond right edge, align to right of badge
+      if (left + popoverWidth > viewportWidth - 16) {
+        left = rect.right - popoverWidth;
+      }
+
+      // Ensure it doesn't go off left edge either
+      if (left < 16) {
+        left = 16;
+      }
+
+      // Calculate vertical position - prefer above, but position below if not enough space
+      let top = rect.top - gap;
+      let transformY = "-100%"; // Position above by default
+
+      // Check if there's enough space above
+      if (rect.top < popoverHeight + gap) {
+        // Not enough space above, position below instead
+        top = rect.bottom + gap;
+        transformY = "0";
+      }
+
       setPosition({
-        top: rect.top - 8, // 8px gap above badge
-        left: rect.left,
+        top: top,
+        left: left,
+        transformY: transformY,
       });
     }
   }, [isOpen, anchorEl]);
@@ -70,6 +102,11 @@ const RatingSliderDialog = ({
   if (!isOpen) return null;
 
   const getRatingGradient = (val) => {
+    // Unrated: neutral gray
+    if (val === null || val === undefined) {
+      return "linear-gradient(90deg, #6B7280 0%, #4B5563 100%)"; // Neutral gray
+    }
+    // Rated: metallic gradients
     if (val < 3.5) {
       return "linear-gradient(90deg, #CD7F32 0%, #B87333 100%)"; // Copper
     } else if (val < 7.0) {
@@ -89,7 +126,9 @@ const RatingSliderDialog = ({
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      onSave(Math.round(newValue * 10)); // Convert back to 0-100
+      const ratingValue = Math.round(newValue * 10); // Convert back to 0-100
+      // If user drags to 0, treat as clearing the rating
+      onSave(ratingValue === 0 ? null : ratingValue);
     }, 300);
   };
 
@@ -115,7 +154,7 @@ const RatingSliderDialog = ({
         width: "280px",
         top: `${position.top}px`,
         left: `${position.left}px`,
-        transform: "translateY(-100%)",
+        transform: `translateY(${position.transformY})`,
         pointerEvents: "auto",
       }}
     >
@@ -154,12 +193,12 @@ const RatingSliderDialog = ({
       <div className="text-center mb-4">
         <div
           className="text-4xl font-bold"
-          style={{ color: "var(--text-primary)" }}
+          style={{ color: value === null ? "var(--text-muted)" : "var(--text-primary)" }}
         >
-          {value.toFixed(1)}
+          {value === null ? "--" : value.toFixed(1)}
         </div>
         <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-          out of 10.0
+          {value === null ? "Not rated" : "out of 10.0"}
         </div>
       </div>
 
@@ -170,7 +209,7 @@ const RatingSliderDialog = ({
           min="0"
           max="10"
           step="0.1"
-          value={value}
+          value={value ?? 0}
           onChange={handleChange}
           className="w-full h-2 rounded-lg appearance-none cursor-pointer"
           style={{

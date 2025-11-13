@@ -11,11 +11,12 @@ const RatingSlider = ({
   label = "Rating",
   showClearButton = true,
 }) => {
-  const [value, setValue] = useState((rating ?? 0) / 10); // Convert 0-100 to 0-10
+  // Track whether item is rated (null = unrated, number = rated)
+  const [value, setValue] = useState(rating === null || rating === undefined ? null : rating / 10);
   const debounceTimerRef = useRef(null);
 
   useEffect(() => {
-    setValue((rating ?? 0) / 10);
+    setValue(rating === null || rating === undefined ? null : rating / 10);
   }, [rating]);
 
   // Clean up timer on unmount
@@ -28,6 +29,11 @@ const RatingSlider = ({
   }, []);
 
   const getRatingGradient = (val) => {
+    // Unrated: neutral gray
+    if (val === null || val === undefined) {
+      return "linear-gradient(90deg, #6B7280 0%, #4B5563 100%)"; // Neutral gray
+    }
+    // Rated: metallic gradients
     if (val < 3.5) {
       return "linear-gradient(90deg, #CD7F32 0%, #B87333 100%)"; // Copper
     } else if (val < 7.0) {
@@ -48,12 +54,14 @@ const RatingSlider = ({
 
     // Set new timer to call onChange after 300ms of no changes
     debounceTimerRef.current = setTimeout(() => {
-      onChange(Math.round(newValue * 10)); // Convert back to 0-100
+      const ratingValue = Math.round(newValue * 10); // Convert back to 0-100
+      // If user drags to 0, treat as clearing the rating
+      onChange(ratingValue === 0 ? null : ratingValue);
     }, 300);
   };
 
   const handleClear = () => {
-    setValue(0);
+    setValue(null);
     onChange(null); // Clear rating
   };
 
@@ -67,9 +75,9 @@ const RatingSlider = ({
         <div className="flex items-center gap-3">
           <span
             className="text-lg font-semibold min-w-[3rem] text-right"
-            style={{ color: "var(--text-primary)" }}
+            style={{ color: value === null ? "var(--text-muted)" : "var(--text-primary)" }}
           >
-            {value.toFixed(1)}
+            {value === null ? "--" : value.toFixed(1)}
           </span>
           {showClearButton && rating !== null && rating !== undefined && (
             <button
@@ -98,7 +106,7 @@ const RatingSlider = ({
         min="0"
         max="10"
         step="0.1"
-        value={value}
+        value={value ?? 0}
         onChange={handleChange}
         className="w-full h-3 rounded-lg appearance-none cursor-pointer"
         style={{

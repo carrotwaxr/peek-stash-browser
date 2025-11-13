@@ -7,6 +7,7 @@ import {
   updateTagRating,
   updateGalleryRating,
   updateGroupRating,
+  updateImageRating,
 } from "../controllers/ratings.js";
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.put("/studio/:studioId", updateStudioRating);
 router.put("/tag/:tagId", updateTagRating);
 router.put("/gallery/:galleryId", updateGalleryRating);
 router.put("/group/:groupId", updateGroupRating);
+router.put("/image/:imageId", updateImageRating);
 
 export default router;
