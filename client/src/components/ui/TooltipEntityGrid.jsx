@@ -68,15 +68,34 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
   const imageRadius = getImageRadius();
   const fallbackEmoji = getFallbackEmoji();
 
+  // Determine grid columns based on entity count (fit to content)
+  const getGridColumns = () => {
+    const count = entities.length;
+    if (count === 1) return "grid-cols-1";
+    if (count === 2) return "grid-cols-2";
+    if (count === 3) return "grid-cols-2 md:grid-cols-3";
+    // 4+ items: responsive 2→3→4
+    return "grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
+  };
+
+  // Calculate max width based on entity count to prevent excessive whitespace
+  const getMaxWidth = () => {
+    const count = entities.length;
+    if (count === 1) return "max-w-[180px]"; // Single item: very narrow
+    if (count === 2) return "max-w-[380px]"; // Two items: narrower
+    if (count === 3) return "max-w-[580px]"; // Three items: medium
+    return "max-w-[780px]"; // 4+ items: full responsive width
+  };
+
   return (
-    <div>
+    <div className={getMaxWidth()}>
       {/* Title */}
       <div className="font-semibold mb-2 text-sm" style={{ color: "var(--text-primary)" }}>
         {title}
       </div>
 
-      {/* Responsive grid: 2 cols mobile, 3 cols tablet, 4 cols desktop */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[60vh] overflow-y-auto pr-2">
+      {/* Responsive grid: columns adapt to entity count */}
+      <div className={`grid ${getGridColumns()} gap-2 max-h-[60vh] overflow-y-auto pr-2`}>
         {entities.map((entity) => (
           <Link
             key={entity.id}
