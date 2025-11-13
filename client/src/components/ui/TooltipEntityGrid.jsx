@@ -12,23 +12,24 @@ import { Link } from "react-router-dom";
 export const TooltipEntityGrid = ({ entityType, entities, title }) => {
   if (!entities || entities.length === 0) return null;
 
-  // Determine aspect ratio based on entity type
+  // Determine aspect ratio based on entity type (match useEntityImageAspectRatio hook)
   const getAspectRatio = () => {
     switch (entityType) {
       case "performer":
       case "gallery":
+      case "group":
         return "2/3"; // Portrait
       case "tag":
       case "studio":
-      case "group":
+      case "scene":
       default:
         return "16/9"; // Landscape
     }
   };
 
-  // Determine image border radius
+  // All images use consistent rounded corners like cards (no circular)
   const getImageRadius = () => {
-    return entityType === "performer" ? "rounded-full" : "rounded";
+    return "rounded";
   };
 
   // Get link path for entity
@@ -70,22 +71,22 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
   return (
     <div>
       {/* Title */}
-      <div className="font-semibold mb-3 text-base" style={{ color: "var(--text-primary)" }}>
+      <div className="font-semibold mb-2 text-sm" style={{ color: "var(--text-primary)" }}>
         {title}
       </div>
 
-      {/* Responsive grid: 1 col mobile, 2 cols tablet, 3 cols desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+      {/* Responsive grid: 2 cols mobile, 3 cols tablet, 4 cols desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-[60vh] overflow-y-auto pr-2">
         {entities.map((entity) => (
           <Link
             key={entity.id}
             to={getLinkPath(entity)}
-            className="flex flex-col items-center p-2 rounded hover:bg-white/10 transition-colors"
+            className="flex flex-col items-center p-1.5 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Image container with aspect ratio */}
             <div
-              className={`w-full mb-2 ${imageRadius} overflow-hidden`}
+              className={`w-full mb-1.5 ${imageRadius} overflow-hidden`}
               style={{
                 aspectRatio,
                 backgroundColor: "var(--bg-secondary)",
@@ -100,14 +101,14 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-4xl">{fallbackEmoji}</span>
+                  <span className="text-2xl">{fallbackEmoji}</span>
                 </div>
               )}
             </div>
 
             {/* Name below image */}
             <span
-              className="text-sm text-center line-clamp-2 w-full px-1"
+              className="text-xs text-center line-clamp-2 w-full px-0.5"
               style={{ color: "var(--text-primary)" }}
               title={entity.name}
             >
