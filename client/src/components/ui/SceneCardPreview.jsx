@@ -322,12 +322,12 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
         </div>
       )}
 
-      {/* Overlays: Duration (bottom-left) and Resolution (top-right) - hidden when preview is playing */}
+      {/* Overlays: Duration (bottom-right) and Resolution (top-right) - hidden when preview is playing */}
       {!shouldShowAnimation && (
         <>
           {/* Duration badge */}
           {duration && (
-            <div className="absolute bottom-2 left-2 pointer-events-none z-10">
+            <div className="absolute bottom-1 right-1 pointer-events-none z-10">
               <span className="px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
                 {duration}
               </span>
@@ -336,7 +336,7 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
 
           {/* Resolution badge */}
           {resolution && (
-            <div className="absolute top-2 right-2 pointer-events-none z-10">
+            <div className="absolute top-1 right-1 pointer-events-none z-10">
               <span className="px-2 py-1 bg-black/70 text-white text-xs font-medium rounded">
                 {resolution}
               </span>
