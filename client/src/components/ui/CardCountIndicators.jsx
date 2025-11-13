@@ -7,7 +7,7 @@ import {
   LucideImages,
   LucideList,
   LucideTag,
-  LucideUserStar,
+  LucideUser,
 } from "lucide-react";
 import { useMemo } from "react";
 import Tooltip from "./Tooltip";
@@ -28,7 +28,7 @@ const CARD_COUNT_INDICATOR_TYPES = {
     iconColor: hueify("var(--status-warning)", "lighter"),
   },
   PERFORMERS: {
-    icon: LucideUserStar,
+    icon: LucideUser,
     iconColor: "var(--accent-primary)",
   },
   TAGS: {
@@ -120,7 +120,7 @@ const CardCountIndicator = ({
   );
 
   return tooltipContent ? (
-    <Tooltip content={tooltipContent}>{guts}</Tooltip>
+    <Tooltip content={tooltipContent} clickable={true}>{guts}</Tooltip>
   ) : (
     guts
   );

@@ -21,7 +21,7 @@ export const NAV_DEFINITIONS = [
     key: "performers",
     name: "Performers",
     path: "/performers",
-    icon: "user-star",
+    icon: "user",
     description: "Browse performers in your library",
   },
   {

@@ -182,7 +182,11 @@ const GalleryCard = forwardRef(
         description={gallery.description}
         entityType="gallery"
         imagePath={coverImage}
-        indicators={[{ type: "IMAGES", count: gallery.image_count }]}
+        indicators={[{
+          type: "IMAGES",
+          count: gallery.image_count,
+          tooltipContent: gallery.image_count === 1 ? "1 Image" : `${gallery.image_count} Images`
+        }]}
         linkTo={`/gallery/${gallery.id}`}
         ratingControlsProps={{
           entityId: gallery.id,

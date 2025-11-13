@@ -1,5 +1,5 @@
 import { forwardRef, useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import SceneCardPreview from "../ui/SceneCardPreview.jsx";
 import {
@@ -83,6 +83,105 @@ const SceneCard = forwardRef(
     };
 
     const allTags = getAllTags();
+
+    // Build rich tooltip content for performers
+    const performersTooltip = scene.performers && scene.performers.length > 0 && (
+      <div>
+        <div className="font-semibold mb-3 text-base">Performers</div>
+        <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+          {scene.performers.map((performer) => (
+            <Link
+              key={performer.id}
+              to={`/performer/${performer.id}`}
+              className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {performer.image_path ? (
+                <img
+                  src={performer.image_path}
+                  alt={performer.name}
+                  className="w-16 h-16 rounded-full object-cover flex-shrink-0"
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: "var(--bg-secondary)" }}
+                >
+                  <span className="text-2xl">👤</span>
+                </div>
+              )}
+              <span className="text-sm truncate flex-1">{performer.name}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+
+    // Build rich tooltip content for groups
+    const groupsTooltip = scene.groups && scene.groups.length > 0 && (
+      <div>
+        <div className="font-semibold mb-3 text-base">Collections</div>
+        <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+          {scene.groups.map((group) => (
+            <Link
+              key={group.id}
+              to={`/collection/${group.id}`}
+              className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {group.front_image_path || group.back_image_path ? (
+                <img
+                  src={group.front_image_path || group.back_image_path}
+                  alt={group.name}
+                  className="w-16 h-16 rounded object-cover flex-shrink-0"
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: "var(--bg-secondary)" }}
+                >
+                  <span className="text-2xl">🎬</span>
+                </div>
+              )}
+              <span className="text-sm truncate flex-1">{group.name}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
+
+    // Build rich tooltip content for tags
+    const tagsTooltip = allTags && allTags.length > 0 && (
+      <div>
+        <div className="font-semibold mb-3 text-base">Tags</div>
+        <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2">
+          {allTags.map((tag) => (
+            <Link
+              key={tag.id}
+              to={`/tag/${tag.id}`}
+              className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {tag.image_path ? (
+                <img
+                  src={tag.image_path}
+                  alt={tag.name}
+                  className="w-16 h-16 rounded object-cover flex-shrink-0"
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: "var(--bg-secondary)" }}
+                >
+                  <span className="text-2xl">🏷️</span>
+                </div>
+              )}
+              <span className="text-sm truncate flex-1">{tag.name}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    );
 
     const handleClick = (e) => {
       const target = e.target;
@@ -352,21 +451,21 @@ const SceneCard = forwardRef(
         {/* Indicators */}
         <CardIndicators
           indicators={[
-            { type: "O_COUNTER", count: scene.o_counter },
-            { type: "PLAY_COUNT", count: scene.play_count },
-            { type: "PERFORMERS", count: scene.performers?.length },
-            { type: "GROUPS", count: scene.groups?.length },
-            { type: "TAGS", count: allTags?.length },
+            { type: "PLAY_COUNT", count: scene.play_count, tooltipContent: "Times watched" },
+            { type: "PERFORMERS", count: scene.performers?.length, tooltipContent: performersTooltip },
+            { type: "GROUPS", count: scene.groups?.length, tooltipContent: groupsTooltip },
+            { type: "TAGS", count: allTags?.length, tooltipContent: tagsTooltip },
           ]}
         />
 
-        {/* Rating and Favorite Row */}
+        {/* Rating, O Counter, and Favorite Row */}
         {!hideRatingControls && (
           <CardRatingRow
             entityType="scene"
             entityId={scene.id}
             initialRating={scene.rating}
             initialFavorite={scene.favorite || false}
+            initialOCounter={scene.o_counter}
             entityTitle={title}
           />
         )}

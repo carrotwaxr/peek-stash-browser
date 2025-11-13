@@ -5,6 +5,7 @@ import Tooltip from "./Tooltip";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
 import FavoriteButton from "./FavoriteButton";
+import OCounterButton from "./OCounterButton";
 import { libraryApi } from "../../services/api";
 
 /**
@@ -222,17 +223,19 @@ export const CardIndicators = ({ indicators }) => {
 
 /**
  * Card rating and favorite row (always fixed height for consistency)
- * Shows rating badge (left) and favorite button (right)
+ * Shows O counter button (left, scenes only), rating badge (center-left), and favorite button (right)
  */
 export const CardRatingRow = ({
   entityType,
   entityId,
   initialRating,
   initialFavorite,
+  initialOCounter, // For scenes only
   entityTitle,
 }) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
+  const [oCounter, setOCounter] = useState(initialOCounter);
   const [dialogOpen, setDialogOpen] = useState(false);
   const badgeRef = useRef(null);
 
@@ -256,12 +259,20 @@ export const CardRatingRow = ({
     }
   };
 
+  const handleOCounterChange = (newCount) => {
+    setOCounter(newCount);
+  };
+
+  // Check if this is a scene (only scenes have O counter button)
+  const isScene = entityType === "scene";
+
   return (
     <>
       <div
         className="flex justify-between items-center w-full my-1"
         style={{ height: "2rem" }}
       >
+        {/* Left side: Rating badge */}
         <div ref={badgeRef}>
           <RatingBadge
             rating={rating}
@@ -269,12 +280,25 @@ export const CardRatingRow = ({
             size="small"
           />
         </div>
-        <FavoriteButton
-          isFavorite={isFavorite}
-          onChange={handleFavoriteChange}
-          size="small"
-          variant="card"
-        />
+
+        {/* Right side: O Counter (scenes only) + Favorite */}
+        <div className="flex items-center gap-2">
+          {isScene && (
+            <OCounterButton
+              sceneId={entityId}
+              initialCount={oCounter}
+              onChange={handleOCounterChange}
+              size="small"
+              variant="card"
+            />
+          )}
+          <FavoriteButton
+            isFavorite={isFavorite}
+            onChange={handleFavoriteChange}
+            size="small"
+            variant="card"
+          />
+        </div>
       </div>
 
       <RatingSliderDialog
