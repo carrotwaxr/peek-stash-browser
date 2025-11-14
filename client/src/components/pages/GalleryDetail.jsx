@@ -207,7 +207,7 @@ const GalleryDetail = () => {
                 {[...Array(gallery.image_count || 12)].map((_, index) => (
                   <div
                     key={index}
-                    className="aspect-[2/3] rounded-lg animate-pulse"
+                    className="aspect-square rounded-lg animate-pulse"
                     style={{
                       backgroundColor: "var(--bg-tertiary)",
                     }}
@@ -219,7 +219,7 @@ const GalleryDetail = () => {
                 {images.map((image, index) => (
                   <div
                     key={image.id}
-                    className="aspect-[2/3] rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
                     style={{
                       backgroundColor: "var(--bg-secondary)",
                       borderColor: "var(--border-color)",
@@ -337,6 +337,7 @@ const GalleryDetail = () => {
         isOpen={lightboxOpen}
         autoPlay={lightboxAutoPlay}
         onClose={() => setLightboxOpen(false)}
+        onImagesUpdate={setImages}
       />
     </div>
   );

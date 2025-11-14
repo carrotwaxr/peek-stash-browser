@@ -31,8 +31,8 @@ const SceneContent = () => {
   const displayTitle = scene?.title || scene?.files?.[0]?.basename || "Scene";
   usePageTitle(displayTitle);
 
-  // Set initial focus to video player when page loads
-  useInitialFocus(pageRef, ".vjs-big-play-button, button", !sceneLoading);
+  // Set initial focus to video player when page loads (excluding back button)
+  useInitialFocus(pageRef, ".vjs-big-play-button", !sceneLoading);
 
   // Local UI state (not managed by context)
   const [showDetails, setShowDetails] = useState(true);
