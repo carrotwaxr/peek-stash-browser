@@ -183,7 +183,6 @@ const SceneCarousel = ({
                 isSelected={selectedScenes.some((s) => s.id === scene.id)}
                 onToggleSelect={onToggleSelect}
                 selectionMode={selectedScenes.length > 0}
-                hideRatingControls={true}
               />
             </div>
           ))}

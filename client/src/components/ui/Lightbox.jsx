@@ -5,7 +5,7 @@ import RatingSliderDialog from "./RatingSliderDialog.jsx";
 import FavoriteButton from "./FavoriteButton.jsx";
 import { libraryApi } from "../../services/api.js";
 
-const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false }) => {
+const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false, onImagesUpdate }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -60,14 +60,29 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false 
     const previousRating = rating;
     setRating(newRating);
 
+    // Update the images array so navigation preserves the change
+    const updatedImages = [...images];
+    updatedImages[currentIndex] = {
+      ...currentImage,
+      rating100: newRating,
+      rating: newRating,
+    };
+    // Call parent update if provided
+    if (onImagesUpdate) {
+      onImagesUpdate(updatedImages);
+    }
+
     try {
       await libraryApi.updateRating("image", currentImage.id, newRating);
     } catch (error) {
       console.error("Failed to update image rating:", error);
       // Revert on error
       setRating(previousRating);
+      if (onImagesUpdate) {
+        onImagesUpdate(images);
+      }
     }
-  }, [images, currentIndex, rating]);
+  }, [images, currentIndex, rating, onImagesUpdate]);
 
   // Handle favorite change
   const handleFavoriteChange = useCallback(async (newFavorite) => {
@@ -78,14 +93,28 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false 
     const previousFavorite = isFavorite;
     setIsFavorite(newFavorite);
 
+    // Update the images array so navigation preserves the change
+    const updatedImages = [...images];
+    updatedImages[currentIndex] = {
+      ...currentImage,
+      favorite: newFavorite,
+    };
+    // Call parent update if provided
+    if (onImagesUpdate) {
+      onImagesUpdate(updatedImages);
+    }
+
     try {
       await libraryApi.updateFavorite("image", currentImage.id, newFavorite);
     } catch (error) {
       console.error("Failed to update image favorite:", error);
       // Revert on error
       setIsFavorite(previousFavorite);
+      if (onImagesUpdate) {
+        onImagesUpdate(images);
+      }
     }
-  }, [images, currentIndex, isFavorite]);
+  }, [images, currentIndex, isFavorite, onImagesUpdate]);
 
   // Update rating/favorite when image changes
   useEffect(() => {

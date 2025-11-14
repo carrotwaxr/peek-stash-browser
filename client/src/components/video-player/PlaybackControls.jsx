@@ -1,11 +1,61 @@
+import { useState, useEffect, useRef } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import AddToPlaylistButton from "../ui/AddToPlaylistButton.jsx";
 import OCounterButton from "../ui/OCounterButton.jsx";
-import RatingControls from "../ui/RatingControls.jsx";
+import RatingBadge from "../ui/RatingBadge.jsx";
+import RatingSliderDialog from "../ui/RatingSliderDialog.jsx";
+import FavoriteButton from "../ui/FavoriteButton.jsx";
+import { libraryApi } from "../../services/api.js";
 
 const PlaybackControls = () => {
   const { scene, sceneLoading, videoLoading, quality, oCounter, dispatch } =
     useScenePlayer();
+
+  // Rating and favorite state
+  const [rating, setRating] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Rating popover state
+  const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
+  const ratingBadgeRef = useRef(null);
+
+  // Sync state when scene changes
+  useEffect(() => {
+    if (scene) {
+      setRating(scene.rating ?? null);
+      setIsFavorite(scene.favorite || false);
+    }
+  }, [scene?.id, scene?.rating, scene?.favorite]);
+
+  // Handle rating change
+  const handleRatingChange = async (newRating) => {
+    if (!scene?.id) return;
+
+    const previousRating = rating;
+    setRating(newRating);
+
+    try {
+      await libraryApi.updateRating("scene", scene.id, newRating);
+    } catch (error) {
+      console.error("Failed to update scene rating:", error);
+      setRating(previousRating);
+    }
+  };
+
+  // Handle favorite change
+  const handleFavoriteChange = async (newFavorite) => {
+    if (!scene?.id) return;
+
+    const previousFavorite = isFavorite;
+    setIsFavorite(newFavorite);
+
+    try {
+      await libraryApi.updateFavorite("scene", scene.id, newFavorite);
+    } catch (error) {
+      console.error("Failed to update scene favorite:", error);
+      setIsFavorite(previousFavorite);
+    }
+  };
 
   // Don't render if no scene data yet
   if (!scene) {
@@ -56,17 +106,22 @@ const PlaybackControls = () => {
             </div>
           </div>
 
-          {/* Row 2 on mobile (centered), Center column on desktop: Rating Controls + O Counter */}
+          {/* Row 2 on mobile (centered), Center column on desktop: Rating Badge + Favorite + O Counter */}
           <div
             className="flex items-center justify-center gap-4 md:flex-1"
             style={{ opacity: isLoading ? 0.6 : 1 }}
           >
-            <RatingControls
-              entityType="scene"
-              entityId={scene?.id}
-              initialRating={scene?.rating}
-              initialFavorite={scene?.favorite || false}
-              size={20}
+            <div ref={ratingBadgeRef}>
+              <RatingBadge
+                rating={rating}
+                onClick={() => setIsRatingPopoverOpen(true)}
+                size="medium"
+              />
+            </div>
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onChange={handleFavoriteChange}
+              size="medium"
             />
             <OCounterButton
               sceneId={scene?.id}
@@ -84,6 +139,17 @@ const PlaybackControls = () => {
           </div>
         </div>
       </div>
+
+      {/* Rating Popover */}
+      <RatingSliderDialog
+        isOpen={isRatingPopoverOpen}
+        onClose={() => setIsRatingPopoverOpen(false)}
+        initialRating={rating}
+        onSave={handleRatingChange}
+        entityType="scene"
+        entityTitle={scene?.title || "Scene"}
+        anchorEl={ratingBadgeRef.current}
+      />
     </section>
   );
 };

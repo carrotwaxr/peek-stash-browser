@@ -162,6 +162,37 @@ const SkeletonSceneCard = () => {
             }}
           />
         </div>
+
+        {/* Rating controls row skeleton (Rating Badge + O Counter + Favorite) */}
+        <div className="flex justify-between items-center w-full my-1" style={{ height: "2rem" }}>
+          {/* Rating badge placeholder (left) */}
+          <div
+            className="h-7 rounded-full px-3 animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              width: "4rem"
+            }}
+          />
+
+          {/* Right side: O Counter + Favorite */}
+          <div className="flex items-center gap-2">
+            {/* O Counter button placeholder */}
+            <div
+              className="h-7 w-7 rounded-full animate-pulse"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+              }}
+            />
+
+            {/* Favorite heart placeholder */}
+            <div
+              className="h-7 w-7 rounded-full animate-pulse"
+              style={{
+                backgroundColor: "var(--bg-tertiary)",
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

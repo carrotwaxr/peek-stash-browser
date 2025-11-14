@@ -191,7 +191,7 @@ const SceneDetails = ({
                   </p>
                 </div>
 
-                {/* Performers - Horizontal scrollable with circular avatars */}
+                {/* Performers - Horizontal scrollable with 2/3 aspect ratio */}
                 {scene.performers && scene.performers.length > 0 && (
                   <div className="mb-6">
                     <h3
@@ -205,14 +205,12 @@ const SceneDetails = ({
                         <Link
                           key={performer.id}
                           to={`/performer/${performer.id}`}
-                          className="flex flex-col items-center flex-shrink-0 group"
+                          className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                         >
                           <div
-                            className="rounded-full overflow-hidden mb-2 ring-2 ring-transparent group-hover:ring-[var(--accent-primary)] transition-all"
+                            className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
                             style={{
                               backgroundColor: "var(--border-color)",
-                              width: "80px",
-                              height: "80px",
                             }}
                           >
                             {performer.image_path ? (
@@ -224,7 +222,7 @@ const SceneDetails = ({
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <span
-                                  className="text-2xl"
+                                  className="text-4xl"
                                   style={{ color: "var(--text-secondary)" }}
                                 >
                                   {performer.gender === "MALE" ? "♂" : "♀"}
@@ -233,7 +231,7 @@ const SceneDetails = ({
                             )}
                           </div>
                           <span
-                            className="text-xs font-medium text-center max-w-[100px] line-clamp-2 group-hover:underline"
+                            className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
                             style={{ color: "var(--text-primary)" }}
                           >
                             {performer.name}
