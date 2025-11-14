@@ -31,6 +31,10 @@ const iconSets = {
       settings: "settings",
       user: "user",
       logout: "log-out",
+      help: "circle-help",
+      questionCircle: "circle-help",
+      info: "info",
+      wrench: "wrench",
 
       // Arrows & Navigation
       arrowUp: "chevron-up",
