@@ -40,10 +40,8 @@ const GlobalLayout = ({ children }) => {
       {/* Top bar - mobile only (logo, hamburger menu) */}
       <TopBar navPreferences={navPreferences} />
 
-      {/* Main content area with responsive spacing */}
-      <main className="lg:ml-16 xl:ml-60 pt-16 lg:pt-0">
-        <div className="w-full 2xl:w-5/6 2xl:mx-auto">{children}</div>
-      </main>
+      {/* Main content area - full width after sidebar, Plex-style */}
+      <main className="lg:ml-16 xl:ml-60 pt-16 lg:pt-0">{children}</main>
     </div>
   );
 };
