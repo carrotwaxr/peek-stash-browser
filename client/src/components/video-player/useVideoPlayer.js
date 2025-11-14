@@ -118,7 +118,22 @@ export function useVideoPlayer({
     player.focus();
 
     player.ready(() => {
-      // Player ready
+      // Restore volume and mute state from localStorage
+      const savedVolume = localStorage.getItem("videoPlayerVolume");
+      const savedMuted = localStorage.getItem("videoPlayerMuted");
+
+      if (savedVolume !== null) {
+        player.volume(parseFloat(savedVolume));
+      }
+      if (savedMuted !== null) {
+        player.muted(savedMuted === "true");
+      }
+
+      // Save volume changes to localStorage
+      player.on("volumechange", () => {
+        localStorage.setItem("videoPlayerVolume", player.volume().toString());
+        localStorage.setItem("videoPlayerMuted", player.muted().toString());
+      });
     });
 
     // Cleanup
@@ -410,6 +425,7 @@ export function useVideoPlayer({
 
   useEffect(() => {
     const player = playerRef.current;
+
     if (!player || !ready || !shouldAutoplay) return;
 
     const shouldResume = location.state?.shouldResume;
@@ -458,29 +474,94 @@ export function useVideoPlayer({
     nextScene();
   }, [playerRef, nextScene, dispatch]);
 
-  // Auto-play next video when current video ends
+  // Auto-play next video when current video ends (respects shuffle/repeat/autoplayNext)
   useEffect(() => {
     const player = playerRef.current;
 
-    if (
-      !player ||
-      player.isDisposed?.() ||
-      !playlist ||
-      !playlist.scenes ||
-      playlist.scenes.length <= 1
-    ) {
+    if (!player || player.isDisposed?.() || !playlist || !playlist.scenes) {
       return;
     }
 
-    player.on("ended", playNextInPlaylist);
+    const handleEnded = () => {
+      // Repeat One: replay current scene
+      if (playlist.repeat === "one") {
+        player.currentTime(0);
+        player.play().catch((err) => console.error("Repeat play failed:", err));
+        return;
+      }
+
+      // Autoplay Next is OFF: stop playback
+      if (!playlist.autoplayNext) {
+        return;
+      }
+
+      // Determine next scene index
+      let nextIndex = null;
+
+      if (playlist.shuffle) {
+        // Shuffle mode: pick random unplayed scene
+        const totalScenes = playlist.scenes.length;
+        const unplayedScenes = [];
+
+        for (let i = 0; i < totalScenes; i++) {
+          if (i !== currentIndex && !playlist.shuffleHistory.includes(i)) {
+            unplayedScenes.push(i);
+          }
+        }
+
+        if (unplayedScenes.length > 0) {
+          // Pick random from unplayed
+          nextIndex =
+            unplayedScenes[Math.floor(Math.random() * unplayedScenes.length)];
+        } else if (playlist.repeat === "all") {
+          // All scenes played, reset shuffle history and start over
+          dispatch({ type: "SET_SHUFFLE_HISTORY", payload: [] });
+          // Pick random scene (excluding current)
+          const candidates = Array.from({ length: totalScenes }, (_, i) => i).filter(
+            (i) => i !== currentIndex
+          );
+          nextIndex = candidates[Math.floor(Math.random() * candidates.length)];
+        }
+        // else: no more scenes and repeat is not "all", stop playback
+      } else {
+        // Sequential mode
+        if (currentIndex < playlist.scenes.length - 1) {
+          nextIndex = currentIndex + 1;
+        } else if (playlist.repeat === "all") {
+          nextIndex = 0; // Loop back to start
+        }
+        // else: last scene and repeat is not "all", stop playback
+      }
+
+      // Navigate to next scene if determined
+      if (nextIndex !== null) {
+        // Add current index to shuffle history
+        if (playlist.shuffle) {
+          const newHistory = [...playlist.shuffleHistory, currentIndex];
+          dispatch({ type: "SET_SHUFFLE_HISTORY", payload: newHistory });
+        }
+
+        // Navigate to next scene with autoplay enabled
+        dispatch({
+          type: "GOTO_SCENE_INDEX",
+          payload: { index: nextIndex, shouldAutoplay: true },
+        });
+      }
+    };
+
+    player.on("ended", handleEnded);
 
     return () => {
       if (player && !player.isDisposed()) {
-        player.off("ended", playNextInPlaylist);
+        player.off("ended", handleEnded);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    playerRef,
+    playlist,
+    currentIndex,
+    dispatch,
+  ]);
 
   // Update Video.js playlist controls when index changes
   useEffect(() => {

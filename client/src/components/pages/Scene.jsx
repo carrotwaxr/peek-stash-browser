@@ -246,6 +246,9 @@ const Scene = () => {
   // useVideoPlayerSources will switch to 480p if browser can't play the codec
   const initialQuality = "direct";
 
+  // Extract shouldAutoplay from location state (set by PlaylistDetail's Play button)
+  const shouldAutoplayFromState = location.state?.shouldAutoplay ?? false;
+
   return (
     <ScenePlayerProvider
       sceneId={sceneId}
@@ -253,6 +256,7 @@ const Scene = () => {
       shouldResume={shouldResume}
       compatibility={compatibility}
       initialQuality={initialQuality}
+      initialShouldAutoplay={shouldAutoplayFromState}
     >
       <SceneContent />
     </ScenePlayerProvider>
