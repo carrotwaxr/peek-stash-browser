@@ -13,7 +13,7 @@
  * @param {string} vttContent - The raw VTT file content
  * @returns {Array<Object>} Array of cue objects with timing and sprite position
  */
-export function parseVTT(vttContent) {
+function parseVTT(vttContent) {
   const cues = [];
   const lines = vttContent.split("\n");
 
@@ -93,32 +93,6 @@ function extractSpritePosition(cue) {
     width: cue.width,
     height: cue.height,
   };
-}
-
-/**
- * Find the sprite position for a given time in the video
- * @param {Array<Object>} cues - Parsed VTT cues
- * @param {number} time - Time in seconds
- * @returns {Object|null} Sprite position object or null if not found
- */
-export function getSpritePositionForTime(cues, time) {
-  if (!cues || cues.length === 0) return null;
-
-  // Find the cue that contains this time
-  const cue = cues.find((c) => time >= c.startTime && time < c.endTime);
-  if (cue) return extractSpritePosition(cue);
-
-  // If exact match not found, return the closest cue
-  if (time < cues[0].startTime) {
-    return extractSpritePosition(cues[0]);
-  }
-
-  const lastCue = cues[cues.length - 1];
-  if (time >= lastCue.endTime) {
-    return extractSpritePosition(lastCue);
-  }
-
-  return null;
 }
 
 /**
