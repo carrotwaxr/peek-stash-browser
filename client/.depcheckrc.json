@@ -1,0 +1,11 @@
+{
+  "ignores": [
+    "@types/*",
+    "autoprefixer",
+    "postcss",
+    "tailwindcss",
+    "babel-plugin-react-compiler",
+    "@vitest/coverage-v8"
+  ],
+  "skip-missing": false
+}

@@ -6,5 +6,18 @@ export default defineConfig({
     environment: 'node',
     include: ['**/*.{test,spec}.{js,ts}'],
     exclude: ['node_modules', 'dist', 'prisma/migrations'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'json'],
+      exclude: [
+        'node_modules/**',
+        'dist/**',
+        'prisma/migrations/**',
+        '**/*.config.ts',
+        '**/*.spec.{js,ts}',
+        '**/*.test.{js,ts}',
+        'index.ts',
+      ],
+    },
   },
 });
