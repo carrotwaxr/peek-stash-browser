@@ -15,7 +15,7 @@ import { useEffect } from "react";
  * @param {Function} options.onMute Callback for mute toggle
  * @param {boolean} options.enabled Whether media keys are enabled
  */
-export const useMediaKeys = ({
+const useMediaKeys = ({
   onPlayPause,
   onNextTrack,
   onPreviousTrack,

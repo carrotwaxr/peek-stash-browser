@@ -328,42 +328,8 @@ export const libraryApi = {
   },
 };
 
-// Valid sort field mappings for Stash GraphQL API
-export const sortFieldMap = {
-  // Scene sort fields
-  TITLE: "title",
-  DATE: "date",
-  CREATED_AT: "created_at",
-  UPDATED_AT: "updated_at",
-  RATING: "rating100",
-  O_COUNTER: "o_counter",
-  PLAY_COUNT: "play_count",
-  PLAY_DURATION: "play_duration",
-  DURATION: "duration",
-  FILESIZE: "filesize",
-  BITRATE: "bitrate",
-  FRAMERATE: "framerate",
-  PERFORMER_COUNT: "performer_count",
-  TAG_COUNT: "tag_count",
-  LAST_PLAYED_AT: "last_played_at",
-  LAST_O_AT: "last_o_at",
-  RANDOM: "random",
-
-  // Performer sort fields
-  NAME: "name",
-  BIRTHDATE: "birthdate",
-  HEIGHT: "height_cm",
-  WEIGHT: "weight",
-  PENIS_LENGTH: "penis_length",
-  SCENE_COUNT: "scene_count",
-
-  // Studio sort fields (reusing scene field names where applicable)
-
-  // Tag sort fields (reusing scene field names where applicable)
-};
-
 // Helper functions for common filtering patterns
-export const filterHelpers = {
+const filterHelpers = {
   /**
    * Create basic pagination filter
    */
@@ -552,7 +518,7 @@ export const setupApi = {
 /**
  * Rating and favorite API endpoints
  */
-export const ratingsApi = {
+const ratingsApi = {
   /**
    * Update rating and/or favorite for a scene
    * @param {string} sceneId - Scene ID

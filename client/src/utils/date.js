@@ -52,27 +52,3 @@ export function formatRelativeTime(dateString) {
     return "Unknown";
   }
 }
-
-/**
- * Get the current year
- */
-export function getCurrentYear() {
-  return new Date().getFullYear();
-}
-
-/**
- * Check if a date is within the last N days
- */
-export function isRecent(dateString, days = 7) {
-  if (!dateString) return false;
-
-  try {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    return diffDays <= days;
-  } catch {
-    return false;
-  }
-}

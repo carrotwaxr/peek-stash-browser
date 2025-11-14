@@ -5,6 +5,7 @@ import packageJson from "../../../package.json";
 import { useAuth } from "../../hooks/useAuth.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { setupApi } from "../../services/api.js";
+import { formatDate } from "../../utils/date.js";
 import ContentRestrictionsModal from "../settings/ContentRestrictionsModal.jsx";
 import ServerStatsSection from "../settings/ServerStatsSection.jsx";
 import { Button, PageHeader, PageLayout, Paper } from "../ui/index.js";
@@ -194,14 +195,6 @@ const ServerSettings = () => {
     } catch (err) {
       setError(err.response?.data?.error || "Failed to update sync setting");
     }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
   };
 
   // Path mapping functions

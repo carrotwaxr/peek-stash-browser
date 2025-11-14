@@ -125,20 +125,6 @@ export function generateTextScale(baseColor, mode = "dark") {
 }
 
 /**
- * Generate accent color shades for hover/active states
- * @param {string} accentColor - Primary accent color (hex)
- * @returns {Object} Accent color shades
- */
-export function generateAccentShades(accentColor) {
-  return {
-    base: accentColor,
-    hover: adjustLightness(accentColor, -8), // Slightly darker for hover
-    active: adjustLightness(accentColor, -12), // Even darker for active
-    light: adjustLightness(accentColor, 10), // Lighter variant
-  };
-}
-
-/**
  * Generate shadow colors based on accent color
  * @param {string} accentColor - Primary accent color (hex)
  * @param {'dark'|'light'} mode - Theme mode

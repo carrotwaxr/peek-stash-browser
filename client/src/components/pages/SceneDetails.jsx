@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { Paper } from "../ui/index.js";
+import { formatBitRate, formatFileSize } from "../../utils/format.js";
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";
@@ -14,22 +15,6 @@ const formatDuration = (seconds) => {
       .padStart(2, "0")}`;
   }
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
-};
-
-const formatFileSize = (bytes) => {
-  if (!bytes) return "Unknown";
-  const gb = bytes / (1024 * 1024 * 1024);
-  if (gb >= 1) return `${gb.toFixed(2)} GB`;
-  const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(1)} MB`;
-};
-
-const formatBitRate = (bitsPerSecond) => {
-  if (!bitsPerSecond) return "Unknown";
-  const mbps = bitsPerSecond / (1000 * 1000);
-  if (mbps >= 1) return `${mbps.toFixed(2)} Mbps`;
-  const kbps = bitsPerSecond / 1000;
-  return `${kbps.toFixed(0)} Kbps`;
 };
 
 /**
