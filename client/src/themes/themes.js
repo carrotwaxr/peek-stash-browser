@@ -1,10 +1,10 @@
 // Theme definitions for the media application
 import {
   adjustLightness,
-  generateTextScale,
-  generateShadows,
   generateFocusRing,
+  generateShadows,
   generateStatusColors,
+  generateTextScale,
   generateToastColors,
 } from "../utils/colorScale.js";
 

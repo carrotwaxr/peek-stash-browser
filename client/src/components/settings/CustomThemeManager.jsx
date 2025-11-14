@@ -1,12 +1,10 @@
 import { useState } from "react";
 import axios from "axios";
-import Button from "../ui/Button.jsx";
-import Paper from "../ui/Paper.jsx";
-import ConfirmDialog from "../ui/ConfirmDialog.jsx";
-import CustomThemeEditor from "./CustomThemeEditor.jsx";
-import { showSuccess, showError } from "../../utils/toast.jsx";
+import { Copy, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useTheme } from "../../themes/useTheme.js";
-import { Pencil, Trash2, Copy, Plus, X } from "lucide-react";
+import { showError, showSuccess } from "../../utils/toast.jsx";
+import { Button, ConfirmDialog, Paper } from "../ui/index.js";
+import CustomThemeEditor from "./CustomThemeEditor.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -17,7 +15,8 @@ const api = axios.create({
  * Custom theme management component
  */
 const CustomThemeManager = () => {
-  const { customThemes, refreshCustomThemes, currentTheme, changeTheme } = useTheme();
+  const { customThemes, refreshCustomThemes, currentTheme, changeTheme } =
+    useTheme();
   const [editingTheme, setEditingTheme] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -106,7 +105,10 @@ const CustomThemeManager = () => {
     return (
       <div>
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+          <h3
+            className="text-xl font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
             {isCreating ? "Create Custom Theme" : `Edit "${editingTheme.name}"`}
           </h3>
           <Button variant="secondary" onClick={handleCancel} disabled={loading}>
@@ -129,14 +131,21 @@ const CustomThemeManager = () => {
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h3 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+          <h3
+            className="text-xl font-semibold mb-1"
+            style={{ color: "var(--text-primary)" }}
+          >
             Custom Themes
           </h3>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             Create and manage your own custom themes
           </p>
         </div>
-        <Button variant="primary" onClick={handleCreate} className="w-full md:w-auto">
+        <Button
+          variant="primary"
+          onClick={handleCreate}
+          className="w-full md:w-auto"
+        >
           <Plus size={16} className="mr-2" />
           Create Theme
         </Button>
@@ -147,10 +156,16 @@ const CustomThemeManager = () => {
           <Paper.Body>
             <div className="text-center py-12">
               <div className="text-4xl mb-4">🎨</div>
-              <h4 className="text-lg font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+              <h4
+                className="text-lg font-semibold mb-2"
+                style={{ color: "var(--text-primary)" }}
+              >
                 No custom themes yet
               </h4>
-              <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+              <p
+                className="text-sm mb-6"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 Create your first custom theme to personalize your experience
               </p>
               <Button variant="primary" onClick={handleCreate}>
@@ -173,12 +188,16 @@ const CustomThemeManager = () => {
                       <div className="flex gap-1">
                         <div
                           className="w-8 h-8 rounded"
-                          style={{ backgroundColor: theme.config.accents.primary }}
+                          style={{
+                            backgroundColor: theme.config.accents.primary,
+                          }}
                           title="Primary Accent"
                         />
                         <div
                           className="w-8 h-8 rounded"
-                          style={{ backgroundColor: theme.config.accents.secondary }}
+                          style={{
+                            backgroundColor: theme.config.accents.secondary,
+                          }}
                           title="Secondary Accent"
                         />
                       </div>
@@ -186,7 +205,10 @@ const CustomThemeManager = () => {
                       {/* Theme Info */}
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-semibold" style={{ color: "var(--text-primary)" }}>
+                          <h4
+                            className="font-semibold"
+                            style={{ color: "var(--text-primary)" }}
+                          >
                             {theme.name}
                           </h4>
                           {isActive && (
@@ -195,17 +217,22 @@ const CustomThemeManager = () => {
                               style={{
                                 backgroundColor: "var(--status-success-bg)",
                                 color: "var(--status-success)",
-                                border: "1px solid var(--status-success-border)",
+                                border:
+                                  "1px solid var(--status-success-border)",
                               }}
                             >
                               Active
                             </span>
                           )}
                         </div>
-                        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                        <p
+                          className="text-sm"
+                          style={{ color: "var(--text-secondary)" }}
+                        >
                           {theme.config.mode === "dark" ? "Dark" : "Light"} mode
                           {" • "}
-                          Created {new Date(theme.createdAt).toLocaleDateString()}
+                          Created{" "}
+                          {new Date(theme.createdAt).toLocaleDateString()}
                         </p>
                       </div>
                     </div>

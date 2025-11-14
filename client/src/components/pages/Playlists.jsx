@@ -1,12 +1,15 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { showSuccess, showError } from "../../utils/toast.jsx";
-import { PageHeader, PageLayout } from "../ui/index.js";
-import ConfirmDialog from "../ui/ConfirmDialog.jsx";
-import Button from "../ui/Button.jsx";
-import Paper from "../ui/Paper.jsx";
+import { showError, showSuccess } from "../../utils/toast.jsx";
+import {
+  Button,
+  ConfirmDialog,
+  PageHeader,
+  PageLayout,
+  Paper,
+} from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -101,7 +104,11 @@ const Playlists = () => {
           title="My Playlists"
           subtitle="Create and manage your video playlists"
         />
-        <Button onClick={() => setShowCreateModal(true)} variant="primary" className="w-full md:w-auto">
+        <Button
+          onClick={() => setShowCreateModal(true)}
+          variant="primary"
+          className="w-full md:w-auto"
+        >
           + New Playlist
         </Button>
       </div>

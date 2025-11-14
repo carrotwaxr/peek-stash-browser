@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import Paper from "../ui/Paper.jsx";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+import { Paper } from "../ui/index.js";
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";
@@ -200,7 +200,10 @@ const SceneDetails = ({
                     >
                       Performers
                     </h3>
-                    <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
+                    <div
+                      className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
+                      style={{ scrollbarWidth: "thin" }}
+                    >
                       {scene.performers.map((performer) => (
                         <Link
                           key={performer.id}

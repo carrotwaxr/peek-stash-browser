@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -249,8 +249,8 @@ const Tooltip = ({
           tooltipPosition.finalPosition === "top"
             ? "translateY(-100%)"
             : tooltipPosition.finalPosition === "left"
-            ? "translateX(-100%)"
-            : "none",
+              ? "translateX(-100%)"
+              : "none",
       }}
     >
       {typeof content === "string" ? (
@@ -268,10 +268,10 @@ const Tooltip = ({
             tooltipPosition.finalPosition === "top"
               ? "0 1px 1px 0"
               : tooltipPosition.finalPosition === "bottom"
-              ? "1px 0 0 1px"
-              : tooltipPosition.finalPosition === "left"
-              ? "1px 1px 0 0"
-              : "0 0 1px 1px",
+                ? "1px 0 0 1px"
+                : tooltipPosition.finalPosition === "left"
+                  ? "1px 1px 0 0"
+                  : "0 0 1px 1px",
           // Position arrow based on actual position
           ...(tooltipPosition.finalPosition === "top" && {
             bottom: "-4px",

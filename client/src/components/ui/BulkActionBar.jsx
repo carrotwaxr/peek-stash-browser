@@ -26,7 +26,9 @@ const BulkActionBar = ({ selectedScenes, onClearSelection }) => {
           {/* Left side - Selection count */}
           <div className="flex items-center gap-2 sm:gap-4">
             <div style={{ color: "var(--text-primary)" }}>
-              <span className="font-semibold text-base sm:text-lg">{selectedCount}</span>
+              <span className="font-semibold text-base sm:text-lg">
+                {selectedCount}
+              </span>
               <span className="ml-1 sm:ml-2 text-sm sm:text-base">
                 {selectedCount === 1 ? "scene" : "scenes"}
               </span>
@@ -49,10 +51,12 @@ const BulkActionBar = ({ selectedScenes, onClearSelection }) => {
           <div className="flex items-center">
             {selectedCount > 0 && (
               <AddToPlaylistButton
-                sceneIds={selectedScenes.map(s => s.id)}
+                sceneIds={selectedScenes.map((s) => s.id)}
                 buttonText={
                   <span>
-                    <span className="hidden sm:inline">Add {selectedCount} to Playlist</span>
+                    <span className="hidden sm:inline">
+                      Add {selectedCount} to Playlist
+                    </span>
                     <span className="sm:hidden">Add to Playlist</span>
                   </span>
                 }

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import Navigation from "./Navigation.jsx";
-import { apiGet } from "../../services/api.js";
+import { useEffect, useState } from "react";
 import { migrateNavPreferences } from "../../constants/navigation.js";
+import { apiGet } from "../../services/api.js";
+import Navigation from "./Navigation.jsx";
 
 /**
  * GlobalLayout - Top-level layout with navigation

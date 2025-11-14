@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { CardCountIndicators } from "../ui/CardCountIndicators.jsx";
+import { CardCountIndicators } from "../ui/index.js";
 
 /**
  * Merge and deduplicate tags from scene, performers, and studio

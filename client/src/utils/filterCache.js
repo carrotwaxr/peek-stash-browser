@@ -69,7 +69,7 @@ export const setCache = (entityType, data) => {
   } catch (error) {
     console.error(`Error setting ${entityType} cache:`, error);
     // If quota exceeded, try to clear old caches
-    if (error.name === 'QuotaExceededError') {
+    if (error.name === "QuotaExceededError") {
       clearAllCaches();
     }
   }
@@ -113,7 +113,9 @@ export const getCacheStats = () => {
     stats[entityType] = {
       cached: !!cached,
       count: cached?.data?.length || 0,
-      age: cached ? Math.floor((Date.now() - cached.timestamp) / 1000 / 60) : null, // minutes
+      age: cached
+        ? Math.floor((Date.now() - cached.timestamp) / 1000 / 60)
+        : null, // minutes
     };
   });
 

@@ -1,7 +1,6 @@
 import { useState } from "react";
-import Button from "../ui/Button.jsx";
-import Paper from "../ui/Paper.jsx";
 import { fontOptions } from "../../themes/themes.js";
+import { Button, Paper } from "../ui/index.js";
 
 /**
  * Color picker input component
@@ -9,7 +8,10 @@ import { fontOptions } from "../../themes/themes.js";
 const ColorInput = ({ label, value, onChange, description }) => {
   return (
     <div>
-      <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+      <label
+        className="block text-sm font-medium mb-2"
+        style={{ color: "var(--text-secondary)" }}
+      >
         {label}
       </label>
       <div className="flex gap-3 items-center">
@@ -49,7 +51,10 @@ const ColorInput = ({ label, value, onChange, description }) => {
 const FontSelector = ({ label, value, onChange, options }) => {
   return (
     <div>
-      <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+      <label
+        className="block text-sm font-medium mb-2"
+        style={{ color: "var(--text-secondary)" }}
+      >
         {label}
       </label>
       <select
@@ -174,7 +179,10 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }) => {
     <div className="space-y-6">
       {/* Theme Name */}
       <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+        <label
+          className="block text-sm font-medium mb-2"
+          style={{ color: "var(--text-secondary)" }}
+        >
           Theme Name
         </label>
         <input
@@ -199,7 +207,10 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }) => {
 
       {/* Mode Selector */}
       <div>
-        <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
+        <label
+          className="block text-sm font-medium mb-2"
+          style={{ color: "var(--text-secondary)" }}
+        >
           Theme Mode
         </label>
         <div className="flex gap-3">
@@ -267,7 +278,9 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }) => {
             <ColorInput
               label="Secondary Background"
               value={config.colors.backgroundSecondary}
-              onChange={(value) => updateConfig("colors.backgroundSecondary", value)}
+              onChange={(value) =>
+                updateConfig("colors.backgroundSecondary", value)
+              }
               description="Nav menu, buttons, form controls, icon placeholders"
             />
             <ColorInput
@@ -356,7 +369,13 @@ const CustomThemeEditor = ({ theme, onSave, onCancel, isNew = false }) => {
       </Paper>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 justify-end sticky bottom-4 p-4 rounded-lg" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border-color)" }}>
+      <div
+        className="flex gap-3 justify-end sticky bottom-4 p-4 rounded-lg"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-color)",
+        }}
+      >
         <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>

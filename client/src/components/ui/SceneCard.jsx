@@ -1,18 +1,23 @@
-import { forwardRef, useRef, useState, useEffect } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
-import SceneCardPreview from "../ui/SceneCardPreview.jsx";
+import { formatRelativeTime } from "../../utils/date.js";
 import {
-  CardImage,
-  CardTitle,
+  formatDurationCompact,
+  formatResolution,
+  getSceneDescription,
+  getSceneTitle,
+} from "../../utils/format.js";
+import {
   CardDescription,
+  CardImage,
   CardIndicators,
   CardRatingRow,
-} from "./CardComponents";
-import { TooltipEntityGrid } from "./TooltipEntityGrid.jsx";
-import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
-import { getSceneTitle, getSceneDescription, formatDurationCompact, formatResolution } from "../../utils/format.js";
-import { formatRelativeTime } from "../../utils/date.js";
+  CardTitle,
+  SceneCardPreview,
+  TooltipEntityGrid,
+} from "./index.js";
 
 /**
  * Enhanced scene card component with keyboard navigation support
@@ -48,9 +53,10 @@ const SceneCard = forwardRef(
     const duration = scene.files?.[0]?.duration
       ? formatDurationCompact(scene.files[0].duration)
       : null;
-    const resolution = scene.files?.[0]?.width && scene.files?.[0]?.height
-      ? formatResolution(scene.files[0].width, scene.files[0].height)
-      : null;
+    const resolution =
+      scene.files?.[0]?.width && scene.files?.[0]?.height
+        ? formatResolution(scene.files[0].width, scene.files[0].height)
+        : null;
 
     // Build subtitle with studio and date (like Groups)
     const subtitle = (() => {
@@ -86,13 +92,14 @@ const SceneCard = forwardRef(
     const allTags = getAllTags();
 
     // Build rich tooltip content using TooltipEntityGrid component
-    const performersTooltip = scene.performers && scene.performers.length > 0 && (
-      <TooltipEntityGrid
-        entityType="performer"
-        entities={scene.performers}
-        title="Performers"
-      />
-    );
+    const performersTooltip = scene.performers &&
+      scene.performers.length > 0 && (
+        <TooltipEntityGrid
+          entityType="performer"
+          entities={scene.performers}
+          title="Performers"
+        />
+      );
 
     const groupsTooltip = scene.groups && scene.groups.length > 0 && (
       <TooltipEntityGrid
@@ -103,11 +110,7 @@ const SceneCard = forwardRef(
     );
 
     const tagsTooltip = allTags && allTags.length > 0 && (
-      <TooltipEntityGrid
-        entityType="tag"
-        entities={allTags}
-        title="Tags"
-      />
+      <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" />
     );
 
     const handleClick = (e) => {
@@ -378,10 +381,26 @@ const SceneCard = forwardRef(
         {/* Indicators */}
         <CardIndicators
           indicators={[
-            { type: "PLAY_COUNT", count: scene.play_count, tooltipContent: "Times watched" },
-            { type: "PERFORMERS", count: scene.performers?.length, tooltipContent: performersTooltip },
-            { type: "GROUPS", count: scene.groups?.length, tooltipContent: groupsTooltip },
-            { type: "TAGS", count: allTags?.length, tooltipContent: tagsTooltip },
+            {
+              type: "PLAY_COUNT",
+              count: scene.play_count,
+              tooltipContent: "Times watched",
+            },
+            {
+              type: "PERFORMERS",
+              count: scene.performers?.length,
+              tooltipContent: performersTooltip,
+            },
+            {
+              type: "GROUPS",
+              count: scene.groups?.length,
+              tooltipContent: groupsTooltip,
+            },
+            {
+              type: "TAGS",
+              count: allTags?.length,
+              tooltipContent: tagsTooltip,
+            },
           ]}
         />
 

@@ -13,22 +13,23 @@ const InfoMessage = ({
 }) => {
   if (!message) return null;
 
-  const baseClasses = mode === "inline"
-    ? "px-4 py-3 rounded-lg border"
-    : "px-4 py-3 rounded-lg";
+  const baseClasses =
+    mode === "inline" ? "px-4 py-3 rounded-lg border" : "px-4 py-3 rounded-lg";
 
-  const containerStyle = mode === "toast"
-    ? {
-        backgroundColor: "var(--toast-info-bg)",
-        border: "2px solid var(--toast-info-border)",
-        color: "white",
-        boxShadow: "0 10px 25px -5px var(--toast-info-shadow), 0 8px 10px -6px rgba(29, 78, 216, 0.3)",
-      }
-    : {
-        backgroundColor: "var(--bg-card)",
-        borderColor: "var(--status-info)",
-        color: "var(--text-primary)",
-      };
+  const containerStyle =
+    mode === "toast"
+      ? {
+          backgroundColor: "var(--toast-info-bg)",
+          border: "2px solid var(--toast-info-border)",
+          color: "white",
+          boxShadow:
+            "0 10px 25px -5px var(--toast-info-shadow), 0 8px 10px -6px rgba(29, 78, 216, 0.3)",
+        }
+      : {
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--status-info)",
+          color: "var(--text-primary)",
+        };
 
   return (
     <div
@@ -53,7 +54,10 @@ const InfoMessage = ({
           </svg>
           <div>
             {mode === "inline" && (
-              <strong className="font-semibold" style={{ color: "var(--status-info)" }}>
+              <strong
+                className="font-semibold"
+                style={{ color: "var(--status-info)" }}
+              >
                 {title}:{" "}
               </strong>
             )}
@@ -65,7 +69,12 @@ const InfoMessage = ({
             onClick={onClose}
             variant="tertiary"
             className="ml-2 hover:opacity-70 !p-0 !border-0 flex-shrink-0"
-            style={{ color: mode === "toast" ? "rgba(255, 255, 255, 0.8)" : "var(--text-muted)" }}
+            style={{
+              color:
+                mode === "toast"
+                  ? "rgba(255, 255, 255, 0.8)"
+                  : "var(--text-muted)",
+            }}
             aria-label="Close"
             icon={
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">

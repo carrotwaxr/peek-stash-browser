@@ -169,7 +169,11 @@ export const buildSearchParams = ({
  * @param {Object} defaults - Default values for search state
  * @returns {Object} Complete search state
  */
-export const parseSearchParams = (searchParams, filterOptions, defaults = {}) => {
+export const parseSearchParams = (
+  searchParams,
+  filterOptions,
+  defaults = {}
+) => {
   return {
     searchText: searchParams.get("q") || defaults.searchText || "",
     sortField: searchParams.get("sort") || defaults.sortField || "o_counter",

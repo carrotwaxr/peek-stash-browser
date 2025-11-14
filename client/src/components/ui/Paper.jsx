@@ -110,7 +110,10 @@ Paper.Body = ({ padding = "md", className, children, ...props }) => {
  */
 Paper.Footer = ({ className, style, children, ...props }) => (
   <div
-    className={clsx("flex items-center justify-end space-x-3 px-6 py-4 border-t", className)}
+    className={clsx(
+      "flex items-center justify-end space-x-3 px-6 py-4 border-t",
+      className
+    )}
     style={{ borderColor: "var(--border-color)", ...style }}
     {...props}
   >

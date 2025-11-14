@@ -15,11 +15,11 @@
  */
 export function parseVTT(vttContent) {
   const cues = [];
-  const lines = vttContent.split('\n');
+  const lines = vttContent.split("\n");
 
   let i = 0;
   // Skip WEBVTT header
-  while (i < lines.length && !lines[i].includes('-->')) {
+  while (i < lines.length && !lines[i].includes("-->")) {
     i++;
   }
 
@@ -27,8 +27,8 @@ export function parseVTT(vttContent) {
     const line = lines[i].trim();
 
     // Look for timestamp lines (format: 00:00:00.000 --> 00:00:10.000)
-    if (line.includes('-->')) {
-      const [startTime, endTime] = line.split('-->').map(t => t.trim());
+    if (line.includes("-->")) {
+      const [startTime, endTime] = line.split("-->").map((t) => t.trim());
 
       // Next line should have the sprite position
       i++;
@@ -62,8 +62,10 @@ export function parseVTT(vttContent) {
  * @returns {number} Time in seconds
  */
 function parseTimestamp(timestamp) {
-  const parts = timestamp.split(':');
-  let hours = 0, minutes = 0, seconds = 0;
+  const parts = timestamp.split(":");
+  let hours = 0,
+    minutes = 0,
+    seconds = 0;
 
   if (parts.length === 3) {
     hours = parseInt(parts[0]);
@@ -103,7 +105,7 @@ export function getSpritePositionForTime(cues, time) {
   if (!cues || cues.length === 0) return null;
 
   // Find the cue that contains this time
-  const cue = cues.find(c => time >= c.startTime && time < c.endTime);
+  const cue = cues.find((c) => time >= c.startTime && time < c.endTime);
   if (cue) return extractSpritePosition(cue);
 
   // If exact match not found, return the closest cue
@@ -133,7 +135,7 @@ export async function fetchAndParseVTT(vttUrl) {
     const vttContent = await response.text();
     return parseVTT(vttContent);
   } catch (error) {
-    console.error('Error fetching VTT file:', error);
+    console.error("Error fetching VTT file:", error);
     return [];
   }
 }

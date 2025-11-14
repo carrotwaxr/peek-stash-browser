@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from "react";
 
 /**
  * Custom hook to detect scroll direction
@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
  * @returns {string} 'up' | 'down' | 'top'
  */
 export const useScrollDirection = (threshold = 100) => {
-  const [scrollDirection, setScrollDirection] = useState('top');
+  const [scrollDirection, setScrollDirection] = useState("top");
   const [lastScrollY, setLastScrollY] = useState(0);
 
   useEffect(() => {
@@ -19,15 +19,15 @@ export const useScrollDirection = (threshold = 100) => {
 
       // At the top of the page
       if (scrollY < threshold) {
-        setScrollDirection('top');
+        setScrollDirection("top");
       }
       // Scrolling down
       else if (scrollY > lastScrollY && scrollY > threshold) {
-        setScrollDirection('down');
+        setScrollDirection("down");
       }
       // Scrolling up
       else if (scrollY < lastScrollY) {
-        setScrollDirection('up');
+        setScrollDirection("up");
       }
 
       setLastScrollY(scrollY);
@@ -41,10 +41,10 @@ export const useScrollDirection = (threshold = 100) => {
       }
     };
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener("scroll", handleScroll);
     };
   }, [lastScrollY, threshold]);
 

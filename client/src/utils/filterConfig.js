@@ -973,7 +973,10 @@ export const buildSceneFilter = (filters) => {
   if (performerIds.length > 0) {
     sceneFilter.performers = {
       value: [...new Set(performerIds)], // Remove duplicates
-      modifier: filters.performerIdsModifier || filters.performers?.modifier || "INCLUDES",
+      modifier:
+        filters.performerIdsModifier ||
+        filters.performers?.modifier ||
+        "INCLUDES",
     };
   }
 
@@ -1003,7 +1006,8 @@ export const buildSceneFilter = (filters) => {
   if (tagIds.length > 0) {
     sceneFilter.tags = {
       value: [...new Set(tagIds)], // Remove duplicates
-      modifier: filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
+      modifier:
+        filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
     };
   }
 
@@ -1018,7 +1022,8 @@ export const buildSceneFilter = (filters) => {
   if (groupIds.length > 0) {
     sceneFilter.groups = {
       value: [...new Set(groupIds)], // Remove duplicates
-      modifier: filters.groupIdsModifier || filters.groups?.modifier || "INCLUDES",
+      modifier:
+        filters.groupIdsModifier || filters.groups?.modifier || "INCLUDES",
     };
   }
 

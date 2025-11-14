@@ -1,15 +1,15 @@
 import { useRef, useState } from "react";
 import {
-  Shuffle,
-  Repeat,
-  Repeat1,
+  ChevronDown,
+  ChevronUp,
   List,
   Play,
-  ChevronUp,
-  ChevronDown,
+  Repeat,
+  Repeat1,
+  Shuffle,
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import Button from "../ui/Button.jsx";
+import { Button } from "../ui/index.js";
 
 /**
  * PlaylistSidebar - Vertical playlist controls optimized for sidebar display
@@ -35,7 +35,8 @@ const PlaylistSidebar = ({ maxHeight }) => {
 
   // Find next scene for "Up Next" preview
   const nextSceneIndex = currentIndex + 1;
-  const nextScene = nextSceneIndex < totalScenes ? playlist.scenes[nextSceneIndex] : null;
+  const nextScene =
+    nextSceneIndex < totalScenes ? playlist.scenes[nextSceneIndex] : null;
 
   const formatDuration = (seconds) => {
     if (!seconds) return "?:??";
@@ -145,7 +146,9 @@ const PlaylistSidebar = ({ maxHeight }) => {
             variant="tertiary"
             size="sm"
             className="p-1 flex-shrink-0 ml-2"
-            icon={isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            icon={
+              isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />
+            }
             aria-label={isExpanded ? "Collapse playlist" : "Expand playlist"}
           />
         </div>
@@ -188,13 +191,16 @@ const PlaylistSidebar = ({ maxHeight }) => {
                 repeat === "one"
                   ? "Repeat: One"
                   : repeat === "all"
-                  ? "Repeat: All"
-                  : "Repeat: Off"
+                    ? "Repeat: All"
+                    : "Repeat: Off"
               }
             />
           </div>
 
-          <div className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+          <div
+            className="text-xs font-medium"
+            style={{ color: "var(--text-muted)" }}
+          >
             {position} / {totalScenes}
           </div>
         </div>
@@ -252,7 +258,11 @@ const PlaylistSidebar = ({ maxHeight }) => {
                     {/* Play icon overlay */}
                     <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play size={24} style={{ color: "white" }} fill="white" />
+                        <Play
+                          size={24}
+                          style={{ color: "white" }}
+                          fill="white"
+                        />
                       </div>
                     </div>
 
@@ -319,7 +329,11 @@ const PlaylistSidebar = ({ maxHeight }) => {
                       style={{ width: "24px" }}
                     >
                       {isCurrent ? (
-                        <Play size={16} style={{ color: "var(--accent-primary)" }} fill="var(--accent-primary)" />
+                        <Play
+                          size={16}
+                          style={{ color: "var(--accent-primary)" }}
+                          fill="var(--accent-primary)"
+                        />
                       ) : (
                         <span
                           className="text-sm font-medium"

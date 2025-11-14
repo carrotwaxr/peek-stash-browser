@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+
 // import { useTheme } from '../../themes/useTheme.js'; // Will be used for theme-specific logos
 
 export const PeekLogo = ({
@@ -81,7 +82,7 @@ export const PeekLogo = ({
         className="text-3xl font-brand"
         style={{
           color: "var(--accent-primary)",
-          fontFamily: "var(--font-brand)"
+          fontFamily: "var(--font-brand)",
         }}
       >
         peek

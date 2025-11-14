@@ -1,19 +1,22 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import SceneCarousel from "../ui/SceneCarousel.jsx";
-import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
-import BulkActionBar from "../ui/BulkActionBar.jsx";
-import { LoadingSpinner } from "../ui/index.js";
-import { PageHeader, PageLayout } from "../ui/index.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useAsyncData } from "../../hooks/useApi.js";
-import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
-import { useAuth } from "../../hooks/useAuth.js";
 import {
   CAROUSEL_DEFINITIONS,
   migrateCarouselPreferences,
 } from "../../constants/carousels.js";
+import { useAsyncData } from "../../hooks/useApi.js";
+import { useAuth } from "../../hooks/useAuth.js";
+import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import {
+  BulkActionBar,
+  ContinueWatchingCarousel,
+  LoadingSpinner,
+  PageHeader,
+  PageLayout,
+  SceneCarousel,
+} from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",

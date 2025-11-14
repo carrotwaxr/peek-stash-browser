@@ -13,7 +13,8 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     super(player, options);
     this.source = options.src || null;
     this.spriteUrl = options.spriteUrl || null;
-    this.showTimestamp = options.showTimestamp !== undefined ? options.showTimestamp : false;
+    this.showTimestamp =
+      options.showTimestamp !== undefined ? options.showTimestamp : false;
 
     this.progressBar = null;
     this.thumbnailHolder = null;
@@ -49,9 +50,18 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     }
 
     if (this.progressBar) {
-      this.progressBar.removeEventListener("pointerenter", this.onBarPointerEnter);
-      this.progressBar.removeEventListener("pointermove", this.onBarPointerMove);
-      this.progressBar.removeEventListener("pointerleave", this.onBarPointerLeave);
+      this.progressBar.removeEventListener(
+        "pointerenter",
+        this.onBarPointerEnter
+      );
+      this.progressBar.removeEventListener(
+        "pointermove",
+        this.onBarPointerMove
+      );
+      this.progressBar.removeEventListener(
+        "pointerleave",
+        this.onBarPointerLeave
+      );
       this.progressBar.removeEventListener("touchstart", this.onTouchStart);
       this.progressBar.removeEventListener("touchmove", this.onTouchMove);
       this.progressBar.removeEventListener("touchend", this.onTouchEnd);
@@ -70,12 +80,14 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     const baseUrl = this.getBaseUrl();
     const url = this.getFullyQualifiedUrl(this.source, baseUrl);
 
-    this.getVttFile(url).then((data) => {
-      this.vttData = this.processVtt(data);
-      this.setupThumbnailElement();
-    }).catch((err) => {
-      console.error('[VTT Thumbnails] Failed to load VTT file:', err);
-    });
+    this.getVttFile(url)
+      .then((data) => {
+        this.vttData = this.processVtt(data);
+        this.setupThumbnailElement();
+      })
+      .catch((err) => {
+        console.error("[VTT Thumbnails] Failed to load VTT file:", err);
+      });
   }
 
   getBaseUrl() {
@@ -151,7 +163,10 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
   onBarPointerLeave = () => {
     this.hideThumbnailHolder();
     if (this.progressBar) {
-      this.progressBar.removeEventListener("pointermove", this.onBarPointerMove);
+      this.progressBar.removeEventListener(
+        "pointermove",
+        this.onBarPointerMove
+      );
     }
   };
 
@@ -229,11 +244,13 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     const marginLeft = xPos - halfThumbnailWidth;
 
     if (marginLeft > 0 && marginRight > 0) {
-      this.thumbnailHolder.style.transform = "translateX(" + (xPos - halfThumbnailWidth) + "px)";
+      this.thumbnailHolder.style.transform =
+        "translateX(" + (xPos - halfThumbnailWidth) + "px)";
     } else if (marginLeft <= 0) {
       this.thumbnailHolder.style.transform = "translateX(" + 0 + "px)";
     } else if (marginRight <= 0) {
-      this.thumbnailHolder.style.transform = "translateX(" + (width - thumbnailWidth) + "px)";
+      this.thumbnailHolder.style.transform =
+        "translateX(" + (width - thumbnailWidth) + "px)";
     }
 
     if (this.lastStyle && this.lastStyle === currentStyle) {
@@ -302,7 +319,14 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
     const spriteUrl = this.spriteUrl || imageProps.image;
 
     return {
-      background: 'url("' + spriteUrl + '") no-repeat -' + imageProps.x + "px -" + imageProps.y + "px",
+      background:
+        'url("' +
+        spriteUrl +
+        '") no-repeat -' +
+        imageProps.x +
+        "px -" +
+        imageProps.y +
+        "px",
       width: imageProps.w + "px",
       height: imageProps.h + "px",
     };
@@ -310,9 +334,28 @@ class VTTThumbnailsPlugin extends videojs.getPlugin("plugin") {
 
   trim(str, charlist) {
     let whitespace = [
-      " ", "\n", "\r", "\t", "\f", "\x0b", "\xa0", "\u2000", "\u2001", "\u2002",
-      "\u2003", "\u2004", "\u2005", "\u2006", "\u2007", "\u2008", "\u2009",
-      "\u200a", "\u200b", "\u2028", "\u2029", "\u3000",
+      " ",
+      "\n",
+      "\r",
+      "\t",
+      "\f",
+      "\x0b",
+      "\xa0",
+      "\u2000",
+      "\u2001",
+      "\u2002",
+      "\u2003",
+      "\u2004",
+      "\u2005",
+      "\u2006",
+      "\u2007",
+      "\u2008",
+      "\u2009",
+      "\u200a",
+      "\u200b",
+      "\u2028",
+      "\u2029",
+      "\u3000",
     ].join("");
     let l = 0;
 

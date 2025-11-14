@@ -1,21 +1,23 @@
-import { useState, useRef, useEffect } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { canDirectPlayVideo } from "../../utils/videoFormat.js";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ScenePlayerProvider,
   useScenePlayer,
 } from "../../contexts/ScenePlayerContext.jsx";
-import Navigation from "../ui/Navigation.jsx";
-import VideoPlayer from "../video-player/VideoPlayer.jsx";
-import PlaybackControls from "../video-player/PlaybackControls.jsx";
-import SceneDetails from "./SceneDetails.jsx";
-import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
-import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
-import ScenesLikeThis from "../ui/ScenesLikeThis.jsx";
-import RecommendedSidebar from "../ui/RecommendedSidebar.jsx";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import Button from "../ui/Button.jsx";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { canDirectPlayVideo } from "../../utils/videoFormat.js";
+import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
+import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
+import {
+  Button,
+  Navigation,
+  RecommendedSidebar,
+  ScenesLikeThis,
+} from "../ui/index.js";
+import PlaybackControls from "../video-player/PlaybackControls.jsx";
+import VideoPlayer from "../video-player/VideoPlayer.jsx";
+import SceneDetails from "./SceneDetails.jsx";
 
 // Inner component that reads from context
 const SceneContent = () => {
@@ -151,7 +153,12 @@ const SceneContent = () => {
               {playlist ? (
                 <PlaylistSidebar maxHeight={sidebarHeight} />
               ) : (
-                scene && <RecommendedSidebar sceneId={scene.id} maxHeight={sidebarHeight} />
+                scene && (
+                  <RecommendedSidebar
+                    sceneId={scene.id}
+                    maxHeight={sidebarHeight}
+                  />
+                )
               )}
             </div>
           </aside>

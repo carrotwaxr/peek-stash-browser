@@ -1,26 +1,28 @@
-import { useState, useEffect } from "react";
-import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
-import SceneSearch from "../scene-search/SceneSearch.jsx";
-import { libraryApi } from "../../services/api.js";
-import { LoadingSpinner } from "../ui/index.js";
-import Button from "../ui/Button.jsx";
-import RatingSlider from "../ui/RatingSlider.jsx";
-import FavoriteButton from "../ui/FavoriteButton.jsx";
-import GenderIcon from "../ui/GenderIcon.jsx";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
+  ArrowLeft,
+  LucideDatabase,
+  LucideFacebook,
+  LucideFilm,
+  LucideGlobe,
+  LucideInstagram,
+  LucideLink,
   LucideStar,
   LucideTwitter,
-  LucideInstagram,
-  LucideFilm,
-  LucideDatabase,
-  LucideGlobe,
-  LucideLink,
-  LucideFacebook,
   LucideVideo,
-  ArrowLeft,
 } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import PageHeader from "../ui/PageHeader.jsx";
+import { libraryApi } from "../../services/api.js";
+import SceneSearch from "../scene-search/SceneSearch.jsx";
+import {
+  Button,
+  FavoriteButton,
+  GenderIcon,
+  LoadingSpinner,
+  PageHeader,
+  RatingSlider,
+} from "../ui/index.js";
 
 // Helper to detect and map URLs to known sites with colors
 const getSiteInfo = (url) => {

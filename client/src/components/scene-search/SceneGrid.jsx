@@ -1,16 +1,18 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { LucideCheckSquare, LucideSquare } from "lucide-react";
-import SceneCard from "../ui/SceneCard.jsx";
-import SkeletonSceneCard from "../ui/SkeletonSceneCard.jsx";
-import { LoadingSpinner } from "../ui/index.js";
-import ErrorMessage from "../ui/ErrorMessage.jsx";
-import EmptyState from "../ui/EmptyState.jsx";
-import Pagination from "../ui/Pagination.jsx";
-import BulkActionBar from "../ui/BulkActionBar.jsx";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
-import Button from "../ui/Button.jsx";
+import {
+  BulkActionBar,
+  Button,
+  EmptyState,
+  ErrorMessage,
+  LoadingSpinner,
+  Pagination,
+  SceneCard,
+  SkeletonSceneCard,
+} from "../ui/index.js";
 
 const SceneGrid = ({
   scenes,

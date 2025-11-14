@@ -1,21 +1,24 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import { ChevronDown } from "lucide-react";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useTheme } from "../../themes/useTheme.js";
-import { PageHeader, PageLayout } from "../ui/index.js";
-import CarouselSettings from "../settings/CarouselSettings.jsx";
-import NavigationSettings from "../settings/NavigationSettings.jsx";
-import CustomThemeManager from "../settings/CustomThemeManager.jsx";
-import Button from "../ui/Button.jsx";
-import Paper from "../ui/Paper.jsx";
-import SuccessMessage from "../ui/SuccessMessage.jsx";
-import WarningMessage from "../ui/WarningMessage.jsx";
-import ErrorMessage from "../ui/ErrorMessage.jsx";
-import InfoMessage from "../ui/InfoMessage.jsx";
-import { showSuccess, showError } from "../../utils/toast.jsx";
 import { migrateCarouselPreferences } from "../../constants/carousels.js";
 import { migrateNavPreferences } from "../../constants/navigation.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useTheme } from "../../themes/useTheme.js";
+import { showError, showSuccess } from "../../utils/toast.jsx";
+import CarouselSettings from "../settings/CarouselSettings.jsx";
+import CustomThemeManager from "../settings/CustomThemeManager.jsx";
+import NavigationSettings from "../settings/NavigationSettings.jsx";
+import {
+  Button,
+  ErrorMessage,
+  InfoMessage,
+  PageHeader,
+  PageLayout,
+  Paper,
+  SuccessMessage,
+  WarningMessage,
+} from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -31,7 +34,8 @@ const Settings = () => {
   // Settings state
   const [preferredQuality, setPreferredQuality] = useState("auto");
   const [preferredPlaybackMode, setPreferredPlaybackMode] = useState("auto");
-  const [preferredPreviewQuality, setPreferredPreviewQuality] = useState("sprite");
+  const [preferredPreviewQuality, setPreferredPreviewQuality] =
+    useState("sprite");
   const [enableCast, setEnableCast] = useState(true);
   const [carouselPreferences, setCarouselPreferences] = useState([]);
   const [navPreferences, setNavPreferences] = useState([]);
@@ -996,7 +1000,9 @@ const Settings = () => {
                       color: "var(--text-primary)",
                     }}
                   >
-                    <option value="sprite">Low Quality - Sprite (Default)</option>
+                    <option value="sprite">
+                      Low Quality - Sprite (Default)
+                    </option>
                     <option value="webp">High Quality - WebP Animation</option>
                     <option value="mp4">High Quality - MP4 Video</option>
                   </select>
@@ -1004,9 +1010,10 @@ const Settings = () => {
                     className="text-sm mt-1"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Quality of preview animations shown when hovering over scene cards.
-                    Low quality (sprite) uses less bandwidth. High quality options (WebP/MP4)
-                    provide better previews but may not be available for all scenes (fallback to sprite).
+                    Quality of preview animations shown when hovering over scene
+                    cards. Low quality (sprite) uses less bandwidth. High
+                    quality options (WebP/MP4) provide better previews but may
+                    not be available for all scenes (fallback to sprite).
                   </p>
                 </div>
 

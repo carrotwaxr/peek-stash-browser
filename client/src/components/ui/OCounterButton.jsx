@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { apiPost } from "../../services/api.js";
+import { useEffect, useState } from "react";
 import { LucideDroplets } from "lucide-react";
+import { apiPost } from "../../services/api.js";
 
 /**
  * Interactive O Counter button component
@@ -81,13 +81,27 @@ const OCounterButton = ({
         isAnimating ? "animate-pulse" : ""
       }`}
       style={{
-        backgroundColor: variant === "card" ? "transparent" : "var(--bg-tertiary)",
+        backgroundColor:
+          variant === "card" ? "transparent" : "var(--bg-tertiary)",
         border: variant === "card" ? "none" : "1px solid var(--border-color)",
-        cursor: interactive && sceneId ? (isUpdating ? "not-allowed" : "pointer") : "default",
+        cursor:
+          interactive && sceneId
+            ? isUpdating
+              ? "not-allowed"
+              : "pointer"
+            : "default",
         opacity: isUpdating ? 0.7 : 1,
       }}
-      aria-label={interactive && sceneId ? `Increment O counter (current: ${count})` : `O Counter: ${count}`}
-      title={interactive && sceneId ? `O Counter: ${count} (click to increment)` : `O Counter: ${count}`}
+      aria-label={
+        interactive && sceneId
+          ? `Increment O counter (current: ${count})`
+          : `O Counter: ${count}`
+      }
+      title={
+        interactive && sceneId
+          ? `O Counter: ${count} (click to increment)`
+          : `O Counter: ${count}`
+      }
     >
       {/* Droplet icon with bounce animation */}
       <span
@@ -134,7 +148,8 @@ const OCounterButton = ({
           className="absolute inset-0 rounded pointer-events-none"
           style={{
             animation: "ripple 0.6s ease-out",
-            background: "radial-gradient(circle, var(--status-info) 0%, transparent 70%)",
+            background:
+              "radial-gradient(circle, var(--status-info) 0%, transparent 70%)",
             opacity: 0.3,
           }}
         />

@@ -31,7 +31,11 @@ async function apiFetch(endpoint, options = {}) {
     }
 
     // Create error with additional metadata
-    const error = new Error(errorData.error || errorData.message || `HTTP error! status: ${response.status}`);
+    const error = new Error(
+      errorData.error ||
+        errorData.message ||
+        `HTTP error! status: ${response.status}`
+    );
     error.status = response.status;
     error.data = errorData;
 
@@ -557,7 +561,8 @@ export const ratingsApi = {
    * @param {boolean} data.favorite - Favorite status
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
-  updateSceneRating: (sceneId, data) => apiPut(`/ratings/scene/${sceneId}`, data),
+  updateSceneRating: (sceneId, data) =>
+    apiPut(`/ratings/scene/${sceneId}`, data),
 
   /**
    * Update rating and/or favorite for a performer
@@ -567,7 +572,8 @@ export const ratingsApi = {
    * @param {boolean} data.favorite - Favorite status
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
-  updatePerformerRating: (performerId, data) => apiPut(`/ratings/performer/${performerId}`, data),
+  updatePerformerRating: (performerId, data) =>
+    apiPut(`/ratings/performer/${performerId}`, data),
 
   /**
    * Update rating and/or favorite for a studio
@@ -577,7 +583,8 @@ export const ratingsApi = {
    * @param {boolean} data.favorite - Favorite status
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
-  updateStudioRating: (studioId, data) => apiPut(`/ratings/studio/${studioId}`, data),
+  updateStudioRating: (studioId, data) =>
+    apiPut(`/ratings/studio/${studioId}`, data),
 
   /**
    * Update rating and/or favorite for a tag
@@ -597,7 +604,8 @@ export const ratingsApi = {
    * @param {boolean} data.favorite - Favorite status
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
-  updateGalleryRating: (galleryId, data) => apiPut(`/ratings/gallery/${galleryId}`, data),
+  updateGalleryRating: (galleryId, data) =>
+    apiPut(`/ratings/gallery/${galleryId}`, data),
 
   /**
    * Update rating and/or favorite for a group
@@ -607,7 +615,8 @@ export const ratingsApi = {
    * @param {boolean} data.favorite - Favorite status
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
-  updateGroupRating: (groupId, data) => apiPut(`/ratings/group/${groupId}`, data),
+  updateGroupRating: (groupId, data) =>
+    apiPut(`/ratings/group/${groupId}`, data),
 
   /**
    * Update rating and/or favorite for an image
@@ -617,5 +626,6 @@ export const ratingsApi = {
    * @param {boolean} data.favorite - Favorite status
    * @returns {Promise<{success: boolean, rating: Object}>}
    */
-  updateImageRating: (imageId, data) => apiPut(`/ratings/image/${imageId}`, data),
+  updateImageRating: (imageId, data) =>
+    apiPut(`/ratings/image/${imageId}`, data),
 };

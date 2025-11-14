@@ -1,12 +1,12 @@
-import { useNavigate } from 'react-router-dom';
-import { formatRelativeTime } from '../../utils/date.js';
+import { useNavigate } from "react-router-dom";
+import { formatRelativeTime } from "../../utils/date.js";
 import {
+  SceneDescription,
+  SceneMetadata,
+  SceneStats,
   SceneThumbnail,
   SceneTitle,
-  SceneStats,
-  SceneMetadata,
-  SceneDescription
-} from '../scene/index.js';
+} from "../scene/index.js";
 
 /**
  * Shared row-based scene list item component
@@ -57,13 +57,13 @@ const SceneListItem = ({
 
       return timeDiff < fiveMinutes;
     } catch (error) {
-      console.error('Error checking O history:', error);
+      console.error("Error checking O history:", error);
       return false;
     }
   };
 
   const formatDuration = (seconds) => {
-    if (!seconds || seconds < 1) return '0m';
+    if (!seconds || seconds < 1) return "0m";
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     if (hours > 0) {
@@ -73,42 +73,43 @@ const SceneListItem = ({
   };
 
   const formatResumeTime = (seconds) => {
-    if (!seconds) return '0:00';
+    if (!seconds) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${String(secs).padStart(2, '0')}`;
+    return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
   const handleClick = (e) => {
     // Don't navigate if clicking on interactive elements
     const target = e.target;
     const isInteractive =
-      target.closest('button') ||
-      target.closest('a') ||
+      target.closest("button") ||
+      target.closest("a") ||
       target.closest('[role="button"]');
 
     if (!isInteractive && exists && scene) {
       // Check if there's a video player currently playing
       // If navigating within a playlist while video is playing, autoplay the next one
-      const videoElements = document.querySelectorAll('video');
+      const videoElements = document.querySelectorAll("video");
       let isPlaying = false;
 
-      videoElements.forEach(video => {
+      videoElements.forEach((video) => {
         if (!video.paused && !video.ended && video.readyState > 2) {
           isPlaying = true;
         }
       });
 
       if (isPlaying && linkState?.playlist) {
-        sessionStorage.setItem('videoPlayerAutoplay', 'true');
+        sessionStorage.setItem("videoPlayerAutoplay", "true");
 
         // Also check if video is fullscreen
-        const isFullscreen = document.fullscreenElement ||
-                            document.webkitFullscreenElement ||
-                            document.mozFullScreenElement ||
-                            document.msFullscreenElement;
+        const isFullscreen =
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement;
         if (isFullscreen) {
-          sessionStorage.setItem('videoPlayerFullscreen', 'true');
+          sessionStorage.setItem("videoPlayerFullscreen", "true");
         }
       }
 
@@ -125,10 +126,10 @@ const SceneListItem = ({
       onClick={handleClick}
       className="rounded-lg border transition-all hover:shadow-lg"
       style={{
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-color)',
+        backgroundColor: "var(--bg-card)",
+        border: "1px solid var(--border-color)",
         opacity: exists ? 1 : 0.6,
-        cursor: draggable ? 'move' : exists ? 'pointer' : 'default',
+        cursor: draggable ? "move" : exists ? "pointer" : "default",
       }}
     >
       <div className="pt-2 px-2 pb-1 md:pt-4 md:px-4 md:pb-2">
@@ -148,11 +149,14 @@ const SceneListItem = ({
               <div
                 className="w-full md:w-64 aspect-video md:aspect-auto md:h-36 rounded flex items-center justify-center"
                 style={{
-                  backgroundColor: 'var(--status-error-bg)',
-                  border: '2px dashed var(--status-error-border)',
+                  backgroundColor: "var(--status-error-bg)",
+                  border: "2px dashed var(--status-error-border)",
                 }}
               >
-                <span className="text-3xl" style={{ color: 'var(--status-error-text)' }}>
+                <span
+                  className="text-3xl"
+                  style={{ color: "var(--status-error-text)" }}
+                >
                   ⚠️
                 </span>
               </div>
@@ -164,103 +168,110 @@ const SceneListItem = ({
             <div className="mb-2">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0 md:pr-4">
-                {exists && scene ? (
-                  <>
-                    {/* Title and Date */}
-                    <div className="mb-2">
-                      <SceneTitle
-                        scene={scene}
-                        linkState={linkState}
-                        titleClassName="text-lg"
-                        dateClassName="mt-1"
-                      />
-                    </div>
+                  {exists && scene ? (
+                    <>
+                      {/* Title and Date */}
+                      <div className="mb-2">
+                        <SceneTitle
+                          scene={scene}
+                          linkState={linkState}
+                          titleClassName="text-lg"
+                          dateClassName="mt-1"
+                        />
+                      </div>
 
-                    {/* Watch History Stats (if provided) */}
-                    {watchHistory && (
-                      <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs mb-2 p-2 rounded" style={{
-                        backgroundColor: 'var(--status-info-bg)',
-                        color: 'var(--text-muted)',
-                        border: '1px solid var(--status-info-bg)'
-                      }}>
-                        {watchHistory.lastPlayedAt && (
-                          <span>
-                            🕐 Last watched: {formatRelativeTime(watchHistory.lastPlayedAt)}
-                          </span>
-                        )}
-                        {watchHistory.resumeTime > 0 && scene.files?.[0]?.duration && (
-                          <span>
-                            ⏸️ Resume at: {formatResumeTime(watchHistory.resumeTime)}
-                            {' '}({Math.round((watchHistory.resumeTime / scene.files[0].duration) * 100)}%)
-                          </span>
-                        )}
-                        {watchHistory.playDuration > 0 && (
-                          <span>
-                            ⏱️ Watched: {formatDuration(watchHistory.playDuration)}
+                      {/* Watch History Stats (if provided) */}
+                      {watchHistory && (
+                        <div
+                          className="flex flex-wrap items-center gap-2 md:gap-4 text-xs mb-2 p-2 rounded"
+                          style={{
+                            backgroundColor: "var(--status-info-bg)",
+                            color: "var(--text-muted)",
+                            border: "1px solid var(--status-info-bg)",
+                          }}
+                        >
+                          {watchHistory.lastPlayedAt && (
+                            <span>
+                              🕐 Last watched:{" "}
+                              {formatRelativeTime(watchHistory.lastPlayedAt)}
+                            </span>
+                          )}
+                          {watchHistory.resumeTime > 0 &&
+                            scene.files?.[0]?.duration && (
+                              <span>
+                                ⏸️ Resume at:{" "}
+                                {formatResumeTime(watchHistory.resumeTime)} (
+                                {Math.round(
+                                  (watchHistory.resumeTime /
+                                    scene.files[0].duration) *
+                                    100
+                                )}
+                                %)
+                              </span>
+                            )}
+                          {watchHistory.playDuration > 0 && (
+                            <span>
+                              ⏱️ Watched:{" "}
+                              {formatDuration(watchHistory.playDuration)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Stats Row */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <SceneStats scene={scene} watchHistory={watchHistory} />
+                        {showSessionOIndicator && hadOInLastSession() && (
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: "rgba(34, 197, 94, 0.1)",
+                              color: "rgb(34, 197, 94)",
+                              border: "1px solid rgba(34, 197, 94, 0.3)",
+                            }}
+                            title="O clicked during this session"
+                          >
+                            💦
                           </span>
                         )}
                       </div>
-                    )}
 
-                    {/* Stats Row */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <SceneStats
-                        scene={scene}
-                        watchHistory={watchHistory}
-                      />
-                      {showSessionOIndicator && hadOInLastSession() && (
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full"
-                          style={{
-                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                            color: 'rgb(34, 197, 94)',
-                            border: '1px solid rgba(34, 197, 94, 0.3)',
-                          }}
-                          title="O clicked during this session"
-                        >
-                          💦
-                        </span>
-                      )}
-                    </div>
+                      {/* Description */}
+                      <SceneDescription scene={scene} className="mb-2" />
 
-                    {/* Description */}
-                    <SceneDescription
-                      scene={scene}
-                      className="mb-2"
-                    />
-
-                    {/* Performers & Tags */}
-                    <SceneMetadata scene={scene} />
-                  </>
-                ) : (
-                  <>
-                    <h3
-                      className="text-lg font-semibold mb-2"
-                      style={{ color: 'var(--status-error-text)' }}
-                    >
-                      ⚠️ Scene Deleted or Not Found
-                    </h3>
-                    <p className="text-sm mb-2" style={{ color: 'var(--text-muted)' }}>
-                      Scene ID: {sceneId} • This scene was removed from Stash
-                    </p>
-                    <p
-                      className="text-xs px-2 py-1 rounded inline-block"
-                      style={{
-                        backgroundColor: 'var(--status-error-bg)',
-                        color: 'var(--status-error-text)',
-                      }}
-                    >
-                      Click "Remove" to clean up this playlist
-                    </p>
-                  </>
-                )}
+                      {/* Performers & Tags */}
+                      <SceneMetadata scene={scene} />
+                    </>
+                  ) : (
+                    <>
+                      <h3
+                        className="text-lg font-semibold mb-2"
+                        style={{ color: "var(--status-error-text)" }}
+                      >
+                        ⚠️ Scene Deleted or Not Found
+                      </h3>
+                      <p
+                        className="text-sm mb-2"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        Scene ID: {sceneId} • This scene was removed from Stash
+                      </p>
+                      <p
+                        className="text-xs px-2 py-1 rounded inline-block"
+                        style={{
+                          backgroundColor: "var(--status-error-bg)",
+                          color: "var(--status-error-text)",
+                        }}
+                      >
+                        Click "Remove" to clean up this playlist
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Action Buttons - Desktop only */}
                 {actionButtons && (
-                  <div className="hidden md:block">
-                    {actionButtons}
-                  </div>
+                  <div className="hidden md:block">{actionButtons}</div>
                 )}
               </div>
             </div>

@@ -1,16 +1,16 @@
-import { useEffect, useRef, useCallback } from "react";
-import videojs from "video.js";
+import { useCallback, useEffect, useRef } from "react";
 import airplay from "@silvermine/videojs-airplay";
-import chromecast from "@silvermine/videojs-chromecast";
-import axios from "axios";
-import "./vtt-thumbnails.js";
 import "@silvermine/videojs-airplay/dist/silvermine-videojs-airplay.css";
+import chromecast from "@silvermine/videojs-chromecast";
 import "@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css";
+import axios from "axios";
+import videojs from "video.js";
 import {
+  setupPlaylistControls,
   setupTranscodedSeeking,
   togglePlaybackRateControl,
-  setupPlaylistControls,
 } from "./videoPlayerUtils.js";
+import "./vtt-thumbnails.js";
 
 // Register Video.js plugins
 airplay(videojs);
@@ -185,11 +185,22 @@ export function useVideoPlayer({
   useEffect(() => {
     const shouldResume = location.state?.shouldResume;
 
-    if (shouldResume && initialResumeTimeRef.current === null && !loadingWatchHistory && watchHistory?.resumeTime > 0) {
+    if (
+      shouldResume &&
+      initialResumeTimeRef.current === null &&
+      !loadingWatchHistory &&
+      watchHistory?.resumeTime > 0
+    ) {
       initialResumeTimeRef.current = watchHistory.resumeTime;
-      dispatch({ type: 'SET_SHOULD_AUTOPLAY', payload: true });
+      dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: true });
     }
-  }, [loadingWatchHistory, watchHistory, location.state, initialResumeTimeRef, dispatch]);
+  }, [
+    loadingWatchHistory,
+    watchHistory,
+    location.state,
+    initialResumeTimeRef,
+    dispatch,
+  ]);
 
   // ============================================================================
   // SCENE CHANGE DETECTION (from useVideoPlayerSources)
@@ -197,7 +208,7 @@ export function useVideoPlayer({
 
   useEffect(() => {
     if (scene?.id && scene.id !== prevSceneIdRef.current) {
-      dispatch({ type: 'SET_READY', payload: false });
+      dispatch({ type: "SET_READY", payload: false });
       prevSceneIdRef.current = scene.id;
     }
   }, [scene?.id, dispatch]);
@@ -250,7 +261,7 @@ export function useVideoPlayer({
     // Set ready=true when loadstart fires
     const handleLoadStart = () => {
       if (!playerRef.current) return;
-      dispatch({ type: 'SET_READY', payload: true });
+      dispatch({ type: "SET_READY", payload: true });
     };
 
     player.one("loadstart", handleLoadStart);
@@ -267,7 +278,7 @@ export function useVideoPlayer({
       player.playbackRates([0.5, 1, 1.25, 1.5, 2]);
     }
 
-    dispatch({ type: 'SET_INITIALIZING', payload: false });
+    dispatch({ type: "SET_INITIALIZING", payload: false });
 
     // Auto-fallback to 480p if direct play codec unsupported
     if (isDirectPlay) {
@@ -280,7 +291,7 @@ export function useVideoPlayer({
 
         // Error codes: 3 = MEDIA_ERR_DECODE, 4 = MEDIA_ERR_SRC_NOT_SUPPORTED
         if (error && (error.code === 3 || error.code === 4)) {
-          console.log('[SOURCES] Codec error, falling back to 480p');
+          console.log("[SOURCES] Codec error, falling back to 480p");
           hasTriggeredFallback = true;
           player.off("error", handleError);
 
@@ -342,7 +353,7 @@ export function useVideoPlayer({
     const isDirectPlay = quality === "direct";
     const currentTime = player.currentTime(); // Capture current position
 
-    dispatch({ type: 'SET_SWITCHING_MODE', payload: true });
+    dispatch({ type: "SET_SWITCHING_MODE", payload: true });
     player.pause();
 
     api
@@ -356,16 +367,19 @@ export function useVideoPlayer({
             type: `video/${firstFile?.format}`,
             duration: firstFile?.duration,
           });
-          dispatch({ type: 'SET_SESSION_ID', payload: null });
-          dispatch({ type: 'SET_VIDEO', payload: { directPlay: true } });
+          dispatch({ type: "SET_SESSION_ID", payload: null });
+          dispatch({ type: "SET_VIDEO", payload: { directPlay: true } });
         } else {
           player.src({
             src: response.data.playlistUrl,
             type: "application/x-mpegURL",
             duration: firstFile?.duration,
           });
-          dispatch({ type: 'SET_SESSION_ID', payload: response.data.sessionId });
-          dispatch({ type: 'SET_VIDEO', payload: response.data.scene });
+          dispatch({
+            type: "SET_SESSION_ID",
+            payload: response.data.sessionId,
+          });
+          dispatch({ type: "SET_VIDEO", payload: response.data.scene });
           setupTranscodedSeeking(player, response.data.sessionId, api);
         }
 
@@ -379,11 +393,11 @@ export function useVideoPlayer({
         });
 
         player.play().catch(() => {});
-        dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
+        dispatch({ type: "SET_SWITCHING_MODE", payload: false });
       })
       .catch((error) => {
-        console.error('[QUALITY] Quality switch failed:', error);
-        dispatch({ type: 'SET_SWITCHING_MODE', payload: false });
+        console.error("[QUALITY] Quality switch failed:", error);
+        dispatch({ type: "SET_SWITCHING_MODE", payload: false });
       });
 
     prevQualityRef.current = quality;
@@ -405,14 +419,22 @@ export function useVideoPlayer({
     if (shouldResume && !hasResumedRef.current && resumeTime > 0) {
       hasResumedRef.current = true;
       player.currentTime(resumeTime);
-      player.play().catch((err) => console.error('Resume failed:', err));
+      player.play().catch((err) => console.error("Resume failed:", err));
     } else {
-      player.play().catch((err) => console.error('Autoplay failed:', err));
+      player.play().catch((err) => console.error("Autoplay failed:", err));
     }
 
     // Clear shouldAutoplay flag after triggering
-    dispatch({ type: 'SET_SHOULD_AUTOPLAY', payload: false });
-  }, [ready, shouldAutoplay, location.state, initialResumeTimeRef, hasResumedRef, playerRef, dispatch]);
+    dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: false });
+  }, [
+    ready,
+    shouldAutoplay,
+    location.state,
+    initialResumeTimeRef,
+    hasResumedRef,
+    playerRef,
+    dispatch,
+  ]);
 
   // ============================================================================
   // PLAYLIST NAVIGATION (from usePlaylistPlayer)
@@ -422,7 +444,7 @@ export function useVideoPlayer({
   const playPreviousInPlaylist = useCallback(() => {
     const player = playerRef.current;
     if (player && !player.paused()) {
-      dispatch({ type: 'SET_SHOULD_AUTOPLAY', payload: true });
+      dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: true });
     }
     prevScene();
   }, [playerRef, prevScene, dispatch]);
@@ -431,7 +453,7 @@ export function useVideoPlayer({
   const playNextInPlaylist = useCallback(() => {
     const player = playerRef.current;
     if (player && !player.paused()) {
-      dispatch({ type: 'SET_SHOULD_AUTOPLAY', payload: true });
+      dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: true });
     }
     nextScene();
   }, [playerRef, nextScene, dispatch]);
@@ -440,7 +462,13 @@ export function useVideoPlayer({
   useEffect(() => {
     const player = playerRef.current;
 
-    if (!player || player.isDisposed?.() || !playlist || !playlist.scenes || playlist.scenes.length <= 1) {
+    if (
+      !player ||
+      player.isDisposed?.() ||
+      !playlist ||
+      !playlist.scenes ||
+      playlist.scenes.length <= 1
+    ) {
       return;
     }
 
@@ -457,11 +485,23 @@ export function useVideoPlayer({
   // Update Video.js playlist controls when index changes
   useEffect(() => {
     const player = playerRef.current;
-    if (!player || player.isDisposed?.() || !playlist || !playlist.scenes || playlist.scenes.length <= 1) {
+    if (
+      !player ||
+      player.isDisposed?.() ||
+      !playlist ||
+      !playlist.scenes ||
+      playlist.scenes.length <= 1
+    ) {
       return;
     }
 
-    setupPlaylistControls(player, playlist, currentIndex, playPreviousInPlaylist, playNextInPlaylist);
+    setupPlaylistControls(
+      player,
+      playlist,
+      currentIndex,
+      playPreviousInPlaylist,
+      playNextInPlaylist
+    );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentIndex, video]);

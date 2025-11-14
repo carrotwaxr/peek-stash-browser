@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "axios";
 import "video.js/dist/video-js.css";
-import "./VideoPlayer.css";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
-import { useVideoPlayer } from "./useVideoPlayer.js";
+import "./VideoPlayer.css";
 import { useOrientationFullscreen } from "./useOrientationFullscreen.js";
+import { useVideoPlayer } from "./useVideoPlayer.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -194,8 +194,8 @@ const VideoPlayer = () => {
                 {!scene
                   ? "Loading scene..."
                   : isAutoFallback
-                  ? "Switching to transcoded playback..."
-                  : "Loading video..."}
+                    ? "Switching to transcoded playback..."
+                    : "Loading video..."}
               </span>
             </div>
           </div>

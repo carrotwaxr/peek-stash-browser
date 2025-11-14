@@ -210,9 +210,8 @@ export function generateStatusColors(status) {
 
     colors[`--status-${type}`] = baseColor; // Base color
     colors[`--status-${type}-bg`] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`; // Background with alpha
-    colors[
-      `--status-${type}-border`
-    ] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
+    colors[`--status-${type}-border`] =
+      `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
   });
 
   return colors;
@@ -241,9 +240,8 @@ export function generateToastColors(status, mode = "dark") {
 
     colors[`--toast-${type}-bg`] = toastBg;
     colors[`--toast-${type}-border`] = toastBorder;
-    colors[
-      `--toast-${type}-shadow`
-    ] = `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
+    colors[`--toast-${type}-shadow`] =
+      `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
   });
 
   return colors;

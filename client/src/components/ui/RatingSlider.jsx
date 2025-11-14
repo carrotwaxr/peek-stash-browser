@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Inline slider for rating on detail pages
@@ -12,7 +12,9 @@ const RatingSlider = ({
   showClearButton = true,
 }) => {
   // Track whether item is rated (null = unrated, number = rated)
-  const [value, setValue] = useState(rating === null || rating === undefined ? null : rating / 10);
+  const [value, setValue] = useState(
+    rating === null || rating === undefined ? null : rating / 10
+  );
   const debounceTimerRef = useRef(null);
 
   useEffect(() => {
@@ -69,13 +71,19 @@ const RatingSlider = ({
     <div className="flex flex-col gap-2">
       {/* Label and Value */}
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+        <label
+          className="text-sm font-medium"
+          style={{ color: "var(--text-primary)" }}
+        >
           {label}
         </label>
         <div className="flex items-center gap-3">
           <span
             className="text-lg font-semibold min-w-[3rem] text-right"
-            style={{ color: value === null ? "var(--text-muted)" : "var(--text-primary)" }}
+            style={{
+              color:
+                value === null ? "var(--text-muted)" : "var(--text-primary)",
+            }}
           >
             {value === null ? "--" : value.toFixed(1)}
           </span>

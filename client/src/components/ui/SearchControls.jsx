@@ -1,18 +1,10 @@
-import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LucideArrowDown, LucideArrowUp } from "lucide-react";
 import { apiGet } from "../../services/api.js";
-import Pagination from "./Pagination.jsx";
-import SearchInput from "./SearchInput.jsx";
-import ActiveFilterChips from "./ActiveFilterChips.jsx";
-import FilterPresets from "./FilterPresets.jsx";
-import Button from "./Button.jsx";
 import {
-  SortControl,
-  FilterPanel,
-  FilterControl,
-} from "../ui/FilterControls.jsx";
-import {
+  GROUP_FILTER_OPTIONS,
+  GROUP_SORT_OPTIONS,
   PERFORMER_FILTER_OPTIONS,
   PERFORMER_SORT_OPTIONS,
   SCENE_FILTER_OPTIONS,
@@ -21,15 +13,23 @@ import {
   STUDIO_SORT_OPTIONS,
   TAG_FILTER_OPTIONS,
   TAG_SORT_OPTIONS,
-  GROUP_FILTER_OPTIONS,
-  GROUP_SORT_OPTIONS,
+  buildGroupFilter,
   buildPerformerFilter,
   buildSceneFilter,
   buildStudioFilter,
   buildTagFilter,
-  buildGroupFilter,
 } from "../../utils/filterConfig";
-import { parseSearchParams, buildSearchParams } from "../../utils/urlParams";
+import { buildSearchParams, parseSearchParams } from "../../utils/urlParams";
+import {
+  ActiveFilterChips,
+  Button,
+  FilterControl,
+  FilterPanel,
+  FilterPresets,
+  Pagination,
+  SearchInput,
+  SortControl,
+} from "./index.js";
 
 const buildFilter = (artifactType, filters) => {
   switch (artifactType) {
@@ -91,7 +91,8 @@ const SearchControls = ({
     return true; // No params, need to fetch defaults
   }, [searchParams]);
 
-  const [isLoadingDefaults, setIsLoadingDefaults] = useState(needsDefaultPreset);
+  const [isLoadingDefaults, setIsLoadingDefaults] =
+    useState(needsDefaultPreset);
 
   // Get filter options for this artifact type
   const filterOptions = useMemo(() => {

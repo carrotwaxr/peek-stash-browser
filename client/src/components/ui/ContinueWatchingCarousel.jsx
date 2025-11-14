@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { PlayCircle } from "lucide-react";
-import SceneCarousel from "./SceneCarousel.jsx";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory.js";
 import { libraryApi } from "../../services/api.js";
+import SceneCarousel from "./SceneCarousel.jsx";
 
 /**
  * Continue Watching carousel component

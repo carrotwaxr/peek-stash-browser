@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import Button from "./Button.jsx";
 import SceneCard from "./SceneCard.jsx";
 import SkeletonSceneCard from "./SkeletonSceneCard.jsx";
-import Button from "./Button.jsx";
 
 const SceneCarousel = ({
   title,

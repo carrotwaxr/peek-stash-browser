@@ -1,7 +1,7 @@
 /**
  * Reusable search input component with debouncing
  */
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Button from "./Button.jsx";
 
 const SearchInput = ({

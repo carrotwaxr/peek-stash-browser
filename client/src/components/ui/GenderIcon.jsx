@@ -1,11 +1,7 @@
-import {
-  LucideMars,
-  LucideVenus,
-  LucideUser,
-} from "lucide-react";
-import TransgenderIcon from "./icons/TransgenderIcon.jsx";
+import { LucideMars, LucideUser, LucideVenus } from "lucide-react";
 import IntersexIcon from "./icons/IntersexIcon.jsx";
 import NonBinaryIcon from "./icons/NonBinaryIcon.jsx";
+import TransgenderIcon from "./icons/TransgenderIcon.jsx";
 
 /**
  * Reusable gender icon component supporting all Stash gender values

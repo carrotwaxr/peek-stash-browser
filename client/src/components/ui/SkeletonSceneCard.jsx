@@ -22,7 +22,7 @@ const SkeletonSceneCard = () => {
           className="absolute top-2 left-2 w-6 h-6 rounded border-2 animate-pulse"
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.3)",
-            borderColor: "rgba(255, 255, 255, 0.3)"
+            borderColor: "rgba(255, 255, 255, 0.3)",
           }}
         />
 
@@ -32,7 +32,7 @@ const SkeletonSceneCard = () => {
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             width: "4rem",
-            height: "1.5rem"
+            height: "1.5rem",
           }}
         />
       </div>
@@ -44,7 +44,7 @@ const SkeletonSceneCard = () => {
           className="h-5 rounded animate-pulse"
           style={{
             backgroundColor: "var(--bg-tertiary)",
-            width: "85%"
+            width: "85%",
           }}
         />
 
@@ -55,7 +55,7 @@ const SkeletonSceneCard = () => {
             className="h-4 rounded animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "3rem"
+              width: "3rem",
             }}
           />
 
@@ -70,7 +70,7 @@ const SkeletonSceneCard = () => {
             className="h-4 rounded animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "4rem"
+              width: "4rem",
             }}
           />
 
@@ -85,7 +85,7 @@ const SkeletonSceneCard = () => {
             className="h-4 rounded animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "5rem"
+              width: "5rem",
             }}
           />
         </div>
@@ -98,14 +98,14 @@ const SkeletonSceneCard = () => {
               className="h-3 rounded animate-pulse"
               style={{
                 backgroundColor: "var(--bg-tertiary)",
-                width: "4rem"
+                width: "4rem",
               }}
             />
             <div
               className="h-3 rounded animate-pulse"
               style={{
                 backgroundColor: "var(--bg-tertiary)",
-                width: "5rem"
+                width: "5rem",
               }}
             />
           </div>
@@ -115,7 +115,7 @@ const SkeletonSceneCard = () => {
             className="h-3 rounded animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "6rem"
+              width: "6rem",
             }}
           />
 
@@ -125,21 +125,21 @@ const SkeletonSceneCard = () => {
               className="h-3 rounded animate-pulse"
               style={{
                 backgroundColor: "var(--bg-tertiary)",
-                width: "3rem"
+                width: "3rem",
               }}
             />
             <div
               className="h-3 rounded animate-pulse"
               style={{
                 backgroundColor: "var(--bg-tertiary)",
-                width: "4rem"
+                width: "4rem",
               }}
             />
             <div
               className="h-3 rounded animate-pulse"
               style={{
                 backgroundColor: "var(--bg-tertiary)",
-                width: "3.5rem"
+                width: "3.5rem",
               }}
             />
           </div>
@@ -151,26 +151,29 @@ const SkeletonSceneCard = () => {
             className="h-5 rounded animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "3rem"
+              width: "3rem",
             }}
           />
           <div
             className="h-5 rounded animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "2.5rem"
+              width: "2.5rem",
             }}
           />
         </div>
 
         {/* Rating controls row skeleton (Rating Badge + O Counter + Favorite) */}
-        <div className="flex justify-between items-center w-full my-1" style={{ height: "2rem" }}>
+        <div
+          className="flex justify-between items-center w-full my-1"
+          style={{ height: "2rem" }}
+        >
           {/* Rating badge placeholder (left) */}
           <div
             className="h-7 rounded-full px-3 animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "4rem"
+              width: "4rem",
             }}
           />
 

@@ -1,21 +1,21 @@
-import { useState, useRef, forwardRef } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { forwardRef, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
+import { useAuth } from "../../hooks/useAuth.js";
+import { useInitialFocus } from "../../hooks/useFocusTrap.js";
+import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
+import { libraryApi } from "../../services/api.js";
 import {
-  PageHeader,
-  PageLayout,
+  CacheLoadingBanner,
   ErrorMessage,
   GridCard,
+  PageHeader,
+  PageLayout,
   SearchControls,
-  CacheLoadingBanner,
 } from "../ui/index.js";
-import { useAuth } from "../../hooks/useAuth.js";
-import { libraryApi } from "../../services/api.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
-import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
 
 const Groups = () => {
   usePageTitle("Collections");

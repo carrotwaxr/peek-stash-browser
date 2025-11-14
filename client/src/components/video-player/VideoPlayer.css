@@ -39,7 +39,9 @@ section.video-container {
   opacity: 0;
   visibility: visible;
   pointer-events: none;
-  transition: opacity 0.3s ease, visibility 0s 0.3s;
+  transition:
+    opacity 0.3s ease,
+    visibility 0s 0.3s;
 }
 
 .video-js.vjs-user-active .vjs-control-bar,
@@ -48,7 +50,9 @@ section.video-container {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
-  transition: opacity 0.3s ease, visibility 0s 0s;
+  transition:
+    opacity 0.3s ease,
+    visibility 0s 0s;
 }
 
 /* ============================================================================
@@ -224,7 +228,9 @@ section.video-container {
   width: 0 !important;
   opacity: 0 !important;
   overflow: visible !important;
-  transition: width 0.2s ease, opacity 0.2s ease !important;
+  transition:
+    width 0.2s ease,
+    opacity 0.2s ease !important;
 }
 
 /* Show volume slider on hover (mouse/pointer devices) */

@@ -1,11 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Clock } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Clock, Pause, Play, X } from "lucide-react";
+import { libraryApi } from "../../services/api.js";
+import FavoriteButton from "./FavoriteButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
 import RatingSliderDialog from "./RatingSliderDialog.jsx";
-import FavoriteButton from "./FavoriteButton.jsx";
-import { libraryApi } from "../../services/api.js";
 
-const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false, onImagesUpdate }) => {
+const Lightbox = ({
+  images,
+  initialIndex = 0,
+  isOpen,
+  onClose,
+  autoPlay = false,
+  onImagesUpdate,
+}) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -52,69 +59,75 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false,
   }, []);
 
   // Handle rating change
-  const handleRatingChange = useCallback(async (newRating) => {
-    const currentImage = images[currentIndex];
-    if (!currentImage?.id) return;
+  const handleRatingChange = useCallback(
+    async (newRating) => {
+      const currentImage = images[currentIndex];
+      if (!currentImage?.id) return;
 
-    // Optimistic update
-    const previousRating = rating;
-    setRating(newRating);
+      // Optimistic update
+      const previousRating = rating;
+      setRating(newRating);
 
-    // Update the images array so navigation preserves the change
-    const updatedImages = [...images];
-    updatedImages[currentIndex] = {
-      ...currentImage,
-      rating100: newRating,
-      rating: newRating,
-    };
-    // Call parent update if provided
-    if (onImagesUpdate) {
-      onImagesUpdate(updatedImages);
-    }
-
-    try {
-      await libraryApi.updateRating("image", currentImage.id, newRating);
-    } catch (error) {
-      console.error("Failed to update image rating:", error);
-      // Revert on error
-      setRating(previousRating);
+      // Update the images array so navigation preserves the change
+      const updatedImages = [...images];
+      updatedImages[currentIndex] = {
+        ...currentImage,
+        rating100: newRating,
+        rating: newRating,
+      };
+      // Call parent update if provided
       if (onImagesUpdate) {
-        onImagesUpdate(images);
+        onImagesUpdate(updatedImages);
       }
-    }
-  }, [images, currentIndex, rating, onImagesUpdate]);
+
+      try {
+        await libraryApi.updateRating("image", currentImage.id, newRating);
+      } catch (error) {
+        console.error("Failed to update image rating:", error);
+        // Revert on error
+        setRating(previousRating);
+        if (onImagesUpdate) {
+          onImagesUpdate(images);
+        }
+      }
+    },
+    [images, currentIndex, rating, onImagesUpdate]
+  );
 
   // Handle favorite change
-  const handleFavoriteChange = useCallback(async (newFavorite) => {
-    const currentImage = images[currentIndex];
-    if (!currentImage?.id) return;
+  const handleFavoriteChange = useCallback(
+    async (newFavorite) => {
+      const currentImage = images[currentIndex];
+      if (!currentImage?.id) return;
 
-    // Optimistic update
-    const previousFavorite = isFavorite;
-    setIsFavorite(newFavorite);
+      // Optimistic update
+      const previousFavorite = isFavorite;
+      setIsFavorite(newFavorite);
 
-    // Update the images array so navigation preserves the change
-    const updatedImages = [...images];
-    updatedImages[currentIndex] = {
-      ...currentImage,
-      favorite: newFavorite,
-    };
-    // Call parent update if provided
-    if (onImagesUpdate) {
-      onImagesUpdate(updatedImages);
-    }
-
-    try {
-      await libraryApi.updateFavorite("image", currentImage.id, newFavorite);
-    } catch (error) {
-      console.error("Failed to update image favorite:", error);
-      // Revert on error
-      setIsFavorite(previousFavorite);
+      // Update the images array so navigation preserves the change
+      const updatedImages = [...images];
+      updatedImages[currentIndex] = {
+        ...currentImage,
+        favorite: newFavorite,
+      };
+      // Call parent update if provided
       if (onImagesUpdate) {
-        onImagesUpdate(images);
+        onImagesUpdate(updatedImages);
       }
-    }
-  }, [images, currentIndex, isFavorite, onImagesUpdate]);
+
+      try {
+        await libraryApi.updateFavorite("image", currentImage.id, newFavorite);
+      } catch (error) {
+        console.error("Failed to update image favorite:", error);
+        // Revert on error
+        setIsFavorite(previousFavorite);
+        if (onImagesUpdate) {
+          onImagesUpdate(images);
+        }
+      }
+    },
+    [images, currentIndex, isFavorite, onImagesUpdate]
+  );
 
   // Update rating/favorite when image changes
   useEffect(() => {
@@ -266,11 +279,51 @@ const Lightbox = ({ images, initialIndex = 0, isOpen, onClose, autoPlay = false,
             className="bg-transparent border-0 outline-none cursor-pointer text-sm"
             style={{ color: "var(--text-primary)" }}
           >
-            <option value={2000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>2s</option>
-            <option value={3000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>3s</option>
-            <option value={5000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>5s</option>
-            <option value={10000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>10s</option>
-            <option value={15000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>15s</option>
+            <option
+              value={2000}
+              style={{
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              2s
+            </option>
+            <option
+              value={3000}
+              style={{
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              3s
+            </option>
+            <option
+              value={5000}
+              style={{
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              5s
+            </option>
+            <option
+              value={10000}
+              style={{
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              10s
+            </option>
+            <option
+              value={15000}
+              style={{
+                backgroundColor: "var(--bg-primary)",
+                color: "var(--text-primary)",
+              }}
+            >
+              15s
+            </option>
           </select>
         </div>
 

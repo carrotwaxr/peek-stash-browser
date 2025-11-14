@@ -1,13 +1,13 @@
 import {
-  Star,
+  Calendar,
   Clock,
   Film,
-  Zap,
-  Calendar,
   Heart,
+  PlayCircle,
+  Star,
   Tag,
   Video,
-  PlayCircle,
+  Zap,
 } from "lucide-react";
 
 /**

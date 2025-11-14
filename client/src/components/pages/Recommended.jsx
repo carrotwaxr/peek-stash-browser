@@ -1,13 +1,16 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
-import { PageHeader, PageLayout } from "../ui/index.js";
-import SceneGrid from "../scene-search/SceneGrid.jsx";
-import Pagination from "../ui/Pagination.jsx";
-import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import SceneGrid from "../scene-search/SceneGrid.jsx";
+import {
+  CacheLoadingBanner,
+  PageHeader,
+  PageLayout,
+  Pagination,
+} from "../ui/index.js";
 
 const Recommended = () => {
   usePageTitle("Recommended");
@@ -58,7 +61,8 @@ const Recommended = () => {
         console.error("Error fetching recommended scenes:", err);
 
         // Check if server is initializing cache
-        const isInitializing = err.response?.status === 503 && err.response?.data?.ready === false;
+        const isInitializing =
+          err.response?.status === 503 && err.response?.data?.ready === false;
 
         if (isInitializing && retryCount < MAX_RETRIES) {
           setInitMessage("Server is loading cache, please wait...");
@@ -113,7 +117,11 @@ const Recommended = () => {
   };
 
   // Initial focus for TV mode
-  useInitialFocus(pageRef, '[tabindex="0"]', !loading && scenes.length > 0 && isTVMode);
+  useInitialFocus(
+    pageRef,
+    '[tabindex="0"]',
+    !loading && scenes.length > 0 && isTVMode
+  );
 
   return (
     <PageLayout>
@@ -143,7 +151,10 @@ const Recommended = () => {
         {!loading && message && (
           <div className="flex items-center justify-center py-16">
             <div className="text-center max-w-md">
-              <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="text-6xl mb-4"
+                style={{ color: "var(--text-muted)" }}
+              >
                 ⭐
               </div>
               <h3
@@ -152,7 +163,10 @@ const Recommended = () => {
               >
                 No Recommendations Yet
               </h3>
-              <p className="text-base" style={{ color: "var(--text-secondary)" }}>
+              <p
+                className="text-base"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 {message}
               </p>
             </div>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { useTheme } from "../../themes/useTheme.js";
 import { setupApi } from "../../services/api.js";
-import Button from "../ui/Button.jsx";
+import { useTheme } from "../../themes/useTheme.js";
+import { Button } from "../ui/index.js";
 
 const SetupWizard = ({ onSetupComplete }) => {
   const { theme } = useTheme();
@@ -82,7 +82,9 @@ const SetupWizard = ({ onSetupComplete }) => {
         >
           <p
             className="text-sm font-semibold mb-2"
-            style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+            style={{
+              color: theme?.properties?.["--text-primary"] || "#ffffff",
+            }}
           >
             Before you begin:
           </p>
@@ -133,7 +135,9 @@ const SetupWizard = ({ onSetupComplete }) => {
         setError("Failed to discover libraries");
       }
     } catch {
-      setError("Failed to connect to Stash server. Check STASH_URL and STASH_API_KEY.");
+      setError(
+        "Failed to connect to Stash server. Check STASH_URL and STASH_API_KEY."
+      );
     } finally {
       setLoading(false);
     }
@@ -180,11 +184,7 @@ const SetupWizard = ({ onSetupComplete }) => {
         Discover Stash Libraries
       </Button>
 
-      <Button
-        onClick={() => setCurrentStep(0)}
-        variant="tertiary"
-        fullWidth
-      >
+      <Button onClick={() => setCurrentStep(0)} variant="tertiary" fullWidth>
         Back
       </Button>
     </div>
@@ -239,7 +239,9 @@ const SetupWizard = ({ onSetupComplete }) => {
 
       setCurrentStep(3);
     } catch (err) {
-      setError("Failed to save path mappings: " + (err.message || "Unknown error"));
+      setError(
+        "Failed to save path mappings: " + (err.message || "Unknown error")
+      );
     } finally {
       setLoading(false);
     }
@@ -277,7 +279,9 @@ const SetupWizard = ({ onSetupComplete }) => {
         setError(data.error || "Failed to create admin user");
       }
     } catch (err) {
-      setError("Failed to create admin user: " + (err.message || "Unknown error"));
+      setError(
+        "Failed to create admin user: " + (err.message || "Unknown error")
+      );
     } finally {
       setLoading(false);
     }
@@ -307,12 +311,7 @@ const SetupWizard = ({ onSetupComplete }) => {
         Your Peek Stash Browser is now configured and ready to use
       </p>
 
-      <Button
-        onClick={onSetupComplete}
-        variant="primary"
-        fullWidth
-        size="lg"
-      >
+      <Button onClick={onSetupComplete} variant="primary" fullWidth size="lg">
         Go to Login
       </Button>
     </div>
@@ -383,8 +382,7 @@ const SetupWizard = ({ onSetupComplete }) => {
             style={{
               backgroundColor:
                 theme?.properties?.["--bg-secondary"] || "#0a0a0a",
-              borderColor:
-                theme?.properties?.["--border-color"] || "#404040",
+              borderColor: theme?.properties?.["--border-color"] || "#404040",
               color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
             }}
           />
@@ -438,11 +436,7 @@ const SetupWizard = ({ onSetupComplete }) => {
       </div>
 
       <div className="flex gap-4">
-        <Button
-          onClick={() => setCurrentStep(2)}
-          variant="tertiary"
-          fullWidth
-        >
+        <Button onClick={() => setCurrentStep(2)} variant="tertiary" fullWidth>
           Back
         </Button>
         <Button
@@ -468,7 +462,9 @@ const SetupWizard = ({ onSetupComplete }) => {
         <div>
           <h2
             className="text-2xl font-bold mb-2"
-            style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+            style={{
+              color: theme?.properties?.["--text-primary"] || "#ffffff",
+            }}
           >
             Configure Path Mappings
           </h2>
@@ -490,8 +486,8 @@ const SetupWizard = ({ onSetupComplete }) => {
             }}
           >
             <p style={{ color: "#f59e0b" }}>
-              No libraries found. You can skip this step and configure
-              paths later in Settings.
+              No libraries found. You can skip this step and configure paths
+              later in Settings.
             </p>
           </div>
         )}
@@ -511,13 +507,14 @@ const SetupWizard = ({ onSetupComplete }) => {
         <div className="space-y-4">
           {pathMappings.map((mapping, index) => {
             const validation = validationResults[index];
-            const libraryType = !mapping.excludeVideo && !mapping.excludeImage
-              ? "Video & Image"
-              : !mapping.excludeVideo
-                ? "Video"
-                : !mapping.excludeImage
-                  ? "Image"
-                  : "Unknown";
+            const libraryType =
+              !mapping.excludeVideo && !mapping.excludeImage
+                ? "Video & Image"
+                : !mapping.excludeVideo
+                  ? "Video"
+                  : !mapping.excludeImage
+                    ? "Image"
+                    : "Unknown";
 
             return (
               <div
@@ -541,8 +538,10 @@ const SetupWizard = ({ onSetupComplete }) => {
                     <span
                       className="text-xs font-normal px-2 py-0.5 rounded"
                       style={{
-                        backgroundColor: theme?.properties?.["--bg-secondary"] || "#0a0a0a",
-                        color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+                        backgroundColor:
+                          theme?.properties?.["--bg-secondary"] || "#0a0a0a",
+                        color:
+                          theme?.properties?.["--text-secondary"] || "#b3b3b3",
                       }}
                     >
                       {libraryType}
@@ -585,7 +584,8 @@ const SetupWizard = ({ onSetupComplete }) => {
                           theme?.properties?.["--bg-card"] || "#1f1f1f",
                         borderColor:
                           theme?.properties?.["--border-color"] || "#404040",
-                        color: theme?.properties?.["--text-primary"] || "#ffffff",
+                        color:
+                          theme?.properties?.["--text-primary"] || "#ffffff",
                       }}
                     />
                     <Button
@@ -672,8 +672,7 @@ const SetupWizard = ({ onSetupComplete }) => {
             <div
               className="h-2 rounded-full"
               style={{
-                backgroundColor:
-                  theme?.properties?.["--bg-card"] || "#1f1f1f",
+                backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
               }}
             >
               <div

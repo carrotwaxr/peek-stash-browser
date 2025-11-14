@@ -1,14 +1,14 @@
 import { forwardRef } from "react";
+import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 import {
   CardContainer,
-  CardImage,
   CardDefaultImage,
-  CardTitle,
   CardDescription,
+  CardImage,
   CardIndicators,
   CardRatingRow,
+  CardTitle,
 } from "./CardComponents";
-import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 
 export const GridCard = forwardRef(
   (

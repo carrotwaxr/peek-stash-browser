@@ -1,5 +1,5 @@
-import SearchableSelect from "./SearchableSelect.jsx";
 import Button from "./Button.jsx";
+import SearchableSelect from "./SearchableSelect.jsx";
 
 /**
  * Reusable Sort Control Component

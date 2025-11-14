@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
-import { GridCard } from "./GridCard.jsx";
 import GenderIcon from "./GenderIcon.jsx";
+import { GridCard } from "./GridCard.jsx";
 
 const PerformerCard = forwardRef(
   ({ performer, referrerUrl, isTVMode, tabIndex, ...others }, ref) => {

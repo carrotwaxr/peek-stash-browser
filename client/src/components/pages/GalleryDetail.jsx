@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
-import { useParams, useLocation, useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Play } from "lucide-react";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { libraryApi } from "../../services/api.js";
+import { galleryTitle } from "../../utils/gallery.js";
 import {
   Button,
   FavoriteButton,
   Lightbox,
   LoadingSpinner,
+  PageHeader,
   RatingSlider,
 } from "../ui/index.js";
-import { ArrowLeft, Play } from "lucide-react";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { galleryTitle } from "../../utils/gallery.js";
-import PageHeader from "../ui/PageHeader.jsx";
 
 const GalleryDetail = () => {
   const { galleryId } = useParams();
