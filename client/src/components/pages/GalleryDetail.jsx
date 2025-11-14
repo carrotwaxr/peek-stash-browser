@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate, Link } from "react-router-dom";
 import { libraryApi } from "../../services/api.js";
 import LoadingSpinner from "../ui/LoadingSpinner.jsx";
 import Button from "../ui/Button.jsx";
 import RatingSlider from "../ui/RatingSlider.jsx";
 import FavoriteButton from "../ui/FavoriteButton.jsx";
 import Lightbox from "../ui/Lightbox.jsx";
-import PerformerCard from "../ui/PerformerCard.jsx";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { galleryTitle } from "../../utils/gallery.js";
@@ -102,10 +101,10 @@ const GalleryDetail = () => {
   }
 
   return (
-    <div className="min-h-screen px-4 lg:px-6 xl:px-8">
+    <div className="min-h-screen px-4 lg:px-6 xl:px-8 py-6">
       <div className="max-w-none">
-        {/* Back Button */}
-        <div className="mt-6 mb-6">
+        {/* Back Button and Header */}
+        <div className="mb-6">
           <Button
             onClick={() =>
               navigate(location.state?.referrerUrl || "/galleries")
@@ -113,16 +112,14 @@ const GalleryDetail = () => {
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
             title="Back to Galleries"
+            className="mb-4"
           >
             <span className="hidden sm:inline">Back to Galleries</span>
           </Button>
-        </div>
 
-        {/* Gallery Header */}
-        <div className="mb-8">
           <PageHeader
             title={
-              <div className="flex gap-4 items-center">
+              <div className="flex flex-wrap gap-3 items-center">
                 <span>{galleryTitle(gallery)}</span>
                 <FavoriteButton
                   isFavorite={isFavorite}
@@ -131,24 +128,41 @@ const GalleryDetail = () => {
                 />
               </div>
             }
+            subtitle={
+              <div className="flex flex-wrap gap-3 items-center text-base mt-2">
+                {gallery.studio && (
+                  <>
+                    <Link
+                      to={`/studio/${gallery.studio.id}`}
+                      className="hover:underline"
+                      style={{ color: "var(--accent-primary)" }}
+                    >
+                      {gallery.studio.name}
+                    </Link>
+                    <span>•</span>
+                  </>
+                )}
+                {gallery.image_count && (
+                  <span>
+                    {gallery.image_count} image
+                    {gallery.image_count !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {gallery.date && (
+                  <>
+                    <span>•</span>
+                    <span>{new Date(gallery.date).toLocaleDateString()}</span>
+                  </>
+                )}
+                {gallery.photographer && (
+                  <>
+                    <span>•</span>
+                    <span>by {gallery.photographer}</span>
+                  </>
+                )}
+              </div>
+            }
           />
-
-          {/* Gallery metadata */}
-          <div
-            className="flex flex-wrap gap-4 mb-4 text-lg"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            {gallery.image_count && (
-              <span>
-                {gallery.image_count} image
-                {gallery.image_count !== 1 ? "s" : ""}
-              </span>
-            )}
-            {gallery.date && (
-              <span>{new Date(gallery.date).toLocaleDateString()}</span>
-            )}
-            {gallery.photographer && <span>by {gallery.photographer}</span>}
-          </div>
 
           {/* Rating Slider */}
           <div className="mt-4 max-w-md">
@@ -158,133 +172,140 @@ const GalleryDetail = () => {
               showClearButton={true}
             />
           </div>
-        </div>
 
-        {/* Gallery Content */}
-        <div className="space-y-8">
           {/* Performers Row */}
           {gallery.performers && gallery.performers.length > 0 && (
-            <div>
-              <h2
-                className="text-2xl font-bold mb-4"
-                style={{ color: "var(--text-primary)" }}
+            <div className="mt-6">
+              <h3
+                className="text-sm font-medium mb-3"
+                style={{ color: "var(--text-secondary)" }}
               >
                 Performers
-              </h2>
-              <div className="flex gap-4 overflow-x-auto pb-4">
+              </h3>
+              <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
                 {gallery.performers.map((performer) => (
-                  <div key={performer.id} className="flex-shrink-0 w-48">
-                    <PerformerCard
-                      performer={performer}
-                      referrerUrl={`${location.pathname}${location.search}`}
-                    />
-                  </div>
+                  <Link
+                    key={performer.id}
+                    to={`/performer/${performer.id}`}
+                    className="flex flex-col items-center flex-shrink-0 group w-[120px]"
+                  >
+                    <div
+                      className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
+                      style={{
+                        backgroundColor: "var(--border-color)",
+                      }}
+                    >
+                      {performer.image_path ? (
+                        <img
+                          src={performer.image_path}
+                          alt={performer.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span
+                            className="text-4xl"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            {performer.gender === "MALE" ? "♂" : "♀"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {performer.name}
+                    </span>
+                  </Link>
                 ))}
               </div>
             </div>
           )}
+        </div>
 
-          {/* Slideshow Button */}
-          <div>
-            <Button
-              variant="primary"
-              icon={<Play size={20} />}
-              onClick={() => {
-                setLightboxIndex(0);
-                setLightboxAutoPlay(true);
-                setLightboxOpen(true);
-              }}
-              disabled={images.length === 0}
-            >
-              Play Slideshow
-            </Button>
-          </div>
-
-          {/* Images Grid */}
-          <div>
-            {imagesLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {[...Array(gallery.image_count || 12)].map((_, index) => (
-                  <div
-                    key={index}
-                    className="aspect-square rounded-lg animate-pulse"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                    }}
-                  />
-                ))}
-              </div>
-            ) : images.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {images.map((image, index) => (
-                  <div
-                    key={image.id}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      borderColor: "var(--border-color)",
-                    }}
-                    onClick={() => {
-                      setLightboxIndex(index);
-                      setLightboxAutoPlay(false);
-                      setLightboxOpen(true);
-                    }}
-                  >
-                    {image.paths?.thumbnail ? (
-                      <img
-                        src={image.paths.thumbnail}
-                        alt={image.title || `Image ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full flex items-center justify-center text-sm"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        No Preview
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div
-                className="text-center py-12"
-                style={{ color: "var(--text-muted)" }}
+        {/* Two-column layout on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-6">
+          {/* Main Content - Images Grid */}
+          <div className="space-y-4">
+            {/* Slideshow Button (above grid on mobile, in grid on desktop) */}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="primary"
+                icon={<Play size={20} />}
+                onClick={() => {
+                  setLightboxIndex(0);
+                  setLightboxAutoPlay(true);
+                  setLightboxOpen(true);
+                }}
+                disabled={images.length === 0}
               >
-                No images found in this gallery
-              </div>
-            )}
+                Play Slideshow
+              </Button>
+            </div>
+
+            {/* Images Grid */}
+            <div>
+              {imagesLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {[...Array(gallery.image_count || 12)].map((_, index) => (
+                    <div
+                      key={index}
+                      className="aspect-square rounded-lg animate-pulse"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : images.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                  {images.map((image, index) => (
+                    <div
+                      key={image.id}
+                      className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        borderColor: "var(--border-color)",
+                      }}
+                      onClick={() => {
+                        setLightboxIndex(index);
+                        setLightboxAutoPlay(false);
+                        setLightboxOpen(true);
+                      }}
+                    >
+                      {image.paths?.thumbnail ? (
+                        <img
+                          src={image.paths.thumbnail}
+                          alt={image.title || `Image ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center text-sm"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          No Preview
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="text-center py-12"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  No images found in this gallery
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Additional Info Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Details */}
-            {gallery.details && (
-              <Card title="Details">
-                <p
-                  className="text-sm whitespace-pre-wrap"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {gallery.details}
-                </p>
-              </Card>
-            )}
-
-            {/* Studio */}
-            {gallery.studio && (
-              <Card title="Studio">
-                <Button
-                  variant="secondary"
-                  onClick={() => navigate(`/studio/${gallery.studio.id}`)}
-                  className="w-full"
-                >
-                  {gallery.studio.name}
-                </Button>
-              </Card>
-            )}
-
+          {/* Sidebar - Metadata */}
+          <aside className="space-y-4">
             {/* Tags */}
             {gallery.tags && gallery.tags.length > 0 && (
               <Card title="Tags">
@@ -312,13 +333,14 @@ const GalleryDetail = () => {
             {/* Linked Scenes */}
             {gallery.scenes && gallery.scenes.length > 0 && (
               <Card title="Related Scenes">
-                <div className="space-y-2">
+                <div className="flex flex-col gap-2">
                   {gallery.scenes.map((scene) => (
                     <Button
                       key={scene.id}
                       variant="secondary"
                       onClick={() => navigate(`/scene/${scene.id}`)}
-                      className="w-full text-left"
+                      className="w-full text-left justify-start truncate"
+                      title={scene.title || `Scene ${scene.id}`}
                     >
                       {scene.title || `Scene ${scene.id}`}
                     </Button>
@@ -326,7 +348,19 @@ const GalleryDetail = () => {
                 </div>
               </Card>
             )}
-          </div>
+
+            {/* Details */}
+            {gallery.details && (
+              <Card title="Details">
+                <p
+                  className="text-sm whitespace-pre-wrap"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {gallery.details}
+                </p>
+              </Card>
+            )}
+          </aside>
         </div>
       </div>
 
