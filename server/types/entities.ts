@@ -14,7 +14,6 @@
 import type {
   Gallery,
   Group,
-  Image,
   Performer,
   Scene,
   Studio,
@@ -148,11 +147,3 @@ export type NormalizedGroup = Group & {
   rating: number | null;
   favorite: boolean;
 };
-
-/**
- * Normalized Image
- *
- * Currently no additional fields, but defined for consistency.
- * Future: May add user ratings, favorites, etc.
- */
-export type NormalizedImage = Image;

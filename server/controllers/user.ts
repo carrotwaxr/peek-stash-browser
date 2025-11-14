@@ -4,8 +4,6 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 
-// import { getDefaultCarouselPreferences } from "../utils/carouselDefaults.js";
-
 /**
  * Carousel preference configuration
  */
@@ -217,11 +215,9 @@ export const updateUserSettings = async (
         minimumPlayPercent < 0 ||
         minimumPlayPercent > 100
       ) {
-        return res
-          .status(400)
-          .json({
-            error: "Minimum play percent must be a number between 0 and 100",
-          });
+        return res.status(400).json({
+          error: "Minimum play percent must be a number between 0 and 100",
+        });
       }
     }
 

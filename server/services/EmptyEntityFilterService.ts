@@ -76,29 +76,6 @@ interface FilterableTag {
   children?: Array<{ id: string }>;
 }
 
-/**
- * Entities that can be filtered by this service
- */
-export interface FilterableEntities {
-  galleries?: FilterableGallery[];
-  groups?: FilterableGroup[];
-  studios?: FilterableStudio[];
-  performers?: FilterablePerformer[];
-  tags?: FilterableTag[];
-}
-
-/**
- * Result of filtering all entities
- */
-export interface FilteredEntities {
-  galleries?: FilterableGallery[];
-  groups?: FilterableGroup[];
-  studios?: FilterableStudio[];
-  performers?: FilterablePerformer[];
-  tags?: FilterableTag[];
-  visibilitySets: VisibleEntitySets;
-}
-
 interface VisibleEntitySets {
   scenes?: Set<string>;
   images?: Set<string>;
