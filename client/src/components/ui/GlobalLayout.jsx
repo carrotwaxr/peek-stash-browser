@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { migrateNavPreferences } from "../../constants/navigation.js";
 import { apiGet } from "../../services/api.js";
-import Navigation from "./Navigation.jsx";
+import Sidebar from "./Sidebar.jsx";
+import TopBar from "./TopBar.jsx";
 
 /**
- * GlobalLayout - Top-level layout with navigation
- * Wraps the entire application to provide consistent navigation structure
+ * GlobalLayout - Top-level layout with sidebar navigation
+ *
+ * Layout structure:
+ * - Sidebar (hidden on mobile, visible lg+)
+ * - TopBar (logo, help, settings, user menu)
+ * - Main content area with responsive spacing
  */
 const GlobalLayout = ({ children }) => {
   const [navPreferences, setNavPreferences] = useState([]);
@@ -28,11 +33,17 @@ const GlobalLayout = ({ children }) => {
   }, []);
 
   return (
-    <div className="layout-container">
-      <Navigation navPreferences={navPreferences} />
-      {/* Spacer to prevent content from going under fixed navbar */}
-      <div style={{ height: "60px" }} />
-      <main className="w-full 2xl:w-5/6 m-auto">{children}</main>
+    <div className="layout-container min-h-screen">
+      {/* Sidebar navigation - hidden on mobile, visible lg+ */}
+      <Sidebar navPreferences={navPreferences} />
+
+      {/* Top bar - mobile only (logo, hamburger menu) */}
+      <TopBar navPreferences={navPreferences} />
+
+      {/* Main content area with responsive spacing */}
+      <main className="lg:ml-16 xl:ml-60 pt-16 lg:pt-0">
+        <div className="w-full 2xl:w-5/6 2xl:mx-auto">{children}</div>
+      </main>
     </div>
   );
 };
