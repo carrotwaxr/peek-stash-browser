@@ -147,32 +147,6 @@ const Recommended = () => {
           </div>
         )}
 
-        {/* Empty state message */}
-        {!loading && message && (
-          <div className="flex items-center justify-center py-16">
-            <div className="text-center max-w-md">
-              <div
-                className="text-6xl mb-4"
-                style={{ color: "var(--text-muted)" }}
-              >
-                ⭐
-              </div>
-              <h3
-                className="text-xl font-medium mb-2"
-                style={{ color: "var(--text-primary)" }}
-              >
-                No Recommendations Yet
-              </h3>
-              <p
-                className="text-base"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {message}
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Scene Grid (includes bottom pagination) */}
         <SceneGrid
           scenes={scenes}
@@ -184,8 +158,8 @@ const Recommended = () => {
           perPage={perPage}
           onPerPageChange={handlePerPageChange}
           totalCount={totalCount}
-          emptyMessage="No recommendations found"
-          emptyDescription="This shouldn't happen - please report this issue"
+          emptyMessage="No Recommendations Yet"
+          emptyDescription="Rate or Favorite more items to get personalized recommendations."
         />
       </div>
     </PageLayout>
