@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   ChevronDown,
   ChevronUp,
   List,
   Play,
+  PlayCircle,
   Repeat,
   Repeat1,
   Shuffle,
@@ -17,12 +18,15 @@ import { Button } from "../ui/index.js";
  * @param {number} maxHeight - Maximum height in pixels to match left column
  */
 const PlaylistSidebar = ({ maxHeight }) => {
-  const { playlist, currentIndex, gotoSceneIndex } = useScenePlayer();
+  const {
+    playlist,
+    currentIndex,
+    gotoSceneIndex,
+    toggleAutoplayNext,
+    toggleShuffle,
+    toggleRepeat,
+  } = useScenePlayer();
   const [isExpanded, setIsExpanded] = useState(true);
-
-  // Shuffle and repeat state
-  const [shuffle, setShuffle] = useState(playlist?.shuffle || false);
-  const [repeat, setRepeat] = useState(playlist?.repeat || "none");
 
   if (!playlist || !playlist.scenes || playlist.scenes.length === 0) {
     return null;
@@ -55,7 +59,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
   const navigateToScene = (index) => {
     if (index < 0 || index >= totalScenes) return;
 
-    // Check if video is playing and set autoplay flag
+    // Check if video is currently playing
     const videoElements = document.querySelectorAll("video");
     let isPlaying = false;
 
@@ -65,9 +69,8 @@ const PlaylistSidebar = ({ maxHeight }) => {
       }
     });
 
+    // Preserve fullscreen state
     if (isPlaying) {
-      sessionStorage.setItem("videoPlayerAutoplay", "true");
-
       const isFullscreen =
         document.fullscreenElement ||
         document.webkitFullscreenElement ||
@@ -78,21 +81,12 @@ const PlaylistSidebar = ({ maxHeight }) => {
       }
     }
 
-    gotoSceneIndex(index);
+    // Navigate with autoplay flag if video is currently playing
+    gotoSceneIndex(index, isPlaying);
   };
 
   const goToPlaylist = () => {
     window.location.href = `/playlist/${playlist.id}`;
-  };
-
-  const toggleShuffle = () => {
-    setShuffle(!shuffle);
-  };
-
-  const toggleRepeat = () => {
-    const repeatModes = ["none", "all", "one"];
-    const currentIdx = repeatModes.indexOf(repeat);
-    setRepeat(repeatModes[(currentIdx + 1) % repeatModes.length]);
   };
 
   return (
@@ -156,45 +150,69 @@ const PlaylistSidebar = ({ maxHeight }) => {
         {/* Control buttons */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {/* Autoplay Next */}
+            <button
+              onClick={toggleAutoplayNext}
+              className="p-1.5 rounded transition-colors focus:outline-none"
+              style={{
+                backgroundColor: playlist.autoplayNext
+                  ? "var(--accent-primary)"
+                  : "transparent",
+                color: playlist.autoplayNext
+                  ? "white"
+                  : "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
+              title={
+                playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"
+              }
+            >
+              <PlayCircle size={14} />
+            </button>
+
             {/* Shuffle */}
-            <Button
+            <button
               onClick={toggleShuffle}
-              variant="secondary"
-              size="sm"
-              className="p-1.5"
-              {...(shuffle && {
-                style: {
-                  border: "2px solid var(--status-info)",
-                  color: "var(--status-info)",
-                },
-              })}
-              icon={<Shuffle size={14} />}
-              title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
-            />
+              className="p-1.5 rounded transition-colors focus:outline-none"
+              style={{
+                backgroundColor: playlist.shuffle
+                  ? "var(--accent-primary)"
+                  : "transparent",
+                color: playlist.shuffle ? "white" : "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
+              title={playlist.shuffle ? "Shuffle: On" : "Shuffle: Off"}
+            >
+              <Shuffle size={14} />
+            </button>
 
             {/* Repeat */}
-            <Button
+            <button
               onClick={toggleRepeat}
-              variant="secondary"
-              size="sm"
-              className="p-1.5"
-              {...(repeat !== "none" && {
-                style: {
-                  border: "2px solid var(--status-info)",
-                  color: "var(--status-info)",
-                },
-              })}
-              icon={
-                repeat === "one" ? <Repeat1 size={14} /> : <Repeat size={14} />
-              }
+              className="p-1.5 rounded transition-colors focus:outline-none"
+              style={{
+                backgroundColor:
+                  playlist.repeat !== "none"
+                    ? "var(--accent-primary)"
+                    : "transparent",
+                color:
+                  playlist.repeat !== "none" ? "white" : "var(--text-secondary)",
+                border: "1px solid var(--border-color)",
+              }}
               title={
-                repeat === "one"
+                playlist.repeat === "one"
                   ? "Repeat: One"
-                  : repeat === "all"
+                  : playlist.repeat === "all"
                     ? "Repeat: All"
                     : "Repeat: Off"
               }
-            />
+            >
+              {playlist.repeat === "one" ? (
+                <Repeat1 size={14} />
+              ) : (
+                <Repeat size={14} />
+              )}
+            </button>
           </div>
 
           <div

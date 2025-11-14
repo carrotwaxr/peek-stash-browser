@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import {
   ChevronLeft,
   ChevronRight,
   List,
+  PlayCircle,
   Repeat,
   Repeat1,
   Shuffle,
@@ -15,7 +16,14 @@ import { Button } from "../ui/index.js";
  * Displays current position, navigation controls, and quick scene access
  */
 const PlaylistStatusCard = () => {
-  const { playlist, currentIndex, gotoSceneIndex } = useScenePlayer();
+  const {
+    playlist,
+    currentIndex,
+    gotoSceneIndex,
+    toggleAutoplayNext,
+    toggleShuffle,
+    toggleRepeat,
+  } = useScenePlayer();
   const currentThumbnailRef = useRef(null);
   const desktopScrollRef = useRef(null);
   const mobileScrollRef = useRef(null);
@@ -24,10 +32,6 @@ const PlaylistStatusCard = () => {
   const scrollLeft = useRef(0);
   const scrollContainer = useRef(null); // Which container is being dragged
   const hasDragged = useRef(false);
-
-  // Shuffle and repeat state (initialize from playlist)
-  const [shuffle, setShuffle] = useState(playlist?.shuffle || false);
-  const [repeat, setRepeat] = useState(playlist?.repeat || "none");
 
   // Scroll current thumbnail into view when currentIndex changes
   useEffect(() => {
@@ -127,7 +131,6 @@ const PlaylistStatusCard = () => {
     if (index < 0 || index >= totalScenes) return;
 
     // Check if there's a video player currently playing
-    // If so, set autoplay flag for next video
     const videoElements = document.querySelectorAll("video");
     let isPlaying = false;
 
@@ -137,10 +140,8 @@ const PlaylistStatusCard = () => {
       }
     });
 
+    // Preserve fullscreen state
     if (isPlaying) {
-      sessionStorage.setItem("videoPlayerAutoplay", "true");
-
-      // Also check if video is fullscreen
       const isFullscreen =
         document.fullscreenElement ||
         document.webkitFullscreenElement ||
@@ -151,41 +152,25 @@ const PlaylistStatusCard = () => {
       }
     }
 
-    // Use context action to navigate to scene
-    gotoSceneIndex(index);
+    // Navigate with autoplay flag if video is currently playing
+    gotoSceneIndex(index, isPlaying);
   };
 
   const handlePrevious = () => {
     if (hasPrevious) {
       navigateToScene(currentIndex - 1);
     }
-    // TODO: Add shuffle/repeat support via context
   };
 
   const handleNext = () => {
     if (hasNext) {
       navigateToScene(currentIndex + 1);
     }
-    // TODO: Add shuffle/repeat support via context
   };
 
   const goToPlaylist = () => {
     // Navigate to playlist page (different route, so we use window.location)
     window.location.href = `/playlist/${playlist.id}`;
-  };
-
-  const toggleShuffle = () => {
-    const newShuffle = !shuffle;
-    setShuffle(newShuffle);
-    // TODO: Persist shuffle state in context if needed
-  };
-
-  const toggleRepeat = () => {
-    const repeatModes = ["none", "all", "one"];
-    const currentIdx = repeatModes.indexOf(repeat);
-    const newRepeat = repeatModes[(currentIdx + 1) % repeatModes.length];
-    setRepeat(newRepeat);
-    // TODO: Persist repeat state in context if needed
   };
 
   return (
@@ -237,57 +222,86 @@ const PlaylistStatusCard = () => {
                 {position} of {totalScenes}
               </div>
 
+              {/* Autoplay Next */}
+              <button
+                onClick={toggleAutoplayNext}
+                className="p-1.5 sm:p-2 rounded transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: playlist.autoplayNext
+                    ? "var(--accent-primary)"
+                    : "transparent",
+                  color: playlist.autoplayNext
+                    ? "white"
+                    : "var(--text-secondary)",
+                  border: "1px solid var(--border-color)",
+                }}
+                title={
+                  playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"
+                }
+                aria-label={
+                  playlist.autoplayNext
+                    ? "Disable autoplay"
+                    : "Enable autoplay"
+                }
+              >
+                <PlayCircle size={16} />
+              </button>
+
               {/* Shuffle Toggle */}
-              <Button
+              <button
                 onClick={toggleShuffle}
-                variant="secondary"
-                size="sm"
-                className="p-1.5 sm:p-2"
-                {...(shuffle && {
-                  style: {
-                    border: "2px solid var(--status-info)",
-                    color: "var(--status-info)",
-                  },
-                })}
-                icon={<Shuffle size={16} />}
-                title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
-                aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
-              />
+                className="p-1.5 sm:p-2 rounded transition-colors focus:outline-none"
+                style={{
+                  backgroundColor: playlist.shuffle
+                    ? "var(--accent-primary)"
+                    : "transparent",
+                  color: playlist.shuffle ? "white" : "var(--text-secondary)",
+                  border: "1px solid var(--border-color)",
+                }}
+                title={playlist.shuffle ? "Shuffle: On" : "Shuffle: Off"}
+                aria-label={
+                  playlist.shuffle ? "Disable shuffle" : "Enable shuffle"
+                }
+              >
+                <Shuffle size={16} />
+              </button>
 
               {/* Repeat Toggle */}
-              <Button
+              <button
                 onClick={toggleRepeat}
-                variant="secondary"
-                size="sm"
-                className="p-1.5 sm:p-2"
-                {...(repeat !== "none" && {
-                  style: {
-                    border: "2px solid var(--status-info)",
-                    color: "var(--status-info)",
-                  },
-                })}
-                icon={
-                  repeat === "one" ? (
-                    <Repeat1 size={16} />
-                  ) : (
-                    <Repeat size={16} />
-                  )
-                }
+                className="p-1.5 sm:p-2 rounded transition-colors focus:outline-none"
+                style={{
+                  backgroundColor:
+                    playlist.repeat !== "none"
+                      ? "var(--accent-primary)"
+                      : "transparent",
+                  color:
+                    playlist.repeat !== "none"
+                      ? "white"
+                      : "var(--text-secondary)",
+                  border: "1px solid var(--border-color)",
+                }}
                 title={
-                  repeat === "one"
+                  playlist.repeat === "one"
                     ? "Repeat: One"
-                    : repeat === "all"
+                    : playlist.repeat === "all"
                       ? "Repeat: All"
                       : "Repeat: Off"
                 }
                 aria-label={
-                  repeat === "one"
+                  playlist.repeat === "one"
                     ? "Disable repeat one"
-                    : repeat === "all"
+                    : playlist.repeat === "all"
                       ? "Switch to repeat one"
                       : "Enable repeat all"
                 }
-              />
+              >
+                {playlist.repeat === "one" ? (
+                  <Repeat1 size={16} />
+                ) : (
+                  <Repeat size={16} />
+                )}
+              </button>
 
               {!isVirtualPlaylist && (
                 <Button

@@ -25,6 +25,7 @@ export function ScenePlayerProvider({
   shouldResume = false,
   compatibility = null,
   initialQuality = "direct",
+  initialShouldAutoplay = false,
 }) {
   const [state, dispatch] = useReducer(scenePlayerReducer, initialState);
 
@@ -37,9 +38,10 @@ export function ScenePlayerProvider({
         currentIndex: playlist?.currentIndex || 0,
         compatibility,
         initialQuality,
+        initialShouldAutoplay,
       },
     });
-  }, [playlist, compatibility, initialQuality]);
+  }, [playlist, compatibility, initialQuality, initialShouldAutoplay]);
 
   // ============================================================================
   // ACTION CREATORS (with side effects)
@@ -163,8 +165,24 @@ export function ScenePlayerProvider({
     dispatch({ type: "PREV_SCENE" });
   }, []);
 
-  const gotoSceneIndex = useCallback((index) => {
-    dispatch({ type: "GOTO_SCENE_INDEX", payload: index });
+  const gotoSceneIndex = useCallback((index, shouldAutoplay = false) => {
+    dispatch({
+      type: "GOTO_SCENE_INDEX",
+      payload: { index, shouldAutoplay },
+    });
+  }, []);
+
+  // Playlist control toggles
+  const toggleAutoplayNext = useCallback(() => {
+    dispatch({ type: "TOGGLE_AUTOPLAY_NEXT" });
+  }, []);
+
+  const toggleShuffle = useCallback(() => {
+    dispatch({ type: "TOGGLE_SHUFFLE" });
+  }, []);
+
+  const toggleRepeat = useCallback(() => {
+    dispatch({ type: "TOGGLE_REPEAT" });
   }, []);
 
   // ============================================================================
@@ -239,6 +257,11 @@ export function ScenePlayerProvider({
     nextScene,
     prevScene,
     gotoSceneIndex,
+
+    // Playlist control toggles
+    toggleAutoplayNext,
+    toggleShuffle,
+    toggleRepeat,
   };
 
   return (

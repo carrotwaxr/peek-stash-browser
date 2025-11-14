@@ -248,20 +248,28 @@ const PlaylistDetail = () => {
     // Play first scene in playlist with playlist context
     if (scenes.length > 0 && scenes[0].exists && scenes[0].scene) {
       const validScenes = scenes.filter((s) => s.exists && s.scene);
-      navigate(`/scene/${scenes[0].sceneId}`, {
+
+      // If shuffle is enabled, pick a random scene to start with
+      const startIndex = shuffle ? Math.floor(Math.random() * validScenes.length) : 0;
+      const startScene = validScenes[startIndex];
+
+      navigate(`/scene/${startScene.sceneId}`, {
         state: {
-          scene: scenes[0].scene,
+          scene: startScene.scene,
+          shouldAutoplay: true, // Start playing immediately when entering from playlist
           playlist: {
             id: playlistId,
             name: playlist.name,
+            autoplayNext: true, // Default to autoplay enabled
             shuffle,
             repeat,
+            shuffleHistory: [], // Initialize empty history
             scenes: validScenes.map((s, idx) => ({
               sceneId: s.sceneId,
               scene: s.scene,
               position: idx,
             })),
-            currentIndex: 0,
+            currentIndex: startIndex,
           },
         },
       });
