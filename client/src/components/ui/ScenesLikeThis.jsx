@@ -70,9 +70,9 @@ const ScenesLikeThis = ({ sceneId }) => {
   }
 
   return (
-    <div className="w-full py-8">
+    <div className="w-full py-4">
       {/* Section Header */}
-      <div className="mb-6">
+      <div className="mb-4">
         <h2
           className="text-2xl font-bold"
           style={{ color: "var(--text-primary)" }}

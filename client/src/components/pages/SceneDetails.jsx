@@ -62,7 +62,7 @@ const SceneDetails = ({
 
   return (
     <section
-      className="w-full mt-6 pb-8"
+      className="w-full mt-4 pb-8"
       style={{
         opacity: sceneLoading ? 0.6 : 1,
         transition: "opacity 0.2s ease-in-out",

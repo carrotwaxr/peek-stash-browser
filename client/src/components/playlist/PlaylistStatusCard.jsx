@@ -183,8 +183,8 @@ const PlaylistStatusCard = () => {
             borderColor: "var(--border-color)",
           }}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between mb-3">
+          {/* Header - SM+ Layout: Stacked label/name, position + controls on same row */}
+          <div className="hidden sm:flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <List size={20} style={{ color: "var(--text-secondary)" }} />
               <div>
@@ -314,6 +314,144 @@ const PlaylistStatusCard = () => {
                   <span className="hidden sm:inline">View All</span>
                 </Button>
               )}
+            </div>
+          </div>
+
+          {/* Header - < SM Layout: Two rows */}
+          <div className="flex sm:hidden flex-col gap-2 mb-3">
+            {/* Row 1: Browsing: Name (inline) */}
+            <div className="flex items-center gap-2">
+              <List size={18} style={{ color: "var(--text-secondary)" }} />
+              <div className="flex items-baseline gap-1.5">
+                <h3
+                  className="font-semibold text-sm"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {isVirtualPlaylist ? "Browsing:" : "Playing from Playlist:"}
+                </h3>
+                {isVirtualPlaylist ? (
+                  <p
+                    className="text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {playlist.name}
+                  </p>
+                ) : (
+                  <Button
+                    onClick={goToPlaylist}
+                    variant="tertiary"
+                    size="sm"
+                    className="text-sm hover:underline !p-0"
+                    style={{ color: "var(--status-info)" }}
+                  >
+                    {playlist.name}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Position + Controls with space-between */}
+            <div className="flex items-center justify-between">
+              <div
+                className="text-sm font-medium"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {position} / {totalScenes}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Autoplay Next */}
+                <button
+                  onClick={toggleAutoplayNext}
+                  className="p-1.5 rounded transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: playlist.autoplayNext
+                      ? "var(--accent-primary)"
+                      : "transparent",
+                    color: playlist.autoplayNext
+                      ? "white"
+                      : "var(--text-secondary)",
+                    border: "1px solid var(--border-color)",
+                  }}
+                  title={
+                    playlist.autoplayNext ? "Autoplay: On" : "Autoplay: Off"
+                  }
+                  aria-label={
+                    playlist.autoplayNext
+                      ? "Disable autoplay"
+                      : "Enable autoplay"
+                  }
+                >
+                  <PlayCircle size={16} />
+                </button>
+
+                {/* Shuffle Toggle */}
+                <button
+                  onClick={toggleShuffle}
+                  className="p-1.5 rounded transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor: playlist.shuffle
+                      ? "var(--accent-primary)"
+                      : "transparent",
+                    color: playlist.shuffle ? "white" : "var(--text-secondary)",
+                    border: "1px solid var(--border-color)",
+                  }}
+                  title={playlist.shuffle ? "Shuffle: On" : "Shuffle: Off"}
+                  aria-label={
+                    playlist.shuffle ? "Disable shuffle" : "Enable shuffle"
+                  }
+                >
+                  <Shuffle size={16} />
+                </button>
+
+                {/* Repeat Toggle */}
+                <button
+                  onClick={toggleRepeat}
+                  className="p-1.5 rounded transition-colors focus:outline-none"
+                  style={{
+                    backgroundColor:
+                      playlist.repeat !== "none"
+                        ? "var(--accent-primary)"
+                        : "transparent",
+                    color:
+                      playlist.repeat !== "none"
+                        ? "white"
+                        : "var(--text-secondary)",
+                    border: "1px solid var(--border-color)",
+                  }}
+                  title={
+                    playlist.repeat === "one"
+                      ? "Repeat: One"
+                      : playlist.repeat === "all"
+                        ? "Repeat: All"
+                        : "Repeat: Off"
+                  }
+                  aria-label={
+                    playlist.repeat === "one"
+                      ? "Disable repeat one"
+                      : playlist.repeat === "all"
+                        ? "Switch to repeat one"
+                        : "Enable repeat all"
+                  }
+                >
+                  {playlist.repeat === "one" ? (
+                    <Repeat1 size={16} />
+                  ) : (
+                    <Repeat size={16} />
+                  )}
+                </button>
+
+                {!isVirtualPlaylist && (
+                  <Button
+                    onClick={goToPlaylist}
+                    variant="secondary"
+                    size="sm"
+                    className="px-2 py-1.5 text-sm"
+                    icon={<List size={14} />}
+                  >
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 

@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import {
   AddToPlaylistButton,
   FavoriteButton,
   OCounterButton,
-  RatingBadge,
-  RatingSliderDialog,
+  RatingSlider,
 } from "../ui/index.js";
 
 const PlaybackControls = () => {
@@ -16,10 +15,6 @@ const PlaybackControls = () => {
   // Rating and favorite state
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
-
-  // Rating popover state
-  const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
-  const ratingBadgeRef = useRef(null);
 
   // Sync state when scene changes
   useEffect(() => {
@@ -66,7 +61,7 @@ const PlaybackControls = () => {
 
   const isLoading = sceneLoading || videoLoading;
   return (
-    <section className="py-4 mt-6">
+    <section>
       <div
         className="p-4 rounded-lg"
         style={{
@@ -74,11 +69,96 @@ const PlaybackControls = () => {
           border: "1px solid var(--border-color)",
         }}
       >
-        {/* Desktop: Three-column layout (left: quality, center: rating/counter, right: add to playlist) */}
-        {/* Mobile: Two rows (row 1: quality + add button, row 2: rating/counter centered) */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          {/* Row 1 on mobile, Left column on desktop: Quality Selector */}
-          <div className="flex items-center justify-between md:justify-start gap-4 md:flex-1">
+        {/* Responsive Layout:
+            - XL+: Single row (Quality >> Rating >> O Counter >> Favorite >> Add to Playlist)
+            - SM to XL: Two rows (Row 1: Rating (50%) + O Counter + Favorite, Row 2: Quality + Add to Playlist)
+            - < SM: Three rows (Row 1: O Counter + Favorite centered, Row 2: Rating (full), Row 3: Quality + Add to Playlist)
+        */}
+
+        {/* XL+ Layout: Single row */}
+        <div className="hidden xl:flex xl:items-center xl:gap-4">
+          <select
+            value={quality}
+            onChange={(e) =>
+              dispatch({ type: "SET_QUALITY", payload: e.target.value })
+            }
+            disabled={isLoading}
+            className="btn text-sm"
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+              color: "var(--text-primary)",
+              padding: "8px 12px",
+              opacity: isLoading ? 0.6 : 1,
+              cursor: isLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            <option value="direct">Direct Play</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+            <option value="360p">360p</option>
+          </select>
+
+          <div className="flex-1 max-w-md" style={{ opacity: isLoading ? 0.6 : 1 }}>
+            <RatingSlider
+              rating={rating}
+              onChange={handleRatingChange}
+              label="Rating"
+              showClearButton={true}
+            />
+          </div>
+
+          <div className="flex items-center gap-4 ml-auto" style={{ opacity: isLoading ? 0.6 : 1 }}>
+            <OCounterButton
+              sceneId={scene?.id}
+              initialCount={oCounter}
+              onIncrement={(newCount) =>
+                dispatch({ type: "SET_O_COUNTER", payload: newCount })
+              }
+              disabled={isLoading}
+            />
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onChange={handleFavoriteChange}
+              size="medium"
+            />
+            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
+          </div>
+        </div>
+
+        {/* SM to XL Layout: Two rows */}
+        <div className="hidden sm:flex sm:flex-col xl:hidden gap-4">
+          {/* Row 1: Rating (50%) + space + O Counter + Favorite */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1 max-w-md" style={{ opacity: isLoading ? 0.6 : 1 }}>
+              <RatingSlider
+                rating={rating}
+                onChange={handleRatingChange}
+                label="Rating"
+                showClearButton={true}
+              />
+            </div>
+
+            <div className="flex items-center gap-4" style={{ opacity: isLoading ? 0.6 : 1 }}>
+              <OCounterButton
+                sceneId={scene?.id}
+                initialCount={oCounter}
+                onIncrement={(newCount) =>
+                  dispatch({ type: "SET_O_COUNTER", payload: newCount })
+                }
+                disabled={isLoading}
+              />
+              <FavoriteButton
+                isFavorite={isFavorite}
+                onChange={handleFavoriteChange}
+                size="medium"
+              />
+            </div>
+          </div>
+
+          {/* Row 2: Quality + Add to Playlist */}
+          <div className="flex items-center justify-between gap-4">
             <select
               value={quality}
               onChange={(e) =>
@@ -102,29 +182,17 @@ const PlaybackControls = () => {
               <option value="360p">360p</option>
             </select>
 
-            {/* Add to Playlist Button - shows on mobile in row 1, hidden on desktop */}
-            <div className="md:hidden">
-              <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
-            </div>
+            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
           </div>
+        </div>
 
-          {/* Row 2 on mobile (centered), Center column on desktop: Rating Badge + Favorite + O Counter */}
+        {/* < SM Layout: Three rows */}
+        <div className="flex sm:hidden flex-col gap-4">
+          {/* Row 1: O Counter + Favorite (centered) */}
           <div
-            className="flex items-center justify-center gap-4 md:flex-1"
+            className="flex items-center justify-center gap-4"
             style={{ opacity: isLoading ? 0.6 : 1 }}
           >
-            <div ref={ratingBadgeRef}>
-              <RatingBadge
-                rating={rating}
-                onClick={() => setIsRatingPopoverOpen(true)}
-                size="medium"
-              />
-            </div>
-            <FavoriteButton
-              isFavorite={isFavorite}
-              onChange={handleFavoriteChange}
-              size="medium"
-            />
             <OCounterButton
               sceneId={scene?.id}
               initialCount={oCounter}
@@ -133,25 +201,52 @@ const PlaybackControls = () => {
               }
               disabled={isLoading}
             />
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onChange={handleFavoriteChange}
+              size="medium"
+            />
           </div>
 
-          {/* Right column on desktop: Add to Playlist Button - hidden on mobile */}
-          <div className="hidden md:flex md:justify-end md:flex-1">
+          {/* Row 2: Rating (full width) */}
+          <div style={{ opacity: isLoading ? 0.6 : 1 }}>
+            <RatingSlider
+              rating={rating}
+              onChange={handleRatingChange}
+              label="Rating"
+              showClearButton={true}
+            />
+          </div>
+
+          {/* Row 3: Quality + Add to Playlist */}
+          <div className="flex items-center justify-between gap-4">
+            <select
+              value={quality}
+              onChange={(e) =>
+                dispatch({ type: "SET_QUALITY", payload: e.target.value })
+              }
+              disabled={isLoading}
+              className="btn text-sm"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+                padding: "8px 12px",
+                opacity: isLoading ? 0.6 : 1,
+                cursor: isLoading ? "not-allowed" : "pointer",
+              }}
+            >
+              <option value="direct">Direct Play</option>
+              <option value="1080p">1080p</option>
+              <option value="720p">720p</option>
+              <option value="480p">480p</option>
+              <option value="360p">360p</option>
+            </select>
+
             <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
           </div>
         </div>
       </div>
-
-      {/* Rating Popover */}
-      <RatingSliderDialog
-        isOpen={isRatingPopoverOpen}
-        onClose={() => setIsRatingPopoverOpen(false)}
-        initialRating={rating}
-        onSave={handleRatingChange}
-        entityType="scene"
-        entityTitle={scene?.title || "Scene"}
-        anchorEl={ratingBadgeRef.current}
-      />
     </section>
   );
 };
