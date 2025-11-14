@@ -400,6 +400,15 @@ section.video-container {
   border-radius: 8px !important;
   padding: 8px 0 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  min-width: 120px !important; /* Prevent narrow menu */
+  left: auto !important; /* Override default positioning */
+  right: 0 !important; /* Align to button */
+}
+
+/* Allow mouse to enter menu without it closing */
+.video-js .vjs-menu-button-popup:hover .vjs-menu,
+.video-js .vjs-menu-button-popup .vjs-menu:hover {
+  display: block !important;
 }
 
 .video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
@@ -412,6 +421,7 @@ section.video-container {
   font-weight: 500 !important;
   color: white !important;
   background: transparent !important;
+  white-space: nowrap !important; /* Prevent text wrapping */
 }
 
 .video-js .vjs-menu-button-popup .vjs-menu-item:hover,

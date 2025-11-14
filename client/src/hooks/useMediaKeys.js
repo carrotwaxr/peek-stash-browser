@@ -1,154 +1,9 @@
-import { useEffect } from "react";
+import { useMemo } from "react";
+import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts.js";
 
 /**
- * Custom hook for handling media keyboard shortcuts
- * Supports standard media keys (play/pause, next/prev track, etc.)
- *
- * @param {Object} options Configuration options
- * @param {Function} options.onPlayPause Callback for play/pause
- * @param {Function} options.onNextTrack Callback for next track
- * @param {Function} options.onPreviousTrack Callback for previous track
- * @param {Function} options.onSeekForward Callback for seek forward
- * @param {Function} options.onSeekBackward Callback for seek backward
- * @param {Function} options.onVolumeUp Callback for volume up
- * @param {Function} options.onVolumeDown Callback for volume down
- * @param {Function} options.onMute Callback for mute toggle
- * @param {boolean} options.enabled Whether media keys are enabled
- */
-const useMediaKeys = ({
-  onPlayPause,
-  onNextTrack,
-  onPreviousTrack,
-  onSeekForward,
-  onSeekBackward,
-  onVolumeUp,
-  onVolumeDown,
-  onMute,
-  enabled = true,
-} = {}) => {
-  useEffect(() => {
-    if (!enabled) return;
-
-    const handleKeyDown = (e) => {
-      // Don't handle media keys if user is typing in an input
-      if (
-        e.target.tagName === "INPUT" ||
-        e.target.tagName === "TEXTAREA" ||
-        e.target.isContentEditable
-      ) {
-        return;
-      }
-
-      let handled = false;
-
-      switch (e.key) {
-        // Media play/pause
-        case "MediaPlayPause":
-        case " ": // Space bar
-          if (e.key === " " && e.target.tagName === "BUTTON") {
-            // Let buttons handle space naturally
-            return;
-          }
-          e.preventDefault();
-          onPlayPause?.();
-          handled = true;
-          break;
-
-        // Media next track
-        case "MediaTrackNext":
-          e.preventDefault();
-          onNextTrack?.();
-          handled = true;
-          break;
-
-        // Media previous track
-        case "MediaTrackPrevious":
-          e.preventDefault();
-          onPreviousTrack?.();
-          handled = true;
-          break;
-
-        // Seek forward (right arrow or custom)
-        case "MediaFastForward":
-        case "ArrowRight":
-          // Only handle if not in a text input and Ctrl/Cmd is held
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            onSeekForward?.();
-            handled = true;
-          }
-          break;
-
-        // Seek backward (left arrow or custom)
-        case "MediaRewind":
-        case "ArrowLeft":
-          // Only handle if not in a text input and Ctrl/Cmd is held
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            onSeekBackward?.();
-            handled = true;
-          }
-          break;
-
-        // Volume up
-        case "ArrowUp":
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            onVolumeUp?.();
-            handled = true;
-          }
-          break;
-
-        // Volume down
-        case "ArrowDown":
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            onVolumeDown?.();
-            handled = true;
-          }
-          break;
-
-        // Mute toggle
-        case "m":
-        case "M":
-          if (!e.ctrlKey && !e.metaKey) {
-            e.preventDefault();
-            onMute?.();
-            handled = true;
-          }
-          break;
-
-        // Fullscreen toggle
-        case "f":
-        case "F":
-          if (!e.ctrlKey && !e.metaKey) {
-            // Let video player handle fullscreen via its own controls
-            // But we could add a callback here if needed
-          }
-          break;
-      }
-
-      return handled;
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
-    enabled,
-    onPlayPause,
-    onNextTrack,
-    onPreviousTrack,
-    onSeekForward,
-    onSeekBackward,
-    onVolumeUp,
-    onVolumeDown,
-    onMute,
-  ]);
-};
-
-/**
- * Hook specifically for playlist-based media controls
- * Only enables next/prev when in a playlist
+ * Hook for video player keyboard shortcuts
+ * Uses the new useKeyboardShortcuts hook with YouTube-standard shortcuts
  *
  * @param {Object} options Configuration options
  * @param {Object} options.playerRef Ref to Video.js player instance
@@ -166,65 +21,216 @@ export const usePlaylistMediaKeys = ({
 }) => {
   const hasPlaylist = playlist && playlist.scenes && playlist.scenes.length > 1;
 
-  useMediaKeys({
-    enabled: enabled && hasPlaylist,
+  // Define all keyboard shortcuts for the video player
+  const shortcuts = useMemo(
+    () => ({
+      // ============================================================================
+      // PLAYBACK CONTROL
+      // ============================================================================
 
-    onPlayPause: () => {
-      const player = playerRef.current;
-      if (player) {
-        if (player.paused()) {
-          player.play();
-        } else {
-          player.pause();
+      // Play/Pause (multiple keys for compatibility)
+      space: () => {
+        const player = playerRef.current;
+        if (player) {
+          if (player.paused()) {
+            player.play();
+          } else {
+            player.pause();
+          }
         }
-      }
-    },
+      },
 
-    onNextTrack: () => {
-      if (hasPlaylist && playNext) {
-        playNext();
-      }
-    },
+      k: () => {
+        const player = playerRef.current;
+        if (player) {
+          if (player.paused()) {
+            player.play();
+          } else {
+            player.pause();
+          }
+        }
+      },
 
-    onPreviousTrack: () => {
-      if (hasPlaylist && playPrevious) {
-        playPrevious();
-      }
-    },
+      // Standard media keys
+      mediaplaypause: () => {
+        const player = playerRef.current;
+        if (player) {
+          if (player.paused()) {
+            player.play();
+          } else {
+            player.pause();
+          }
+        }
+      },
 
-    onSeekForward: () => {
-      const player = playerRef.current;
-      if (player) {
-        player.currentTime(player.currentTime() + 10);
-      }
-    },
+      // ============================================================================
+      // SEEKING
+      // ============================================================================
 
-    onSeekBackward: () => {
-      const player = playerRef.current;
-      if (player) {
-        player.currentTime(Math.max(0, player.currentTime() - 10));
-      }
-    },
+      // Jump backward 10 seconds (J key - YouTube style)
+      j: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.currentTime(Math.max(0, player.currentTime() - 10));
+        }
+      },
 
-    onVolumeUp: () => {
-      const player = playerRef.current;
-      if (player) {
-        player.volume(Math.min(1, player.volume() + 0.1));
-      }
-    },
+      // Jump forward 10 seconds (L key - YouTube style)
+      l: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.currentTime(player.currentTime() + 10);
+        }
+      },
 
-    onVolumeDown: () => {
-      const player = playerRef.current;
-      if (player) {
-        player.volume(Math.max(0, player.volume() - 0.1));
-      }
-    },
+      // Arrow keys for 5-second jumps (no modifier needed)
+      left: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.currentTime(Math.max(0, player.currentTime() - 5));
+        }
+      },
 
-    onMute: () => {
-      const player = playerRef.current;
-      if (player) {
-        player.muted(!player.muted());
-      }
-    },
+      right: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.currentTime(player.currentTime() + 5);
+        }
+      },
+
+      // Media keys
+      mediafastforward: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.currentTime(player.currentTime() + 10);
+        }
+      },
+
+      mediarewind: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.currentTime(Math.max(0, player.currentTime() - 10));
+        }
+      },
+
+      // Jump to start/end
+      home: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.currentTime(0);
+        }
+      },
+
+      end: () => {
+        const player = playerRef.current;
+        if (player && player.duration()) {
+          player.currentTime(player.duration());
+        }
+      },
+
+      // Number keys for percentage jumps (0-9)
+      "0": () => jumpToPercentage(playerRef, 0),
+      "1": () => jumpToPercentage(playerRef, 10),
+      "2": () => jumpToPercentage(playerRef, 20),
+      "3": () => jumpToPercentage(playerRef, 30),
+      "4": () => jumpToPercentage(playerRef, 40),
+      "5": () => jumpToPercentage(playerRef, 50),
+      "6": () => jumpToPercentage(playerRef, 60),
+      "7": () => jumpToPercentage(playerRef, 70),
+      "8": () => jumpToPercentage(playerRef, 80),
+      "9": () => jumpToPercentage(playerRef, 90),
+
+      // ============================================================================
+      // VOLUME CONTROL
+      // ============================================================================
+
+      up: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.volume(Math.min(1, player.volume() + 0.05));
+        }
+      },
+
+      down: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.volume(Math.max(0, player.volume() - 0.05));
+        }
+      },
+
+      m: () => {
+        const player = playerRef.current;
+        if (player) {
+          player.muted(!player.muted());
+        }
+      },
+
+      // ============================================================================
+      // PLAYBACK SPEED
+      // ============================================================================
+
+      "shift+>": () => {
+        const player = playerRef.current;
+        if (player) {
+          const currentRate = player.playbackRate();
+          const newRate = Math.min(2, currentRate + 0.25);
+          player.playbackRate(newRate);
+        }
+      },
+
+      "shift+<": () => {
+        const player = playerRef.current;
+        if (player) {
+          const currentRate = player.playbackRate();
+          const newRate = Math.max(0.25, currentRate - 0.25);
+          player.playbackRate(newRate);
+        }
+      },
+
+      // ============================================================================
+      // DISPLAY CONTROL
+      // ============================================================================
+
+      f: () => {
+        const player = playerRef.current;
+        if (player) {
+          if (player.isFullscreen()) {
+            player.exitFullscreen();
+          } else {
+            player.requestFullscreen();
+          }
+        }
+      },
+
+      // ============================================================================
+      // PLAYLIST NAVIGATION (only if in a playlist)
+      // ============================================================================
+
+      ...(hasPlaylist && playNext && playPrevious
+        ? {
+            mediatracknext: () => playNext(),
+            mediatrackprevious: () => playPrevious(),
+          }
+        : {}),
+    }),
+    [playerRef, hasPlaylist, playNext, playPrevious]
+  );
+
+  // Use the video player shortcuts hook
+  useVideoPlayerShortcuts(playerRef, shortcuts, {
+    enabled: enabled && !!playerRef.current,
   });
 };
+
+/**
+ * Jump to a percentage of the video duration
+ * @param {Object} playerRef - Ref to Video.js player
+ * @param {number} percentage - Percentage (0-100)
+ */
+function jumpToPercentage(playerRef, percentage) {
+  const player = playerRef.current;
+  if (player && player.duration()) {
+    const targetTime = (player.duration() * percentage) / 100;
+    player.currentTime(targetTime);
+  }
+}

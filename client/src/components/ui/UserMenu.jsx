@@ -46,7 +46,6 @@ const UserMenu = () => {
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         variant="tertiary"
-        className="p-2"
         style={{
           backgroundColor: isOpen ? "var(--bg-card)" : "transparent",
           border: isOpen

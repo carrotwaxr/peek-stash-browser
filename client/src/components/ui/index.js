@@ -27,6 +27,7 @@ export { default as FilterPresets } from "./FilterPresets.jsx";
 export { default as GenderIcon } from "./GenderIcon.jsx";
 export { default as GlobalLayout } from "./GlobalLayout.jsx";
 export { GridCard } from "./GridCard.jsx";
+export { default as HelpModal } from "./HelpModal.jsx";
 export { default as InfoMessage } from "./InfoMessage.jsx";
 export { default as Lightbox } from "./Lightbox.jsx";
 export { default as LoadingSpinner } from "./LoadingSpinner.jsx";
