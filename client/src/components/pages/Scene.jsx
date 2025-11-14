@@ -134,7 +134,7 @@ const SceneContent = () => {
         {/* Two-column layout on desktop, single column on mobile */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6 mb-6">
           {/* Left Column: Video + Controls */}
-          <div ref={leftColumnRef} className="flex flex-col gap-4">
+          <div ref={leftColumnRef} className="flex flex-col gap-2">
             <VideoPlayer />
             <PlaybackControls />
 
