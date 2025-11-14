@@ -1,11 +1,11 @@
 /**
- * PageLayout component - Provides consistent page wrapper with responsive padding
- * Use this for all pages to ensure consistent spacing and layout
+ * PageLayout component - Provides consistent page wrapper with minimal padding
+ * Follows Plex/Jellyfin pattern: minimal edge spacing, let content flow naturally
  */
 const PageLayout = ({ children, className = "", fullHeight = false }) => {
   return (
     <div
-      className={`w-full py-8 px-4 lg:px-6 xl:px-8 ${fullHeight ? "min-h-screen" : ""} ${className}`}
+      className={`w-full py-8 px-4 ${fullHeight ? "min-h-screen" : ""} ${className}`}
     >
       {children}
     </div>

@@ -323,7 +323,8 @@ const SceneCardPreview = ({
       <img
         src={scene?.paths?.screenshot}
         alt={scene?.title || "Scene"}
-        className="w-full h-full object-cover pointer-events-none"
+        className="w-full h-full object-contain pointer-events-none"
+        style={{ backgroundColor: "var(--bg-secondary)" }}
         loading="lazy"
       />
 
@@ -333,7 +334,8 @@ const SceneCardPreview = ({
         previewDataLoaded && (
           <video
             src={getPreviewUrl()}
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            style={{ backgroundColor: "var(--bg-secondary)" }}
             autoPlay
             loop
             muted
@@ -348,7 +350,8 @@ const SceneCardPreview = ({
           <img
             src={getPreviewUrl()}
             alt={scene?.title || "Scene preview"}
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            style={{ backgroundColor: "var(--bg-secondary)" }}
           />
         )}
 

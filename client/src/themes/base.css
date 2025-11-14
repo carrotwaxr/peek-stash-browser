@@ -229,59 +229,6 @@ pre,
   display: none;
 }
 
-/* Additional responsive helpers for 10ft/TV mode */
-@media (min-width: 1920px) {
-  .container {
-    padding: 0 2rem;
-  }
-
-  /* Larger text for TV viewing */
-  body {
-    font-size: 18px;
-  }
-}
-
-/* Ultra-wide and large screen support */
-@media (min-width: 2560px) {
-  .container {
-    padding: 0 4rem;
-  }
-
-  body {
-    font-size: 20px;
-  }
-}
-
-/* 4K and 8K display support */
-@media (min-width: 3840px) {
-  .card-grid-responsive {
-    gap: 3rem;
-  }
-
-  /* Larger touch targets for 10ft mode */
-  .btn {
-    padding: 1rem 1.5rem;
-    font-size: 1.125rem;
-  }
-
-  /* Larger text for better visibility */
-  .text-sm {
-    font-size: 1.125rem;
-  }
-  .text-base {
-    font-size: 1.25rem;
-  }
-  .text-lg {
-    font-size: 1.5rem;
-  }
-  .text-xl {
-    font-size: 1.75rem;
-  }
-  .text-2xl {
-    font-size: 2.25rem;
-  }
-}
-
 /* Keyboard Navigation Styles */
 .keyboard-focused {
   /* Enhanced focus ring for keyboard navigation */
