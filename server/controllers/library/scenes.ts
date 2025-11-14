@@ -146,7 +146,7 @@ export async function mergeScenesWithUserData(
  * Apply quick scene filters (don't require merged user data)
  * These filters only access data already present in the scene object from cache
  */
-function applyQuickSceneFilters(
+export function applyQuickSceneFilters(
   scenes: NormalizedScene[],
   filters: PeekSceneFilter | null | undefined
 ): NormalizedScene[] {
@@ -163,7 +163,7 @@ function applyQuickSceneFilters(
   // Filter by performers
   if (filters.performers) {
     const { value: performerIds, modifier } = filters.performers;
-    if (!performerIds) return filtered;
+    if (!performerIds || performerIds.length === 0) return filtered;
     filtered = filtered.filter((s) => {
       const scenePerformerIds = (s.performers || []).map((p) => String(p.id));
       const filterPerformerIds = performerIds.map((id) => String(id));
@@ -189,7 +189,7 @@ function applyQuickSceneFilters(
   // Filter by tags (squashed: scene + performers + studio tags)
   if (filters.tags) {
     const { value: tagIds, modifier } = filters.tags;
-    if (!tagIds) return filtered;
+    if (!tagIds || tagIds.length === 0) return filtered;
     filtered = filtered.filter((s) => {
       // Collect all tag IDs from scene, performers, and studio
       const allTagIds = new Set<string>();
@@ -225,7 +225,7 @@ function applyQuickSceneFilters(
   // Filter by studios
   if (filters.studios) {
     const { value: studioIds, modifier } = filters.studios;
-    if (!studioIds) return filtered;
+    if (!studioIds || studioIds.length === 0) return filtered;
     filtered = filtered.filter((s) => {
       if (!s.studio) return modifier === "EXCLUDES";
       const filterStudioIds = studioIds.map((id) => String(id));
@@ -243,7 +243,7 @@ function applyQuickSceneFilters(
   // Filter by groups
   if (filters.groups) {
     const { value: groupIds, modifier } = filters.groups;
-    if (!groupIds) return filtered;
+    if (!groupIds || groupIds.length === 0) return filtered;
 
     filtered = filtered.filter((s) => {
       // After transformScene, groups are flattened: { id, name, scene_index }
@@ -402,6 +402,30 @@ function applyQuickSceneFilters(
     });
   }
 
+  // Filter by orientation
+  if (filters.orientation) {
+    const { value: orientations } = filters.orientation;
+    if (!orientations || orientations.length === 0) return filtered;
+
+    filtered = filtered.filter((s) => {
+      const width = s.files?.[0]?.width || 0;
+      const height = s.files?.[0]?.height || 0;
+
+      // Determine scene orientation from dimensions
+      let sceneOrientation: string;
+      if (width > height) {
+        sceneOrientation = "LANDSCAPE";
+      } else if (width < height) {
+        sceneOrientation = "PORTRAIT";
+      } else {
+        sceneOrientation = "SQUARE";
+      }
+
+      // Check if scene orientation matches any of the filter orientations
+      return orientations.includes(sceneOrientation as any);
+    });
+  }
+
   // Filter by title
   if (filters.title) {
     const { value, modifier } = filters.title;
@@ -435,7 +459,7 @@ function applyQuickSceneFilters(
  * Apply expensive scene filters (require merged user data)
  * These filters access user-specific data (ratings, watch history, favorites)
  */
-function applyExpensiveSceneFilters(
+export function applyExpensiveSceneFilters(
   scenes: NormalizedScene[],
   filters: PeekSceneFilter | null | undefined
 ): NormalizedScene[] {

@@ -349,6 +349,18 @@ export const SCENE_FILTER_OPTIONS = [
     max: 120,
   },
   {
+    key: "orientation",
+    label: "Orientation",
+    type: "select",
+    defaultValue: "",
+    options: [
+      { value: "LANDSCAPE", label: "Landscape" },
+      { value: "PORTRAIT", label: "Portrait" },
+      { value: "SQUARE", label: "Square" },
+    ],
+    placeholder: "Any orientation",
+  },
+  {
     key: "audioCodec",
     label: "Audio Codec",
     type: "text",
@@ -1351,6 +1363,13 @@ export const buildSceneFilter = (filters) => {
     sceneFilter.audio_codec = {
       value: filters.audioCodec,
       modifier: "INCLUDES",
+    };
+  }
+
+  // Orientation filter
+  if (filters.orientation) {
+    sceneFilter.orientation = {
+      value: [filters.orientation],
     };
   }
 
