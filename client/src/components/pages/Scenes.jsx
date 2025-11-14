@@ -1,7 +1,7 @@
 import { useRef } from "react";
-import SceneSearch from "../scene-search/SceneSearch.jsx";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import SceneSearch from "../scene-search/SceneSearch.jsx";
 
 const Scenes = () => {
   usePageTitle("Scenes");

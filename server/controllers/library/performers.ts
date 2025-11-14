@@ -1,17 +1,17 @@
 import type { Response } from "express";
+import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
-import { logger } from "../../utils/logger.js";
+import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
+import getStash from "../../stash.js";
 import type {
   NormalizedPerformer,
   PeekPerformerFilter,
 } from "../../types/index.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { userStatsService } from "../../services/UserStatsService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
-import getStash from "../../stash.js";
+import { logger } from "../../utils/logger.js";
 
 /**
  * Merge user-specific data into performers
@@ -106,10 +106,11 @@ export const findPerformers = async (
 
       // Apply content restrictions (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredPerformers = await userRestrictionService.filterPerformersForUser(
-          filteredPerformers,
-          userId
-        );
+        filteredPerformers =
+          await userRestrictionService.filterPerformersForUser(
+            filteredPerformers,
+            userId
+          );
       }
 
       // Filter empty performers (non-admins only)
@@ -129,8 +130,10 @@ export const findPerformers = async (
         );
 
         // Then filter for empty entities
-        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleGalleries =
+          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups =
+          emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter performers using properly restricted visibility sets
         filteredPerformers = emptyEntityFilterService.filterEmptyPerformers(
@@ -148,7 +151,10 @@ export const findPerformers = async (
         cacheVersion
       );
     } else {
-      logger.debug("Performers cache hit", { userId, entityCount: filteredPerformers.length });
+      logger.debug("Performers cache hit", {
+        userId,
+        entityCount: filteredPerformers.length,
+      });
     }
 
     // Use cached/filtered performers for remaining operations
@@ -245,13 +251,19 @@ function applyPerformerFilters(
         const filterTagIds = tagIds.map(String);
 
         if (modifier === "INCLUDES_ALL") {
-          return filterTagIds.every((id: string) => performerTagIds.includes(id));
+          return filterTagIds.every((id: string) =>
+            performerTagIds.includes(id)
+          );
         }
         if (modifier === "INCLUDES") {
-          return filterTagIds.some((id: string) => performerTagIds.includes(id));
+          return filterTagIds.some((id: string) =>
+            performerTagIds.includes(id)
+          );
         }
         if (modifier === "EXCLUDES") {
-          return !filterTagIds.some((id: string) => performerTagIds.includes(id));
+          return !filterTagIds.some((id: string) =>
+            performerTagIds.includes(id)
+          );
         }
         return true;
       });
@@ -525,8 +537,10 @@ export const findPerformersMinimal = async (
         );
 
         // Then filter for empty entities
-        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleGalleries =
+          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups =
+          emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter performers using properly restricted visibility sets
         filteredPerformers = emptyEntityFilterService.filterEmptyPerformers(
@@ -544,7 +558,10 @@ export const findPerformersMinimal = async (
         cacheVersion
       );
     } else {
-      logger.debug("Performers minimal cache hit", { userId, entityCount: filteredPerformers.length });
+      logger.debug("Performers minimal cache hit", {
+        userId,
+        entityCount: filteredPerformers.length,
+      });
     }
 
     // Use cached/filtered performers
@@ -571,10 +588,10 @@ export const findPerformersMinimal = async (
         typeof aValue === "string" && typeof bValue === "string"
           ? aValue.localeCompare(bValue)
           : aValue > bValue
-          ? 1
-          : aValue < bValue
-          ? -1
-          : 0;
+            ? 1
+            : aValue < bValue
+              ? -1
+              : 0;
       return sortDirection.toUpperCase() === "DESC" ? -comparison : comparison;
     });
 

@@ -1,15 +1,15 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
 import {
-  getUserPlaylists,
-  getPlaylist,
-  createPlaylist,
-  updatePlaylist,
-  deletePlaylist,
   addSceneToPlaylist,
+  createPlaylist,
+  deletePlaylist,
+  getPlaylist,
+  getUserPlaylists,
   removeSceneFromPlaylist,
   reorderPlaylist,
+  updatePlaylist,
 } from "../controllers/playlist.js";
+import { authenticateToken } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();

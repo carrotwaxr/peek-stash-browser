@@ -11,15 +11,13 @@
  * - Import base types from stashapp-api when working with raw Stash GraphQL responses
  * - Import Normalized types from here when working with cached data or API responses to clients
  */
-
 import type {
-  Scene,
-  Performer,
-  Studio,
-  Tag,
   Gallery,
   Group,
-  Image,
+  Performer,
+  Scene,
+  Studio,
+  Tag,
 } from "stashapp-api";
 
 /**
@@ -149,11 +147,3 @@ export type NormalizedGroup = Group & {
   rating: number | null;
   favorite: boolean;
 };
-
-/**
- * Normalized Image
- *
- * Currently no additional fields, but defined for consistency.
- * Future: May add user ratings, favorites, etc.
- */
-export type NormalizedImage = Image;

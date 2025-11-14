@@ -4,14 +4,13 @@
  * These types extend the base filter types from stashapp-api
  * to include Peek-specific filter fields.
  */
-
 import type {
-  SceneFilterType as BaseSceneFilterType,
-  PerformerFilterType as BasePerformerFilterType,
-  StudioFilterType as BaseStudioFilterType,
-  TagFilterType as BaseTagFilterType,
   GalleryFilterType as BaseGalleryFilterType,
   GroupFilterType as BaseGroupFilterType,
+  PerformerFilterType as BasePerformerFilterType,
+  SceneFilterType as BaseSceneFilterType,
+  StudioFilterType as BaseStudioFilterType,
+  TagFilterType as BaseTagFilterType,
 } from "stashapp-api";
 
 /**

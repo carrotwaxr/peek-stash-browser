@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { themes as builtInThemes, defaultTheme, generateThemeCSSVars } from "./themes.js";
-import { ThemeContext } from "./ThemeContext.js";
 import axios from "axios";
+import { ThemeContext } from "./ThemeContext.js";
+import {
+  themes as builtInThemes,
+  defaultTheme,
+  generateThemeCSSVars,
+} from "./themes.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -90,9 +94,11 @@ export const ThemeProvider = ({ children }) => {
       });
     } else if (builtInThemes[currentTheme]) {
       // Fallback to built-in theme if custom theme not loaded yet
-      Object.entries(builtInThemes[currentTheme].properties).forEach(([property, value]) => {
-        root.style.setProperty(property, value);
-      });
+      Object.entries(builtInThemes[currentTheme].properties).forEach(
+        ([property, value]) => {
+          root.style.setProperty(property, value);
+        }
+      );
     }
   }, [currentTheme, allThemes]);
 

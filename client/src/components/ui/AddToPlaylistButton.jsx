@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { showSuccess, showWarning, showError } from "../../utils/toast.jsx";
+import { showError, showSuccess, showWarning } from "../../utils/toast.jsx";
 import Button from "./Button.jsx";
 import Paper from "./Paper.jsx";
 
@@ -16,7 +16,7 @@ const AddToPlaylistButton = ({
   buttonText,
   icon,
   dropdownPosition = "below", // "below" or "above"
-  onSuccess // Optional callback called after successful add
+  onSuccess, // Optional callback called after successful add
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [playlists, setPlaylists] = useState([]);
@@ -48,7 +48,8 @@ const AddToPlaylistButton = ({
 
     if (showMenu) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showMenu]);
 
@@ -135,7 +136,7 @@ const AddToPlaylistButton = ({
       const { addedCount } = await addToPlaylist(newPlaylistId, true);
 
       showSuccess(
-        `Playlist created and ${addedCount} ${addedCount === 1 ? 'scene' : 'scenes'} added!`
+        `Playlist created and ${addedCount} ${addedCount === 1 ? "scene" : "scenes"} added!`
       );
       setNewPlaylistName("");
       setNewPlaylistDescription("");
@@ -275,75 +276,80 @@ const AddToPlaylistButton = ({
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
           onClick={() => setShowCreateModal(false)}
         >
-          <Paper className="max-w-md w-full m-4" onClick={(e) => e.stopPropagation()}>
+          <Paper
+            className="max-w-md w-full m-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Paper.Header title="Create New Playlist" />
             <form onSubmit={createPlaylistAndAdd}>
               <Paper.Body>
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="playlistName"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Playlist Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="playlistName"
-                    value={newPlaylistName}
-                    onChange={(e) => setNewPlaylistName(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    placeholder="Enter playlist name"
-                    required
-                    autoFocus
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="playlistName"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Playlist Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="playlistName"
+                      value={newPlaylistName}
+                      onChange={(e) => setNewPlaylistName(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      placeholder="Enter playlist name"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="playlistDescription"
+                      className="block text-sm font-medium mb-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      id="playlistDescription"
+                      value={newPlaylistDescription}
+                      onChange={(e) =>
+                        setNewPlaylistDescription(e.target.value)
+                      }
+                      className="w-full px-4 py-2 rounded-lg"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                      placeholder="Enter description (optional)"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => setShowCreateModal(false)}
+                      variant="secondary"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={creating || !newPlaylistName.trim()}
+                      variant="primary"
+                      loading={creating}
+                    >
+                      Create & Add
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <label
-                    htmlFor="playlistDescription"
-                    className="block text-sm font-medium mb-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    id="playlistDescription"
-                    value={newPlaylistDescription}
-                    onChange={(e) => setNewPlaylistDescription(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                    placeholder="Enter description (optional)"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex gap-3 justify-end">
-                  <Button
-                    type="button"
-                    onClick={() => setShowCreateModal(false)}
-                    variant="secondary"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={creating || !newPlaylistName.trim()}
-                    variant="primary"
-                    loading={creating}
-                  >
-                    Create & Add
-                  </Button>
-                </div>
-              </div>
               </Paper.Body>
             </form>
           </Paper>

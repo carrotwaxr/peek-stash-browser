@@ -1,10 +1,10 @@
-import { Response } from "express";
-import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
-import getStash from "../stash.js";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import { WatchHistory } from "@prisma/client";
+import { Response } from "express";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import prisma from "../prisma/singleton.js";
 import { userStatsService } from "../services/UserStatsService.js";
+import getStash from "../stash.js";
+import { logger } from "../utils/logger.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
 // Key format: "userId:sceneId"
@@ -543,7 +543,12 @@ export async function clearAllWatchHistory(
     logger.info("Clearing all watch history and stats", { userId });
 
     // Delete watch history and all related stats in parallel
-    const [watchHistoryResult, performerStatsResult, studioStatsResult, tagStatsResult] = await Promise.all([
+    const [
+      watchHistoryResult,
+      performerStatsResult,
+      studioStatsResult,
+      tagStatsResult,
+    ] = await Promise.all([
       prisma.watchHistory.deleteMany({ where: { userId } }),
       prisma.userPerformerStats.deleteMany({ where: { userId } }),
       prisma.userStudioStats.deleteMany({ where: { userId } }),

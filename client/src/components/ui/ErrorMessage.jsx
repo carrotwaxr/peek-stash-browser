@@ -15,26 +15,27 @@ const ErrorMessage = ({
   if (!error) return null;
 
   // Extract error message from error object or use string directly
-  const errorMessage = typeof error === 'string'
-    ? error
-    : error?.message || error?.toString() || "An error occurred";
+  const errorMessage =
+    typeof error === "string"
+      ? error
+      : error?.message || error?.toString() || "An error occurred";
 
-  const baseClasses = mode === "inline"
-    ? "px-4 py-3 rounded-lg border"
-    : "px-4 py-3 rounded-lg";
+  const baseClasses =
+    mode === "inline" ? "px-4 py-3 rounded-lg border" : "px-4 py-3 rounded-lg";
 
-  const containerStyle = mode === "toast"
-    ? {
-        backgroundColor: "var(--toast-error-bg)",
-        border: "2px solid var(--toast-error-border)",
-        color: "white",
-        boxShadow: `0 10px 25px -5px var(--toast-error-shadow), 0 8px 10px -6px var(--toast-error-shadow)`,
-      }
-    : {
-        backgroundColor: "var(--bg-card)",
-        borderColor: "var(--status-error)",
-        color: "var(--text-primary)",
-      };
+  const containerStyle =
+    mode === "toast"
+      ? {
+          backgroundColor: "var(--toast-error-bg)",
+          border: "2px solid var(--toast-error-border)",
+          color: "white",
+          boxShadow: `0 10px 25px -5px var(--toast-error-shadow), 0 8px 10px -6px var(--toast-error-shadow)`,
+        }
+      : {
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--status-error)",
+          color: "var(--text-primary)",
+        };
 
   return (
     <div
@@ -47,7 +48,9 @@ const ErrorMessage = ({
           {/* Error Icon */}
           <svg
             className="w-5 h-5 flex-shrink-0 mt-0.5"
-            style={{ color: mode === "toast" ? "white" : "var(--status-error)" }}
+            style={{
+              color: mode === "toast" ? "white" : "var(--status-error)",
+            }}
             fill="currentColor"
             viewBox="0 0 20 20"
           >
@@ -59,7 +62,10 @@ const ErrorMessage = ({
           </svg>
           <div>
             {mode === "inline" && (
-              <strong className="font-semibold" style={{ color: "var(--status-error)" }}>
+              <strong
+                className="font-semibold"
+                style={{ color: "var(--status-error)" }}
+              >
                 {title}:{" "}
               </strong>
             )}

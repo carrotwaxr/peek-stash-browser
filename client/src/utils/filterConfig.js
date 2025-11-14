@@ -82,7 +82,7 @@ export const GROUP_SORT_OPTIONS = [
 ];
 
 // Filter type options for different data types
-export const RATING_OPTIONS = [
+const RATING_OPTIONS = [
   { value: "1", label: "1 Star" },
   { value: "2", label: "2 Stars" },
   { value: "3", label: "3 Stars" },
@@ -90,7 +90,7 @@ export const RATING_OPTIONS = [
   { value: "5", label: "5 Stars" },
 ];
 
-export const GENDER_OPTIONS = [
+const GENDER_OPTIONS = [
   { value: "MALE", label: "Male" },
   { value: "FEMALE", label: "Female" },
   { value: "TRANSGENDER_MALE", label: "Trans Male" },
@@ -99,7 +99,7 @@ export const GENDER_OPTIONS = [
   { value: "NON_BINARY", label: "Non-Binary" },
 ];
 
-export const ETHNICITY_OPTIONS = [
+const ETHNICITY_OPTIONS = [
   { value: "CAUCASIAN", label: "Caucasian" },
   { value: "BLACK", label: "Black" },
   { value: "ASIAN", label: "Asian" },
@@ -110,7 +110,7 @@ export const ETHNICITY_OPTIONS = [
   { value: "OTHER", label: "Other" },
 ];
 
-export const HAIR_COLOR_OPTIONS = [
+const HAIR_COLOR_OPTIONS = [
   { value: "BLONDE", label: "Blonde" },
   { value: "BRUNETTE", label: "Brunette" },
   { value: "BLACK", label: "Black" },
@@ -122,7 +122,7 @@ export const HAIR_COLOR_OPTIONS = [
   { value: "OTHER", label: "Other" },
 ];
 
-export const EYE_COLOR_OPTIONS = [
+const EYE_COLOR_OPTIONS = [
   { value: "BROWN", label: "Brown" },
   { value: "BLUE", label: "Blue" },
   { value: "GREEN", label: "Green" },
@@ -131,23 +131,18 @@ export const EYE_COLOR_OPTIONS = [
   { value: "OTHER", label: "Other" },
 ];
 
-export const FAKE_TITS_OPTIONS = [
+const FAKE_TITS_OPTIONS = [
   { value: "TRUE", label: "Fake" },
   { value: "FALSE", label: "Natural" },
 ];
 
-export const ORGANIZED_OPTIONS = [
+const ORGANIZED_OPTIONS = [
   { value: "TRUE", label: "Organized" },
   { value: "FALSE", label: "Not Organized" },
 ];
 
-export const FAVORITE_OPTIONS = [
-  { value: "TRUE", label: "Favorite" },
-  { value: "FALSE", label: "Not Favorite" },
-];
-
 // Resolution options (common video resolutions)
-export const RESOLUTION_OPTIONS = [
+const RESOLUTION_OPTIONS = [
   { value: "720", label: "720p" },
   { value: "1080", label: "1080p" },
   { value: "1440", label: "1440p" },
@@ -155,14 +150,14 @@ export const RESOLUTION_OPTIONS = [
 ];
 
 // Multi-criterion modifier options (for tags, performers, etc.)
-export const MULTI_MODIFIER_OPTIONS = [
+const MULTI_MODIFIER_OPTIONS = [
   { value: "INCLUDES_ALL", label: "Has ALL of these" },
   { value: "INCLUDES", label: "Has ANY of these" },
   { value: "EXCLUDES", label: "Has NONE of these" },
 ];
 
 // Group/Collection modifier options (simpler - just include/exclude)
-export const GROUP_MODIFIER_OPTIONS = [
+const GROUP_MODIFIER_OPTIONS = [
   { value: "INCLUDES", label: "In ANY of these" },
   { value: "EXCLUDES", label: "NOT in these" },
 ];
@@ -973,7 +968,10 @@ export const buildSceneFilter = (filters) => {
   if (performerIds.length > 0) {
     sceneFilter.performers = {
       value: [...new Set(performerIds)], // Remove duplicates
-      modifier: filters.performerIdsModifier || filters.performers?.modifier || "INCLUDES",
+      modifier:
+        filters.performerIdsModifier ||
+        filters.performers?.modifier ||
+        "INCLUDES",
     };
   }
 
@@ -1003,7 +1001,8 @@ export const buildSceneFilter = (filters) => {
   if (tagIds.length > 0) {
     sceneFilter.tags = {
       value: [...new Set(tagIds)], // Remove duplicates
-      modifier: filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
+      modifier:
+        filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
     };
   }
 
@@ -1018,7 +1017,8 @@ export const buildSceneFilter = (filters) => {
   if (groupIds.length > 0) {
     sceneFilter.groups = {
       value: [...new Set(groupIds)], // Remove duplicates
-      modifier: filters.groupIdsModifier || filters.groups?.modifier || "INCLUDES",
+      modifier:
+        filters.groupIdsModifier || filters.groups?.modifier || "INCLUDES",
     };
   }
 

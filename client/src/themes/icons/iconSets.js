@@ -1,7 +1,7 @@
 // Theme-based icon sets
 // Each theme can have its own icon pack
 
-export const iconSets = {
+const iconSets = {
   peek: {
     // Default "Peek" theme icons
     name: "peek",
@@ -65,7 +65,7 @@ export const iconSets = {
   },
 };
 
-export const getIconSet = (themeName) => {
+const getIconSet = (themeName) => {
   return iconSets[themeName] || iconSets.peek;
 };
 

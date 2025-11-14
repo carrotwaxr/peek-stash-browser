@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { ErrorMessage, PageHeader, PageLayout } from "../ui";
-import SceneGrid from "./SceneGrid.jsx";
-import SearchControls from "../ui/SearchControls.jsx";
-import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
+import {
+  CacheLoadingBanner,
+  ErrorMessage,
+  PageHeader,
+  PageLayout,
+  SearchControls,
+} from "../ui/index.js";
+import SceneGrid from "./SceneGrid.jsx";
 
 /**
  * SceneSearch is one of the more core Components of the app. It appears on most pages, and utilizes the

@@ -1,6 +1,6 @@
 import prisma from "../prisma/singleton.js";
-import { stashCacheManager } from "./StashCacheManager.js";
 import { logger } from "../utils/logger.js";
+import { stashCacheManager } from "./StashCacheManager.js";
 
 /**
  * UserStatsService
@@ -40,7 +40,9 @@ class UserStatsService {
    * Get all performer stats for a user
    * Returns a Map for O(1) lookup by performerId
    */
-  async getPerformerStats(userId: number): Promise<Map<string, Omit<PerformerStats, 'performerId'>>> {
+  async getPerformerStats(
+    userId: number
+  ): Promise<Map<string, Omit<PerformerStats, "performerId">>> {
     const stats = await prisma.userPerformerStats.findMany({
       where: { userId },
       select: {
@@ -69,7 +71,9 @@ class UserStatsService {
    * Get all studio stats for a user
    * Returns a Map for O(1) lookup by studioId
    */
-  async getStudioStats(userId: number): Promise<Map<string, Omit<StudioStats, 'studioId'>>> {
+  async getStudioStats(
+    userId: number
+  ): Promise<Map<string, Omit<StudioStats, "studioId">>> {
     const stats = await prisma.userStudioStats.findMany({
       where: { userId },
       select: {
@@ -94,7 +98,9 @@ class UserStatsService {
    * Get all tag stats for a user
    * Returns a Map for O(1) lookup by tagId
    */
-  async getTagStats(userId: number): Promise<Map<string, Omit<TagStats, 'tagId'>>> {
+  async getTagStats(
+    userId: number
+  ): Promise<Map<string, Omit<TagStats, "tagId">>> {
     const stats = await prisma.userTagStats.findMany({
       where: { userId },
       select: {
@@ -325,20 +331,29 @@ class UserStatsService {
       });
 
       // Aggregate stats by entity
-      const performerStatsMap = new Map<string, {
-        oCounter: number;
-        playCount: number;
-        lastPlayedAt: Date | null;
-        lastOAt: Date | null;
-      }>();
-      const studioStatsMap = new Map<string, {
-        oCounter: number;
-        playCount: number;
-      }>();
-      const tagStatsMap = new Map<string, {
-        oCounter: number;
-        playCount: number;
-      }>();
+      const performerStatsMap = new Map<
+        string,
+        {
+          oCounter: number;
+          playCount: number;
+          lastPlayedAt: Date | null;
+          lastOAt: Date | null;
+        }
+      >();
+      const studioStatsMap = new Map<
+        string,
+        {
+          oCounter: number;
+          playCount: number;
+        }
+      >();
+      const tagStatsMap = new Map<
+        string,
+        {
+          oCounter: number;
+          playCount: number;
+        }
+      >();
 
       for (const wh of watchHistory) {
         const scene = stashCacheManager.getScene(wh.sceneId);
@@ -352,12 +367,12 @@ class UserStatsService {
           ? wh.playHistory
           : JSON.parse((wh.playHistory as string) || "[]");
 
-        const lastPlayedAt = playHistory.length > 0
-          ? new Date(playHistory[playHistory.length - 1])
-          : null;
-        const lastOAt = oHistory.length > 0
-          ? new Date(oHistory[oHistory.length - 1])
-          : null;
+        const lastPlayedAt =
+          playHistory.length > 0
+            ? new Date(playHistory[playHistory.length - 1])
+            : null;
+        const lastOAt =
+          oHistory.length > 0 ? new Date(oHistory[oHistory.length - 1]) : null;
 
         // Aggregate performers
         for (const performer of scene.performers || []) {
@@ -371,12 +386,15 @@ class UserStatsService {
           performerStatsMap.set(performer.id, {
             oCounter: existing.oCounter + (wh.oCount || 0),
             playCount: existing.playCount + (wh.playCount || 0),
-            lastPlayedAt: lastPlayedAt && (!existing.lastPlayedAt || lastPlayedAt > existing.lastPlayedAt)
-              ? lastPlayedAt
-              : existing.lastPlayedAt,
-            lastOAt: lastOAt && (!existing.lastOAt || lastOAt > existing.lastOAt)
-              ? lastOAt
-              : existing.lastOAt,
+            lastPlayedAt:
+              lastPlayedAt &&
+              (!existing.lastPlayedAt || lastPlayedAt > existing.lastPlayedAt)
+                ? lastPlayedAt
+                : existing.lastPlayedAt,
+            lastOAt:
+              lastOAt && (!existing.lastOAt || lastOAt > existing.lastOAt)
+                ? lastOAt
+                : existing.lastOAt,
           });
         }
 
@@ -412,23 +430,27 @@ class UserStatsService {
       await Promise.all([
         // Performers
         prisma.userPerformerStats.createMany({
-          data: Array.from(performerStatsMap.entries()).map(([performerId, stats]) => ({
-            userId,
-            performerId,
-            oCounter: stats.oCounter,
-            playCount: stats.playCount,
-            lastPlayedAt: stats.lastPlayedAt,
-            lastOAt: stats.lastOAt,
-          })),
+          data: Array.from(performerStatsMap.entries()).map(
+            ([performerId, stats]) => ({
+              userId,
+              performerId,
+              oCounter: stats.oCounter,
+              playCount: stats.playCount,
+              lastPlayedAt: stats.lastPlayedAt,
+              lastOAt: stats.lastOAt,
+            })
+          ),
         }),
         // Studios
         prisma.userStudioStats.createMany({
-          data: Array.from(studioStatsMap.entries()).map(([studioId, stats]) => ({
-            userId,
-            studioId,
-            oCounter: stats.oCounter,
-            playCount: stats.playCount,
-          })),
+          data: Array.from(studioStatsMap.entries()).map(
+            ([studioId, stats]) => ({
+              userId,
+              studioId,
+              oCounter: stats.oCounter,
+              playCount: stats.playCount,
+            })
+          ),
         }),
         // Tags
         prisma.userTagStats.createMany({

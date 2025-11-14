@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-react";
-import Button from "../ui/Button.jsx";
+import { useEffect, useState } from "react";
+import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
+import { Button } from "../ui/index.js";
 
 /**
  * Carousel metadata mapping fetchKey to display information
@@ -122,7 +122,8 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
           Homepage Carousels
         </h3>
         <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
-          Use arrow buttons to reorder carousels, click the eye icon to toggle visibility
+          Use arrow buttons to reorder carousels, click the eye icon to toggle
+          visibility
         </p>
       </div>
 

@@ -8,7 +8,9 @@
 /* Keyboard Navigation Focus Styles - TV-friendly indicators */
 .keyboard-focus {
   outline: none !important;
-  box-shadow: var(--focus-ring-shadow), 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+  box-shadow:
+    var(--focus-ring-shadow),
+    0 8px 24px rgba(0, 0, 0, 0.4) !important;
   transform: scale(1.05) !important;
   z-index: 10 !important;
   transition: all 0.2s ease-in-out !important;
@@ -17,7 +19,7 @@
 }
 
 .keyboard-focus::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: -8px;
   border-radius: inherit;
@@ -27,7 +29,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.6;
     transform: scale(1);
   }
@@ -48,7 +51,9 @@ a:focus-visible,
 
 /* Skip navigation on mouse interaction */
 .keyboard-focus:hover {
-  box-shadow: var(--focus-ring-shadow), 0 12px 32px rgba(0, 0, 0, 0.5) !important;
+  box-shadow:
+    var(--focus-ring-shadow),
+    0 12px 32px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* Scene card hover/selection states */
@@ -108,10 +113,14 @@ a:focus-visible,
 
 .range-slider::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 0 10px rgba(255, 255, 255, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.6);
 }
 
 .range-slider::-moz-range-thumb:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 0 10px rgba(255, 255, 255, 0.1), 0 4px 12px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 0 10px rgba(255, 255, 255, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.6);
 }

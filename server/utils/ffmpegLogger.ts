@@ -7,7 +7,6 @@
  * - Filters out noise and repetitive messages
  * - Logs only important events at appropriate levels
  */
-
 import { logger } from "./logger.js";
 
 export interface FFmpegProgress {
@@ -111,7 +110,11 @@ export function createThrottledFFmpegHandler(
 
     // Collect progress samples for smoothing
     const progress = parseFFmpegProgress(output);
-    if (progress && progress.speed !== undefined && progress.fps !== undefined) {
+    if (
+      progress &&
+      progress.speed !== undefined &&
+      progress.fps !== undefined
+    ) {
       const now = Date.now();
 
       // Collect sample
@@ -124,8 +127,12 @@ export function createThrottledFFmpegHandler(
       // Log averaged progress at specified interval
       if (now - lastProgressLog >= intervalMs) {
         // Calculate averages from samples
-        const avgSpeed = progressSamples.reduce((sum, s) => sum + s.speed, 0) / progressSamples.length;
-        const avgFps = progressSamples.reduce((sum, s) => sum + s.fps, 0) / progressSamples.length;
+        const avgSpeed =
+          progressSamples.reduce((sum, s) => sum + s.speed, 0) /
+          progressSamples.length;
+        const avgFps =
+          progressSamples.reduce((sum, s) => sum + s.fps, 0) /
+          progressSamples.length;
 
         logger.info(
           `FFmpeg progress in session ${sessionId}: time=${progress.time} avgSpeed=${avgSpeed.toFixed(2)}x avgFps=${avgFps.toFixed(1)} (${progressSamples.length} samples over ${intervalMs / 1000}s)`

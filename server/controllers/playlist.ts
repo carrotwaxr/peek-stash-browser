@@ -1,14 +1,17 @@
 import { Response } from "express";
-import prisma from "../prisma/singleton.js";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Scene } from "stashapp-api";
-import { transformScene } from "../utils/pathMapping.js";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
+import { transformScene } from "../utils/pathMapping.js";
 
 /**
  * Get all playlists for current user
  */
-export const getUserPlaylists = async (req: AuthenticatedRequest, res: Response) => {
+export const getUserPlaylists = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -73,7 +76,7 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
 
     // Fetch scene details from Stash for all items
     if (playlist.items.length > 0) {
-      const sceneIds = playlist.items.map(item => item.sceneId);
+      const sceneIds = playlist.items.map((item) => item.sceneId);
 
       // Import getStash and fetch scenes
       const getStash = (await import("../stash.js")).default;
@@ -81,25 +84,32 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
 
       try {
         const scenesResponse = await stash.findScenes({
-          scene_ids: sceneIds.map(id => parseInt(id)),
+          scene_ids: sceneIds.map((id) => parseInt(id)),
         });
 
         const scenes = scenesResponse.findScenes.scenes;
 
         // Transform scenes to add API key to image paths
         // GraphQL response types don't exactly match Scene type, use unknown for type safety
-        const transformedScenes = scenes.map((s: unknown) => transformScene(s as Scene));
+        const transformedScenes = scenes.map((s: unknown) =>
+          transformScene(s as Scene)
+        );
 
         // Override with per-user watch history
         const { mergeScenesWithUserData } = await import("./library/scenes.js");
         // Type assertion safe: scenes from API are compatible with Normalized type structure
-        const scenesWithUserHistory = await mergeScenesWithUserData(transformedScenes as unknown as NormalizedScene[], userId);
+        const scenesWithUserHistory = await mergeScenesWithUserData(
+          transformedScenes as unknown as NormalizedScene[],
+          userId
+        );
 
         // Create a map of scene ID to scene data
-        const sceneMap = new Map(scenesWithUserHistory.map((s: NormalizedScene) => [s.id, s]));
+        const sceneMap = new Map(
+          scenesWithUserHistory.map((s: NormalizedScene) => [s.id, s])
+        );
 
         // Attach scene data to each playlist item
-        const itemsWithScenes = playlist.items.map(item => ({
+        const itemsWithScenes = playlist.items.map((item) => ({
           ...item,
           scene: sceneMap.get(item.sceneId) || null,
         }));
@@ -108,7 +118,7 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
           playlist: {
             ...playlist,
             items: itemsWithScenes,
-          }
+          },
         });
       } catch (stashError) {
         console.error("Error fetching scenes from Stash:", stashError);
@@ -127,7 +137,10 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Create new playlist
  */
-export const createPlaylist = async (req: AuthenticatedRequest, res: Response) => {
+export const createPlaylist = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -165,7 +178,10 @@ export const createPlaylist = async (req: AuthenticatedRequest, res: Response) =
 /**
  * Update playlist
  */
-export const updatePlaylist = async (req: AuthenticatedRequest, res: Response) => {
+export const updatePlaylist = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const playlistId = parseInt(req.params.id);
@@ -196,7 +212,9 @@ export const updatePlaylist = async (req: AuthenticatedRequest, res: Response) =
       where: { id: playlistId },
       data: {
         ...(name !== undefined && { name: name.trim() }),
-        ...(description !== undefined && { description: description?.trim() || null }),
+        ...(description !== undefined && {
+          description: description?.trim() || null,
+        }),
         ...(isPublic !== undefined && { isPublic: isPublic === true }),
         ...(shuffle !== undefined && { shuffle: shuffle === true }),
         ...(repeat !== undefined && { repeat }),
@@ -218,7 +236,10 @@ export const updatePlaylist = async (req: AuthenticatedRequest, res: Response) =
 /**
  * Delete playlist
  */
-export const deletePlaylist = async (req: AuthenticatedRequest, res: Response) => {
+export const deletePlaylist = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const playlistId = parseInt(req.params.id);
@@ -258,7 +279,10 @@ export const deletePlaylist = async (req: AuthenticatedRequest, res: Response) =
 /**
  * Add scene to playlist
  */
-export const addSceneToPlaylist = async (req: AuthenticatedRequest, res: Response) => {
+export const addSceneToPlaylist = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const playlistId = parseInt(req.params.id);
@@ -312,7 +336,8 @@ export const addSceneToPlaylist = async (req: AuthenticatedRequest, res: Respons
     }
 
     // Calculate next position
-    const nextPosition = playlist.items.length > 0 ? playlist.items[0].position + 1 : 0;
+    const nextPosition =
+      playlist.items.length > 0 ? playlist.items[0].position + 1 : 0;
 
     const item = await prisma.playlistItem.create({
       data: {
@@ -332,7 +357,10 @@ export const addSceneToPlaylist = async (req: AuthenticatedRequest, res: Respons
 /**
  * Remove scene from playlist
  */
-export const removeSceneFromPlaylist = async (req: AuthenticatedRequest, res: Response) => {
+export const removeSceneFromPlaylist = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const playlistId = parseInt(req.params.id);
@@ -378,7 +406,10 @@ export const removeSceneFromPlaylist = async (req: AuthenticatedRequest, res: Re
 /**
  * Reorder playlist items
  */
-export const reorderPlaylist = async (req: AuthenticatedRequest, res: Response) => {
+export const reorderPlaylist = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
     const playlistId = parseInt(req.params.id);

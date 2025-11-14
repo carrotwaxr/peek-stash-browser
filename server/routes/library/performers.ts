@@ -1,13 +1,10 @@
 import express from "express";
 import {
-  authenticateToken,
-  requireCacheReady,
-} from "../../middleware/auth.js";
-import {
   findPerformers,
   findPerformersMinimal,
   updatePerformer,
 } from "../../controllers/library/performers.js";
+import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();

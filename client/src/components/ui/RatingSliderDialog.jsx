@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -17,14 +17,26 @@ const RatingSliderDialog = ({
   anchorEl,
 }) => {
   // Track null separately - null means unrated, not 0
-  const [value, setValue] = useState(initialRating === null || initialRating === undefined ? null : initialRating / 10);
-  const [position, setPosition] = useState({ top: 0, left: 0, transformY: "-100%" });
+  const [value, setValue] = useState(
+    initialRating === null || initialRating === undefined
+      ? null
+      : initialRating / 10
+  );
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    transformY: "-100%",
+  });
   const popoverRef = useRef(null);
   const debounceTimerRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
-      setValue(initialRating === null || initialRating === undefined ? null : initialRating / 10);
+      setValue(
+        initialRating === null || initialRating === undefined
+          ? null
+          : initialRating / 10
+      );
     }
   }, [isOpen, initialRating]);
 
@@ -75,7 +87,11 @@ const RatingSliderDialog = ({
     if (!isOpen) return;
 
     const handleClickOutside = (e) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target) && !anchorEl?.contains(e.target)) {
+      if (
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target) &&
+        !anchorEl?.contains(e.target)
+      ) {
         onClose();
       }
     };
@@ -162,7 +178,10 @@ const RatingSliderDialog = ({
       <div className="mb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1">
-            <div className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+            <div
+              className="text-sm font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
               Rate {entityType}
             </div>
             {entityTitle && (
@@ -193,7 +212,9 @@ const RatingSliderDialog = ({
       <div className="text-center mb-4">
         <div
           className="text-4xl font-bold"
-          style={{ color: value === null ? "var(--text-muted)" : "var(--text-primary)" }}
+          style={{
+            color: value === null ? "var(--text-muted)" : "var(--text-primary)",
+          }}
         >
           {value === null ? "--" : value.toFixed(1)}
         </div>

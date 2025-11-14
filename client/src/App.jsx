@@ -1,14 +1,14 @@
-import { lazy, Suspense, useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import GlobalLayout from "./components/ui/GlobalLayout.jsx";
 import Login from "./components/pages/Login.jsx";
 import SetupWizard from "./components/pages/SetupWizard.jsx";
-import { ThemeProvider } from "./themes/ThemeProvider.jsx";
+import { GlobalLayout } from "./components/ui/index.js";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
 import { useAuth } from "./hooks/useAuth.js";
 import { setupApi } from "./services/api.js";
+import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import "./themes/base.css";
 
 // Lazy load page components for code splitting
@@ -20,23 +20,23 @@ const Studios = lazy(() => import("./components/pages/Studios.jsx"));
 const Tags = lazy(() => import("./components/pages/Tags.jsx"));
 const Groups = lazy(() => import("./components/pages/Groups.jsx"));
 const Galleries = lazy(() => import("./components/pages/Galleries.jsx"));
-const GalleryDetail = lazy(() =>
-  import("./components/pages/GalleryDetail.jsx")
+const GalleryDetail = lazy(
+  () => import("./components/pages/GalleryDetail.jsx")
 );
 const GroupDetail = lazy(() => import("./components/pages/GroupDetail.jsx"));
 const Scene = lazy(() => import("./components/pages/Scene.jsx"));
-const PerformerDetail = lazy(() =>
-  import("./components/pages/PerformerDetail.jsx")
+const PerformerDetail = lazy(
+  () => import("./components/pages/PerformerDetail.jsx")
 );
 const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
 const TagDetail = lazy(() => import("./components/pages/TagDetail.jsx"));
 const Settings = lazy(() => import("./components/pages/Settings.jsx"));
 const Playlists = lazy(() => import("./components/pages/Playlists.jsx"));
-const PlaylistDetail = lazy(() =>
-  import("./components/pages/PlaylistDetail.jsx")
+const PlaylistDetail = lazy(
+  () => import("./components/pages/PlaylistDetail.jsx")
 );
-const ServerSettings = lazy(() =>
-  import("./components/pages/ServerSettings.jsx")
+const ServerSettings = lazy(
+  () => import("./components/pages/ServerSettings.jsx")
 );
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
 

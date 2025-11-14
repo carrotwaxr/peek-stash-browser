@@ -1,14 +1,14 @@
 import type { Response } from "express";
-import prisma from "../../prisma/singleton.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
-import { logger } from "../../utils/logger.js";
-import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
-import getStash from "../../stash.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { userStatsService } from "../../services/UserStatsService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
+import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
+import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
+import getStash from "../../stash.js";
+import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
 
 /**
  * Merge user-specific data into tags
@@ -97,12 +97,19 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
 
       // Apply content restrictions (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredTags = await userRestrictionService.filterTagsForUser(filteredTags, userId);
+        filteredTags = await userRestrictionService.filterTagsForUser(
+          filteredTags,
+          userId
+        );
       }
 
       // Filter empty tags (non-admins only)
       // Skip filtering when fetching by specific IDs (detail page requests)
-      if (requestingUser && requestingUser.role !== "ADMIN" && !isFetchingByIds) {
+      if (
+        requestingUser &&
+        requestingUser.role !== "ADMIN" &&
+        !isFetchingByIds
+      ) {
         // Get all entities from cache
         let allGalleries = stashCacheManager.getAllGalleries();
         let allGroups = stashCacheManager.getAllGroups();
@@ -125,18 +132,21 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         // No direct performer restrictions, but we still process them
 
         // Then filter for empty entities in dependency order
-        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleGalleries =
+          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups =
+          emptyEntityFilterService.filterEmptyGroups(allGroups);
         const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
           allStudios,
           visibleGroups,
           visibleGalleries
         );
-        const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
-          allPerformers,
-          visibleGroups,
-          visibleGalleries
-        );
+        const visiblePerformers =
+          emptyEntityFilterService.filterEmptyPerformers(
+            allPerformers,
+            visibleGroups,
+            visibleGalleries
+          );
 
         const visibilitySet = {
           galleries: new Set(visibleGalleries.map((g) => g.id)),
@@ -145,7 +155,10 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
           performers: new Set(visiblePerformers.map((p) => p.id)),
         };
 
-        filteredTags = emptyEntityFilterService.filterEmptyTags(filteredTags, visibilitySet);
+        filteredTags = emptyEntityFilterService.filterEmptyTags(
+          filteredTags,
+          visibilitySet
+        );
       }
 
       // Store in cache
@@ -156,7 +169,10 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         cacheVersion
       );
     } else {
-      logger.debug("Tags cache hit", { userId, entityCount: filteredTags.length });
+      logger.debug("Tags cache hit", {
+        userId,
+        entityCount: filteredTags.length,
+      });
     }
 
     // Use cached/filtered tags for remaining operations
@@ -470,9 +486,10 @@ export const findTagsMinimal = async (
 
     // OPTIMIZATION: Skip expensive filtering only if user has NO content restrictions
     // Check if user has any restrictions configured
-    const userRestrictions = requestingUser && requestingUser.role !== "ADMIN"
-      ? await prisma.userContentRestriction.findMany({ where: { userId } })
-      : [];
+    const userRestrictions =
+      requestingUser && requestingUser.role !== "ADMIN"
+        ? await prisma.userContentRestriction.findMany({ where: { userId } })
+        : [];
 
     // Early return: If no restrictions, just return all tags (safe, nothing to leak)
     if (userRestrictions.length === 0) {
@@ -512,18 +529,21 @@ export const findTagsMinimal = async (
         );
 
         // Then filter for empty entities in dependency order
-        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleGalleries =
+          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups =
+          emptyEntityFilterService.filterEmptyGroups(allGroups);
         const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
           allStudios,
           visibleGroups,
           visibleGalleries
         );
-        const visiblePerformers = emptyEntityFilterService.filterEmptyPerformers(
-          allPerformers,
-          visibleGroups,
-          visibleGalleries
-        );
+        const visiblePerformers =
+          emptyEntityFilterService.filterEmptyPerformers(
+            allPerformers,
+            visibleGroups,
+            visibleGalleries
+          );
 
         const visibilitySet = {
           galleries: new Set(visibleGalleries.map((g) => g.id)),
@@ -532,7 +552,10 @@ export const findTagsMinimal = async (
           performers: new Set(visiblePerformers.map((p) => p.id)),
         };
 
-        filteredTags = emptyEntityFilterService.filterEmptyTags(filteredTags, visibilitySet);
+        filteredTags = emptyEntityFilterService.filterEmptyTags(
+          filteredTags,
+          visibilitySet
+        );
 
         // Store in cache
         filteredEntityCacheService.set(
@@ -542,7 +565,10 @@ export const findTagsMinimal = async (
           cacheVersion
         );
       } else {
-        logger.debug("Tags minimal cache hit", { userId, entityCount: filteredTags.length });
+        logger.debug("Tags minimal cache hit", {
+          userId,
+          entityCount: filteredTags.length,
+        });
       }
 
       tags = filteredTags;
@@ -569,10 +595,10 @@ export const findTagsMinimal = async (
         typeof aValue === "string" && typeof bValue === "string"
           ? aValue.localeCompare(bValue)
           : aValue > bValue
-          ? 1
-          : aValue < bValue
-          ? -1
-          : 0;
+            ? 1
+            : aValue < bValue
+              ? -1
+              : 0;
       return sortDirection.toUpperCase() === "DESC" ? -comparison : comparison;
     });
 

@@ -1,8 +1,6 @@
-import { useState, useEffect } from "react";
-import Paper from "../ui/Paper.jsx";
-import Button from "../ui/Button.jsx";
-import SearchableSelect from "../ui/SearchableSelect.jsx";
+import { useEffect, useState } from "react";
 import axios from "axios";
+import { Button, Paper, SearchableSelect } from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",

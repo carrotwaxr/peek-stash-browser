@@ -1,18 +1,14 @@
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
 
 /**
  * Scene thumbnail with progress bar, duration, and studio overlays
  */
-const SceneThumbnail = ({
-  scene,
-  watchHistory,
-  className = ""
-}) => {
+const SceneThumbnail = ({ scene, watchHistory, className = "" }) => {
   const formatResumeTime = (seconds) => {
-    if (!seconds) return '0:00';
+    if (!seconds) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${String(secs).padStart(2, '0')}`;
+    return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
   if (!scene?.paths?.screenshot) {
@@ -20,10 +16,10 @@ const SceneThumbnail = ({
       <div
         className={`rounded flex items-center justify-center ${className}`}
         style={{
-          backgroundColor: 'var(--bg-secondary)',
+          backgroundColor: "var(--bg-secondary)",
         }}
       >
-        <span className="text-3xl" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-3xl" style={{ color: "var(--text-muted)" }}>
           📹
         </span>
       </div>
@@ -34,7 +30,7 @@ const SceneThumbnail = ({
     <div className={`relative rounded overflow-hidden ${className}`}>
       <img
         src={scene.paths.screenshot}
-        alt={scene.title || 'Scene'}
+        alt={scene.title || "Scene"}
         className="w-full h-full object-cover"
       />
 

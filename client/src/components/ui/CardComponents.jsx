@@ -1,12 +1,12 @@
-import { forwardRef, useMemo, useState, useRef } from "react";
+import { forwardRef, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { libraryApi } from "../../services/api";
 import { CardCountIndicators } from "./CardCountIndicators";
-import Tooltip from "./Tooltip";
-import RatingBadge from "./RatingBadge";
-import RatingSliderDialog from "./RatingSliderDialog";
 import FavoriteButton from "./FavoriteButton";
 import OCounterButton from "./OCounterButton";
-import { libraryApi } from "../../services/api";
+import RatingBadge from "./RatingBadge";
+import RatingSliderDialog from "./RatingSliderDialog";
+import Tooltip from "./Tooltip";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard
@@ -313,6 +313,3 @@ export const CardRatingRow = ({
     </>
   );
 };
-
-// Legacy export for backward compatibility (will be removed)
-export const CardRating = CardRatingRow;

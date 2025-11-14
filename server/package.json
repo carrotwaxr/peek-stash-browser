@@ -10,9 +10,15 @@
     "start": "node dist/index.js",
     "dev": "nodemon --legacy-watch --watch './**/*.ts' --watch '../.env' --ext ts --exec 'node --loader ts-node/esm' index.ts",
     "lint": "eslint .",
+    "format": "prettier --write \"**/*.{js,ts,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,ts,json,md}\"",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "depcheck": "depcheck",
+    "knip": "knip",
+    "analyze": "npm run depcheck && npm run knip"
   },
   "prisma": {
     "seed": "node --loader ts-node/esm prisma/seed.ts"
@@ -20,6 +26,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
@@ -27,10 +34,14 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@typescript-eslint/eslint-plugin": "^8.46.1",
     "@typescript-eslint/parser": "^8.46.1",
+    "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
+    "depcheck": "^1.4.7",
     "eslint": "^9.38.0",
     "globals": "^16.4.0",
+    "knip": "^5.69.1",
     "nodemon": "^3.1.10",
+    "prettier": "^3.6.2",
     "prisma": "^6.17.0",
     "ts-node": "^10.9.2",
     "vitest": "^3.2.4"
@@ -42,9 +53,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
-    "graphql-tag": "^2.12.6",
     "jsonwebtoken": "^9.0.2",
-    "node-cache": "^5.1.2",
     "stashapp-api": "^0.3.15"
   }
 }

@@ -23,13 +23,13 @@ export const useFocusTrap = (enabled = true, onEscape = null) => {
     // Get all focusable elements within the container
     const getFocusableElements = () => {
       const focusableSelectors = [
-        'a[href]',
-        'button:not([disabled])',
-        'textarea:not([disabled])',
-        'input:not([disabled])',
-        'select:not([disabled])',
+        "a[href]",
+        "button:not([disabled])",
+        "textarea:not([disabled])",
+        "input:not([disabled])",
+        "select:not([disabled])",
         '[tabindex]:not([tabindex="-1"])',
-      ].join(', ');
+      ].join(", ");
 
       return Array.from(container.querySelectorAll(focusableSelectors));
     };
@@ -82,7 +82,10 @@ export const useFocusTrap = (enabled = true, onEscape = null) => {
     // Cleanup: restore focus to previously focused element
     return () => {
       container.removeEventListener("keydown", handleKeyDown);
-      if (previousActiveElement.current && previousActiveElement.current.focus) {
+      if (
+        previousActiveElement.current &&
+        previousActiveElement.current.focus
+      ) {
         previousActiveElement.current.focus();
       }
     };
@@ -99,7 +102,11 @@ export const useFocusTrap = (enabled = true, onEscape = null) => {
  * @param {string} selector Optional CSS selector for the element to focus
  * @param {boolean} enabled Whether to auto-focus on mount
  */
-export const useInitialFocus = (containerRef, selector = null, enabled = true) => {
+export const useInitialFocus = (
+  containerRef,
+  selector = null,
+  enabled = true
+) => {
   useEffect(() => {
     if (!enabled || !containerRef?.current) return;
 
@@ -116,10 +123,10 @@ export const useInitialFocus = (containerRef, selector = null, enabled = true) =
         // Default: find first focusable element
         const focusableSelectors = [
           'input:not([disabled]):not([type="hidden"])',
-          'button:not([disabled])',
-          'a[href]',
+          "button:not([disabled])",
+          "a[href]",
           '[tabindex="0"]',
-        ].join(', ');
+        ].join(", ");
 
         elementToFocus = container.querySelector(focusableSelectors);
       }

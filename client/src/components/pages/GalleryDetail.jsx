@@ -1,15 +1,17 @@
-import { useState, useEffect } from "react";
-import { useParams, useLocation, useNavigate, Link } from "react-router-dom";
-import { libraryApi } from "../../services/api.js";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
-import Button from "../ui/Button.jsx";
-import RatingSlider from "../ui/RatingSlider.jsx";
-import FavoriteButton from "../ui/FavoriteButton.jsx";
-import Lightbox from "../ui/Lightbox.jsx";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
-import PageHeader from "../ui/PageHeader.jsx";
+import {
+  Button,
+  FavoriteButton,
+  Lightbox,
+  LoadingSpinner,
+  PageHeader,
+  RatingSlider,
+} from "../ui/index.js";
 
 const GalleryDetail = () => {
   const { galleryId } = useParams();
@@ -182,7 +184,10 @@ const GalleryDetail = () => {
               >
                 Performers
               </h3>
-              <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
+              <div
+                className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
+                style={{ scrollbarWidth: "thin" }}
+              >
                 {gallery.performers.map((performer) => (
                   <Link
                     key={performer.id}

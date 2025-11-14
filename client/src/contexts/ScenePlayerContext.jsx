@@ -1,9 +1,15 @@
-import { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
-import axios from 'axios';
-import { scenePlayerReducer, initialState } from './scenePlayerReducer.js';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useReducer,
+} from "react";
+import axios from "axios";
+import { initialState, scenePlayerReducer } from "./scenePlayerReducer.js";
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: "/api",
 });
 
 const ScenePlayerContext = createContext(null);
@@ -18,14 +24,14 @@ export function ScenePlayerProvider({
   playlist = null,
   shouldResume = false,
   compatibility = null,
-  initialQuality = 'direct'
+  initialQuality = "direct",
 }) {
   const [state, dispatch] = useReducer(scenePlayerReducer, initialState);
 
   // Initialize context from props
   useEffect(() => {
     dispatch({
-      type: 'INITIALIZE',
+      type: "INITIALIZE",
       payload: {
         playlist,
         currentIndex: playlist?.currentIndex || 0,
@@ -40,118 +46,125 @@ export function ScenePlayerProvider({
   // ============================================================================
 
   const loadScene = useCallback(async (sceneIdToLoad) => {
-    dispatch({ type: 'LOAD_SCENE_START' });
+    dispatch({ type: "LOAD_SCENE_START" });
     try {
-      const response = await api.post('/library/scenes', { ids: [sceneIdToLoad] });
+      const response = await api.post("/library/scenes", {
+        ids: [sceneIdToLoad],
+      });
       const scene = response.data?.findScenes?.scenes?.[0];
 
       if (!scene) {
-        throw new Error('Scene not found');
+        throw new Error("Scene not found");
       }
 
       dispatch({
-        type: 'LOAD_SCENE_SUCCESS',
+        type: "LOAD_SCENE_SUCCESS",
         payload: {
           scene: scene,
           oCounter: scene.o_counter || 0,
         },
       });
     } catch (error) {
-      console.error('Error loading scene:', error);
+      console.error("Error loading scene:", error);
       dispatch({
-        type: 'LOAD_SCENE_ERROR',
+        type: "LOAD_SCENE_ERROR",
         payload: error,
       });
     }
   }, []);
 
-  const loadVideo = useCallback(async (forceQuality = null) => {
-    const qualityToUse = forceQuality || state.quality;
-    const isDirectPlay = qualityToUse === 'direct';
+  const loadVideo = useCallback(
+    async (forceQuality = null) => {
+      const qualityToUse = forceQuality || state.quality;
+      const isDirectPlay = qualityToUse === "direct";
 
-    dispatch({ type: 'LOAD_VIDEO_START' });
+      dispatch({ type: "LOAD_VIDEO_START" });
 
-    try {
-      if (isDirectPlay) {
+      try {
+        if (isDirectPlay) {
+          dispatch({
+            type: "LOAD_VIDEO_SUCCESS",
+            payload: {
+              video: { directPlay: true },
+              sessionId: null,
+            },
+          });
+        } else {
+          const response = await api.get(
+            `/video/play?sceneId=${state.scene.id}&quality=${qualityToUse}`
+          );
+          dispatch({
+            type: "LOAD_VIDEO_SUCCESS",
+            payload: {
+              video: response.data.scene,
+              sessionId: response.data.sessionId,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error loading video:", error);
         dispatch({
-          type: 'LOAD_VIDEO_SUCCESS',
-          payload: {
-            video: { directPlay: true },
-            sessionId: null,
-          },
-        });
-      } else {
-        const response = await api.get(
-          `/video/play?sceneId=${state.scene.id}&quality=${qualityToUse}`
-        );
-        dispatch({
-          type: 'LOAD_VIDEO_SUCCESS',
-          payload: {
-            video: response.data.scene,
-            sessionId: response.data.sessionId,
-          },
+          type: "LOAD_VIDEO_ERROR",
+          payload: error,
         });
       }
-    } catch (error) {
-      console.error('Error loading video:', error);
-      dispatch({
-        type: 'LOAD_VIDEO_ERROR',
-        payload: error,
-      });
-    }
-  }, [state.quality, state.scene]);
+    },
+    [state.quality, state.scene]
+  );
 
   // Complex action creators (with side effects or logic)
   const incrementOCounter = useCallback(async () => {
     if (!state.scene?.id) return;
 
-    dispatch({ type: 'INCREMENT_O_COUNTER_START' });
+    dispatch({ type: "INCREMENT_O_COUNTER_START" });
     try {
-      await api.post('/watch-history/increment-o', { sceneId: state.scene.id });
-      dispatch({ type: 'INCREMENT_O_COUNTER_SUCCESS' });
+      await api.post("/watch-history/increment-o", { sceneId: state.scene.id });
+      dispatch({ type: "INCREMENT_O_COUNTER_SUCCESS" });
     } catch (error) {
-      console.error('Error incrementing O counter:', error);
-      dispatch({ type: 'INCREMENT_O_COUNTER_ERROR' });
+      console.error("Error incrementing O counter:", error);
+      dispatch({ type: "INCREMENT_O_COUNTER_ERROR" });
     }
   }, [state.scene?.id]);
 
   const enableAutoFallback = useCallback(async () => {
     if (!state.scene?.id) return;
 
-    dispatch({ type: 'SET_AUTO_FALLBACK', payload: true });
-    dispatch({ type: 'SET_QUALITY', payload: '480p' });
+    dispatch({ type: "SET_AUTO_FALLBACK", payload: true });
+    dispatch({ type: "SET_QUALITY", payload: "480p" });
 
     try {
-      const response = await api.get(`/video/play?sceneId=${state.scene.id}&quality=480p`);
+      const response = await api.get(
+        `/video/play?sceneId=${state.scene.id}&quality=480p`
+      );
 
       dispatch({
-        type: 'LOAD_VIDEO_SUCCESS',
+        type: "LOAD_VIDEO_SUCCESS",
         payload: {
           video: response.data.scene,
           sessionId: response.data.sessionId,
         },
       });
 
-      dispatch({ type: 'SET_AUTO_FALLBACK', payload: false });
+      dispatch({ type: "SET_AUTO_FALLBACK", payload: false });
       return { success: true, sessionId: response.data.sessionId };
     } catch (error) {
-      console.error('Error enabling auto-fallback:', error);
-      dispatch({ type: 'SET_AUTO_FALLBACK', payload: false });
+      console.error("Error enabling auto-fallback:", error);
+      dispatch({ type: "SET_AUTO_FALLBACK", payload: false });
       return { success: false, error };
     }
   }, [state.scene?.id]);
 
   // Playlist navigation helpers (kept for convenience)
   const nextScene = useCallback(() => {
-    dispatch({ type: 'NEXT_SCENE' });
+    dispatch({ type: "NEXT_SCENE" });
   }, []);
 
   const prevScene = useCallback(() => {
-    dispatch({ type: 'PREV_SCENE' });
+    dispatch({ type: "PREV_SCENE" });
   }, []);
 
   const gotoSceneIndex = useCallback((index) => {
-    dispatch({ type: 'GOTO_SCENE_INDEX', payload: index });
+    dispatch({ type: "GOTO_SCENE_INDEX", payload: index });
   }, []);
 
   // ============================================================================
@@ -175,7 +188,8 @@ export function ScenePlayerProvider({
     if (state.scene && !state.video && !state.videoLoading) {
       // In playlist mode, only auto-load if the current scene matches the expected scene for the current index
       if (state.playlist) {
-        const expectedSceneId = state.playlist.scenes[state.currentIndex]?.sceneId;
+        const expectedSceneId =
+          state.playlist.scenes[state.currentIndex]?.sceneId;
 
         if (state.scene.id !== expectedSceneId) {
           return; // Waiting for new scene to load
@@ -184,14 +198,21 @@ export function ScenePlayerProvider({
 
       loadVideo();
     }
-  }, [state.scene, state.video, state.videoLoading, state.playlist, state.currentIndex, loadVideo]);
+  }, [
+    state.scene,
+    state.video,
+    state.videoLoading,
+    state.playlist,
+    state.currentIndex,
+    loadVideo,
+  ]);
 
   // Update URL when navigating playlist (without React Router navigation)
   useEffect(() => {
     if (state.playlist && state.scene) {
       const newUrl = `/scene/${state.scene.id}`;
       if (window.location.pathname !== newUrl) {
-        window.history.replaceState(null, '', newUrl);
+        window.history.replaceState(null, "", newUrl);
       }
     }
   }, [state.scene, state.playlist]);
@@ -235,7 +256,7 @@ export function ScenePlayerProvider({
 export function useScenePlayer() {
   const context = useContext(ScenePlayerContext);
   if (!context) {
-    throw new Error('useScenePlayer must be used within ScenePlayerProvider');
+    throw new Error("useScenePlayer must be used within ScenePlayerProvider");
   }
   return context;
 }

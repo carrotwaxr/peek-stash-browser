@@ -19,23 +19,7 @@ export type {
   NormalizedTag,
   NormalizedGallery,
   NormalizedGroup,
-  NormalizedImage,
 } from "./entities.js";
-
-// Nested/partial entity types
-export type {
-  NestedTag,
-  NestedPerformerCompact,
-  NestedPerformerFull,
-  NestedStudioCompact,
-  NestedStudioFull,
-  NestedGallery,
-  NestedGroup,
-  SceneGroup,
-  VideoFile,
-  ScenePaths,
-  GalleryPaths,
-} from "./nested.js";
 
 // Base filter types from stashapp-api
 export type {

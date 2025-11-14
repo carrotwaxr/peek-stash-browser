@@ -1,4 +1,3 @@
-import { logger } from "../utils/logger.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
@@ -6,6 +5,7 @@ import type {
   NormalizedStudio,
   NormalizedTag,
 } from "../types/index.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * FilteredEntityCacheService
@@ -96,7 +96,11 @@ class FilteredEntityCacheService {
     }
 
     this.hits++;
-    logger.debug("Cache hit", { userId, entityType, entityCount: cached.entities.length });
+    logger.debug("Cache hit", {
+      userId,
+      entityType,
+      entityCount: cached.entities.length,
+    });
     return cached.entities;
   }
 

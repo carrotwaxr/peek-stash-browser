@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
@@ -90,7 +90,9 @@ const UserMenu = () => {
                   {user?.username || "User"}
                 </div>
                 <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "User"}
+                  {user?.role
+                    ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                    : "User"}
                 </div>
               </div>
             </div>
@@ -168,7 +170,11 @@ const UserMenu = () => {
               }}
             >
               <div className="flex items-center gap-3">
-                <ThemedIcon name="tv" size={16} color={isTVMode ? "white" : "currentColor"} />
+                <ThemedIcon
+                  name="tv"
+                  size={16}
+                  color={isTVMode ? "white" : "currentColor"}
+                />
                 <span>TV Mode</span>
               </div>
               {isTVMode && <span className="text-sm">✓</span>}

@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { PeekLogo } from "../branding/PeekLogo.jsx";
-import UserMenu from "./UserMenu.jsx";
-import { ThemedIcon } from "../icons/index.js";
+import { getOrderedNavItems } from "../../constants/navigation.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useScrollDirection } from "../../hooks/useScrollDirection.js";
-import { getOrderedNavItems } from "../../constants/navigation.js";
+import { PeekLogo } from "../branding/PeekLogo.jsx";
+import { ThemedIcon } from "../icons/index.js";
 import Button from "./Button.jsx";
+import UserMenu from "./UserMenu.jsx";
 
 const Navigation = ({ navPreferences = [] }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -22,14 +22,14 @@ const Navigation = ({ navPreferences = [] }) => {
     const path = location.pathname;
 
     // Find matching nav item by path
-    const matchingItem = navItems.find(item => item.path === path);
+    const matchingItem = navItems.find((item) => item.path === path);
     return matchingItem ? matchingItem.name : null;
   };
 
   const currentPage = getCurrentPage();
 
   // Determine if navbar should be visible
-  const isVisible = scrollDirection === 'top' || scrollDirection === 'up';
+  const isVisible = scrollDirection === "top" || scrollDirection === "up";
 
   return (
     <nav
@@ -37,7 +37,7 @@ const Navigation = ({ navPreferences = [] }) => {
       style={{
         backgroundColor: "var(--bg-secondary)",
         borderBottom: "1px solid var(--border-color)",
-        transform: isVisible ? 'translateY(0)' : 'translateY(-100%)',
+        transform: isVisible ? "translateY(0)" : "translateY(-100%)",
       }}
     >
       <div className="w-full max-w-none">

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 /**
  * Automatically enter fullscreen when device rotates to landscape while video is playing
@@ -7,7 +7,11 @@ import { useEffect, useRef } from 'react';
  * - If user exits fullscreen, respect that for this video
  * - Reset declined flag only when user manually enters fullscreen or new video loads
  */
-export const useOrientationFullscreen = (playerRef, sceneId, enabled = true) => {
+export const useOrientationFullscreen = (
+  playerRef,
+  sceneId,
+  enabled = true
+) => {
   const userDeclinedRef = useRef(false);
   const previousSceneIdRef = useRef(sceneId);
 
@@ -32,14 +36,20 @@ export const useOrientationFullscreen = (playerRef, sceneId, enabled = true) => 
       // Delay to let window dimensions update after orientation change
       setTimeout(() => {
         const screenOrientationType = window.screen?.orientation?.type;
-        const isLandscape = screenOrientationType?.includes('landscape') ||
-                            window.innerWidth > window.innerHeight;
+        const isLandscape =
+          screenOrientationType?.includes("landscape") ||
+          window.innerWidth > window.innerHeight;
         const isPlaying = !player.paused();
         const isCurrentlyFullscreen = player.isFullscreen();
         const userDeclined = userDeclinedRef.current;
 
         // Auto-fullscreen on landscape if: playing, not fullscreen, and user hasn't declined
-        if (isLandscape && isPlaying && !isCurrentlyFullscreen && !userDeclined) {
+        if (
+          isLandscape &&
+          isPlaying &&
+          !isCurrentlyFullscreen &&
+          !userDeclined
+        ) {
           player.requestFullscreen().catch(() => {
             // Fullscreen request failed (expected in some browsers/contexts)
           });
@@ -60,14 +70,14 @@ export const useOrientationFullscreen = (playerRef, sceneId, enabled = true) => 
       }
     };
 
-    player.on('fullscreenchange', handleFullscreenChange);
-    window.addEventListener('orientationchange', handleOrientationChange);
+    player.on("fullscreenchange", handleFullscreenChange);
+    window.addEventListener("orientationchange", handleOrientationChange);
 
     return () => {
       if (player && !player.isDisposed()) {
-        player.off('fullscreenchange', handleFullscreenChange);
+        player.off("fullscreenchange", handleFullscreenChange);
       }
-      window.removeEventListener('orientationchange', handleOrientationChange);
+      window.removeEventListener("orientationchange", handleOrientationChange);
     };
   }, [playerRef, sceneId, enabled]);
 };

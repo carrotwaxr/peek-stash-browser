@@ -1,17 +1,21 @@
-import { useState, useRef, forwardRef } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { forwardRef, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage } from "../ui/index.js";
-import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
-import { libraryApi } from "../../services/api.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
-import { GridCard } from "../ui/GridCard.jsx";
+import { libraryApi } from "../../services/api.js";
+import {
+  CacheLoadingBanner,
+  ErrorMessage,
+  GridCard,
+  PageHeader,
+  PageLayout,
+  SearchControls,
+} from "../ui/index.js";
 
 const Tags = () => {
   usePageTitle("Tags");

@@ -3,12 +3,12 @@ import {
   ChevronLeft,
   ChevronRight,
   List,
-  Shuffle,
   Repeat,
   Repeat1,
+  Shuffle,
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import Button from "../ui/Button.jsx";
+import { Button } from "../ui/index.js";
 
 /**
  * PlaylistStatusCard - Shows playlist context when viewing a scene from a playlist
@@ -277,15 +277,15 @@ const PlaylistStatusCard = () => {
                   repeat === "one"
                     ? "Repeat: One"
                     : repeat === "all"
-                    ? "Repeat: All"
-                    : "Repeat: Off"
+                      ? "Repeat: All"
+                      : "Repeat: Off"
                 }
                 aria-label={
                   repeat === "one"
                     ? "Disable repeat one"
                     : repeat === "all"
-                    ? "Switch to repeat one"
-                    : "Enable repeat all"
+                      ? "Switch to repeat one"
+                      : "Enable repeat all"
                 }
               />
 

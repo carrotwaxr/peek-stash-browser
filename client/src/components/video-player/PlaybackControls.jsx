@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import AddToPlaylistButton from "../ui/AddToPlaylistButton.jsx";
-import OCounterButton from "../ui/OCounterButton.jsx";
-import RatingBadge from "../ui/RatingBadge.jsx";
-import RatingSliderDialog from "../ui/RatingSliderDialog.jsx";
-import FavoriteButton from "../ui/FavoriteButton.jsx";
 import { libraryApi } from "../../services/api.js";
+import {
+  AddToPlaylistButton,
+  FavoriteButton,
+  OCounterButton,
+  RatingBadge,
+  RatingSliderDialog,
+} from "../ui/index.js";
 
 const PlaybackControls = () => {
   const { scene, sceneLoading, videoLoading, quality, oCounter, dispatch } =

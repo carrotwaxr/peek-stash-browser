@@ -9,7 +9,7 @@
  * @param {Array} filterOptions - Filter configuration from filterConfig.js
  * @returns {URLSearchParams} URL search params object
  */
-export const filtersToUrlParams = (filters, filterOptions) => {
+const filtersToUrlParams = (filters, filterOptions) => {
   const params = new URLSearchParams();
 
   filterOptions.forEach(({ key, type, multi }) => {
@@ -69,7 +69,7 @@ export const filtersToUrlParams = (filters, filterOptions) => {
  * @param {Array} filterOptions - Filter configuration from filterConfig.js
  * @returns {Object} Filter state object
  */
-export const urlParamsToFilters = (searchParams, filterOptions) => {
+const urlParamsToFilters = (searchParams, filterOptions) => {
   const filters = {};
 
   filterOptions.forEach(({ key, type, multi }) => {
@@ -169,7 +169,11 @@ export const buildSearchParams = ({
  * @param {Object} defaults - Default values for search state
  * @returns {Object} Complete search state
  */
-export const parseSearchParams = (searchParams, filterOptions, defaults = {}) => {
+export const parseSearchParams = (
+  searchParams,
+  filterOptions,
+  defaults = {}
+) => {
   return {
     searchText: searchParams.get("q") || defaults.searchText || "",
     sortField: searchParams.get("sort") || defaults.sortField || "o_counter",

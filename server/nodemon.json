@@ -1,13 +1,6 @@
 {
-  "watch": [
-    "./**/*.ts",
-    "../.env"
-  ],
-  "ignore": [
-    "data/**",
-    "node_modules/**",
-    "dist/**"
-  ],
+  "watch": ["./**/*.ts", "../.env"],
+  "ignore": ["data/**", "node_modules/**", "dist/**"],
   "ext": "ts",
   "exec": "node --loader ts-node/esm index.ts",
   "legacyWatch": true

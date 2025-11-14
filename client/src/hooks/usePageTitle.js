@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 /**
  * Custom hook to set the document title for a page.
@@ -17,11 +17,11 @@ import { useEffect } from 'react';
  * // Detail pages
  * usePageTitle(sceneName);  // Sets "Scene Name - Peek"
  */
-export const usePageTitle = (title = '', options = {}) => {
-  const suffix = options.suffix || 'Peek';
+export const usePageTitle = (title = "", options = {}) => {
+  const suffix = options.suffix || "Peek";
 
   useEffect(() => {
-    if (!title || title.trim() === '') {
+    if (!title || title.trim() === "") {
       document.title = suffix;
     } else {
       document.title = `${title} - ${suffix}`;
@@ -33,5 +33,3 @@ export const usePageTitle = (title = '', options = {}) => {
     };
   }, [title, suffix]);
 };
-
-export default usePageTitle;

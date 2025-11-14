@@ -125,20 +125,6 @@ export function generateTextScale(baseColor, mode = "dark") {
 }
 
 /**
- * Generate accent color shades for hover/active states
- * @param {string} accentColor - Primary accent color (hex)
- * @returns {Object} Accent color shades
- */
-export function generateAccentShades(accentColor) {
-  return {
-    base: accentColor,
-    hover: adjustLightness(accentColor, -8), // Slightly darker for hover
-    active: adjustLightness(accentColor, -12), // Even darker for active
-    light: adjustLightness(accentColor, 10), // Lighter variant
-  };
-}
-
-/**
  * Generate shadow colors based on accent color
  * @param {string} accentColor - Primary accent color (hex)
  * @param {'dark'|'light'} mode - Theme mode
@@ -210,9 +196,8 @@ export function generateStatusColors(status) {
 
     colors[`--status-${type}`] = baseColor; // Base color
     colors[`--status-${type}-bg`] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`; // Background with alpha
-    colors[
-      `--status-${type}-border`
-    ] = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
+    colors[`--status-${type}-border`] =
+      `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.3)`; // Border with alpha
   });
 
   return colors;
@@ -241,9 +226,8 @@ export function generateToastColors(status, mode = "dark") {
 
     colors[`--toast-${type}-bg`] = toastBg;
     colors[`--toast-${type}-border`] = toastBorder;
-    colors[
-      `--toast-${type}-shadow`
-    ] = `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
+    colors[`--toast-${type}-shadow`] =
+      `rgba(${bgRgb.r}, ${bgRgb.g}, ${bgRgb.b}, 0.4)`;
   });
 
   return colors;

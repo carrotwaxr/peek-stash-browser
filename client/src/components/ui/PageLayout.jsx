@@ -5,7 +5,7 @@
 const PageLayout = ({ children, className = "", fullHeight = false }) => {
   return (
     <div
-      className={`w-full py-8 px-4 lg:px-6 xl:px-8 ${fullHeight ? 'min-h-screen' : ''} ${className}`}
+      className={`w-full py-8 px-4 lg:px-6 xl:px-8 ${fullHeight ? "min-h-screen" : ""} ${className}`}
     >
       {children}
     </div>

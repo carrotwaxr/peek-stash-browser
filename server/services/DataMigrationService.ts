@@ -21,7 +21,8 @@ interface Migration {
 const migrations: Migration[] = [
   {
     name: "001_rebuild_user_stats",
-    description: "Rebuild all user stats from watch history (backfill for v1.4.x)",
+    description:
+      "Rebuild all user stats from watch history (backfill for v1.4.x)",
     run: async () => {
       logger.info("[Migration 001] Starting user stats rebuild for all users");
 
@@ -30,21 +31,23 @@ const migrations: Migration[] = [
         select: { id: true, username: true },
       });
 
-      logger.info("[Migration 001] Found users to migrate", { count: users.length });
+      logger.info("[Migration 001] Found users to migrate", {
+        count: users.length,
+      });
 
       // Rebuild stats for each user
       for (const user of users) {
         try {
           logger.info("[Migration 001] Rebuilding stats", {
             userId: user.id,
-            username: user.username
+            username: user.username,
           });
 
           await userStatsService.rebuildAllStatsForUser(user.id);
 
           logger.info("[Migration 001] Successfully rebuilt stats", {
             userId: user.id,
-            username: user.username
+            username: user.username,
           });
         } catch (error) {
           logger.error("[Migration 001] Failed to rebuild stats for user", {
@@ -74,7 +77,9 @@ class DataMigrationService {
       const appliedMigrations = await prisma.dataMigration.findMany({
         select: { name: true },
       });
-      const appliedMigrationNames = new Set(appliedMigrations.map((m) => m.name));
+      const appliedMigrationNames = new Set(
+        appliedMigrations.map((m) => m.name)
+      );
 
       // Filter to only pending migrations
       const pendingMigrations = migrations.filter(

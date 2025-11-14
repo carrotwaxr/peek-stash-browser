@@ -1,15 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../hooks/useAuth.js";
 import axios from "axios";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { PageHeader, PageLayout } from "../ui/index.js";
-import { setupApi } from "../../services/api.js";
-import Button from "../ui/Button.jsx";
-import Paper from "../ui/Paper.jsx";
-import ServerStatsSection from "../settings/ServerStatsSection.jsx";
-import ContentRestrictionsModal from "../settings/ContentRestrictionsModal.jsx";
 import packageJson from "../../../package.json";
+import { useAuth } from "../../hooks/useAuth.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { setupApi } from "../../services/api.js";
+import { formatDate } from "../../utils/date.js";
+import ContentRestrictionsModal from "../settings/ContentRestrictionsModal.jsx";
+import ServerStatsSection from "../settings/ServerStatsSection.jsx";
+import { Button, PageHeader, PageLayout, Paper } from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -196,14 +195,6 @@ const ServerSettings = () => {
     } catch (err) {
       setError(err.response?.data?.error || "Failed to update sync setting");
     }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
   };
 
   // Path mapping functions
@@ -511,16 +502,32 @@ const ServerSettings = () => {
                   color: "rgb(245, 158, 11)",
                 }}
               >
-                <div className="font-semibold mb-1">⚠️ Sync to Stash Policy</div>
-                <div className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  When enabled, user ratings and favorites will sync to Stash.<br/>
-                  <strong>O Counters AGGREGATE</strong> (multiple users increment the same counter).<br/>
-                  <strong>Ratings OVERWRITE</strong> (last user to rate wins, no aggregation).<br/>
+                <div className="font-semibold mb-1">
+                  ⚠️ Sync to Stash Policy
+                </div>
+                <div
+                  className="text-xs leading-relaxed"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  When enabled, user ratings and favorites will sync to Stash.
+                  <br />
+                  <strong>O Counters AGGREGATE</strong> (multiple users
+                  increment the same counter).
+                  <br />
+                  <strong>Ratings OVERWRITE</strong> (last user to rate wins, no
+                  aggregation).
+                  <br />
                   Be cautious enabling for multiple users to avoid conflicts.
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <div className="md:hidden px-4 py-3 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                <div
+                  className="md:hidden px-4 py-3 text-xs"
+                  style={{
+                    color: "var(--text-muted)",
+                    borderBottom: "1px solid var(--border-color)",
+                  }}
+                >
                   ← Swipe to see more →
                 </div>
                 <table className="w-full" style={{ minWidth: "800px" }}>
@@ -698,7 +705,11 @@ const ServerSettings = () => {
                   </Paper.Subtitle>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                  <Button onClick={discoverLibraries} variant="secondary" className="w-full sm:w-auto">
+                  <Button
+                    onClick={discoverLibraries}
+                    variant="secondary"
+                    className="w-full sm:w-auto"
+                  >
                     Discover Libraries
                   </Button>
                   <Button
@@ -724,7 +735,13 @@ const ServerSettings = () => {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <div className="md:hidden px-4 py-3 text-xs" style={{ color: "var(--text-muted)", borderBottom: "1px solid var(--border-color)" }}>
+                  <div
+                    className="md:hidden px-4 py-3 text-xs"
+                    style={{
+                      color: "var(--text-muted)",
+                      borderBottom: "1px solid var(--border-color)",
+                    }}
+                  >
                     ← Swipe to see more →
                   </div>
                   <table className="w-full" style={{ minWidth: "700px" }}>
@@ -1526,7 +1543,8 @@ const ServerSettings = () => {
                           Galleries
                         </p>
                         <p style={{ color: "var(--text-secondary)" }}>
-                          {syncResult.galleries?.checked.toLocaleString() || 0} checked
+                          {syncResult.galleries?.checked.toLocaleString() || 0}{" "}
+                          checked
                           <br />
                           {syncResult.galleries?.created || 0} new
                           <br />
@@ -1541,7 +1559,8 @@ const ServerSettings = () => {
                           Groups
                         </p>
                         <p style={{ color: "var(--text-secondary)" }}>
-                          {syncResult.groups?.checked.toLocaleString() || 0} checked
+                          {syncResult.groups?.checked.toLocaleString() || 0}{" "}
+                          checked
                           <br />
                           {syncResult.groups?.created || 0} new
                           <br />

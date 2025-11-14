@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import SceneGrid from "../scene-search/SceneGrid.jsx";
 import Button from "./Button.jsx";
@@ -36,7 +36,7 @@ const ScenesLikeThis = ({ sceneId }) => {
         setScenes((prev) => [...prev, ...newScenes]);
       }
 
-      setHasMore((pageNum * perPage) < count);
+      setHasMore(pageNum * perPage < count);
     } catch (err) {
       console.error("Error fetching similar scenes:", err);
       setError(err.response?.data?.error || "Failed to load similar scenes");

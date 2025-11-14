@@ -69,29 +69,16 @@ export const setCache = (entityType, data) => {
   } catch (error) {
     console.error(`Error setting ${entityType} cache:`, error);
     // If quota exceeded, try to clear old caches
-    if (error.name === 'QuotaExceededError') {
+    if (error.name === "QuotaExceededError") {
       clearAllCaches();
     }
   }
 };
 
 /**
- * Clear cache for a specific entity type
- * @param {"performers"|"studios"|"tags"} entityType
- */
-export const clearCache = (entityType) => {
-  try {
-    const cacheKey = CACHE_KEYS[entityType];
-    localStorage.removeItem(cacheKey);
-  } catch (error) {
-    console.error(`Error clearing ${entityType} cache:`, error);
-  }
-};
-
-/**
  * Clear all filter caches
  */
-export const clearAllCaches = () => {
+const clearAllCaches = () => {
   Object.values(CACHE_KEYS).forEach((key) => {
     try {
       localStorage.removeItem(key);
@@ -99,23 +86,4 @@ export const clearAllCaches = () => {
       console.error(`Error clearing cache ${key}:`, error);
     }
   });
-};
-
-/**
- * Get cache statistics
- * @returns {Object} Cache stats for each entity type
- */
-export const getCacheStats = () => {
-  const stats = {};
-
-  Object.entries(CACHE_KEYS).forEach(([entityType]) => {
-    const cached = getCache(entityType);
-    stats[entityType] = {
-      cached: !!cached,
-      count: cached?.data?.length || 0,
-      age: cached ? Math.floor((Date.now() - cached.timestamp) / 1000 / 60) : null, // minutes
-    };
-  });
-
-  return stats;
 };

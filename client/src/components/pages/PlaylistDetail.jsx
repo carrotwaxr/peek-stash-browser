@@ -1,25 +1,28 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import {
-  Shuffle,
+  ArrowLeft,
+  ArrowUpDown,
+  Edit2,
+  Play,
   Repeat,
   Repeat1,
-  ArrowLeft,
-  Edit2,
-  ArrowUpDown,
-  Play,
   Save,
+  Shuffle,
   X,
 } from "lucide-react";
-import { getSceneTitle } from "../../utils/format.js";
-import SceneListItem from "../ui/SceneListItem.jsx";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { showSuccess, showError } from "../../utils/toast.jsx";
-import ConfirmDialog from "../ui/ConfirmDialog.jsx";
-import Button from "../ui/Button.jsx";
-import { PageHeader, PageLayout } from "../ui/index.js";
-import Paper from "../ui/Paper.jsx";
+import { getSceneTitle } from "../../utils/format.js";
+import { showError, showSuccess } from "../../utils/toast.jsx";
+import {
+  Button,
+  ConfirmDialog,
+  PageHeader,
+  PageLayout,
+  Paper,
+  SceneListItem,
+} from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -398,8 +401,8 @@ const PlaylistDetail = () => {
                     repeat === "all"
                       ? "Repeat all"
                       : repeat === "one"
-                      ? "Repeat one"
-                      : "Repeat off"
+                        ? "Repeat one"
+                        : "Repeat off"
                   }
                 />
 

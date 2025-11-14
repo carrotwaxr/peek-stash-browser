@@ -1,8 +1,14 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import Paper from "../ui/Paper.jsx";
-import Button from "../ui/Button.jsx";
-import { Server, Database, HardDrive, Cpu, Clock, RefreshCw } from "lucide-react";
+import {
+  Clock,
+  Cpu,
+  Database,
+  HardDrive,
+  RefreshCw,
+  Server,
+} from "lucide-react";
+import { Button, Paper } from "../ui/index.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -72,7 +78,11 @@ const ServerStatsSection = () => {
             onClick={loadStats}
             disabled={refreshing}
             variant="secondary"
-            icon={<RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />}
+            icon={
+              <RefreshCw
+                className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+            }
           />
         </div>
       </Paper.Header>
@@ -99,14 +109,22 @@ const ServerStatsSection = () => {
             <StatCard
               label="System Memory"
               value={stats.system?.usedMemory || "N/A"}
-              subtitle={stats.system?.memoryUsagePercent ? `${stats.system.memoryUsagePercent}%` : null}
+              subtitle={
+                stats.system?.memoryUsagePercent
+                  ? `${stats.system.memoryUsagePercent}%`
+                  : null
+              }
               icon={<HardDrive className="w-4 h-4" />}
               progress={parseFloat(stats.system?.memoryUsagePercent || 0)}
             />
             <StatCard
               label="Process Memory"
               value={stats.process?.heapUsed || "N/A"}
-              subtitle={stats.process?.heapUsedPercent ? `${stats.process.heapUsedPercent}%` : null}
+              subtitle={
+                stats.process?.heapUsedPercent
+                  ? `${stats.process.heapUsedPercent}%`
+                  : null
+              }
               icon={<HardDrive className="w-4 h-4" />}
               progress={parseFloat(stats.process?.heapUsedPercent || 0)}
             />
@@ -149,16 +167,24 @@ const ServerStatsSection = () => {
               compact
             />
           </div>
-          <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-muted)" }}>
+          <div
+            className="flex items-center justify-between text-xs"
+            style={{ color: "var(--text-muted)" }}
+          >
             <span>
-              Cache size: {stats.cache?.estimatedSize || "N/A"} |{" "}
-              Status: {stats.cache?.isInitialized ? "Ready" : stats.cache?.lastRefreshed ? "Initializing" : "Not Loaded"}
+              Cache size: {stats.cache?.estimatedSize || "N/A"} | Status:{" "}
+              {stats.cache?.isInitialized
+                ? "Ready"
+                : stats.cache?.lastRefreshed
+                  ? "Initializing"
+                  : "Not Loaded"}
               {stats.cache?.isRefreshing && " (Refreshing...)"}
             </span>
             <div className="flex items-center gap-2">
               {stats.cache?.lastRefreshed && (
                 <span>
-                  Last refreshed: {new Date(stats.cache.lastRefreshed).toLocaleTimeString()}
+                  Last refreshed:{" "}
+                  {new Date(stats.cache.lastRefreshed).toLocaleTimeString()}
                 </span>
               )}
               <button
@@ -166,12 +192,27 @@ const ServerStatsSection = () => {
                 disabled={refreshingCache || stats.cache?.isRefreshing}
                 className="p-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: refreshingCache || stats.cache?.isRefreshing ? 'transparent' : 'transparent',
+                  backgroundColor:
+                    refreshingCache || stats.cache?.isRefreshing
+                      ? "transparent"
+                      : "transparent",
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-info)'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                title={stats.cache?.lastRefreshed ? "Refresh cache now" : "Initialize cache"}
-                aria-label={stats.cache?.lastRefreshed ? "Refresh cache" : "Initialize cache"}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.backgroundColor = "var(--bg-info)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.backgroundColor = "transparent")
+                }
+                title={
+                  stats.cache?.lastRefreshed
+                    ? "Refresh cache now"
+                    : "Initialize cache"
+                }
+                aria-label={
+                  stats.cache?.lastRefreshed
+                    ? "Refresh cache"
+                    : "Initialize cache"
+                }
               >
                 <RefreshCw
                   className={`w-3 h-3 ${refreshingCache || stats.cache?.isRefreshing ? "animate-spin" : ""}`}
@@ -243,16 +284,28 @@ const ServerStatsSection = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                    <th className="text-left p-2" style={{ color: "var(--text-secondary)" }}>
+                    <th
+                      className="text-left p-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       Scene
                     </th>
-                    <th className="text-left p-2" style={{ color: "var(--text-secondary)" }}>
+                    <th
+                      className="text-left p-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       Quality
                     </th>
-                    <th className="text-left p-2" style={{ color: "var(--text-secondary)" }}>
+                    <th
+                      className="text-left p-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       Age
                     </th>
-                    <th className="text-left p-2" style={{ color: "var(--text-secondary)" }}>
+                    <th
+                      className="text-left p-2"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       Status
                     </th>
                   </tr>
@@ -274,10 +327,16 @@ const ServerStatsSection = () => {
                       >
                         {session.sceneId?.substring(0, 8)}...
                       </td>
-                      <td className="p-2" style={{ color: "var(--text-primary)" }}>
+                      <td
+                        className="p-2"
+                        style={{ color: "var(--text-primary)" }}
+                      >
                         {session.quality}
                       </td>
-                      <td className="p-2" style={{ color: "var(--text-muted)" }}>
+                      <td
+                        className="p-2"
+                        style={{ color: "var(--text-muted)" }}
+                      >
                         {session.age}
                       </td>
                       <td className="p-2">
@@ -308,7 +367,15 @@ const ServerStatsSection = () => {
 };
 
 // Reusable stat card component
-const StatCard = ({ label, value, subtitle, icon, valueColor, progress, compact }) => {
+const StatCard = ({
+  label,
+  value,
+  subtitle,
+  icon,
+  valueColor,
+  progress,
+  compact,
+}) => {
   return (
     <div
       className={`rounded-lg ${compact ? "p-3" : "p-4"}`}
@@ -319,7 +386,10 @@ const StatCard = ({ label, value, subtitle, icon, valueColor, progress, compact 
           {icon}
         </div>
       )}
-      <div className={`${compact ? "text-xs" : "text-sm"} mb-1`} style={{ color: "var(--text-secondary)" }}>
+      <div
+        className={`${compact ? "text-xs" : "text-sm"} mb-1`}
+        style={{ color: "var(--text-secondary)" }}
+      >
         {label}
       </div>
       <div
@@ -346,8 +416,8 @@ const StatCard = ({ label, value, subtitle, icon, valueColor, progress, compact 
                 progress > 90
                   ? "var(--status-error)"
                   : progress > 70
-                  ? "var(--status-warning)"
-                  : "var(--status-success)",
+                    ? "var(--status-warning)"
+                    : "var(--status-success)",
             }}
           />
         </div>

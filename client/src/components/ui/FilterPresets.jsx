@@ -1,8 +1,14 @@
-import { useState, useEffect } from "react";
-import { LucideBookmark, LucideSave, LucideTrash2, LucideChevronDown, LucideStar } from "lucide-react";
-import { apiGet, apiPost, apiDelete, apiPut } from "../../services/api.js";
-import { InfoMessage, ErrorMessage, SuccessMessage } from "./index.js";
+import { useEffect, useState } from "react";
+import {
+  LucideBookmark,
+  LucideChevronDown,
+  LucideSave,
+  LucideStar,
+  LucideTrash2,
+} from "lucide-react";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../services/api.js";
 import Button from "./Button.jsx";
+import { ErrorMessage, InfoMessage, SuccessMessage } from "./index.js";
 
 /**
  * Filter Presets Component
@@ -233,26 +239,38 @@ const FilterPresets = ({
                           </Button>
                           <div className="flex items-center gap-1 ml-2">
                             <Button
-                              onClick={(e) => handleToggleDefault(preset.id, preset.name, e)}
+                              onClick={(e) =>
+                                handleToggleDefault(preset.id, preset.name, e)
+                              }
                               variant="tertiary"
                               className={`p-1 transition-opacity ${
                                 isDefault
                                   ? "opacity-100"
                                   : "opacity-0 group-hover:opacity-100"
                               }`}
-                              title={isDefault ? "Remove as default" : "Set as default"}
+                              title={
+                                isDefault
+                                  ? "Remove as default"
+                                  : "Set as default"
+                              }
                             >
                               <LucideStar
                                 className={`w-3.5 h-3.5 ${
-                                  isDefault ? "fill-yellow-400 stroke-yellow-400" : ""
+                                  isDefault
+                                    ? "fill-yellow-400 stroke-yellow-400"
+                                    : ""
                                 }`}
                                 style={{
-                                  color: isDefault ? "rgb(250, 204, 21)" : "currentColor",
+                                  color: isDefault
+                                    ? "rgb(250, 204, 21)"
+                                    : "currentColor",
                                 }}
                               />
                             </Button>
                             <Button
-                              onClick={() => handleDeletePreset(preset.id, preset.name)}
+                              onClick={() =>
+                                handleDeletePreset(preset.id, preset.name)
+                              }
                               variant="tertiary"
                               className="p-1 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100"
                               icon={<LucideTrash2 className="w-3.5 h-3.5" />}
@@ -309,7 +327,8 @@ const FilterPresets = ({
                   className="text-sm mb-4"
                   style={{ color: "var(--text-secondary)" }}
                 >
-                  Give your current filter configuration a name so you can quickly apply it later.
+                  Give your current filter configuration a name so you can
+                  quickly apply it later.
                 </p>
 
                 <input

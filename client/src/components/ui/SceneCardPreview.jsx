@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../hooks/useAuth.js";
 import {
   fetchAndParseVTT,
@@ -35,7 +35,14 @@ import {
  * @param {string} duration - Formatted duration string for bottom-left overlay (e.g., "2h03m")
  * @param {string} resolution - Formatted resolution string for top-right overlay (e.g., "1080p")
  */
-const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800, spriteCount = 5, duration = null, resolution = null }) => {
+const SceneCardPreview = ({
+  scene,
+  autoplayOnScroll = false,
+  cycleInterval = 800,
+  spriteCount = 5,
+  duration = null,
+  resolution = null,
+}) => {
   const { user } = useAuth();
   const [sprites, setSprites] = useState([]);
   const [currentSpriteIndex, setCurrentSpriteIndex] = useState(0);
@@ -52,29 +59,28 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
   // Determine preview type based on user preference
   // Note: We don't check if paths exist yet - that happens in the lazy-load effect
   const preferredPreviewType = useMemo(() => {
-    const userPref = user?.preferredPreviewQuality || 'sprite';
+    const userPref = user?.preferredPreviewQuality || "sprite";
 
     // For sprite preference, check if VTT/sprite are available
-    if (userPref === 'sprite') {
-      return (scene?.paths?.vtt && scene?.paths?.sprite) ? 'sprite' : null;
+    if (userPref === "sprite") {
+      return scene?.paths?.vtt && scene?.paths?.sprite ? "sprite" : null;
     }
 
     // For high quality preferences, we'll try the preference and fallback to sprite if needed
     return userPref; // 'webp' or 'mp4'
   }, [user?.preferredPreviewQuality, scene?.paths?.vtt, scene?.paths?.sprite]);
 
-
   // Detect hover capability (mouse/trackpad vs touch-only)
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(hover: hover)');
+    const mediaQuery = window.matchMedia("(hover: hover)");
     setHasHoverCapability(mediaQuery.matches);
 
     const handleChange = (e) => {
       setHasHoverCapability(e.matches);
     };
-    mediaQuery.addEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
 
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   // Intersection Observer for scroll-based autoplay (when autoplayOnScroll is enabled)
@@ -88,7 +94,8 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
         entries.forEach((entry) => {
           // Only autoplay when thumbnail is mostly visible (90%) with clearance from viewport edges
           // The 5% rootMargin shrink ensures thumbnail isn't right at viewport edge
-          const newIsInView = entry.isIntersecting && entry.intersectionRatio >= 0.9;
+          const newIsInView =
+            entry.isIntersecting && entry.intersectionRatio >= 0.9;
           setIsInView(newIsInView);
         });
       },
@@ -109,7 +116,12 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
     const shouldTriggerLoad = autoplayOnScroll ? isInView : isHovering;
 
     // Don't load if not triggered yet, already loaded, no preview type, or already loading
-    if (!shouldTriggerLoad || previewDataLoaded || !preferredPreviewType || isLoading) {
+    if (
+      !shouldTriggerLoad ||
+      previewDataLoaded ||
+      !preferredPreviewType ||
+      isLoading
+    ) {
       return;
     }
 
@@ -118,25 +130,29 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
 
       try {
         // Handle sprite preference (low quality, always use sprite)
-        if (preferredPreviewType === 'sprite') {
+        if (preferredPreviewType === "sprite") {
           const parsedCues = await fetchAndParseVTT(scene.paths.vtt);
           if (parsedCues.length > 0) {
-            const evenlySpaced = getEvenlySpacedSprites(parsedCues, spriteCount);
+            const evenlySpaced = getEvenlySpacedSprites(
+              parsedCues,
+              spriteCount
+            );
             setSprites(evenlySpaced);
           }
-          setActivePreviewType('sprite');
+          setActivePreviewType("sprite");
           setIsLoading(false);
           setPreviewDataLoaded(true);
           return;
         }
 
         // Handle high quality preferences (webp/mp4) with 404 fallback to sprite
-        const previewUrl = preferredPreviewType === 'mp4'
-          ? `/api/proxy/scene/${scene.id}/preview`
-          : `/api/proxy/scene/${scene.id}/webp`;
+        const previewUrl =
+          preferredPreviewType === "mp4"
+            ? `/api/proxy/scene/${scene.id}/preview`
+            : `/api/proxy/scene/${scene.id}/webp`;
 
         // Test if high quality preview exists by doing a HEAD request
-        const response = await fetch(previewUrl, { method: 'HEAD' });
+        const response = await fetch(previewUrl, { method: "HEAD" });
 
         if (response.ok) {
           // High quality preview available, use it
@@ -148,10 +164,13 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
           if (scene?.paths?.vtt && scene?.paths?.sprite) {
             const parsedCues = await fetchAndParseVTT(scene.paths.vtt);
             if (parsedCues.length > 0) {
-              const evenlySpaced = getEvenlySpacedSprites(parsedCues, spriteCount);
+              const evenlySpaced = getEvenlySpacedSprites(
+                parsedCues,
+                spriteCount
+              );
               setSprites(evenlySpaced);
             }
-            setActivePreviewType('sprite');
+            setActivePreviewType("sprite");
           } else {
             setActivePreviewType(null); // No fallback available
           }
@@ -165,10 +184,13 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
           try {
             const parsedCues = await fetchAndParseVTT(scene.paths.vtt);
             if (parsedCues.length > 0) {
-              const evenlySpaced = getEvenlySpacedSprites(parsedCues, spriteCount);
+              const evenlySpaced = getEvenlySpacedSprites(
+                parsedCues,
+                spriteCount
+              );
               setSprites(evenlySpaced);
             }
-            setActivePreviewType('sprite');
+            setActivePreviewType("sprite");
           } catch {
             setActivePreviewType(null);
           }
@@ -181,7 +203,18 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
     };
 
     loadPreview();
-  }, [isHovering, isInView, autoplayOnScroll, preferredPreviewType, previewDataLoaded, isLoading, scene?.paths?.vtt, scene?.paths?.sprite, scene?.id, spriteCount]);
+  }, [
+    isHovering,
+    isInView,
+    autoplayOnScroll,
+    preferredPreviewType,
+    previewDataLoaded,
+    isLoading,
+    scene?.paths?.vtt,
+    scene?.paths?.sprite,
+    scene?.id,
+    spriteCount,
+  ]);
 
   // Measure container width on mount and when hovering
   useEffect(() => {
@@ -213,14 +246,16 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
   // Cycle through sprites (only for sprite preview type)
   useEffect(() => {
     // Only cycle if we're using sprite preview type
-    if (activePreviewType !== 'sprite') {
+    if (activePreviewType !== "sprite") {
       return;
     }
 
     // Determine if we should animate based on hover capability and autoplayOnScroll setting
     const shouldAnimate = autoplayOnScroll
       ? isInView // When autoplayOnScroll is enabled, animate when in view (mobile-first)
-      : (hasHoverCapability ? isHovering : false); // Otherwise, use hover detection
+      : hasHoverCapability
+        ? isHovering
+        : false; // Otherwise, use hover detection
 
     if (!shouldAnimate || sprites.length === 0) {
       if (intervalRef.current) {
@@ -242,12 +277,22 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
         intervalRef.current = null;
       }
     };
-  }, [activePreviewType, isHovering, isInView, hasHoverCapability, autoplayOnScroll, sprites.length, cycleInterval]);
+  }, [
+    activePreviewType,
+    isHovering,
+    isInView,
+    hasHoverCapability,
+    autoplayOnScroll,
+    sprites.length,
+    cycleInterval,
+  ]);
 
   // Determine if we should show animation based on hover/scroll state
   const shouldShowAnimation = autoplayOnScroll
     ? isInView
-    : (hasHoverCapability ? isHovering : false);
+    : hasHoverCapability
+      ? isHovering
+      : false;
 
   // For sprite preview, calculate scale factor
   const currentSprite = sprites[currentSpriteIndex];
@@ -258,10 +303,10 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
 
   // Build preview URL for video/webp (proxied through backend to hide API keys)
   const getPreviewUrl = () => {
-    if (activePreviewType === 'mp4' && scene?.id) {
+    if (activePreviewType === "mp4" && scene?.id) {
       return `/api/proxy/scene/${scene.id}/preview`;
     }
-    if (activePreviewType === 'webp' && scene?.id) {
+    if (activePreviewType === "webp" && scene?.id) {
       return `/api/proxy/scene/${scene.id}/webp`;
     }
     return null;
@@ -283,44 +328,52 @@ const SceneCardPreview = ({ scene, autoplayOnScroll = false, cycleInterval = 800
       />
 
       {/* Overlay: Video preview (MP4, high quality) */}
-      {activePreviewType === 'mp4' && shouldShowAnimation && previewDataLoaded && (
-        <video
-          src={getPreviewUrl()}
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          autoPlay
-          loop
-          muted
-          playsInline
-        />
-      )}
+      {activePreviewType === "mp4" &&
+        shouldShowAnimation &&
+        previewDataLoaded && (
+          <video
+            src={getPreviewUrl()}
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+        )}
 
       {/* Overlay: WebP animated preview (high quality) */}
-      {activePreviewType === 'webp' && shouldShowAnimation && previewDataLoaded && (
-        <img
-          src={getPreviewUrl()}
-          alt={scene?.title || "Scene preview"}
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-        />
-      )}
+      {activePreviewType === "webp" &&
+        shouldShowAnimation &&
+        previewDataLoaded && (
+          <img
+            src={getPreviewUrl()}
+            alt={scene?.title || "Scene preview"}
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          />
+        )}
 
       {/* Overlay: Sprite sheet preview (low quality / fallback) */}
-      {activePreviewType === 'sprite' && shouldShowAnimation && previewDataLoaded && sprites.length > 0 && currentSprite && (
-        <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
-          <img
-            src={scene.paths.sprite}
-            alt={scene?.title || "Scene preview"}
-            className="pointer-events-none"
-            style={{
-              position: "absolute",
-              left: `-${currentSprite.x * scale}px`,
-              top: `-${currentSprite.y * scale}px`,
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
-              maxWidth: "none",
-            }}
-          />
-        </div>
-      )}
+      {activePreviewType === "sprite" &&
+        shouldShowAnimation &&
+        previewDataLoaded &&
+        sprites.length > 0 &&
+        currentSprite && (
+          <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
+            <img
+              src={scene.paths.sprite}
+              alt={scene?.title || "Scene preview"}
+              className="pointer-events-none"
+              style={{
+                position: "absolute",
+                left: `-${currentSprite.x * scale}px`,
+                top: `-${currentSprite.y * scale}px`,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                maxWidth: "none",
+              }}
+            />
+          </div>
+        )}
 
       {/* Overlays: Duration (bottom-right) and Resolution (top-right) - hidden when preview is playing */}
       {!shouldShowAnimation && (

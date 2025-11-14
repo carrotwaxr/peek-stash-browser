@@ -306,7 +306,10 @@ pre,
 
 /* Smooth transitions for focus changes */
 [tabindex]:not([tabindex="-1"]) {
-  transition: transform 0.15s ease, box-shadow 0.15s ease, outline 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    outline 0.15s ease;
 }
 
 /* Special styling for grid navigation */
@@ -327,7 +330,9 @@ pre,
   color: var(--text-secondary);
   text-decoration: none;
   background-color: transparent;
-  transition: color 0.2s ease, background-color 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease;
 }
 
 .nav-link:hover {

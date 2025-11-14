@@ -90,12 +90,17 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
   return (
     <div className={getMaxWidth()}>
       {/* Title */}
-      <div className="font-semibold mb-2 text-sm" style={{ color: "var(--text-primary)" }}>
+      <div
+        className="font-semibold mb-2 text-sm"
+        style={{ color: "var(--text-primary)" }}
+      >
         {title}
       </div>
 
       {/* Responsive grid: columns adapt to entity count */}
-      <div className={`grid ${getGridColumns()} gap-2 max-h-[60vh] overflow-y-auto pr-2`}>
+      <div
+        className={`grid ${getGridColumns()} gap-2 max-h-[60vh] overflow-y-auto pr-2`}
+      >
         {entities.map((entity) => (
           <Link
             key={entity.id}
@@ -139,5 +144,3 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
     </div>
   );
 };
-
-export default TooltipEntityGrid;

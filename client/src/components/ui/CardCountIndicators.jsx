@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   LucideClapperboard,
   LucideDroplets,
@@ -9,7 +10,6 @@ import {
   LucideTag,
   LucideUser,
 } from "lucide-react";
-import { useMemo } from "react";
 import Tooltip from "./Tooltip";
 
 const hueify = (color, direction = "lighter", amount = 12) => {
@@ -120,7 +120,9 @@ const CardCountIndicator = ({
   );
 
   return tooltipContent ? (
-    <Tooltip content={tooltipContent} clickable={true}>{guts}</Tooltip>
+    <Tooltip content={tooltipContent} clickable={true}>
+      {guts}
+    </Tooltip>
   ) : (
     guts
   );

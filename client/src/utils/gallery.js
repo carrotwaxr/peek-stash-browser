@@ -8,7 +8,7 @@
  * @param {string} path - File path
  * @returns {string} Basename of path
  */
-export function fileNameFromPath(path) {
+function fileNameFromPath(path) {
   if (!path) return "No File Name";
   return path.replace(/^.*[\\/]/, "");
 }
@@ -53,23 +53,4 @@ export function galleryTitle(gallery) {
   }
 
   return "Untitled Gallery";
-}
-
-/**
- * Get the path for a gallery
- * @param {Object} gallery - Gallery object
- * @returns {string} Gallery path
- */
-export function galleryPath(gallery) {
-  if (!gallery) return "";
-
-  if (gallery.files && gallery.files.length > 0 && gallery.files[0].path) {
-    return gallery.files[0].path;
-  }
-
-  if (gallery.folder && gallery.folder.path) {
-    return gallery.folder.path;
-  }
-
-  return "";
 }

@@ -1,11 +1,11 @@
 import type { Response } from "express";
+import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
-import { logger } from "../../utils/logger.js";
-import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
-import getStash from "../../stash.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import getStash from "../../stash.js";
+import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
 
 /**
  * Seeded random number generator for consistent shuffling per user
@@ -1249,13 +1249,15 @@ export const getRecommendedScenes = async (
         else if (highlyRatedTags.has(tagId)) ratedSceneTagCount++;
       }
       for (const tagId of performerTags) {
-        if (!sceneTags.has(tagId)) { // Don't double-count
+        if (!sceneTags.has(tagId)) {
+          // Don't double-count
           if (favoriteTags.has(tagId)) favoritePerformerTagCount++;
           else if (highlyRatedTags.has(tagId)) ratedPerformerTagCount++;
         }
       }
       for (const tagId of studioTags) {
-        if (!sceneTags.has(tagId) && !performerTags.has(tagId)) { // Don't double-count
+        if (!sceneTags.has(tagId) && !performerTags.has(tagId)) {
+          // Don't double-count
           if (favoriteTags.has(tagId)) favoriteStudioTagCount++;
           else if (highlyRatedTags.has(tagId)) ratedStudioTagCount++;
         }

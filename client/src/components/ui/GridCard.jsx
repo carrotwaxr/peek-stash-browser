@@ -1,14 +1,14 @@
 import { forwardRef } from "react";
+import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 import {
   CardContainer,
-  CardImage,
   CardDefaultImage,
-  CardTitle,
   CardDescription,
+  CardImage,
   CardIndicators,
-  CardRating,
+  CardRatingRow,
+  CardTitle,
 } from "./CardComponents";
-import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 
 export const GridCard = forwardRef(
   (
@@ -82,13 +82,13 @@ export const GridCard = forwardRef(
         <CardIndicators indicators={indicators} />
 
         {ratingControlsProps && (
-          <CardRating
+          <CardRatingRow
             entityType={entityType}
             entityId={ratingControlsProps.entityId}
             initialRating={ratingControlsProps.initialRating}
             initialFavorite={ratingControlsProps.initialFavorite}
             initialOCounter={ratingControlsProps.initialOCounter}
-            entityTitle={typeof title === 'string' ? title : undefined}
+            entityTitle={typeof title === "string" ? title : undefined}
           />
         )}
       </CardContainer>

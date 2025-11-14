@@ -1,17 +1,22 @@
-import { useState, useRef, forwardRef } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { forwardRef, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage, GridCard } from "../ui/index.js";
-import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import { galleryTitle } from "../../utils/gallery.js";
-import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
-import { libraryApi } from "../../services/api.js";
-import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import { libraryApi } from "../../services/api.js";
+import { galleryTitle } from "../../utils/gallery.js";
+import {
+  CacheLoadingBanner,
+  ErrorMessage,
+  GridCard,
+  PageHeader,
+  PageLayout,
+  SearchControls,
+} from "../ui/index.js";
 
 const Galleries = () => {
   usePageTitle("Galleries");
@@ -182,11 +187,16 @@ const GalleryCard = forwardRef(
         description={gallery.description}
         entityType="gallery"
         imagePath={coverImage}
-        indicators={[{
-          type: "IMAGES",
-          count: gallery.image_count,
-          tooltipContent: gallery.image_count === 1 ? "1 Image" : `${gallery.image_count} Images`
-        }]}
+        indicators={[
+          {
+            type: "IMAGES",
+            count: gallery.image_count,
+            tooltipContent:
+              gallery.image_count === 1
+                ? "1 Image"
+                : `${gallery.image_count} Images`,
+          },
+        ]}
         linkTo={`/gallery/${gallery.id}`}
         ratingControlsProps={{
           entityId: gallery.id,
