@@ -1,13 +1,13 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
 import {
-  getUserCustomThemes,
-  getCustomTheme,
   createCustomTheme,
-  updateCustomTheme,
   deleteCustomTheme,
   duplicateCustomTheme,
+  getCustomTheme,
+  getUserCustomThemes,
+  updateCustomTheme,
 } from "../controllers/customTheme.js";
+import { authenticateToken } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();

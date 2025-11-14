@@ -1,12 +1,12 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
 import {
-  pingWatchHistory,
-  incrementOCounter,
-  getWatchHistory,
-  getAllWatchHistory,
   clearAllWatchHistory,
+  getAllWatchHistory,
+  getWatchHistory,
+  incrementOCounter,
+  pingWatchHistory,
 } from "../controllers/watchHistory.js";
+import { authenticateToken } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();

@@ -1,14 +1,11 @@
 import express from "express";
 import {
-  authenticateToken,
-  requireCacheReady,
-} from "../../middleware/auth.js";
-import {
   findScenes,
   findSimilarScenes,
   getRecommendedScenes,
   updateScene,
 } from "../../controllers/library/scenes.js";
+import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();

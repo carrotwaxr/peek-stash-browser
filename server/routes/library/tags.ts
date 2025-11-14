@@ -1,13 +1,10 @@
 import express from "express";
 import {
-  authenticateToken,
-  requireCacheReady,
-} from "../../middleware/auth.js";
-import {
   findTags,
   findTagsMinimal,
   updateTag,
 } from "../../controllers/library/tags.js";
+import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();

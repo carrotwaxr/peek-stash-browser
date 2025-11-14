@@ -1,4 +1,4 @@
-import { logger } from '../utils/logger.js';
+import { logger } from "../utils/logger.js";
 
 /**
  * EmptyEntityFilterService
@@ -114,7 +114,7 @@ class EmptyEntityFilterService {
    * Simple case - just check image_count
    */
   filterEmptyGalleries<T extends FilterableGallery>(galleries: T[]): T[] {
-    return galleries.filter(gallery => {
+    return galleries.filter((gallery) => {
       return gallery.image_count && gallery.image_count > 0;
     });
   }
@@ -128,7 +128,7 @@ class EmptyEntityFilterService {
     if (groups.length === 0) return [];
 
     // Create a map for quick lookups
-    const groupMap = new Map(groups.map(g => [g.id, g]));
+    const groupMap = new Map(groups.map((g) => [g.id, g]));
 
     // Track which groups have content (directly or through children)
     const hasContent = new Map<string, boolean>();
@@ -137,7 +137,10 @@ class EmptyEntityFilterService {
      * Recursively check if a group has content
      * Content = has scenes OR has children with content
      */
-    const checkHasContent = (groupId: string, visited = new Set<string>()): boolean => {
+    const checkHasContent = (
+      groupId: string,
+      visited = new Set<string>()
+    ): boolean => {
       // Prevent infinite loops in case of circular references
       if (visited.has(groupId)) return false;
       visited.add(groupId);
@@ -178,9 +181,11 @@ class EmptyEntityFilterService {
     }
 
     // Filter to only groups with content
-    const filtered = groups.filter(group => hasContent.get(group.id) === true);
+    const filtered = groups.filter(
+      (group) => hasContent.get(group.id) === true
+    );
 
-    logger.debug('Filtered empty groups', {
+    logger.debug("Filtered empty groups", {
       original: groups.length,
       filtered: filtered.length,
       removed: groups.length - filtered.length,
@@ -209,7 +214,8 @@ class EmptyEntityFilterService {
     // Index performers from visible groups
     for (const group of visibleGroups) {
       // Groups have performers array with nested structure
-      const groupPerformers = (group as { performers?: Array<{ id: string }> }).performers;
+      const groupPerformers = (group as { performers?: Array<{ id: string }> })
+        .performers;
       if (groupPerformers) {
         for (const performer of groupPerformers) {
           performersInVisibleGroups.add(performer.id);
@@ -220,7 +226,9 @@ class EmptyEntityFilterService {
     // Index performers from visible galleries
     for (const gallery of visibleGalleries) {
       // Galleries have performers array
-      const galleryPerformers = (gallery as { performers?: Array<{ id: string }> }).performers;
+      const galleryPerformers = (
+        gallery as { performers?: Array<{ id: string }> }
+      ).performers;
       if (galleryPerformers) {
         for (const performer of galleryPerformers) {
           performersInVisibleGalleries.add(performer.id);
@@ -228,7 +236,7 @@ class EmptyEntityFilterService {
       }
     }
 
-    return performers.filter(performer => {
+    return performers.filter((performer) => {
       // Has scenes? Keep
       if (performer.scene_count && performer.scene_count > 0) {
         return true;
@@ -268,10 +276,10 @@ class EmptyEntityFilterService {
     visibleGalleries: FilterableGallery[]
   ): T[] {
     // Build sets of visible group and gallery IDs for fast lookup
-    const visibleGroupIds = new Set(visibleGroups.map(g => g.id));
-    const visibleGalleryIds = new Set(visibleGalleries.map(g => g.id));
+    const visibleGroupIds = new Set(visibleGroups.map((g) => g.id));
+    const visibleGalleryIds = new Set(visibleGalleries.map((g) => g.id));
 
-    return studios.filter(studio => {
+    return studios.filter((studio) => {
       // Has scenes? Keep
       if (studio.scene_count && studio.scene_count > 0) {
         return true;
@@ -284,7 +292,7 @@ class EmptyEntityFilterService {
 
       // Has visible groups? Keep
       if (studio.groups && Array.isArray(studio.groups)) {
-        const hasVisibleGroup = studio.groups.some(g =>
+        const hasVisibleGroup = studio.groups.some((g) =>
           visibleGroupIds.has(g.id)
         );
         if (hasVisibleGroup) {
@@ -294,9 +302,10 @@ class EmptyEntityFilterService {
 
       // Has visible galleries? Keep
       // Check studio's galleries array against visible galleries
-      const studioGalleries = (studio as { galleries?: Array<{ id: string }> }).galleries;
+      const studioGalleries = (studio as { galleries?: Array<{ id: string }> })
+        .galleries;
       if (studioGalleries && studioGalleries.length > 0) {
-        const hasVisibleGallery = studioGalleries.some(g =>
+        const hasVisibleGallery = studioGalleries.some((g) =>
           visibleGalleryIds.has(g.id)
         );
         if (hasVisibleGallery) {
@@ -324,7 +333,7 @@ class EmptyEntityFilterService {
     if (tags.length === 0) return [];
 
     // Create a map for quick lookups
-    const tagMap = new Map(tags.map(t => [t.id, t]));
+    const tagMap = new Map(tags.map((t) => [t.id, t]));
 
     // Track which tags have content (directly or through valid children)
     const hasContent = new Map<string, boolean>();
@@ -386,7 +395,10 @@ class EmptyEntityFilterService {
      * Note: Tags can form DAGs (multiple parents), not just trees
      * A tag should be kept if it has ANY valid child
      */
-    const checkHasContent = (tagId: string, visited = new Set<string>()): boolean => {
+    const checkHasContent = (
+      tagId: string,
+      visited = new Set<string>()
+    ): boolean => {
       // Prevent infinite loops
       if (visited.has(tagId)) return false;
       visited.add(tagId);
@@ -427,9 +439,9 @@ class EmptyEntityFilterService {
     }
 
     // Filter to only tags with content
-    const filtered = tags.filter(tag => hasContent.get(tag.id) === true);
+    const filtered = tags.filter((tag) => hasContent.get(tag.id) === true);
 
-    logger.debug('Filtered empty tags', {
+    logger.debug("Filtered empty tags", {
       original: tags.length,
       filtered: filtered.length,
       removed: tags.length - filtered.length,
@@ -448,7 +460,7 @@ class EmptyEntityFilterService {
     TGroup extends FilterableGroup = FilterableGroup,
     TStudio extends FilterableStudio = FilterableStudio,
     TPerformer extends FilterablePerformer = FilterablePerformer,
-    TTag extends FilterableTag = FilterableTag
+    TTag extends FilterableTag = FilterableTag,
   >(entities: {
     galleries?: TGallery[];
     groups?: TGroup[];
@@ -475,19 +487,27 @@ class EmptyEntityFilterService {
 
     // Step 3: Filter studios (needs: groups, galleries)
     const filteredStudios = entities.studios
-      ? this.filterEmptyStudios(entities.studios, filteredGroups, filteredGalleries)
+      ? this.filterEmptyStudios(
+          entities.studios,
+          filteredGroups,
+          filteredGalleries
+        )
       : [];
 
     // Step 4: Filter performers (needs: groups, galleries)
     const filteredPerformers = entities.performers
-      ? this.filterEmptyPerformers(entities.performers, filteredGroups, filteredGalleries)
+      ? this.filterEmptyPerformers(
+          entities.performers,
+          filteredGroups,
+          filteredGalleries
+        )
       : [];
 
     // Build visibility sets for tags
-    const visibleGalleries = new Set(filteredGalleries.map(g => g.id));
-    const visibleGroups = new Set(filteredGroups.map(g => g.id));
-    const visibleStudios = new Set(filteredStudios.map(s => s.id));
-    const visiblePerformers = new Set(filteredPerformers.map(p => p.id));
+    const visibleGalleries = new Set(filteredGalleries.map((g) => g.id));
+    const visibleGroups = new Set(filteredGroups.map((g) => g.id));
+    const visibleStudios = new Set(filteredStudios.map((s) => s.id));
+    const visiblePerformers = new Set(filteredPerformers.map((p) => p.id));
 
     // Step 5: Filter tags (needs: all entities)
     const visibilitySet: VisibleEntitySets = {

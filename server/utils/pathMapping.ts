@@ -14,18 +14,17 @@
  * 3. Stash native + Peek Docker: /home/user/videos → /mnt/nfs/videos
  * 4. Multiple libraries: /data, /data2, /images → separate Peek mounts
  */
-
-import path from "path";
 import { PrismaClient } from "@prisma/client";
-import { logger } from "./logger.js";
+import path from "path";
 import type {
-  Scene,
-  Performer,
-  Studio,
-  Tag,
   Gallery,
   Group,
+  Performer,
+  Scene,
+  Studio,
+  Tag,
 } from "stashapp-api";
+import { logger } from "./logger.js";
 
 const prisma = new PrismaClient();
 
@@ -81,7 +80,7 @@ class PathMapper {
 
       if (dbMappings.length > 0) {
         // Use database mappings
-        this.mappings = dbMappings.map(m => ({
+        this.mappings = dbMappings.map((m) => ({
           id: m.id,
           stashPath: m.stashPath,
           peekPath: m.peekPath,
@@ -89,7 +88,10 @@ class PathMapper {
 
         logger.info("PathMapper loaded from database", {
           count: this.mappings.length,
-          mappings: this.mappings.map(m => ({ stash: m.stashPath, peek: m.peekPath })),
+          mappings: this.mappings.map((m) => ({
+            stash: m.stashPath,
+            peek: m.peekPath,
+          })),
         });
 
         // Sort by path length descending (longest match first)
@@ -150,7 +152,10 @@ class PathMapper {
   /**
    * Update an existing path mapping
    */
-  async updateMapping(id: number, input: PathMappingInput): Promise<PathMapping> {
+  async updateMapping(
+    id: number,
+    input: PathMappingInput
+  ): Promise<PathMapping> {
     const updated = await prisma.pathMapping.update({
       where: { id },
       data: {
@@ -166,7 +171,7 @@ class PathMapper {
     };
 
     // Update in-memory cache and re-sort
-    const index = this.mappings.findIndex(m => m.id === id);
+    const index = this.mappings.findIndex((m) => m.id === id);
     if (index >= 0) {
       this.mappings[index] = mapping;
       this.mappings.sort((a, b) => b.stashPath.length - a.stashPath.length);
@@ -184,7 +189,7 @@ class PathMapper {
     await prisma.pathMapping.delete({ where: { id } });
 
     // Remove from in-memory cache
-    this.mappings = this.mappings.filter(m => m.id !== id);
+    this.mappings = this.mappings.filter((m) => m.id !== id);
 
     logger.info("Deleted path mapping", { id });
   }
@@ -220,7 +225,7 @@ class PathMapper {
     if (this.mappings.length === 0) {
       throw new Error(
         "No path mappings configured. " +
-        "Complete setup wizard or configure path mappings in Settings."
+          "Complete setup wizard or configure path mappings in Settings."
       );
     }
 
@@ -256,9 +261,11 @@ class PathMapper {
     // No mapping found
     const error = new Error(
       `No path mapping found for: ${stashPath}\n` +
-      `Configured mappings:\n` +
-      this.mappings.map(m => `  ${m.stashPath} → ${m.peekPath}`).join("\n") +
-      `\n\nConfigure path mappings in Settings > Path Mappings`
+        `Configured mappings:\n` +
+        this.mappings
+          .map((m) => `  ${m.stashPath} → ${m.peekPath}`)
+          .join("\n") +
+        `\n\nConfigure path mappings in Settings > Path Mappings`
     );
 
     logger.error("Path translation failed", {
@@ -317,7 +324,9 @@ export const appendApiKeyToUrl = convertToProxyUrl;
  * Transform performer to add API key to image_path
  * Works with both full Performer objects and nested PerformerCompact/PerformerFull
  */
-export const transformPerformer = <T extends Partial<Performer>>(performer: T): T => {
+export const transformPerformer = <T extends Partial<Performer>>(
+  performer: T
+): T => {
   try {
     const mutated = {
       ...performer,
@@ -330,7 +339,9 @@ export const transformPerformer = <T extends Partial<Performer>>(performer: T): 
     if (performer.tags && Array.isArray(performer.tags)) {
       mutated.tags = performer.tags.map((t: NestedTagWithImage) => ({
         ...t,
-        image_path: t.image_path ? appendApiKeyToUrl(t.image_path) : t.image_path,
+        image_path: t.image_path
+          ? appendApiKeyToUrl(t.image_path)
+          : t.image_path,
       })) as T["tags"];
     }
 
@@ -358,7 +369,9 @@ export const transformStudio = <T extends Partial<Studio>>(studio: T): T => {
     if (studio.tags && Array.isArray(studio.tags)) {
       mutated.tags = studio.tags.map((t: NestedTagWithImage) => ({
         ...t,
-        image_path: t.image_path ? appendApiKeyToUrl(t.image_path) : t.image_path,
+        image_path: t.image_path
+          ? appendApiKeyToUrl(t.image_path)
+          : t.image_path,
       })) as T["tags"];
     }
 
@@ -410,12 +423,16 @@ export const transformScene = <T extends Partial<Scene>>(scene: T): T => {
 
     // Transform performers to add API key to image_path
     if (scene.performers && Array.isArray(scene.performers)) {
-      mutated.performers = scene.performers.map((p: NestedPerformer) => transformPerformer(p)) as T["performers"];
+      mutated.performers = scene.performers.map((p: NestedPerformer) =>
+        transformPerformer(p)
+      ) as T["performers"];
     }
 
     // Transform tags to add API key to image_path
     if (scene.tags && Array.isArray(scene.tags)) {
-      mutated.tags = scene.tags.map((t: NestedTagWithImage) => transformTag(t)) as T["tags"];
+      mutated.tags = scene.tags.map((t: NestedTagWithImage) =>
+        transformTag(t)
+      ) as T["tags"];
     }
 
     // Transform studio to add API key to image_path
@@ -466,12 +483,16 @@ export const transformGallery = <T extends Partial<Gallery>>(gallery: T): T => {
 
     // Transform performers to add API key to image_path
     if (gallery.performers && Array.isArray(gallery.performers)) {
-      mutated.performers = gallery.performers.map((p: NestedPerformer) => transformPerformer(p)) as T["performers"];
+      mutated.performers = gallery.performers.map((p: NestedPerformer) =>
+        transformPerformer(p)
+      ) as T["performers"];
     }
 
     // Transform tags to add API key to image_path
     if (gallery.tags && Array.isArray(gallery.tags)) {
-      mutated.tags = gallery.tags.map((t: NestedTagWithImage) => transformTag(t)) as T["tags"];
+      mutated.tags = gallery.tags.map((t: NestedTagWithImage) =>
+        transformTag(t)
+      ) as T["tags"];
     }
 
     // Transform studio to add API key to image_path
@@ -498,10 +519,14 @@ export const transformGroup = <T extends Partial<Group>>(group: T): T => {
 
     // Transform front and back image paths
     if (group.front_image_path) {
-      mutated.front_image_path = appendApiKeyToUrl(group.front_image_path) as T["front_image_path"];
+      mutated.front_image_path = appendApiKeyToUrl(
+        group.front_image_path
+      ) as T["front_image_path"];
     }
     if (group.back_image_path) {
-      mutated.back_image_path = appendApiKeyToUrl(group.back_image_path) as T["back_image_path"];
+      mutated.back_image_path = appendApiKeyToUrl(
+        group.back_image_path
+      ) as T["back_image_path"];
     }
 
     // Transform studio to add API key to image_path
@@ -511,7 +536,9 @@ export const transformGroup = <T extends Partial<Group>>(group: T): T => {
 
     // Transform tags to add API key to image_path
     if (group.tags && Array.isArray(group.tags)) {
-      mutated.tags = group.tags.map((t: NestedTagWithImage) => transformTag(t)) as T["tags"];
+      mutated.tags = group.tags.map((t: NestedTagWithImage) =>
+        transformTag(t)
+      ) as T["tags"];
     }
 
     return mutated;

@@ -1,13 +1,10 @@
 import express from "express";
 import {
-  authenticateToken,
-  requireCacheReady,
-} from "../../middleware/auth.js";
-import {
   findStudios,
   findStudiosMinimal,
   updateStudio,
 } from "../../controllers/library/studios.js";
+import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();

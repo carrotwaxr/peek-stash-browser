@@ -1,5 +1,5 @@
-import prisma from "./singleton.js";
 import bcrypt from "bcryptjs";
+import prisma from "./singleton.js";
 
 async function main() {
   // Create default admin user

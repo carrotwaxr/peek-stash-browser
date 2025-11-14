@@ -252,7 +252,11 @@ class UserRestrictionService {
     switch (entityType) {
       case "groups":
         // SceneGroup has nested group.id structure, but sometimes just id
-        return scene.groups?.map((g: SceneGroupEntity) => String((g.group?.id || (g as { id?: string }).id))) || [];
+        return (
+          scene.groups?.map((g: SceneGroupEntity) =>
+            String(g.group?.id || (g as { id?: string }).id)
+          ) || []
+        );
       case "tags":
         return scene.tags?.map((t: EntityWithId) => String(t.id)) || [];
       case "studios":

@@ -1,13 +1,13 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
 import {
+  getSegmentStates,
+  getSessionStatus,
   getStreamSegment,
+  killSession,
   playVideo,
   seekVideo,
-  getSessionStatus,
-  getSegmentStates,
-  killSession,
 } from "../controllers/video.js";
+import { authenticateToken } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();

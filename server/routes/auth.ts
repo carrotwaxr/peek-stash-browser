@@ -1,9 +1,9 @@
-import express, { Response } from "express";
 import bcrypt from "bcryptjs";
+import express, { Response } from "express";
 import {
-  generateToken,
-  authenticateToken,
   AuthenticatedRequest,
+  authenticateToken,
+  generateToken,
 } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { authenticated } from "../utils/routeHelpers.js";

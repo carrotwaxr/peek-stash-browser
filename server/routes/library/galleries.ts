@@ -1,11 +1,11 @@
 import express from "express";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
 import {
   findGalleries,
   findGalleriesMinimal,
   findGalleryById,
   getGalleryImages,
 } from "../../controllers/library/galleries.js";
+import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();

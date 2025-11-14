@@ -1,8 +1,9 @@
-import { Response } from "express";
-import prisma from "../prisma/singleton.js";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import { Response } from "express";
+import { AuthenticatedRequest } from "../middleware/auth.js";
+import prisma from "../prisma/singleton.js";
+
 // import { getDefaultCarouselPreferences } from "../utils/carouselDefaults.js";
 
 /**
@@ -91,7 +92,10 @@ const getDefaultCarouselPreferences = (): CarouselPreference[] => [
 /**
  * Get user settings
  */
-export const getUserSettings = async (req: AuthenticatedRequest, res: Response) => {
+export const getUserSettings = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -129,7 +133,8 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
         preferredPreviewQuality: user.preferredPreviewQuality,
         enableCast: user.enableCast,
         theme: user.theme,
-        carouselPreferences: user.carouselPreferences || getDefaultCarouselPreferences(),
+        carouselPreferences:
+          user.carouselPreferences || getDefaultCarouselPreferences(),
         navPreferences: user.navPreferences || null,
         minimumPlayPercent: user.minimumPlayPercent,
         syncToStash: user.syncToStash,
@@ -144,7 +149,10 @@ export const getUserSettings = async (req: AuthenticatedRequest, res: Response) 
 /**
  * Update user settings
  */
-export const updateUserSettings = async (req: AuthenticatedRequest, res: Response) => {
+export const updateUserSettings = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const currentUserId = req.user?.id;
     const currentUserRole = req.user?.role;
@@ -159,13 +167,25 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
     let targetUserId = currentUserId;
     if (req.params.userId) {
       // Admin updating another user's settings (or admin updating themselves via ServerSettings)
-      if (currentUserRole !== 'ADMIN') {
-        return res.status(403).json({ error: "Only admins can update other users' settings" });
+      if (currentUserRole !== "ADMIN") {
+        return res
+          .status(403)
+          .json({ error: "Only admins can update other users' settings" });
       }
       targetUserId = parseInt(req.params.userId);
     }
 
-    const { preferredQuality, preferredPlaybackMode, preferredPreviewQuality, enableCast, theme, carouselPreferences, navPreferences, minimumPlayPercent, syncToStash } = req.body;
+    const {
+      preferredQuality,
+      preferredPlaybackMode,
+      preferredPreviewQuality,
+      enableCast,
+      theme,
+      carouselPreferences,
+      navPreferences,
+      minimumPlayPercent,
+      syncToStash,
+    } = req.body;
 
     // Validate values
     const validQualities = ["auto", "1080p", "720p", "480p", "360p"];
@@ -176,36 +196,58 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       return res.status(400).json({ error: "Invalid quality setting" });
     }
 
-    if (preferredPlaybackMode && !validPlaybackModes.includes(preferredPlaybackMode)) {
+    if (
+      preferredPlaybackMode &&
+      !validPlaybackModes.includes(preferredPlaybackMode)
+    ) {
       return res.status(400).json({ error: "Invalid playback mode setting" });
     }
 
-    if (preferredPreviewQuality && !validPreviewQualities.includes(preferredPreviewQuality)) {
+    if (
+      preferredPreviewQuality &&
+      !validPreviewQualities.includes(preferredPreviewQuality)
+    ) {
       return res.status(400).json({ error: "Invalid preview quality setting" });
     }
 
     // Validate minimumPlayPercent if provided
     if (minimumPlayPercent !== undefined) {
-      if (typeof minimumPlayPercent !== 'number' || minimumPlayPercent < 0 || minimumPlayPercent > 100) {
-        return res.status(400).json({ error: "Minimum play percent must be a number between 0 and 100" });
+      if (
+        typeof minimumPlayPercent !== "number" ||
+        minimumPlayPercent < 0 ||
+        minimumPlayPercent > 100
+      ) {
+        return res
+          .status(400)
+          .json({
+            error: "Minimum play percent must be a number between 0 and 100",
+          });
       }
     }
 
     // Validate syncToStash if provided (admin only can change this)
-    if (syncToStash !== undefined && typeof syncToStash !== 'boolean') {
+    if (syncToStash !== undefined && typeof syncToStash !== "boolean") {
       return res.status(400).json({ error: "Sync to Stash must be a boolean" });
     }
 
     // Validate carousel preferences if provided
     if (carouselPreferences !== undefined) {
       if (!Array.isArray(carouselPreferences)) {
-        return res.status(400).json({ error: "Carousel preferences must be an array" });
+        return res
+          .status(400)
+          .json({ error: "Carousel preferences must be an array" });
       }
 
       // Validate each carousel preference
       for (const pref of carouselPreferences) {
-        if (typeof pref.id !== 'string' || typeof pref.enabled !== 'boolean' || typeof pref.order !== 'number') {
-          return res.status(400).json({ error: "Invalid carousel preference format" });
+        if (
+          typeof pref.id !== "string" ||
+          typeof pref.enabled !== "boolean" ||
+          typeof pref.order !== "number"
+        ) {
+          return res
+            .status(400)
+            .json({ error: "Invalid carousel preference format" });
         }
       }
     }
@@ -213,13 +255,21 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
     // Validate navigation preferences if provided
     if (navPreferences !== undefined) {
       if (!Array.isArray(navPreferences)) {
-        return res.status(400).json({ error: "Navigation preferences must be an array" });
+        return res
+          .status(400)
+          .json({ error: "Navigation preferences must be an array" });
       }
 
       // Validate each navigation preference
       for (const pref of navPreferences) {
-        if (typeof pref.id !== 'string' || typeof pref.enabled !== 'boolean' || typeof pref.order !== 'number') {
-          return res.status(400).json({ error: "Invalid navigation preference format" });
+        if (
+          typeof pref.id !== "string" ||
+          typeof pref.enabled !== "boolean" ||
+          typeof pref.order !== "number"
+        ) {
+          return res
+            .status(400)
+            .json({ error: "Invalid navigation preference format" });
         }
       }
     }
@@ -229,7 +279,9 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
       data: {
         ...(preferredQuality !== undefined && { preferredQuality }),
         ...(preferredPlaybackMode !== undefined && { preferredPlaybackMode }),
-        ...(preferredPreviewQuality !== undefined && { preferredPreviewQuality }),
+        ...(preferredPreviewQuality !== undefined && {
+          preferredPreviewQuality,
+        }),
         ...(enableCast !== undefined && { enableCast }),
         ...(theme !== undefined && { theme }),
         ...(carouselPreferences !== undefined && { carouselPreferences }),
@@ -258,7 +310,8 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
         preferredQuality: updatedUser.preferredQuality,
         preferredPlaybackMode: updatedUser.preferredPlaybackMode,
         theme: updatedUser.theme,
-        carouselPreferences: updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
+        carouselPreferences:
+          updatedUser.carouselPreferences || getDefaultCarouselPreferences(),
         navPreferences: updatedUser.navPreferences || null,
         minimumPlayPercent: updatedUser.minimumPlayPercent,
         syncToStash: updatedUser.syncToStash,
@@ -273,7 +326,10 @@ export const updateUserSettings = async (req: AuthenticatedRequest, res: Respons
 /**
  * Change user password
  */
-export const changePassword = async (req: AuthenticatedRequest, res: Response) => {
+export const changePassword = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -284,11 +340,15 @@ export const changePassword = async (req: AuthenticatedRequest, res: Response) =
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: "Current password and new password are required" });
+      return res
+        .status(400)
+        .json({ error: "Current password and new password are required" });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ error: "New password must be at least 6 characters" });
+      return res
+        .status(400)
+        .json({ error: "New password must be at least 6 characters" });
     }
 
     // Get current user with password
@@ -329,7 +389,9 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ error: "Forbidden: Admin access required" });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
     }
 
     const users = await prisma.user.findMany({
@@ -360,21 +422,29 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ error: "Forbidden: Admin access required" });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
     }
 
     const { username, password, role } = req.body;
 
     if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required" });
+      return res
+        .status(400)
+        .json({ error: "Username and password are required" });
     }
 
     if (password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters" });
     }
 
     if (role && role !== "ADMIN" && role !== "USER") {
-      return res.status(400).json({ error: "Role must be either ADMIN or USER" });
+      return res
+        .status(400)
+        .json({ error: "Role must be either ADMIN or USER" });
     }
 
     // Check if username already exists
@@ -419,7 +489,9 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ error: "Forbidden: Admin access required" });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
     }
 
     const { userId } = req.params;
@@ -458,11 +530,16 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Update user role (admin only)
  */
-export const updateUserRole = async (req: AuthenticatedRequest, res: Response) => {
+export const updateUserRole = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     // Check if user is admin
     if (req.user?.role !== "ADMIN") {
-      return res.status(403).json({ error: "Forbidden: Admin access required" });
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
     }
 
     const { userId } = req.params;
@@ -474,7 +551,9 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response) =
     }
 
     if (!role || (role !== "ADMIN" && role !== "USER")) {
-      return res.status(400).json({ error: "Role must be either ADMIN or USER" });
+      return res
+        .status(400)
+        .json({ error: "Role must be either ADMIN or USER" });
     }
 
     // Prevent admin from changing their own role
@@ -504,7 +583,10 @@ export const updateUserRole = async (req: AuthenticatedRequest, res: Response) =
 /**
  * Get user's filter presets
  */
-export const getFilterPresets = async (req: AuthenticatedRequest, res: Response) => {
+export const getFilterPresets = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -541,7 +623,10 @@ export const getFilterPresets = async (req: AuthenticatedRequest, res: Response)
 /**
  * Save a new filter preset
  */
-export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response) => {
+export const saveFilterPreset = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -549,7 +634,8 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { artifactType, name, filters, sort, direction, setAsDefault } = req.body;
+    const { artifactType, name, filters, sort, direction, setAsDefault } =
+      req.body;
 
     // Validate required fields
     if (!artifactType || !name || !filters || !sort || !direction) {
@@ -557,7 +643,14 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
     }
 
     // Validate artifact type
-    const validTypes = ["scene", "performer", "studio", "tag", "group", "gallery"];
+    const validTypes = [
+      "scene",
+      "performer",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+    ];
     if (!validTypes.includes(artifactType)) {
       return res.status(400).json({ error: "Invalid artifact type" });
     }
@@ -569,7 +662,8 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
     });
 
     const currentPresets = (user?.filterPresets as FilterPresets | null) || {};
-    const currentDefaults = (user?.defaultFilterPresets as DefaultFilterPresets | null) || {};
+    const currentDefaults =
+      (user?.defaultFilterPresets as DefaultFilterPresets | null) || {};
 
     // Create new preset
     const newPreset = {
@@ -582,7 +676,10 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
     };
 
     // Add preset to the appropriate artifact type array
-    currentPresets[artifactType] = [...(currentPresets[artifactType] || []), newPreset];
+    currentPresets[artifactType] = [
+      ...(currentPresets[artifactType] || []),
+      newPreset,
+    ];
 
     // If setAsDefault is true, set this preset as default
     if (setAsDefault) {
@@ -608,7 +705,10 @@ export const saveFilterPreset = async (req: AuthenticatedRequest, res: Response)
 /**
  * Delete a filter preset
  */
-export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Response) => {
+export const deleteFilterPreset = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -619,7 +719,14 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
     const { artifactType, presetId } = req.params;
 
     // Validate artifact type
-    const validTypes = ["scene", "performer", "studio", "tag", "group", "gallery"];
+    const validTypes = [
+      "scene",
+      "performer",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+    ];
     if (!validTypes.includes(artifactType)) {
       return res.status(400).json({ error: "Invalid artifact type" });
     }
@@ -635,7 +742,8 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
     }
 
     const currentPresets = (user.filterPresets as FilterPresets) || {};
-    const currentDefaults = (user.defaultFilterPresets as DefaultFilterPresets) || {};
+    const currentDefaults =
+      (user.defaultFilterPresets as DefaultFilterPresets) || {};
 
     // Remove preset from the appropriate artifact type array
     currentPresets[artifactType] = (currentPresets[artifactType] || []).filter(
@@ -666,7 +774,10 @@ export const deleteFilterPreset = async (req: AuthenticatedRequest, res: Respons
 /**
  * Get default filter presets
  */
-export const getDefaultFilterPresets = async (req: AuthenticatedRequest, res: Response) => {
+export const getDefaultFilterPresets = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -699,7 +810,10 @@ export const getDefaultFilterPresets = async (req: AuthenticatedRequest, res: Re
 /**
  * Set default filter preset for an artifact type
  */
-export const setDefaultFilterPreset = async (req: AuthenticatedRequest, res: Response) => {
+export const setDefaultFilterPreset = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const userId = req.user?.id;
 
@@ -715,7 +829,14 @@ export const setDefaultFilterPreset = async (req: AuthenticatedRequest, res: Res
     }
 
     // Validate artifact type
-    const validTypes = ["scene", "performer", "studio", "tag", "group", "gallery"];
+    const validTypes = [
+      "scene",
+      "performer",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+    ];
     if (!validTypes.includes(artifactType)) {
       return res.status(400).json({ error: "Invalid artifact type" });
     }
@@ -730,7 +851,8 @@ export const setDefaultFilterPreset = async (req: AuthenticatedRequest, res: Res
       return res.status(404).json({ error: "User not found" });
     }
 
-    const currentDefaults = (user.defaultFilterPresets as DefaultFilterPresets) || {};
+    const currentDefaults =
+      (user.defaultFilterPresets as DefaultFilterPresets) || {};
     const currentPresets = (user.filterPresets as FilterPresets) || {};
 
     // If presetId is provided, validate it exists
@@ -769,12 +891,15 @@ export const setDefaultFilterPreset = async (req: AuthenticatedRequest, res: Res
  * This is a one-time import operation, not continuous sync
  * Admin only - syncs data for a specific user
  */
-export const syncFromStash = async (req: AuthenticatedRequest, res: Response) => {
+export const syncFromStash = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const currentUser = req.user;
 
     // Only admins can sync
-    if (!currentUser || currentUser.role !== 'ADMIN') {
+    if (!currentUser || currentUser.role !== "ADMIN") {
       return res.status(403).json({ error: "Only admins can sync from Stash" });
     }
 
@@ -792,12 +917,12 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       performers: { rating: true, favorite: true },
       studios: { rating: true, favorite: true },
       tags: { rating: false, favorite: true },
-      galleries: { rating: true },  // Galleries only have rating, no favorite
-      groups: { rating: true },      // Groups only have rating, no favorite
+      galleries: { rating: true }, // Galleries only have rating, no favorite
+      groups: { rating: true }, // Groups only have rating, no favorite
     };
 
     // Import stash singleton
-    const getStash = (await import('../stash.js')).default;
+    const getStash = (await import("../stash.js")).default;
     const stash = getStash();
 
     const stats = {
@@ -810,7 +935,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
     };
 
     // Fetch all entities from Stash (per_page: -1 = unlimited)
-    console.log('Syncing from Stash: Fetching all entities...');
+    console.log("Syncing from Stash: Fetching all entities...");
 
     // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
     if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
@@ -818,22 +943,32 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Determine which filter to use
       if (syncOptions.scenes.rating && !syncOptions.scenes.oCounter) {
-        sceneFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
+        sceneFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
       } else if (syncOptions.scenes.oCounter && !syncOptions.scenes.rating) {
-        sceneFilter = { o_counter: { value: 0, modifier: 'GREATER_THAN' } };
+        sceneFilter = { o_counter: { value: 0, modifier: "GREATER_THAN" } };
       }
       // If both are selected, fetch all scenes (can't do OR in single query)
 
       const scenesData = await stash.findScenes({
         filter: { per_page: -1 },
-        scene_filter: Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined
+        scene_filter:
+          Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined,
       });
       const scenes = scenesData.findScenes.scenes;
 
       // Filter in code only if both options are selected
-      const filteredScenes = (syncOptions.scenes.rating && syncOptions.scenes.oCounter)
-        ? scenes.filter((s: { rating100?: number | null; o_counter?: number | null }) => ((s.rating100 !== null && s.rating100 !== undefined && s.rating100 > 0)) || ((s.o_counter !== null && s.o_counter !== undefined && s.o_counter > 0)))
-        : scenes;
+      const filteredScenes =
+        syncOptions.scenes.rating && syncOptions.scenes.oCounter
+          ? scenes.filter(
+              (s: { rating100?: number | null; o_counter?: number | null }) =>
+                (s.rating100 !== null &&
+                  s.rating100 !== undefined &&
+                  s.rating100 > 0) ||
+                (s.o_counter !== null &&
+                  s.o_counter !== undefined &&
+                  s.o_counter > 0)
+            )
+          : scenes;
 
       stats.scenes.checked = filteredScenes.length;
 
@@ -846,23 +981,31 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
         let sceneWasUpdated = false;
 
         // Handle rating sync (use upsert to prevent duplicate key errors)
-        if (syncOptions.scenes.rating && scene.rating100 && scene.rating100 > 0) {
+        if (
+          syncOptions.scenes.rating &&
+          scene.rating100 &&
+          scene.rating100 > 0
+        ) {
           const stashRating = scene.rating100;
 
           // Check if record exists before upsert to track created vs updated
           const existingRating = await prisma.sceneRating.findUnique({
-            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
+            where: {
+              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+            },
           });
 
           await prisma.sceneRating.upsert({
-            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } },
+            where: {
+              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+            },
             update: { rating: stashRating },
             create: {
               userId: targetUserId,
               sceneId: scene.id,
               rating: stashRating,
               favorite: false,
-            }
+            },
           });
 
           if (!existingRating) {
@@ -873,16 +1016,24 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
         }
 
         // Handle o_counter sync (use upsert to prevent duplicate key errors)
-        if (syncOptions.scenes.oCounter && scene.o_counter && scene.o_counter > 0) {
+        if (
+          syncOptions.scenes.oCounter &&
+          scene.o_counter &&
+          scene.o_counter > 0
+        ) {
           const stashOCounter = scene.o_counter;
 
           // Check if record exists before upsert to track created vs updated
           const existingWatchHistory = await prisma.watchHistory.findUnique({
-            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } }
+            where: {
+              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+            },
           });
 
           await prisma.watchHistory.upsert({
-            where: { userId_sceneId: { userId: targetUserId, sceneId: scene.id } },
+            where: {
+              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+            },
             update: { oCount: stashOCounter },
             create: {
               userId: targetUserId,
@@ -892,7 +1043,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
               playCount: 0,
               playDuration: 0,
               playHistory: [],
-            }
+            },
           });
 
           if (!existingWatchHistory) {
@@ -920,32 +1071,52 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Use GraphQL filter when only one option is selected
       if (syncOptions.performers.rating && !syncOptions.performers.favorite) {
-        performerFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
-      } else if (syncOptions.performers.favorite && !syncOptions.performers.rating) {
+        performerFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
+      } else if (
+        syncOptions.performers.favorite &&
+        !syncOptions.performers.rating
+      ) {
         performerFilter = { filter_favorites: true };
       }
       // If both are selected, fetch all and filter in code (can't do OR in single query)
 
       const performersData = await stash.findPerformers({
         filter: { per_page: -1 },
-        performer_filter: Object.keys(performerFilter).length > 0 ? performerFilter : undefined
+        performer_filter:
+          Object.keys(performerFilter).length > 0 ? performerFilter : undefined,
       });
       const performers = performersData.findPerformers.performers;
 
       // Filter in code only if both options are selected
-      const filteredPerformers = (syncOptions.performers.rating && syncOptions.performers.favorite)
-        ? performers.filter((p: { rating100?: number | null; favorite?: boolean }) => ((p.rating100 !== null && p.rating100 !== undefined && p.rating100 > 0)) || p.favorite)
-        : performers;
+      const filteredPerformers =
+        syncOptions.performers.rating && syncOptions.performers.favorite
+          ? performers.filter(
+              (p: { rating100?: number | null; favorite?: boolean }) =>
+                (p.rating100 !== null &&
+                  p.rating100 !== undefined &&
+                  p.rating100 > 0) ||
+                p.favorite
+            )
+          : performers;
 
       stats.performers.checked = filteredPerformers.length;
 
       for (const performer of filteredPerformers) {
-        const stashRating = syncOptions.performers.rating ? performer.rating100 : null;
-        const stashFavorite = syncOptions.performers.favorite ? (performer.favorite || false) : false;
+        const stashRating = syncOptions.performers.rating
+          ? performer.rating100
+          : null;
+        const stashFavorite = syncOptions.performers.favorite
+          ? performer.favorite || false
+          : false;
 
         // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.performerRating.findUnique({
-          where: { userId_performerId: { userId: targetUserId, performerId: performer.id } }
+          where: {
+            userId_performerId: {
+              userId: targetUserId,
+              performerId: performer.id,
+            },
+          },
         });
 
         const updates: SyncUpdates = {};
@@ -953,22 +1124,35 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
         if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
 
         await prisma.performerRating.upsert({
-          where: { userId_performerId: { userId: targetUserId, performerId: performer.id } },
+          where: {
+            userId_performerId: {
+              userId: targetUserId,
+              performerId: performer.id,
+            },
+          },
           update: updates,
           create: {
             userId: targetUserId,
             performerId: performer.id,
             rating: stashRating,
             favorite: stashFavorite,
-          }
+          },
         });
 
         if (!existingRating) {
           stats.performers.created++;
         } else {
           let needsUpdate = false;
-          if (syncOptions.performers.rating && existingRating.rating !== stashRating) needsUpdate = true;
-          if (syncOptions.performers.favorite && existingRating.favorite !== stashFavorite) needsUpdate = true;
+          if (
+            syncOptions.performers.rating &&
+            existingRating.rating !== stashRating
+          )
+            needsUpdate = true;
+          if (
+            syncOptions.performers.favorite &&
+            existingRating.favorite !== stashFavorite
+          )
+            needsUpdate = true;
 
           if (needsUpdate) {
             stats.performers.updated++;
@@ -983,7 +1167,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       // Use GraphQL filter when only one option is selected
       if (syncOptions.studios.rating && !syncOptions.studios.favorite) {
-        studioFilter = { rating100: { value: 0, modifier: 'GREATER_THAN' } };
+        studioFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
       } else if (syncOptions.studios.favorite && !syncOptions.studios.rating) {
         studioFilter = { favorite: true };
       }
@@ -991,24 +1175,38 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
       const studiosData = await stash.findStudios({
         filter: { per_page: -1 },
-        studio_filter: Object.keys(studioFilter).length > 0 ? studioFilter : undefined
+        studio_filter:
+          Object.keys(studioFilter).length > 0 ? studioFilter : undefined,
       });
       const studios = studiosData.findStudios.studios;
 
       // Filter in code only if both options are selected
-      const filteredStudios = (syncOptions.studios.rating && syncOptions.studios.favorite)
-        ? studios.filter((s: { rating100?: number | null; favorite?: boolean }) => ((s.rating100 !== null && s.rating100 !== undefined && s.rating100 > 0)) || s.favorite)
-        : studios;
+      const filteredStudios =
+        syncOptions.studios.rating && syncOptions.studios.favorite
+          ? studios.filter(
+              (s: { rating100?: number | null; favorite?: boolean }) =>
+                (s.rating100 !== null &&
+                  s.rating100 !== undefined &&
+                  s.rating100 > 0) ||
+                s.favorite
+            )
+          : studios;
 
       stats.studios.checked = filteredStudios.length;
 
       for (const studio of filteredStudios) {
-        const stashRating = syncOptions.studios.rating ? studio.rating100 : null;
-        const stashFavorite = syncOptions.studios.favorite ? (studio.favorite || false) : false;
+        const stashRating = syncOptions.studios.rating
+          ? studio.rating100
+          : null;
+        const stashFavorite = syncOptions.studios.favorite
+          ? studio.favorite || false
+          : false;
 
         // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.studioRating.findUnique({
-          where: { userId_studioId: { userId: targetUserId, studioId: studio.id } }
+          where: {
+            userId_studioId: { userId: targetUserId, studioId: studio.id },
+          },
         });
 
         const updates: SyncUpdates = {};
@@ -1016,22 +1214,32 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
         if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
 
         await prisma.studioRating.upsert({
-          where: { userId_studioId: { userId: targetUserId, studioId: studio.id } },
+          where: {
+            userId_studioId: { userId: targetUserId, studioId: studio.id },
+          },
           update: updates,
           create: {
             userId: targetUserId,
             studioId: studio.id,
             rating: stashRating,
             favorite: stashFavorite,
-          }
+          },
         });
 
         if (!existingRating) {
           stats.studios.created++;
         } else {
           let needsUpdate = false;
-          if (syncOptions.studios.rating && existingRating.rating !== stashRating) needsUpdate = true;
-          if (syncOptions.studios.favorite && existingRating.favorite !== stashFavorite) needsUpdate = true;
+          if (
+            syncOptions.studios.rating &&
+            existingRating.rating !== stashRating
+          )
+            needsUpdate = true;
+          if (
+            syncOptions.studios.favorite &&
+            existingRating.favorite !== stashFavorite
+          )
+            needsUpdate = true;
 
           if (needsUpdate) {
             stats.studios.updated++;
@@ -1044,7 +1252,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
     if (syncOptions.tags.favorite) {
       const tagsData = await stash.findTags({
         filter: { per_page: -1 },
-        tag_filter: { favorite: true }
+        tag_filter: { favorite: true },
       });
       const tags = tagsData.findTags.tags;
       stats.tags.checked = tags.length;
@@ -1054,7 +1262,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
         // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.tagRating.findUnique({
-          where: { userId_tagId: { userId: targetUserId, tagId: tag.id } }
+          where: { userId_tagId: { userId: targetUserId, tagId: tag.id } },
         });
 
         await prisma.tagRating.upsert({
@@ -1065,7 +1273,7 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
             tagId: tag.id,
             rating: null, // Tags don't have ratings in Stash
             favorite: stashFavorite,
-          }
+          },
         });
 
         if (!existingRating) {
@@ -1080,11 +1288,12 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
     if (syncOptions.galleries && syncOptions.galleries.rating) {
       const galleriesData = await stash.findGalleries({
         filter: { per_page: -1 },
-        gallery_filter: undefined  // Fetch all galleries
+        gallery_filter: undefined, // Fetch all galleries
       });
       // Filter for rated galleries in code
       const galleries = galleriesData.findGalleries.galleries.filter(
-        (g: { rating100?: number | null }) => g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
+        (g: { rating100?: number | null }) =>
+          g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
       );
       stats.galleries.checked = galleries.length;
 
@@ -1093,18 +1302,22 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
         // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.galleryRating.findUnique({
-          where: { userId_galleryId: { userId: targetUserId, galleryId: gallery.id } }
+          where: {
+            userId_galleryId: { userId: targetUserId, galleryId: gallery.id },
+          },
         });
 
         await prisma.galleryRating.upsert({
-          where: { userId_galleryId: { userId: targetUserId, galleryId: gallery.id } },
+          where: {
+            userId_galleryId: { userId: targetUserId, galleryId: gallery.id },
+          },
           update: { rating: stashRating },
           create: {
             userId: targetUserId,
             galleryId: gallery.id,
             rating: stashRating,
-            favorite: false,  // Galleries don't have favorites
-          }
+            favorite: false, // Galleries don't have favorites
+          },
         });
 
         if (!existingRating) {
@@ -1119,11 +1332,12 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
     if (syncOptions.groups && syncOptions.groups.rating) {
       const groupsData = await stash.findGroups({
         filter: { per_page: -1 },
-        group_filter: undefined  // Fetch all groups
+        group_filter: undefined, // Fetch all groups
       });
       // Filter for rated groups in code
       const groups = groupsData.findGroups.groups.filter(
-        (g: { rating100?: number | null }) => g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
+        (g: { rating100?: number | null }) =>
+          g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
       );
       stats.groups.checked = groups.length;
 
@@ -1132,18 +1346,22 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 
         // Check if record exists before upsert to track created vs updated
         const existingRating = await prisma.groupRating.findUnique({
-          where: { userId_groupId: { userId: targetUserId, groupId: group.id } }
+          where: {
+            userId_groupId: { userId: targetUserId, groupId: group.id },
+          },
         });
 
         await prisma.groupRating.upsert({
-          where: { userId_groupId: { userId: targetUserId, groupId: group.id } },
+          where: {
+            userId_groupId: { userId: targetUserId, groupId: group.id },
+          },
           update: { rating: stashRating },
           create: {
             userId: targetUserId,
             groupId: group.id,
             rating: stashRating,
-            favorite: false,  // Groups don't have favorites
-          }
+            favorite: false, // Groups don't have favorites
+          },
         });
 
         if (!existingRating) {
@@ -1154,12 +1372,12 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
       }
     }
 
-    console.log('Stash sync completed', { targetUserId, stats });
+    console.log("Stash sync completed", { targetUserId, stats });
 
     res.json({
       success: true,
-      message: 'Successfully synced ratings and favorites from Stash',
-      stats
+      message: "Successfully synced ratings and favorites from Stash",
+      stats,
     });
   } catch (error) {
     console.error("Error syncing from Stash:", error);
@@ -1170,7 +1388,10 @@ export const syncFromStash = async (req: AuthenticatedRequest, res: Response) =>
 /**
  * Get content restrictions for a user (Admin only)
  */
-export const getUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
+export const getUserRestrictions = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const { userId } = req.params;
     const requestingUser = req.user;
@@ -1181,11 +1402,13 @@ export const getUserRestrictions = async (req: AuthenticatedRequest, res: Respon
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
-      return res.status(403).json({ error: "Only administrators can manage content restrictions" });
+      return res
+        .status(403)
+        .json({ error: "Only administrators can manage content restrictions" });
     }
 
     const restrictions = await prisma.userContentRestriction.findMany({
-      where: { userId: parseInt(userId) }
+      where: { userId: parseInt(userId) },
     });
 
     res.json({ restrictions });
@@ -1199,7 +1422,10 @@ export const getUserRestrictions = async (req: AuthenticatedRequest, res: Respon
  * Update content restrictions for a user (Admin only)
  * Replaces all existing restrictions with new ones
  */
-export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
+export const updateUserRestrictions = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const { userId } = req.params;
     const { restrictions } = req.body; // Array of {entityType, mode, entityIds, restrictEmpty}
@@ -1211,7 +1437,9 @@ export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Res
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
-      return res.status(403).json({ error: "Only administrators can manage content restrictions" });
+      return res
+        .status(403)
+        .json({ error: "Only administrators can manage content restrictions" });
     }
 
     const targetUserId = parseInt(userId);
@@ -1223,10 +1451,12 @@ export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Res
 
     // Validate each restriction
     for (const r of restrictions) {
-      if (!['groups', 'tags', 'studios', 'galleries'].includes(r.entityType)) {
-        return res.status(400).json({ error: `Invalid entity type: ${r.entityType}` });
+      if (!["groups", "tags", "studios", "galleries"].includes(r.entityType)) {
+        return res
+          .status(400)
+          .json({ error: `Invalid entity type: ${r.entityType}` });
       }
-      if (!['INCLUDE', 'EXCLUDE'].includes(r.mode)) {
+      if (!["INCLUDE", "EXCLUDE"].includes(r.mode)) {
         return res.status(400).json({ error: `Invalid mode: ${r.mode}` });
       }
       if (!Array.isArray(r.entityIds)) {
@@ -1236,7 +1466,7 @@ export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Res
 
     // Delete existing restrictions
     await prisma.userContentRestriction.deleteMany({
-      where: { userId: targetUserId }
+      where: { userId: targetUserId },
     });
 
     // Create new restrictions
@@ -1248,16 +1478,16 @@ export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Res
             entityType: r.entityType,
             mode: r.mode,
             entityIds: JSON.stringify(r.entityIds),
-            restrictEmpty: r.restrictEmpty || false
-          }
+            restrictEmpty: r.restrictEmpty || false,
+          },
         })
       )
     );
 
     res.json({
       success: true,
-      message: 'Content restrictions updated successfully',
-      restrictions: created
+      message: "Content restrictions updated successfully",
+      restrictions: created,
     });
   } catch (error) {
     console.error("Error updating user restrictions:", error);
@@ -1268,7 +1498,10 @@ export const updateUserRestrictions = async (req: AuthenticatedRequest, res: Res
 /**
  * Delete all content restrictions for a user (Admin only)
  */
-export const deleteUserRestrictions = async (req: AuthenticatedRequest, res: Response) => {
+export const deleteUserRestrictions = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
   try {
     const { userId } = req.params;
     const requestingUser = req.user;
@@ -1279,16 +1512,18 @@ export const deleteUserRestrictions = async (req: AuthenticatedRequest, res: Res
 
     // Only admins can manage restrictions
     if (requestingUser.role !== "ADMIN") {
-      return res.status(403).json({ error: "Only administrators can manage content restrictions" });
+      return res
+        .status(403)
+        .json({ error: "Only administrators can manage content restrictions" });
     }
 
     await prisma.userContentRestriction.deleteMany({
-      where: { userId: parseInt(userId) }
+      where: { userId: parseInt(userId) },
     });
 
     res.json({
       success: true,
-      message: 'All content restrictions removed successfully'
+      message: "All content restrictions removed successfully",
     });
   } catch (error) {
     console.error("Error deleting user restrictions:", error);

@@ -11,15 +11,14 @@
  * - Import base types from stashapp-api when working with raw Stash GraphQL responses
  * - Import Normalized types from here when working with cached data or API responses to clients
  */
-
 import type {
-  Scene,
-  Performer,
-  Studio,
-  Tag,
   Gallery,
   Group,
   Image,
+  Performer,
+  Scene,
+  Studio,
+  Tag,
 } from "stashapp-api";
 
 /**

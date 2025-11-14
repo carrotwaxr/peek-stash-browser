@@ -1,7 +1,11 @@
 import type { Response } from "express";
+import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
-import { logger } from "../../utils/logger.js";
+import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import getStash from "../../stash.js";
 import {
   CriterionModifier,
   NormalizedGallery,
@@ -9,15 +13,11 @@ import {
   NormalizedTag,
   PeekGalleryFilter,
 } from "../../types/index.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
-import { mergeTagsWithUserData } from "./tags.js";
+import { logger } from "../../utils/logger.js";
+import { convertToProxyUrl } from "../../utils/pathMapping.js";
 import { mergePerformersWithUserData } from "./performers.js";
 import { mergeStudiosWithUserData } from "./studios.js";
-import getStash from "../../stash.js";
-import { convertToProxyUrl } from "../../utils/pathMapping.js";
+import { mergeTagsWithUserData } from "./tags.js";
 
 /**
  * Merge galleries with user rating/favorite data
@@ -276,7 +276,8 @@ export const findGalleries = async (
 
       // Filter empty galleries (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGalleries = emptyEntityFilterService.filterEmptyGalleries(filteredGalleries);
+        filteredGalleries =
+          emptyEntityFilterService.filterEmptyGalleries(filteredGalleries);
       }
 
       // Store in cache
@@ -287,7 +288,10 @@ export const findGalleries = async (
         cacheVersion
       );
     } else {
-      logger.debug("Galleries cache hit", { userId, entityCount: filteredGalleries.length });
+      logger.debug("Galleries cache hit", {
+        userId,
+        entityCount: filteredGalleries.length,
+      });
     }
 
     // Use cached/filtered galleries for remaining operations
@@ -547,7 +551,10 @@ export const getGalleryImages = async (
     }));
 
     // Merge images with user data (ratings/favorites)
-    const mergedImages = await mergeImagesWithUserData(transformedImages, userId);
+    const mergedImages = await mergeImagesWithUserData(
+      transformedImages,
+      userId
+    );
 
     res.json({
       images: mergedImages,

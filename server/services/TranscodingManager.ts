@@ -1,9 +1,9 @@
-import { ChildProcess, spawn, execSync } from "child_process";
+import { ChildProcess, execSync, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { Scene } from "stashapp-api";
-import { logger } from "../utils/logger.js";
 import { createThrottledFFmpegHandler } from "../utils/ffmpegLogger.js";
+import { logger } from "../utils/logger.js";
 
 // Use POSIX paths since we always run in Docker/Linux containers
 const posixPath = path.posix;
@@ -13,24 +13,29 @@ export const QUALITY_PRESETS = {
   "360p": { width: 640, height: 360, bitrate: "800k", audioBitrate: "96k" },
   "480p": { width: 854, height: 480, bitrate: "1400k", audioBitrate: "128k" },
   "720p": { width: 1280, height: 720, bitrate: "2800k", audioBitrate: "128k" },
-  "1080p": { width: 1920, height: 1080, bitrate: "5000k", audioBitrate: "192k" },
+  "1080p": {
+    width: 1920,
+    height: 1080,
+    bitrate: "5000k",
+    audioBitrate: "192k",
+  },
 };
 
 // Segment state enum
 export enum SegmentState {
-  WAITING = "waiting",         // Segment not yet started transcoding
+  WAITING = "waiting", // Segment not yet started transcoding
   TRANSCODING = "transcoding", // Segment currently being transcoded
-  COMPLETED = "completed",     // Segment successfully transcoded
-  FAILED = "failed",           // Segment transcoding failed
+  COMPLETED = "completed", // Segment successfully transcoded
+  FAILED = "failed", // Segment transcoding failed
 }
 
 // Segment metadata interface
 export interface SegmentMetadata {
   state: SegmentState;
-  startTime?: number;     // When transcoding started (timestamp)
+  startTime?: number; // When transcoding started (timestamp)
   completedTime?: number; // When transcoding completed (timestamp)
-  lastError?: string;     // Error message if failed
-  retryCount: number;     // Number of retry attempts (default 0)
+  lastError?: string; // Error message if failed
+  retryCount: number; // Number of retry attempts (default 0)
 }
 
 // Maximum retry attempts for failed segments
@@ -72,9 +77,7 @@ export class TranscodingManager {
 
   constructor(tmpDir: string) {
     // Normalize path to POSIX format for Docker/Linux containers
-    this.tmpDir = tmpDir
-      .replace(/\\/g, "/")
-      .replace(/^[A-Z]:/i, "");
+    this.tmpDir = tmpDir.replace(/\\/g, "/").replace(/^[A-Z]:/i, "");
 
     if (!this.tmpDir.startsWith("/")) {
       this.tmpDir = "/" + this.tmpDir;
@@ -103,11 +106,7 @@ export class TranscodingManager {
     scene?: Scene
   ): Promise<TranscodingSession> {
     const sessionId = `${videoId}_${startTime}_${Date.now()}`;
-    const outputDir = posixPath.join(
-      this.tmpDir,
-      "segments",
-      sessionId
-    );
+    const outputDir = posixPath.join(this.tmpDir, "segments", sessionId);
 
     // Calculate total segments from video duration
     const duration = scene?.files?.[0]?.duration || 0;
@@ -160,7 +159,8 @@ export class TranscodingManager {
 
       // Get video duration from scene metadata
       const duration = session.scene?.files?.[0]?.duration || 0;
-      const preset = QUALITY_PRESETS[session.quality as keyof typeof QUALITY_PRESETS];
+      const preset =
+        QUALITY_PRESETS[session.quality as keyof typeof QUALITY_PRESETS];
 
       logger.info("Starting continuous HLS transcode", {
         sessionId: session.sessionId,
@@ -175,38 +175,61 @@ export class TranscodingManager {
       // IMPORTANT: Always start segment numbering from 0, even when seeking mid-video
       // This prevents Video.js confusion with media sequence numbers
       const args = [
-        "-ss", session.startTime.toString(),  // Seek to start position in source file
-        "-i", sceneFilePath,                  // Input file
+        "-ss",
+        session.startTime.toString(), // Seek to start position in source file
+        "-i",
+        sceneFilePath, // Input file
 
         // Video encoding
-        "-c:v", "libx264",
-        "-preset", "veryfast",                // Balance between speed and quality
-        "-crf", "23",                         // Constant quality
-        "-profile:v", "main",
-        "-level", "4.0",
-        "-g", "48",                           // GOP size (keyframe every 2 seconds at 24fps)
-        "-keyint_min", "48",
-        "-sc_threshold", "0",                 // Disable scene change detection
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
-        "-vf", `scale=${preset.width}:${preset.height}`,
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast", // Balance between speed and quality
+        "-crf",
+        "23", // Constant quality
+        "-profile:v",
+        "main",
+        "-level",
+        "4.0",
+        "-g",
+        "48", // GOP size (keyframe every 2 seconds at 24fps)
+        "-keyint_min",
+        "48",
+        "-sc_threshold",
+        "0", // Disable scene change detection
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        "-vf",
+        `scale=${preset.width}:${preset.height}`,
 
         // Audio encoding
-        "-c:a", "aac",
-        "-b:a", preset.audioBitrate,
-        "-ar", "48000",
-        "-ac", "2",
+        "-c:a",
+        "aac",
+        "-b:a",
+        preset.audioBitrate,
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
 
         // HLS output format
-        "-f", "hls",
-        "-hls_time", "4",                     // 4-second segments
-        "-hls_list_size", "0",                // Keep all segments in playlist
-        "-hls_segment_filename", posixPath.join(qualityDir, "segment_%03d.ts"),
-        "-hls_playlist_type", "vod",          // VOD mode for proper seeking
-        "-hls_flags", "independent_segments", // Each segment is independently decodable
+        "-f",
+        "hls",
+        "-hls_time",
+        "4", // 4-second segments
+        "-hls_list_size",
+        "0", // Keep all segments in playlist
+        "-hls_segment_filename",
+        posixPath.join(qualityDir, "segment_%03d.ts"),
+        "-hls_playlist_type",
+        "vod", // VOD mode for proper seeking
+        "-hls_flags",
+        "independent_segments", // Each segment is independently decodable
         // NOTE: No -start_number, always start from 0 for clean HLS playlists
 
-        posixPath.join(qualityDir, "stream.m3u8")
+        posixPath.join(qualityDir, "stream.m3u8"),
       ];
 
       logger.debug("FFmpeg command", {
@@ -261,8 +284,9 @@ export class TranscodingManager {
       await this.waitForFirstSegment(session);
 
       session.status = "active";
-      logger.info("Transcoding session active", { sessionId: session.sessionId });
-
+      logger.info("Transcoding session active", {
+        sessionId: session.sessionId,
+      });
     } catch (error) {
       logger.error("Error starting transcoding", {
         sessionId: session.sessionId,
@@ -278,7 +302,9 @@ export class TranscodingManager {
    * Note: We only check for segment files, not the playlist.
    * FFmpeg creates segments first, then updates the playlist periodically.
    */
-  private async waitForFirstSegment(session: TranscodingSession): Promise<void> {
+  private async waitForFirstSegment(
+    session: TranscodingSession
+  ): Promise<void> {
     const qualityDir = posixPath.join(session.outputDir, session.quality);
 
     logger.debug("Waiting for first segment", {
@@ -294,7 +320,7 @@ export class TranscodingManager {
         // Check if quality directory exists and has any .ts segment files
         if (fs.existsSync(qualityDir)) {
           const files = fs.readdirSync(qualityDir);
-          const segmentFiles = files.filter(f => f.endsWith('.ts'));
+          const segmentFiles = files.filter((f) => f.endsWith(".ts"));
 
           if (segmentFiles.length > 0) {
             logger.info("First segment ready", {
@@ -309,7 +335,7 @@ export class TranscodingManager {
         // Directory might not be accessible yet, continue waiting
       }
 
-      await new Promise(resolve => setTimeout(resolve, interval));
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
 
     throw new Error("Timeout waiting for first segment");
@@ -349,7 +375,8 @@ export class TranscodingManager {
 
     // Check if target segment already exists and is completed
     const targetSegmentState = session.segmentStates.get(newSegment);
-    const targetSegmentExists = targetSegmentState?.state === SegmentState.COMPLETED;
+    const targetSegmentExists =
+      targetSegmentState?.state === SegmentState.COMPLETED;
     if (targetSegmentExists) {
       logger.debug("Target segment already transcoded, no action needed", {
         sessionId,
@@ -396,7 +423,8 @@ export class TranscodingManager {
     const oldQualityDir = posixPath.join(session.outputDir, session.quality);
 
     // Update session to new start time
-    const alignedStartTime = Math.floor(newStartTime / segmentDuration) * segmentDuration;
+    const alignedStartTime =
+      Math.floor(newStartTime / segmentDuration) * segmentDuration;
     const newStartSegment = Math.floor(alignedStartTime / segmentDuration);
 
     session.startTime = alignedStartTime;
@@ -411,7 +439,10 @@ export class TranscodingManager {
     // We want segments from newStartSegment onwards that already exist
     const segmentsToCopy: number[] = [];
     for (const [segNum, metadata] of oldCompletedSegments) {
-      if (segNum >= newStartSegment && metadata.state === SegmentState.COMPLETED) {
+      if (
+        segNum >= newStartSegment &&
+        metadata.state === SegmentState.COMPLETED
+      ) {
         segmentsToCopy.push(segNum);
       }
     }
@@ -427,13 +458,16 @@ export class TranscodingManager {
 
     // Preserve segments using move instead of copy for better performance
     if (segmentsToCopy.length > 0) {
-      const backupDir = posixPath.join(session.outputDir, `${session.quality}_backup`);
+      const backupDir = posixPath.join(
+        session.outputDir,
+        `${session.quality}_backup`
+      );
       fs.mkdirSync(backupDir, { recursive: true });
 
       // Move segments to backup (fast, no copying)
       let movedCount = 0;
       for (const segNum of segmentsToCopy) {
-        const segmentFile = `segment_${segNum.toString().padStart(3, '0')}.ts`;
+        const segmentFile = `segment_${segNum.toString().padStart(3, "0")}.ts`;
         const oldPath = posixPath.join(oldQualityDir, segmentFile);
         const backupPath = posixPath.join(backupDir, segmentFile);
 
@@ -468,7 +502,7 @@ export class TranscodingManager {
       fs.mkdirSync(oldQualityDir, { recursive: true });
 
       for (const segNum of segmentsToCopy) {
-        const segmentFile = `segment_${segNum.toString().padStart(3, '0')}.ts`;
+        const segmentFile = `segment_${segNum.toString().padStart(3, "0")}.ts`;
         const backupPath = posixPath.join(backupDir, segmentFile);
         const newPath = posixPath.join(oldQualityDir, segmentFile);
 
@@ -567,8 +601,10 @@ export class TranscodingManager {
    * Create master playlist for HLS
    */
   private createMasterPlaylist(session: TranscodingSession): void {
-    const preset = QUALITY_PRESETS[session.quality as keyof typeof QUALITY_PRESETS];
-    const bandwidth = parseInt(preset.bitrate) * 1000 + parseInt(preset.audioBitrate) * 1000;
+    const preset =
+      QUALITY_PRESETS[session.quality as keyof typeof QUALITY_PRESETS];
+    const bandwidth =
+      parseInt(preset.bitrate) * 1000 + parseInt(preset.audioBitrate) * 1000;
 
     const masterContent = `#EXTM3U
 #EXT-X-VERSION:6
@@ -628,7 +664,11 @@ ${session.quality}/stream.m3u8
           session.totalSegments - startSegment // Don't check beyond total segments
         );
 
-        for (let ffmpegSegNum = 0; ffmpegSegNum <= maxSegmentToCheck; ffmpegSegNum++) {
+        for (
+          let ffmpegSegNum = 0;
+          ffmpegSegNum <= maxSegmentToCheck;
+          ffmpegSegNum++
+        ) {
           const actualSegNum = startSegment + ffmpegSegNum;
 
           // Get current segment state
@@ -639,8 +679,14 @@ ${session.quality}/stream.m3u8
             continue;
           }
 
-          const ffmpegPath = posixPath.join(qualityDir, `segment_${ffmpegSegNum.toString().padStart(3, '0')}.ts`);
-          const actualPath = posixPath.join(qualityDir, `segment_${actualSegNum.toString().padStart(3, '0')}.ts`);
+          const ffmpegPath = posixPath.join(
+            qualityDir,
+            `segment_${ffmpegSegNum.toString().padStart(3, "0")}.ts`
+          );
+          const actualPath = posixPath.join(
+            qualityDir,
+            `segment_${actualSegNum.toString().padStart(3, "0")}.ts`
+          );
 
           // Check if FFmpeg's segment exists
           if (fs.existsSync(ffmpegPath)) {
@@ -673,8 +719,8 @@ ${session.quality}/stream.m3u8
                 });
                 logger.verbose("Renamed segment", {
                   sessionId: session.sessionId,
-                  from: `segment_${ffmpegSegNum.toString().padStart(3, '0')}.ts`,
-                  to: `segment_${actualSegNum.toString().padStart(3, '0')}.ts`,
+                  from: `segment_${ffmpegSegNum.toString().padStart(3, "0")}.ts`,
+                  to: `segment_${actualSegNum.toString().padStart(3, "0")}.ts`,
                   progress: `${this.getCompletedSegmentCount(session)}/${session.totalSegments}`,
                 });
               } catch (err) {
@@ -736,8 +782,9 @@ ${session.quality}/stream.m3u8
         // Check if transcoding is complete
         const expectedSegmentCount = session.totalSegments; // Total segments for the full video
         const transcodedCount = this.getCompletedSegmentCount(session);
-        const isComplete = transcodedCount >= expectedSegmentCount ||
-                          session.status === "completed";
+        const isComplete =
+          transcodedCount >= expectedSegmentCount ||
+          session.status === "completed";
 
         if (isComplete && session.playlistMonitor) {
           clearInterval(session.playlistMonitor);
@@ -783,7 +830,7 @@ ${session.quality}/stream.m3u8
     // Add ALL segments from 0 to end of video (even ones that don't exist)
     for (let i = 0; i < totalSegmentsInVideo; i++) {
       playlist += `#EXTINF:${segmentDuration}.000,\n`;
-      playlist += `segment_${i.toString().padStart(3, '0')}.ts\n`;
+      playlist += `segment_${i.toString().padStart(3, "0")}.ts\n`;
     }
 
     // Always include ENDLIST for VOD (this gives us the seek bar!)
@@ -841,7 +888,8 @@ ${session.quality}/stream.m3u8
       if (session.lastAccess < cutoff) {
         logger.info("Cleaning up inactive session", {
           sessionId,
-          lastAccessAge: Math.floor((Date.now() - session.lastAccess) / 1000) + " seconds",
+          lastAccessAge:
+            Math.floor((Date.now() - session.lastAccess) / 1000) + " seconds",
         });
         this.killSession(sessionId);
       }
@@ -862,11 +910,11 @@ ${session.quality}/stream.m3u8
         // Find FFmpeg PIDs: ps aux | grep ffmpeg | grep -v grep | awk '{print $2}'
         const pids = execSync("ps aux | grep '[f]fmpeg' | awk '{print $2}'", {
           stdio: "pipe",
-          encoding: "utf-8"
+          encoding: "utf-8",
         }).trim();
 
         if (pids) {
-          const pidArray = pids.split("\n").filter(p => p.trim());
+          const pidArray = pids.split("\n").filter((p) => p.trim());
           logger.info("Found orphaned FFmpeg processes", {
             count: pidArray.length,
             pids: pidArray.join(", "),
@@ -1006,7 +1054,9 @@ ${session.quality}/stream.m3u8
   /**
    * Get segment state information for a session
    */
-  getSegmentStates(sessionId: string): Map<number, SegmentMetadata> | undefined {
+  getSegmentStates(
+    sessionId: string
+  ): Map<number, SegmentMetadata> | undefined {
     const session = this.sessions.get(sessionId);
     return session?.segmentStates;
   }
@@ -1019,19 +1069,23 @@ ${session.quality}/stream.m3u8
     return {
       activeSessions: this.sessions.size,
       totalSessionsCreated: this.totalSessionsCreated,
-      sessions: sessions.map(session => ({
+      sessions: sessions.map((session) => ({
         sessionId: session.sessionId,
         sceneId: session.videoId,
         quality: session.quality,
         status: session.status,
-        startTime: new Date(session.lastAccess - (Date.now() - session.lastAccess)).toISOString(),
+        startTime: new Date(
+          session.lastAccess - (Date.now() - session.lastAccess)
+        ).toISOString(),
         lastAccess: new Date(session.lastAccess).toISOString(),
         totalSegments: session.totalSegments,
         completedSegments: this.getCompletedSegmentCount(session),
-        ffmpegProcess: session.process ? {
-          pid: session.process.pid,
-          killed: session.process.killed,
-        } : null,
+        ffmpegProcess: session.process
+          ? {
+              pid: session.process.pid,
+              killed: session.process.killed,
+            }
+          : null,
       })),
     };
   }

@@ -1,14 +1,14 @@
 import type { Response } from "express";
-import prisma from "../../prisma/singleton.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
-import { logger } from "../../utils/logger.js";
-import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { userStatsService } from "../../services/UserStatsService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
+import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
+import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
+import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { userStatsService } from "../../services/UserStatsService.js";
 import getStash from "../../stash.js";
+import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
 
 /**
  * Merge user-specific data into studios
@@ -119,8 +119,10 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
         );
 
         // Then filter for empty entities
-        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleGalleries =
+          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups =
+          emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter studios using properly restricted visibility sets
         filteredStudios = emptyEntityFilterService.filterEmptyStudios(
@@ -138,7 +140,10 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
         cacheVersion
       );
     } else {
-      logger.debug("Studios cache hit", { userId, entityCount: filteredStudios.length });
+      logger.debug("Studios cache hit", {
+        userId,
+        entityCount: filteredStudios.length,
+      });
     }
 
     // Use cached/filtered studios for remaining operations
@@ -499,8 +504,10 @@ export const findStudiosMinimal = async (
         );
 
         // Then filter for empty entities
-        const visibleGalleries = emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups = emptyEntityFilterService.filterEmptyGroups(allGroups);
+        const visibleGalleries =
+          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
+        const visibleGroups =
+          emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter studios using properly restricted visibility sets
         filteredStudios = emptyEntityFilterService.filterEmptyStudios(
@@ -518,7 +525,10 @@ export const findStudiosMinimal = async (
         cacheVersion
       );
     } else {
-      logger.debug("Studios minimal cache hit", { userId, entityCount: filteredStudios.length });
+      logger.debug("Studios minimal cache hit", {
+        userId,
+        entityCount: filteredStudios.length,
+      });
     }
 
     // Use cached/filtered studios
@@ -545,10 +555,10 @@ export const findStudiosMinimal = async (
         typeof aValue === "string" && typeof bValue === "string"
           ? aValue.localeCompare(bValue)
           : aValue > bValue
-          ? 1
-          : aValue < bValue
-          ? -1
-          : 0;
+            ? 1
+            : aValue < bValue
+              ? -1
+              : 0;
       return sortDirection.toUpperCase() === "DESC" ? -comparison : comparison;
     });
 

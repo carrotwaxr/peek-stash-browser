@@ -107,7 +107,9 @@ const initializeCacheWithRetry = async (): Promise<boolean> => {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       logger.info("=".repeat(60));
-      logger.info(`Initializing Stash cache (attempt ${attempt}/${MAX_RETRIES})...`);
+      logger.info(
+        `Initializing Stash cache (attempt ${attempt}/${MAX_RETRIES})...`
+      );
       logger.info("=".repeat(60));
 
       await stashCacheManager.initialize();
@@ -119,7 +121,9 @@ const initializeCacheWithRetry = async (): Promise<boolean> => {
       return true;
     } catch (error) {
       logger.error("=".repeat(60));
-      logger.error(`✗ Failed to initialize Stash cache (attempt ${attempt}/${MAX_RETRIES})`);
+      logger.error(
+        `✗ Failed to initialize Stash cache (attempt ${attempt}/${MAX_RETRIES})`
+      );
       logger.error("=".repeat(60));
 
       if (error instanceof Error) {
@@ -137,16 +141,22 @@ const initializeCacheWithRetry = async (): Promise<boolean> => {
         const delayMs = INITIAL_DELAY_MS * Math.pow(2, attempt - 1);
         const delaySec = delayMs / 1000;
 
-        logger.warn(`Retrying in ${delaySec} seconds... (${MAX_RETRIES - attempt} attempts remaining)`);
+        logger.warn(
+          `Retrying in ${delaySec} seconds... (${MAX_RETRIES - attempt} attempts remaining)`
+        );
 
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       } else {
         // Max retries reached
         logger.error("=".repeat(60));
         logger.error("✗ Max retries reached - cache initialization failed");
         logger.error("=".repeat(60));
-        logger.warn("Server will continue without cache - performance may be degraded");
-        logger.warn("Fix the issue and use the 'Refresh Cache' button in Server Settings");
+        logger.warn(
+          "Server will continue without cache - performance may be degraded"
+        );
+        logger.warn(
+          "Fix the issue and use the 'Refresh Cache' button in Server Settings"
+        );
       }
     }
   }

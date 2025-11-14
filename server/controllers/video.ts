@@ -1,12 +1,12 @@
 import { Request, Response } from "express";
-import getStash from "../stash.js";
 import fs from "fs";
 import path from "path";
 import { Scene } from "stashapp-api";
-import { transcodingManager } from "../services/TranscodingManager.js";
-import { translateStashPath } from "../utils/pathMapping.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import { transcodingManager } from "../services/TranscodingManager.js";
+import getStash from "../stash.js";
 import { logger } from "../utils/logger.js";
+import { translateStashPath } from "../utils/pathMapping.js";
 
 interface PlayVideoRequest extends AuthenticatedRequest {
   query: {
@@ -89,8 +89,8 @@ export const getStreamSegment = (req: Request, res: Response) => {
     // session.masterPlaylistPath is already an absolute path
     if (fs.existsSync(session.masterPlaylistPath)) {
       // Use sendFile for better performance (streaming instead of reading entire file into memory)
-      res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+      res.setHeader("Cache-Control", "no-cache");
       res.sendFile(session.masterPlaylistPath, (err) => {
         if (err) {
           logger.error("Error sending master playlist", {
@@ -205,7 +205,8 @@ export const getStreamSegment = (req: Request, res: Response) => {
         const trySend = () => {
           if (fs.existsSync(filePath)) {
             // Segment is ready! Serve it to all waiting requests
-            const waitingRequests = pendingSegmentRequests.get(requestKey) || [];
+            const waitingRequests =
+              pendingSegmentRequests.get(requestKey) || [];
             pendingSegmentRequests.delete(requestKey);
 
             logger.verbose("Serving segment to waiting requests", {
@@ -224,7 +225,8 @@ export const getStreamSegment = (req: Request, res: Response) => {
             setTimeout(trySend, interval);
           } else {
             // Timeout - send 404 to all waiting requests
-            const waitingRequests = pendingSegmentRequests.get(requestKey) || [];
+            const waitingRequests =
+              pendingSegmentRequests.get(requestKey) || [];
             pendingSegmentRequests.delete(requestKey);
 
             logger.error("Timeout waiting for segment", {
@@ -300,7 +302,11 @@ const getSceneData = async (sceneId: string): Promise<Scene> => {
 
 export const playVideo = async (req: PlayVideoRequest, res: Response) => {
   try {
-    const { startTime = "0", sessionId: _sessionId, quality = "direct" } = req.query;
+    const {
+      startTime = "0",
+      sessionId: _sessionId,
+      quality = "direct",
+    } = req.query;
     const { videoId } = req.params;
 
     // Get userId from authenticated user
@@ -529,10 +535,7 @@ export async function seekVideo(req: SeekVideoRequest, res: Response) {
     }
 
     // Handle seeking - may restart transcoding if needed
-    const session = await transcodingManager.handleSeek(
-      sessionId,
-      startTime
-    );
+    const session = await transcodingManager.handleSeek(sessionId, startTime);
 
     // Get the scene file path
     if (!session?.scene) {
@@ -629,7 +632,14 @@ export async function getSegmentStates(req: Request, res: Response) {
     transcodingManager.updateSessionAccess(sessionId);
 
     // Convert Map to array for JSON serialization
-    const segments: Array<{ number: number; state: string; startTime?: number; completedTime?: number; retryCount: number; lastError?: string }> = [];
+    const segments: Array<{
+      number: number;
+      state: string;
+      startTime?: number;
+      completedTime?: number;
+      retryCount: number;
+      lastError?: string;
+    }> = [];
 
     for (const [segmentNum, metadata] of segmentStates) {
       segments.push({
@@ -649,10 +659,10 @@ export async function getSegmentStates(req: Request, res: Response) {
       sessionId,
       segments,
       summary: {
-        completed: segments.filter(s => s.state === "completed").length,
-        transcoding: segments.filter(s => s.state === "transcoding").length,
-        failed: segments.filter(s => s.state === "failed").length,
-        waiting: segments.filter(s => s.state === "waiting").length,
+        completed: segments.filter((s) => s.state === "completed").length,
+        transcoding: segments.filter((s) => s.state === "transcoding").length,
+        failed: segments.filter((s) => s.state === "failed").length,
+        waiting: segments.filter((s) => s.state === "waiting").length,
         total: segments.length,
       },
     });

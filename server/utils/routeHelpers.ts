@@ -1,4 +1,4 @@
-import { Response, NextFunction, RequestHandler } from "express";
+import { NextFunction, RequestHandler, Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 
 /**
@@ -16,7 +16,7 @@ export function authenticated<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ReqBody = any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ReqQuery = any
+  ReqQuery = any,
 >(
   handler: (
     req: AuthenticatedRequest,

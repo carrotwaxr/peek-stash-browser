@@ -1,12 +1,12 @@
 import type { Response } from "express";
+import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
-import { logger } from "../../utils/logger.js";
-import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
+import { logger } from "../../utils/logger.js";
 
 /**
  * Merge user-specific data into groups
@@ -220,12 +220,16 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
 
       // Apply content restrictions (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGroups = await userRestrictionService.filterGroupsForUser(filteredGroups, userId);
+        filteredGroups = await userRestrictionService.filterGroupsForUser(
+          filteredGroups,
+          userId
+        );
       }
 
       // Filter empty groups (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGroups = emptyEntityFilterService.filterEmptyGroups(filteredGroups);
+        filteredGroups =
+          emptyEntityFilterService.filterEmptyGroups(filteredGroups);
       }
 
       // Store in cache
@@ -236,7 +240,10 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
         cacheVersion
       );
     } else {
-      logger.debug("Groups cache hit", { userId, entityCount: filteredGroups.length });
+      logger.debug("Groups cache hit", {
+        userId,
+        entityCount: filteredGroups.length,
+      });
     }
 
     // Use cached/filtered groups for remaining operations
@@ -328,7 +335,8 @@ export const findGroupsMinimal = async (
 
       // Filter empty groups (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGroups = emptyEntityFilterService.filterEmptyGroups(filteredGroups);
+        filteredGroups =
+          emptyEntityFilterService.filterEmptyGroups(filteredGroups);
       }
 
       // Store in cache
@@ -339,7 +347,10 @@ export const findGroupsMinimal = async (
         cacheVersion
       );
     } else {
-      logger.debug("Groups minimal cache hit", { userId, entityCount: filteredGroups.length });
+      logger.debug("Groups minimal cache hit", {
+        userId,
+        entityCount: filteredGroups.length,
+      });
     }
 
     // Use cached/filtered groups

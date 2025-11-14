@@ -1,6 +1,6 @@
 import { Response } from "express";
-import prisma from "../prisma/singleton.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import prisma from "../prisma/singleton.js";
 
 /**
  * Theme config validation schema

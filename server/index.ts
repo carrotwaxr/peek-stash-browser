@@ -1,7 +1,15 @@
+import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { PrismaClient } from "@prisma/client";
+import { setupAPI } from "./initializers/api.js";
+import { initializeCache } from "./initializers/cache.js";
+import { initializeDatabase } from "./initializers/database.js";
+import { validateStartup } from "./initializers/validate.js";
+import { dataMigrationService } from "./services/DataMigrationService.js";
+import { stashCacheManager } from "./services/StashCacheManager.js";
+import { logger } from "./utils/logger.js";
+import { pathMapper } from "./utils/pathMapping.js";
 
 const prisma = new PrismaClient();
 
@@ -18,14 +26,6 @@ const envPath =
     : path.resolve(__dirname, "../.env"); // From server/ to project root
 
 dotenv.config({ path: envPath });
-import { setupAPI } from "./initializers/api.js";
-import { initializeDatabase } from "./initializers/database.js";
-import { validateStartup } from "./initializers/validate.js";
-import { stashCacheManager } from "./services/StashCacheManager.js";
-import { logger } from "./utils/logger.js";
-import { pathMapper } from "./utils/pathMapping.js";
-import { initializeCache } from "./initializers/cache.js";
-import { dataMigrationService } from "./services/DataMigrationService.js";
 
 const main = async () => {
   logger.info("Starting Peek server");

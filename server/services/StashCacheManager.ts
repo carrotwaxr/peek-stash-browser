@@ -1,23 +1,30 @@
-import getStash from "../stash.js";
-import { logger } from "../utils/logger.js";
-import {
-  transformScene,
-  transformPerformer,
-  transformStudio,
-  transformTag,
-  transformGallery,
-  transformGroup,
-} from "../utils/pathMapping.js";
-import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
-import type { Scene, Performer, Studio, Tag, Gallery, Group } from "stashapp-api";
 import type {
-  NormalizedScene,
-  NormalizedPerformer,
-  NormalizedStudio,
-  NormalizedTag,
+  Gallery,
+  Group,
+  Performer,
+  Scene,
+  Studio,
+  Tag,
+} from "stashapp-api";
+import getStash from "../stash.js";
+import type {
   NormalizedGallery,
   NormalizedGroup,
+  NormalizedPerformer,
+  NormalizedScene,
+  NormalizedStudio,
+  NormalizedTag,
 } from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import {
+  transformGallery,
+  transformGroup,
+  transformPerformer,
+  transformScene,
+  transformStudio,
+  transformTag,
+} from "../utils/pathMapping.js";
+import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
 
 /**
  * Server-wide cache state
@@ -84,7 +91,10 @@ class StashCacheManager {
   /**
    * Helper to extract detailed error information from GraphQL/network errors
    */
-  private getDetailedErrorInfo(error: unknown, context: string): Record<string, unknown> {
+  private getDetailedErrorInfo(
+    error: unknown,
+    context: string
+  ): Record<string, unknown> {
     const details: Record<string, unknown> = {
       context,
       timestamp: new Date().toISOString(),
@@ -107,7 +117,7 @@ class StashCacheManager {
           details.graphqlErrors = gqlError.response.errors;
         }
         if (gqlError.response.data) {
-          details.partialData = 'Response contained partial data';
+          details.partialData = "Response contained partial data";
         }
       }
 
@@ -144,57 +154,93 @@ class StashCacheManager {
       // Fetch entities individually with detailed progress logging
       logger.info("Fetching scenes (compact)...");
       const scenesStart = Date.now();
-      const scenesResult = await stash.findScenesCompact({ filter: { per_page: -1 } })
-        .catch(err => {
-          logger.error("Failed to fetch scenes", this.getDetailedErrorInfo(err, "findScenesCompact"));
+      const scenesResult = await stash
+        .findScenesCompact({ filter: { per_page: -1 } })
+        .catch((err) => {
+          logger.error(
+            "Failed to fetch scenes",
+            this.getDetailedErrorInfo(err, "findScenesCompact")
+          );
           throw new Error(`Scene fetch failed: ${err.message}`);
         });
-      logger.info(`Scenes fetched in ${Date.now() - scenesStart}ms (${scenesResult.findScenes.scenes.length} scenes)`);
+      logger.info(
+        `Scenes fetched in ${Date.now() - scenesStart}ms (${scenesResult.findScenes.scenes.length} scenes)`
+      );
 
       logger.info("Fetching performers...");
       const performersStart = Date.now();
-      const performersResult = await stash.findPerformers({ filter: { per_page: -1 } })
-        .catch(err => {
-          logger.error("Failed to fetch performers", this.getDetailedErrorInfo(err, "findPerformers"));
+      const performersResult = await stash
+        .findPerformers({ filter: { per_page: -1 } })
+        .catch((err) => {
+          logger.error(
+            "Failed to fetch performers",
+            this.getDetailedErrorInfo(err, "findPerformers")
+          );
           throw new Error(`Performer fetch failed: ${err.message}`);
         });
-      logger.info(`Performers fetched in ${Date.now() - performersStart}ms (${performersResult.findPerformers.performers.length} performers)`);
+      logger.info(
+        `Performers fetched in ${Date.now() - performersStart}ms (${performersResult.findPerformers.performers.length} performers)`
+      );
 
       logger.info("Fetching studios...");
       const studiosStart = Date.now();
-      const studiosResult = await stash.findStudios({ filter: { per_page: -1 } })
-        .catch(err => {
-          logger.error("Failed to fetch studios", this.getDetailedErrorInfo(err, "findStudios"));
+      const studiosResult = await stash
+        .findStudios({ filter: { per_page: -1 } })
+        .catch((err) => {
+          logger.error(
+            "Failed to fetch studios",
+            this.getDetailedErrorInfo(err, "findStudios")
+          );
           throw new Error(`Studio fetch failed: ${err.message}`);
         });
-      logger.info(`Studios fetched in ${Date.now() - studiosStart}ms (${studiosResult.findStudios.studios.length} studios)`);
+      logger.info(
+        `Studios fetched in ${Date.now() - studiosStart}ms (${studiosResult.findStudios.studios.length} studios)`
+      );
 
       logger.info("Fetching tags...");
       const tagsStart = Date.now();
-      const tagsResult = await stash.findTags({ filter: { per_page: -1 } })
-        .catch(err => {
-          logger.error("Failed to fetch tags", this.getDetailedErrorInfo(err, "findTags"));
+      const tagsResult = await stash
+        .findTags({ filter: { per_page: -1 } })
+        .catch((err) => {
+          logger.error(
+            "Failed to fetch tags",
+            this.getDetailedErrorInfo(err, "findTags")
+          );
           throw new Error(`Tag fetch failed: ${err.message}`);
         });
-      logger.info(`Tags fetched in ${Date.now() - tagsStart}ms (${tagsResult.findTags.tags.length} tags)`);
+      logger.info(
+        `Tags fetched in ${Date.now() - tagsStart}ms (${tagsResult.findTags.tags.length} tags)`
+      );
 
       logger.info("Fetching galleries...");
       const galleriesStart = Date.now();
-      const galleriesResult = await stash.findGalleries({ filter: { per_page: -1 } })
-        .catch(err => {
-          logger.error("Failed to fetch galleries", this.getDetailedErrorInfo(err, "findGalleries"));
+      const galleriesResult = await stash
+        .findGalleries({ filter: { per_page: -1 } })
+        .catch((err) => {
+          logger.error(
+            "Failed to fetch galleries",
+            this.getDetailedErrorInfo(err, "findGalleries")
+          );
           throw new Error(`Gallery fetch failed: ${err.message}`);
         });
-      logger.info(`Galleries fetched in ${Date.now() - galleriesStart}ms (${galleriesResult.findGalleries.galleries.length} galleries)`);
+      logger.info(
+        `Galleries fetched in ${Date.now() - galleriesStart}ms (${galleriesResult.findGalleries.galleries.length} galleries)`
+      );
 
       logger.info("Fetching groups...");
       const groupsStart = Date.now();
-      const groupsResult = await stash.findGroups({ filter: { per_page: -1 } })
-        .catch(err => {
-          logger.error("Failed to fetch groups", this.getDetailedErrorInfo(err, "findGroups"));
+      const groupsResult = await stash
+        .findGroups({ filter: { per_page: -1 } })
+        .catch((err) => {
+          logger.error(
+            "Failed to fetch groups",
+            this.getDetailedErrorInfo(err, "findGroups")
+          );
           throw new Error(`Group fetch failed: ${err.message}`);
         });
-      logger.info(`Groups fetched in ${Date.now() - groupsStart}ms (${groupsResult.findGroups.groups.length} groups)`);
+      logger.info(
+        `Groups fetched in ${Date.now() - groupsStart}ms (${groupsResult.findGroups.groups.length} groups)`
+      );
 
       // Create new Maps (double-buffering for atomic swap)
       const newScenes = new Map<string, NormalizedScene>();
@@ -226,20 +272,18 @@ class StashCacheManager {
 
       // Normalize performers with default per-user fields AND transform image URLs
       // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
-      performersResult.findPerformers.performers.forEach(
-        (performer) => {
-          const transformed = transformPerformer(performer as Performer);
-          newPerformers.set(performer.id, {
-            ...transformed,
-            rating: null,
-            favorite: false,
-            o_counter: 0,
-            play_count: 0,
-            last_played_at: null,
-            last_o_at: null,
-          });
-        }
-      );
+      performersResult.findPerformers.performers.forEach((performer) => {
+        const transformed = transformPerformer(performer as Performer);
+        newPerformers.set(performer.id, {
+          ...transformed,
+          rating: null,
+          favorite: false,
+          o_counter: 0,
+          play_count: 0,
+          last_played_at: null,
+          last_o_at: null,
+        });
+      });
 
       // Normalize studios with default per-user fields AND transform image URLs
       // Type assertion needed: GraphQL generated types don't perfectly match but structure is compatible
@@ -302,7 +346,9 @@ class StashCacheManager {
 
       // Invalidate all filtered entity caches (they depend on this data)
       filteredEntityCacheService.invalidateAll();
-      logger.info("Invalidated all filtered entity caches due to Stash cache refresh");
+      logger.info(
+        "Invalidated all filtered entity caches due to Stash cache refresh"
+      );
 
       const duration = Date.now() - startTime;
       logger.info("✓ Cache refreshed successfully", {
@@ -315,8 +361,13 @@ class StashCacheManager {
           galleries: newGalleries.size,
           groups: newGroups.size,
         },
-        totalEntities: newScenes.size + newPerformers.size + newStudios.size +
-                       newTags.size + newGalleries.size + newGroups.size,
+        totalEntities:
+          newScenes.size +
+          newPerformers.size +
+          newStudios.size +
+          newTags.size +
+          newGalleries.size +
+          newGroups.size,
       });
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -334,24 +385,28 @@ class StashCacheManager {
       // Check more specific errors first, then more general ones
       if (error instanceof Error) {
         const message = error.message.toLowerCase();
-        if (message.includes('unauthorized') || message.includes('401')) {
+        if (message.includes("unauthorized") || message.includes("401")) {
           logger.error("TROUBLESHOOTING: Authentication failed");
           logger.error("  → Verify STASH_API_KEY is correct");
           logger.error("  → Check Stash Settings > Security > API Key");
-        } else if (message.includes('403') || message.includes('forbidden')) {
+        } else if (message.includes("403") || message.includes("forbidden")) {
           logger.error("TROUBLESHOOTING: Access forbidden");
           logger.error("  → API key may not have required permissions");
-        } else if (message.includes('timeout')) {
+        } else if (message.includes("timeout")) {
           logger.error("TROUBLESHOOTING: Request timed out");
           logger.error("  → Stash may be overloaded or have large library");
           logger.error("  → Check Stash server logs for performance issues");
-        } else if (message.includes('ssl') || message.includes('certificate')) {
+        } else if (message.includes("ssl") || message.includes("certificate")) {
           logger.error("TROUBLESHOOTING: TLS/SSL certificate issue");
           logger.error("  → Use http:// instead of https:// for local Stash");
-          logger.error("  → Or configure NODE_TLS_REJECT_UNAUTHORIZED=0 (not recommended for production)");
-        } else if (message.includes('fetch') && message.includes('failed')) {
+          logger.error(
+            "  → Or configure NODE_TLS_REJECT_UNAUTHORIZED=0 (not recommended for production)"
+          );
+        } else if (message.includes("fetch") && message.includes("failed")) {
           logger.error("TROUBLESHOOTING: Network connectivity issue detected");
-          logger.error("  → Verify STASH_URL is correct and accessible from Peek container");
+          logger.error(
+            "  → Verify STASH_URL is correct and accessible from Peek container"
+          );
           logger.error("  → Check if Stash server is running");
           logger.error("  → Test connectivity: curl -v <STASH_URL>/graphql");
         }

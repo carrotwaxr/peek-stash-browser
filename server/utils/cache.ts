@@ -123,24 +123,28 @@ userRatingCache.on("expired", (key, _value) => {
 });
 
 // Log cache stats periodically (every 30 minutes)
-setInterval(() => {
-  const stashStats = stashCache.getStats();
-  const ratingStats = ratingCache.getStats();
+setInterval(
+  () => {
+    const stashStats = stashCache.getStats();
+    const ratingStats = ratingCache.getStats();
 
-  logger.info("Cache statistics", {
-    stash: {
-      keys: stashStats.keys,
-      hits: stashStats.hits,
-      misses: stashStats.misses,
-      hitRate: stashStats.hits / (stashStats.hits + stashStats.misses) || 0,
-    },
-    ratings: {
-      keys: ratingStats.keys,
-      hits: ratingStats.hits,
-      misses: ratingStats.misses,
-      hitRate: ratingStats.hits / (ratingStats.hits + ratingStats.misses) || 0,
-    },
-  });
-}, 30 * 60 * 1000);
+    logger.info("Cache statistics", {
+      stash: {
+        keys: stashStats.keys,
+        hits: stashStats.hits,
+        misses: stashStats.misses,
+        hitRate: stashStats.hits / (stashStats.hits + stashStats.misses) || 0,
+      },
+      ratings: {
+        keys: ratingStats.keys,
+        hits: ratingStats.hits,
+        misses: ratingStats.misses,
+        hitRate:
+          ratingStats.hits / (ratingStats.hits + ratingStats.misses) || 0,
+      },
+    });
+  },
+  30 * 60 * 1000
+);
 
 export default { stashCache, ratingCache, CACHE_KEYS };

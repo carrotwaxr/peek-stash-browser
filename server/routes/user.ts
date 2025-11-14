@@ -1,23 +1,23 @@
 import express from "express";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import {
-  getUserSettings,
-  updateUserSettings,
   changePassword,
-  getAllUsers,
   createUser,
-  deleteUser,
-  updateUserRole,
-  getFilterPresets,
-  saveFilterPreset,
   deleteFilterPreset,
+  deleteUser,
+  deleteUserRestrictions,
+  getAllUsers,
   getDefaultFilterPresets,
+  getFilterPresets,
+  getUserRestrictions,
+  getUserSettings,
+  saveFilterPreset,
   setDefaultFilterPreset,
   syncFromStash,
-  getUserRestrictions,
   updateUserRestrictions,
-  deleteUserRestrictions,
+  updateUserRole,
+  updateUserSettings,
 } from "../controllers/user.js";
+import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();

@@ -1,14 +1,14 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
 import {
-  updateSceneRating,
-  updatePerformerRating,
-  updateStudioRating,
-  updateTagRating,
   updateGalleryRating,
   updateGroupRating,
   updateImageRating,
+  updatePerformerRating,
+  updateSceneRating,
+  updateStudioRating,
+  updateTagRating,
 } from "../controllers/ratings.js";
+import { authenticateToken } from "../middleware/auth.js";
 
 const router = express.Router();
 

@@ -1,26 +1,30 @@
-import express from "express";
-import cors from "cors";
 import cookieParser from "cookie-parser";
+import cors from "cors";
+import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { proxyStashMedia, proxyScenePreview, proxySceneWebp } from "../controllers/proxy.js";
+import {
+  proxyScenePreview,
+  proxySceneWebp,
+  proxyStashMedia,
+} from "../controllers/proxy.js";
 import * as statsController from "../controllers/stats.js";
+import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import authRoutes from "../routes/auth.js";
-import userRoutes from "../routes/user.js";
-import playlistRoutes from "../routes/playlist.js";
-import watchHistoryRoutes from "../routes/watchHistory.js";
-import ratingsRoutes from "../routes/ratings.js";
-import setupRoutes from "../routes/setup.js";
 import customThemeRoutes from "../routes/customTheme.js";
-import videoRoutes from "../routes/video.js";
-import libraryScenesRoutes from "../routes/library/scenes.js";
+import libraryGalleriesRoutes from "../routes/library/galleries.js";
+import libraryGroupsRoutes from "../routes/library/groups.js";
 import libraryPerformersRoutes from "../routes/library/performers.js";
+import libraryScenesRoutes from "../routes/library/scenes.js";
 import libraryStudiosRoutes from "../routes/library/studios.js";
 import libraryTagsRoutes from "../routes/library/tags.js";
-import libraryGroupsRoutes from "../routes/library/groups.js";
-import libraryGalleriesRoutes from "../routes/library/galleries.js";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import playlistRoutes from "../routes/playlist.js";
+import ratingsRoutes from "../routes/ratings.js";
+import setupRoutes from "../routes/setup.js";
+import userRoutes from "../routes/user.js";
+import videoRoutes from "../routes/video.js";
+import watchHistoryRoutes from "../routes/watchHistory.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
