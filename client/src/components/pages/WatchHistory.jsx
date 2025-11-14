@@ -4,7 +4,7 @@ import { useAllWatchHistory } from "../../hooks/useWatchHistory.js";
 import { libraryApi, apiDelete } from "../../services/api.js";
 import { PageHeader, PageLayout } from "../ui/index.js";
 import SceneListItem from "../ui/SceneListItem.jsx";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { LoadingSpinner } from "../ui/index.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import Button from "../ui/Button.jsx";
 

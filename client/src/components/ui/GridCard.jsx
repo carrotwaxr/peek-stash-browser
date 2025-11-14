@@ -6,7 +6,7 @@ import {
   CardTitle,
   CardDescription,
   CardIndicators,
-  CardRating,
+  CardRatingRow,
 } from "./CardComponents";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio";
 
@@ -82,13 +82,13 @@ export const GridCard = forwardRef(
         <CardIndicators indicators={indicators} />
 
         {ratingControlsProps && (
-          <CardRating
+          <CardRatingRow
             entityType={entityType}
             entityId={ratingControlsProps.entityId}
             initialRating={ratingControlsProps.initialRating}
             initialFavorite={ratingControlsProps.initialFavorite}
             initialOCounter={ratingControlsProps.initialOCounter}
-            entityTitle={typeof title === 'string' ? title : undefined}
+            entityTitle={typeof title === "string" ? title : undefined}
           />
         )}
       </CardContainer>

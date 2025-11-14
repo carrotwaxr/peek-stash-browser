@@ -4,7 +4,7 @@ import axios from "axios";
 import SceneCarousel from "../ui/SceneCarousel.jsx";
 import ContinueWatchingCarousel from "../ui/ContinueWatchingCarousel.jsx";
 import BulkActionBar from "../ui/BulkActionBar.jsx";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { LoadingSpinner } from "../ui/index.js";
 import { PageHeader, PageLayout } from "../ui/index.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useAsyncData } from "../../hooks/useApi.js";

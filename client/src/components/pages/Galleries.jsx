@@ -1,10 +1,15 @@
 import { useState, useRef, forwardRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage, GridCard } from "../ui/index.js";
-import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
+import {
+  CacheLoadingBanner,
+  PageHeader,
+  PageLayout,
+  ErrorMessage,
+  GridCard,
+  SearchControls,
+} from "../ui/index.js";
 import { galleryTitle } from "../../utils/gallery.js";
-import SearchControls from "../ui/SearchControls.jsx";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -182,11 +187,16 @@ const GalleryCard = forwardRef(
         description={gallery.description}
         entityType="gallery"
         imagePath={coverImage}
-        indicators={[{
-          type: "IMAGES",
-          count: gallery.image_count,
-          tooltipContent: gallery.image_count === 1 ? "1 Image" : `${gallery.image_count} Images`
-        }]}
+        indicators={[
+          {
+            type: "IMAGES",
+            count: gallery.image_count,
+            tooltipContent:
+              gallery.image_count === 1
+                ? "1 Image"
+                : `${gallery.image_count} Images`,
+          },
+        ]}
         linkTo={`/gallery/${gallery.id}`}
         ratingControlsProps={{
           entityId: gallery.id,

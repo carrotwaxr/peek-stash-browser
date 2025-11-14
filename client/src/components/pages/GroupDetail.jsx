@@ -2,14 +2,16 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
-import Button from "../ui/Button.jsx";
-import RatingSlider from "../ui/RatingSlider.jsx";
-import FavoriteButton from "../ui/FavoriteButton.jsx";
+import {
+  Button,
+  FavoriteButton,
+  LoadingSpinner,
+  RatingSlider,
+  PageHeader,
+} from "../ui/index.js";
 import { ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { formatDuration } from "../../utils/format.js";
-import PageHeader from "../ui/PageHeader.jsx";
 
 const GroupDetail = () => {
   const { groupId } = useParams();

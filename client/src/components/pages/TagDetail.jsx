@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { LoadingSpinner } from "../ui/index.js";
 import Button from "../ui/Button.jsx";
 import RatingSlider from "../ui/RatingSlider.jsx";
 import FavoriteButton from "../ui/FavoriteButton.jsx";
@@ -90,7 +90,10 @@ const TagDetail = () => {
             >
               Tag Not Found
             </h2>
-            <p className="text-center mb-6" style={{ color: "var(--text-muted)" }}>
+            <p
+              className="text-center mb-6"
+              style={{ color: "var(--text-muted)" }}
+            >
               The tag you're looking for could not be found or you don't have
               permission to view it.
             </p>

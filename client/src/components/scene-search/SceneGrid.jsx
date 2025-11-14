@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { LucideCheckSquare, LucideSquare } from "lucide-react";
 import SceneCard from "../ui/SceneCard.jsx";
 import SkeletonSceneCard from "../ui/SkeletonSceneCard.jsx";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { LoadingSpinner } from "../ui/index.js";
 import ErrorMessage from "../ui/ErrorMessage.jsx";
 import EmptyState from "../ui/EmptyState.jsx";
 import Pagination from "../ui/Pagination.jsx";

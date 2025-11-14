@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import { libraryApi } from "../../services/api.js";
-import LoadingSpinner from "../ui/LoadingSpinner.jsx";
+import { LoadingSpinner } from "../ui/index.js";
 import Button from "../ui/Button.jsx";
 import RatingSlider from "../ui/RatingSlider.jsx";
 import FavoriteButton from "../ui/FavoriteButton.jsx";

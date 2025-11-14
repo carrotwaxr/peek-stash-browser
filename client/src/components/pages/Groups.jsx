@@ -1,9 +1,14 @@
 import { useState, useRef, forwardRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
-import { PageHeader, PageLayout, ErrorMessage, GridCard } from "../ui/index.js";
-import CacheLoadingBanner from "../ui/CacheLoadingBanner.jsx";
-import SearchControls from "../ui/SearchControls.jsx";
+import {
+  PageHeader,
+  PageLayout,
+  ErrorMessage,
+  GridCard,
+  SearchControls,
+  CacheLoadingBanner,
+} from "../ui/index.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";

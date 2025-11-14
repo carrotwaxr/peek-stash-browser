@@ -29,5 +29,3 @@ export const ThemedIcon = ({
     <LucideIcon size={size} color={color} className={className} {...props} />
   );
 };
-
-export default ThemedIcon;

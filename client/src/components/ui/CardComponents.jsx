@@ -313,6 +313,3 @@ export const CardRatingRow = ({
     </>
   );
 };
-
-// Legacy export for backward compatibility (will be removed)
-export const CardRating = CardRatingRow;
