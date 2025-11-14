@@ -1,6 +1,7 @@
 import { forwardRef, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
+import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
@@ -106,9 +107,6 @@ const Galleries = () => {
     );
   }
 
-  const gridClassNames =
-    "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6";
-
   return (
     <PageLayout>
       <div ref={pageRef}>
@@ -127,7 +125,7 @@ const Galleries = () => {
           totalCount={totalCount}
         >
           {isLoading ? (
-            <div className={gridClassNames}>
+            <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
               {[...Array(24)].map((_, i) => (
                 <div
                   key={i}
@@ -141,7 +139,7 @@ const Galleries = () => {
             </div>
           ) : (
             <>
-              <div ref={gridRef} className={gridClassNames}>
+              <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
                 {currentGalleries.map((gallery, index) => (
                   <GalleryCard
                     key={gallery.id}

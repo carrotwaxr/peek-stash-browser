@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { LucideCheckSquare, LucideSquare } from "lucide-react";
+import { SCENE_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
@@ -98,12 +99,9 @@ const SceneGrid = ({
     setSelectedScenes([]);
   }, [currentPage]);
 
-  const gridClassNames =
-    "card-grid-responsive grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5";
-
   if (loading) {
     return (
-      <div className={gridClassNames}>
+      <div className={SCENE_GRID_CONTAINER_CLASSNAMES}>
         {[...Array(12)].map((_, i) => (
           <SkeletonSceneCard key={i} />
         ))}
@@ -159,7 +157,7 @@ const SceneGrid = ({
       )}
 
       {/* Grid */}
-      <div ref={gridRef} className={gridClassNames}>
+      <div ref={gridRef} className={SCENE_GRID_CONTAINER_CLASSNAMES}>
         {scenes.map((scene, index) => (
           <SceneCard
             key={scene.id}
