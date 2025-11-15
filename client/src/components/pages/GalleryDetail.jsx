@@ -105,8 +105,8 @@ const GalleryDetail = () => {
   return (
     <div className="min-h-screen px-4 lg:px-6 xl:px-8 py-6">
       <div className="max-w-none">
-        {/* Back Button and Header */}
-        <div className="mb-6">
+        {/* Back Button and Play Slideshow Button */}
+        <div className="flex items-center justify-between mb-4">
           <Button
             onClick={() =>
               navigate(location.state?.referrerUrl || "/galleries")
@@ -114,11 +114,27 @@ const GalleryDetail = () => {
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
             title="Back to Galleries"
-            className="mb-4"
           >
             <span className="hidden sm:inline">Back to Galleries</span>
           </Button>
 
+          <Button
+            variant="primary"
+            icon={<Play size={20} />}
+            onClick={() => {
+              setLightboxIndex(0);
+              setLightboxAutoPlay(true);
+              setLightboxOpen(true);
+            }}
+            disabled={images.length === 0}
+            title="Play Slideshow"
+          >
+            <span className="hidden sm:inline">Play Slideshow</span>
+          </Button>
+        </div>
+
+        {/* Header */}
+        <div className="mb-6">
           <PageHeader
             title={
               <div className="flex flex-wrap gap-3 items-center">
@@ -232,40 +248,22 @@ const GalleryDetail = () => {
 
         {/* Two-column layout on desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-6">
-          {/* Main Content - Images Grid */}
-          <div className="space-y-4">
-            {/* Slideshow Button (above grid on mobile, in grid on desktop) */}
-            <div className="flex items-center gap-4">
-              <Button
-                variant="primary"
-                icon={<Play size={20} />}
-                onClick={() => {
-                  setLightboxIndex(0);
-                  setLightboxAutoPlay(true);
-                  setLightboxOpen(true);
-                }}
-                disabled={images.length === 0}
-              >
-                Play Slideshow
-              </Button>
-            </div>
-
-            {/* Images Grid */}
-            <div>
-              {imagesLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-                  {[...Array(gallery.image_count || 12)].map((_, index) => (
-                    <div
-                      key={index}
-                      className="aspect-square rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : images.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {/* Main Content - Images Grid (full width) */}
+          <div>
+            {imagesLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+                {[...Array(gallery.image_count || 12)].map((_, index) => (
+                  <div
+                    key={index}
+                    className="aspect-square rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                    }}
+                  />
+                ))}
+              </div>
+            ) : images.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
                   {images.map((image, index) => (
                     <div
                       key={image.id}
@@ -296,17 +294,16 @@ const GalleryDetail = () => {
                         </div>
                       )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className="text-center py-12"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  No images found in this gallery
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="text-center py-12"
+                style={{ color: "var(--text-muted)" }}
+              >
+                No images found in this gallery
+              </div>
+            )}
           </div>
 
           {/* Sidebar - Metadata */}
