@@ -126,7 +126,7 @@ const Playlists = () => {
         </div>
       )}
 
-      {/* Playlists Grid */}
+      {/* Playlists Grid - Wider cards with scene preview images */}
       {playlists.length === 0 ? (
         <div className="text-center py-16">
           <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
@@ -143,42 +143,86 @@ const Playlists = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6">
           {playlists.map((playlist) => (
             <Paper key={playlist.id}>
               <Paper.Body>
-                <Link to={`/playlist/${playlist.id}`}>
-                  <h3
-                    className="text-lg font-semibold mb-2 hover:underline"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {playlist.name}
-                  </h3>
-                </Link>
-                {playlist.description && (
-                  <p
-                    className="text-sm mb-4 line-clamp-2"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
-                    {playlist.description}
-                  </p>
-                )}
-                <div
-                  className="flex items-center justify-between text-sm"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  <span>
-                    {playlist._count.items}{" "}
-                    {playlist._count.items === 1 ? "video" : "videos"}
-                  </span>
-                  <Button
-                    onClick={() => handleDeleteClick(playlist)}
-                    variant="destructive"
-                    size="sm"
-                    className="px-3 py-1"
-                  >
-                    Delete
-                  </Button>
+                <div className="flex gap-4">
+                  {/* Scene Preview Grid (2x2) */}
+                  {playlist.items && playlist.items.length > 0 && (
+                    <div className="flex-shrink-0 w-32 h-32">
+                      <div className="grid grid-cols-2 gap-1 w-full h-full rounded-lg overflow-hidden">
+                        {playlist.items.slice(0, 4).map((item, idx) => (
+                          <div
+                            key={item.scene?.id || idx}
+                            className="aspect-square overflow-hidden"
+                            style={{ backgroundColor: "var(--bg-tertiary)" }}
+                          >
+                            {item.scene?.paths?.screenshot ? (
+                              <img
+                                src={item.scene.paths.screenshot}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-full flex items-center justify-center text-xs"
+                                style={{ color: "var(--text-muted)" }}
+                              >
+                                {idx < playlist._count.items ? "?" : ""}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {/* Fill remaining slots if less than 4 items */}
+                        {playlist.items.length < 4 &&
+                          [...Array(4 - playlist.items.length)].map((_, idx) => (
+                            <div
+                              key={`empty-${idx}`}
+                              className="aspect-square"
+                              style={{ backgroundColor: "var(--bg-tertiary)" }}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Playlist Details */}
+                  <div className="flex-1 min-w-0">
+                    <Link to={`/playlist/${playlist.id}`}>
+                      <h3
+                        className="text-lg font-semibold mb-2 hover:underline"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {playlist.name}
+                      </h3>
+                    </Link>
+                    {playlist.description && (
+                      <p
+                        className="text-sm mb-4 line-clamp-2"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {playlist.description}
+                      </p>
+                    )}
+                    <div
+                      className="flex items-center justify-between text-sm"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <span>
+                        {playlist._count.items}{" "}
+                        {playlist._count.items === 1 ? "video" : "videos"}
+                      </span>
+                      <Button
+                        onClick={() => handleDeleteClick(playlist)}
+                        variant="destructive"
+                        size="sm"
+                        className="px-3 py-1"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </Paper.Body>
             </Paper>

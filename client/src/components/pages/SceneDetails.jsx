@@ -230,7 +230,7 @@ const SceneDetails = ({
                   </div>
                 )}
 
-                {/* Groups */}
+                {/* Groups/Collections - Display as colored chips like tags */}
                 {scene.groups && scene.groups.length > 0 && (
                   <div className="mb-6">
                     <h3
@@ -239,57 +239,75 @@ const SceneDetails = ({
                     >
                       Collections
                     </h3>
-                    <div className="flex flex-wrap gap-3">
-                      {scene.groups.map((group) => (
-                        <Link
-                          key={group.id}
-                          to={`/collection/${group.id}`}
-                          className="flex flex-col items-center rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                          style={{
-                            backgroundColor: "var(--bg-secondary)",
-                            width: "100px",
-                          }}
-                        >
-                          <div
-                            className="w-full overflow-hidden flex items-center justify-center"
-                            style={{
-                              backgroundColor: "var(--border-color)",
-                              height: "150px",
-                            }}
-                          >
-                            {group.front_image_path || group.back_image_path ? (
-                              <img
-                                src={
-                                  group.front_image_path ||
-                                  group.back_image_path
-                                }
-                                alt={group.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span
-                                className="text-3xl"
-                                style={{ color: "var(--text-secondary)" }}
-                              >
-                                🎬
-                              </span>
-                            )}
-                          </div>
-                          <div className="w-full px-2 py-2 text-center">
-                            <span
-                              className="text-xs font-medium line-clamp-2"
-                              style={{ color: "var(--text-primary)" }}
+                    <div className="flex flex-wrap gap-2">
+                      {scene.groups.map((group) => {
+                        // Generate a color based on group ID for consistency
+                        const hue = (parseInt(group.id, 10) * 137.5) % 360;
+                        return (
+                          <div key={group.id} className="relative group/tooltip">
+                            <Link
+                              to={`/collection/${group.id}`}
+                              className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium inline-block"
+                              style={{
+                                backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                                color: "white",
+                              }}
                             >
                               {group.name}
-                            </span>
+                            </Link>
+                            {/* Tooltip with image and name on hover */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity duration-200 z-10">
+                              <div
+                                className="rounded-lg overflow-hidden shadow-lg"
+                                style={{
+                                  backgroundColor: "var(--bg-secondary)",
+                                  border: "1px solid var(--border-color)",
+                                  width: "120px",
+                                }}
+                              >
+                                <div
+                                  className="w-full overflow-hidden flex items-center justify-center"
+                                  style={{
+                                    backgroundColor: "var(--border-color)",
+                                    height: "180px",
+                                  }}
+                                >
+                                  {group.front_image_path || group.back_image_path ? (
+                                    <img
+                                      src={
+                                        group.front_image_path ||
+                                        group.back_image_path
+                                      }
+                                      alt={group.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <span
+                                      className="text-3xl"
+                                      style={{ color: "var(--text-secondary)" }}
+                                    >
+                                      🎬
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="px-2 py-2 text-center">
+                                  <span
+                                    className="text-xs font-medium line-clamp-2"
+                                    style={{ color: "var(--text-primary)" }}
+                                  >
+                                    {group.name}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </Link>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Tags - Compact chips */}
+                {/* Tags - Styled to match PerformerDetail */}
                 {(() => {
                   const allTags = mergeAllTags(scene);
                   return (
@@ -309,11 +327,10 @@ const SceneDetails = ({
                               <Link
                                 key={tag.id}
                                 to={`/tag/${tag.id}`}
-                                className="px-2.5 py-1 rounded text-xs font-medium transition-all hover:scale-105"
+                                className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium"
                                 style={{
-                                  backgroundColor: `hsla(${hue}, 70%, 45%, 0.15)`,
-                                  color: `hsl(${hue}, 70%, 55%)`,
-                                  border: `1px solid hsla(${hue}, 70%, 55%, 0.3)`,
+                                  backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                                  color: "white",
                                 }}
                               >
                                 {tag.name}

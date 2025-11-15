@@ -8,7 +8,7 @@ export const SortControl = ({
   options,
   value,
   onChange,
-  label = "Sort by",
+  label,
 }) => {
   // Standardized styles (same as FilterControl)
   const baseInputStyle = {
@@ -19,13 +19,15 @@ export const SortControl = ({
   const inputClasses = "px-3 py-2 border rounded-md text-sm";
 
   return (
-    <div className="flex">
-      <label
-        className="text-sm font-medium mr-2 self-center"
-        style={{ color: "var(--text-primary)" }}
-      >
-        {label}:
-      </label>
+    <div className="flex items-center">
+      {label && (
+        <label
+          className="text-sm font-medium mr-2"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {label}:
+        </label>
+      )}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}

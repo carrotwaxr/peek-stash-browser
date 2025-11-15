@@ -115,18 +115,32 @@ const StudioDetail = () => {
           </div>
         </div>
 
-        {/* Two Column Layout - Image on left, content on right (lg+) */}
+        {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
-          {/* Left Column: Studio Image */}
-          <div className="w-full lg:w-2/5 flex-shrink-0">
+          {/* Left Column: Studio Image (1:1 for logos) */}
+          <div className="w-full lg:w-1/2 flex-shrink-0">
             <StudioImage studio={studio} />
           </div>
 
-          {/* Right Column: Stats and Details */}
-          <div className="flex-1 space-y-6">
-            <StudioStats studio={studio} />
-            <StudioDetails studio={studio} />
+          {/* Right Column: Details (scrollable, matches image height) */}
+          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
+            {studio?.details && (
+              <Card title="Details">
+                <p
+                  className="text-sm whitespace-pre-wrap"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {studio.details}
+                </p>
+              </Card>
+            )}
           </div>
+        </div>
+
+        {/* Full Width Sections - Statistics, Parent Studio, Tags, Website */}
+        <div className="space-y-6 mb-8">
+          <StudioStats studio={studio} />
+          <StudioDetails studio={studio} />
         </div>
 
         {/* Scenes Section */}
@@ -175,14 +189,14 @@ const Card = ({ title, children }) => {
   );
 };
 
-// Studio Image Component (Logo)
+// Studio Image Component (Logo - 1:1 aspect ratio)
 const StudioImage = ({ studio }) => {
   return (
     <div
       className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
       style={{
         backgroundColor: "var(--bg-card)",
-        aspectRatio: "7/10",
+        aspectRatio: "1/1",
         width: "100%",
         maxHeight: "80vh",
       }}
