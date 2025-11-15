@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import { formatDuration } from "../../utils/format.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
@@ -24,6 +25,12 @@ const GroupDetail = () => {
 
   // Set page title to group name
   usePageTitle(group?.name || "Collection");
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!group,
+    setRating: handleRatingChange,
+  });
 
   useEffect(() => {
     const fetchGroup = async () => {

@@ -13,6 +13,7 @@ import {
   LucideVideo,
 } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -93,6 +94,12 @@ const PerformerDetail = () => {
 
   // Set page title to performer name
   usePageTitle(performer?.name || "Performer");
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!performer,
+    setRating: handleRatingChange,
+  });
 
   useEffect(() => {
     const fetchPerformer = async () => {
