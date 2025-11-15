@@ -198,7 +198,7 @@ const GalleryCard = forwardRef(
         linkTo={`/gallery/${gallery.id}`}
         ratingControlsProps={{
           entityId: gallery.id,
-          initialRating: gallery.rating,
+          initialRating: gallery.rating100 || gallery.rating,
           initialFavorite: gallery.favorite || false,
           initialOCounter: gallery.o_counter,
         }}
