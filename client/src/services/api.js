@@ -384,37 +384,11 @@ export const commonFilters = {
     scene_filter: {},
   }),
 
-  /** Get highest bitrate scenes
-   */
-  highBitrateScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
-    scene_filter: {
-      bitrate: { modifier: "GREATER_THAN", value: 14000000 },
-    },
-  }),
-
-  /** Get barely legal scenes
-   */
-  barelyLegalScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
-    scene_filter: { performer_age: { modifier: "EQUALS", value: 18 } },
-  }),
-
-  /** Get barely legal scenes
+  /** Get favorite performer scenes
    */
   favoritePerformerScenes: (page = 1, perPage = 24) => ({
     filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
     scene_filter: { performer_favorite: true },
-  }),
-
-  /**
-   * Get long scenes (over 30 minutes)
-   */
-  longScenes: (page = 1, perPage = 24) => ({
-    filter: filterHelpers.pagination(page, perPage, "random", "ASC"),
-    scene_filter: {
-      duration: { modifier: "GREATER_THAN", value: 4800 },
-    },
   }),
 
   /**

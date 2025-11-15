@@ -12,12 +12,9 @@ export interface CarouselPreference {
 export const DEFAULT_CAROUSELS = [
   { id: "highRatedScenes", enabled: true, order: 0 },
   { id: "recentlyAddedScenes", enabled: true, order: 1 },
-  { id: "longScenes", enabled: true, order: 2 },
-  { id: "highBitrateScenes", enabled: true, order: 3 },
-  { id: "barelyLegalScenes", enabled: true, order: 4 },
-  { id: "favoritePerformerScenes", enabled: true, order: 5 },
-  { id: "favoriteStudioScenes", enabled: true, order: 6 },
-  { id: "favoriteTagScenes", enabled: true, order: 7 },
+  { id: "favoritePerformerScenes", enabled: true, order: 2 },
+  { id: "favoriteStudioScenes", enabled: true, order: 3 },
+  { id: "favoriteTagScenes", enabled: true, order: 4 },
 ];
 
 /**

@@ -1,19 +1,19 @@
 import {
-  Calendar,
   Clock,
-  Film,
   Heart,
   PlayCircle,
   Star,
   Tag,
   Video,
-  Zap,
 } from "lucide-react";
 
 /**
  * Shared carousel definitions for homepage and settings
  * Order: Continue Watching, Recently Added, High Rated, Favorite Performers,
- *        Favorite Tags, Favorite Studios, Barely Legal, Feature Length, High Bitrate
+ *        Favorite Tags, Favorite Studios
+ *
+ * Note: Some carousels (High Bitrate, Barely Legal, Feature Length) have been removed.
+ * In the future, users will be able to create custom carousels using a filter builder.
  */
 export const CAROUSEL_DEFINITIONS = [
   {
@@ -62,33 +62,6 @@ export const CAROUSEL_DEFINITIONS = [
     iconProps: { className: "w-6 h-6", style: { color: "var(--status-info)" } },
     fetchKey: "favoriteStudioScenes",
   },
-  {
-    title: "Barely Legal",
-    iconComponent: Calendar,
-    iconProps: {
-      className: "w-6 h-6",
-      style: { color: "var(--status-warning)" },
-    },
-    fetchKey: "barelyLegalScenes",
-  },
-  {
-    title: "Feature Length",
-    iconComponent: Film,
-    iconProps: {
-      className: "w-6 h-6",
-      style: { color: "var(--accent-secondary)" },
-    },
-    fetchKey: "longScenes",
-  },
-  {
-    title: "High Bitrate",
-    iconComponent: Zap,
-    iconProps: {
-      className: "w-6 h-6",
-      style: { color: "var(--status-success)" },
-    },
-    fetchKey: "highBitrateScenes",
-  },
 ];
 
 /**
@@ -107,6 +80,10 @@ export const migrateCarouselPreferences = (savedPreferences) => {
       order: idx,
     }));
   }
+
+  // Filter out removed carousels (barelyLegalScenes, longScenes, highBitrateScenes)
+  const validIds = new Set(CAROUSEL_DEFINITIONS.map((def) => def.fetchKey));
+  prefs = prefs.filter((pref) => validIds.has(pref.id));
 
   // Migrate: Add any new carousels that don't exist in saved preferences
   const existingIds = new Set(prefs.map((p) => p.id));
