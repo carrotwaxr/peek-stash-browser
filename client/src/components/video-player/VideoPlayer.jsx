@@ -77,7 +77,6 @@ const VideoPlayer = () => {
     playlist,
     currentIndex,
     dispatch,
-    enableAutoFallback,
     nextScene,
     prevScene,
   } = useScenePlayer();
@@ -117,7 +116,6 @@ const VideoPlayer = () => {
     playlist,
     currentIndex,
     dispatch,
-    enableAutoFallback,
     nextScene,
     prevScene,
     updateQuality,

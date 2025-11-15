@@ -75,45 +75,6 @@ export function ScenePlayerProvider({
     }
   }, []);
 
-  const loadVideo = useCallback(
-    async (forceQuality = null) => {
-      const qualityToUse = forceQuality || state.quality;
-      const isDirectPlay = qualityToUse === "direct";
-
-      dispatch({ type: "LOAD_VIDEO_START" });
-
-      try {
-        if (isDirectPlay) {
-          dispatch({
-            type: "LOAD_VIDEO_SUCCESS",
-            payload: {
-              video: { directPlay: true },
-              sessionId: null,
-            },
-          });
-        } else {
-          const response = await api.get(
-            `/video/play?sceneId=${state.scene.id}&quality=${qualityToUse}`
-          );
-          dispatch({
-            type: "LOAD_VIDEO_SUCCESS",
-            payload: {
-              video: response.data.scene,
-              sessionId: response.data.sessionId,
-            },
-          });
-        }
-      } catch (error) {
-        console.error("Error loading video:", error);
-        dispatch({
-          type: "LOAD_VIDEO_ERROR",
-          payload: error,
-        });
-      }
-    },
-    [state.quality, state.scene]
-  );
-
   // Complex action creators (with side effects or logic)
   const incrementOCounter = useCallback(async () => {
     if (!state.scene?.id) return;
@@ -125,34 +86,6 @@ export function ScenePlayerProvider({
     } catch (error) {
       console.error("Error incrementing O counter:", error);
       dispatch({ type: "INCREMENT_O_COUNTER_ERROR" });
-    }
-  }, [state.scene?.id]);
-
-  const enableAutoFallback = useCallback(async () => {
-    if (!state.scene?.id) return;
-
-    dispatch({ type: "SET_AUTO_FALLBACK", payload: true });
-    dispatch({ type: "SET_QUALITY", payload: "480p" });
-
-    try {
-      const response = await api.get(
-        `/video/play?sceneId=${state.scene.id}&quality=480p`
-      );
-
-      dispatch({
-        type: "LOAD_VIDEO_SUCCESS",
-        payload: {
-          video: response.data.scene,
-          sessionId: response.data.sessionId,
-        },
-      });
-
-      dispatch({ type: "SET_AUTO_FALLBACK", payload: false });
-      return { success: true, sessionId: response.data.sessionId };
-    } catch (error) {
-      console.error("Error enabling auto-fallback:", error);
-      dispatch({ type: "SET_AUTO_FALLBACK", payload: false });
-      return { success: false, error };
     }
   }, [state.scene?.id]);
 
@@ -200,31 +133,6 @@ export function ScenePlayerProvider({
     }
   }, [sceneId, state.currentIndex, state.playlist, loadScene]);
 
-  // Auto-load video data after scene loads (like Stash does)
-  // This ensures Video.js has a source and controls work properly
-  useEffect(() => {
-    if (state.scene && !state.video && !state.videoLoading) {
-      // In playlist mode, only auto-load if the current scene matches the expected scene for the current index
-      if (state.playlist) {
-        const expectedSceneId =
-          state.playlist.scenes[state.currentIndex]?.sceneId;
-
-        if (state.scene.id !== expectedSceneId) {
-          return; // Waiting for new scene to load
-        }
-      }
-
-      loadVideo();
-    }
-  }, [
-    state.scene,
-    state.video,
-    state.videoLoading,
-    state.playlist,
-    state.currentIndex,
-    loadVideo,
-  ]);
-
   // Update URL when navigating playlist (without React Router navigation)
   useEffect(() => {
     if (state.playlist && state.scene) {
@@ -249,9 +157,7 @@ export function ScenePlayerProvider({
 
     // Complex actions (with side effects)
     loadScene,
-    loadVideo,
     incrementOCounter,
-    enableAutoFallback,
 
     // Playlist navigation helpers (kept for convenience)
     nextScene,
