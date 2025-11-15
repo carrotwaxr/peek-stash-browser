@@ -854,6 +854,398 @@ describe("Scene Filters - Quick Filters", () => {
     });
   });
 
+  describe("Resolution Filter", () => {
+    it("should filter scenes with EQUALS modifier (720p)", () => {
+      // Create test scenes with different resolutions
+      const scene720p = createMockScene({
+        id: "scene_720p",
+        files: [
+          {
+            id: "file_720p",
+            path: "/path/to/720p.mp4",
+            size: "1000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1280,
+            height: 720,
+            frame_rate: 30,
+            bit_rate: 5000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene1080p = createMockScene({
+        id: "scene_1080p",
+        files: [
+          {
+            id: "file_1080p",
+            path: "/path/to/1080p.mp4",
+            size: "2000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 8000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const testScenes = [scene720p, scene1080p];
+
+      const filter: PeekSceneFilter = {
+        resolution: { value: "STANDARD_HD", modifier: "EQUALS" },
+      };
+
+      const result = applyQuickSceneFilters(testScenes, filter);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("scene_720p");
+      expect(result[0].files?.[0]?.height).toBe(720);
+    });
+
+    it("should filter scenes with NOT_EQUALS modifier", () => {
+      const scene720p = createMockScene({
+        id: "scene_720p",
+        files: [
+          {
+            id: "file_720p",
+            path: "/path/to/720p.mp4",
+            size: "1000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1280,
+            height: 720,
+            frame_rate: 30,
+            bit_rate: 5000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene1080p = createMockScene({
+        id: "scene_1080p",
+        files: [
+          {
+            id: "file_1080p",
+            path: "/path/to/1080p.mp4",
+            size: "2000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 8000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const testScenes = [scene720p, scene1080p];
+
+      const filter: PeekSceneFilter = {
+        resolution: { value: "STANDARD_HD", modifier: "NOT_EQUALS" },
+      };
+
+      const result = applyQuickSceneFilters(testScenes, filter);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("scene_1080p");
+      expect(result[0].files?.[0]?.height).toBe(1080);
+    });
+
+    it("should filter scenes with GREATER_THAN modifier (> 720p)", () => {
+      const scene480p = createMockScene({
+        id: "scene_480p",
+        files: [
+          {
+            id: "file_480p",
+            path: "/path/to/480p.mp4",
+            size: "500000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 854,
+            height: 480,
+            frame_rate: 30,
+            bit_rate: 2500000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene720p = createMockScene({
+        id: "scene_720p",
+        files: [
+          {
+            id: "file_720p",
+            path: "/path/to/720p.mp4",
+            size: "1000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1280,
+            height: 720,
+            frame_rate: 30,
+            bit_rate: 5000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene1080p = createMockScene({
+        id: "scene_1080p",
+        files: [
+          {
+            id: "file_1080p",
+            path: "/path/to/1080p.mp4",
+            size: "2000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 8000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const testScenes = [scene480p, scene720p, scene1080p];
+
+      const filter: PeekSceneFilter = {
+        resolution: { value: "STANDARD_HD", modifier: "GREATER_THAN" },
+      };
+
+      const result = applyQuickSceneFilters(testScenes, filter);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("scene_1080p");
+      result.forEach((scene) => {
+        const height = scene.files?.[0]?.height || 0;
+        expect(height).toBeGreaterThan(720);
+      });
+    });
+
+    it("should filter scenes with LESS_THAN modifier (< 720p)", () => {
+      const scene480p = createMockScene({
+        id: "scene_480p",
+        files: [
+          {
+            id: "file_480p",
+            path: "/path/to/480p.mp4",
+            size: "500000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 854,
+            height: 480,
+            frame_rate: 30,
+            bit_rate: 2500000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene720p = createMockScene({
+        id: "scene_720p",
+        files: [
+          {
+            id: "file_720p",
+            path: "/path/to/720p.mp4",
+            size: "1000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1280,
+            height: 720,
+            frame_rate: 30,
+            bit_rate: 5000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene1080p = createMockScene({
+        id: "scene_1080p",
+        files: [
+          {
+            id: "file_1080p",
+            path: "/path/to/1080p.mp4",
+            size: "2000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1920,
+            height: 1080,
+            frame_rate: 30,
+            bit_rate: 8000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const testScenes = [scene480p, scene720p, scene1080p];
+
+      const filter: PeekSceneFilter = {
+        resolution: { value: "STANDARD_HD", modifier: "LESS_THAN" },
+      };
+
+      const result = applyQuickSceneFilters(testScenes, filter);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("scene_480p");
+      result.forEach((scene) => {
+        const height = scene.files?.[0]?.height || 0;
+        expect(height).toBeLessThan(720);
+      });
+    });
+
+    it("should handle various resolution enums correctly", () => {
+      const scene360p = createMockScene({
+        id: "scene_360p",
+        files: [
+          {
+            id: "file_360p",
+            path: "/path/to/360p.mp4",
+            size: "300000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 640,
+            height: 360,
+            frame_rate: 30,
+            bit_rate: 1500000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene480p = createMockScene({
+        id: "scene_480p",
+        files: [
+          {
+            id: "file_480p",
+            path: "/path/to/480p.mp4",
+            size: "500000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 854,
+            height: 480,
+            frame_rate: 30,
+            bit_rate: 2500000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene4k = createMockScene({
+        id: "scene_4k",
+        files: [
+          {
+            id: "file_4k",
+            path: "/path/to/4k.mp4",
+            size: "5000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 3840,
+            height: 2160,
+            frame_rate: 60,
+            bit_rate: 20000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const testScenes = [scene360p, scene480p, scene4k];
+
+      // Test R360P
+      const filter360p: PeekSceneFilter = {
+        resolution: { value: "R360P", modifier: "EQUALS" },
+      };
+      const result360p = applyQuickSceneFilters(testScenes, filter360p);
+      expect(result360p).toHaveLength(1);
+      expect(result360p[0].id).toBe("scene_360p");
+
+      // Test STANDARD (480p)
+      const filter480p: PeekSceneFilter = {
+        resolution: { value: "STANDARD", modifier: "EQUALS" },
+      };
+      const result480p = applyQuickSceneFilters(testScenes, filter480p);
+      expect(result480p).toHaveLength(1);
+      expect(result480p[0].id).toBe("scene_480p");
+
+      // Test FOUR_K (2160p)
+      const filter4k: PeekSceneFilter = {
+        resolution: { value: "FOUR_K", modifier: "EQUALS" },
+      };
+      const result4k = applyQuickSceneFilters(testScenes, filter4k);
+      expect(result4k).toHaveLength(1);
+      expect(result4k[0].id).toBe("scene_4k");
+    });
+
+    it("should handle scenes with missing height data", () => {
+      const sceneNoHeight = createMockScene({
+        id: "scene_no_height",
+        files: [
+          {
+            id: "file_no_height",
+            path: "/path/to/noheight.mp4",
+            size: "1000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 0,
+            height: 0,
+            frame_rate: 30,
+            bit_rate: 5000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const scene720p = createMockScene({
+        id: "scene_720p",
+        files: [
+          {
+            id: "file_720p",
+            path: "/path/to/720p.mp4",
+            size: "1000000000",
+            duration: 3600,
+            video_codec: "h264",
+            audio_codec: "aac",
+            width: 1280,
+            height: 720,
+            frame_rate: 30,
+            bit_rate: 5000000,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      });
+      const testScenes = [sceneNoHeight, scene720p];
+
+      const filter: PeekSceneFilter = {
+        resolution: { value: "STANDARD_HD", modifier: "EQUALS" },
+      };
+
+      const result = applyQuickSceneFilters(testScenes, filter);
+
+      // Should only match the 720p scene, not the one with missing height
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("scene_720p");
+    });
+  });
+
   describe("Multiple Filters Combined", () => {
     it("should apply multiple filters together (AND logic)", () => {
       const performerIds = [mockPerformers[0].id];

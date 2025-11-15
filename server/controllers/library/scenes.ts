@@ -426,6 +426,42 @@ export function applyQuickSceneFilters(
     });
   }
 
+  // Filter by resolution
+  if (filters.resolution) {
+    const { value: resolutionEnum, modifier } = filters.resolution;
+    if (!resolutionEnum) return filtered;
+
+    // Map resolution enum to pixel heights
+    const resolutionHeights: Record<string, number> = {
+      VERY_LOW: 144,
+      LOW: 240,
+      R360P: 360,
+      STANDARD: 480,
+      WEB_HD: 540,
+      STANDARD_HD: 720,
+      FULL_HD: 1080,
+      QUAD_HD: 1440,
+      FOUR_K: 2160,
+      FIVE_K: 2880,
+      SIX_K: 3384,
+      SEVEN_K: 4320,
+      EIGHT_K: 4320,
+      HUGE: 8640,
+    };
+
+    const filterHeight = resolutionHeights[resolutionEnum];
+    if (filterHeight === undefined) return filtered;
+
+    filtered = filtered.filter((s) => {
+      const height = s.files?.[0]?.height || 0;
+      if (modifier === "EQUALS") return height === filterHeight;
+      if (modifier === "NOT_EQUALS") return height !== filterHeight;
+      if (modifier === "GREATER_THAN") return height > filterHeight;
+      if (modifier === "LESS_THAN") return height < filterHeight;
+      return true;
+    });
+  }
+
   // Filter by title
   if (filters.title) {
     const { value, modifier } = filters.title;
