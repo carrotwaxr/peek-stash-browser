@@ -219,11 +219,11 @@ const Card = ({ title, children }) => {
   );
 };
 
-// Tag Image Component (1:1 aspect ratio)
+// Tag Image Component (16:9 aspect ratio to match tag cards)
 const TagImage = ({ tag }) => {
   return (
     <div
-      className="rounded-lg w-full aspect-square overflow-hidden shadow-lg flex items-center justify-center"
+      className="rounded-lg w-full aspect-video overflow-hidden shadow-lg flex items-center justify-center"
       style={{
         backgroundColor: "var(--bg-card)",
         maxHeight: "80vh",
