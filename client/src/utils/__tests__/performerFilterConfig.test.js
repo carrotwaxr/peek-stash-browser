@@ -178,7 +178,8 @@ describe("buildPerformerFilter", () => {
         rating: { min: "", max: "" },
       };
       const result = buildPerformerFilter(uiFilters);
-      expect(result.rating100).toEqual({}); // Empty object created but no modifier/value
+      // Bug #2 fix: Empty range values should not create filter objects
+      expect(result.rating100).toBeUndefined();
     });
   });
 
@@ -507,9 +508,10 @@ describe("buildPerformerFilter", () => {
         sceneCount: { min: "", max: "" },
       };
       const result = buildPerformerFilter(uiFilters);
-      expect(result.o_counter).toEqual({}); // Empty object
-      expect(result.play_count).toEqual({}); // Empty object
-      expect(result.scene_count).toEqual({}); // Empty object
+      // Bug #2 fix: Empty range values should not create filter objects
+      expect(result.o_counter).toBeUndefined();
+      expect(result.play_count).toBeUndefined();
+      expect(result.scene_count).toBeUndefined();
     });
   });
 

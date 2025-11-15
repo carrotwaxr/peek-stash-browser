@@ -109,7 +109,7 @@ All array-based filters in these files should be checked and fixed.
 
 ## Bug #2: Empty Range Filter Objects in Frontend Filter Builders
 
-**Status**: Found
+**Status**: Fixed
 **Severity**: Low
 **Affected Filters**: All range-based filters in frontend `buildPerformerFilter()`, `buildSceneFilter()`, etc.
 **File**: `client/src/utils/filterConfig.js`
@@ -281,3 +281,38 @@ This pattern affects ALL range-based filters in frontend filter builders:
 - Backend likely handles empty objects gracefully
 - Should be fixed for code cleanliness and to prevent potential future issues
 - Can be batched with other filter improvements
+
+### Fix Applied
+
+**Implementation**: Option 2 (check for empty values in outer condition) was implemented for all affected filters in `buildPerformerFilter()`:
+
+```javascript
+// Example: o_counter filter fix
+const hasOCounterMin =
+  filters.oCounter?.min !== undefined && filters.oCounter.min !== "";
+const hasOCounterMax =
+  filters.oCounter?.max !== undefined && filters.oCounter.max !== "";
+
+if (hasOCounterMin || hasOCounterMax) {
+  performerFilter.o_counter = {};
+  // ... populate filter only if we have valid values
+}
+```
+
+**Filters Fixed in `buildPerformerFilter()`**:
+- `rating100` (lines 1404-1424)
+- `o_counter` (lines 1528-1548)
+- `play_count` (lines 1550-1570)
+- `scene_count` (lines 1572-1592)
+
+**Test Coverage**: Updated frontend tests to verify empty range values result in `undefined` filters:
+- `should not include rating filter when min and max are empty strings` - ✅ Passing
+- `should not include count filters when min and max are empty strings` - ✅ Passing
+
+All 66 frontend performer filter tests passing after fix.
+
+**Remaining Work**: This same pattern should be applied to:
+- `buildSceneFilter()` range filters
+- `buildStudioFilter()` range filters
+- `buildTagFilter()` range filters
+- `buildGroupFilter()` range filters
