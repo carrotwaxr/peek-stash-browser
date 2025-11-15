@@ -228,7 +228,7 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Apply tag filters
  */
-function applyTagFilters(
+export function applyTagFilters(
   tags: NormalizedTag[],
   filters: PeekTagFilter | null | undefined
 ): NormalizedTag[] {

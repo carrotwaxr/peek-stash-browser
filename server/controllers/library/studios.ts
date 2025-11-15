@@ -199,7 +199,7 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Apply studio filters
  */
-function applyStudioFilters(
+export function applyStudioFilters(
   studios: NormalizedStudio[],
   filters: PeekStudioFilter | null | undefined
 ): NormalizedStudio[] {

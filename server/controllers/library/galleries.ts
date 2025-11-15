@@ -74,7 +74,7 @@ async function mergeImagesWithUserData(
 /**
  * Apply gallery filters
  */
-function applyGalleryFilters(
+export function applyGalleryFilters(
   galleries: NormalizedGallery[],
   filters: PeekGalleryFilter | null | undefined
 ): NormalizedGallery[] {

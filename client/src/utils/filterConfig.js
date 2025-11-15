@@ -2101,3 +2101,91 @@ export const buildGroupFilter = (filters) => {
 
   return groupFilter;
 };
+
+export const buildGalleryFilter = (filters) => {
+  const galleryFilter = {};
+
+  // Boolean filter
+  if (filters.favorite === true || filters.favorite === "TRUE") {
+    galleryFilter.favorite = true;
+  }
+
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
+    galleryFilter.rating100 = {};
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
+
+    if (hasMin && hasMax) {
+      galleryFilter.rating100.modifier = "BETWEEN";
+      galleryFilter.rating100.value = parseInt(filters.rating.min);
+      galleryFilter.rating100.value2 = parseInt(filters.rating.max);
+    } else if (hasMin) {
+      galleryFilter.rating100.modifier = "GREATER_THAN";
+      galleryFilter.rating100.value = parseInt(filters.rating.min) - 1;
+    } else if (hasMax) {
+      galleryFilter.rating100.modifier = "LESS_THAN";
+      galleryFilter.rating100.value = parseInt(filters.rating.max) + 1;
+    }
+  }
+
+  // Image count filter
+  if (
+    filters.imageCount?.min !== undefined ||
+    filters.imageCount?.max !== undefined
+  ) {
+    galleryFilter.image_count = {};
+    const hasMin =
+      filters.imageCount.min !== undefined && filters.imageCount.min !== "";
+    const hasMax =
+      filters.imageCount.max !== undefined && filters.imageCount.max !== "";
+
+    if (hasMin && hasMax) {
+      galleryFilter.image_count.modifier = "BETWEEN";
+      galleryFilter.image_count.value = parseInt(filters.imageCount.min);
+      galleryFilter.image_count.value2 = parseInt(filters.imageCount.max);
+    } else if (hasMin) {
+      galleryFilter.image_count.modifier = "GREATER_THAN";
+      galleryFilter.image_count.value = parseInt(filters.imageCount.min) - 1;
+    } else if (hasMax) {
+      galleryFilter.image_count.modifier = "LESS_THAN";
+      galleryFilter.image_count.value = parseInt(filters.imageCount.max) + 1;
+    }
+  }
+
+  // Text search filter
+  if (filters.title) {
+    galleryFilter.title = {
+      value: filters.title,
+      modifier: "INCLUDES",
+    };
+  }
+
+  // Studio filter
+  if (filters.studioIds && filters.studioIds.length > 0) {
+    galleryFilter.studios = {
+      value: filters.studioIds.map(String),
+      modifier: filters.studioIdsModifier || "INCLUDES",
+    };
+  }
+
+  // Performers filter
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    galleryFilter.performers = {
+      value: filters.performerIds.map(String),
+      modifier: filters.performerIdsModifier || "INCLUDES",
+    };
+  }
+
+  // Tags filter
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    galleryFilter.tags = {
+      value: filters.tagIds.map(String),
+      modifier: filters.tagIdsModifier || "INCLUDES",
+    };
+  }
+
+  return galleryFilter;
+};
