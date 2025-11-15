@@ -141,12 +141,30 @@ const ORGANIZED_OPTIONS = [
   { value: "FALSE", label: "Not Organized" },
 ];
 
-// Resolution options (common video resolutions)
+// Resolution options (matching Stash's ResolutionEnum)
 const RESOLUTION_OPTIONS = [
-  { value: "720", label: "720p" },
-  { value: "1080", label: "1080p" },
-  { value: "1440", label: "1440p" },
-  { value: "2160", label: "4K" },
+  { value: "VERY_LOW", label: "144p" },
+  { value: "LOW", label: "240p" },
+  { value: "R360P", label: "360p" },
+  { value: "STANDARD", label: "480p" },
+  { value: "WEB_HD", label: "540p" },
+  { value: "STANDARD_HD", label: "720p" },
+  { value: "FULL_HD", label: "1080p" },
+  { value: "QUAD_HD", label: "1440p" },
+  { value: "FOUR_K", label: "4K" },
+  { value: "FIVE_K", label: "5K" },
+  { value: "SIX_K", label: "6K" },
+  { value: "SEVEN_K", label: "7K" },
+  { value: "EIGHT_K", label: "8K" },
+  { value: "HUGE", label: "Huge" },
+];
+
+// Resolution modifier options
+const RESOLUTION_MODIFIER_OPTIONS = [
+  { value: "EQUALS", label: "Equals" },
+  { value: "NOT_EQUALS", label: "Not Equals" },
+  { value: "GREATER_THAN", label: "Greater Than" },
+  { value: "LESS_THAN", label: "Less Than" },
 ];
 
 // Multi-criterion modifier options (for tags, performers, etc.)
@@ -331,6 +349,9 @@ export const SCENE_FILTER_OPTIONS = [
     defaultValue: "",
     options: RESOLUTION_OPTIONS,
     placeholder: "Any resolution",
+    modifierOptions: RESOLUTION_MODIFIER_OPTIONS,
+    modifierKey: "resolutionModifier",
+    defaultModifier: "EQUALS",
   },
   {
     key: "bitrate",
@@ -1077,10 +1098,9 @@ export const buildSceneFilter = (filters) => {
 
   // Resolution filter
   if (filters.resolution) {
-    const height = parseInt(filters.resolution);
     sceneFilter.resolution = {
-      value: `${height}p`,
-      modifier: "EQUALS",
+      value: filters.resolution,
+      modifier: filters.resolutionModifier || "EQUALS",
     };
   }
 
