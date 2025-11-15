@@ -213,7 +213,7 @@ export const findPerformers = async (
 /**
  * Apply performer filters
  */
-function applyPerformerFilters(
+export function applyPerformerFilters(
   performers: NormalizedPerformer[],
   filters: PeekPerformerFilter | null | undefined
 ): NormalizedPerformer[] {

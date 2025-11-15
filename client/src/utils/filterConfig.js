@@ -1401,21 +1401,23 @@ export const buildPerformerFilter = (filters) => {
   }
 
   // Rating filter (0-100 scale)
-  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
-    performerFilter.rating100 = {};
-    const hasMin =
-      filters.rating.min !== undefined && filters.rating.min !== "";
-    const hasMax =
-      filters.rating.max !== undefined && filters.rating.max !== "";
+  // Check for non-empty values before creating filter object
+  const hasRatingMin =
+    filters.rating?.min !== undefined && filters.rating.min !== "";
+  const hasRatingMax =
+    filters.rating?.max !== undefined && filters.rating.max !== "";
 
-    if (hasMin && hasMax) {
+  if (hasRatingMin || hasRatingMax) {
+    performerFilter.rating100 = {};
+
+    if (hasRatingMin && hasRatingMax) {
       performerFilter.rating100.modifier = "BETWEEN";
       performerFilter.rating100.value = parseInt(filters.rating.min);
       performerFilter.rating100.value2 = parseInt(filters.rating.max);
-    } else if (hasMin) {
+    } else if (hasRatingMin) {
       performerFilter.rating100.modifier = "GREATER_THAN";
       performerFilter.rating100.value = parseInt(filters.rating.min) - 1;
-    } else if (hasMax) {
+    } else if (hasRatingMax) {
       performerFilter.rating100.modifier = "LESS_THAN";
       performerFilter.rating100.value = parseInt(filters.rating.max) + 1;
     }
@@ -1523,70 +1525,67 @@ export const buildPerformerFilter = (filters) => {
       performerFilter.penis_length.value2 = parseInt(filters.penisLength.max);
   }
 
-  if (
-    filters.oCounter?.min !== undefined ||
-    filters.oCounter?.max !== undefined
-  ) {
-    performerFilter.o_counter = {};
-    const hasMin =
-      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
-    const hasMax =
-      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
+  // Check for non-empty values before creating filter object
+  const hasOCounterMin =
+    filters.oCounter?.min !== undefined && filters.oCounter.min !== "";
+  const hasOCounterMax =
+    filters.oCounter?.max !== undefined && filters.oCounter.max !== "";
 
-    if (hasMin && hasMax) {
+  if (hasOCounterMin || hasOCounterMax) {
+    performerFilter.o_counter = {};
+
+    if (hasOCounterMin && hasOCounterMax) {
       performerFilter.o_counter.modifier = "BETWEEN";
       performerFilter.o_counter.value = parseInt(filters.oCounter.min);
       performerFilter.o_counter.value2 = parseInt(filters.oCounter.max);
-    } else if (hasMin) {
+    } else if (hasOCounterMin) {
       performerFilter.o_counter.modifier = "GREATER_THAN";
       performerFilter.o_counter.value = parseInt(filters.oCounter.min) - 1;
-    } else if (hasMax) {
+    } else if (hasOCounterMax) {
       performerFilter.o_counter.modifier = "LESS_THAN";
       performerFilter.o_counter.value = parseInt(filters.oCounter.max) + 1;
     }
   }
 
-  if (
-    filters.playCount?.min !== undefined ||
-    filters.playCount?.max !== undefined
-  ) {
-    performerFilter.play_count = {};
-    const hasMin =
-      filters.playCount.min !== undefined && filters.playCount.min !== "";
-    const hasMax =
-      filters.playCount.max !== undefined && filters.playCount.max !== "";
+  // Check for non-empty values before creating filter object
+  const hasPlayCountMin =
+    filters.playCount?.min !== undefined && filters.playCount.min !== "";
+  const hasPlayCountMax =
+    filters.playCount?.max !== undefined && filters.playCount.max !== "";
 
-    if (hasMin && hasMax) {
+  if (hasPlayCountMin || hasPlayCountMax) {
+    performerFilter.play_count = {};
+
+    if (hasPlayCountMin && hasPlayCountMax) {
       performerFilter.play_count.modifier = "BETWEEN";
       performerFilter.play_count.value = parseInt(filters.playCount.min);
       performerFilter.play_count.value2 = parseInt(filters.playCount.max);
-    } else if (hasMin) {
+    } else if (hasPlayCountMin) {
       performerFilter.play_count.modifier = "GREATER_THAN";
       performerFilter.play_count.value = parseInt(filters.playCount.min) - 1;
-    } else if (hasMax) {
+    } else if (hasPlayCountMax) {
       performerFilter.play_count.modifier = "LESS_THAN";
       performerFilter.play_count.value = parseInt(filters.playCount.max) + 1;
     }
   }
 
-  if (
-    filters.sceneCount?.min !== undefined ||
-    filters.sceneCount?.max !== undefined
-  ) {
-    performerFilter.scene_count = {};
-    const hasMin =
-      filters.sceneCount.min !== undefined && filters.sceneCount.min !== "";
-    const hasMax =
-      filters.sceneCount.max !== undefined && filters.sceneCount.max !== "";
+  // Check for non-empty values before creating filter object
+  const hasSceneCountMin =
+    filters.sceneCount?.min !== undefined && filters.sceneCount.min !== "";
+  const hasSceneCountMax =
+    filters.sceneCount?.max !== undefined && filters.sceneCount.max !== "";
 
-    if (hasMin && hasMax) {
+  if (hasSceneCountMin || hasSceneCountMax) {
+    performerFilter.scene_count = {};
+
+    if (hasSceneCountMin && hasSceneCountMax) {
       performerFilter.scene_count.modifier = "BETWEEN";
       performerFilter.scene_count.value = parseInt(filters.sceneCount.min);
       performerFilter.scene_count.value2 = parseInt(filters.sceneCount.max);
-    } else if (hasMin) {
+    } else if (hasSceneCountMin) {
       performerFilter.scene_count.modifier = "GREATER_THAN";
       performerFilter.scene_count.value = parseInt(filters.sceneCount.min) - 1;
-    } else if (hasMax) {
+    } else if (hasSceneCountMax) {
       performerFilter.scene_count.modifier = "LESS_THAN";
       performerFilter.scene_count.value = parseInt(filters.sceneCount.max) + 1;
     }
