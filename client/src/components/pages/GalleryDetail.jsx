@@ -86,9 +86,10 @@ const GalleryDetail = () => {
 
   // Check if there's any sidebar content to display
   const hasSidebarContent =
-    (gallery.tags && gallery.tags.length > 0) ||
-    (gallery.scenes && gallery.scenes.length > 0) ||
-    gallery.details;
+    gallery &&
+    ((gallery.tags && gallery.tags.length > 0) ||
+      (gallery.scenes && gallery.scenes.length > 0) ||
+      gallery.details);
 
   if (isLoading) {
     return (
