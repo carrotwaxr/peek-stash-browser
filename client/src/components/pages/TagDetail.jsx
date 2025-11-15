@@ -150,18 +150,32 @@ const TagDetail = () => {
           </div>
         </div>
 
-        {/* Two Column Layout - Image on left, content on right (lg+) */}
+        {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
-          {/* Left Column: Tag Image */}
-          <div className="w-full lg:w-2/5 flex-shrink-0">
+          {/* Left Column: Tag Image (1:1) */}
+          <div className="w-full lg:w-1/2 flex-shrink-0">
             <TagImage tag={tag} />
           </div>
 
-          {/* Right Column: Stats and Details */}
-          <div className="flex-1 space-y-6">
-            <TagStats tag={tag} />
-            <TagDetails tag={tag} />
+          {/* Right Column: Details (scrollable, matches image height) */}
+          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
+            {tag?.description && (
+              <Card title="Details">
+                <p
+                  className="text-sm whitespace-pre-wrap"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {tag.description}
+                </p>
+              </Card>
+            )}
           </div>
+        </div>
+
+        {/* Full Width Sections - Statistics, Parents, Children, Aliases */}
+        <div className="space-y-6 mb-8">
+          <TagStats tag={tag} />
+          <TagDetails tag={tag} />
         </div>
 
         {/* Scenes Section */}
@@ -205,13 +219,14 @@ const Card = ({ title, children }) => {
   );
 };
 
-// Tag Image Component
+// Tag Image Component (1:1 aspect ratio)
 const TagImage = ({ tag }) => {
   return (
     <div
-      className="rounded-lg w-full aspect-video overflow-hidden shadow-lg"
+      className="rounded-lg w-full aspect-square overflow-hidden shadow-lg flex items-center justify-center"
       style={{
         backgroundColor: "var(--bg-card)",
+        maxHeight: "80vh",
       }}
     >
       {tag?.image_path ? (
@@ -298,21 +313,10 @@ const TagStats = ({ tag }) => {
   );
 };
 
-// Tag Details Component
+// Tag Details Component (Parent Tags, Child Tags, Aliases)
 const TagDetails = ({ tag }) => {
   return (
     <>
-      {tag?.description && (
-        <Card title="Description">
-          <p
-            className="text-sm whitespace-pre-wrap"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {tag.description}
-          </p>
-        </Card>
-      )}
-
       {tag?.parents && tag.parents.length > 0 && (
         <Card title="Parent Tags">
           <div className="flex flex-wrap gap-2">
