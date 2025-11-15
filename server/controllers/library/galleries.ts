@@ -41,6 +41,9 @@ async function mergeGalleriesWithUserData(
 
   return galleries.map((gallery) => ({
     ...gallery,
+    rating: null,
+    rating100: null,
+    favorite: false,
     ...ratingMap.get(gallery.id),
   }));
 }

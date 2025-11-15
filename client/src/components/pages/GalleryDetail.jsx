@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import {
@@ -73,6 +74,12 @@ const GalleryDetail = () => {
       setRating(gallery.rating);
     }
   };
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!gallery,
+    setRating: handleRatingChange,
+  });
 
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);

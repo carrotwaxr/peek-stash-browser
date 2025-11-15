@@ -14,7 +14,7 @@ const PageHeader = ({ title, subtitle, className = "" }) => {
           >
             {title}
           </h1>
-          {subtitle && <p style={{ color: "var(--text-muted)" }}>{subtitle}</p>}
+          {subtitle && <div style={{ color: "var(--text-muted)" }}>{subtitle}</div>}
         </div>
       </div>
     </div>

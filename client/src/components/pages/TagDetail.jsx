@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -51,6 +52,12 @@ const TagDetail = () => {
       setRating(tag.rating);
     }
   };
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!tag,
+    setRating: handleRatingChange,
+  });
 
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);

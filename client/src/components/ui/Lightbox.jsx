@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, Pause, Play, X } from "lucide-react";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import FavoriteButton from "./FavoriteButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
@@ -138,6 +139,12 @@ const Lightbox = ({
     setRating(currentImage?.rating100 ?? null);
     setIsFavorite(currentImage?.favorite ?? false);
   }, [currentIndex, images]);
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: isOpen && images.length > 0,
+    setRating: handleRatingChange,
+  });
 
   // Auto-advance slideshow
   useEffect(() => {

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "../prisma/singleton.js";
 import getStash from "../stash.js";
 import { logger } from "../utils/logger.js";
+import { filteredEntityCacheService } from "../services/FilteredEntityCacheService.js";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -94,6 +95,9 @@ export async function updateSceneRating(
     });
 
     logger.info("Scene rating updated", { userId, sceneId, rating, favorite });
+
+    // Invalidate user's filtered entity cache so updated rating appears immediately
+    filteredEntityCacheService.invalidateUser(userId);
 
     // Sync rating to Stash if enabled (only rating, NOT favorite for scenes)
     if (user?.syncToStash && rating !== undefined) {
@@ -192,6 +196,9 @@ export async function updatePerformerRating(
       rating,
       favorite,
     });
+
+    // Invalidate user's filtered entity cache so updated rating appears immediately
+    filteredEntityCacheService.invalidateUser(userId);
 
     // Sync to Stash if enabled (performer supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
@@ -292,6 +299,9 @@ export async function updateStudioRating(
       favorite,
     });
 
+    // Invalidate user's filtered entity cache so updated rating appears immediately
+    filteredEntityCacheService.invalidateUser(userId);
+
     // Sync to Stash if enabled (studio supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
       try {
@@ -385,6 +395,9 @@ export async function updateTagRating(
     });
 
     logger.info("Tag rating updated", { userId, tagId, rating, favorite });
+
+    // Invalidate user's filtered entity cache so updated rating appears immediately
+    filteredEntityCacheService.invalidateUser(userId);
 
     // Sync favorite only to Stash if enabled (tags don't have rating100 in Stash)
     if (user?.syncToStash && favorite !== undefined) {
@@ -483,6 +496,9 @@ export async function updateGalleryRating(
       favorite,
     });
 
+    // Invalidate user's filtered entity cache so updated rating appears immediately
+    filteredEntityCacheService.invalidateUser(userId);
+
     // Sync rating only to Stash if enabled (galleries don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
@@ -575,6 +591,9 @@ export async function updateGroupRating(
 
     logger.info("Group rating updated", { userId, groupId, rating, favorite });
 
+    // Invalidate user's filtered entity cache so updated rating appears immediately
+    filteredEntityCacheService.invalidateUser(userId);
+
     // Sync rating only to Stash if enabled (groups don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
@@ -666,6 +685,9 @@ export async function updateImageRating(
     });
 
     logger.info("Image rating updated", { userId, imageId, rating, favorite });
+
+    // Invalidate user's filtered entity cache so updated rating appears immediately
+    filteredEntityCacheService.invalidateUser(userId);
 
     // Sync rating only to Stash if enabled (images don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {

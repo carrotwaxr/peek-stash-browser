@@ -17,12 +17,17 @@ const HelpModal = ({ onClose }) => {
     const path = location.pathname;
     if (path.startsWith("/scene/")) return "scene";
     if (path.startsWith("/scenes")) return "scenes";
+    if (path.startsWith("/performer/")) return "performer";
     if (path.startsWith("/performers")) return "performers";
-    if (path.startsWith("/playlists")) return "playlists";
-    if (path.startsWith("/galleries")) return "galleries";
-    if (path.startsWith("/groups")) return "groups";
-    if (path.startsWith("/tags")) return "tags";
+    if (path.startsWith("/studio/")) return "studio";
     if (path.startsWith("/studios")) return "studios";
+    if (path.startsWith("/tag/")) return "tag";
+    if (path.startsWith("/tags")) return "tags";
+    if (path.startsWith("/gallery/")) return "gallery";
+    if (path.startsWith("/galleries")) return "galleries";
+    if (path.startsWith("/group/")) return "group";
+    if (path.startsWith("/groups")) return "groups";
+    if (path.startsWith("/playlists")) return "playlists";
     return "global";
   };
 
@@ -30,6 +35,60 @@ const HelpModal = ({ onClose }) => {
 
   // Keyboard shortcuts organized by page
   const shortcuts = {
+    performer: [
+      {
+        category: "Rating",
+        items: [
+          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
+          { keys: ["R", "0"], description: "Clear rating" },
+        ],
+      },
+    ],
+    studio: [
+      {
+        category: "Rating",
+        items: [
+          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
+          { keys: ["R", "0"], description: "Clear rating" },
+        ],
+      },
+    ],
+    tag: [
+      {
+        category: "Rating",
+        items: [
+          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
+          { keys: ["R", "0"], description: "Clear rating" },
+        ],
+      },
+    ],
+    gallery: [
+      {
+        category: "Rating",
+        items: [
+          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
+          { keys: ["R", "0"], description: "Clear rating" },
+        ],
+      },
+      {
+        category: "Image Navigation (Lightbox)",
+        items: [
+          { keys: ["←"], description: "Previous image" },
+          { keys: ["→"], description: "Next image" },
+          { keys: ["Space"], description: "Play / Pause slideshow" },
+          { keys: ["Esc"], description: "Close lightbox" },
+        ],
+      },
+    ],
+    group: [
+      {
+        category: "Rating",
+        items: [
+          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
+          { keys: ["R", "0"], description: "Clear rating" },
+        ],
+      },
+    ],
     scene: [
       {
         category: "Playback Control",
@@ -174,12 +233,17 @@ const HelpModal = ({ onClose }) => {
     const titles = {
       scene: "Video Player Shortcuts",
       scenes: "Scenes Page Shortcuts",
+      performer: "Performer Detail Shortcuts",
       performers: "Performers Page Shortcuts",
-      playlists: "Playlists Page Shortcuts",
-      galleries: "Galleries Page Shortcuts",
-      groups: "Collections Page Shortcuts",
-      tags: "Tags Page Shortcuts",
+      studio: "Studio Detail Shortcuts",
       studios: "Studios Page Shortcuts",
+      tag: "Tag Detail Shortcuts",
+      tags: "Tags Page Shortcuts",
+      gallery: "Gallery Detail Shortcuts",
+      galleries: "Galleries Page Shortcuts",
+      group: "Collection Detail Shortcuts",
+      groups: "Collections Page Shortcuts",
+      playlists: "Playlists Page Shortcuts",
       global: "Keyboard Shortcuts",
     };
     return titles[currentPage] || "Keyboard Shortcuts";
@@ -356,7 +420,9 @@ const HelpModal = ({ onClose }) => {
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                     {currentPage === "scene"
                       ? "Control video playback and navigation with these keyboard shortcuts"
-                      : "No page-specific shortcuts available yet"}
+                      : ["performer", "studio", "tag", "gallery", "group"].includes(currentPage)
+                        ? "Use these shortcuts to quickly rate items. Press R followed by 1-5 to set rating, or R then 0 to clear."
+                        : "No page-specific shortcuts available yet"}
                   </p>
                 </div>
 
@@ -366,7 +432,7 @@ const HelpModal = ({ onClose }) => {
                   )}
                 </div>
 
-                {currentPage !== "scene" && (
+                {!["scene", "performer", "studio", "tag", "gallery", "group"].includes(currentPage) && (
                   <div
                     className="mt-6 p-4 rounded-lg text-sm"
                     style={{
@@ -376,8 +442,7 @@ const HelpModal = ({ onClose }) => {
                     }}
                   >
                     <p>
-                      More page-specific shortcuts coming soon! Video player
-                      shortcuts are currently available on scene pages.
+                      Page-specific shortcuts are available on detail pages for performers, studios, tags, galleries, and collections.
                     </p>
                   </div>
                 )}
