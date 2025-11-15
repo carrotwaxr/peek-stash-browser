@@ -31,12 +31,6 @@ const GalleryDetail = () => {
   // Set page title to gallery name
   usePageTitle(gallery ? galleryTitle(gallery) : "Gallery");
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!gallery,
-    setRating: handleRatingChange,
-  });
-
   useEffect(() => {
     const fetchGallery = async () => {
       try {
@@ -80,6 +74,12 @@ const GalleryDetail = () => {
       setRating(gallery.rating);
     }
   };
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!gallery,
+    setRating: handleRatingChange,
+  });
 
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);

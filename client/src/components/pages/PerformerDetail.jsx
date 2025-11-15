@@ -95,12 +95,6 @@ const PerformerDetail = () => {
   // Set page title to performer name
   usePageTitle(performer?.name || "Performer");
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!performer,
-    setRating: handleRatingChange,
-  });
-
   useEffect(() => {
     const fetchPerformer = async () => {
       try {
@@ -128,6 +122,12 @@ const PerformerDetail = () => {
       setRating(performer.rating); // Revert on error
     }
   };
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!performer,
+    setRating: handleRatingChange,
+  });
 
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);

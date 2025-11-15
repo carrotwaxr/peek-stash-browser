@@ -26,12 +26,6 @@ const GroupDetail = () => {
   // Set page title to group name
   usePageTitle(group?.name || "Collection");
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!group,
-    setRating: handleRatingChange,
-  });
-
   useEffect(() => {
     const fetchGroup = async () => {
       try {
@@ -59,6 +53,12 @@ const GroupDetail = () => {
       setRating(group.rating);
     }
   };
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!group,
+    setRating: handleRatingChange,
+  });
 
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);

@@ -25,12 +25,6 @@ const StudioDetail = () => {
   // Set page title to studio name
   usePageTitle(studio?.name || "Studio");
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!studio,
-    setRating: handleRatingChange,
-  });
-
   useEffect(() => {
     const fetchStudio = async () => {
       try {
@@ -58,6 +52,12 @@ const StudioDetail = () => {
       setRating(studio.rating);
     }
   };
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!studio,
+    setRating: handleRatingChange,
+  });
 
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);

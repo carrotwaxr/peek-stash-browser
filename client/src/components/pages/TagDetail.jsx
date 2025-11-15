@@ -25,12 +25,6 @@ const TagDetail = () => {
   // Set page title to tag name
   usePageTitle(tag?.name || "Tag");
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!tag,
-    setRating: handleRatingChange,
-  });
-
   useEffect(() => {
     const fetchTag = async () => {
       try {
@@ -58,6 +52,12 @@ const TagDetail = () => {
       setRating(tag.rating);
     }
   };
+
+  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
+  useRatingHotkeys({
+    enabled: !isLoading && !!tag,
+    setRating: handleRatingChange,
+  });
 
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
