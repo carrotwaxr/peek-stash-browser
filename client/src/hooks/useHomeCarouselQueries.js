@@ -2,13 +2,6 @@ import { commonFilters, libraryApi } from "../services/api";
 
 export const useHomeCarouselQueries = (perCarousel = 12) => {
   return {
-    barelyLegalScenes: async () => {
-      const response = await libraryApi.findScenes(
-        commonFilters.barelyLegalScenes(1, perCarousel)
-      );
-      // Extract scenes from server response structure
-      return response?.findScenes?.scenes || [];
-    },
     favoritePerformerScenes: async () => {
       const response = await libraryApi.findScenes(
         commonFilters.favoritePerformerScenes(1, perCarousel)
@@ -78,26 +71,11 @@ export const useHomeCarouselQueries = (perCarousel = 12) => {
 
       return scenesResponse?.findScenes?.scenes || [];
     },
-    highBitrateScenes: async () => {
-      const response = await libraryApi.findScenes(
-        commonFilters.highBitrateScenes(1, perCarousel)
-      );
-
-      // Extract scenes from server response structure
-      return response?.findScenes?.scenes || [];
-    },
     highRatedScenes: async () => {
       const response = await libraryApi.findScenes(
         commonFilters.highRatedScenes(1, perCarousel)
       );
 
-      // Extract scenes from server response structure
-      return response?.findScenes?.scenes || [];
-    },
-    longScenes: async () => {
-      const response = await libraryApi.findScenes(
-        commonFilters.longScenes(1, perCarousel)
-      );
       // Extract scenes from server response structure
       return response?.findScenes?.scenes || [];
     },
