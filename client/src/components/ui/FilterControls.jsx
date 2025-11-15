@@ -96,19 +96,37 @@ export const FilterControl = ({
         );
       case "select":
         return (
-          <select
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className={inputClasses}
-            style={baseInputStyle}
-          >
-            <option value="">{placeholder || `All ${label}`}</option>
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="space-y-2">
+            {/* Modifier dropdown (if provided) */}
+            {modifierOptions && modifierOptions.length > 0 && (
+              <select
+                value={modifierValue}
+                onChange={(e) => onModifierChange(e.target.value)}
+                className={inputClasses}
+                style={baseInputStyle}
+              >
+                {modifierOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* Main select */}
+            <select
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              className={inputClasses}
+              style={baseInputStyle}
+            >
+              <option value="">{placeholder || `All ${label}`}</option>
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         );
       case "searchable-select":
         return (
