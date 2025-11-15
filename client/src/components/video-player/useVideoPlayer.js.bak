@@ -229,92 +229,24 @@ export function useVideoPlayer({
   }, [scene?.id, dispatch]);
 
   // ============================================================================
-  // AUTO-FALLBACK ERROR HANDLER (set up once per scene)
-  // ============================================================================
-
-  const hasFallbackTriggeredRef = useRef(false);
-  const isAutoFallbackRef = useRef(false); // Use ref instead of state to avoid re-renders
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player || !scene) return;
-
-    // Reset fallback flags when scene changes
-    hasFallbackTriggeredRef.current = false;
-    isAutoFallbackRef.current = false;
-
-    const handleError = async () => {
-      if (hasFallbackTriggeredRef.current) {
-        console.log("[AUTO-FALLBACK] Already triggered for this scene, ignoring");
-        return;
-      }
-
-      const error = player.error();
-      if (!error) return;
-
-      // Only handle codec errors (3 = MEDIA_ERR_DECODE, 4 = MEDIA_ERR_SRC_NOT_SUPPORTED)
-      if (error.code !== 3 && error.code !== 4) return;
-
-      // Only auto-fallback if we're currently on direct play
-      const currentSrc = player.currentSrc();
-      if (!currentSrc || currentSrc.includes('.m3u8')) return;  // Already on HLS
-
-      console.log("[AUTO-FALLBACK] Codec error detected, falling back to 480p transcoding");
-      hasFallbackTriggeredRef.current = true;
-      isAutoFallbackRef.current = true; // Set ref flag (no re-render)
-
-      // Preserve current playback position (exactly like Stash does)
-      const currentTime = player.currentTime();
-      const hlsUrl = `/api/scene/${scene.id}/stream.m3u8?quality=480p`;
-
-      console.log(`[AUTO-FALLBACK] Trying next source: '480p Transcode'`);
-
-      // Configure transcoded playback
-      togglePlaybackRateControl(player, false);
-
-      // Switch source exactly like Stash does - no clearing, no resetting
-      player.src({
-        src: hlsUrl,
-        type: "application/x-mpegURL",
-      });
-
-      player.load();
-
-      player.one("canplay", () => {
-        console.log("[AUTO-FALLBACK] canplay fired, restoring position");
-        player.currentTime(currentTime);
-        console.log("[AUTO-FALLBACK] Playback started successfully");
-        // Update quality in state (quality selector UI)
-        dispatch({ type: "SET_QUALITY", payload: "480p" });
-        // Clear auto-fallback flag
-        isAutoFallbackRef.current = false;
-      });
-
-      // Call play() immediately to prevent big play button from showing
-      player.play().catch((err) => console.error("[AUTO-FALLBACK] Play failed:", err));
-    };
-
-    player.on("error", handleError);
-
-    return () => {
-      player.off("error", handleError);
-    };
-  }, [scene?.id, dispatch]); // Only re-run when scene changes
-
-  // ============================================================================
-  // VIDEO SOURCES LOADING
+  // VIDEO SOURCES LOADING (from useVideoPlayerSources)
   // ============================================================================
 
   useEffect(() => {
     const player = playerRef.current;
 
-    // Guard: Need player and scene (video/sessionId no longer needed for stateless)
-    if (!player || !scene) {
+    // Guard: Need player, video data, and scene
+    if (!player || !video || !scene) {
       return;
     }
 
     const isDirectPlay = quality === "direct";
     const firstFile = scene?.files?.[0];
+
+    // For transcoded, we need a session ID
+    if (!isDirectPlay && !sessionId) {
+      return;
+    }
 
     // Set poster
     const posterUrl = scene?.paths?.screenshot;
@@ -328,41 +260,34 @@ export function useVideoPlayer({
     const sources = isDirectPlay
       ? [
           {
-            src: `/api/scene/${scene.id}/stream`,  // Direct video file (no .m3u8)
+            src: `/api/video/play?sceneId=${scene.id}&quality=direct`,
             type: `video/${firstFile?.format}`,
             duration,
           },
         ]
       : [
           {
-            src: `/api/scene/${scene.id}/stream.m3u8?quality=${quality}`,
+            src: `/api/video/playlist/${sessionId}/master.m3u8`,
             type: "application/x-mpegURL",
             duration,
           },
         ];
 
-    // Check if source has changed before reloading
-    const currentSrc = player.currentSrc();
-    const targetSrc = sources[0].src;
-    const needsReload = !currentSrc || !currentSrc.includes(targetSrc.split('?')[0].split('/').pop());
+    // Set ready=true when loadstart fires
+    const handleLoadStart = () => {
+      if (!playerRef.current) return;
+      dispatch({ type: "SET_READY", payload: true });
+    };
 
-    if (needsReload) {
-      console.log("[SOURCES] Loading new source:", targetSrc);
-
-      // Set ready=true when loadstart fires
-      const handleLoadStart = () => {
-        if (!playerRef.current) return;
-        dispatch({ type: "SET_READY", payload: true });
-      };
-
-      player.one("loadstart", handleLoadStart);
-      player.src(sources);
-      player.load();
-    } else {
-      console.log("[SOURCES] Source unchanged, skipping reload");
-    }
+    player.one("loadstart", handleLoadStart);
+    player.src(sources);
+    player.load();
 
     // Configure player
+    if (!isDirectPlay) {
+      setupTranscodedSeeking(player, sessionId, api);
+    }
+
     togglePlaybackRateControl(player, isDirectPlay);
     if (isDirectPlay) {
       player.playbackRates([0.5, 1, 1.25, 1.5, 2]);
@@ -370,8 +295,53 @@ export function useVideoPlayer({
 
     dispatch({ type: "SET_INITIALIZING", payload: false });
 
+    // Auto-fallback to 480p if direct play codec unsupported
+    if (isDirectPlay) {
+      let hasTriggeredFallback = false;
+
+      const handleError = async () => {
+        if (hasTriggeredFallback) return;
+
+        const error = player.error();
+
+        // Error codes: 3 = MEDIA_ERR_DECODE, 4 = MEDIA_ERR_SRC_NOT_SUPPORTED
+        if (error && (error.code === 3 || error.code === 4)) {
+          console.log("[SOURCES] Codec error, falling back to 480p");
+          hasTriggeredFallback = true;
+          player.off("error", handleError);
+
+          const result = await enableAutoFallback();
+
+          if (result?.success && playerRef.current) {
+            console.log("[SOURCES] Auto-fallback successful, setting up HLS source");
+            setupTranscodedSeeking(player, result.sessionId, api);
+
+            // Include duration in source object
+            player.src({
+              src: `/api/video/playlist/${result.sessionId}/master.m3u8`,
+              type: "application/x-mpegURL",
+              duration: firstFile?.duration,
+            });
+            player.load(); // Load the HLS playlist
+
+            player.one("loadedmetadata", () => {
+              console.log("[SOURCES] Loadedmetadata fired, attempting autoplay");
+              if (playerRef.current) {
+                player.currentTime(0);
+                player.play()
+                  .then(() => console.log("[SOURCES] Auto-fallback playback started"))
+                  .catch((err) => console.error("[SOURCES] Auto-fallback play failed:", err));
+              }
+            });
+          }
+        }
+      };
+
+      player.on("error", handleError);
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene?.id, quality]); // Stateless: only scene and quality matter
+  }, [video, sessionId, quality]);
 
   // ============================================================================
   // QUALITY SWITCHING (from useVideoPlayerSources)
@@ -393,7 +363,7 @@ export function useVideoPlayer({
     if (
       !player ||
       !scene ||
-      isAutoFallbackRef.current || // Check ref instead of state
+      isAutoFallback ||
       prevQualityRef.current === null ||
       prevQualityRef.current === quality
     ) {
@@ -453,7 +423,7 @@ export function useVideoPlayer({
 
     prevQualityRef.current = quality;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quality, scene?.id]); // isAutoFallbackRef is a ref, not a dependency
+  }, [quality, scene?.id, isAutoFallback]);
 
   // ============================================================================
   // AUTOPLAY AND RESUME (from useVideoPlayerSources)

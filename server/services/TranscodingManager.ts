@@ -4,6 +4,7 @@ import path from "path";
 import { Scene } from "stashapp-api";
 import { createThrottledFFmpegHandler } from "../utils/ffmpegLogger.js";
 import { logger } from "../utils/logger.js";
+import { translateStashPath } from "../utils/pathMapping.js";
 
 // Use POSIX paths since we always run in Docker/Linux containers
 const posixPath = path.posix;
@@ -71,7 +72,8 @@ export interface TranscodingSession {
  * - Seeking restarts the FFmpeg process from new position
  */
 export class TranscodingManager {
-  private sessions = new Map<string, TranscodingSession>();
+  private sessions = new Map<string, TranscodingSession>(); // Legacy: sessionId -> session
+  private streamsByKey = new Map<string, TranscodingSession>(); // New: "sceneId_quality" -> session
   private tmpDir: string;
   private totalSessionsCreated = 0;
 
@@ -822,15 +824,20 @@ ${session.quality}/stream.m3u8
     const totalSegmentsInVideo = Math.ceil(videoDuration / segmentDuration);
 
     // Generate complete VOD playlist for entire video (0 to end)
+    // Like Stash: segment URLs are simple numbers (0.ts, 1.ts, 2.ts)
     let playlist = `#EXTM3U\n`;
     playlist += `#EXT-X-VERSION:3\n`;
     playlist += `#EXT-X-TARGETDURATION:${segmentDuration}\n`;
     playlist += `#EXT-X-MEDIA-SEQUENCE:0\n`;
+    playlist += `#EXT-X-PLAYLIST-TYPE:VOD\n`;
 
     // Add ALL segments from 0 to end of video (even ones that don't exist)
+    // FFmpeg generates files as segment_000.ts, segment_001.ts, etc.
+    // Playlist at: /api/scene/:sceneId/stream.m3u8
+    // Segments at: /api/scene/:sceneId/segment_000.ts (resolved from playlist URL)
     for (let i = 0; i < totalSegmentsInVideo; i++) {
       playlist += `#EXTINF:${segmentDuration}.000,\n`;
-      playlist += `segment_${i.toString().padStart(3, "0")}.ts\n`;
+      playlist += `segment_${i.toString().padStart(3, '0')}.ts\n`;
     }
 
     // Always include ENDLIST for VOD (this gives us the seek bar!)
@@ -1088,6 +1095,96 @@ ${session.quality}/stream.m3u8
           : null,
       })),
     };
+  }
+
+  // ============================================================================
+  // STATELESS STREAM MANAGEMENT (Stash-style)
+  // ============================================================================
+
+  /**
+   * Get stream by key (sceneId_quality)
+   */
+  getStreamByKey(streamKey: string): TranscodingSession | undefined {
+    return this.streamsByKey.get(streamKey);
+  }
+
+  /**
+   * Get or create stream by key (stateless, like Stash)
+   */
+  async getOrCreateStreamByKey(
+    streamKey: string,
+    sceneId: string,
+    quality: string,
+    scene: Scene
+  ): Promise<TranscodingSession | null> {
+    // Check if stream already exists
+    let session = this.streamsByKey.get(streamKey);
+    if (session) {
+      logger.debug(`[STATELESS] Reusing existing stream: ${streamKey}`);
+      session.lastAccess = Date.now();
+      return session;
+    }
+
+    // Create new stream
+    logger.info(`[STATELESS] Creating new stream: ${streamKey}`);
+
+    const sessionId = `stateless_${streamKey}_${Date.now()}`;
+    const firstFile = scene.files?.[0];
+    if (!firstFile) {
+      logger.error(`[STATELESS] No video file found for scene ${sceneId}`);
+      return null;
+    }
+
+    const filePath = translateStashPath(firstFile.path);
+    const duration = firstFile.duration || 0;
+    const totalSegments = Math.ceil(duration / 2); // 2-second segments
+
+    const outputDir = posixPath.join(this.tmpDir, streamKey);
+
+    // Create output directory
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // Create quality subdirectory
+    const qualityDir = posixPath.join(outputDir, quality);
+    if (!fs.existsSync(qualityDir)) {
+      fs.mkdirSync(qualityDir, { recursive: true });
+    }
+
+    session = {
+      sessionId,
+      videoId: sceneId,
+      startTime: 0,
+      quality,
+      process: null,
+      outputDir,
+      masterPlaylistPath: posixPath.join(outputDir, "master.m3u8"),
+      lastAccess: Date.now(),
+      status: "starting",
+      scene,
+      segmentStates: new Map(),
+      totalSegments,
+    };
+
+    // Store in both maps
+    this.sessions.set(sessionId, session);
+    this.streamsByKey.set(streamKey, session);
+
+    // Start transcoding
+    await this.startTranscoding(session, filePath);
+
+    return session;
+  }
+
+  /**
+   * Update stream access time
+   */
+  updateStreamAccess(streamKey: string): void {
+    const session = this.streamsByKey.get(streamKey);
+    if (session) {
+      session.lastAccess = Date.now();
+    }
   }
 }
 

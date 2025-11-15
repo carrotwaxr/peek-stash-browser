@@ -54,33 +54,14 @@ export function scenePlayerReducer(state, action) {
         sceneError: null,
       };
 
-    case "LOAD_SCENE_SUCCESS": {
-      const scene = action.payload.scene;
-
-      // Smart default quality selection based on codec detection (Phase 2)
-      // If scene has streamability info and quality is still at default "direct",
-      // automatically choose the best quality
-      let autoSelectedQuality = state.quality;
-
-      if (state.quality === "direct" && scene.isStreamable !== undefined) {
-        if (scene.isStreamable) {
-          // Scene is browser-compatible - keep direct play
-          autoSelectedQuality = "direct";
-        } else {
-          // Scene needs transcoding - default to 480p (good balance)
-          autoSelectedQuality = "480p";
-        }
-      }
-
+    case "LOAD_SCENE_SUCCESS":
       return {
         ...state,
-        scene: scene,
+        scene: action.payload.scene,
         oCounter: action.payload.oCounter || 0,
-        quality: autoSelectedQuality,
         sceneLoading: false,
         sceneError: null,
       };
-    }
 
     case "LOAD_SCENE_ERROR":
       return {
@@ -222,8 +203,6 @@ export function scenePlayerReducer(state, action) {
         sessionId: null,
         isInitializing: false,
         ready: false,
-        // Reset quality to "direct" for new scene - will be auto-selected based on codec
-        quality: "direct",
       };
     }
 
@@ -254,8 +233,6 @@ export function scenePlayerReducer(state, action) {
             sessionId: null,
             isInitializing: false,
             ready: false,
-            // Reset quality to "direct" for new scene - will be auto-selected based on codec
-            quality: "direct",
           };
         } else if (state.repeat === "all") {
           // No history, but repeat all is on - go to last scene
@@ -283,8 +260,6 @@ export function scenePlayerReducer(state, action) {
         sessionId: null,
         isInitializing: false,
         ready: false,
-        // Reset quality to "direct" for new scene - will be auto-selected based on codec
-        quality: "direct",
       };
     }
 
@@ -310,8 +285,6 @@ export function scenePlayerReducer(state, action) {
         ready: false, // Reset ready state for new scene
         // Set shouldAutoplay based on payload
         shouldAutoplay: shouldAutoplay,
-        // Reset quality to "direct" for new scene - will be auto-selected based on codec
-        quality: "direct",
       };
     }
 

@@ -5,6 +5,7 @@ import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import getStash from "../../stash.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
+import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { logger } from "../../utils/logger.js";
 
 /**
@@ -139,6 +140,25 @@ export async function mergeScenesWithUserData(
     }
 
     return mergedScene;
+  });
+}
+
+/**
+ * Add streamability information to scenes
+ * This adds codec detection metadata to determine if scenes can be directly played
+ * in browsers without transcoding
+ */
+export function addStreamabilityInfo(
+  scenes: NormalizedScene[]
+): NormalizedScene[] {
+  return scenes.map((scene) => {
+    const streamabilityInfo = isSceneStreamable(scene);
+
+    return {
+      ...scene,
+      isStreamable: streamabilityInfo.isStreamable,
+      streamabilityReasons: streamabilityInfo.reasons,
+    };
   });
 }
 
@@ -484,6 +504,32 @@ export function applyQuickSceneFilters(
       if (modifier === "INCLUDES") return details.includes(searchValue);
       if (modifier === "EXCLUDES") return !details.includes(searchValue);
       if (modifier === "EQUALS") return details === searchValue;
+      return true;
+    });
+  }
+
+  // Filter by video codec
+  if (filters.video_codec) {
+    const { value, modifier } = filters.video_codec;
+    const searchValue = value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const videoCodec = (s.files?.[0]?.video_codec || "").toLowerCase();
+      if (modifier === "INCLUDES") return videoCodec.includes(searchValue);
+      if (modifier === "EXCLUDES") return !videoCodec.includes(searchValue);
+      if (modifier === "EQUALS") return videoCodec === searchValue;
+      return true;
+    });
+  }
+
+  // Filter by audio codec
+  if (filters.audio_codec) {
+    const { value, modifier } = filters.audio_codec;
+    const searchValue = value.toLowerCase();
+    filtered = filtered.filter((s) => {
+      const audioCodec = (s.files?.[0]?.audio_codec || "").toLowerCase();
+      if (modifier === "INCLUDES") return audioCodec.includes(searchValue);
+      if (modifier === "EXCLUDES") return !audioCodec.includes(searchValue);
+      if (modifier === "EQUALS") return audioCodec === searchValue;
       return true;
     });
   }
@@ -863,10 +909,13 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       const endIndex = startIndex + perPage;
       const paginatedScenes = scenes.slice(startIndex, endIndex);
 
+      // Step 8: Add streamability information
+      const scenesWithStreamability = addStreamabilityInfo(paginatedScenes);
+
       return res.json({
         findScenes: {
           count: total,
-          scenes: paginatedScenes,
+          scenes: scenesWithStreamability,
         },
       });
     } else {
@@ -929,10 +978,13 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         mergedFilter
       );
 
+      // Step 9: Add streamability information
+      const scenesWithStreamability = addStreamabilityInfo(finalScenes);
+
       return res.json({
         findScenes: {
           count: total,
-          scenes: finalScenes,
+          scenes: scenesWithStreamability,
         },
       });
     }
