@@ -534,17 +534,17 @@ const SearchControls = ({
   return (
     <div>
       {/* Mobile-responsive controls - optimized for minimal vertical space */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 mb-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
         {/* Search Input - Flexible width with min-width */}
         <SearchInput
           placeholder="Search..."
           value={searchText}
           onSearch={handleChangeSearchText}
-          className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-md"
+          className="w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
         />
 
-        {/* Sort, Filter, Presets - Inline on larger screens */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Sort, Filter, Presets - Wrap on narrow widths */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
           {/* Sort Control - No label, just dropdown + direction button */}
           <div className="flex items-center gap-1">
             <SortControl
