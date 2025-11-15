@@ -84,6 +84,12 @@ const GalleryDetail = () => {
     }
   };
 
+  // Check if there's any sidebar content to display
+  const hasSidebarContent =
+    (gallery.tags && gallery.tags.length > 0) ||
+    (gallery.scenes && gallery.scenes.length > 0) ||
+    gallery.details;
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -246,8 +252,14 @@ const GalleryDetail = () => {
           )}
         </div>
 
-        {/* Two-column layout on desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-6">
+        {/* Images Grid - Conditional sidebar layout */}
+        <div
+          className={
+            hasSidebarContent
+              ? "grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-6"
+              : "mb-6"
+          }
+        >
           {/* Main Content - Images Grid (full width) */}
           <div>
             {imagesLoading ? (
@@ -306,8 +318,8 @@ const GalleryDetail = () => {
             )}
           </div>
 
-          {/* Sidebar - Metadata */}
-          <aside className="space-y-4">
+          {/* Sidebar - Metadata (only render if there's content) */}
+          {hasSidebarContent && <aside className="space-y-4">
             {/* Tags */}
             {gallery.tags && gallery.tags.length > 0 && (
               <Card title="Tags">
@@ -362,7 +374,7 @@ const GalleryDetail = () => {
                 </p>
               </Card>
             )}
-          </aside>
+          </aside>}
         </div>
       </div>
 
