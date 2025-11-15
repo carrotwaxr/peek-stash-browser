@@ -118,18 +118,32 @@ const GroupDetail = () => {
           </div>
         </div>
 
-        {/* Two Column Layout - Image on left, content on right (lg+) */}
+        {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
-          {/* Left Column: Group Image with Front/Back Flipper */}
-          <div className="w-full lg:w-2/5 flex-shrink-0">
+          {/* Left Column: Group Image with Front/Back Flipper (1:1) */}
+          <div className="w-full lg:w-1/2 flex-shrink-0">
             <GroupImageFlipper group={group} />
           </div>
 
-          {/* Right Column: Stats and Details */}
-          <div className="flex-1 space-y-6">
-            <GroupStats group={group} />
-            <GroupDetails group={group} />
+          {/* Right Column: Details (scrollable, matches image height) */}
+          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
+            {group?.synopsis && (
+              <Card title="Details">
+                <p
+                  className="text-sm whitespace-pre-wrap"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {group.synopsis}
+                </p>
+              </Card>
+            )}
           </div>
+        </div>
+
+        {/* Full Width Sections - Statistics, Studio, Tags, Parent/Sub Collections */}
+        <div className="space-y-6 mb-8">
+          <GroupStats group={group} />
+          <GroupDetails group={group} />
         </div>
 
         {/* Scenes Section */}
@@ -198,7 +212,7 @@ const GroupImageFlipper = ({ group }) => {
         className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
         style={{
           backgroundColor: "var(--bg-card)",
-          aspectRatio: "7/10",
+          aspectRatio: "1/1",
           width: "100%",
           maxHeight: "80vh",
         }}
@@ -320,21 +334,10 @@ const GroupStats = ({ group }) => {
   );
 };
 
-// Group Details Component
+// Group Details Component (Studio, Tags, Parent/Sub Collections)
 const GroupDetails = ({ group }) => {
   return (
     <>
-      {group?.synopsis && (
-        <Card title="Synopsis">
-          <p
-            className="text-sm whitespace-pre-wrap"
-            style={{ color: "var(--text-primary)" }}
-          >
-            {group.synopsis}
-          </p>
-        </Card>
-      )}
-
       {group?.studio && (
         <Card title="Studio">
           <Link
