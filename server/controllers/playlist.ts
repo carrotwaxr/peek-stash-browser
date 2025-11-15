@@ -7,6 +7,7 @@ import { transformScene } from "../utils/pathMapping.js";
 
 /**
  * Get all playlists for current user
+ * Includes first 4 items with scene preview data for thumbnail display
  */
 export const getUserPlaylists = async (
   req: AuthenticatedRequest,
@@ -27,13 +28,69 @@ export const getUserPlaylists = async (
         _count: {
           select: { items: true },
         },
+        items: {
+          orderBy: {
+            position: "asc",
+          },
+          take: 4, // Only fetch first 4 items for preview
+        },
       },
       orderBy: {
         updatedAt: "desc",
       },
     });
 
-    res.json({ playlists });
+    // Fetch scene details for preview items from Stash
+    const playlistsWithScenes = await Promise.all(
+      playlists.map(async (playlist) => {
+        if (playlist.items.length === 0) {
+          return playlist;
+        }
+
+        const sceneIds = playlist.items.map((item) => item.sceneId);
+
+        try {
+          const getStash = (await import("../stash.js")).default;
+          const stash = getStash();
+
+          const scenesResponse = await stash.findScenes({
+            scene_ids: sceneIds.map((id) => parseInt(id)),
+          });
+
+          const scenes = scenesResponse.findScenes.scenes;
+
+          // Transform scenes to add API key to image paths
+          const transformedScenes = scenes.map((s: unknown) =>
+            transformScene(s as Scene)
+          );
+
+          // Create a map of scene ID to scene data
+          const sceneMap = new Map(
+            transformedScenes.map((s: Scene) => [s.id, s])
+          );
+
+          // Attach scene data to each playlist item (only paths.screenshot needed for preview)
+          const itemsWithScenes = playlist.items.map((item) => ({
+            ...item,
+            scene: sceneMap.get(item.sceneId) || null,
+          }));
+
+          return {
+            ...playlist,
+            items: itemsWithScenes,
+          };
+        } catch (stashError) {
+          console.error(
+            `Error fetching scenes for playlist ${playlist.id}:`,
+            stashError
+          );
+          // Return playlist without scene details if Stash fails
+          return playlist;
+        }
+      })
+    );
+
+    res.json({ playlists: playlistsWithScenes });
   } catch (error) {
     console.error("Error getting playlists:", error);
     res.status(500).json({ error: "Failed to get playlists" });
