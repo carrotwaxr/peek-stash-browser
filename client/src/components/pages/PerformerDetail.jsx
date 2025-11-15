@@ -188,19 +188,23 @@ const PerformerDetail = () => {
           </div>
         </div>
 
-        {/* Two Column Layout - Image on left, content on right (lg+) */}
+        {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
           {/* Left Column: Performer Image */}
           <div className="w-full lg:w-1/2 flex-shrink-0">
             <PerformerImage performer={performer} />
           </div>
 
-          {/* Right Column: Stats and Details */}
-          <div className="flex-1 space-y-6">
-            <PerformerStats performer={performer} />
+          {/* Right Column: Details (scrollable, matches image height) */}
+          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
             <PerformerDetails performer={performer} />
-            <PerformerLinks performer={performer} />
           </div>
+        </div>
+
+        {/* Full Width Sections - Statistics, Tags, Links */}
+        <div className="space-y-6 mb-8">
+          <PerformerStats performer={performer} />
+          <PerformerLinks performer={performer} />
         </div>
 
         {/* Scenes Section */}
