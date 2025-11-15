@@ -49,7 +49,7 @@ async function mergeGroupsWithUserData(
 /**
  * Apply group filters
  */
-function applyGroupFilters(
+export function applyGroupFilters(
   groups: NormalizedGroup[],
   filters: PeekGroupFilter | null | undefined
 ): NormalizedGroup[] {
