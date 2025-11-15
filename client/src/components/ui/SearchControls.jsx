@@ -533,25 +533,24 @@ const SearchControls = ({
 
   return (
     <div>
-      {/* Mobile-responsive controls - wrap on small screens */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 mb-4">
-        {/* Search Input - Full width on mobile */}
+      {/* Mobile-responsive controls - optimized for minimal vertical space */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 mb-4">
+        {/* Search Input - Flexible width with min-width */}
         <SearchInput
           placeholder="Search..."
           value={searchText}
           onSearch={handleChangeSearchText}
-          className="w-full sm:w-80"
+          className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-md"
         />
 
-        {/* Sort, Filter, Presets - Wrap on mobile */}
-        <div className="flex items-center justify-center gap-6 flex-wrap">
-          {/* Sort Control */}
-          <div className="flex items-center space-x-1">
+        {/* Sort, Filter, Presets - Inline on larger screens */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Sort Control - No label, just dropdown + direction button */}
+          <div className="flex items-center gap-1">
             <SortControl
               options={sortOptions}
               value={sortField}
               onChange={handleSortChange}
-              label="Sort"
             />
             <Button
               onClick={() => handleSortChange(sortField)}
