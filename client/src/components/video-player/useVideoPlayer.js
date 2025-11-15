@@ -385,9 +385,12 @@ export function useVideoPlayer({
         ];
 
     // Check if source has changed before reloading
+    // Compare full URL path (excluding query params) to detect scene changes
     const currentSrc = player.currentSrc();
     const targetSrc = sources[0].src;
-    const needsReload = !currentSrc || !currentSrc.includes(targetSrc.split('?')[0].split('/').pop());
+    const currentPath = currentSrc ? currentSrc.split('?')[0] : '';
+    const targetPath = targetSrc.split('?')[0];
+    const needsReload = !currentSrc || currentPath !== targetPath;
 
     if (needsReload) {
       console.log("[SOURCES] Loading new source:", targetSrc);
