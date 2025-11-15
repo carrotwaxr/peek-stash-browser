@@ -382,6 +382,13 @@ export const SCENE_FILTER_OPTIONS = [
     placeholder: "Any orientation",
   },
   {
+    key: "videoCodec",
+    label: "Video Codec",
+    type: "text",
+    defaultValue: "",
+    placeholder: "e.g. h264, hevc",
+  },
+  {
     key: "audioCodec",
     label: "Audio Codec",
     type: "text",
@@ -1375,6 +1382,13 @@ export const buildSceneFilter = (filters) => {
   if (filters.director) {
     sceneFilter.director = {
       value: filters.director,
+      modifier: "INCLUDES",
+    };
+  }
+
+  if (filters.videoCodec) {
+    sceneFilter.video_codec = {
+      value: filters.videoCodec,
       modifier: "INCLUDES",
     };
   }
