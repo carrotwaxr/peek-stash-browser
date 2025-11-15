@@ -7,7 +7,6 @@ import axios from "axios";
 import videojs from "video.js";
 import {
   setupPlaylistControls,
-  setupTranscodedSeeking,
   togglePlaybackRateControl,
 } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
@@ -20,6 +19,48 @@ const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
+
+/**
+ * Quality presets in descending order of resolution
+ * Must match the presets defined in TranscodingManager.ts
+ */
+const QUALITY_PRESETS = [
+  { height: 2160, quality: "2160p" },
+  { height: 1080, quality: "1080p" },
+  { height: 720, quality: "720p" },
+  { height: 480, quality: "480p" },
+  { height: 360, quality: "360p" },
+];
+
+/**
+ * Get the best transcode quality for a given source resolution
+ * Returns the highest quality preset that is <= source height
+ *
+ * @param {number} sourceHeight - Height of the source video
+ * @returns {string} Quality string (e.g., "1080p", "720p")
+ */
+function getBestTranscodeQuality(sourceHeight) {
+  // Find highest preset <= source resolution
+  for (const preset of QUALITY_PRESETS) {
+    if (preset.height <= sourceHeight) {
+      return preset.quality;
+    }
+  }
+  // Fallback to lowest quality if source is very small
+  return "360p";
+}
+
+/**
+ * Get available quality options for a given source resolution
+ * Only includes presets that are <= source height (no upscaling)
+ * Always includes "direct" option
+ *
+ * @param {number} sourceHeight - Height of the source video
+ * @returns {Array<{quality: string, height: number}>} Available quality options
+ */
+function getAvailableQualities(sourceHeight) {
+  return QUALITY_PRESETS.filter(preset => preset.height <= sourceHeight);
+}
 
 /**
  * useVideoPlayer
@@ -43,7 +84,6 @@ export function useVideoPlayer({
   playlist,
   currentIndex,
   dispatch,
-  enableAutoFallback,
   nextScene,
   prevScene,
   updateQuality,
@@ -55,8 +95,7 @@ export function useVideoPlayer({
   loadingWatchHistory,
   enableCast = true,
 }) {
-  // Track previous quality and scene for detecting changes
-  const prevQualityRef = useRef(null);
+  // Track previous scene for detecting changes
   const prevSceneIdRef = useRef(null);
 
   // ============================================================================
@@ -259,15 +298,19 @@ export function useVideoPlayer({
       const currentSrc = player.currentSrc();
       if (!currentSrc || currentSrc.includes('.m3u8')) return;  // Already on HLS
 
-      console.log("[AUTO-FALLBACK] Codec error detected, falling back to 480p transcoding");
+      // Determine best transcode quality based on source resolution
+      const sourceHeight = scene?.files?.[0]?.height || 1080;
+      const bestQuality = getBestTranscodeQuality(sourceHeight);
+
+      console.log(`[AUTO-FALLBACK] Codec error detected, falling back to ${bestQuality} transcoding (source: ${sourceHeight}p)`);
       hasFallbackTriggeredRef.current = true;
       isAutoFallbackRef.current = true; // Set ref flag (no re-render)
 
       // Preserve current playback position (exactly like Stash does)
       const currentTime = player.currentTime();
-      const hlsUrl = `/api/scene/${scene.id}/stream.m3u8?quality=480p`;
+      const hlsUrl = `/api/scene/${scene.id}/stream.m3u8?quality=${bestQuality}`;
 
-      console.log(`[AUTO-FALLBACK] Trying next source: '480p Transcode'`);
+      console.log(`[AUTO-FALLBACK] Trying next source: '${bestQuality} Transcode'`);
 
       // Configure transcoded playback
       togglePlaybackRateControl(player, false);
@@ -285,7 +328,7 @@ export function useVideoPlayer({
         player.currentTime(currentTime);
         console.log("[AUTO-FALLBACK] Playback started successfully");
         // Update quality in state (quality selector UI)
-        dispatch({ type: "SET_QUALITY", payload: "480p" });
+        dispatch({ type: "SET_QUALITY", payload: bestQuality });
         // Clear auto-fallback flag
         isAutoFallbackRef.current = false;
       });
@@ -383,77 +426,6 @@ export function useVideoPlayer({
       updateQuality(quality);
     }
   }, [quality, updateQuality]);
-
-  // Handle user-initiated quality changes (preserve playback position)
-  useEffect(() => {
-    const player = playerRef.current;
-    const firstFile = scene?.files?.[0];
-
-    // Guard: Need player, scene, and actual quality change (not auto-fallback)
-    if (
-      !player ||
-      !scene ||
-      isAutoFallbackRef.current || // Check ref instead of state
-      prevQualityRef.current === null ||
-      prevQualityRef.current === quality
-    ) {
-      prevQualityRef.current = quality;
-      return;
-    }
-
-    const isDirectPlay = quality === "direct";
-    const currentTime = player.currentTime(); // Capture current position
-
-    dispatch({ type: "SET_SWITCHING_MODE", payload: true });
-    player.pause();
-
-    api
-      .get(`/video/play?sceneId=${scene.id}&quality=${quality}`)
-      .then((response) => {
-        if (!playerRef.current) return;
-
-        if (isDirectPlay) {
-          player.src({
-            src: `/api/video/play?sceneId=${scene.id}&quality=direct`,
-            type: `video/${firstFile?.format}`,
-            duration: firstFile?.duration,
-          });
-          dispatch({ type: "SET_SESSION_ID", payload: null });
-          dispatch({ type: "SET_VIDEO", payload: { directPlay: true } });
-        } else {
-          player.src({
-            src: response.data.playlistUrl,
-            type: "application/x-mpegURL",
-            duration: firstFile?.duration,
-          });
-          dispatch({
-            type: "SET_SESSION_ID",
-            payload: response.data.sessionId,
-          });
-          dispatch({ type: "SET_VIDEO", payload: response.data.scene });
-          setupTranscodedSeeking(player, response.data.sessionId, api);
-        }
-
-        togglePlaybackRateControl(player, isDirectPlay);
-
-        // Restore playback position after metadata loads
-        player.one("loadedmetadata", () => {
-          if (playerRef.current && currentTime > 0) {
-            player.currentTime(currentTime);
-          }
-        });
-
-        player.play().catch(() => {});
-        dispatch({ type: "SET_SWITCHING_MODE", payload: false });
-      })
-      .catch((error) => {
-        console.error("[QUALITY] Quality switch failed:", error);
-        dispatch({ type: "SET_SWITCHING_MODE", payload: false });
-      });
-
-    prevQualityRef.current = quality;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quality, scene?.id]); // isAutoFallbackRef is a ref, not a dependency
 
   // ============================================================================
   // AUTOPLAY AND RESUME (from useVideoPlayerSources)

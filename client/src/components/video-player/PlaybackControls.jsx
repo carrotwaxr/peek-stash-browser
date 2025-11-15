@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import {
@@ -8,6 +8,18 @@ import {
   RatingSlider,
 } from "../ui/index.js";
 
+/**
+ * Quality presets in descending order of resolution
+ * Must match the presets defined in TranscodingManager.ts and useVideoPlayer.js
+ */
+const QUALITY_PRESETS = [
+  { height: 2160, quality: "2160p", label: "2160p (4K)" },
+  { height: 1080, quality: "1080p", label: "1080p" },
+  { height: 720, quality: "720p", label: "720p" },
+  { height: 480, quality: "480p", label: "480p" },
+  { height: 360, quality: "360p", label: "360p" },
+];
+
 const PlaybackControls = () => {
   const { scene, sceneLoading, videoLoading, quality, oCounter, dispatch } =
     useScenePlayer();
@@ -15,6 +27,22 @@ const PlaybackControls = () => {
   // Rating and favorite state
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Calculate available quality options based on source resolution
+  const availableQualities = useMemo(() => {
+    const sourceHeight = scene?.files?.[0]?.height || 1080;
+    // Filter to only include qualities <= source resolution (no upscaling)
+    return QUALITY_PRESETS.filter(preset => preset.height <= sourceHeight);
+  }, [scene?.files]);
+
+  // Get source resolution for "Direct Play" label
+  const sourceResolution = useMemo(() => {
+    const sourceHeight = scene?.files?.[0]?.height;
+    if (sourceHeight) {
+      return `${sourceHeight}p`;
+    }
+    return "";
+  }, [scene?.files]);
 
   // Sync state when scene changes
   useEffect(() => {
@@ -93,11 +121,14 @@ const PlaybackControls = () => {
               cursor: isLoading ? "not-allowed" : "pointer",
             }}
           >
-            <option value="direct">Direct Play</option>
-            <option value="1080p">1080p</option>
-            <option value="720p">720p</option>
-            <option value="480p">480p</option>
-            <option value="360p">360p</option>
+            <option value="direct">
+              Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
+            </option>
+            {availableQualities.map(preset => (
+              <option key={preset.quality} value={preset.quality}>
+                {preset.label}
+              </option>
+            ))}
           </select>
 
           <div className="flex-1 max-w-md" style={{ opacity: isLoading ? 0.6 : 1 }}>
@@ -175,11 +206,14 @@ const PlaybackControls = () => {
                 cursor: isLoading ? "not-allowed" : "pointer",
               }}
             >
-              <option value="direct">Direct Play</option>
-              <option value="1080p">1080p</option>
-              <option value="720p">720p</option>
-              <option value="480p">480p</option>
-              <option value="360p">360p</option>
+              <option value="direct">
+                Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
+              </option>
+              {availableQualities.map(preset => (
+                <option key={preset.quality} value={preset.quality}>
+                  {preset.label}
+                </option>
+              ))}
             </select>
 
             <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
@@ -236,11 +270,14 @@ const PlaybackControls = () => {
                 cursor: isLoading ? "not-allowed" : "pointer",
               }}
             >
-              <option value="direct">Direct Play</option>
-              <option value="1080p">1080p</option>
-              <option value="720p">720p</option>
-              <option value="480p">480p</option>
-              <option value="360p">360p</option>
+              <option value="direct">
+                Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
+              </option>
+              {availableQualities.map(preset => (
+                <option key={preset.quality} value={preset.quality}>
+                  {preset.label}
+                </option>
+              ))}
             </select>
 
             <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />

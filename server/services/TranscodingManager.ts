@@ -833,11 +833,11 @@ ${session.quality}/stream.m3u8
 
     // Add ALL segments from 0 to end of video (even ones that don't exist)
     // FFmpeg generates files as segment_000.ts, segment_001.ts, etc.
-    // Playlist at: /api/scene/:sceneId/stream.m3u8
-    // Segments at: /api/scene/:sceneId/segment_000.ts (resolved from playlist URL)
+    // Playlist at: /api/scene/:sceneId/stream.m3u8?quality=720p
+    // Segments at: /api/scene/:sceneId/segment_000.ts?quality=720p
     for (let i = 0; i < totalSegmentsInVideo; i++) {
       playlist += `#EXTINF:${segmentDuration}.000,\n`;
-      playlist += `segment_${i.toString().padStart(3, '0')}.ts\n`;
+      playlist += `segment_${i.toString().padStart(3, '0')}.ts?quality=${session.quality}\n`;
     }
 
     // Always include ENDLIST for VOD (this gives us the seek bar!)

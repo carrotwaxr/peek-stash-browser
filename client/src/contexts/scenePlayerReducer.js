@@ -1,4 +1,33 @@
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Quality presets in descending order of resolution
+ * Must match the presets defined in TranscodingManager.ts and useVideoPlayer.js
+ */
+const QUALITY_PRESETS = [
+  { height: 2160, quality: "2160p" },
+  { height: 1080, quality: "1080p" },
+  { height: 720, quality: "720p" },
+  { height: 480, quality: "480p" },
+  { height: 360, quality: "360p" },
+];
+
+/**
+ * Get the best transcode quality for a given source resolution
+ * Returns the highest quality preset that is <= source height
+ */
+function getBestTranscodeQuality(sourceHeight) {
+  for (const preset of QUALITY_PRESETS) {
+    if (preset.height <= sourceHeight) {
+      return preset.quality;
+    }
+  }
+  return "360p";
+}
+
+// ============================================================================
 // INITIAL STATE
 // ============================================================================
 
@@ -57,7 +86,7 @@ export function scenePlayerReducer(state, action) {
     case "LOAD_SCENE_SUCCESS": {
       const scene = action.payload.scene;
 
-      // Smart default quality selection based on codec detection (Phase 2)
+      // Smart default quality selection based on codec detection (Phase 3)
       // If scene has streamability info and quality is still at default "direct",
       // automatically choose the best quality
       let autoSelectedQuality = state.quality;
@@ -67,8 +96,9 @@ export function scenePlayerReducer(state, action) {
           // Scene is browser-compatible - keep direct play
           autoSelectedQuality = "direct";
         } else {
-          // Scene needs transcoding - default to 480p (good balance)
-          autoSelectedQuality = "480p";
+          // Scene needs transcoding - choose highest quality <= source resolution
+          const sourceHeight = scene.files?.[0]?.height || 1080;
+          autoSelectedQuality = getBestTranscodeQuality(sourceHeight);
         }
       }
 
