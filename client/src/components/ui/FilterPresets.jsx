@@ -10,24 +10,47 @@ import { apiDelete, apiGet, apiPost, apiPut } from "../../services/api.js";
 import Button from "./Button.jsx";
 import { ErrorMessage, InfoMessage, SuccessMessage } from "./index.js";
 
+// Helper to get context label for UI
+const getContextLabel = (ctx) => {
+  const labels = {
+    scene: "All Scenes page",
+    scene_performer: "Performer pages",
+    scene_tag: "Tag pages",
+    scene_studio: "Studio pages",
+    scene_group: "Group pages",
+    performer: "Performers page",
+    studio: "Studios page",
+    tag: "Tags page",
+    group: "Groups page",
+    gallery: "Galleries page",
+  };
+  return labels[ctx] || ctx;
+};
+
 /**
  * Filter Presets Component
  * Allows users to save, load, and manage filter presets
  *
  * @param {Object} props
- * @param {string} props.artifactType - Type of artifact (scene, performer, studio, tag)
- * @param {Object} props.currentFilters - Current filter state
+ * @param {string} props.artifactType - Type of artifact for preset storage (scene, performer, studio, tag)
+ * @param {string} props.context - Context for default selection (scene_performer, scene_tag, etc.)
+ * @param {Object} props.currentFilters - Current filter state (includes permanent filters)
+ * @param {Object} props.permanentFilters - Permanent filters to exclude from saved presets
  * @param {string} props.currentSort - Current sort field
  * @param {string} props.currentDirection - Current sort direction
  * @param {Function} props.onLoadPreset - Callback when a preset is loaded
  */
 const FilterPresets = ({
   artifactType,
+  context,
   currentFilters,
+  permanentFilters = {},
   currentSort,
   currentDirection,
   onLoadPreset,
 }) => {
+  // Use context if provided, otherwise fall back to artifactType
+  const effectiveContext = context || artifactType;
   const [presets, setPresets] = useState([]);
   const [defaultPresetId, setDefaultPresetId] = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -53,10 +76,15 @@ const FilterPresets = ({
       ]);
 
       const allPresets = presetsResponse?.presets || {};
-      setPresets(allPresets[artifactType] || []);
+      // Get presets for the artifact type (scene grid contexts use "scene" presets)
+      const presetArtifactType = effectiveContext.startsWith("scene_")
+        ? "scene"
+        : effectiveContext;
+      setPresets(allPresets[presetArtifactType] || []);
 
       const defaults = defaultsResponse?.defaults || {};
-      setDefaultPresetId(defaults[artifactType] || null);
+      // Get default for this specific context
+      setDefaultPresetId(defaults[effectiveContext] || null);
     } catch (err) {
       console.error("Error fetching filter presets:", err);
     }
@@ -72,10 +100,17 @@ const FilterPresets = ({
     setError(null);
 
     try {
+      // Strip out permanent filters before saving
+      const filtersToSave = { ...currentFilters };
+      Object.keys(permanentFilters).forEach((key) => {
+        delete filtersToSave[key];
+      });
+
       await apiPost("/user/filter-presets", {
         artifactType,
+        context: effectiveContext,
         name: presetName,
-        filters: currentFilters,
+        filters: filtersToSave,
         sort: currentSort,
         direction: currentDirection,
         setAsDefault,
@@ -99,8 +134,14 @@ const FilterPresets = ({
   };
 
   const handleLoadPreset = (preset) => {
+    // Merge permanent filters back in when loading
+    const mergedFilters = {
+      ...preset.filters,
+      ...permanentFilters,
+    };
+
     onLoadPreset({
-      filters: preset.filters,
+      filters: mergedFilters,
       sort: preset.sort,
       direction: preset.direction,
     });
@@ -120,15 +161,15 @@ const FilterPresets = ({
       const isCurrentlyDefault = defaultPresetId === presetId;
 
       await apiPut("/user/default-preset", {
-        artifactType,
+        context: effectiveContext,
         presetId: isCurrentlyDefault ? null : presetId,
       });
 
       if (isCurrentlyDefault) {
-        setSuccess(`"${presetName}" removed as default`);
+        setSuccess(`"${presetName}" removed as default for ${getContextLabel(effectiveContext)}`);
         setDefaultPresetId(null);
       } else {
-        setSuccess(`"${presetName}" set as default!`);
+        setSuccess(`"${presetName}" set as default for ${getContextLabel(effectiveContext)}!`);
         setDefaultPresetId(presetId);
       }
 
@@ -360,7 +401,9 @@ const FilterPresets = ({
                       accentColor: "var(--accent-primary)",
                     }}
                   />
-                  <span className="text-sm">Set as default preset</span>
+                  <span className="text-sm">
+                    Set as default for {getContextLabel(effectiveContext)}
+                  </span>
                 </label>
 
                 <div className="flex justify-end gap-3">

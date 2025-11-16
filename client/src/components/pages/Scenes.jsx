@@ -13,6 +13,7 @@ const Scenes = () => {
   return (
     <div ref={pageRef}>
       <SceneSearch
+        context="scene"
         initialSort="created_at"
         subtitle="Browse your complete scene library"
         title="All Scenes"
