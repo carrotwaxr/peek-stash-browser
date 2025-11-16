@@ -630,8 +630,15 @@ export const saveFilterPreset = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { artifactType, name, filters, sort, direction, setAsDefault } =
-      req.body;
+    const {
+      artifactType,
+      context,
+      name,
+      filters,
+      sort,
+      direction,
+      setAsDefault,
+    } = req.body;
 
     // Validate required fields
     if (!artifactType || !name || !filters || !sort || !direction) {
@@ -649,6 +656,25 @@ export const saveFilterPreset = async (
     ];
     if (!validTypes.includes(artifactType)) {
       return res.status(400).json({ error: "Invalid artifact type" });
+    }
+
+    // Validate context if provided (used for setAsDefault)
+    if (context) {
+      const validContexts = [
+        "scene",
+        "scene_performer",
+        "scene_tag",
+        "scene_studio",
+        "scene_group",
+        "performer",
+        "studio",
+        "tag",
+        "group",
+        "gallery",
+      ];
+      if (!validContexts.includes(context)) {
+        return res.status(400).json({ error: "Invalid context" });
+      }
     }
 
     // Get current presets and defaults
@@ -677,9 +703,10 @@ export const saveFilterPreset = async (
       newPreset,
     ];
 
-    // If setAsDefault is true, set this preset as default
+    // If setAsDefault is true, set this preset as default for the context
     if (setAsDefault) {
-      currentDefaults[artifactType] = newPreset.id;
+      const defaultContext = context || artifactType;
+      currentDefaults[defaultContext] = newPreset.id;
     }
 
     // Update user
@@ -804,7 +831,9 @@ export const getDefaultFilterPresets = async (
 };
 
 /**
- * Set default filter preset for an artifact type
+ * Set default filter preset for a context
+ * Context can be an artifact type (scene, performer, etc.) or a scene grid context
+ * (scene_performer, scene_tag, scene_studio, scene_group)
  */
 export const setDefaultFilterPreset = async (
   req: AuthenticatedRequest,
@@ -817,24 +846,28 @@ export const setDefaultFilterPreset = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { artifactType, presetId } = req.body;
+    const { context, presetId } = req.body;
 
     // Validate required fields
-    if (!artifactType) {
-      return res.status(400).json({ error: "Missing artifactType" });
+    if (!context) {
+      return res.status(400).json({ error: "Missing context" });
     }
 
-    // Validate artifact type
-    const validTypes = [
+    // Validate context - includes base types and scene grid contexts
+    const validContexts = [
       "scene",
+      "scene_performer",
+      "scene_tag",
+      "scene_studio",
+      "scene_group",
       "performer",
       "studio",
       "tag",
       "group",
       "gallery",
     ];
-    if (!validTypes.includes(artifactType)) {
-      return res.status(400).json({ error: "Invalid artifact type" });
+    if (!validContexts.includes(context)) {
+      return res.status(400).json({ error: "Invalid context" });
     }
 
     // Get current defaults
@@ -852,7 +885,9 @@ export const setDefaultFilterPreset = async (
     const currentPresets = (user.filterPresets as FilterPresets) || {};
 
     // If presetId is provided, validate it exists
+    // For scene grid contexts (scene_performer, etc.), validate against "scene" presets
     if (presetId) {
+      const artifactType = context.startsWith("scene_") ? "scene" : context;
       const presetExists = (currentPresets[artifactType] || []).some(
         (preset: FilterPreset) => preset.id === presetId
       );
@@ -861,10 +896,10 @@ export const setDefaultFilterPreset = async (
         return res.status(400).json({ error: "Preset not found" });
       }
 
-      currentDefaults[artifactType] = presetId;
+      currentDefaults[context] = presetId;
     } else {
       // If presetId is null/undefined, clear the default
-      delete currentDefaults[artifactType];
+      delete currentDefaults[context];
     }
 
     // Update user

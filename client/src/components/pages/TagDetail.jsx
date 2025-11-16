@@ -188,6 +188,7 @@ const TagDetail = () => {
         {/* Scenes Section */}
         <div className="mt-8">
           <SceneSearch
+            context="scene_tag"
             permanentFilters={{
               tags: { value: [parseInt(tagId, 10)], modifier: "INCLUDES" },
             }}

@@ -65,6 +65,7 @@ const getSortOptions = (artifactType) => {
 
 const SearchControls = ({
   artifactType = "scene",
+  context, // Optional context override (e.g., "scene_performer", "scene_tag")
   children,
   initialSort = "o_counter",
   onQueryChange,
@@ -74,6 +75,8 @@ const SearchControls = ({
   totalCount,
   syncToUrl = true,
 }) => {
+  // Use context if provided, otherwise fall back to artifactType
+  const effectiveContext = context || artifactType;
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -164,10 +167,14 @@ const SearchControls = ({
 
           const allPresets = presetsResponse?.presets || {};
           const defaults = defaultsResponse?.defaults || {};
-          const defaultPresetId = defaults[artifactType];
+          const defaultPresetId = defaults[effectiveContext];
 
-          // Find the default preset for this artifact type
-          const presets = allPresets[artifactType] || [];
+          // Find the default preset for this context
+          // Scene grid contexts (scene_performer, etc.) use "scene" presets
+          const presetArtifactType = effectiveContext.startsWith("scene_")
+            ? "scene"
+            : effectiveContext;
+          const presets = allPresets[presetArtifactType] || [];
           const defaultPreset = presets.find((p) => p.id === defaultPresetId);
 
           if (defaultPreset) {
@@ -610,9 +617,11 @@ const SearchControls = ({
           {/* Filter Presets */}
           <FilterPresets
             artifactType={artifactType}
+            context={effectiveContext}
             currentFilters={filters}
             currentSort={sortField}
             currentDirection={sortDirection}
+            permanentFilters={permanentFilters}
             onLoadPreset={handleLoadPreset}
           />
         </div>

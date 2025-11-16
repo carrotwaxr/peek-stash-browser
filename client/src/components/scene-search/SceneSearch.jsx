@@ -21,6 +21,7 @@ import SceneGrid from "./SceneGrid.jsx";
  * a Performer, Studio, or Tag page for instance), and default sorting options.
  */
 const SceneSearch = ({
+  context, // Optional context for filter preset defaults (scene_performer, scene_tag, etc.)
   initialSort = "o_counter",
   permanentFilters = {},
   permanentFiltersMetadata = {},
@@ -134,6 +135,7 @@ const SceneSearch = ({
 
       <SearchControls
         artifactType="scene"
+        context={context}
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
         permanentFilters={permanentFilters}

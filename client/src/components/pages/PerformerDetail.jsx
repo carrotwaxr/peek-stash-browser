@@ -217,6 +217,7 @@ const PerformerDetail = () => {
         {/* Scenes Section */}
         <div className="mt-8">
           <SceneSearch
+            context="scene_performer"
             permanentFilters={{
               performers: {
                 value: [parseInt(performerId, 10)],

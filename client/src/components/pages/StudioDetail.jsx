@@ -153,6 +153,7 @@ const StudioDetail = () => {
         {/* Scenes Section */}
         <div className="mt-8">
           <SceneSearch
+            context="scene_studio"
             permanentFilters={{
               studios: {
                 value: [parseInt(studioId, 10)],
