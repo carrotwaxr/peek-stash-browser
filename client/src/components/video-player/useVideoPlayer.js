@@ -577,6 +577,7 @@ export function useVideoPlayer({
   // Update Video.js playlist controls when index changes
   useEffect(() => {
     const player = playerRef.current;
+
     if (
       !player ||
       player.isDisposed?.() ||
@@ -596,7 +597,7 @@ export function useVideoPlayer({
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, video]);
+  }, [currentIndex, video, playlist]);
 
   // Return playlist navigation functions for use by media keys hook
   return {

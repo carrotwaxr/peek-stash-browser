@@ -20,8 +20,7 @@ import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import SceneDetails from "./SceneDetails.jsx";
 
 // Inner component that reads from context
-const SceneContent = () => {
-  const location = useLocation();
+const SceneContent = ({ location }) => {
   const navigate = useNavigate();
   const pageRef = useRef(null);
   const leftColumnRef = useRef(null);
@@ -184,9 +183,19 @@ const Scene = () => {
   const { sceneId } = useParams();
   const location = useLocation();
 
-  // Extract data from location.state
-  let playlist = location.state?.playlist;
-  const shouldResume = location.state?.shouldResume;
+  // Capture location state in a ref to preserve it across re-renders
+  // React Router sometimes loses state on initial render, so we store it once it arrives
+  const locationStateRef = useRef(null);
+
+  // Update ref synchronously during render (not in useEffect)
+  if (location.state && !locationStateRef.current) {
+    locationStateRef.current = location.state;
+  }
+
+  // Extract data from location.state (prefer current state, fall back to ref)
+  const stateToUse = location.state || locationStateRef.current;
+  let playlist = stateToUse?.playlist;
+  const shouldResume = stateToUse?.shouldResume;
 
   // Persist auto-playlists to sessionStorage for page refresh support
   // Use a stable key that doesn't change when navigating between scenes
@@ -238,7 +247,7 @@ const Scene = () => {
 
   // Compute compatibility if scene data is available from navigation state
   // (only available when navigating from scene cards, not on direct page load)
-  const scene = location.state?.scene;
+  const scene = stateToUse?.scene;
   const firstFile = scene?.files?.[0];
   const compatibility = firstFile ? canDirectPlayVideo(firstFile) : null;
 
@@ -247,7 +256,7 @@ const Scene = () => {
   const initialQuality = "direct";
 
   // Extract shouldAutoplay from location state (set by PlaylistDetail's Play button)
-  const shouldAutoplayFromState = location.state?.shouldAutoplay ?? false;
+  const shouldAutoplayFromState = stateToUse?.shouldAutoplay ?? false;
 
   return (
     <ScenePlayerProvider
@@ -258,7 +267,7 @@ const Scene = () => {
       initialQuality={initialQuality}
       initialShouldAutoplay={shouldAutoplayFromState}
     >
-      <SceneContent />
+      <SceneContent location={{ ...location, state: stateToUse }} />
     </ScenePlayerProvider>
   );
 };

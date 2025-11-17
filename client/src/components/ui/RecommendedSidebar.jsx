@@ -62,6 +62,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
         referrerUrl: `/scene/${sceneId}`,
       },
     });
+    return true; // Prevent fallback navigation in SceneCard
   };
 
   // Loading state
