@@ -71,6 +71,7 @@ const SceneSearch = ({
     }
 
     navigate(`/scene/${scene.id}`, { state: navigationState });
+    return true; // Prevent fallback navigation in SceneCard
   };
 
   const handleQueryChange = async (newQuery, retryCount = 0) => {

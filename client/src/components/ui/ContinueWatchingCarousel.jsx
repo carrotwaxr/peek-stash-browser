@@ -155,6 +155,7 @@ const ContinueWatchingCarousel = ({
         },
       },
     });
+    return true; // Prevent fallback navigation in SceneCard
   };
 
   // Don't show carousel if error (non-initialization) or no scenes

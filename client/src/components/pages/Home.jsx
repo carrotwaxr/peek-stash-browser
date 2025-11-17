@@ -75,6 +75,7 @@ const Home = () => {
         },
       },
     });
+    return true; // Prevent fallback navigation in SceneCard
   };
 
   const handleToggleSelect = (scene) => {
