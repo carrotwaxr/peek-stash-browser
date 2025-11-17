@@ -287,11 +287,15 @@ export function scenePlayerReducer(state, action) {
             // Reset quality to "direct" for new scene - will be auto-selected based on codec
             quality: "direct",
           };
-        } else if (state.repeat === "all") {
-          // No history, but repeat all is on - go to last scene
-          prevIndex = totalScenes - 1;
+        } else {
+          // No history - pick a random scene (excluding current)
+          if (state.repeat === "all" || totalScenes > 1) {
+            const candidates = Array.from({ length: totalScenes }, (_, i) => i)
+              .filter((i) => i !== state.currentIndex);
+            prevIndex = candidates[Math.floor(Math.random() * candidates.length)];
+          }
+          // else: only 1 scene in playlist, can't go anywhere
         }
-        // else: no history and no repeat, stay on current
       } else {
         // Sequential mode
         if (state.currentIndex > 0) {
