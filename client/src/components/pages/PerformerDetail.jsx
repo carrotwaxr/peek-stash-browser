@@ -123,12 +123,6 @@ const PerformerDetail = () => {
     }
   };
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!performer,
-    setRating: handleRatingChange,
-  });
-
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
@@ -138,6 +132,17 @@ const PerformerDetail = () => {
       setIsFavorite(performer.favorite || false); // Revert on error
     }
   };
+
+  const toggleFavorite = () => {
+    handleFavoriteChange(!isFavorite);
+  };
+
+  // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
+  useRatingHotkeys({
+    enabled: !isLoading && !!performer,
+    setRating: handleRatingChange,
+    toggleFavorite,
+  });
 
   if (isLoading) {
     return (

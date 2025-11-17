@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+import useRatingHotkeys from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import {
   AddToPlaylistButton,
@@ -32,7 +33,7 @@ const PlaybackControls = () => {
   const availableQualities = useMemo(() => {
     const sourceHeight = scene?.files?.[0]?.height || 1080;
     // Filter to only include qualities <= source resolution (no upscaling)
-    return QUALITY_PRESETS.filter(preset => preset.height <= sourceHeight);
+    return QUALITY_PRESETS.filter((preset) => preset.height <= sourceHeight);
   }, [scene?.files]);
 
   // Get source resolution for "Direct Play" label
@@ -82,6 +83,13 @@ const PlaybackControls = () => {
     }
   };
 
+  // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
+  useRatingHotkeys({
+    enabled: !sceneLoading && !!scene,
+    setRating: handleRatingChange,
+    toggleFavorite: () => handleFavoriteChange(!isFavorite),
+  });
+
   // Don't render if no scene data yet
   if (!scene) {
     return null;
@@ -124,14 +132,17 @@ const PlaybackControls = () => {
             <option value="direct">
               Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
             </option>
-            {availableQualities.map(preset => (
+            {availableQualities.map((preset) => (
               <option key={preset.quality} value={preset.quality}>
                 {preset.label}
               </option>
             ))}
           </select>
 
-          <div className="flex-1 max-w-md" style={{ opacity: isLoading ? 0.6 : 1 }}>
+          <div
+            className="flex-1 max-w-md"
+            style={{ opacity: isLoading ? 0.6 : 1 }}
+          >
             <RatingSlider
               rating={rating}
               onChange={handleRatingChange}
@@ -140,7 +151,10 @@ const PlaybackControls = () => {
             />
           </div>
 
-          <div className="flex items-center gap-4 ml-auto" style={{ opacity: isLoading ? 0.6 : 1 }}>
+          <div
+            className="flex items-center gap-4 ml-auto"
+            style={{ opacity: isLoading ? 0.6 : 1 }}
+          >
             <OCounterButton
               sceneId={scene?.id}
               initialCount={oCounter}
@@ -162,7 +176,10 @@ const PlaybackControls = () => {
         <div className="hidden sm:flex sm:flex-col xl:hidden gap-4">
           {/* Row 1: Rating (50%) + space + O Counter + Favorite */}
           <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 max-w-md" style={{ opacity: isLoading ? 0.6 : 1 }}>
+            <div
+              className="flex-1 max-w-md"
+              style={{ opacity: isLoading ? 0.6 : 1 }}
+            >
               <RatingSlider
                 rating={rating}
                 onChange={handleRatingChange}
@@ -171,7 +188,10 @@ const PlaybackControls = () => {
               />
             </div>
 
-            <div className="flex items-center gap-4" style={{ opacity: isLoading ? 0.6 : 1 }}>
+            <div
+              className="flex items-center gap-4"
+              style={{ opacity: isLoading ? 0.6 : 1 }}
+            >
               <OCounterButton
                 sceneId={scene?.id}
                 initialCount={oCounter}
@@ -209,7 +229,7 @@ const PlaybackControls = () => {
               <option value="direct">
                 Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
               </option>
-              {availableQualities.map(preset => (
+              {availableQualities.map((preset) => (
                 <option key={preset.quality} value={preset.quality}>
                   {preset.label}
                 </option>
@@ -273,7 +293,7 @@ const PlaybackControls = () => {
               <option value="direct">
                 Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
               </option>
-              {availableQualities.map(preset => (
+              {availableQualities.map((preset) => (
                 <option key={preset.quality} value={preset.quality}>
                   {preset.label}
                 </option>

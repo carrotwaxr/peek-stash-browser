@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { migrateNavPreferences } from "../../constants/navigation.js";
+import { useGlobalNavigation } from "../../hooks/useGlobalNavigation.js";
 import { apiGet } from "../../services/api.js";
 import Sidebar from "./Sidebar.jsx";
 import TopBar from "./TopBar.jsx";
@@ -31,6 +32,8 @@ const GlobalLayout = ({ children }) => {
 
     loadNavPreferences();
   }, []);
+
+  useGlobalNavigation();
 
   return (
     <div className="layout-container min-h-screen">
