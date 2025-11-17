@@ -2,23 +2,29 @@ import { useEffect, useRef } from "react";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts.js";
 
 /**
- * Hook for rating keyboard shortcuts (Stash-compatible)
+ * Hook for rating and favorite keyboard shortcuts (Stash-compatible)
  *
- * Provides "r + number" hotkey support for setting ratings on detail pages.
- * Follows Stash's pattern: press "r" then "1-5" for ratings (20/40/60/80/100)
- * or "0" to clear rating.
+ * Provides "r + key" hotkey support for setting ratings and toggling favorites.
+ * Follows Stash's pattern: press "r" then "1-5" for ratings (20/40/60/80/100),
+ * "0" to clear rating, or "f" to toggle favorite.
  *
  * @param {Object} options Configuration options
  * @param {boolean} options.enabled Whether hotkeys are enabled
  * @param {Function} options.setRating Callback to set rating (receives number 0-100 or null)
+ * @param {Function} options.toggleFavorite Optional callback to toggle favorite status
  *
  * @example
  * useRatingHotkeys({
  *   enabled: true,
- *   setRating: (newRating) => updateEntityRating(newRating)
+ *   setRating: (newRating) => updateEntityRating(newRating),
+ *   toggleFavorite: () => setFavorite(!favorite)
  * });
  */
-export const useRatingHotkeys = ({ enabled = true, setRating }) => {
+export const useRatingHotkeys = ({
+  enabled = true,
+  setRating,
+  toggleFavorite = null,
+}) => {
   const ratingModeTimeoutRef = useRef(null);
   const inRatingModeRef = useRef(false);
 
@@ -82,11 +88,27 @@ export const useRatingHotkeys = ({ enabled = true, setRating }) => {
     };
   });
 
+  // Register 'f' key for favorite toggle (only if callback provided)
+  if (toggleFavorite) {
+    shortcuts["f"] = () => {
+      // Only handle if in rating mode
+      if (inRatingModeRef.current) {
+        toggleFavorite();
+
+        // Exit rating mode immediately after toggling favorite
+        inRatingModeRef.current = false;
+        if (ratingModeTimeoutRef.current) {
+          clearTimeout(ratingModeTimeoutRef.current);
+        }
+      }
+    };
+  }
+
   // Register keyboard shortcuts
   useKeyboardShortcuts(shortcuts, {
     enabled,
     context: "rating-hotkeys",
-    // Custom handler to check rating mode for number keys
+    // Custom handler to check rating mode for number keys and 'f' key
     shouldHandle: (event) => {
       const key = event.key;
 
@@ -97,6 +119,11 @@ export const useRatingHotkeys = ({ enabled = true, setRating }) => {
 
       // Only handle number keys if in rating mode
       if (key >= "0" && key <= "5") {
+        return inRatingModeRef.current;
+      }
+
+      // Only handle 'f' key if in rating mode and toggleFavorite is provided
+      if ((key === "f" || key === "F") && toggleFavorite) {
         return inRatingModeRef.current;
       }
 

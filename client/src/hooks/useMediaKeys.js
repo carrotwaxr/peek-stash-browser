@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts.js";
 
 /**
@@ -208,6 +208,7 @@ export const usePlaylistMediaKeys = ({
 
       ...(hasPlaylist && playNext && playPrevious
         ? {
+            // Hardware media keys
             mediatracknext: () => playNext(),
             mediatrackprevious: () => playPrevious(),
           }
@@ -220,6 +221,38 @@ export const usePlaylistMediaKeys = ({
   useVideoPlayerShortcuts(playerRef, shortcuts, {
     enabled: enabled && !!playerRef.current,
   });
+
+  // Handle Shift+N/P separately since buildKeyCombo ignores shift for letters
+  useEffect(() => {
+    if (!hasPlaylist || !playNext || !playPrevious || !enabled) return;
+
+    const handleShiftNav = (event) => {
+      // Only handle if shift is pressed
+      if (!event.shiftKey) return;
+
+      // Don't handle if user is typing in an input field
+      const target = event.target;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key === "n") {
+        event.preventDefault();
+        playNext();
+      } else if (key === "p") {
+        event.preventDefault();
+        playPrevious();
+      }
+    };
+
+    document.addEventListener("keydown", handleShiftNav);
+    return () => document.removeEventListener("keydown", handleShiftNav);
+  }, [hasPlaylist, playNext, playPrevious, enabled]);
 };
 
 /**

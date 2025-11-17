@@ -28,12 +28,7 @@ import { useEffect, useRef } from "react";
  */
 export const useKeyboardShortcuts = (
   shortcuts = {},
-  {
-    enabled = true,
-    context = "global",
-    priority = 0,
-    shouldHandle = null,
-  } = {}
+  { enabled = true, context = "global", priority = 0, shouldHandle = null } = {}
 ) => {
   // Use ref to avoid recreating handler on every render
   const shortcutsRef = useRef(shortcuts);

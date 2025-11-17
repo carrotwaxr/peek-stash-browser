@@ -54,12 +54,6 @@ const GroupDetail = () => {
     }
   };
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!group,
-    setRating: handleRatingChange,
-  });
-
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
@@ -69,6 +63,17 @@ const GroupDetail = () => {
       setIsFavorite(group.favorite || false);
     }
   };
+
+  const toggleFavorite = () => {
+    handleFavoriteChange(!isFavorite);
+  };
+
+  // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
+  useRatingHotkeys({
+    enabled: !isLoading && !!group,
+    setRating: handleRatingChange,
+    toggleFavorite,
+  });
 
   if (isLoading) {
     return (

@@ -20,7 +20,6 @@ const Sidebar = ({ navPreferences = [] }) => {
   const location = useLocation();
   const { user } = useAuth();
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences);

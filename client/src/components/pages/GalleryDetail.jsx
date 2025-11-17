@@ -75,12 +75,6 @@ const GalleryDetail = () => {
     }
   };
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!gallery,
-    setRating: handleRatingChange,
-  });
-
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
@@ -90,6 +84,17 @@ const GalleryDetail = () => {
       setIsFavorite(gallery.favorite || false);
     }
   };
+
+  const toggleFavorite = () => {
+    handleFavoriteChange(!isFavorite);
+  };
+
+  // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
+  useRatingHotkeys({
+    enabled: !isLoading && !!gallery,
+    setRating: handleRatingChange,
+    toggleFavorite,
+  });
 
   // Check if there's any sidebar content to display
   const hasSidebarContent =
@@ -284,36 +289,36 @@ const GalleryDetail = () => {
               </div>
             ) : images.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                  {images.map((image, index) => (
-                    <div
-                      key={image.id}
-                      className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
-                      style={{
-                        backgroundColor: "var(--bg-secondary)",
-                        borderColor: "var(--border-color)",
-                      }}
-                      onClick={() => {
-                        setLightboxIndex(index);
-                        setLightboxAutoPlay(false);
-                        setLightboxOpen(true);
-                      }}
-                    >
-                      {image.paths?.thumbnail ? (
-                        <img
-                          src={image.paths.thumbnail}
-                          alt={image.title || `Image ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div
-                          className="w-full h-full flex items-center justify-center text-sm"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          No Preview
-                        </div>
-                      )}
-                    </div>
+                {images.map((image, index) => (
+                  <div
+                    key={image.id}
+                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+                    style={{
+                      backgroundColor: "var(--bg-secondary)",
+                      borderColor: "var(--border-color)",
+                    }}
+                    onClick={() => {
+                      setLightboxIndex(index);
+                      setLightboxAutoPlay(false);
+                      setLightboxOpen(true);
+                    }}
+                  >
+                    {image.paths?.thumbnail ? (
+                      <img
+                        src={image.paths.thumbnail}
+                        alt={image.title || `Image ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center text-sm"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        No Preview
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -327,62 +332,64 @@ const GalleryDetail = () => {
           </div>
 
           {/* Sidebar - Metadata (only render if there's content) */}
-          {hasSidebarContent && <aside className="space-y-4">
-            {/* Tags */}
-            {gallery.tags && gallery.tags.length > 0 && (
-              <Card title="Tags">
-                <div className="flex flex-wrap gap-2">
-                  {gallery.tags.map((tag) => {
-                    const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-                    return (
-                      <button
-                        key={tag.id}
-                        onClick={() => navigate(`/tag/${tag.id}`)}
-                        className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                        style={{
-                          backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                          color: "white",
-                        }}
+          {hasSidebarContent && (
+            <aside className="space-y-4">
+              {/* Tags */}
+              {gallery.tags && gallery.tags.length > 0 && (
+                <Card title="Tags">
+                  <div className="flex flex-wrap gap-2">
+                    {gallery.tags.map((tag) => {
+                      const hue = (parseInt(tag.id, 10) * 137.5) % 360;
+                      return (
+                        <button
+                          key={tag.id}
+                          onClick={() => navigate(`/tag/${tag.id}`)}
+                          className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
+                          style={{
+                            backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                            color: "white",
+                          }}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+
+              {/* Linked Scenes */}
+              {gallery.scenes && gallery.scenes.length > 0 && (
+                <Card title="Related Scenes">
+                  <div className="flex flex-col gap-2">
+                    {gallery.scenes.map((scene) => (
+                      <Button
+                        key={scene.id}
+                        variant="secondary"
+                        onClick={() => navigate(`/scene/${scene.id}`)}
+                        className="w-full text-left justify-start truncate"
+                        title={scene.title || `Scene ${scene.id}`}
                       >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Card>
-            )}
+                        {scene.title || `Scene ${scene.id}`}
+                      </Button>
+                    ))}
+                  </div>
+                </Card>
+              )}
 
-            {/* Linked Scenes */}
-            {gallery.scenes && gallery.scenes.length > 0 && (
-              <Card title="Related Scenes">
-                <div className="flex flex-col gap-2">
-                  {gallery.scenes.map((scene) => (
-                    <Button
-                      key={scene.id}
-                      variant="secondary"
-                      onClick={() => navigate(`/scene/${scene.id}`)}
-                      className="w-full text-left justify-start truncate"
-                      title={scene.title || `Scene ${scene.id}`}
-                    >
-                      {scene.title || `Scene ${scene.id}`}
-                    </Button>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Details */}
-            {gallery.details && (
-              <Card title="Details">
-                <p
-                  className="text-sm whitespace-pre-wrap"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {gallery.details}
-                </p>
-              </Card>
-            )}
-          </aside>}
+              {/* Details */}
+              {gallery.details && (
+                <Card title="Details">
+                  <p
+                    className="text-sm whitespace-pre-wrap"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {gallery.details}
+                  </p>
+                </Card>
+              )}
+            </aside>
+          )}
         </div>
       </div>
 

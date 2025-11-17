@@ -144,6 +144,7 @@ const Lightbox = ({
   useRatingHotkeys({
     enabled: isOpen && images.length > 0,
     setRating: handleRatingChange,
+    toggleFavorite: () => handleFavoriteChange(!isFavorite),
   });
 
   // Auto-advance slideshow

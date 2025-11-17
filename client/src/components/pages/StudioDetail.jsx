@@ -53,12 +53,6 @@ const StudioDetail = () => {
     }
   };
 
-  // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
-  useRatingHotkeys({
-    enabled: !isLoading && !!studio,
-    setRating: handleRatingChange,
-  });
-
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
@@ -68,6 +62,17 @@ const StudioDetail = () => {
       setIsFavorite(studio.favorite || false);
     }
   };
+
+  const toggleFavorite = () => {
+    handleFavoriteChange(!isFavorite);
+  };
+
+  // Rating and favorite hotkeys (r + 1-5 for ratings, r + 0 to clear, r + f to toggle favorite)
+  useRatingHotkeys({
+    enabled: !isLoading && !!studio,
+    setRating: handleRatingChange,
+    toggleFavorite,
+  });
 
   if (isLoading) {
     return (

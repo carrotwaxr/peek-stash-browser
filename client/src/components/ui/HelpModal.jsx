@@ -3,6 +3,25 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { Button } from "./index.js";
 
+// Determine current page from URL
+const getCurrentPage = (location) => {
+  const path = location.pathname;
+  if (path.startsWith("/scene/")) return "scene";
+  if (path.startsWith("/scenes")) return "scenes";
+  if (path.startsWith("/performer/")) return "performer";
+  if (path.startsWith("/performers")) return "performers";
+  if (path.startsWith("/studio/")) return "studio";
+  if (path.startsWith("/studios")) return "studios";
+  if (path.startsWith("/tag/")) return "tag";
+  if (path.startsWith("/tags")) return "tags";
+  if (path.startsWith("/gallery/")) return "gallery";
+  if (path.startsWith("/galleries")) return "galleries";
+  if (path.startsWith("/group/")) return "group";
+  if (path.startsWith("/groups")) return "groups";
+  if (path.startsWith("/playlists")) return "playlists";
+  return "global";
+};
+
 /**
  * Help Modal - Shows context-aware help documentation
  * Currently displays keyboard shortcuts for the current page
@@ -12,26 +31,7 @@ const HelpModal = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState("hotkeys");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Determine current page from URL
-  const getCurrentPage = () => {
-    const path = location.pathname;
-    if (path.startsWith("/scene/")) return "scene";
-    if (path.startsWith("/scenes")) return "scenes";
-    if (path.startsWith("/performer/")) return "performer";
-    if (path.startsWith("/performers")) return "performers";
-    if (path.startsWith("/studio/")) return "studio";
-    if (path.startsWith("/studios")) return "studios";
-    if (path.startsWith("/tag/")) return "tag";
-    if (path.startsWith("/tags")) return "tags";
-    if (path.startsWith("/gallery/")) return "gallery";
-    if (path.startsWith("/galleries")) return "galleries";
-    if (path.startsWith("/group/")) return "group";
-    if (path.startsWith("/groups")) return "groups";
-    if (path.startsWith("/playlists")) return "playlists";
-    return "global";
-  };
-
-  const currentPage = getCurrentPage();
+  const currentPage = getCurrentPage(location);
 
   // Keyboard shortcuts organized by page
   const shortcuts = {
@@ -39,8 +39,12 @@ const HelpModal = ({ onClose }) => {
       {
         category: "Rating",
         items: [
-          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
-          { keys: ["R", "0"], description: "Clear rating" },
+          {
+            keys: ["r 1-5"],
+            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+          },
+          { keys: ["r 0"], description: "Clear rating" },
+          { keys: ["r f"], description: "Toggle Favorite" },
         ],
       },
     ],
@@ -48,8 +52,12 @@ const HelpModal = ({ onClose }) => {
       {
         category: "Rating",
         items: [
-          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
-          { keys: ["R", "0"], description: "Clear rating" },
+          {
+            keys: ["r 1-5"],
+            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+          },
+          { keys: ["r 0"], description: "Clear rating" },
+          { keys: ["r f"], description: "Toggle Favorite" },
         ],
       },
     ],
@@ -57,8 +65,12 @@ const HelpModal = ({ onClose }) => {
       {
         category: "Rating",
         items: [
-          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
-          { keys: ["R", "0"], description: "Clear rating" },
+          {
+            keys: ["r 1-5"],
+            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+          },
+          { keys: ["r 0"], description: "Clear rating" },
+          { keys: ["r f"], description: "Toggle Favorite" },
         ],
       },
     ],
@@ -66,8 +78,12 @@ const HelpModal = ({ onClose }) => {
       {
         category: "Rating",
         items: [
-          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
-          { keys: ["R", "0"], description: "Clear rating" },
+          {
+            keys: ["r 1-5"],
+            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+          },
+          { keys: ["r 0"], description: "Clear rating" },
+          { keys: ["r f"], description: "Toggle Favorite" },
         ],
       },
       {
@@ -77,6 +93,12 @@ const HelpModal = ({ onClose }) => {
           { keys: ["→"], description: "Next image" },
           { keys: ["Space"], description: "Play / Pause slideshow" },
           { keys: ["Esc"], description: "Close lightbox" },
+          {
+            keys: ["r 1-5"],
+            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+          },
+          { keys: ["r 0"], description: "Clear rating" },
+          { keys: ["r f"], description: "Toggle Favorite" },
         ],
       },
     ],
@@ -84,8 +106,12 @@ const HelpModal = ({ onClose }) => {
       {
         category: "Rating",
         items: [
-          { keys: ["R", "1-5"], description: "Set rating (20%, 40%, 60%, 80%, 100%)" },
-          { keys: ["R", "0"], description: "Clear rating" },
+          {
+            keys: ["r 1-5"],
+            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+          },
+          { keys: ["r 0"], description: "Clear rating" },
+          { keys: ["r f"], description: "Toggle Favorite" },
         ],
       },
     ],
@@ -137,8 +163,17 @@ const HelpModal = ({ onClose }) => {
         items: [
           {
             keys: ["?"],
-            description: "Show this help dialog (coming soon)",
+            description: "Show this help dialog",
           },
+          { keys: ["g s"], description: "Navigate to Scenes page" },
+          { keys: ["g r"], description: "Navigate to Recommended page" },
+          { keys: ["g p"], description: "Navigate to Performers page" },
+          { keys: ["g u"], description: "Navigate to Studios page" },
+          { keys: ["g t"], description: "Navigate to Tags page" },
+          { keys: ["g c"], description: "Navigate to Collections page" },
+          { keys: ["g l"], description: "Navigate to Galleries page" },
+          { keys: ["g y"], description: "Navigate to Playlists page" },
+          { keys: ["g z"], description: "Navigate to Settings page" },
         ],
       },
     ],
@@ -420,7 +455,13 @@ const HelpModal = ({ onClose }) => {
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                     {currentPage === "scene"
                       ? "Control video playback and navigation with these keyboard shortcuts"
-                      : ["performer", "studio", "tag", "gallery", "group"].includes(currentPage)
+                      : [
+                            "performer",
+                            "studio",
+                            "tag",
+                            "gallery",
+                            "group",
+                          ].includes(currentPage)
                         ? "Use these shortcuts to quickly rate items. Press R followed by 1-5 to set rating, or R then 0 to clear."
                         : "No page-specific shortcuts available yet"}
                   </p>
@@ -432,7 +473,22 @@ const HelpModal = ({ onClose }) => {
                   )}
                 </div>
 
-                {!["scene", "performer", "studio", "tag", "gallery", "group"].includes(currentPage) && (
+                {currentPage !== "global" && (
+                  <div>
+                    {shortcuts.global.map((category) =>
+                      renderShortcutCategory(category)
+                    )}
+                  </div>
+                )}
+
+                {![
+                  "scene",
+                  "performer",
+                  "studio",
+                  "tag",
+                  "gallery",
+                  "group",
+                ].includes(currentPage) && (
                   <div
                     className="mt-6 p-4 rounded-lg text-sm"
                     style={{
@@ -442,7 +498,8 @@ const HelpModal = ({ onClose }) => {
                     }}
                   >
                     <p>
-                      Page-specific shortcuts are available on detail pages for performers, studios, tags, galleries, and collections.
+                      Page-specific shortcuts are available on detail pages for
+                      performers, studios, tags, galleries, and collections.
                     </p>
                   </div>
                 )}
