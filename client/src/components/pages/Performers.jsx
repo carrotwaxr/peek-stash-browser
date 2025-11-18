@@ -33,6 +33,14 @@ const Performers = () => {
   // TV Navigation zones
   // mainNav (sidebar) is separate - accessed via left/right arrows
   // Content zones are vertical stack: search -> topPagination -> grid -> bottomPagination
+  //
+  // IMPLEMENTATION STATUS:
+  // ✅ Grid zone: Full 2D spatial navigation with focus indicators
+  // ✅ mainNav zone: Vertical navigation through sidebar items with smart skipping
+  // ⏳ Content zones: Zone transitions work, but need to implement:
+  //    - Search zone: Navigate through search input, sort dropdown, filter buttons
+  //    - topPagination/bottomPagination: Navigate through page buttons, per-page selector
+  //    - Use useHorizontalNavigation hook for Left/Right navigation within these zones
   const tvNavigation = useTVNavigation({
     zones: ["search", "topPagination", "grid", "bottomPagination", "mainNav"],
     initialZone: "grid", // Start at grid for now
