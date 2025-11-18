@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @param {Function} options.onPageDown Callback for PageDown key
  * @param {Function} options.onEscapeUp Callback when Up arrow pressed on top row
  * @param {Function} options.onEscapeDown Callback when Down arrow pressed on bottom row
+ * @param {Function} options.onEscapeLeft Callback when Left arrow pressed on leftmost column
  * @param {number} options.initialFocusIndex Initial focus index (default: 0)
  * @returns {Object} Navigation state and helpers
  */
@@ -25,6 +26,7 @@ export const useSpatialNavigation = ({
   onPageDown,
   onEscapeUp,
   onEscapeDown,
+  onEscapeLeft,
   initialFocusIndex = 0,
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(initialFocusIndex);
@@ -63,7 +65,12 @@ export const useSpatialNavigation = ({
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
-          setFocusedIndex((prev) => Math.max(0, prev - 1));
+          // Check if we're in the leftmost column (index % columns === 0)
+          if (focusedIndex % columns === 0 && onEscapeLeft) {
+            onEscapeLeft();
+          } else {
+            setFocusedIndex((prev) => Math.max(0, prev - 1));
+          }
           handled = true;
           break;
 
@@ -147,6 +154,7 @@ export const useSpatialNavigation = ({
       onPageDown,
       onEscapeUp,
       onEscapeDown,
+      onEscapeLeft,
     ]
   );
 

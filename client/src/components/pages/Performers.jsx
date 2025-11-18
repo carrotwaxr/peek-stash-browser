@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
@@ -30,9 +30,11 @@ const Performers = () => {
   const { isTVMode } = useTVMode();
   const columns = useGridColumns("performers");
 
-  // TV Navigation zones (for Phase 2 zone management)
+  // TV Navigation zones
+  // mainNav (sidebar) is separate - accessed via left/right arrows
+  // Content zones are vertical stack: search -> topPagination -> grid -> bottomPagination
   const tvNavigation = useTVNavigation({
-    zones: ["mainNav", "search", "topPagination", "grid", "bottomPagination"],
+    zones: ["search", "topPagination", "grid", "bottomPagination", "mainNav"],
     initialZone: "grid", // Start at grid for now
     enabled: isTVMode,
   });
@@ -107,28 +109,96 @@ const Performers = () => {
     }
   }, [urlPage, totalPages]);
 
-  // Escape handlers for zone navigation (will be implemented in Phase 2)
+  // Escape handlers for zone navigation (from grid boundaries)
   const handleEscapeUp = useCallback(() => {
+    const moved = tvNavigation.goToPreviousZone();
     console.log(
-      "🔼 Escape Up: User pressed Up on top row",
-      `Current zone: ${tvNavigation.currentZone}`
+      moved
+        ? `🔼 Moved to previous zone: ${tvNavigation.currentZone}`
+        : "🔼 Already at first zone"
     );
-    // Will call tvNavigation.goToPreviousZone() in Phase 2
-  }, [tvNavigation.currentZone]);
+  }, [tvNavigation]);
 
   const handleEscapeDown = useCallback(() => {
+    const moved = tvNavigation.goToNextZone();
     console.log(
-      "🔽 Escape Down: User pressed Down on bottom row",
-      `Current zone: ${tvNavigation.currentZone}`
+      moved
+        ? `🔽 Moved to next zone: ${tvNavigation.currentZone}`
+        : "🔽 Already at last zone"
     );
-    // Will call tvNavigation.goToNextZone() in Phase 2
-  }, [tvNavigation.currentZone]);
+  }, [tvNavigation]);
 
-  // Spatial navigation
+  const handleEscapeLeft = useCallback(() => {
+    const moved = tvNavigation.goToZone("mainNav");
+    console.log(
+      moved
+        ? `⬅️ Moved to sidebar: ${tvNavigation.currentZone}`
+        : "⬅️ Could not move to mainNav"
+    );
+  }, [tvNavigation]);
+
+  // Global keyboard handler for non-grid zones
+  useEffect(() => {
+    if (!isTVMode || tvNavigation.isZoneActive("grid")) return;
+
+    const handleGlobalKeyDown = (e) => {
+      const currentZone = tvNavigation.currentZone;
+
+      // Sidebar (mainNav) navigation
+      if (currentZone === "mainNav") {
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          tvNavigation.goToZone("grid");
+          console.log("➡️ Moved from sidebar to grid");
+        }
+        // Up/Down within sidebar handled by useHorizontalNavigation (future)
+        return;
+      }
+
+      // Content zones (search, topPagination, bottomPagination)
+      // These zones form a vertical stack, separate from mainNav
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        // Don't go up from search (it's the first content zone)
+        if (currentZone === "search") {
+          console.log("🔼 Already at first content zone");
+          return;
+        }
+        const moved = tvNavigation.goToPreviousZone();
+        console.log(
+          moved
+            ? `🔼 Moved to zone: ${tvNavigation.currentZone}`
+            : "🔼 Could not move up"
+        );
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        // Don't go down from bottomPagination (it's the last content zone)
+        if (currentZone === "bottomPagination") {
+          console.log("🔽 Already at last content zone");
+          return;
+        }
+        const moved = tvNavigation.goToNextZone();
+        console.log(
+          moved
+            ? `🔽 Moved to zone: ${tvNavigation.currentZone}`
+            : "🔽 Could not move down"
+        );
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        tvNavigation.goToZone("mainNav");
+        console.log("⬅️ Moved to sidebar from content zone");
+      }
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [isTVMode, tvNavigation]);
+
+  // Spatial navigation - only enabled when in grid zone
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentPerformers,
     columns,
-    enabled: !isLoading && isTVMode,
+    enabled: !isLoading && isTVMode && tvNavigation.isZoneActive("grid"),
     onSelect: (performer) =>
       navigate(`/performer/${performer.id}`, {
         state: { referrerUrl: `${location.pathname}${location.search}` },
@@ -137,6 +207,7 @@ const Performers = () => {
     onPageDown: handlePageDownKey,
     onEscapeUp: handleEscapeUp,
     onEscapeDown: handleEscapeDown,
+    onEscapeLeft: handleEscapeLeft,
   });
 
   // Initial focus
@@ -158,6 +229,26 @@ const Performers = () => {
 
   return (
     <PageLayout>
+      {/* TV Mode Zone Indicator (temporary for testing) */}
+      {isTVMode && (
+        <div
+          style={{
+            position: "fixed",
+            top: "10px",
+            right: "10px",
+            zIndex: 9999,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            color: "white",
+            padding: "8px 12px",
+            borderRadius: "4px",
+            fontSize: "14px",
+            fontFamily: "monospace",
+          }}
+        >
+          Zone: <strong>{tvNavigation.currentZone}</strong>
+        </div>
+      )}
+
       <div ref={pageRef}>
         <PageHeader
           title="Performers"
