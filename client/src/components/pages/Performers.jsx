@@ -39,6 +39,17 @@ const Performers = () => {
     enabled: isTVMode,
   });
 
+  // Dispatch zone change events for global listeners (e.g., Sidebar)
+  useEffect(() => {
+    if (isTVMode) {
+      window.dispatchEvent(
+        new CustomEvent("tvZoneChange", {
+          detail: { zone: tvNavigation.currentZone },
+        })
+      );
+    }
+  }, [isTVMode, tvNavigation.currentZone]);
+
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -151,7 +162,7 @@ const Performers = () => {
           tvNavigation.goToZone("grid");
           console.log("➡️ Moved from sidebar to grid");
         }
-        // Up/Down within sidebar handled by useHorizontalNavigation (future)
+        // Up/Down navigation handled by Sidebar component itself
         return;
       }
 
@@ -187,6 +198,11 @@ const Performers = () => {
         e.preventDefault();
         tvNavigation.goToZone("mainNav");
         console.log("⬅️ Moved to sidebar from content zone");
+      } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        // TODO: Left/Right within content zones to navigate through controls
+        // (search input, sort dropdown, filters, pagination buttons, etc.)
+        // Will use useHorizontalNavigation hook
+        console.log(`${ e.key === "ArrowLeft" ? "⬅️" : "➡️"} Navigation within ${currentZone} zone (not yet implemented)`);
       }
     };
 
