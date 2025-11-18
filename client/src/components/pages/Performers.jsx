@@ -99,6 +99,15 @@ const Performers = () => {
     }
   }, [urlPage, totalPages]);
 
+  // Escape handlers for zone navigation (will be implemented in Phase 2)
+  const handleEscapeUp = useCallback(() => {
+    console.log("🔼 Escape Up: User pressed Up on top row - will navigate to pagination zone");
+  }, []);
+
+  const handleEscapeDown = useCallback(() => {
+    console.log("🔽 Escape Down: User pressed Down on bottom row - will navigate to pagination zone");
+  }, []);
+
   // Spatial navigation
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentPerformers,
@@ -110,6 +119,8 @@ const Performers = () => {
       }),
     onPageUp: handlePageUpKey,
     onPageDown: handlePageDownKey,
+    onEscapeUp: handleEscapeUp,
+    onEscapeDown: handleEscapeDown,
   });
 
   // Initial focus

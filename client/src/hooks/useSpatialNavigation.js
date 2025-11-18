@@ -11,6 +11,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @param {Function} options.onSelect Callback when item is selected (Enter/Space)
  * @param {Function} options.onPageUp Callback for PageUp key
  * @param {Function} options.onPageDown Callback for PageDown key
+ * @param {Function} options.onEscapeUp Callback when Up arrow pressed on top row
+ * @param {Function} options.onEscapeDown Callback when Down arrow pressed on bottom row
  * @param {number} options.initialFocusIndex Initial focus index (default: 0)
  * @returns {Object} Navigation state and helpers
  */
@@ -21,6 +23,8 @@ export const useSpatialNavigation = ({
   onSelect,
   onPageUp,
   onPageDown,
+  onEscapeUp,
+  onEscapeDown,
   initialFocusIndex = 0,
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(initialFocusIndex);
@@ -71,15 +75,27 @@ export const useSpatialNavigation = ({
 
         case "ArrowUp":
           e.preventDefault();
-          setFocusedIndex((prev) => Math.max(0, prev - columns));
+          // Check if we're on the top row (index < columns)
+          if (focusedIndex < columns && onEscapeUp) {
+            onEscapeUp();
+          } else {
+            setFocusedIndex((prev) => Math.max(0, prev - columns));
+          }
           handled = true;
           break;
 
-        case "ArrowDown":
+        case "ArrowDown": {
           e.preventDefault();
-          setFocusedIndex((prev) => Math.min(totalItems - 1, prev + columns));
+          // Check if we're on the bottom row (moving down would exceed total items)
+          const wouldExceed = focusedIndex + columns >= totalItems;
+          if (wouldExceed && onEscapeDown) {
+            onEscapeDown();
+          } else {
+            setFocusedIndex((prev) => Math.min(totalItems - 1, prev + columns));
+          }
           handled = true;
           break;
+        }
 
         case "Enter":
         case " ":
@@ -121,7 +137,17 @@ export const useSpatialNavigation = ({
 
       return handled;
     },
-    [enabled, items, focusedIndex, columns, onSelect, onPageUp, onPageDown]
+    [
+      enabled,
+      items,
+      focusedIndex,
+      columns,
+      onSelect,
+      onPageUp,
+      onPageDown,
+      onEscapeUp,
+      onEscapeDown,
+    ]
   );
 
   // Attach keyboard listener
