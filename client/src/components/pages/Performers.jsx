@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
@@ -83,24 +83,33 @@ const Performers = () => {
   // Calculate totalPages based on urlPerPage (from URL params), not lastQuery
   const totalPages = Math.ceil(totalCount / urlPerPage);
 
+  // Ref to receive handlePageChange from SearchControls
+  const paginationHandlerRef = useRef(null);
+
+  // Handlers for PageUp/PageDown navigation (use the exposed handler from SearchControls)
+  const handlePageUpKey = useCallback(() => {
+    if (urlPage > 1 && paginationHandlerRef.current) {
+      paginationHandlerRef.current(urlPage - 1);
+    }
+  }, [urlPage]);
+
+  const handlePageDownKey = useCallback(() => {
+    if (urlPage < totalPages && paginationHandlerRef.current) {
+      paginationHandlerRef.current(urlPage + 1);
+    }
+  }, [urlPage, totalPages]);
+
   // Spatial navigation
   const { setItemRef, isFocused } = useSpatialNavigation({
     items: currentPerformers,
     columns,
     enabled: !isLoading && isTVMode,
-    onSelect: (performer) => navigate(`/performer/${performer.id}`),
-    onPageUp: () =>
-      urlPage > 1 &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage - 1 },
+    onSelect: (performer) =>
+      navigate(`/performer/${performer.id}`, {
+        state: { referrerUrl: `${location.pathname}${location.search}` },
       }),
-    onPageDown: () =>
-      urlPage < totalPages &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage + 1 },
-      }),
+    onPageUp: handlePageUpKey,
+    onPageDown: handlePageDownKey,
   });
 
   // Initial focus
@@ -135,6 +144,7 @@ const Performers = () => {
           artifactType="performer"
           initialSort="o_counter"
           onQueryChange={handleQueryChange}
+          paginationHandlerRef={paginationHandlerRef}
           totalPages={totalPages}
           totalCount={totalCount}
         >

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LucideArrowDown, LucideArrowUp } from "lucide-react";
 import { apiGet } from "../../services/api.js";
@@ -69,6 +69,7 @@ const SearchControls = ({
   children,
   initialSort = "o_counter",
   onQueryChange,
+  paginationHandlerRef, // Optional ref to expose handlePageChange for TV mode
   permanentFilters = {},
   permanentFiltersMetadata = {},
   totalPages,
@@ -429,6 +430,13 @@ const SearchControls = ({
       }
     }, 50);
   };
+
+  // Expose pagination handler to parent via ref (for TV mode PageUp/PageDown)
+  useEffect(() => {
+    if (paginationHandlerRef) {
+      paginationHandlerRef.current = handlePageChange;
+    }
+  }, [paginationHandlerRef, handlePageChange]);
 
   const handleChangeSearchText = (searchStr) => {
     if (searchStr === searchText) return; // No change
