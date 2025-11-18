@@ -8,6 +8,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import { useTVNavigation } from "../../hooks/useTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
   CacheLoadingBanner,
@@ -28,6 +29,13 @@ const Performers = () => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const { isTVMode } = useTVMode();
   const columns = useGridColumns("performers");
+
+  // TV Navigation zones (for Phase 2 zone management)
+  const tvNavigation = useTVNavigation({
+    zones: ["mainNav", "search", "topPagination", "grid", "bottomPagination"],
+    initialZone: "grid", // Start at grid for now
+    enabled: isTVMode,
+  });
 
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -101,12 +109,20 @@ const Performers = () => {
 
   // Escape handlers for zone navigation (will be implemented in Phase 2)
   const handleEscapeUp = useCallback(() => {
-    console.log("🔼 Escape Up: User pressed Up on top row - will navigate to pagination zone");
-  }, []);
+    console.log(
+      "🔼 Escape Up: User pressed Up on top row",
+      `Current zone: ${tvNavigation.currentZone}`
+    );
+    // Will call tvNavigation.goToPreviousZone() in Phase 2
+  }, [tvNavigation.currentZone]);
 
   const handleEscapeDown = useCallback(() => {
-    console.log("🔽 Escape Down: User pressed Down on bottom row - will navigate to pagination zone");
-  }, []);
+    console.log(
+      "🔽 Escape Down: User pressed Down on bottom row",
+      `Current zone: ${tvNavigation.currentZone}`
+    );
+    // Will call tvNavigation.goToNextZone() in Phase 2
+  }, [tvNavigation.currentZone]);
 
   // Spatial navigation
   const { setItemRef, isFocused } = useSpatialNavigation({
