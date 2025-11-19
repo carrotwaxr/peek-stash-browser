@@ -138,6 +138,7 @@ const Sidebar = ({ navPreferences = [] }) => {
         case "Enter":
         case " ":
           e.preventDefault();
+          e.stopPropagation();
           const item = allNavItems[focusedIndex];
           if (item) {
             if (item.name === "Help") {
