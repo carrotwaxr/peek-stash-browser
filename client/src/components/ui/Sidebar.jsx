@@ -103,7 +103,9 @@ const Sidebar = ({ navPreferences = [] }) => {
 
   // Keyboard navigation when mainNav is active
   useEffect(() => {
-    if (!isTVMode || !isMainNavActive) return;
+    if (!isTVMode || !isMainNavActive) {
+      return;
+    }
 
     const handleKeyDown = (e) => {
       switch (e.key) {
@@ -116,7 +118,6 @@ const Sidebar = ({ navPreferences = [] }) => {
           }
           if (newIndex >= 0) {
             setFocusedIndex(newIndex);
-            console.log(`🔼 Sidebar: Focused item ${newIndex} (${allNavItems[newIndex]?.name})`);
           }
           break;
         }
@@ -130,7 +131,6 @@ const Sidebar = ({ navPreferences = [] }) => {
           }
           if (newIndex < allNavItems.length) {
             setFocusedIndex(newIndex);
-            console.log(`🔽 Sidebar: Focused item ${newIndex} (${allNavItems[newIndex]?.name})`);
           }
           break;
         }
@@ -143,19 +143,14 @@ const Sidebar = ({ navPreferences = [] }) => {
           if (item) {
             if (item.name === "Help") {
               setIsHelpModalOpen(true);
-              console.log("✅ Sidebar: Opened Help modal");
             } else if (item.isUserMenu) {
               setIsUserMenuExpanded(!isUserMenuExpanded);
-              console.log(`✅ Sidebar: ${isUserMenuExpanded ? 'Collapsed' : 'Expanded'} user menu`);
             } else if (item.name === "TV Mode") {
               toggleTVMode();
-              console.log("✅ Sidebar: Toggled TV Mode");
             } else if (item.name === "Sign Out") {
               logout();
-              console.log("✅ Sidebar: Logged out");
             } else if (item.path) {
               navigate(item.path);
-              console.log(`✅ Sidebar: Navigated to ${item.path}`);
             }
           }
           break;

@@ -220,6 +220,12 @@ const SceneCard = forwardRef(
     }, []);
 
     const handleKeyDown = (e) => {
+      // Only handle keyboard events if this card is actually the focused element
+      // This prevents handling events when focus is on other elements (like sidebar)
+      if (e.currentTarget !== document.activeElement && !e.currentTarget.contains(document.activeElement)) {
+        return;
+      }
+
       const target = e.target;
       const isInputField =
         target.tagName === "INPUT" ||
