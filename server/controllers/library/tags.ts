@@ -11,6 +11,68 @@ import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 
 /**
+ * Enhance tags with scene counts from tagged performers
+ * This adds scenes where performers have the tag, even if the scene itself doesn't
+ */
+function enhanceTagsWithPerformerScenes(tags: NormalizedTag[]): NormalizedTag[] {
+  // Get all scenes and performers from cache
+  const allScenes = stashCacheManager.getAllScenes();
+  const allPerformers = stashCacheManager.getAllPerformers();
+
+  // Build a map of performer ID -> set of tag IDs
+  const performerTagsMap = new Map<string, Set<string>>();
+  allPerformers.forEach((performer) => {
+    if (performer.tags && performer.tags.length > 0) {
+      performerTagsMap.set(
+        performer.id,
+        new Set(performer.tags.map((t) => t.id))
+      );
+    }
+  });
+
+  // Build a map of tag ID -> count of scenes with tagged performers
+  const tagPerformerSceneCount = new Map<string, number>();
+
+  allScenes.forEach((scene) => {
+    if (!scene.performers || scene.performers.length === 0) return;
+
+    // Get all unique tag IDs from this scene's performers
+    const performerTagIds = new Set<string>();
+    scene.performers.forEach((performer) => {
+      const performerTags = performerTagsMap.get(performer.id);
+      if (performerTags) {
+        performerTags.forEach((tagId) => performerTagIds.add(tagId));
+      }
+    });
+
+    // Increment count for each unique tag
+    performerTagIds.forEach((tagId) => {
+      tagPerformerSceneCount.set(
+        tagId,
+        (tagPerformerSceneCount.get(tagId) || 0) + 1
+      );
+    });
+  });
+
+  // Enhance tags with the calculated counts
+  return tags.map((tag) => {
+    const performerSceneCount = tagPerformerSceneCount.get(tag.id) || 0;
+    const directSceneCount = tag.scene_count || 0;
+
+    // Use the greater of direct scene count or performer scene count
+    // This handles cases where a tag is on both scenes and performers
+    const totalSceneCount = Math.max(directSceneCount, performerSceneCount);
+
+    return {
+      ...tag,
+      scene_count: totalSceneCount,
+      scene_count_via_performers: performerSceneCount,
+      scene_count_direct: directSceneCount,
+    };
+  });
+}
+
+/**
  * Merge user-specific data into tags
  * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
  */
@@ -177,6 +239,10 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
 
     // Use cached/filtered tags for remaining operations
     tags = filteredTags;
+
+    // Step 2.7: Enhance tags with performer scene counts
+    // This adds scenes where performers have the tag, even if the scene doesn't
+    tags = enhanceTagsWithPerformerScenes(tags);
 
     // Step 3: Merge with FRESH user data (ratings, stats)
     // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current

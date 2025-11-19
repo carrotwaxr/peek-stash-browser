@@ -153,10 +153,10 @@ export function applyGalleryFilters(
   }
 
   // Filter by performers
-  if (filters.performers) {
-    const performerIds = new Set(filters.performers.value);
+  if (filters.performers && filters.performers.value) {
+    const performerIds = new Set(filters.performers.value.map(String));
     filtered = filtered.filter((g) =>
-      g.performers?.some((p) => performerIds.has(p.id))
+      g.performers?.some((p) => performerIds.has(String(p.id)))
     );
   }
 

@@ -270,6 +270,28 @@ export function applyPerformerFilters(
     }
   }
 
+  // Filter by studios
+  // Note: Performers don't have a direct studio relationship in Stash
+  // We need to filter by performers who appear in scenes from specific studios
+  // This requires checking the scenes cache
+  if (filters.studios && filters.studios.value) {
+    const studioIds = new Set(filters.studios.value.map(String));
+    const allScenes = stashCacheManager.getAllScenes();
+
+    // Build a set of performer IDs that appear in scenes from the specified studios
+    const performerIdsInStudios = new Set<string>();
+    allScenes.forEach((scene) => {
+      if (scene.studio && studioIds.has(String(scene.studio.id))) {
+        scene.performers?.forEach((performer) => {
+          performerIdsInStudios.add(String(performer.id));
+        });
+      }
+    });
+
+    // Filter performers to only those who appear in scenes from the specified studios
+    filtered = filtered.filter((p) => performerIdsInStudios.has(p.id));
+  }
+
   // Filter by rating100
   if (filters.rating100) {
     const { modifier, value, value2 } = filters.rating100;

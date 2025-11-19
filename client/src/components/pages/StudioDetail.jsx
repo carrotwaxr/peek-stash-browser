@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
@@ -26,7 +32,7 @@ const StudioDetail = () => {
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Get active tab from URL or default to 'scenes'
-  const activeTab = searchParams.get('tab') || 'scenes';
+  const activeTab = searchParams.get("tab") || "scenes";
 
   // Set page title to studio name
   usePageTitle(studio?.name || "Studio");
@@ -165,17 +171,29 @@ const StudioDetail = () => {
         <div className="mt-8">
           <TabNavigation
             tabs={[
-              { id: 'scenes', label: 'Scenes', count: studio.scene_count || 0 },
-              { id: 'galleries', label: 'Galleries', count: studio.gallery_count || 0 },
-              { id: 'images', label: 'Images', count: studio.image_count || 0 },
-              { id: 'performers', label: 'Performers', count: studio.performer_count || 0 },
-              { id: 'groups', label: 'Collections', count: studio.group_count || 0 },
+              { id: "scenes", label: "Scenes", count: studio.scene_count || 0 },
+              {
+                id: "galleries",
+                label: "Galleries",
+                count: studio.gallery_count || 0,
+              },
+              { id: "images", label: "Images", count: studio.image_count || 0 },
+              {
+                id: "performers",
+                label: "Performers",
+                count: studio.performer_count || 0,
+              },
+              {
+                id: "groups",
+                label: "Collections",
+                count: studio.group_count || 0,
+              },
             ]}
             defaultTab="scenes"
           />
 
           {/* Tab Content */}
-          {activeTab === 'scenes' && (
+          {activeTab === "scenes" && (
             <SceneSearch
               context="scene_studio"
               permanentFilters={{
@@ -194,7 +212,7 @@ const StudioDetail = () => {
             />
           )}
 
-          {activeTab === 'galleries' && (
+          {activeTab === "galleries" && (
             <EntityGrid
               entityType="gallery"
               filters={{
@@ -209,7 +227,7 @@ const StudioDetail = () => {
             />
           )}
 
-          {activeTab === 'images' && (
+          {activeTab === "images" && (
             <EntityGrid
               entityType="image"
               filters={{
@@ -224,7 +242,7 @@ const StudioDetail = () => {
             />
           )}
 
-          {activeTab === 'performers' && (
+          {activeTab === "performers" && (
             <EntityGrid
               entityType="performer"
               filters={{
@@ -239,7 +257,7 @@ const StudioDetail = () => {
             />
           )}
 
-          {activeTab === 'groups' && (
+          {activeTab === "groups" && (
             <EntityGrid
               entityType="group"
               filters={{
@@ -321,20 +339,26 @@ const StudioImage = ({ studio }) => {
 // Studio Stats Component
 const StudioStats = ({ studio, studioId }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'scenes';
+  const activeTab = searchParams.get("tab") || "scenes";
 
   const handleTabSwitch = (tabId) => {
     const newParams = new URLSearchParams(searchParams);
-    if (tabId === 'scenes') {
-      newParams.delete('tab');
+    if (tabId === "scenes") {
+      newParams.delete("tab");
     } else {
-      newParams.set('tab', tabId);
+      newParams.set("tab", tabId);
     }
     setSearchParams(newParams);
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   };
 
-  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
+  const StatField = ({
+    label,
+    value,
+    valueColor = "var(--text-primary)",
+    onClick,
+    isActive,
+  }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && value > 0;
@@ -349,8 +373,8 @@ const StudioStats = ({ studio, studioId }) => {
             className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
             style={{
               color: valueColor,
-              cursor: isActive ? 'default' : 'pointer',
-              textDecoration: isActive ? 'underline' : 'none',
+              cursor: isActive ? "default" : "pointer",
+              textDecoration: isActive ? "underline" : "none",
             }}
           >
             {value}
@@ -367,7 +391,7 @@ const StudioStats = ({ studio, studioId }) => {
   return (
     <Card title="Statistics">
       {/* Visual Rating Display */}
-      {studio?.rating100 && studio.rating100 > 0 && (
+      {studio?.rating100 > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span
@@ -404,36 +428,36 @@ const StudioStats = ({ studio, studioId }) => {
           label="Scenes:"
           value={studio?.scene_count}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('scenes')}
-          isActive={activeTab === 'scenes'}
+          onClick={() => handleTabSwitch("scenes")}
+          isActive={activeTab === "scenes"}
         />
         <StatField
           label="Performers:"
           value={studio?.performer_count}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('performers')}
-          isActive={activeTab === 'performers'}
+          onClick={() => handleTabSwitch("performers")}
+          isActive={activeTab === "performers"}
         />
         <StatField
           label="Images:"
           value={studio?.image_count}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('images')}
-          isActive={activeTab === 'images'}
+          onClick={() => handleTabSwitch("images")}
+          isActive={activeTab === "images"}
         />
         <StatField
           label="Galleries:"
           value={studio?.gallery_count}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('galleries')}
-          isActive={activeTab === 'galleries'}
+          onClick={() => handleTabSwitch("galleries")}
+          isActive={activeTab === "galleries"}
         />
         <StatField
           label="Collections:"
           value={studio?.group_count}
           valueColor="var(--accent-primary)"
-          onClick={() => handleTabSwitch('groups')}
-          isActive={activeTab === 'groups'}
+          onClick={() => handleTabSwitch("groups")}
+          isActive={activeTab === "groups"}
         />
       </div>
     </Card>

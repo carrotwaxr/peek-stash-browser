@@ -43,39 +43,39 @@ const EntityGrid = ({ entityType, filters, emptyMessage }) => {
         switch (entityType) {
           case 'gallery':
             result = await libraryApi.findGalleries(queryParams);
-            setData(result.galleries || []);
-            setTotalCount(result.count || 0);
+            setData(result.findGalleries?.galleries || []);
+            setTotalCount(result.findGalleries?.count || 0);
             break;
           case 'group':
             result = await libraryApi.findGroups(queryParams);
-            setData(result.groups || []);
-            setTotalCount(result.count || 0);
+            setData(result.findGroups?.groups || []);
+            setTotalCount(result.findGroups?.count || 0);
             break;
           case 'performer':
             result = await libraryApi.findPerformers(queryParams);
-            setData(result.performers || []);
-            setTotalCount(result.count || 0);
+            setData(result.findPerformers?.performers || []);
+            setTotalCount(result.findPerformers?.count || 0);
             break;
           case 'studio':
             result = await libraryApi.findStudios(queryParams);
-            setData(result.studios || []);
-            setTotalCount(result.count || 0);
+            setData(result.findStudios?.studios || []);
+            setTotalCount(result.findStudios?.count || 0);
             break;
           case 'tag':
             result = await libraryApi.findTags(queryParams);
-            setData(result.tags || []);
-            setTotalCount(result.count || 0);
+            setData(result.findTags?.tags || []);
+            setTotalCount(result.findTags?.count || 0);
             break;
           case 'image':
             result = await libraryApi.findImages(queryParams);
-            setData(result.images || []);
-            setTotalCount(result.count || 0);
+            setData(result.findImages?.images || []);
+            setTotalCount(result.findImages?.count || 0);
             break;
           default:
             console.error(`Unknown entity type: ${entityType}`);
         }
       } catch (error) {
-        console.error(`Error fetching ${entityType}s:`, error);
+        console.error(`[EntityGrid] Error fetching ${entityType}s:`, error);
       } finally {
         setIsLoading(false);
       }
@@ -106,8 +106,7 @@ const EntityGrid = ({ entityType, filters, emptyMessage }) => {
   if (!data || data.length === 0) {
     return (
       <EmptyState
-        message={emptyMessage || `No ${entityType}s found`}
-        icon="📦"
+        title={emptyMessage || `No ${entityType}s found`}
       />
     );
   }
