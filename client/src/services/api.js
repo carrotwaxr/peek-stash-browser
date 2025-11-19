@@ -276,6 +276,16 @@ export const libraryApi = {
   },
 
   /**
+   * Search images with filtering and pagination
+   * @param {Object} params - Search parameters
+   * @param {Object} params.filter - General filters (pagination, search, sort)
+   * @param {Object} params.image_filter - Image-specific filters
+   */
+  findImages: (params = {}) => {
+    return apiPost("/library/images", params);
+  },
+
+  /**
    * Update rating for any entity type
    * @param {string} entityType - Entity type (scene, performer, tag, studio, gallery, group)
    * @param {string} entityId - Entity ID
