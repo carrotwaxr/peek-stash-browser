@@ -918,6 +918,27 @@ export const GROUP_FILTER_OPTIONS = [
     placeholder: "Search director...",
   },
   {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select performers...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "performerIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "studioId",
+    label: "Studio",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select studio...",
+  },
+  {
     key: "tagIds",
     label: "Tags",
     type: "searchable-select",
@@ -2010,6 +2031,22 @@ export const buildGroupFilter = (filters) => {
     groupFilter.tags = {
       value: filters.tagIds.map(String),
       modifier: filters.tagIdsModifier || "INCLUDES_ALL",
+    };
+  }
+
+  // Performers filter
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    groupFilter.performers = {
+      value: filters.performerIds.map(String),
+      modifier: filters.performerIdsModifier || "INCLUDES",
+    };
+  }
+
+  // Studios filter
+  if (filters.studioId && filters.studioId !== "") {
+    groupFilter.studios = {
+      value: [String(filters.studioId)],
+      modifier: "INCLUDES",
     };
   }
 
