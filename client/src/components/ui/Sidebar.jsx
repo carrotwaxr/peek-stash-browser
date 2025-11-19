@@ -35,7 +35,16 @@ const Sidebar = ({ navPreferences = [] }) => {
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences);
 
+  // User menu sub-items (static definition)
+  const userMenuSubItems = useMemo(() => [
+    { name: "Watch History", path: "/watch-history", icon: "history", isSubItem: true },
+    { name: "My Settings", path: "/my-settings", icon: "settings", isSubItem: true },
+    { name: "TV Mode", path: null, isToggle: true, icon: "tv", isSubItem: true },
+    { name: "Sign Out", path: null, isButton: true, icon: "logout", isSubItem: true },
+  ], []);
+
   // Build complete list of all navigable items (nav items + bottom items)
+  // When user menu is expanded, include sub-items in the navigation list
   const allNavItems = useMemo(() => {
     const bottomItems = [
       { name: "Help", path: null, isButton: true, icon: "questionCircle" },
@@ -51,16 +60,15 @@ const Sidebar = ({ navPreferences = [] }) => {
       path: null,
       isUserMenu: true,
       icon: "circle-user-round",
-      subItems: [
-        { name: "Watch History", path: "/watch-history", icon: "history" },
-        { name: "My Settings", path: "/my-settings", icon: "settings" },
-        { name: "TV Mode", path: null, isToggle: true, icon: "tv" },
-        { name: "Sign Out", path: null, isButton: true, icon: "logout" },
-      ]
     });
 
+    // If user menu is expanded, add sub-items to navigation list
+    if (isUserMenuExpanded) {
+      bottomItems.push(...userMenuSubItems);
+    }
+
     return [...navItems, ...bottomItems];
-  }, [navItems, user]);
+  }, [navItems, user, isUserMenuExpanded, userMenuSubItems]);
 
   // Get current page from React Router location
   const getCurrentPage = () => {
@@ -301,10 +309,8 @@ const Sidebar = ({ navPreferences = [] }) => {
 
               {/* User Menu */}
               {(() => {
-                const itemIndex = navItems.length + (user && user.role === "ADMIN" ? 2 : 1);
-                const isFocused = isTVMode && isMainNavActive && focusedIndex === itemIndex;
-                const userMenuIndex = allNavItems.findIndex(item => item.isUserMenu);
-                const userMenuItem = allNavItems[userMenuIndex];
+                const userMenuItemIndex = navItems.length + (user && user.role === "ADMIN" ? 2 : 1);
+                const isUserMenuFocused = isTVMode && isMainNavActive && focusedIndex === userMenuItemIndex;
 
                 return (
                   <div>
@@ -312,11 +318,11 @@ const Sidebar = ({ navPreferences = [] }) => {
                     <div className="xl:hidden">
                       <Tooltip content={user?.username || "User"} position="right">
                         <button
-                          ref={(el) => (itemRefs.current[itemIndex] = el)}
+                          ref={(el) => (itemRefs.current[userMenuItemIndex] = el)}
                           onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
+                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
                           aria-label="User menu"
-                          tabIndex={isFocused ? 0 : -1}
+                          tabIndex={isUserMenuFocused ? 0 : -1}
                         >
                           <ThemedIcon name="circle-user-round" size={20} />
                         </button>
@@ -325,10 +331,10 @@ const Sidebar = ({ navPreferences = [] }) => {
 
                     {/* User menu toggle - expanded view */}
                     <button
-                      ref={(el) => (itemRefs.current[itemIndex] = el)}
+                      ref={(el) => (itemRefs.current[userMenuItemIndex] = el)}
                       onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
-                      className={`hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                      tabIndex={isFocused ? 0 : -1}
+                      className={`hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
+                      tabIndex={isUserMenuFocused ? 0 : -1}
                     >
                       <div className="flex items-center gap-3">
                         <ThemedIcon name="circle-user-round" size={20} />
@@ -343,15 +349,20 @@ const Sidebar = ({ navPreferences = [] }) => {
                     {/* Nested user menu items - only in expanded view */}
                     {isUserMenuExpanded && (
                       <div className="hidden xl:block mt-1 ml-4 pl-4 border-l" style={{ borderColor: "var(--border-color)" }}>
-                        {userMenuItem?.subItems?.map((subItem) => {
+                        {userMenuSubItems.map((subItem, subIndex) => {
+                          const subItemIndex = userMenuItemIndex + 1 + subIndex;
+                          const isSubItemFocused = isTVMode && isMainNavActive && focusedIndex === subItemIndex;
+
                           if (subItem.name === "TV Mode") {
                             return (
                               <button
                                 key={subItem.name}
+                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
                                 onClick={() => {
                                   toggleTVMode();
                                 }}
-                                className="w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 nav-link mb-1"
+                                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
+                                tabIndex={isSubItemFocused ? 0 : -1}
                               >
                                 <div className="flex items-center gap-3">
                                   <ThemedIcon name="tv" size={16} />
@@ -364,8 +375,10 @@ const Sidebar = ({ navPreferences = [] }) => {
                             return (
                               <button
                                 key={subItem.name}
+                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
                                 onClick={logout}
-                                className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 text-red-600 hover:bg-red-50 mb-1"
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus text-red-600 hover:bg-red-50" : "text-red-600 hover:bg-red-50"}`}
+                                tabIndex={isSubItemFocused ? 0 : -1}
                               >
                                 <ThemedIcon name="logout" size={16} color="currentColor" />
                                 <span>Sign Out</span>
@@ -375,8 +388,10 @@ const Sidebar = ({ navPreferences = [] }) => {
                             return (
                               <Link
                                 key={subItem.name}
+                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
                                 to={subItem.path}
-                                className="flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 nav-link mb-1"
+                                className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
+                                tabIndex={isSubItemFocused ? 0 : -1}
                               >
                                 <ThemedIcon name={subItem.icon} size={16} />
                                 <span>{subItem.name}</span>
