@@ -94,7 +94,10 @@ const Sidebar = ({ navPreferences = [] }) => {
   // Listen for zone change events from page components
   useEffect(() => {
     const handleZoneChange = (e) => {
-      setIsMainNavActive(e.detail.zone === "mainNav");
+      const zone = e.detail.zone;
+      // zone === null means page doesn't support TV navigation (e.g., Scene player page)
+      // In this case, deactivate mainNav so keyboard events don't get intercepted
+      setIsMainNavActive(zone === "mainNav");
     };
 
     window.addEventListener("tvZoneChange", handleZoneChange);
