@@ -42,28 +42,25 @@ export const useGridPageTVNavigation = ({
     enabled: isTVMode && tvNavigation.isZoneActive("grid"),
     onSelect: onItemSelect,
     onEscapeUp: useCallback(() => {
-      const moved = tvNavigation.goToPreviousZone();
-      console.log(
-        moved
-          ? `🔼 Moved to previous zone: ${tvNavigation.currentZone}`
-          : "🔼 Already at first zone"
-      );
+      // Blur the currently focused element before switching zones
+      if (document.activeElement) {
+        document.activeElement.blur();
+      }
+      tvNavigation.goToPreviousZone();
     }, [tvNavigation]),
     onEscapeDown: useCallback(() => {
-      const moved = tvNavigation.goToNextZone();
-      console.log(
-        moved
-          ? `🔽 Moved to next zone: ${tvNavigation.currentZone}`
-          : "🔽 Already at last zone"
-      );
+      // Blur the currently focused element before switching zones
+      if (document.activeElement) {
+        document.activeElement.blur();
+      }
+      tvNavigation.goToNextZone();
     }, [tvNavigation]),
     onEscapeLeft: useCallback(() => {
-      const moved = tvNavigation.goToZone("mainNav");
-      console.log(
-        moved
-          ? `⬅️ Moved to sidebar: ${tvNavigation.currentZone}`
-          : "⬅️ Could not move to mainNav"
-      );
+      // Blur the currently focused element before switching zones
+      if (document.activeElement) {
+        document.activeElement.blur();
+      }
+      tvNavigation.goToZone("mainNav");
     }, [tvNavigation]),
   });
 

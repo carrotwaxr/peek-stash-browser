@@ -5,9 +5,9 @@ import { useAuth } from "../../hooks/useAuth.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { PeekLogo } from "../branding/PeekLogo.jsx";
 import { ThemedIcon } from "../icons/index.js";
+import Button from "./Button.jsx";
 import HelpModal from "./HelpModal.jsx";
 import Tooltip from "./Tooltip.jsx";
-import UserMenu from "./UserMenu.jsx";
 
 /**
  * Sidebar Navigation Component
@@ -24,17 +24,27 @@ import UserMenu from "./UserMenu.jsx";
 const Sidebar = ({ navPreferences = [] }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { isTVMode } = useTVMode();
+  const { user, logout } = useAuth();
+  const { isTVMode, toggleTVMode } = useTVMode();
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isMainNavActive, setIsMainNavActive] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [isUserMenuExpanded, setIsUserMenuExpanded] = useState(false);
   const itemRefs = useRef([]);
 
   // Get ordered and filtered nav items based on user preferences
   const navItems = getOrderedNavItems(navPreferences);
 
+  // User menu sub-items (static definition)
+  const userMenuSubItems = useMemo(() => [
+    { name: "Watch History", path: "/watch-history", icon: "history", isSubItem: true },
+    { name: "My Settings", path: "/my-settings", icon: "settings", isSubItem: true },
+    { name: "TV Mode", path: null, isToggle: true, icon: "tv", isSubItem: true },
+    { name: "Sign Out", path: null, isButton: true, icon: "logout", isSubItem: true },
+  ], []);
+
   // Build complete list of all navigable items (nav items + bottom items)
+  // When user menu is expanded, include sub-items in the navigation list
   const allNavItems = useMemo(() => {
     const bottomItems = [
       { name: "Help", path: null, isButton: true, icon: "questionCircle" },
@@ -44,13 +54,21 @@ const Sidebar = ({ navPreferences = [] }) => {
       bottomItems.push({ name: "Server Settings", path: "/server-settings", icon: "wrench" });
     }
 
-    bottomItems.push(
-      { name: "My Settings", path: "/my-settings", icon: "settings" },
-      { name: "Watch History", path: "/watch-history", icon: "history" }
-    );
+    // User menu parent item
+    bottomItems.push({
+      name: "User Menu",
+      path: null,
+      isUserMenu: true,
+      icon: "circle-user-round",
+    });
+
+    // If user menu is expanded, add sub-items to navigation list
+    if (isUserMenuExpanded) {
+      bottomItems.push(...userMenuSubItems);
+    }
 
     return [...navItems, ...bottomItems];
-  }, [navItems, user]);
+  }, [navItems, user, isUserMenuExpanded, userMenuSubItems]);
 
   // Get current page from React Router location
   const getCurrentPage = () => {
@@ -85,7 +103,9 @@ const Sidebar = ({ navPreferences = [] }) => {
 
   // Keyboard navigation when mainNav is active
   useEffect(() => {
-    if (!isTVMode || !isMainNavActive) return;
+    if (!isTVMode || !isMainNavActive) {
+      return;
+    }
 
     const handleKeyDown = (e) => {
       switch (e.key) {
@@ -98,7 +118,6 @@ const Sidebar = ({ navPreferences = [] }) => {
           }
           if (newIndex >= 0) {
             setFocusedIndex(newIndex);
-            console.log(`🔼 Sidebar: Focused item ${newIndex} (${allNavItems[newIndex]?.name})`);
           }
           break;
         }
@@ -112,7 +131,6 @@ const Sidebar = ({ navPreferences = [] }) => {
           }
           if (newIndex < allNavItems.length) {
             setFocusedIndex(newIndex);
-            console.log(`🔽 Sidebar: Focused item ${newIndex} (${allNavItems[newIndex]?.name})`);
           }
           break;
         }
@@ -120,14 +138,19 @@ const Sidebar = ({ navPreferences = [] }) => {
         case "Enter":
         case " ":
           e.preventDefault();
+          e.stopPropagation();
           const item = allNavItems[focusedIndex];
           if (item) {
             if (item.name === "Help") {
               setIsHelpModalOpen(true);
-              console.log("✅ Sidebar: Opened Help modal");
+            } else if (item.isUserMenu) {
+              setIsUserMenuExpanded(!isUserMenuExpanded);
+            } else if (item.name === "TV Mode") {
+              toggleTVMode();
+            } else if (item.name === "Sign Out") {
+              logout();
             } else if (item.path) {
               navigate(item.path);
-              console.log(`✅ Sidebar: Navigated to ${item.path}`);
             }
           }
           break;
@@ -136,7 +159,7 @@ const Sidebar = ({ navPreferences = [] }) => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isTVMode, isMainNavActive, focusedIndex, allNavItems, navigate, currentPage]);
+  }, [isTVMode, isMainNavActive, focusedIndex, allNavItems, navigate, currentPage, isUserMenuExpanded, toggleTVMode, logout]);
 
   // Scroll focused item into view
   useEffect(() => {
@@ -210,7 +233,7 @@ const Sidebar = ({ navPreferences = [] }) => {
             </ul>
           </nav>
 
-          {/* Bottom section - Help, Settings, My Settings, Watch History */}
+          {/* Bottom section - Help, Server Settings (admin), User Menu */}
           <div
             className="border-t p-2"
             style={{ borderColor: "var(--border-color)" }}
@@ -218,7 +241,7 @@ const Sidebar = ({ navPreferences = [] }) => {
             <div className="flex flex-col gap-1">
               {/* Help button */}
               {(() => {
-                const itemIndex = navItems.length; // First bottom item
+                const itemIndex = navItems.length;
                 const isFocused = isTVMode && isMainNavActive && focusedIndex === itemIndex;
                 return (
                   <>
@@ -280,67 +303,101 @@ const Sidebar = ({ navPreferences = [] }) => {
                 );
               })()}
 
-              {/* My Settings */}
+              {/* User Menu */}
               {(() => {
-                const itemIndex = navItems.length + (user && user.role === "ADMIN" ? 2 : 1);
-                const isFocused = isTVMode && isMainNavActive && focusedIndex === itemIndex;
-                return (
-                  <>
-                    <div className="xl:hidden">
-                      <Tooltip content="My Settings" position="right">
-                        <Link
-                          ref={(el) => (itemRefs.current[itemIndex] = el)}
-                          to="/my-settings"
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                          aria-label="My Settings"
-                          tabIndex={isFocused ? 0 : -1}
-                        >
-                          <ThemedIcon name="settings" size={20} />
-                        </Link>
-                      </Tooltip>
-                    </div>
-                    <Link
-                      ref={(el) => (itemRefs.current[itemIndex] = el)}
-                      to="/my-settings"
-                      className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                      tabIndex={isFocused ? 0 : -1}
-                    >
-                      <ThemedIcon name="settings" size={20} />
-                      <span className="text-sm font-medium">My Settings</span>
-                    </Link>
-                  </>
-                );
-              })()}
+                const userMenuItemIndex = navItems.length + (user && user.role === "ADMIN" ? 2 : 1);
+                const isUserMenuFocused = isTVMode && isMainNavActive && focusedIndex === userMenuItemIndex;
 
-              {/* Watch History */}
-              {(() => {
-                const itemIndex = navItems.length + (user && user.role === "ADMIN" ? 3 : 2);
-                const isFocused = isTVMode && isMainNavActive && focusedIndex === itemIndex;
                 return (
-                  <>
+                  <div>
+                    {/* User menu toggle - collapsed view */}
                     <div className="xl:hidden">
-                      <Tooltip content="Watch History" position="right">
-                        <Link
-                          ref={(el) => (itemRefs.current[itemIndex] = el)}
-                          to="/watch-history"
-                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                          aria-label="Watch History"
-                          tabIndex={isFocused ? 0 : -1}
+                      <Tooltip content={user?.username || "User"} position="right">
+                        <button
+                          ref={(el) => (itemRefs.current[userMenuItemIndex] = el)}
+                          onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
+                          className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
+                          aria-label="User menu"
+                          tabIndex={isUserMenuFocused ? 0 : -1}
                         >
-                          <ThemedIcon name="history" size={20} />
-                        </Link>
+                          <ThemedIcon name="circle-user-round" size={20} />
+                        </button>
                       </Tooltip>
                     </div>
-                    <Link
-                      ref={(el) => (itemRefs.current[itemIndex] = el)}
-                      to="/watch-history"
-                      className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                      tabIndex={isFocused ? 0 : -1}
+
+                    {/* User menu toggle - expanded view */}
+                    <button
+                      ref={(el) => (itemRefs.current[userMenuItemIndex] = el)}
+                      onClick={() => setIsUserMenuExpanded(!isUserMenuExpanded)}
+                      className={`hidden xl:flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 ${isUserMenuFocused ? "keyboard-focus" : "nav-link"}`}
+                      tabIndex={isUserMenuFocused ? 0 : -1}
                     >
-                      <ThemedIcon name="history" size={20} />
-                      <span className="text-sm font-medium">Watch History</span>
-                    </Link>
-                  </>
+                      <div className="flex items-center gap-3">
+                        <ThemedIcon name="circle-user-round" size={20} />
+                        <span className="text-sm font-medium">{user?.username || "User"}</span>
+                      </div>
+                      <ThemedIcon
+                        name={isUserMenuExpanded ? "chevron-up" : "chevron-down"}
+                        size={16}
+                      />
+                    </button>
+
+                    {/* Nested user menu items - only in expanded view */}
+                    {isUserMenuExpanded && (
+                      <div className="hidden xl:block mt-1 ml-4 pl-4 border-l" style={{ borderColor: "var(--border-color)" }}>
+                        {userMenuSubItems.map((subItem, subIndex) => {
+                          const subItemIndex = userMenuItemIndex + 1 + subIndex;
+                          const isSubItemFocused = isTVMode && isMainNavActive && focusedIndex === subItemIndex;
+
+                          if (subItem.name === "TV Mode") {
+                            return (
+                              <button
+                                key={subItem.name}
+                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
+                                onClick={() => {
+                                  toggleTVMode();
+                                }}
+                                className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
+                                tabIndex={isSubItemFocused ? 0 : -1}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <ThemedIcon name="tv" size={16} />
+                                  <span>TV Mode</span>
+                                </div>
+                                {isTVMode && <span className="text-sm">✓</span>}
+                              </button>
+                            );
+                          } else if (subItem.name === "Sign Out") {
+                            return (
+                              <button
+                                key={subItem.name}
+                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
+                                onClick={logout}
+                                className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus text-red-600 hover:bg-red-50" : "text-red-600 hover:bg-red-50"}`}
+                                tabIndex={isSubItemFocused ? 0 : -1}
+                              >
+                                <ThemedIcon name="logout" size={16} color="currentColor" />
+                                <span>Sign Out</span>
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <Link
+                                key={subItem.name}
+                                ref={(el) => (itemRefs.current[subItemIndex] = el)}
+                                to={subItem.path}
+                                className={`flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1 ${isSubItemFocused ? "keyboard-focus" : "nav-link"}`}
+                                tabIndex={isSubItemFocused ? 0 : -1}
+                              >
+                                <ThemedIcon name={subItem.icon} size={16} />
+                                <span>{subItem.name}</span>
+                              </Link>
+                            );
+                          }
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })()}
             </div>
