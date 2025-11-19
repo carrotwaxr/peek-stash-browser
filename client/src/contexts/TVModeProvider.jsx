@@ -2,12 +2,11 @@ import React, { useState } from "react";
 import { TVModeContext } from "./TVModeContext.js";
 
 export const TVModeProvider = ({ children }) => {
-  /*const [isTVMode, setIsTVMode] = useState(() => {
+  const [isTVMode, setIsTVMode] = useState(() => {
     // Load TV mode preference from localStorage (default: false)
     const saved = localStorage.getItem("peek-tv-mode");
     return saved === "true";
-  });*/
-  const [isTVMode, setIsTVMode] = useState(true);
+  });
 
   const toggleTVMode = () => {
     setIsTVMode((prev) => {
