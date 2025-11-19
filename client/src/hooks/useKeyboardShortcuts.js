@@ -51,12 +51,13 @@ export const useKeyboardShortcuts = (
     const handleKeyDown = (event) => {
       // Skip if user is typing in an input field
       if (isTypingInInput(event.target)) {
+        console.log(`[useKeyboardShortcuts:${context}] Skipping ${event.key} - typing in input (target: ${event.target.tagName})`);
         return;
       }
 
       // Skip if custom shouldHandle returns false
       if (shouldHandleRef.current && !shouldHandleRef.current(event)) {
-        console.log(`[useKeyboardShortcuts:${context}] shouldHandle returned false for ${event.key}`);
+        console.log(`[useKeyboardShortcuts:${context}] shouldHandle returned false for ${event.key} (target: ${event.target.tagName}, classes: ${event.target.className})`);
         return;
       }
 
@@ -86,13 +87,15 @@ export const useKeyboardShortcuts = (
       }
     };
 
-    // Add event listener
-    document.addEventListener("keydown", handleKeyDown);
+    // Add event listener with capture phase for video-player context
+    // This ensures we receive events before Video.js can stop propagation
+    const useCapture = context === "video-player";
+    document.addEventListener("keydown", handleKeyDown, useCapture);
 
     // Cleanup
     return () => {
       console.log(`[useKeyboardShortcuts:${context}] Removing keyboard shortcuts`);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, useCapture);
     };
   }, [enabled, context, priority]);
 };
