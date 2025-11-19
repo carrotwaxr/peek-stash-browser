@@ -1,0 +1,15 @@
+---
+description: Create a branch and begin a new work item
+---
+
+I want to create a new branch to add a feature, fix a bug, or make another type of improvement to the code. Please:
+
+1. Read any context or information the user provides about the new work item
+2. Read any relevant project documentation (\*.md, /docs/\*) for additional context
+3. Utilize best practices and industry-standard solutions, using web search as needed
+4. Take inspiration from Stash (~/code/stash), Plex, YouTube, and Jellyfin as these are popular web apps with similar features
+5. Present a summarized step-by-step implementation plan to the user
+6. Wait for confirmation
+7. If uncertain when making code changes, stop and ask for input from the user rather than iterating repeatedly guessing at the solution
+8. Keep code changes DRY and follow JavaScript / React best practices. Look for opportunities to refactor or improve affected code while making changes
+9. Once complete and testable, ask the user to start and test the application

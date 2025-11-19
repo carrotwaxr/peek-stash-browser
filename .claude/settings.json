@@ -1,0 +1,91 @@
+{
+  "name": "Peek Stash Browser",
+  "description": "Full-stack web application for browsing and streaming Stash media",
+  "permissions": {
+    "bash": {
+      "enabled": true,
+      "autoApprove": [
+        "git status",
+        "git diff",
+        "git log",
+        "git branch",
+        "git add",
+        "git commit",
+        "git push",
+        "git tag",
+        "npm test",
+        "npm run test:run",
+        "npm run test:coverage",
+        "npm run lint",
+        "npm run format",
+        "npm run format:check",
+        "npm run build",
+        "npm run analyze",
+        "npm run depcheck",
+        "npm run knip",
+        "npx prisma",
+        "docker-compose logs",
+        "docker-compose ps",
+        "docker-compose restart",
+        "docker ps",
+        "docker logs",
+        "ls",
+        "pwd",
+        "cat",
+        "find",
+        "grep"
+      ]
+    },
+    "edit": {
+      "enabled": true,
+      "autoApprove": true
+    },
+    "write": {
+      "enabled": true,
+      "autoApprove": false,
+      "requireConfirmation": [
+        "*.prisma",
+        "package.json",
+        "docker-compose.yml",
+        "Dockerfile*",
+        ".env*"
+      ]
+    },
+    "read": {
+      "enabled": true,
+      "autoApprove": true
+    }
+  },
+  "conventions": {
+    "branchNaming": {
+      "pattern": "(feature|bugfix|hotfix|improvement)/*",
+      "examples": [
+        "feature/add-markers-support",
+        "bugfix/fix-video-seeking",
+        "improvement/optimize-cache"
+      ]
+    },
+    "commitMessages": {
+      "format": "conventional",
+      "types": ["feat", "fix", "docs", "refactor", "perf", "test", "chore"],
+      "includeCoAuthor": true
+    },
+    "testing": {
+      "runBeforeCommit": true,
+      "framework": "vitest"
+    }
+  },
+  "workflows": {
+    "beforeCommit": [
+      "Run tests (npm test in client and server)",
+      "Run linter (npm run lint)",
+      "Check for uncommitted changes in docs that need updating"
+    ],
+    "beforePR": [
+      "Ensure all tests pass",
+      "Update README.md if user-facing changes",
+      "Update docs/ if feature changes",
+      "Verify version sync between client and server package.json"
+    ]
+  }
+}
