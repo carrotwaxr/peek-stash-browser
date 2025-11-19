@@ -40,6 +40,16 @@ const SceneContent = ({ location }) => {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [sidebarHeight, setSidebarHeight] = useState(null);
 
+  // Dispatch zone change event to disable TV navigation on this page
+  useEffect(() => {
+    // Dispatch event to inform global listeners (Sidebar) that we're on a page without TV navigation zones
+    window.dispatchEvent(
+      new CustomEvent("tvZoneChange", {
+        detail: { zone: null }, // null zone means no TV navigation active
+      })
+    );
+  }, []); // Run once on mount
+
   // Measure left column height and sync to sidebar
   useEffect(() => {
     if (!leftColumnRef.current) return;

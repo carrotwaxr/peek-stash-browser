@@ -132,12 +132,13 @@ const VideoPlayer = () => {
   });
 
   // Media keys for playlist navigation
+  // Always enabled - shortcuts check playerRef.current before executing
   usePlaylistMediaKeys({
     playerRef,
     playlist,
     playNext: playNextInPlaylist,
     playPrevious: playPreviousInPlaylist,
-    enabled: !!video,
+    enabled: true,
   });
 
   // Auto-fullscreen on mobile orientation change

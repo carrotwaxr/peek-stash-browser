@@ -77,12 +77,14 @@ export const useKeyboardShortcuts = (
       }
     };
 
-    // Add event listener
-    document.addEventListener("keydown", handleKeyDown);
+    // Add event listener with capture phase for video-player context
+    // This ensures we receive events before Video.js can stop propagation
+    const useCapture = context === "video-player";
+    document.addEventListener("keydown", handleKeyDown, useCapture);
 
     // Cleanup
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, useCapture);
     };
   }, [enabled, context, priority]);
 };
