@@ -6,8 +6,7 @@ import { useAuth } from "../../hooks/useAuth.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import {
@@ -27,7 +26,6 @@ const Galleries = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
-  const { isTVMode } = useTVMode();
   const columns = useGridColumns("galleries");
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -69,27 +67,20 @@ const Galleries = () => {
   const currentGalleries = data?.galleries || [];
   const totalCount = data?.count || 0;
 
-  const urlPage = parseInt(searchParams.get("page")) || 1;
   const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
   const totalPages = Math.ceil(totalCount / urlPerPage);
 
-  const { setItemRef, isFocused } = useSpatialNavigation({
+  // TV Navigation - use shared hook for all grid pages
+  const {
+    isTVMode,
+    tvNavigation,
+    searchControlsProps,
+    gridItemProps,
+  } = useGridPageTVNavigation({
     items: currentGalleries,
     columns,
-    enabled: !isLoading && isTVMode,
-    onSelect: (gallery) => navigate(`/gallery/${gallery.id}`),
-    onPageUp: () =>
-      urlPage > 1 &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage - 1 },
-      }),
-    onPageDown: () =>
-      urlPage < totalPages &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage + 1 },
-      }),
+    totalPages,
+    onItemSelect: (gallery) => navigate(`/gallery/${gallery.id}`),
   });
 
   useInitialFocus(
@@ -123,6 +114,7 @@ const Galleries = () => {
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}
+          {...searchControlsProps}
         >
           {isLoading ? (
             <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
@@ -140,17 +132,18 @@ const Galleries = () => {
           ) : (
             <>
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
-                {currentGalleries.map((gallery, index) => (
-                  <GalleryCard
-                    key={gallery.id}
-                    ref={(el) => setItemRef(index, el)}
-                    gallery={gallery}
-                    tabIndex={isFocused(index) ? 0 : -1}
-                    className={isFocused(index) ? "keyboard-focus" : ""}
-                    isTVMode={isTVMode}
-                    referrerUrl={`${location.pathname}${location.search}`}
-                  />
-                ))}
+                {currentGalleries.map((gallery, index) => {
+                  const itemProps = gridItemProps(index);
+                  return (
+                    <GalleryCard
+                      key={gallery.id}
+                      gallery={gallery}
+                      isTVMode={isTVMode}
+                      referrerUrl={`${location.pathname}${location.search}`}
+                      {...itemProps}
+                    />
+                  );
+                })}
               </div>
             </>
           )}

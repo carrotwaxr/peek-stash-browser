@@ -6,8 +6,7 @@ import { useAuth } from "../../hooks/useAuth.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
   CacheLoadingBanner,
@@ -26,7 +25,6 @@ const Performers = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
-  const { isTVMode } = useTVMode();
   const columns = useGridColumns("performers");
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -73,33 +71,26 @@ const Performers = () => {
   };
 
   const currentPerformers = data?.performers || [];
-
   const totalCount = data?.count || 0;
 
-  // Get current pagination state from URL params for bottom pagination
-  const urlPage = parseInt(searchParams.get("page")) || 1;
-  const urlPerPage = parseInt(searchParams.get("per_page")) || 24; // Fixed: 'per_page' not 'perPage'
-
-  // Calculate totalPages based on urlPerPage (from URL params), not lastQuery
+  // Calculate totalPages based on URL params
+  const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
   const totalPages = Math.ceil(totalCount / urlPerPage);
 
-  // Spatial navigation
-  const { setItemRef, isFocused } = useSpatialNavigation({
+  // TV Navigation - use shared hook for all grid pages
+  const {
+    isTVMode,
+    tvNavigation,
+    gridNavigation,
+    searchControlsProps,
+    gridItemProps,
+  } = useGridPageTVNavigation({
     items: currentPerformers,
     columns,
-    enabled: !isLoading && isTVMode,
-    onSelect: (performer) => navigate(`/performer/${performer.id}`),
-    onPageUp: () =>
-      urlPage > 1 &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage - 1 },
-      }),
-    onPageDown: () =>
-      urlPage < totalPages &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage + 1 },
+    totalPages,
+    onItemSelect: (performer) =>
+      navigate(`/performer/${performer.id}`, {
+        state: { referrerUrl: `${location.pathname}${location.search}` },
       }),
   });
 
@@ -122,6 +113,26 @@ const Performers = () => {
 
   return (
     <PageLayout>
+      {/* TV Mode Zone Indicator (temporary for testing) */}
+      {isTVMode && (
+        <div
+          style={{
+            position: "fixed",
+            top: "10px",
+            right: "10px",
+            zIndex: 9999,
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            color: "white",
+            padding: "8px 12px",
+            borderRadius: "4px",
+            fontSize: "14px",
+            fontFamily: "monospace",
+          }}
+        >
+          Zone: <strong>{tvNavigation.currentZone}</strong>
+        </div>
+      )}
+
       <div ref={pageRef}>
         <PageHeader
           title="Performers"
@@ -137,6 +148,7 @@ const Performers = () => {
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}
+          {...searchControlsProps}
         >
           {isLoading ? (
             <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
@@ -154,17 +166,18 @@ const Performers = () => {
           ) : (
             <>
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
-                {currentPerformers.map((performer, index) => (
-                  <PerformerCard
-                    key={performer.id}
-                    ref={(el) => setItemRef(index, el)}
-                    performer={performer}
-                    tabIndex={isFocused(index) ? 0 : -1}
-                    className={isFocused(index) ? "keyboard-focus" : ""}
-                    isTVMode={isTVMode}
-                    referrerUrl={`${location.pathname}${location.search}`}
-                  />
-                ))}
+                {currentPerformers.map((performer, index) => {
+                  const itemProps = gridItemProps(index);
+                  return (
+                    <PerformerCard
+                      key={performer.id}
+                      performer={performer}
+                      isTVMode={isTVMode}
+                      referrerUrl={`${location.pathname}${location.search}`}
+                      {...itemProps}
+                    />
+                  );
+                })}
               </div>
             </>
           )}

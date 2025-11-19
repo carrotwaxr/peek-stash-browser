@@ -1,32 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Custom hook for spatial (2D grid) keyboard navigation
- * Provides TV-friendly navigation with arrow keys
+ * Custom hook for horizontal (1D) keyboard navigation
+ * Used for navigation bars, button groups, etc.
  *
  * @param {Object} options Configuration options
  * @param {Array} options.items Array of items to navigate
- * @param {number} options.columns Number of columns in grid
  * @param {boolean} options.enabled Whether navigation is enabled
- * @param {Function} options.onSelect Callback when item is selected (Enter/Space)
- * @param {Function} options.onPageUp Callback for PageUp key
- * @param {Function} options.onPageDown Callback for PageDown key
- * @param {Function} options.onEscapeUp Callback when Up arrow pressed on top row
- * @param {Function} options.onEscapeDown Callback when Down arrow pressed on bottom row
- * @param {Function} options.onEscapeLeft Callback when Left arrow pressed on leftmost column
+ * @param {Function} options.onSelect Callback when item is selected (Enter)
+ * @param {Function} options.onEscapeUp Callback when Up arrow pressed (exit zone upward)
+ * @param {Function} options.onEscapeDown Callback when Down arrow pressed (exit zone downward)
  * @param {number} options.initialFocusIndex Initial focus index (default: 0)
  * @returns {Object} Navigation state and helpers
  */
-export const useSpatialNavigation = ({
+export const useHorizontalNavigation = ({
   items = [],
-  columns = 4,
   enabled = true,
   onSelect,
-  onPageUp,
-  onPageDown,
   onEscapeUp,
   onEscapeDown,
-  onEscapeLeft,
   initialFocusIndex = 0,
 }) => {
   const [focusedIndex, setFocusedIndex] = useState(initialFocusIndex);
@@ -65,12 +57,7 @@ export const useSpatialNavigation = ({
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
-          // Check if we're in the leftmost column (index % columns === 0)
-          if (focusedIndex % columns === 0 && onEscapeLeft) {
-            onEscapeLeft();
-          } else {
-            setFocusedIndex((prev) => Math.max(0, prev - 1));
-          }
+          setFocusedIndex((prev) => Math.max(0, prev - 1));
           handled = true;
           break;
 
@@ -82,49 +69,25 @@ export const useSpatialNavigation = ({
 
         case "ArrowUp":
           e.preventDefault();
-          // Check if we're on the top row (index < columns)
-          if (focusedIndex < columns && onEscapeUp) {
+          if (onEscapeUp) {
             onEscapeUp();
-          } else {
-            setFocusedIndex((prev) => Math.max(0, prev - columns));
           }
           handled = true;
           break;
 
-        case "ArrowDown": {
+        case "ArrowDown":
           e.preventDefault();
-          // Check if we're on the bottom row (moving down would exceed total items)
-          const wouldExceed = focusedIndex + columns >= totalItems;
-          if (wouldExceed && onEscapeDown) {
+          if (onEscapeDown) {
             onEscapeDown();
-          } else {
-            setFocusedIndex((prev) => Math.min(totalItems - 1, prev + columns));
           }
           handled = true;
           break;
-        }
 
         case "Enter":
         case " ":
           e.preventDefault();
           if (items[focusedIndex] && onSelect) {
             onSelect(items[focusedIndex], focusedIndex);
-          }
-          handled = true;
-          break;
-
-        case "PageUp":
-          e.preventDefault();
-          if (onPageUp) {
-            onPageUp();
-          }
-          handled = true;
-          break;
-
-        case "PageDown":
-          e.preventDefault();
-          if (onPageDown) {
-            onPageDown();
           }
           handled = true;
           break;
@@ -144,18 +107,7 @@ export const useSpatialNavigation = ({
 
       return handled;
     },
-    [
-      enabled,
-      items,
-      focusedIndex,
-      columns,
-      onSelect,
-      onPageUp,
-      onPageDown,
-      onEscapeUp,
-      onEscapeDown,
-      onEscapeLeft,
-    ]
+    [enabled, items, focusedIndex, onSelect, onEscapeUp, onEscapeDown]
   );
 
   // Attach keyboard listener

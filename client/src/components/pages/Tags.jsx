@@ -6,8 +6,7 @@ import { useAuth } from "../../hooks/useAuth.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
   CacheLoadingBanner,
@@ -26,7 +25,6 @@ const Tags = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
-  const { isTVMode } = useTVMode();
   const columns = useGridColumns("tags");
 
   const [lastQuery, setLastQuery] = useState(null);
@@ -75,31 +73,21 @@ const Tags = () => {
   const currentTags = data?.tags || [];
   const totalCount = data?.count || 0;
 
-  // Get current pagination state from URL params for bottom pagination
-  const urlPage = parseInt(searchParams.get("page")) || 1;
-  const urlPerPage = parseInt(searchParams.get("per_page")) || 24; // Fixed: 'per_page' not 'perPage'
-
-  // Calculate totalPages based on urlPerPage (from URL params), not lastQuery
+  // Calculate totalPages based on URL params
+  const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
   const totalPages = Math.ceil(totalCount / urlPerPage);
 
-  // Spatial navigation
-  const { setItemRef, isFocused } = useSpatialNavigation({
+  // TV Navigation - use shared hook for all grid pages
+  const {
+    isTVMode,
+    tvNavigation,
+    searchControlsProps,
+    gridItemProps,
+  } = useGridPageTVNavigation({
     items: currentTags,
     columns,
-    enabled: !isLoading && isTVMode,
-    onSelect: (tag) => navigate(`/tag/${tag.id}`),
-    onPageUp: () =>
-      urlPage > 1 &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage - 1 },
-      }),
-    onPageDown: () =>
-      urlPage < totalPages &&
-      handleQueryChange({
-        ...lastQuery,
-        filter: { ...lastQuery.filter, page: urlPage + 1 },
-      }),
+    totalPages,
+    onItemSelect: (tag) => navigate(`/tag/${tag.id}`),
   });
 
   // Initial focus
@@ -133,6 +121,7 @@ const Tags = () => {
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}
+          {...searchControlsProps}
         >
           {isLoading ? (
             <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
@@ -150,17 +139,18 @@ const Tags = () => {
           ) : (
             <>
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
-                {currentTags.map((tag, index) => (
-                  <TagCard
-                    key={tag.id}
-                    ref={(el) => setItemRef(index, el)}
-                    tag={tag}
-                    tabIndex={isFocused(index) ? 0 : -1}
-                    className={isFocused(index) ? "keyboard-focus" : ""}
-                    isTVMode={isTVMode}
-                    referrerUrl={`${location.pathname}${location.search}`}
-                  />
-                ))}
+                {currentTags.map((tag, index) => {
+                  const itemProps = gridItemProps(index);
+                  return (
+                    <TagCard
+                      key={tag.id}
+                      tag={tag}
+                      isTVMode={isTVMode}
+                      referrerUrl={`${location.pathname}${location.search}`}
+                      {...itemProps}
+                    />
+                  );
+                })}
               </div>
             </>
           )}
