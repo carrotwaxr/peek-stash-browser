@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { useAuth } from "../../hooks/useAuth.js";
+import { useGridColumns } from "../../hooks/useGridColumns.js";
+import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
   CacheLoadingBanner,
@@ -31,8 +33,10 @@ const SceneSearch = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const columns = useGridColumns("scenes");
 
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,6 +123,20 @@ const SceneSearch = ({
   // Calculate totalPages based on currentPerPage from query
   const totalPages = Math.ceil(totalCount / currentPerPage);
 
+  // TV Navigation - use shared hook for all grid pages
+  const {
+    isTVMode,
+    tvNavigation,
+    gridNavigation,
+    searchControlsProps,
+    gridItemProps,
+  } = useGridPageTVNavigation({
+    items: currentScenes,
+    columns,
+    totalPages,
+    onItemSelect: handleSceneClick,
+  });
+
   if (error) {
     return (
       <PageLayout>
@@ -144,6 +162,7 @@ const SceneSearch = ({
         totalPages={totalPages}
         totalCount={totalCount}
         syncToUrl={captureReferrer}
+        {...searchControlsProps}
       >
         <SceneGrid
           scenes={currentScenes || []}
@@ -153,6 +172,10 @@ const SceneSearch = ({
           emptyMessage="No scenes found"
           emptyDescription="Try adjusting your search filters"
           enableKeyboard={true}
+          isTVMode={isTVMode}
+          tvGridZoneActive={isTVMode && tvNavigation.isZoneActive("grid")}
+          gridNavigation={gridNavigation}
+          gridItemProps={gridItemProps}
         />
       </SearchControls>
     </PageLayout>

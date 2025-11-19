@@ -2,8 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { LucideCheckSquare, LucideSquare } from "lucide-react";
 import { SCENE_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { useSpatialNavigation } from "../../hooks/useSpatialNavigation.js";
-import { useTVMode } from "../../hooks/useTVMode.js";
 import {
   BulkActionBar,
   Button,
@@ -26,10 +24,13 @@ const SceneGrid = ({
   emptyMessage = "No scenes found",
   emptyDescription = "Check your media library configuration",
   enableKeyboard = true,
+  isTVMode = false,
+  tvGridZoneActive = false,
+  gridNavigation = null,
+  gridItemProps = null,
 }) => {
   const gridRef = useRef();
   const columns = useGridColumns("scenes");
-  const { isTVMode } = useTVMode();
 
   // Selection state (always enabled, no mode toggle)
   const [selectedScenes, setSelectedScenes] = useState([]);
@@ -58,41 +59,16 @@ const SceneGrid = ({
     setSelectedScenes([]);
   };
 
-  // Handle selection with keyboard (Enter/Space)
-  const handleKeyboardSelect = (scene) => {
-    if (selectedScenes.length > 0) {
-      handleToggleSelect(scene);
-    } else {
-      onSceneClick?.(scene);
-    }
-  };
-
-  // Spatial navigation hook
-  const {
-    focusedIndex: _focusedIndex,
-    setItemRef,
-    isFocused,
-  } = useSpatialNavigation({
-    items: scenes,
-    columns,
-    enabled: isTVMode && enableKeyboard,
-    onSelect: handleKeyboardSelect,
-    onPageUp: () =>
-      onPageChange && currentPage > 1 && onPageChange(currentPage - 1),
-    onPageDown: () =>
-      onPageChange && currentPage < totalPages && onPageChange(currentPage + 1),
-  });
-
-  // Set initial focus when grid loads (only in TV mode)
+  // Set initial focus when grid loads and zone is active (only in TV mode)
   useEffect(() => {
-    if (isTVMode && enableKeyboard && scenes?.length > 0 && gridRef.current) {
+    if (tvGridZoneActive && scenes?.length > 0 && gridRef.current) {
       // Focus the grid container to enable keyboard navigation
       const firstFocusable = gridRef.current.querySelector('[tabindex="0"]');
       if (firstFocusable) {
         firstFocusable.focus();
       }
     }
-  }, [isTVMode, enableKeyboard, scenes]);
+  }, [tvGridZoneActive, scenes]);
 
   // Clear selections when page changes
   useEffect(() => {
@@ -158,20 +134,22 @@ const SceneGrid = ({
 
       {/* Grid */}
       <div ref={gridRef} className={SCENE_GRID_CONTAINER_CLASSNAMES}>
-        {scenes.map((scene, index) => (
-          <SceneCard
-            key={scene.id}
-            ref={(el) => setItemRef(index, el)}
-            scene={scene}
-            onClick={onSceneClick}
-            tabIndex={isFocused(index) ? 0 : -1}
-            className={isFocused(index) ? "keyboard-focus" : ""}
-            isSelected={selectedScenes.some((s) => s.id === scene.id)}
-            onToggleSelect={handleToggleSelect}
-            selectionMode={selectedScenes.length > 0}
-            autoplayOnScroll={columns === 1}
-          />
-        ))}
+        {scenes.map((scene, index) => {
+          // Use gridItemProps if provided (TV mode with zone navigation), otherwise use defaults
+          const itemProps = gridItemProps ? gridItemProps(index) : {};
+          return (
+            <SceneCard
+              key={scene.id}
+              scene={scene}
+              onClick={onSceneClick}
+              isSelected={selectedScenes.some((s) => s.id === scene.id)}
+              onToggleSelect={handleToggleSelect}
+              selectionMode={selectedScenes.length > 0}
+              autoplayOnScroll={columns === 1}
+              {...itemProps}
+            />
+          );
+        })}
       </div>
 
       {/* Pagination */}
