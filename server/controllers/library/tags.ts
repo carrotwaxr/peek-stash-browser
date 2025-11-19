@@ -9,6 +9,7 @@ import { userStatsService } from "../../services/UserStatsService.js";
 import getStash from "../../stash.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Enhance tags with scene counts from tagged performers
@@ -272,7 +273,25 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     const total = tags.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedTags = tags.slice(startIndex, endIndex);
+    let paginatedTags = tags.slice(startIndex, endIndex);
+
+    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
+    if (ids && ids.length === 1 && paginatedTags.length === 1) {
+      const tag = paginatedTags[0];
+      const actualImageCount = await calculateEntityImageCount("tag", tag.id);
+      paginatedTags = [
+        {
+          ...tag,
+          image_count: actualImageCount,
+        },
+      ];
+      logger.info("Calculated accurate image_count for tag detail", {
+        tagId: tag.id,
+        tagName: tag.name,
+        stashImageCount: tag.image_count,
+        actualImageCount,
+      });
+    }
 
     res.json({
       findTags: {

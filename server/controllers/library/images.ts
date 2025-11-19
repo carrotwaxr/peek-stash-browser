@@ -7,6 +7,70 @@ import { logger } from "../../utils/logger.js";
 import { transformImage } from "../../utils/pathMapping.js";
 
 /**
+ * Calculate actual image count for an entity by querying galleries→images
+ * This provides the real count that includes Gallery→Image relationships
+ */
+export async function calculateEntityImageCount(
+  entityType: "performer" | "studio" | "tag",
+  entityId: string
+): Promise<number> {
+  try {
+    // Step 1: Find galleries matching the entity
+    const allGalleries = stashCacheManager.getAllGalleries();
+    let matchingGalleries = allGalleries;
+
+    if (entityType === "performer") {
+      const performerIds = new Set([String(entityId)]);
+      matchingGalleries = matchingGalleries.filter((g) =>
+        g.performers?.some((p) => performerIds.has(String(p.id)))
+      );
+    } else if (entityType === "tag") {
+      const tagIds = new Set([String(entityId)]);
+      matchingGalleries = matchingGalleries.filter((g) =>
+        g.tags?.some((t) => tagIds.has(String(t.id)))
+      );
+    } else if (entityType === "studio") {
+      const studioIds = new Set([String(entityId)]);
+      matchingGalleries = matchingGalleries.filter(
+        (g) => g.studio && studioIds.has(String(g.studio.id))
+      );
+    }
+
+    // Step 2: Get all images from matching galleries and dedupe
+    const stash = getStash();
+    const allImagesMap = new Map();
+
+    for (const gallery of matchingGalleries) {
+      try {
+        const result = await stash.findImages({
+          filter: { per_page: -1 },
+          image_filter: {
+            galleries: {
+              value: [gallery.id],
+              modifier: CriterionModifier.Includes,
+            },
+          },
+        });
+
+        const images = result?.findImages?.images || [];
+        images.forEach((image: any) => {
+          allImagesMap.set(image.id, image);
+        });
+      } catch (error) {
+        // Continue with other galleries
+      }
+    }
+
+    return allImagesMap.size;
+  } catch (error) {
+    logger.error(`Error calculating image count for ${entityType} ${entityId}`, {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return 0;
+  }
+}
+
+/**
  * Find images endpoint
  * Handles both:
  * 1. Direct Entity→Image relationships (rare - most users don't tag individual images)
