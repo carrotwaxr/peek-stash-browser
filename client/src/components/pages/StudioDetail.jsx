@@ -177,7 +177,7 @@ const StudioDetail = () => {
                 label: "Galleries",
                 count: studio.gallery_count || 0,
               },
-              { id: "images", label: "Images", count: studio.image_count || 0 },
+              { id: "images", label: "Images", count: studio.gallery_count || 0 }, // Use gallery count as proxy
               {
                 id: "performers",
                 label: "Performers",

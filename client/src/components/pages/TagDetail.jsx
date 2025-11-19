@@ -202,7 +202,7 @@ const TagDetail = () => {
             tabs={[
               { id: 'scenes', label: 'Scenes', count: tag.scene_count || 0 },
               { id: 'galleries', label: 'Galleries', count: tag.gallery_count || 0 },
-              { id: 'images', label: 'Images', count: tag.image_count || 0 },
+              { id: 'images', label: 'Images', count: tag.gallery_count || 0 }, // Use gallery count as proxy
               { id: 'performers', label: 'Performers', count: tag.performer_count || 0 },
               { id: 'studios', label: 'Studios', count: tag.studio_count || 0 },
               { id: 'groups', label: 'Collections', count: tag.group_count || 0 },

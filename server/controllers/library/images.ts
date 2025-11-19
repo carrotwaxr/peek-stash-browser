@@ -4,6 +4,7 @@ import { stashCacheManager } from "../../services/StashCacheManager.js";
 import getStash from "../../stash.js";
 import { CriterionModifier } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { transformImage } from "../../utils/pathMapping.js";
 
 /**
  * Find images endpoint
@@ -51,7 +52,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
       );
     }
 
-    logger.debug("Finding images for entity", {
+    logger.info("Finding images for entity", {
       galleryCount: matchingGalleries.length,
       performerFilter: image_filter?.performers?.value,
       tagFilter: image_filter?.tags?.value,
@@ -106,7 +107,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
 
     let images = Array.from(allImagesMap.values());
 
-    logger.debug("Total unique images found", { count: images.length });
+    logger.info("Total unique images found", { count: images.length });
 
     // Step 3: Apply additional filters (favorite, rating, etc.)
     if (image_filter?.favorite !== undefined) {
@@ -177,10 +178,13 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     const paginatedImages = images.slice(startIndex, endIndex);
 
+    // Step 6: Transform images to proxy URLs
+    const transformedImages = paginatedImages.map(transformImage);
+
     res.json({
       findImages: {
         count: total,
-        images: paginatedImages,
+        images: transformedImages,
       },
     });
   } catch (error) {

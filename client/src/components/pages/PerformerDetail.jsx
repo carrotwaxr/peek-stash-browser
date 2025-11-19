@@ -231,7 +231,7 @@ const PerformerDetail = () => {
             tabs={[
               { id: 'scenes', label: 'Scenes', count: performer.scene_count || 0 },
               { id: 'galleries', label: 'Galleries', count: performer.gallery_count || 0 },
-              { id: 'images', label: 'Images', count: performer.image_count || 0 },
+              { id: 'images', label: 'Images', count: performer.gallery_count || 0 }, // Use gallery count as proxy
               { id: 'groups', label: 'Collections', count: performer.group_count || 0 },
             ]}
             defaultTab="scenes"

@@ -508,6 +508,53 @@ export const transformGallery = <T extends Partial<Gallery>>(gallery: T): T => {
 };
 
 /**
+ * Transform image to add API keys to image URLs
+ * Similar to transformGallery - handles paths object and nested entities
+ */
+export const transformImage = (image: any): any => {
+  try {
+    const mutated = {
+      ...image,
+    };
+
+    // Transform paths object if present (thumbnail, image, etc.)
+    if (image.paths) {
+      mutated.paths = Object.entries(image.paths).reduce(
+        (acc, [key, val]) => {
+          acc[key] = appendApiKeyToUrl(val as string);
+          return acc;
+        },
+        {} as Record<string, string>
+      );
+    }
+
+    // Transform performers to add API key to image_path
+    if (image.performers && Array.isArray(image.performers)) {
+      mutated.performers = image.performers.map((p: any) =>
+        transformPerformer(p)
+      );
+    }
+
+    // Transform tags to add API key to image_path
+    if (image.tags && Array.isArray(image.tags)) {
+      mutated.tags = image.tags.map((t: any) =>
+        transformTag(t)
+      );
+    }
+
+    // Transform studio to add API key to image_path
+    if (image.studio) {
+      mutated.studio = transformStudio(image.studio);
+    }
+
+    return mutated;
+  } catch (error) {
+    logger.error("Error transforming image", { error });
+    return image; // Return original image if transformation fails
+  }
+};
+
+/**
  * Transform group to add API keys to image URLs
  * Works with both full Group objects and nested NestedGroup
  */
