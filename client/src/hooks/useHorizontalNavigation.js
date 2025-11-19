@@ -36,14 +36,17 @@ export const useHorizontalNavigation = ({
     }
   }, [items.length, focusedIndex]);
 
-  // Scroll focused item into view
+  // Scroll focused item into view and update DOM focus
   useEffect(() => {
     if (enabled && itemRefs.current[focusedIndex]) {
-      itemRefs.current[focusedIndex]?.scrollIntoView({
+      const element = itemRefs.current[focusedIndex];
+      element?.scrollIntoView({
         behavior: "smooth",
         block: "nearest",
         inline: "nearest",
       });
+      // Update DOM focus to match visual navigation state
+      element?.focus();
     }
   }, [focusedIndex, enabled]);
 
