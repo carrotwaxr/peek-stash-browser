@@ -62,8 +62,6 @@ export const useSpatialNavigation = ({
     (e) => {
       if (!enabled || !items.length) return;
 
-      console.log(`[useSpatialNavigation] Key pressed: ${e.key}, preventDefault about to be called`);
-
       const totalItems = items.length;
       let handled = false;
 
@@ -165,17 +163,10 @@ export const useSpatialNavigation = ({
 
   // Attach keyboard listener
   useEffect(() => {
-    if (!enabled) {
-      console.log("[useSpatialNavigation] NOT registering (enabled=false)");
-      return;
-    }
+    if (!enabled) return;
 
-    console.log("[useSpatialNavigation] Registering keyboard listener");
     document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      console.log("[useSpatialNavigation] Removing keyboard listener");
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [enabled, handleKeyDown]);
 
   // Helper to set ref for an item

@@ -41,23 +41,16 @@ export const useKeyboardShortcuts = (
   }, [shortcuts, shouldHandle]);
 
   useEffect(() => {
-    if (!enabled) {
-      console.log(`[useKeyboardShortcuts:${context}] NOT registering (enabled=false)`);
-      return;
-    }
-
-    console.log(`[useKeyboardShortcuts:${context}] Registering keyboard shortcuts`);
+    if (!enabled) return;
 
     const handleKeyDown = (event) => {
       // Skip if user is typing in an input field
       if (isTypingInInput(event.target)) {
-        console.log(`[useKeyboardShortcuts:${context}] Skipping ${event.key} - typing in input (target: ${event.target.tagName})`);
         return;
       }
 
       // Skip if custom shouldHandle returns false
       if (shouldHandleRef.current && !shouldHandleRef.current(event)) {
-        console.log(`[useKeyboardShortcuts:${context}] shouldHandle returned false for ${event.key} (target: ${event.target.tagName}, classes: ${event.target.className})`);
         return;
       }
 
@@ -68,7 +61,6 @@ export const useKeyboardShortcuts = (
       const handler = shortcutsRef.current[keyCombo];
 
       if (handler) {
-        console.log(`[useKeyboardShortcuts:${context}] Handling "${keyCombo}"`);
         // Prevent default browser behavior for this shortcut
         event.preventDefault();
         event.stopPropagation();
@@ -82,8 +74,6 @@ export const useKeyboardShortcuts = (
             error
           );
         }
-      } else {
-        console.log(`[useKeyboardShortcuts:${context}] No handler for "${keyCombo}"`);
       }
     };
 
@@ -94,7 +84,6 @@ export const useKeyboardShortcuts = (
 
     // Cleanup
     return () => {
-      console.log(`[useKeyboardShortcuts:${context}] Removing keyboard shortcuts`);
       document.removeEventListener("keydown", handleKeyDown, useCapture);
     };
   }, [enabled, context, priority]);
