@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom";
 import { LucideArrowDown, LucideArrowUp } from "lucide-react";
 import { apiGet } from "../../services/api.js";
+import { useTVMode } from "../../hooks/useTVMode.js";
+import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation.js";
 import {
   GROUP_FILTER_OPTIONS,
   GROUP_SORT_OPTIONS,
@@ -75,6 +77,10 @@ const SearchControls = ({
   totalPages,
   totalCount,
   syncToUrl = true,
+  // TV Mode props
+  tvSearchZoneActive = false,
+  tvTopPaginationZoneActive = false,
+  tvBottomPaginationZoneActive = false,
 }) => {
   // Use context if provided, otherwise fall back to artifactType
   const effectiveContext = context || artifactType;
@@ -83,6 +89,43 @@ const SearchControls = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const hasInitialized = useRef(false); // Prevent double initialization
   const topPaginationRef = useRef(null); // Ref for top pagination element
+
+  // TV Mode
+  const { isTVMode } = useTVMode();
+
+  // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets
+  const searchZoneItems = useMemo(() => [
+    { id: "search-input", name: "Search" },
+    { id: "sort-control", name: "Sort" },
+    { id: "sort-direction", name: "Direction" },
+    { id: "filters-button", name: "Filters" },
+    { id: "filter-presets", name: "Presets" },
+  ], []);
+
+  // Horizontal navigation for search zone
+  const searchZoneNav = useHorizontalNavigation({
+    items: searchZoneItems,
+    enabled: isTVMode && tvSearchZoneActive,
+    onSelect: (item) => {
+      // Trigger click on the focused element
+      const element = document.querySelector(`[data-tv-search-item="${item.id}"]`);
+      if (element) {
+        element.click();
+        // For search input, focus it
+        if (item.id === "search-input") {
+          const input = element.querySelector("input");
+          if (input) input.focus();
+        }
+      }
+    },
+    onEscapeUp: () => {
+      // Let parent handle zone transition
+      window.dispatchEvent(new CustomEvent("tvSearchZoneEscape", { detail: { direction: "up" } }));
+    },
+    onEscapeDown: () => {
+      window.dispatchEvent(new CustomEvent("tvSearchZoneEscape", { detail: { direction: "down" } }));
+    },
+  });
 
   // Determine if we need to load defaults (only if URL has no filter/sort params)
   const needsDefaultPreset = useMemo(() => {
@@ -551,87 +594,119 @@ const SearchControls = ({
       {/* Mobile-responsive controls - optimized for minimal vertical space */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
         {/* Search Input - Flexible width with min-width */}
-        <SearchInput
-          placeholder="Search..."
-          value={searchText}
-          onSearch={handleChangeSearchText}
-          className="w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm"
-        />
+        <div
+          data-tv-search-item="search-input"
+          ref={(el) => searchZoneNav.setItemRef(0, el)}
+          className={`w-full sm:flex-1 sm:min-w-[180px] sm:max-w-sm ${
+            searchZoneNav.isFocused(0) ? "keyboard-focus" : ""
+          }`}
+        >
+          <SearchInput
+            placeholder="Search..."
+            value={searchText}
+            onSearch={handleChangeSearchText}
+            className="w-full"
+          />
+        </div>
 
         {/* Sort, Filter, Presets - Wrap on narrow widths */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
           {/* Sort Control - No label, just dropdown + direction button */}
           <div className="flex items-center gap-1">
-            <SortControl
-              options={sortOptions}
-              value={sortField}
-              onChange={handleSortChange}
-            />
-            <Button
-              onClick={() => handleSortChange(sortField)}
-              variant="secondary"
-              size="sm"
-              className="py-1"
-              icon={
-                sortDirection === "ASC" ? (
-                  <LucideArrowUp size={22} />
-                ) : (
-                  <LucideArrowDown size={22} />
-                )
-              }
-            />
+            <div
+              data-tv-search-item="sort-control"
+              ref={(el) => searchZoneNav.setItemRef(1, el)}
+              className={searchZoneNav.isFocused(1) ? "keyboard-focus" : ""}
+            >
+              <SortControl
+                options={sortOptions}
+                value={sortField}
+                onChange={handleSortChange}
+              />
+            </div>
+            <div
+              data-tv-search-item="sort-direction"
+              ref={(el) => searchZoneNav.setItemRef(2, el)}
+              className={searchZoneNav.isFocused(2) ? "keyboard-focus" : ""}
+            >
+              <Button
+                onClick={() => handleSortChange(sortField)}
+                variant="secondary"
+                size="sm"
+                className="py-1"
+                icon={
+                  sortDirection === "ASC" ? (
+                    <LucideArrowUp size={22} />
+                  ) : (
+                    <LucideArrowDown size={22} />
+                  )
+                }
+              />
+            </div>
           </div>
 
           {/* Filters Toggle Button */}
-          <Button
-            onClick={handleToggleFilterPanel}
-            variant={isFilterPanelOpen ? "primary" : "secondary"}
-            size="sm"
-            className="flex items-center space-x-2 font-medium"
-            icon={
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            }
+          <div
+            data-tv-search-item="filters-button"
+            ref={(el) => searchZoneNav.setItemRef(3, el)}
+            className={searchZoneNav.isFocused(3) ? "keyboard-focus" : ""}
           >
-            <span>Filters</span>
-            {hasActiveFilters && !isFilterPanelOpen && (
-              <span
-                className="text-xs px-2 py-0.5 rounded-full ml-1"
-                style={{
-                  backgroundColor: "var(--accent-secondary)",
-                  color: "white",
-                }}
-              >
-                {
-                  Object.keys(filters).filter(
-                    (key) =>
-                      filters[key] !== undefined &&
-                      filters[key] !== "" &&
-                      (typeof filters[key] !== "object" ||
-                        Object.values(filters[key]).some(
-                          (v) => v !== "" && v !== undefined
-                        ))
-                  ).length
-                }
-              </span>
-            )}
-          </Button>
+            <Button
+              onClick={handleToggleFilterPanel}
+              variant={isFilterPanelOpen ? "primary" : "secondary"}
+              size="sm"
+              className="flex items-center space-x-2 font-medium"
+              icon={
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              }
+            >
+              <span>Filters</span>
+              {hasActiveFilters && !isFilterPanelOpen && (
+                <span
+                  className="text-xs px-2 py-0.5 rounded-full ml-1"
+                  style={{
+                    backgroundColor: "var(--accent-secondary)",
+                    color: "white",
+                  }}
+                >
+                  {
+                    Object.keys(filters).filter(
+                      (key) =>
+                        filters[key] !== undefined &&
+                        filters[key] !== "" &&
+                        (typeof filters[key] !== "object" ||
+                          Object.values(filters[key]).some(
+                            (v) => v !== "" && v !== undefined
+                          ))
+                    ).length
+                  }
+                </span>
+              )}
+            </Button>
+          </div>
 
           {/* Filter Presets */}
-          <FilterPresets
-            artifactType={artifactType}
-            context={effectiveContext}
-            currentFilters={filters}
-            currentSort={sortField}
-            currentDirection={sortDirection}
-            permanentFilters={permanentFilters}
-            onLoadPreset={handleLoadPreset}
-          />
+          <div
+            data-tv-search-item="filter-presets"
+            ref={(el) => searchZoneNav.setItemRef(4, el)}
+            className={searchZoneNav.isFocused(4) ? "keyboard-focus" : ""}
+          >
+            <FilterPresets
+              artifactType={artifactType}
+              context={effectiveContext}
+              currentFilters={filters}
+              currentSort={sortField}
+              currentDirection={sortDirection}
+              permanentFilters={permanentFilters}
+              onLoadPreset={handleLoadPreset}
+            />
+          </div>
         </div>
       </div>
 
@@ -655,6 +730,17 @@ const SearchControls = ({
             totalCount={totalCount}
             showInfo={true}
             totalPages={totalPages}
+            tvActive={isTVMode && tvTopPaginationZoneActive}
+            onEscapeUp={() => {
+              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
+                detail: { zone: "top", direction: "up" }
+              }));
+            }}
+            onEscapeDown={() => {
+              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
+                detail: { zone: "top", direction: "down" }
+              }));
+            }}
           />
         </div>
       )}
@@ -777,6 +863,17 @@ const SearchControls = ({
             totalCount={totalCount}
             showInfo={true}
             totalPages={totalPages}
+            tvActive={isTVMode && tvBottomPaginationZoneActive}
+            onEscapeUp={() => {
+              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
+                detail: { zone: "bottom", direction: "up" }
+              }));
+            }}
+            onEscapeDown={() => {
+              window.dispatchEvent(new CustomEvent("tvPaginationEscape", {
+                detail: { zone: "bottom", direction: "down" }
+              }));
+            }}
           />
         </div>
       )}
