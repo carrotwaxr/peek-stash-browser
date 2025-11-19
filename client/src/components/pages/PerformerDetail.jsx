@@ -589,21 +589,21 @@ const PerformerStats = ({ performer, performerId }) => {
         <StatField
           label="Galleries:"
           value={performer?.gallery_count || 0}
-          valueColor="var(--text-secondary)"
+          valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('galleries')}
           isActive={activeTab === 'galleries'}
         />
         <StatField
           label="Images:"
           value={performer?.image_count || 0}
-          valueColor="var(--text-secondary)"
+          valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('images')}
           isActive={activeTab === 'images'}
         />
         <StatField
           label="Collections:"
           value={performer?.group_count || 0}
-          valueColor="var(--text-secondary)"
+          valueColor="var(--accent-primary)"
           onClick={() => handleTabSwitch('groups')}
           isActive={activeTab === 'groups'}
         />
