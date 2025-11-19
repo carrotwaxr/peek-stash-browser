@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
@@ -7,20 +7,26 @@ import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
+  EntityGrid,
   FavoriteButton,
   LoadingSpinner,
   PageHeader,
   RatingSlider,
+  TabNavigation,
 } from "../ui/index.js";
 
 const TagDetail = () => {
   const { tagId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [tag, setTag] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Get active tab from URL or default to 'scenes'
+  const activeTab = searchParams.get('tab') || 'scenes';
 
   // Set page title to tag name
   usePageTitle(tag?.name || "Tag");
@@ -186,23 +192,113 @@ const TagDetail = () => {
 
         {/* Full Width Sections - Statistics, Parents, Children, Aliases */}
         <div className="space-y-6 mb-8">
-          <TagStats tag={tag} />
+          <TagStats tag={tag} tagId={tagId} />
           <TagDetails tag={tag} />
         </div>
 
-        {/* Scenes Section */}
+        {/* Tabbed Content Section */}
         <div className="mt-8">
-          <SceneSearch
-            context="scene_tag"
-            permanentFilters={{
-              tags: { value: [parseInt(tagId, 10)], modifier: "INCLUDES" },
-            }}
-            permanentFiltersMetadata={{
-              tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
-            }}
-            title={`Scenes tagged with ${tag?.name || "this tag"}`}
-            captureReferrer={false}
+          <TabNavigation
+            tabs={[
+              { id: 'scenes', label: 'Scenes', count: tag.scene_count || 0 },
+              { id: 'galleries', label: 'Galleries', count: tag.gallery_count || 0 },
+              { id: 'images', label: 'Images', count: tag.image_count || 0 },
+              { id: 'performers', label: 'Performers', count: tag.performer_count || 0 },
+              { id: 'studios', label: 'Studios', count: tag.studio_count || 0 },
+              { id: 'groups', label: 'Collections', count: tag.group_count || 0 },
+            ]}
+            defaultTab="scenes"
           />
+
+          {/* Tab Content */}
+          {activeTab === 'scenes' && (
+            <SceneSearch
+              context="scene_tag"
+              permanentFilters={{
+                tags: { value: [parseInt(tagId, 10)], modifier: "INCLUDES" },
+              }}
+              permanentFiltersMetadata={{
+                tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
+              }}
+              title={`Scenes tagged with ${tag?.name || "this tag"}`}
+              captureReferrer={false}
+            />
+          )}
+
+          {activeTab === 'galleries' && (
+            <EntityGrid
+              entityType="gallery"
+              filters={{
+                gallery_filter: {
+                  tags: {
+                    value: [parseInt(tagId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No galleries found with tag "${tag?.name}"`}
+            />
+          )}
+
+          {activeTab === 'images' && (
+            <EntityGrid
+              entityType="image"
+              filters={{
+                image_filter: {
+                  tags: {
+                    value: [parseInt(tagId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No images found with tag "${tag?.name}"`}
+            />
+          )}
+
+          {activeTab === 'performers' && (
+            <EntityGrid
+              entityType="performer"
+              filters={{
+                performer_filter: {
+                  tags: {
+                    value: [parseInt(tagId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No performers found with tag "${tag?.name}"`}
+            />
+          )}
+
+          {activeTab === 'studios' && (
+            <EntityGrid
+              entityType="studio"
+              filters={{
+                studio_filter: {
+                  tags: {
+                    value: [parseInt(tagId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No studios found with tag "${tag?.name}"`}
+            />
+          )}
+
+          {activeTab === 'groups' && (
+            <EntityGrid
+              entityType="group"
+              filters={{
+                group_filter: {
+                  tags: {
+                    value: [parseInt(tagId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No collections found with tag "${tag?.name}"`}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -265,15 +361,47 @@ const TagImage = ({ tag }) => {
 };
 
 // Tag Stats Component
-const TagStats = ({ tag }) => {
-  const StatField = ({ label, value, valueColor = "var(--text-primary)" }) => {
+const TagStats = ({ tag, tagId }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'scenes';
+
+  const handleTabSwitch = (tabId) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tabId === 'scenes') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tabId);
+    }
+    setSearchParams(newParams);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  };
+
+  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
     if (!value && value !== 0) return null;
+
+    const clickable = onClick && value > 0;
+
     return (
       <div className="flex justify-between">
         <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-        <span className="font-medium" style={{ color: valueColor }}>
-          {value}
-        </span>
+        {clickable ? (
+          <button
+            onClick={onClick}
+            disabled={isActive}
+            className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
+            style={{
+              color: valueColor,
+              cursor: isActive ? 'default' : 'pointer',
+              textDecoration: isActive ? 'underline' : 'none',
+            }}
+          >
+            {value}
+          </button>
+        ) : (
+          <span className="font-medium" style={{ color: valueColor }}>
+            {value}
+          </span>
+        )}
       </div>
     );
   };
@@ -285,6 +413,8 @@ const TagStats = ({ tag }) => {
           label="Scenes:"
           value={tag?.scene_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('scenes')}
+          isActive={activeTab === 'scenes'}
         />
         <StatField
           label="Markers:"
@@ -295,31 +425,36 @@ const TagStats = ({ tag }) => {
           label="Images:"
           value={tag?.image_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('images')}
+          isActive={activeTab === 'images'}
         />
         <StatField
           label="Galleries:"
           value={tag?.gallery_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('galleries')}
+          isActive={activeTab === 'galleries'}
         />
         <StatField
           label="Performers:"
           value={tag?.performer_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('performers')}
+          isActive={activeTab === 'performers'}
         />
         <StatField
           label="Studios:"
           value={tag?.studio_count}
           valueColor="var(--accent-primary)"
-        />
-        <StatField
-          label="Movies:"
-          value={tag?.movie_count}
-          valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('studios')}
+          isActive={activeTab === 'studios'}
         />
         <StatField
           label="Collections:"
           value={tag?.group_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('groups')}
+          isActive={activeTab === 'groups'}
         />
       </div>
     </Card>

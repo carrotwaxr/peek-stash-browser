@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   LucideDatabase,
@@ -18,11 +18,13 @@ import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
+  EntityGrid,
   FavoriteButton,
   GenderIcon,
   LoadingSpinner,
   PageHeader,
   RatingSlider,
+  TabNavigation,
 } from "../ui/index.js";
 
 // Helper to detect and map URLs to known sites with colors
@@ -87,10 +89,14 @@ const PerformerDetail = () => {
   const { performerId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [performer, setPerformer] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Get active tab from URL or default to 'scenes'
+  const activeTab = searchParams.get('tab') || 'scenes';
 
   // Set page title to performer name
   usePageTitle(performer?.name || "Performer");
@@ -215,26 +221,84 @@ const PerformerDetail = () => {
 
         {/* Full Width Sections - Statistics, Tags, Links */}
         <div className="space-y-6 mb-8">
-          <PerformerStats performer={performer} />
+          <PerformerStats performer={performer} performerId={performerId} />
           <PerformerLinks performer={performer} />
         </div>
 
-        {/* Scenes Section */}
+        {/* Tabbed Content Section */}
         <div className="mt-8">
-          <SceneSearch
-            context="scene_performer"
-            permanentFilters={{
-              performers: {
-                value: [parseInt(performerId, 10)],
-                modifier: "INCLUDES",
-              },
-            }}
-            permanentFiltersMetadata={{
-              performers: [{ id: performerId, name: performer.name }],
-            }}
-            title={`Scenes featuring ${performer.name}`}
-            captureReferrer={false}
+          <TabNavigation
+            tabs={[
+              { id: 'scenes', label: 'Scenes', count: performer.scene_count || 0 },
+              { id: 'galleries', label: 'Galleries', count: performer.gallery_count || 0 },
+              { id: 'images', label: 'Images', count: performer.image_count || 0 },
+              { id: 'groups', label: 'Collections', count: performer.group_count || 0 },
+            ]}
+            defaultTab="scenes"
           />
+
+          {/* Tab Content */}
+          {activeTab === 'scenes' && (
+            <SceneSearch
+              context="scene_performer"
+              permanentFilters={{
+                performers: {
+                  value: [parseInt(performerId, 10)],
+                  modifier: "INCLUDES",
+                },
+              }}
+              permanentFiltersMetadata={{
+                performers: [{ id: performerId, name: performer.name }],
+              }}
+              title={`Scenes featuring ${performer.name}`}
+              captureReferrer={false}
+            />
+          )}
+
+          {activeTab === 'galleries' && (
+            <EntityGrid
+              entityType="gallery"
+              filters={{
+                gallery_filter: {
+                  performers: {
+                    value: [parseInt(performerId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No galleries found for ${performer.name}`}
+            />
+          )}
+
+          {activeTab === 'images' && (
+            <EntityGrid
+              entityType="image"
+              filters={{
+                image_filter: {
+                  performers: {
+                    value: [parseInt(performerId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No images found for ${performer.name}`}
+            />
+          )}
+
+          {activeTab === 'groups' && (
+            <EntityGrid
+              entityType="group"
+              filters={{
+                group_filter: {
+                  performers: {
+                    value: [parseInt(performerId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No collections found for ${performer.name}`}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -261,15 +325,32 @@ const DetailField = ({ label, value }) => {
 };
 
 // Reusable component for stat field (label/value pair in stats card)
-const StatField = ({ label, value, valueColor = "var(--text-primary)" }) => {
+const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
   if (!value && value !== 0) return null;
+
+  const clickable = onClick && value > 0;
 
   return (
     <div className="flex justify-between">
       <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-      <span className="font-medium" style={{ color: valueColor }}>
-        {value}
-      </span>
+      {clickable ? (
+        <button
+          onClick={onClick}
+          disabled={isActive}
+          className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
+          style={{
+            color: valueColor,
+            cursor: isActive ? 'default' : 'pointer',
+            textDecoration: isActive ? 'underline' : 'none',
+          }}
+        >
+          {value}
+        </button>
+      ) : (
+        <span className="font-medium" style={{ color: valueColor }}>
+          {value}
+        </span>
+      )}
     </div>
   );
 };
@@ -462,7 +543,22 @@ const PerformerDetails = ({ performer }) => {
   );
 };
 
-const PerformerStats = ({ performer }) => {
+const PerformerStats = ({ performer, performerId }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'scenes';
+
+  const handleTabSwitch = (tabId) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tabId === 'scenes') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tabId);
+    }
+    setSearchParams(newParams);
+    // Scroll to content area
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  };
+
   // Calculate O-Count percentage
   const oCountPercentage =
     performer?.scene_count && performer?.o_counter
@@ -482,6 +578,8 @@ const PerformerStats = ({ performer }) => {
           label="Scenes:"
           value={performer?.scene_count || 0}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('scenes')}
+          isActive={activeTab === 'scenes'}
         />
         <StatField
           label="O-Count:"
@@ -492,26 +590,27 @@ const PerformerStats = ({ performer }) => {
           label="Galleries:"
           value={performer?.gallery_count || 0}
           valueColor="var(--text-secondary)"
+          onClick={() => handleTabSwitch('galleries')}
+          isActive={activeTab === 'galleries'}
         />
         <StatField
           label="Images:"
           value={performer?.image_count || 0}
           valueColor="var(--text-secondary)"
+          onClick={() => handleTabSwitch('images')}
+          isActive={activeTab === 'images'}
         />
         <StatField
           label="Collections:"
           value={performer?.group_count || 0}
           valueColor="var(--text-secondary)"
-        />
-        <StatField
-          label="Movies:"
-          value={performer?.movie_count || 0}
-          valueColor="var(--text-secondary)"
+          onClick={() => handleTabSwitch('groups')}
+          isActive={activeTab === 'groups'}
         />
       </div>
 
       {/* Visual Rating Display */}
-      {performer?.rating100 && (
+      {performer?.rating100 && performer.rating100 > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span
