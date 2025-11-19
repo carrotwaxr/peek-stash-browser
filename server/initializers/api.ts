@@ -15,6 +15,7 @@ import authRoutes from "../routes/auth.js";
 import customThemeRoutes from "../routes/customTheme.js";
 import libraryGalleriesRoutes from "../routes/library/galleries.js";
 import libraryGroupsRoutes from "../routes/library/groups.js";
+import libraryImagesRoutes from "../routes/library/images.js";
 import libraryPerformersRoutes from "../routes/library/performers.js";
 import libraryScenesRoutes from "../routes/library/scenes.js";
 import libraryStudiosRoutes from "../routes/library/studios.js";
@@ -126,6 +127,7 @@ export const setupAPI = () => {
   app.use("/api/library", libraryTagsRoutes);
   app.use("/api/library", libraryGroupsRoutes);
   app.use("/api/library", libraryGalleriesRoutes);
+  app.use("/api/library", libraryImagesRoutes);
 
   // Video routes (playback, sessions, HLS streaming)
   app.use("/api", videoRoutes);
