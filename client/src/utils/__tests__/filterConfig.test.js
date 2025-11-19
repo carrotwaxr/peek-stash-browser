@@ -396,7 +396,7 @@ describe("buildSceneFilter", () => {
       const uiFilters = { resolution: "1080" };
       const result = buildSceneFilter(uiFilters);
       expect(result.resolution).toEqual({
-        value: "1080p",
+        value: "1080",
         modifier: "EQUALS",
       });
     });
@@ -405,7 +405,7 @@ describe("buildSceneFilter", () => {
       const uiFilters = { resolution: "720" };
       const result = buildSceneFilter(uiFilters);
       expect(result.resolution).toEqual({
-        value: "720p",
+        value: "720",
         modifier: "EQUALS",
       });
     });
