@@ -703,6 +703,33 @@ export const PERFORMER_FILTER_OPTIONS = [
     defaultValue: "",
     placeholder: "Search details...",
   },
+
+  // Entity Filters
+  {
+    type: "section-header",
+    label: "Entity Filters",
+    key: "section-entities",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "sceneId",
+    label: "Scene",
+    type: "searchable-select",
+    entityType: "scenes",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select scene...",
+  },
+  {
+    key: "groupIds",
+    label: "Collections",
+    type: "searchable-select",
+    entityType: "groups",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select collections...",
+  },
 ];
 
 export const STUDIO_FILTER_OPTIONS = [
@@ -865,6 +892,51 @@ export const TAG_FILTER_OPTIONS = [
     placeholder: "Favorites Only",
   },
 
+  // Entity Filters
+  {
+    type: "section-header",
+    label: "Entity Filters",
+    key: "section-entities",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select performers...",
+  },
+  {
+    key: "studioId",
+    label: "Studio",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select studio...",
+  },
+  {
+    key: "sceneId",
+    label: "Scene",
+    type: "searchable-select",
+    entityType: "scenes",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select scene...",
+  },
+  {
+    key: "groupIds",
+    label: "Collections",
+    type: "searchable-select",
+    entityType: "groups",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select collections...",
+  },
+
   // Date Ranges
   {
     type: "section-header",
@@ -1007,6 +1079,24 @@ export const GROUP_FILTER_OPTIONS = [
     label: "Updated Date",
     type: "date-range",
     defaultValue: {},
+  },
+
+  // Entity Filters
+  {
+    type: "section-header",
+    label: "Entity Filters",
+    key: "section-entities",
+    collapsible: true,
+    defaultOpen: false,
+  },
+  {
+    key: "sceneId",
+    label: "Scene",
+    type: "searchable-select",
+    entityType: "scenes",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Select scene...",
   },
 ];
 
@@ -1727,6 +1817,24 @@ export const buildPerformerFilter = (filters) => {
     };
   }
 
+  // Entity filters
+  if (filters.sceneId) {
+    performerFilter.scene_filter = {
+      id: {
+        value: [filters.sceneId],
+        modifier: "INCLUDES",
+      },
+    };
+  }
+
+  if (filters.groupIds && filters.groupIds.length > 0) {
+    performerFilter.scene_filter = performerFilter.scene_filter || {};
+    performerFilter.scene_filter.groups = {
+      value: filters.groupIds,
+      modifier: "INCLUDES",
+    };
+  }
+
   return performerFilter;
 };
 
@@ -2015,6 +2123,38 @@ export const buildTagFilter = (filters) => {
     };
   }
 
+  // Entity filters
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    tagFilter.performers = {
+      value: filters.performerIds,
+      modifier: "INCLUDES",
+    };
+  }
+
+  if (filters.studioId) {
+    tagFilter.studios = {
+      value: [filters.studioId],
+      modifier: "INCLUDES",
+    };
+  }
+
+  if (filters.sceneId) {
+    tagFilter.scenes_filter = {
+      id: {
+        value: [filters.sceneId],
+        modifier: "INCLUDES",
+      },
+    };
+  }
+
+  if (filters.groupIds && filters.groupIds.length > 0) {
+    tagFilter.scenes_filter = tagFilter.scenes_filter || {};
+    tagFilter.scenes_filter.groups = {
+      value: filters.groupIds,
+      modifier: "INCLUDES",
+    };
+  }
+
   return tagFilter;
 };
 
@@ -2167,6 +2307,16 @@ export const buildGroupFilter = (filters) => {
     groupFilter.director = {
       value: filters.director,
       modifier: "INCLUDES",
+    };
+  }
+
+  // Entity filters
+  if (filters.sceneId) {
+    groupFilter.scene_filter = {
+      id: {
+        value: [filters.sceneId],
+        modifier: "INCLUDES",
+      },
     };
   }
 
