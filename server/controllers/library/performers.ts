@@ -12,6 +12,7 @@ import type {
   PeekPerformerFilter,
 } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { calculateEntityImageCount } from "./images.js";
 
 /**
@@ -216,10 +217,16 @@ export const findPerformers = async (
       });
     }
 
+    // Add stashUrl to each performer
+    const performersWithStashUrl = paginatedPerformers.map(performer => ({
+      ...performer,
+      stashUrl: buildStashEntityUrl('performer', performer.id),
+    }));
+
     res.json({
       findPerformers: {
         count: total,
-        performers: paginatedPerformers,
+        performers: performersWithStashUrl,
       },
     });
   } catch (error) {

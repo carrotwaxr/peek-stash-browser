@@ -14,6 +14,7 @@ import {
   PeekGalleryFilter,
 } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { convertToProxyUrl } from "../../utils/pathMapping.js";
 import { mergePerformersWithUserData } from "./performers.js";
 import { mergeStudiosWithUserData } from "./studios.js";
@@ -328,10 +329,16 @@ export const findGalleries = async (
     const endIndex = startIndex + perPage;
     const paginatedGalleries = galleries.slice(startIndex, endIndex);
 
+    // Add stashUrl to each gallery
+    const galleriesWithStashUrl = paginatedGalleries.map((gallery) => ({
+      ...gallery,
+      stashUrl: buildStashEntityUrl("gallery", gallery.id),
+    }));
+
     res.json({
       findGalleries: {
         count: total,
-        galleries: paginatedGalleries,
+        galleries: galleriesWithStashUrl,
       },
     });
   } catch (error) {

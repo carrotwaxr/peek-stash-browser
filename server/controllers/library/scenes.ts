@@ -7,6 +7,7 @@ import getStash from "../../stash.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { logger } from "../../utils/logger.js";
+import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
  * Seeded random number generator for consistent shuffling per user
@@ -153,11 +154,13 @@ export function addStreamabilityInfo(
 ): NormalizedScene[] {
   return scenes.map((scene) => {
     const streamabilityInfo = isSceneStreamable(scene);
+    const stashUrl = buildStashEntityUrl('scene', scene.id);
 
     return {
       ...scene,
       isStreamable: streamabilityInfo.isStreamable,
       streamabilityReasons: streamabilityInfo.reasons,
+      stashUrl,
     };
   });
 }

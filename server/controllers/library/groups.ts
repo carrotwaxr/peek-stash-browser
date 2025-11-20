@@ -7,6 +7,7 @@ import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
  * Merge user-specific data into groups
@@ -313,10 +314,16 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     const paginatedGroups = groups.slice(startIndex, endIndex);
 
+    // Add stashUrl to each group
+    const groupsWithStashUrl = paginatedGroups.map(group => ({
+      ...group,
+      stashUrl: buildStashEntityUrl('group', group.id),
+    }));
+
     res.json({
       findGroups: {
         count: total,
-        groups: paginatedGroups,
+        groups: groupsWithStashUrl,
       },
     });
   } catch (error) {

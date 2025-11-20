@@ -9,6 +9,7 @@ import { userStatsService } from "../../services/UserStatsService.js";
 import getStash from "../../stash.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { calculateEntityImageCount } from "./images.js";
 
 /**
@@ -293,10 +294,16 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    // Add stashUrl to each tag
+    const tagsWithStashUrl = paginatedTags.map(tag => ({
+      ...tag,
+      stashUrl: buildStashEntityUrl('tag', tag.id),
+    }));
+
     res.json({
       findTags: {
         count: total,
-        tags: paginatedTags,
+        tags: tagsWithStashUrl,
       },
     });
   } catch (error) {
