@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
@@ -18,6 +18,7 @@ import PerformerCard from "./PerformerCard.jsx";
  * @param {string} [props.emptyMessage] - Message to display when no results
  */
 const EntityGrid = ({ entityType, filters, emptyMessage }) => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState([]);
