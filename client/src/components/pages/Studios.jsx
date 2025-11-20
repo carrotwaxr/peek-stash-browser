@@ -164,6 +164,8 @@ const Studios = () => {
 
 const StudioCard = forwardRef(
   ({ studio, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
+    const navigate = useNavigate();
+
     return (
       <GridCard
         description={studio.description}
@@ -171,10 +173,31 @@ const StudioCard = forwardRef(
         imagePath={studio.image_path}
         indicators={[
           { type: "PLAY_COUNT", count: studio.play_count },
-          { type: "SCENES", count: studio.scene_count },
-          { type: "IMAGES", count: studio.image_count },
-          { type: "GALLERIES", count: studio.gallery_count },
-          { type: "PERFORMERS", count: studio.performer_count },
+          {
+            type: "SCENES",
+            count: studio.scene_count,
+            onClick: studio.scene_count > 0 ? () => navigate(`/scenes?studioId=${studio.id}`) : undefined,
+          },
+          {
+            type: "IMAGES",
+            count: studio.image_count,
+            onClick: studio.image_count > 0 ? () => navigate(`/images?studioId=${studio.id}`) : undefined,
+          },
+          {
+            type: "GALLERIES",
+            count: studio.gallery_count,
+            onClick: studio.gallery_count > 0 ? () => navigate(`/galleries?studioId=${studio.id}`) : undefined,
+          },
+          {
+            type: "PERFORMERS",
+            count: studio.performer_count,
+            onClick: studio.performer_count > 0 ? () => navigate(`/performers?studioId=${studio.id}`) : undefined,
+          },
+          {
+            type: "TAGS",
+            count: studio.tags?.length || 0,
+            onClick: studio.tags?.length > 0 ? () => navigate(`/tags?studioId=${studio.id}`) : undefined,
+          },
         ]}
         linkTo={`/studio/${studio.id}`}
         ratingControlsProps={{

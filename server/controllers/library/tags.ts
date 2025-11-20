@@ -484,6 +484,121 @@ export function applyTagFilters(
     });
   }
 
+  // Filter by performers (tags that appear on those performers)
+  if (filters.performers) {
+    const performerIdSet = new Set(
+      (filters.performers.value || []).map(String)
+    );
+    if (performerIdSet.size > 0) {
+      const allPerformers = stashCacheManager.getAllPerformers();
+      const matchingPerformers = allPerformers.filter((p) =>
+        performerIdSet.has(String(p.id))
+      );
+
+      // Get all tag IDs from matching performers
+      const tagIdSet = new Set<string>();
+      matchingPerformers.forEach((performer) => {
+        if (performer.tags) {
+          performer.tags.forEach((tag) => tagIdSet.add(tag.id));
+        }
+      });
+
+      filtered = filtered.filter((t) => tagIdSet.has(t.id));
+    }
+  }
+
+  // Filter by studios (tags that are directly on those studio objects)
+  if (filters.studios) {
+    const studioIdSet = new Set((filters.studios.value || []).map(String));
+    if (studioIdSet.size > 0) {
+      const allStudios = stashCacheManager.getAllStudios();
+
+      // Get all tag IDs directly from matching studios
+      const tagIdSet = new Set<string>();
+
+      allStudios.forEach((studio) => {
+        if (studioIdSet.has(String(studio.id))) {
+          if (studio.tags) {
+            studio.tags.forEach((tag) => tagIdSet.add(tag.id));
+          }
+        }
+      });
+
+      filtered = filtered.filter((t) => tagIdSet.has(t.id));
+    }
+  }
+
+  // Filter by scene (tags that appear on that scene or its performers)
+  if (filters.scenes_filter?.id) {
+    const sceneIdSet = new Set(
+      (filters.scenes_filter.id.value || []).map(String)
+    );
+    if (sceneIdSet.size > 0) {
+      const allScenes = stashCacheManager.getAllScenes();
+      const allPerformers = stashCacheManager.getAllPerformers();
+      const matchingScenes = allScenes.filter((s) =>
+        sceneIdSet.has(String(s.id))
+      );
+
+      // Get all tag IDs from matching scenes
+      const tagIdSet = new Set<string>();
+      matchingScenes.forEach((scene) => {
+        if (scene.tags) {
+          scene.tags.forEach((tag) => tagIdSet.add(tag.id));
+        }
+        // Also include tags from performers in those scenes
+        if (scene.performers) {
+          scene.performers.forEach((performer) => {
+            const fullPerformer = allPerformers.find(
+              (p) => p.id === performer.id
+            );
+            if (fullPerformer?.tags) {
+              fullPerformer.tags.forEach((tag) => tagIdSet.add(tag.id));
+            }
+          });
+        }
+      });
+
+      filtered = filtered.filter((t) => tagIdSet.has(t.id));
+    }
+  }
+
+  // Filter by groups/collections (tags that appear on scenes in those groups or their performers)
+  if (filters.scenes_filter?.groups) {
+    const groupIdSet = new Set(
+      (filters.scenes_filter.groups.value || []).map(String)
+    );
+    if (groupIdSet.size > 0) {
+      const allScenes = stashCacheManager.getAllScenes();
+      const allPerformers = stashCacheManager.getAllPerformers();
+      const matchingScenes = allScenes.filter((scene) => {
+        if (!scene.groups) return false;
+        return scene.groups.some((g: any) => groupIdSet.has(String(g.id)));
+      });
+
+      // Get all tag IDs from matching scenes
+      const tagIdSet = new Set<string>();
+      matchingScenes.forEach((scene) => {
+        if (scene.tags) {
+          scene.tags.forEach((tag) => tagIdSet.add(tag.id));
+        }
+        // Also include tags from performers in those scenes
+        if (scene.performers) {
+          scene.performers.forEach((performer) => {
+            const fullPerformer = allPerformers.find(
+              (p) => p.id === performer.id
+            );
+            if (fullPerformer?.tags) {
+              fullPerformer.tags.forEach((tag) => tagIdSet.add(tag.id));
+            }
+          });
+        }
+      });
+
+      filtered = filtered.filter((t) => tagIdSet.has(t.id));
+    }
+  }
+
   return filtered;
 }
 

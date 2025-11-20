@@ -55,6 +55,10 @@ const CARD_COUNT_INDICATOR_TYPES = {
     icon: LucideList,
     iconColor: hueify("var(--status-warning)", "darker"),
   },
+  STUDIOS: {
+    icon: LucideClapperboard,
+    iconColor: hueify("var(--accent-secondary)", "lighter", 8),
+  },
 };
 
 export const CardCountIndicators = ({
@@ -85,6 +89,7 @@ export const CardCountIndicators = ({
             iconSize={size}
             textSize={textSize}
             tooltipContent={indicator.tooltipContent}
+            onClick={indicator.onClick}
           />
         );
       })}
@@ -99,11 +104,21 @@ const CardCountIndicator = ({
   iconSize = 20,
   textSize = "sm",
   tooltipContent = null,
+  onClick = null,
 }) => {
   const Icon = icon;
 
   const guts = (
-    <div className="flex items-center gap-1">
+    <div
+      className={`flex items-center gap-1 ${onClick ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
+      onClick={(e) => {
+        if (onClick) {
+          e.stopPropagation(); // Prevent card click
+          e.preventDefault(); // Prevent link navigation
+          onClick(e);
+        }
+      }}
+    >
       <span
         className="flex items-center justify-center"
         style={{ color: iconColor }}

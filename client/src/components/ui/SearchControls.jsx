@@ -197,54 +197,62 @@ const SearchControls = ({
     const initializeState = async () => {
       let initialState;
 
-      if (!needsDefaultPreset) {
-        // Priority 1: URL has filter/sort params → Use URL params
-        initialState = urlState;
-        setIsLoadingDefaults(false);
-      } else {
-        // Priority 2: No URL params → Try to load default preset
-        try {
-          const [presetsResponse, defaultsResponse] = await Promise.all([
-            apiGet("/user/filter-presets"),
-            apiGet("/user/default-presets"),
-          ]);
+      // Always try to load default preset to merge with URL params
+      try {
+        const [presetsResponse, defaultsResponse] = await Promise.all([
+          apiGet("/user/filter-presets"),
+          apiGet("/user/default-presets"),
+        ]);
 
-          const allPresets = presetsResponse?.presets || {};
-          const defaults = defaultsResponse?.defaults || {};
-          const defaultPresetId = defaults[effectiveContext];
+        const allPresets = presetsResponse?.presets || {};
+        const defaults = defaultsResponse?.defaults || {};
+        const defaultPresetId = defaults[effectiveContext];
 
-          // Find the default preset for this context
-          // Scene grid contexts (scene_performer, etc.) use "scene" presets
-          const presetArtifactType = effectiveContext.startsWith("scene_")
-            ? "scene"
-            : effectiveContext;
-          const presets = allPresets[presetArtifactType] || [];
-          const defaultPreset = presets.find((p) => p.id === defaultPresetId);
+        // Find the default preset for this context
+        // Scene grid contexts (scene_performer, etc.) use "scene" presets
+        const presetArtifactType = effectiveContext.startsWith("scene_")
+          ? "scene"
+          : effectiveContext;
+        const presets = allPresets[presetArtifactType] || [];
+        const defaultPreset = presets.find((p) => p.id === defaultPresetId);
 
-          if (defaultPreset) {
-            // Priority 2a: User has a default preset → Use it
-            initialState = {
-              currentPage: 1,
-              perPage: urlState.perPage,
-              searchText: "",
-              filters: { ...permanentFilters, ...defaultPreset.filters },
-              sortField: defaultPreset.sort,
-              sortDirection: defaultPreset.direction,
-            };
-          } else {
-            // Priority 3: No default preset → Use hardcoded defaults
-            initialState = {
-              currentPage: urlState.currentPage,
-              perPage: urlState.perPage,
-              searchText: "",
-              filters: { ...permanentFilters },
-              sortField: initialSort,
-              sortDirection: "DESC",
-            };
-          }
-        } catch (err) {
-          console.error("Error loading default preset:", err);
-          // Fallback to hardcoded defaults on error
+        if (!needsDefaultPreset) {
+          // Priority 1: URL has params → Merge with default preset
+          const baseState = defaultPreset
+            ? {
+                filters: { ...permanentFilters, ...defaultPreset.filters },
+                sortField: defaultPreset.sort,
+                sortDirection: defaultPreset.direction,
+              }
+            : {
+                filters: { ...permanentFilters },
+                sortField: initialSort,
+                sortDirection: "DESC",
+              };
+
+          // Parse URL params and merge with base state
+          const parsedUrlState = parseSearchParams(searchParams, filterOptions, baseState);
+
+          initialState = {
+            currentPage: parsedUrlState.currentPage,
+            perPage: parsedUrlState.perPage,
+            searchText: parsedUrlState.searchText,
+            filters: parsedUrlState.filters, // Already merged by parseSearchParams
+            sortField: parsedUrlState.sortField,
+            sortDirection: parsedUrlState.sortDirection,
+          };
+        } else if (defaultPreset) {
+          // Priority 2: No URL params + default preset exists → Use default preset
+          initialState = {
+            currentPage: 1,
+            perPage: urlState.perPage,
+            searchText: "",
+            filters: { ...permanentFilters, ...defaultPreset.filters },
+            sortField: defaultPreset.sort,
+            sortDirection: defaultPreset.direction,
+          };
+        } else {
+          // Priority 3: No URL params + no default preset → Use hardcoded defaults
           initialState = {
             currentPage: urlState.currentPage,
             perPage: urlState.perPage,
@@ -253,9 +261,22 @@ const SearchControls = ({
             sortField: initialSort,
             sortDirection: "DESC",
           };
-        } finally {
-          setIsLoadingDefaults(false);
         }
+      } catch (err) {
+        console.error("Error loading default preset:", err);
+        // Fallback to URL state or hardcoded defaults on error
+        initialState = !needsDefaultPreset
+          ? urlState
+          : {
+              currentPage: urlState.currentPage,
+              perPage: urlState.perPage,
+              searchText: "",
+              filters: { ...permanentFilters },
+              sortField: initialSort,
+              sortDirection: "DESC",
+            };
+      } finally {
+        setIsLoadingDefaults(false);
       }
 
       // Set all state at once

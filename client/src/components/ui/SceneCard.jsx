@@ -113,6 +113,14 @@ const SceneCard = forwardRef(
       <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" />
     );
 
+    const galleriesTooltip = scene.galleries && scene.galleries.length > 0 && (
+      <TooltipEntityGrid
+        entityType="gallery"
+        entities={scene.galleries}
+        title="Galleries"
+      />
+    );
+
     const handleClick = (e) => {
       const target = e.target;
       const closestButton = target.closest("button");
@@ -396,16 +404,33 @@ const SceneCard = forwardRef(
               type: "PERFORMERS",
               count: scene.performers?.length,
               tooltipContent: performersTooltip,
+              onClick: scene.performers?.length > 0 ? () => {
+                navigate(`/performers?sceneId=${scene.id}`);
+              } : undefined,
             },
             {
               type: "GROUPS",
               count: scene.groups?.length,
               tooltipContent: groupsTooltip,
+              onClick: scene.groups?.length > 0 ? () => {
+                navigate(`/collections?sceneId=${scene.id}`);
+              } : undefined,
+            },
+            {
+              type: "GALLERIES",
+              count: scene.galleries?.length,
+              tooltipContent: galleriesTooltip,
+              onClick: scene.galleries?.length > 0 ? () => {
+                navigate(`/galleries?sceneId=${scene.id}`);
+              } : undefined,
             },
             {
               type: "TAGS",
               count: allTags?.length,
               tooltipContent: tagsTooltip,
+              onClick: allTags?.length > 0 ? () => {
+                navigate(`/tags?sceneId=${scene.id}`);
+              } : undefined,
             },
           ]}
         />

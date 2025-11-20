@@ -56,6 +56,13 @@ export type PeekTagFilter = BaseTagFilterType & {
   rating100?: { value?: number; value2?: number; modifier?: string };
   o_counter?: { value?: number; value2?: number; modifier?: string };
   play_count?: { value?: number; value2?: number; modifier?: string };
+  // Custom entity filters (not in Stash API)
+  performers?: { value: string[]; modifier?: string };
+  studios?: { value: string[]; modifier?: string };
+  scenes_filter?: {
+    id?: { value: string[]; modifier?: string };
+    groups?: { value: string[]; modifier?: string };
+  };
 };
 
 /**
