@@ -21,8 +21,10 @@ import {
   EntityGrid,
   FavoriteButton,
   GenderIcon,
+  Lightbox,
   LoadingSpinner,
   PageHeader,
+  Pagination,
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
@@ -231,7 +233,7 @@ const PerformerDetail = () => {
             tabs={[
               { id: 'scenes', label: 'Scenes', count: performer.scene_count || 0 },
               { id: 'galleries', label: 'Galleries', count: performer.gallery_count || 0 },
-              { id: 'images', label: 'Images', count: performer.gallery_count || 0 }, // Use gallery count as proxy
+              { id: 'images', label: 'Images', count: performer.image_count || 0 },
               { id: 'groups', label: 'Collections', count: performer.group_count || 0 },
             ]}
             defaultTab="scenes"
@@ -271,18 +273,7 @@ const PerformerDetail = () => {
           )}
 
           {activeTab === 'images' && (
-            <EntityGrid
-              entityType="image"
-              filters={{
-                image_filter: {
-                  performers: {
-                    value: [parseInt(performerId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
-              emptyMessage={`No images found for ${performer.name}`}
-            />
+            <ImagesTab performerId={performerId} performerName={performer?.name} />
           )}
 
           {activeTab === 'groups' && (
@@ -786,6 +777,144 @@ const PerformerLinks = ({ performer }) => {
           </p>
         </Card>
       )}
+    </>
+  );
+};
+
+// Images Tab Component with Lightbox
+const ImagesTab = ({ performerId, performerName }) => {
+  const [images, setImages] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const perPage = 100;
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        setIsLoading(true);
+        const data = await libraryApi.findImages({
+          filter: {
+            page: currentPage,
+            per_page: perPage,
+          },
+          image_filter: {
+            performers: {
+              value: [parseInt(performerId, 10)],
+              modifier: "INCLUDES",
+            },
+          },
+        });
+        setImages(data.findImages?.images || []);
+        setTotalCount(data.findImages?.count || 0);
+      } catch (error) {
+        console.error("Error loading images:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchImages();
+  }, [performerId, currentPage]);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 mt-6">
+        {[...Array(12)].map((_, index) => (
+          <div
+            key={index}
+            className="aspect-square rounded-lg animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (images.length === 0) {
+    return (
+      <div
+        className="text-center py-12 mt-6"
+        style={{ color: "var(--text-muted)" }}
+      >
+        No images found for {performerName}
+      </div>
+    );
+  }
+
+  const totalPages = Math.ceil(totalCount / perPage);
+
+  return (
+    <>
+      {/* Pagination - Top */}
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 mt-6">
+        {images.map((image, index) => (
+          <div
+            key={image.id}
+            className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-color)",
+            }}
+            onClick={() => {
+              setLightboxIndex(index);
+              setLightboxOpen(true);
+            }}
+          >
+            {image.paths?.thumbnail ? (
+              <img
+                src={image.paths.thumbnail}
+                alt={image.title || `Image ${index + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                No Preview
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
+      {/* Lightbox */}
+      <Lightbox
+        images={images}
+        initialIndex={lightboxIndex}
+        isOpen={lightboxOpen}
+        autoPlay={false}
+        onClose={() => setLightboxOpen(false)}
+        onImagesUpdate={setImages}
+      />
     </>
   );
 };
