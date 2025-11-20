@@ -22,6 +22,7 @@ import {
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
+import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const StudioDetail = () => {
   const { studioId } = useParams();
@@ -122,6 +123,7 @@ const StudioDetail = () => {
                   onChange={handleFavoriteChange}
                   size="large"
                 />
+                <ViewInStashButton stashUrl={studio?.stashUrl} size={24} />
               </div>
             }
             subtitle={

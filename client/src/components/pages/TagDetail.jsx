@@ -16,6 +16,7 @@ import {
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
+import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const TagDetail = () => {
   const { tagId } = useParams();
@@ -151,6 +152,7 @@ const TagDetail = () => {
                   onChange={handleFavoriteChange}
                   size="large"
                 />
+                <ViewInStashButton stashUrl={tag?.stashUrl} size={24} />
               </div>
             }
             subtitle={

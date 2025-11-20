@@ -13,6 +13,7 @@ import {
   PageHeader,
   RatingSlider,
 } from "../ui/index.js";
+import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const GroupDetail = () => {
   const { groupId } = useParams();
@@ -111,6 +112,7 @@ const GroupDetail = () => {
                   onChange={handleFavoriteChange}
                   size="large"
                 />
+                <ViewInStashButton stashUrl={group?.stashUrl} size={24} />
               </div>
             }
             subtitle={

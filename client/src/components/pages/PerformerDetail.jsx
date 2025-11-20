@@ -28,6 +28,7 @@ import {
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
+import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 // Helper to detect and map URLs to known sites with colors
 const getSiteInfo = (url) => {
@@ -189,6 +190,7 @@ const PerformerDetail = () => {
                   onChange={handleFavoriteChange}
                   size="large"
                 />
+                <ViewInStashButton stashUrl={performer?.stashUrl} size={24} />
               </div>
             }
             subtitle={

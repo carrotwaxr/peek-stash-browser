@@ -13,6 +13,7 @@ import {
   PageHeader,
   RatingSlider,
 } from "../ui/index.js";
+import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const GalleryDetail = () => {
   const { galleryId } = useParams();
@@ -163,6 +164,7 @@ const GalleryDetail = () => {
                   onChange={handleFavoriteChange}
                   size="large"
                 />
+                <ViewInStashButton stashUrl={gallery?.stashUrl} size={24} />
               </div>
             }
             subtitle={

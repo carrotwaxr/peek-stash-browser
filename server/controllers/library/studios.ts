@@ -9,6 +9,7 @@ import { userStatsService } from "../../services/UserStatsService.js";
 import getStash from "../../stash.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { calculateEntityImageCount } from "./images.js";
 
 /**
@@ -201,10 +202,16 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    // Add stashUrl to each studio
+    const studiosWithStashUrl = paginatedStudios.map(studio => ({
+      ...studio,
+      stashUrl: buildStashEntityUrl('studio', studio.id),
+    }));
+
     res.json({
       findStudios: {
         count: total,
-        studios: paginatedStudios,
+        studios: studiosWithStashUrl,
       },
     });
   } catch (error) {

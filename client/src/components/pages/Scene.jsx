@@ -17,6 +17,7 @@ import {
 } from "../ui/index.js";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
+import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 import SceneDetails from "./SceneDetails.jsx";
 
 // Inner component that reads from context
@@ -113,22 +114,25 @@ const SceneContent = ({ location }) => {
       {/* Video Player Header */}
       <header className="w-full py-8 px-4 lg:px-6 xl:px-8">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-          <Button
-            onClick={() => {
-              // If we have a referrer URL with filters, navigate to it
-              // Otherwise use browser back
-              if (location.state?.referrerUrl) {
-                navigate(location.state.referrerUrl);
-              } else {
-                navigate(-1);
-              }
-            }}
-            variant="secondary"
-            className="inline-flex items-center gap-2 flex-shrink-0 self-start"
-          >
-            <span>←</span>
-            <span className="whitespace-nowrap">Back to Scenes</span>
-          </Button>
+          <div className="flex items-center gap-2 flex-shrink-0 self-start">
+            <Button
+              onClick={() => {
+                // If we have a referrer URL with filters, navigate to it
+                // Otherwise use browser back
+                if (location.state?.referrerUrl) {
+                  navigate(location.state.referrerUrl);
+                } else {
+                  navigate(-1);
+                }
+              }}
+              variant="secondary"
+              className="inline-flex items-center gap-2"
+            >
+              <span>←</span>
+              <span className="whitespace-nowrap">Back to Scenes</span>
+            </Button>
+            <ViewInStashButton stashUrl={scene?.stashUrl} size={20} />
+          </div>
           <h1
             className="text-2xl font-bold line-clamp-2"
             style={{ color: "var(--text-primary)" }}
