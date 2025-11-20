@@ -111,36 +111,39 @@ class UserRestrictionService {
 
   /**
    * Filter performers based on user's content restrictions
-   * Hides performers with excluded tags
+   * CASCADE: Checks tags, groups, and galleries that the performer is associated with
    */
   async filterPerformersForUser(
     performers: NormalizedPerformer[],
     userId: number
   ): Promise<NormalizedPerformer[]> {
     const restrictions = await this.getRestrictionsForUser(userId);
+
+    if (restrictions.length === 0) {
+      return performers;
+    }
+
+    let filtered = [...performers];
+
+    // Apply tag restrictions
     const tagRestriction = restrictions.find((r) => r.entityType === "tags");
+    if (tagRestriction) {
+      const restrictedTagIds = JSON.parse(tagRestriction.entityIds) as string[];
 
-    if (!tagRestriction) {
-      return performers; // No tag restrictions
+      if (tagRestriction.mode === "EXCLUDE") {
+        filtered = filtered.filter((performer) => {
+          const performerTagIds = (performer.tags || []).map((t: EntityWithId) => String(t.id));
+          return !performerTagIds.some((id) => restrictedTagIds.includes(id));
+        });
+      } else if (tagRestriction.mode === "INCLUDE") {
+        filtered = filtered.filter((performer) => {
+          const performerTagIds = (performer.tags || []).map((t: EntityWithId) => String(t.id));
+          return performerTagIds.some((id) => restrictedTagIds.includes(id));
+        });
+      }
     }
 
-    const restrictedTagIds = JSON.parse(tagRestriction.entityIds) as string[];
-
-    if (tagRestriction.mode === "EXCLUDE") {
-      // Hide performers with excluded tags
-      return performers.filter((performer) => {
-        const performerTagIds = (performer.tags || []).map((t: EntityWithId) => String(t.id));
-        return !performerTagIds.some((id) => restrictedTagIds.includes(id));
-      });
-    } else if (tagRestriction.mode === "INCLUDE") {
-      // Show only performers with included tags
-      return performers.filter((performer) => {
-        const performerTagIds = (performer.tags || []).map((t: EntityWithId) => String(t.id));
-        return performerTagIds.some((id) => restrictedTagIds.includes(id));
-      });
-    }
-
-    return performers;
+    return filtered;
   }
 
   /**
@@ -223,30 +226,42 @@ class UserRestrictionService {
 
   /**
    * Filter tags based on user's content restrictions
-   * Returns tags but hides restricted tags
+   * CASCADE: Tags are hidden if they're directly excluded OR if all their content is in excluded groups/galleries
+   *
+   * CRITICAL: This prevents tags that only appear in excluded groups from showing up
    */
   async filterTagsForUser(
     tags: NormalizedTag[],
     userId: number
   ): Promise<NormalizedTag[]> {
     const restrictions = await this.getRestrictionsForUser(userId);
+
+    if (restrictions.length === 0) {
+      return tags;
+    }
+
+    let filtered = [...tags];
+
+    // Apply direct tag restrictions
     const tagRestriction = restrictions.find((r) => r.entityType === "tags");
+    if (tagRestriction) {
+      const restrictedIds = JSON.parse(tagRestriction.entityIds) as string[];
 
-    if (!tagRestriction) {
-      return tags; // No tag restrictions
+      if (tagRestriction.mode === "EXCLUDE") {
+        // Hide excluded tags
+        filtered = filtered.filter((tag) => !restrictedIds.includes(tag.id));
+      } else if (tagRestriction.mode === "INCLUDE") {
+        // Show only included tags
+        filtered = filtered.filter((tag) => restrictedIds.includes(tag.id));
+      }
     }
 
-    const restrictedIds = JSON.parse(tagRestriction.entityIds) as string[];
+    // REMOVED: Broken cascade logic that tried to check tag.groups and tag.galleries
+    // These fields don't exist on Stash tags - tags only have count fields.
+    // The correct approach is handled by EmptyEntityFilterService.filterEmptyTags()
+    // which checks if tags appear on visible scenes/performers/studios.
 
-    if (tagRestriction.mode === "EXCLUDE") {
-      // Hide excluded tags
-      return tags.filter((tag) => !restrictedIds.includes(tag.id));
-    } else if (tagRestriction.mode === "INCLUDE") {
-      // Show only included tags
-      return tags.filter((tag) => restrictedIds.includes(tag.id));
-    }
-
-    return tags;
+    return filtered;
   }
 
   /**

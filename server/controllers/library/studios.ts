@@ -106,6 +106,13 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
 
       // Filter empty studios (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
+        // CRITICAL FIX: Filter scenes first to get visibility baseline
+        let visibleScenes = stashCacheManager.getAllScenes();
+        visibleScenes = await userRestrictionService.filterScenesForUser(
+          visibleScenes,
+          userId
+        );
+
         // Get all entities from cache
         let allGalleries = stashCacheManager.getAllGalleries();
         let allGroups = stashCacheManager.getAllGroups();
@@ -127,10 +134,12 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
           emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter studios using properly restricted visibility sets
+        // CRITICAL FIX: Pass visibleScenes to check actual visibility
         filteredStudios = emptyEntityFilterService.filterEmptyStudios(
           filteredStudios,
           visibleGroups,
-          visibleGalleries
+          visibleGalleries,
+          visibleScenes // ← NEW: Pass visible scenes
         );
       }
 
@@ -518,6 +527,13 @@ export const findStudiosMinimal = async (
 
       // Filter empty studios (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
+        // CRITICAL FIX: Filter scenes first to get visibility baseline
+        let visibleScenes = stashCacheManager.getAllScenes();
+        visibleScenes = await userRestrictionService.filterScenesForUser(
+          visibleScenes,
+          userId
+        );
+
         // Get all entities from cache
         let allGalleries = stashCacheManager.getAllGalleries();
         let allGroups = stashCacheManager.getAllGroups();
@@ -539,10 +555,12 @@ export const findStudiosMinimal = async (
           emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter studios using properly restricted visibility sets
+        // CRITICAL FIX: Pass visibleScenes to check actual visibility
         filteredStudios = emptyEntityFilterService.filterEmptyStudios(
           filteredStudios,
           visibleGroups,
-          visibleGalleries
+          visibleGalleries,
+          visibleScenes // ← NEW: Pass visible scenes
         );
       }
 
