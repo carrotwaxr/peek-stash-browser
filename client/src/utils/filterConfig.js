@@ -81,6 +81,18 @@ export const GROUP_SORT_OPTIONS = [
   { value: "updated_at", label: "Updated At" },
 ];
 
+// Gallery sorting options (alphabetically organized by label)
+export const GALLERY_SORT_OPTIONS = [
+  { value: "created_at", label: "Created At" },
+  { value: "date", label: "Date" },
+  { value: "image_count", label: "Image Count" },
+  { value: "path", label: "Path" },
+  { value: "random", label: "Random" },
+  { value: "rating", label: "Rating" },
+  { value: "title", label: "Title" },
+  { value: "updated_at", label: "Updated At" },
+];
+
 // Filter type options for different data types
 const RATING_OPTIONS = [
   { value: "1", label: "1 Star" },
@@ -1097,6 +1109,83 @@ export const GROUP_FILTER_OPTIONS = [
     multi: false,
     defaultValue: "",
     placeholder: "Select scene...",
+  },
+];
+
+export const GALLERY_FILTER_OPTIONS = [
+  // Common Filters
+  {
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
+  },
+  {
+    key: "title",
+    label: "Title Search",
+    type: "text",
+    defaultValue: "",
+    placeholder: "Search title...",
+  },
+  {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select performers...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "performerIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "studioIds",
+    label: "Studios",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select studios...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "studioIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES_ALL",
+  },
+  {
+    key: "rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
+  },
+  {
+    key: "imageCount",
+    label: "Image Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
+  {
+    key: "favorite",
+    label: "Favorite Galleries",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
   },
 ];
 
