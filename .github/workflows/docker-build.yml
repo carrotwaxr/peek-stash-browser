@@ -2,8 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    tags:
-      - 'v*'  # Only build on version tags (e.g., v1.0.1)
+    tags: ["v*"]  # Only build on version tags (e.g., v1.0.1)
 
 env:
   REGISTRY: docker.io
