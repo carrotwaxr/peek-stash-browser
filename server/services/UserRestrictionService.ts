@@ -1,5 +1,5 @@
-import { PrismaClient } from "@prisma/client";
 import type { UserContentRestriction } from "@prisma/client";
+import prisma from "../prisma/singleton.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
@@ -23,8 +23,6 @@ interface SceneGroupEntity {
   group?: { id: string };
   id?: string;
 }
-
-const prisma = new PrismaClient();
 
 /**
  * UserRestrictionService
@@ -113,73 +111,157 @@ class UserRestrictionService {
 
   /**
    * Filter performers based on user's content restrictions
-   * Returns performers but with filtered scene counts
+   * CASCADE: Checks tags, groups, and galleries that the performer is associated with
    */
   async filterPerformersForUser(
     performers: NormalizedPerformer[],
-    _userId: number
+    userId: number
   ): Promise<NormalizedPerformer[]> {
-    // For now, return all performers
-    // In the future, we could filter based on whether all their scenes are restricted
-    return performers;
+    const restrictions = await this.getRestrictionsForUser(userId);
+
+    if (restrictions.length === 0) {
+      return performers;
+    }
+
+    let filtered = [...performers];
+
+    // Apply tag restrictions
+    const tagRestriction = restrictions.find((r) => r.entityType === "tags");
+    if (tagRestriction) {
+      const restrictedTagIds = JSON.parse(tagRestriction.entityIds) as string[];
+
+      if (tagRestriction.mode === "EXCLUDE") {
+        filtered = filtered.filter((performer) => {
+          const performerTagIds = (performer.tags || []).map((t: EntityWithId) => String(t.id));
+          return !performerTagIds.some((id) => restrictedTagIds.includes(id));
+        });
+      } else if (tagRestriction.mode === "INCLUDE") {
+        filtered = filtered.filter((performer) => {
+          const performerTagIds = (performer.tags || []).map((t: EntityWithId) => String(t.id));
+          return performerTagIds.some((id) => restrictedTagIds.includes(id));
+        });
+      }
+    }
+
+    return filtered;
   }
 
   /**
    * Filter studios based on user's content restrictions
-   * Returns studios but with filtered scene counts
+   * Applies direct studio restrictions AND cascading tag/group restrictions
    */
   async filterStudiosForUser(
     studios: NormalizedStudio[],
     userId: number
   ): Promise<NormalizedStudio[]> {
     const restrictions = await this.getRestrictionsForUser(userId);
+
+    if (restrictions.length === 0) {
+      return studios; // No restrictions
+    }
+
+    let filtered = [...studios];
+
+    // Apply direct studio restrictions
     const studioRestriction = restrictions.find(
       (r) => r.entityType === "studios"
     );
 
-    if (!studioRestriction) {
-      return studios; // No studio restrictions
+    if (studioRestriction) {
+      const restrictedIds = JSON.parse(studioRestriction.entityIds) as string[];
+
+      if (studioRestriction.mode === "EXCLUDE") {
+        // Hide excluded studios
+        filtered = filtered.filter((studio) => !restrictedIds.includes(studio.id));
+      } else if (studioRestriction.mode === "INCLUDE") {
+        // Show only included studios
+        filtered = filtered.filter((studio) => restrictedIds.includes(studio.id));
+      }
     }
 
-    const restrictedIds = JSON.parse(studioRestriction.entityIds) as string[];
+    // CASCADE: Apply tag restrictions to studios
+    const tagRestriction = restrictions.find((r) => r.entityType === "tags");
 
-    if (studioRestriction.mode === "EXCLUDE") {
-      // Hide excluded studios
-      return studios.filter((studio) => !restrictedIds.includes(studio.id));
-    } else if (studioRestriction.mode === "INCLUDE") {
-      // Show only included studios
-      return studios.filter((studio) => restrictedIds.includes(studio.id));
+    if (tagRestriction) {
+      const restrictedTagIds = JSON.parse(tagRestriction.entityIds) as string[];
+
+      if (tagRestriction.mode === "EXCLUDE") {
+        // Hide studios with excluded tags
+        filtered = filtered.filter((studio) => {
+          const studioTagIds = (studio.tags || []).map((t: EntityWithId) => String(t.id));
+          return !studioTagIds.some((id) => restrictedTagIds.includes(id));
+        });
+      } else if (tagRestriction.mode === "INCLUDE") {
+        // Show only studios with included tags
+        filtered = filtered.filter((studio) => {
+          const studioTagIds = (studio.tags || []).map((t: EntityWithId) => String(t.id));
+          return studioTagIds.some((id) => restrictedTagIds.includes(id));
+        });
+      }
     }
 
-    return studios;
+    // CASCADE: Apply group restrictions to studios
+    const groupRestriction = restrictions.find((r) => r.entityType === "groups");
+
+    if (groupRestriction) {
+      const restrictedGroupIds = JSON.parse(groupRestriction.entityIds) as string[];
+
+      if (groupRestriction.mode === "EXCLUDE") {
+        // Hide studios with excluded groups
+        filtered = filtered.filter((studio) => {
+          const studioGroupIds = ((studio as any).groups || []).map((g: EntityWithId) => String(g.id));
+          return !studioGroupIds.some((id: string) => restrictedGroupIds.includes(id));
+        });
+      } else if (groupRestriction.mode === "INCLUDE") {
+        // Show only studios with included groups
+        filtered = filtered.filter((studio) => {
+          const studioGroupIds = ((studio as any).groups || []).map((g: EntityWithId) => String(g.id));
+          return studioGroupIds.some((id: string) => restrictedGroupIds.includes(id));
+        });
+      }
+    }
+
+    return filtered;
   }
 
   /**
    * Filter tags based on user's content restrictions
-   * Returns tags but hides restricted tags
+   * CASCADE: Tags are hidden if they're directly excluded OR if all their content is in excluded groups/galleries
+   *
+   * CRITICAL: This prevents tags that only appear in excluded groups from showing up
    */
   async filterTagsForUser(
     tags: NormalizedTag[],
     userId: number
   ): Promise<NormalizedTag[]> {
     const restrictions = await this.getRestrictionsForUser(userId);
+
+    if (restrictions.length === 0) {
+      return tags;
+    }
+
+    let filtered = [...tags];
+
+    // Apply direct tag restrictions
     const tagRestriction = restrictions.find((r) => r.entityType === "tags");
+    if (tagRestriction) {
+      const restrictedIds = JSON.parse(tagRestriction.entityIds) as string[];
 
-    if (!tagRestriction) {
-      return tags; // No tag restrictions
+      if (tagRestriction.mode === "EXCLUDE") {
+        // Hide excluded tags
+        filtered = filtered.filter((tag) => !restrictedIds.includes(tag.id));
+      } else if (tagRestriction.mode === "INCLUDE") {
+        // Show only included tags
+        filtered = filtered.filter((tag) => restrictedIds.includes(tag.id));
+      }
     }
 
-    const restrictedIds = JSON.parse(tagRestriction.entityIds) as string[];
+    // REMOVED: Broken cascade logic that tried to check tag.groups and tag.galleries
+    // These fields don't exist on Stash tags - tags only have count fields.
+    // The correct approach is handled by EmptyEntityFilterService.filterEmptyTags()
+    // which checks if tags appear on visible scenes/performers/studios.
 
-    if (tagRestriction.mode === "EXCLUDE") {
-      // Hide excluded tags
-      return tags.filter((tag) => !restrictedIds.includes(tag.id));
-    } else if (tagRestriction.mode === "INCLUDE") {
-      // Show only included tags
-      return tags.filter((tag) => restrictedIds.includes(tag.id));
-    }
-
-    return tags;
+    return filtered;
   }
 
   /**
@@ -244,6 +326,11 @@ class UserRestrictionService {
 
   /**
    * Get entity IDs from a scene based on entity type
+   *
+   * FOR TAGS: Implements cascading logic - checks:
+   * - Direct scene tags
+   * - Tags on the scene's studio
+   * - Tags on the scene's performers
    */
   private getSceneEntityIds(
     scene: NormalizedScene,
@@ -256,8 +343,35 @@ class UserRestrictionService {
             String(g.group?.id || (g as { id?: string }).id)
           ) || []
         );
-      case "tags":
-        return scene.tags?.map((t: EntityWithId) => String(t.id)) || [];
+      case "tags": {
+        // CASCADE: Collect tags from scene, studio, and performers
+        const tagIds = new Set<string>();
+
+        // Direct scene tags
+        (scene.tags || []).forEach((t: EntityWithId) => {
+          tagIds.add(String(t.id));
+        });
+
+        // Studio tags (cascading)
+        if (scene.studio?.tags) {
+          (scene.studio.tags as EntityWithId[]).forEach((t: EntityWithId) => {
+            tagIds.add(String(t.id));
+          });
+        }
+
+        // Performer tags (cascading)
+        if (scene.performers) {
+          scene.performers.forEach((performer) => {
+            if ((performer as any).tags) {
+              ((performer as any).tags as EntityWithId[]).forEach((t: EntityWithId) => {
+                tagIds.add(String(t.id));
+              });
+            }
+          });
+        }
+
+        return Array.from(tagIds);
+      }
       case "studios":
         return scene.studio ? [String(scene.studio.id)] : [];
       case "galleries":

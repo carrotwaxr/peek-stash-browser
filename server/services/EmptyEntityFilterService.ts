@@ -174,7 +174,7 @@ class EmptyEntityFilterService {
   /**
    * Filter performers with no content
    * Hide if ALL of:
-   * - No scenes
+   * - Not in any visible scene
    * - No images
    * - Not in any visible group
    * - No visible gallery
@@ -182,8 +182,21 @@ class EmptyEntityFilterService {
   filterEmptyPerformers<T extends FilterablePerformer>(
     performers: T[],
     visibleGroups: FilterableGroup[],
-    visibleGalleries: FilterableGallery[]
+    visibleGalleries: FilterableGallery[],
+    visibleScenes?: Array<{ id: string; performers?: Array<{ id: string }> }>
   ): T[] {
+    // Build set of performers in visible scenes
+    const performersInVisibleScenes = new Set<string>();
+    if (visibleScenes) {
+      for (const scene of visibleScenes) {
+        if (scene.performers) {
+          for (const performer of scene.performers) {
+            performersInVisibleScenes.add(performer.id);
+          }
+        }
+      }
+    }
+
     // Build reverse indexes: which performers appear in visible groups/galleries
     const performersInVisibleGroups = new Set<string>();
     const performersInVisibleGalleries = new Set<string>();
@@ -214,8 +227,14 @@ class EmptyEntityFilterService {
     }
 
     return performers.filter((performer) => {
-      // Has scenes? Keep
-      if (performer.scene_count && performer.scene_count > 0) {
+      // CRITICAL FIX: Check if performer appears in visible scenes
+      // This replaces the buggy scene_count check
+      if (visibleScenes && performersInVisibleScenes.has(performer.id)) {
+        return true;
+      }
+
+      // Fallback to old logic if visibleScenes not provided (backward compatibility)
+      if (!visibleScenes && performer.scene_count && performer.scene_count > 0) {
         return true;
       }
 
@@ -242,7 +261,7 @@ class EmptyEntityFilterService {
   /**
    * Filter studios with no content
    * Hide if ALL of:
-   * - No scenes
+   * - Not in any visible scene
    * - No visible groups
    * - No images
    * - No visible galleries
@@ -250,15 +269,32 @@ class EmptyEntityFilterService {
   filterEmptyStudios<T extends FilterableStudio>(
     studios: T[],
     visibleGroups: FilterableGroup[],
-    visibleGalleries: FilterableGallery[]
+    visibleGalleries: FilterableGallery[],
+    visibleScenes?: Array<{ id: string; studio?: { id: string } | null }>
   ): T[] {
+    // Build set of studios in visible scenes
+    const studiosInVisibleScenes = new Set<string>();
+    if (visibleScenes) {
+      for (const scene of visibleScenes) {
+        if (scene.studio) {
+          studiosInVisibleScenes.add(scene.studio.id);
+        }
+      }
+    }
+
     // Build sets of visible group and gallery IDs for fast lookup
     const visibleGroupIds = new Set(visibleGroups.map((g) => g.id));
     const visibleGalleryIds = new Set(visibleGalleries.map((g) => g.id));
 
     return studios.filter((studio) => {
-      // Has scenes? Keep
-      if (studio.scene_count && studio.scene_count > 0) {
+      // CRITICAL FIX: Check if studio appears in visible scenes
+      // This replaces the buggy scene_count check
+      if (visibleScenes && studiosInVisibleScenes.has(studio.id)) {
+        return true;
+      }
+
+      // Fallback to old logic if visibleScenes not provided (backward compatibility)
+      if (!visibleScenes && studio.scene_count && studio.scene_count > 0) {
         return true;
       }
 
@@ -305,7 +341,13 @@ class EmptyEntityFilterService {
    */
   filterEmptyTags<T extends FilterableTag>(
     tags: T[],
-    _visibleEntities: VisibleEntitySets
+    visibleEntities: VisibleEntitySets,
+    visibleScenes?: Array<{
+      id: string;
+      tags?: Array<{ id: string }>;
+      performers?: Array<{ id: string; tags?: Array<{ id: string }> }>;
+      studio?: { id: string; tags?: Array<{ id: string }> } | null;
+    }>
   ): T[] {
     if (tags.length === 0) return [];
 
@@ -316,49 +358,94 @@ class EmptyEntityFilterService {
     const hasContent = new Map<string, boolean>();
 
     /**
+     * CRITICAL FIX: Build set of tags that appear on visible entities
+     * This replaces the buggy count-based heuristic
+     */
+    const tagsOnVisibleEntities = new Set<string>();
+
+    if (visibleScenes) {
+      // Tags on visible scenes (direct scene tags)
+      for (const scene of visibleScenes) {
+        if (scene.tags) {
+          for (const tag of scene.tags) {
+            tagsOnVisibleEntities.add(tag.id);
+          }
+        }
+
+        // Tags on performers in visible scenes
+        if (scene.performers) {
+          for (const performer of scene.performers) {
+            if (performer.tags) {
+              for (const tag of performer.tags) {
+                tagsOnVisibleEntities.add(tag.id);
+              }
+            }
+          }
+        }
+
+        // Tags on studio in visible scenes
+        if (scene.studio?.tags) {
+          for (const tag of scene.studio.tags) {
+            tagsOnVisibleEntities.add(tag.id);
+          }
+        }
+      }
+    }
+
+    // Tags on visible performers (from visibilitySet)
+    // Note: We already captured these from scenes above if visibleScenes provided
+
+    // Tags on visible studios (from visibilitySet)
+    // Note: We already captured these from scenes above if visibleScenes provided
+
+    /**
      * Check if a tag has any attachments to visible entities
-     * This requires checking the tag's counts against the visible sets
-     *
-     * Note: The tag counts include ALL entities, not just visible ones
-     * So we need to actually check if the tag appears on any visible entity
-     * This is expensive but necessary for accuracy
      */
     const checkDirectContent = (tag: FilterableTag): boolean => {
-      // For now, use the counts as a heuristic
-      // A more accurate implementation would query the cache for each entity type
-      // and check if the tag appears on any visible entities
-
-      // Has scenes? Keep (assuming scenes are filtered by user restrictions already)
-      if (tag.scene_count && tag.scene_count > 0) {
+      // CRITICAL FIX: Check if tag appears on visible entities
+      if (visibleScenes && tagsOnVisibleEntities.has(tag.id)) {
         return true;
       }
 
-      // Has images? Keep
+      // Fallback to old count-based heuristic if visibleScenes not provided
+      if (!visibleScenes) {
+        // Has scenes? Keep (assuming scenes are filtered by user restrictions already)
+        if (tag.scene_count && tag.scene_count > 0) {
+          return true;
+        }
+
+        // Has images? Keep
+        if (tag.image_count && tag.image_count > 0) {
+          return true;
+        }
+
+        // Attached to visible galleries?
+        if (tag.gallery_count && tag.gallery_count > 0) {
+          // Conservative: if it has any galleries, assume at least one is visible
+          return true;
+        }
+
+        // Attached to visible groups?
+        if (tag.group_count && tag.group_count > 0) {
+          // Conservative: if it has any groups, assume at least one is visible
+          return true;
+        }
+
+        // Attached to visible performers?
+        if (tag.performer_count && tag.performer_count > 0) {
+          // Conservative: if it has any performers, assume at least one is visible
+          return true;
+        }
+
+        // Attached to visible studios?
+        if (tag.studio_count && tag.studio_count > 0) {
+          // Conservative: if it has any studios, assume at least one is visible
+          return true;
+        }
+      }
+
+      // Has images? Keep (always check this)
       if (tag.image_count && tag.image_count > 0) {
-        return true;
-      }
-
-      // Attached to visible galleries?
-      if (tag.gallery_count && tag.gallery_count > 0) {
-        // Conservative: if it has any galleries, assume at least one is visible
-        return true;
-      }
-
-      // Attached to visible groups?
-      if (tag.group_count && tag.group_count > 0) {
-        // Conservative: if it has any groups, assume at least one is visible
-        return true;
-      }
-
-      // Attached to visible performers?
-      if (tag.performer_count && tag.performer_count > 0) {
-        // Conservative: if it has any performers, assume at least one is visible
-        return true;
-      }
-
-      // Attached to visible studios?
-      if (tag.studio_count && tag.studio_count > 0) {
-        // Conservative: if it has any studios, assume at least one is visible
         return true;
       }
 

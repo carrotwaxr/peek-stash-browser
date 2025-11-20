@@ -174,6 +174,13 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         requestingUser.role !== "ADMIN" &&
         !isFetchingByIds
       ) {
+        // CRITICAL FIX: Filter scenes first to get visibility baseline
+        let visibleScenes = stashCacheManager.getAllScenes();
+        visibleScenes = await userRestrictionService.filterScenesForUser(
+          visibleScenes,
+          userId
+        );
+
         // Get all entities from cache
         let allGalleries = stashCacheManager.getAllGalleries();
         let allGroups = stashCacheManager.getAllGroups();
@@ -203,13 +210,15 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
           allStudios,
           visibleGroups,
-          visibleGalleries
+          visibleGalleries,
+          visibleScenes // ← NEW: Pass visible scenes
         );
         const visiblePerformers =
           emptyEntityFilterService.filterEmptyPerformers(
             allPerformers,
             visibleGroups,
-            visibleGalleries
+            visibleGalleries,
+            visibleScenes // ← NEW: Pass visible scenes
           );
 
         const visibilitySet = {
@@ -219,9 +228,11 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
           performers: new Set(visiblePerformers.map((p) => p.id)),
         };
 
+        // CRITICAL FIX: Pass visibleScenes to check actual visibility
         filteredTags = emptyEntityFilterService.filterEmptyTags(
           filteredTags,
-          visibilitySet
+          visibilitySet,
+          visibleScenes // ← NEW: Pass visible scenes
         );
       }
 

@@ -117,6 +117,13 @@ export const findPerformers = async (
 
       // Filter empty performers (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
+        // CRITICAL FIX: Filter scenes first to get visibility baseline
+        let visibleScenes = stashCacheManager.getAllScenes();
+        visibleScenes = await userRestrictionService.filterScenesForUser(
+          visibleScenes,
+          userId
+        );
+
         // Get all entities from cache
         let allGalleries = stashCacheManager.getAllGalleries();
         let allGroups = stashCacheManager.getAllGroups();
@@ -138,10 +145,12 @@ export const findPerformers = async (
           emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter performers using properly restricted visibility sets
+        // CRITICAL FIX: Pass visibleScenes to check actual visibility
         filteredPerformers = emptyEntityFilterService.filterEmptyPerformers(
           filteredPerformers,
           visibleGroups,
-          visibleGalleries
+          visibleGalleries,
+          visibleScenes // ← NEW: Pass visible scenes
         );
       }
 
@@ -574,6 +583,13 @@ export const findPerformersMinimal = async (
 
       // Filter empty performers (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
+        // CRITICAL FIX: Filter scenes first to get visibility baseline
+        let visibleScenes = stashCacheManager.getAllScenes();
+        visibleScenes = await userRestrictionService.filterScenesForUser(
+          visibleScenes,
+          userId
+        );
+
         // Get all entities from cache
         let allGalleries = stashCacheManager.getAllGalleries();
         let allGroups = stashCacheManager.getAllGroups();
@@ -595,10 +611,12 @@ export const findPerformersMinimal = async (
           emptyEntityFilterService.filterEmptyGroups(allGroups);
 
         // Finally filter performers using properly restricted visibility sets
+        // CRITICAL FIX: Pass visibleScenes to check actual visibility
         filteredPerformers = emptyEntityFilterService.filterEmptyPerformers(
           filteredPerformers,
           visibleGroups,
-          visibleGalleries
+          visibleGalleries,
+          visibleScenes // ← NEW: Pass visible scenes
         );
       }
 
