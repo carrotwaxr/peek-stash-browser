@@ -9,6 +9,7 @@ import { userStatsService } from "../../services/UserStatsService.js";
 import getStash from "../../stash.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Merge user-specific data into studios
@@ -177,7 +178,28 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     const total = studios.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedStudios = studios.slice(startIndex, endIndex);
+    let paginatedStudios = studios.slice(startIndex, endIndex);
+
+    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
+    if (ids && ids.length === 1 && paginatedStudios.length === 1) {
+      const studio = paginatedStudios[0];
+      const actualImageCount = await calculateEntityImageCount(
+        "studio",
+        studio.id
+      );
+      paginatedStudios = [
+        {
+          ...studio,
+          image_count: actualImageCount,
+        },
+      ];
+      logger.info("Calculated accurate image_count for studio detail", {
+        studioId: studio.id,
+        studioName: studio.name,
+        stashImageCount: studio.image_count,
+        actualImageCount,
+      });
+    }
 
     res.json({
       findStudios: {

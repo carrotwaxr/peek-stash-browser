@@ -72,3 +72,6 @@ server/*.sqlite3
 
 # MkDocs build output
 site/
+
+# Claude Code local settings (user-specific)
+.claude/settings.local.json

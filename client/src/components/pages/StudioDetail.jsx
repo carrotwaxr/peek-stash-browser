@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
@@ -7,20 +13,28 @@ import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
+  EntityGrid,
   FavoriteButton,
+  Lightbox,
   LoadingSpinner,
   PageHeader,
+  Pagination,
   RatingSlider,
+  TabNavigation,
 } from "../ui/index.js";
 
 const StudioDetail = () => {
   const { studioId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [studio, setStudio] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Get active tab from URL or default to 'scenes'
+  const activeTab = searchParams.get("tab") || "scenes";
 
   // Set page title to studio name
   usePageTitle(studio?.name || "Studio");
@@ -151,28 +165,103 @@ const StudioDetail = () => {
 
         {/* Full Width Sections - Statistics, Parent Studio, Tags, Website */}
         <div className="space-y-6 mb-8">
-          <StudioStats studio={studio} />
+          <StudioStats studio={studio} studioId={studioId} />
           <StudioDetails studio={studio} />
         </div>
 
-        {/* Scenes Section */}
+        {/* Tabbed Content Section */}
         <div className="mt-8">
-          <SceneSearch
-            context="scene_studio"
-            permanentFilters={{
-              studios: {
-                value: [parseInt(studioId, 10)],
-                modifier: "INCLUDES",
+          <TabNavigation
+            tabs={[
+              { id: "scenes", label: "Scenes", count: studio.scene_count || 0 },
+              {
+                id: "galleries",
+                label: "Galleries",
+                count: studio.gallery_count || 0,
               },
-            }}
-            permanentFiltersMetadata={{
-              studios: [
-                { id: studioId, name: studio?.name || "Unknown Studio" },
-              ],
-            }}
-            title={`Scenes from ${studio?.name || "this studio"}`}
-            captureReferrer={false}
+              { id: "images", label: "Images", count: studio.image_count || 0 },
+              {
+                id: "performers",
+                label: "Performers",
+                count: studio.performer_count || 0,
+              },
+              {
+                id: "groups",
+                label: "Collections",
+                count: studio.group_count || 0,
+              },
+            ]}
+            defaultTab="scenes"
           />
+
+          {/* Tab Content */}
+          {activeTab === "scenes" && (
+            <SceneSearch
+              context="scene_studio"
+              permanentFilters={{
+                studios: {
+                  value: [parseInt(studioId, 10)],
+                  modifier: "INCLUDES",
+                },
+              }}
+              permanentFiltersMetadata={{
+                studios: [
+                  { id: studioId, name: studio?.name || "Unknown Studio" },
+                ],
+              }}
+              title={`Scenes from ${studio?.name || "this studio"}`}
+              captureReferrer={false}
+            />
+          )}
+
+          {activeTab === "galleries" && (
+            <EntityGrid
+              entityType="gallery"
+              filters={{
+                gallery_filter: {
+                  studios: {
+                    value: [parseInt(studioId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No galleries found for ${studio?.name}`}
+            />
+          )}
+
+          {activeTab === "images" && (
+            <ImagesTab studioId={studioId} studioName={studio?.name} />
+          )}
+
+          {activeTab === "performers" && (
+            <EntityGrid
+              entityType="performer"
+              filters={{
+                performer_filter: {
+                  studios: {
+                    value: [parseInt(studioId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No performers found for ${studio?.name}`}
+            />
+          )}
+
+          {activeTab === "groups" && (
+            <EntityGrid
+              entityType="group"
+              filters={{
+                group_filter: {
+                  studios: {
+                    value: [parseInt(studioId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No collections found for ${studio?.name}`}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -239,15 +328,53 @@ const StudioImage = ({ studio }) => {
 };
 
 // Studio Stats Component
-const StudioStats = ({ studio }) => {
-  const StatField = ({ label, value, valueColor = "var(--text-primary)" }) => {
+const StudioStats = ({ studio, studioId }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "scenes";
+
+  const handleTabSwitch = (tabId) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tabId === "scenes") {
+      newParams.delete("tab");
+    } else {
+      newParams.set("tab", tabId);
+    }
+    setSearchParams(newParams);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  };
+
+  const StatField = ({
+    label,
+    value,
+    valueColor = "var(--text-primary)",
+    onClick,
+    isActive,
+  }) => {
     if (!value && value !== 0) return null;
+
+    const clickable = onClick && value > 0;
+
     return (
       <div className="flex justify-between">
         <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-        <span className="font-medium" style={{ color: valueColor }}>
-          {value}
-        </span>
+        {clickable ? (
+          <button
+            onClick={onClick}
+            disabled={isActive}
+            className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
+            style={{
+              color: valueColor,
+              cursor: isActive ? "default" : "pointer",
+              textDecoration: isActive ? "underline" : "none",
+            }}
+          >
+            {value}
+          </button>
+        ) : (
+          <span className="font-medium" style={{ color: valueColor }}>
+            {value}
+          </span>
+        )}
       </div>
     );
   };
@@ -255,7 +382,7 @@ const StudioStats = ({ studio }) => {
   return (
     <Card title="Statistics">
       {/* Visual Rating Display */}
-      {studio?.rating100 && (
+      {studio?.rating100 > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span
@@ -292,31 +419,36 @@ const StudioStats = ({ studio }) => {
           label="Scenes:"
           value={studio?.scene_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch("scenes")}
+          isActive={activeTab === "scenes"}
         />
         <StatField
           label="Performers:"
           value={studio?.performer_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch("performers")}
+          isActive={activeTab === "performers"}
         />
         <StatField
           label="Images:"
           value={studio?.image_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch("images")}
+          isActive={activeTab === "images"}
         />
         <StatField
           label="Galleries:"
           value={studio?.gallery_count}
           valueColor="var(--accent-primary)"
-        />
-        <StatField
-          label="Movies:"
-          value={studio?.movie_count}
-          valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch("galleries")}
+          isActive={activeTab === "galleries"}
         />
         <StatField
           label="Collections:"
           value={studio?.group_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch("groups")}
+          isActive={activeTab === "groups"}
         />
       </div>
     </Card>
@@ -491,6 +623,144 @@ const StudioDetails = ({ studio }) => {
           </div>
         </Card>
       )}
+    </>
+  );
+};
+
+// Images Tab Component with Lightbox
+const ImagesTab = ({ studioId, studioName }) => {
+  const [images, setImages] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const perPage = 100;
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        setIsLoading(true);
+        const data = await libraryApi.findImages({
+          filter: {
+            page: currentPage,
+            per_page: perPage,
+          },
+          image_filter: {
+            studios: {
+              value: [parseInt(studioId, 10)],
+              modifier: "INCLUDES",
+            },
+          },
+        });
+        setImages(data.findImages?.images || []);
+        setTotalCount(data.findImages?.count || 0);
+      } catch (error) {
+        console.error("Error loading images:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchImages();
+  }, [studioId, currentPage]);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 mt-6">
+        {[...Array(12)].map((_, index) => (
+          <div
+            key={index}
+            className="aspect-square rounded-lg animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (images.length === 0) {
+    return (
+      <div
+        className="text-center py-12 mt-6"
+        style={{ color: "var(--text-muted)" }}
+      >
+        No images found for {studioName}
+      </div>
+    );
+  }
+
+  const totalPages = Math.ceil(totalCount / perPage);
+
+  return (
+    <>
+      {/* Pagination - Top */}
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 mt-6">
+        {images.map((image, index) => (
+          <div
+            key={image.id}
+            className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-color)",
+            }}
+            onClick={() => {
+              setLightboxIndex(index);
+              setLightboxOpen(true);
+            }}
+          >
+            {image.paths?.thumbnail ? (
+              <img
+                src={image.paths.thumbnail}
+                alt={image.title || `Image ${index + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                No Preview
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
+      {/* Lightbox */}
+      <Lightbox
+        images={images}
+        initialIndex={lightboxIndex}
+        isOpen={lightboxOpen}
+        autoPlay={false}
+        onClose={() => setLightboxOpen(false)}
+        onImagesUpdate={setImages}
+      />
     </>
   );
 };

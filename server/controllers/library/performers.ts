@@ -12,6 +12,7 @@ import type {
   PeekPerformerFilter,
 } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
+import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Merge user-specific data into performers
@@ -191,7 +192,29 @@ export const findPerformers = async (
     const total = performers.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedPerformers = performers.slice(startIndex, endIndex);
+    let paginatedPerformers = performers.slice(startIndex, endIndex);
+
+    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
+    // This accounts for Gallery→Image relationships, not just direct image tagging
+    if (ids && ids.length === 1 && paginatedPerformers.length === 1) {
+      const performer = paginatedPerformers[0];
+      const actualImageCount = await calculateEntityImageCount(
+        "performer",
+        performer.id
+      );
+      paginatedPerformers = [
+        {
+          ...performer,
+          image_count: actualImageCount,
+        },
+      ];
+      logger.info("Calculated accurate image_count for performer detail", {
+        performerId: performer.id,
+        performerName: performer.name,
+        stashImageCount: performer.image_count,
+        actualImageCount,
+      });
+    }
 
     res.json({
       findPerformers: {
@@ -268,6 +291,28 @@ export function applyPerformerFilters(
         return true;
       });
     }
+  }
+
+  // Filter by studios
+  // Note: Performers don't have a direct studio relationship in Stash
+  // We need to filter by performers who appear in scenes from specific studios
+  // This requires checking the scenes cache
+  if (filters.studios && filters.studios.value) {
+    const studioIds = new Set(filters.studios.value.map(String));
+    const allScenes = stashCacheManager.getAllScenes();
+
+    // Build a set of performer IDs that appear in scenes from the specified studios
+    const performerIdsInStudios = new Set<string>();
+    allScenes.forEach((scene) => {
+      if (scene.studio && studioIds.has(String(scene.studio.id))) {
+        scene.performers?.forEach((performer) => {
+          performerIdsInStudios.add(String(performer.id));
+        });
+      }
+    });
+
+    // Filter performers to only those who appear in scenes from the specified studios
+    filtered = filtered.filter((p) => performerIdsInStudios.has(p.id));
   }
 
   // Filter by rating100

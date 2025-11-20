@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   LucideDatabase,
@@ -18,11 +18,15 @@ import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
+  EntityGrid,
   FavoriteButton,
   GenderIcon,
+  Lightbox,
   LoadingSpinner,
   PageHeader,
+  Pagination,
   RatingSlider,
+  TabNavigation,
 } from "../ui/index.js";
 
 // Helper to detect and map URLs to known sites with colors
@@ -87,10 +91,14 @@ const PerformerDetail = () => {
   const { performerId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [performer, setPerformer] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Get active tab from URL or default to 'scenes'
+  const activeTab = searchParams.get('tab') || 'scenes';
 
   // Set page title to performer name
   usePageTitle(performer?.name || "Performer");
@@ -215,26 +223,73 @@ const PerformerDetail = () => {
 
         {/* Full Width Sections - Statistics, Tags, Links */}
         <div className="space-y-6 mb-8">
-          <PerformerStats performer={performer} />
+          <PerformerStats performer={performer} performerId={performerId} />
           <PerformerLinks performer={performer} />
         </div>
 
-        {/* Scenes Section */}
+        {/* Tabbed Content Section */}
         <div className="mt-8">
-          <SceneSearch
-            context="scene_performer"
-            permanentFilters={{
-              performers: {
-                value: [parseInt(performerId, 10)],
-                modifier: "INCLUDES",
-              },
-            }}
-            permanentFiltersMetadata={{
-              performers: [{ id: performerId, name: performer.name }],
-            }}
-            title={`Scenes featuring ${performer.name}`}
-            captureReferrer={false}
+          <TabNavigation
+            tabs={[
+              { id: 'scenes', label: 'Scenes', count: performer.scene_count || 0 },
+              { id: 'galleries', label: 'Galleries', count: performer.gallery_count || 0 },
+              { id: 'images', label: 'Images', count: performer.image_count || 0 },
+              { id: 'groups', label: 'Collections', count: performer.group_count || 0 },
+            ]}
+            defaultTab="scenes"
           />
+
+          {/* Tab Content */}
+          {activeTab === 'scenes' && (
+            <SceneSearch
+              context="scene_performer"
+              permanentFilters={{
+                performers: {
+                  value: [parseInt(performerId, 10)],
+                  modifier: "INCLUDES",
+                },
+              }}
+              permanentFiltersMetadata={{
+                performers: [{ id: performerId, name: performer.name }],
+              }}
+              title={`Scenes featuring ${performer.name}`}
+              captureReferrer={false}
+            />
+          )}
+
+          {activeTab === 'galleries' && (
+            <EntityGrid
+              entityType="gallery"
+              filters={{
+                gallery_filter: {
+                  performers: {
+                    value: [parseInt(performerId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No galleries found for ${performer.name}`}
+            />
+          )}
+
+          {activeTab === 'images' && (
+            <ImagesTab performerId={performerId} performerName={performer?.name} />
+          )}
+
+          {activeTab === 'groups' && (
+            <EntityGrid
+              entityType="group"
+              filters={{
+                group_filter: {
+                  performers: {
+                    value: [parseInt(performerId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No collections found for ${performer.name}`}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -261,15 +316,32 @@ const DetailField = ({ label, value }) => {
 };
 
 // Reusable component for stat field (label/value pair in stats card)
-const StatField = ({ label, value, valueColor = "var(--text-primary)" }) => {
+const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
   if (!value && value !== 0) return null;
+
+  const clickable = onClick && value > 0;
 
   return (
     <div className="flex justify-between">
       <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-      <span className="font-medium" style={{ color: valueColor }}>
-        {value}
-      </span>
+      {clickable ? (
+        <button
+          onClick={onClick}
+          disabled={isActive}
+          className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
+          style={{
+            color: valueColor,
+            cursor: isActive ? 'default' : 'pointer',
+            textDecoration: isActive ? 'underline' : 'none',
+          }}
+        >
+          {value}
+        </button>
+      ) : (
+        <span className="font-medium" style={{ color: valueColor }}>
+          {value}
+        </span>
+      )}
     </div>
   );
 };
@@ -462,7 +534,22 @@ const PerformerDetails = ({ performer }) => {
   );
 };
 
-const PerformerStats = ({ performer }) => {
+const PerformerStats = ({ performer, performerId }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'scenes';
+
+  const handleTabSwitch = (tabId) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tabId === 'scenes') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tabId);
+    }
+    setSearchParams(newParams);
+    // Scroll to content area
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  };
+
   // Calculate O-Count percentage
   const oCountPercentage =
     performer?.scene_count && performer?.o_counter
@@ -482,6 +569,8 @@ const PerformerStats = ({ performer }) => {
           label="Scenes:"
           value={performer?.scene_count || 0}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('scenes')}
+          isActive={activeTab === 'scenes'}
         />
         <StatField
           label="O-Count:"
@@ -491,27 +580,28 @@ const PerformerStats = ({ performer }) => {
         <StatField
           label="Galleries:"
           value={performer?.gallery_count || 0}
-          valueColor="var(--text-secondary)"
+          valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('galleries')}
+          isActive={activeTab === 'galleries'}
         />
         <StatField
           label="Images:"
           value={performer?.image_count || 0}
-          valueColor="var(--text-secondary)"
+          valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('images')}
+          isActive={activeTab === 'images'}
         />
         <StatField
           label="Collections:"
           value={performer?.group_count || 0}
-          valueColor="var(--text-secondary)"
-        />
-        <StatField
-          label="Movies:"
-          value={performer?.movie_count || 0}
-          valueColor="var(--text-secondary)"
+          valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('groups')}
+          isActive={activeTab === 'groups'}
         />
       </div>
 
       {/* Visual Rating Display */}
-      {performer?.rating100 && (
+      {performer?.rating100 && performer.rating100 > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <span
@@ -687,6 +777,144 @@ const PerformerLinks = ({ performer }) => {
           </p>
         </Card>
       )}
+    </>
+  );
+};
+
+// Images Tab Component with Lightbox
+const ImagesTab = ({ performerId, performerName }) => {
+  const [images, setImages] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const perPage = 100;
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        setIsLoading(true);
+        const data = await libraryApi.findImages({
+          filter: {
+            page: currentPage,
+            per_page: perPage,
+          },
+          image_filter: {
+            performers: {
+              value: [parseInt(performerId, 10)],
+              modifier: "INCLUDES",
+            },
+          },
+        });
+        setImages(data.findImages?.images || []);
+        setTotalCount(data.findImages?.count || 0);
+      } catch (error) {
+        console.error("Error loading images:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchImages();
+  }, [performerId, currentPage]);
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 mt-6">
+        {[...Array(12)].map((_, index) => (
+          <div
+            key={index}
+            className="aspect-square rounded-lg animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (images.length === 0) {
+    return (
+      <div
+        className="text-center py-12 mt-6"
+        style={{ color: "var(--text-muted)" }}
+      >
+        No images found for {performerName}
+      </div>
+    );
+  }
+
+  const totalPages = Math.ceil(totalCount / perPage);
+
+  return (
+    <>
+      {/* Pagination - Top */}
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 mt-6">
+        {images.map((image, index) => (
+          <div
+            key={image.id}
+            className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-color)",
+            }}
+            onClick={() => {
+              setLightboxIndex(index);
+              setLightboxOpen(true);
+            }}
+          >
+            {image.paths?.thumbnail ? (
+              <img
+                src={image.paths.thumbnail}
+                alt={image.title || `Image ${index + 1}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                No Preview
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
+      {/* Lightbox */}
+      <Lightbox
+        images={images}
+        initialIndex={lightboxIndex}
+        isOpen={lightboxOpen}
+        autoPlay={false}
+        onClose={() => setLightboxOpen(false)}
+        onImagesUpdate={setImages}
+      />
     </>
   );
 };

@@ -90,6 +90,44 @@ export function applyGroupFilters(
     }
   }
 
+  // Filter by performers
+  // Note: Groups/Collections don't have direct performer relationships in Stash
+  // We need to check which groups contain scenes with these performers
+  if (filters.performers && filters.performers.value) {
+    const performerIds = new Set(filters.performers.value.map(String));
+    const allScenes = stashCacheManager.getAllScenes();
+
+    // Build a set of group IDs that contain scenes with these performers
+    const groupIdsWithPerformers = new Set<string>();
+    allScenes.forEach((scene) => {
+      if (scene.performers && scene.performers.length > 0) {
+        const sceneHasPerformer = scene.performers.some((p) =>
+          performerIds.has(String(p.id))
+        );
+        if (sceneHasPerformer && scene.groups && scene.groups.length > 0) {
+          scene.groups.forEach((group: any) => {
+            // Handle both nested { group: { id } } and flattened { id } structures
+            const groupId = group.group?.id || group.id;
+            if (groupId) {
+              groupIdsWithPerformers.add(String(groupId));
+            }
+          });
+        }
+      }
+    });
+
+    // Filter groups to only those that contain scenes with the specified performers
+    filtered = filtered.filter((g) => groupIdsWithPerformers.has(g.id));
+  }
+
+  // Filter by studios
+  if (filters.studios && filters.studios.value) {
+    const studioIds = new Set(filters.studios.value.map(String));
+    filtered = filtered.filter(
+      (g) => g.studio && studioIds.has(String(g.studio.id))
+    );
+  }
+
   // Filter by rating100
   if (filters.rating100) {
     const { modifier, value, value2 } = filters.rating100;
