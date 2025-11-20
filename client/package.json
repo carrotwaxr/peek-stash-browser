@@ -1,7 +1,7 @@
 {
   "name": "peek-client",
   "private": true,
-  "version": "1.5.2",
+  "version": "1.5.3-beta.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
