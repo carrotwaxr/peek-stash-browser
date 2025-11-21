@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="168.0898mm"
+   height="168.0898mm"
+   viewBox="0 0 168.0898 168.0898"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <g
+     id="layer1"
+     transform="translate(-20.902092,-64.558338)">
+    <circle
+       id="XMLID_4404_"
+       style="fill:#fd6b86;fill-opacity:1;stroke-width:0.264583"
+       cx="104.94698"
+       cy="148.60323"
+       r="84.044891" />
+    <path
+       id="XMLID_4276_"
+       style="fill:#896ee3;fill-opacity:1;stroke-width:0.264583"
+       d="m 32.371238,160.147 c -3.641461,-3.37662 -3.934619,-9.03129 -0.67998,-12.78229 11.07784,-12.76641 38.086506,-39.17712 72.830002,-40.42119 35.12158,-1.25783 65.15814,27.05127 77.32871,40.41696 3.40836,3.74279 3.15992,9.52764 -0.55642,12.96484 -13.18418,12.19359 -44.78364,38.21377 -74.36511,38.21377 C 77.202502,198.53883 45.438214,172.26306 32.371238,160.147 Z" />
+    <circle
+       id="XMLID_4275_"
+       transform="rotate(-45)"
+       style="fill:#433930;stroke-width:0.264581"
+       cx="-33.556076"
+       cy="182.42386"
+       r="38.153873" />
+    <circle
+       id="XMLID_4274_"
+       transform="rotate(-6.8919232)"
+       style="fill:#f9d5e9;fill-opacity:1;stroke-width:0.26459"
+       cx="76.898903"
+       cy="160.61407"
+       r="19.587612" />
+    <circle
+       id="XMLID_4273_"
+       transform="rotate(-4.7151077)"
+       style="fill:#896ee3;fill-opacity:1;stroke-width:0.264579"
+       cx="102.31604"
+       cy="152.13599"
+       r="5.9718161" />
+  </g>
+</svg>

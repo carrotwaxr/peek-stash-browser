@@ -1,14 +1,117 @@
 /* Custom styles for Peek documentation */
 
+/* Peek brand colors from themes.js */
 :root {
-  --md-primary-fg-color: #2563eb;
-  --md-accent-fg-color: #3b82f6;
+  --peek-purple: #6D2CE3;
+  --peek-pink: #FD6B86;
+  --peek-dark-bg: #0a0a0b;
+  --peek-card-bg: #19191b;
+  --peek-secondary-bg: #1d1d20;
 }
 
+/* Override Material theme with Peek brand colors */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: var(--peek-purple);
+  --md-primary-fg-color--light: #8b5cf6;
+  --md-primary-fg-color--dark: #5b21b6;
+  --md-accent-fg-color: var(--peek-pink);
+  --md-accent-fg-color--transparent: rgba(253, 107, 134, 0.1);
+}
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: var(--peek-purple);
+  --md-primary-fg-color--light: #8b5cf6;
+  --md-primary-fg-color--dark: #5b21b6;
+  --md-accent-fg-color: var(--peek-pink);
+}
+
+/* Improve logo appearance */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 2rem;
+  width: auto;
+}
+
+/* Enhanced card grid spacing */
 .md-typeset .grid.cards {
-  grid-gap: 1rem;
+  grid-gap: 1.5rem;
+  margin: 2rem 0;
 }
 
+.md-typeset .grid.cards > * {
+  border-color: var(--peek-purple);
+  transition: all 0.3s ease;
+}
+
+.md-typeset .grid.cards > *:hover {
+  border-color: var(--peek-pink);
+  box-shadow: 0 0 20px rgba(109, 44, 227, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Better admonition styling */
 .md-typeset .admonition {
   margin: 1.5625em 0;
+  border-left: 0.2rem solid var(--peek-purple);
+}
+
+.md-typeset .admonition.tip {
+  border-left-color: var(--peek-purple);
+}
+
+.md-typeset .admonition.warning {
+  border-left-color: #FA8C2A;
+}
+
+.md-typeset .admonition.info {
+  border-left-color: #3993DD;
+}
+
+/* Code block improvements */
+.md-typeset code {
+  background-color: rgba(109, 44, 227, 0.1);
+  border-radius: 0.2em;
+}
+
+.md-typeset pre > code {
+  background-color: var(--peek-card-bg);
+}
+
+/* Link styling */
+.md-typeset a {
+  color: var(--peek-purple);
+}
+
+.md-typeset a:hover {
+  color: var(--peek-pink);
+}
+
+/* Table improvements */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--peek-purple);
+}
+
+.md-typeset table:not([class]) th {
+  background-color: rgba(109, 44, 227, 0.2);
+  color: inherit;
+}
+
+/* Hero section on homepage */
+.md-typeset h1:first-of-type {
+  color: var(--peek-purple);
+  font-weight: 700;
+}
+
+/* Navigation tabs */
+.md-tabs {
+  background-color: var(--peek-secondary-bg);
+}
+
+/* Improve button-like links in cards */
+.md-typeset .grid.cards a {
+  text-decoration: none;
+}
+
+.md-typeset .grid.cards a:hover {
+  color: var(--peek-pink);
 }
