@@ -1,6 +1,10 @@
 # Welcome to Peek Stash Browser
 
-A modern web application for browsing and streaming your [Stash](https://github.com/stashapp/stash) adult content library with adaptive video streaming, playlists, and watch history tracking.
+<p align="center">
+  <img src="assets/peek-logo.png" alt="Peek Logo" width="200"/>
+</p>
+
+A modern web application for browsing and streaming your [Stash](https://github.com/stashapp/stash) media library with adaptive video streaming, playlists, and watch history tracking.
 
 <div class="grid cards" markdown>
 
@@ -32,7 +36,7 @@ A modern web application for browsing and streaming your [Stash](https://github.
 
 ## What is Peek?
 
-Peek is a web-based browser for your Stash library, offering a sleek modern interface for browsing your "documentary" collection.
+Peek is a web-based browser for your Stash library, offering a sleek modern interface optimized for video streaming and playback.
 
 ### Key Features
 
@@ -74,8 +78,8 @@ Peek is a web-based browser for your Stash library, offering a sleek modern inte
 - **Username:** `admin`
 - **Password:** `admin`
 
-!!! warning "Change Default Password"
-**Immediately change your password** after first login via Settings → My Settings
+!!! warning "Important: Change Default Password"
+    **Immediately change your password** after first login via Settings → My Settings
 
 ## Requirements
 

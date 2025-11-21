@@ -19,16 +19,16 @@ theme:
     # Light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: blue
-      accent: blue
+      primary: deep purple
+      accent: pink
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
-    # Dark mode
+    # Dark mode (primary theme - Peek branded)
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue
-      accent: blue
+      primary: deep purple
+      accent: pink
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -49,7 +49,7 @@ theme:
   icon:
     repo: fontawesome/brands/github
   favicon: assets/favicon.png
-  logo: assets/logo.png
+  logo: assets/peek-logo.png
 
 # Plugins
 plugins:
