@@ -393,7 +393,20 @@ export function useVideoPlayer({
     const needsReload = !currentSrc || currentPath !== targetPath;
 
     if (needsReload) {
-      console.log("[SOURCES] Loading new source:", targetSrc);
+      // Determine if this is a quality switch (user-initiated) vs initial load
+      // Quality switch: currentSrc exists and is different from target
+      // Initial load: no currentSrc (empty string)
+      const isQualitySwitch = currentSrc !== "";
+
+      // Preserve playback state ONLY for quality switches (like Stash does)
+      // For initial loads, let the AUTOPLAY effect handle playback
+      let wasPaused = true;
+      let savedTime = 0;
+
+      if (isQualitySwitch) {
+        wasPaused = player.paused();
+        savedTime = player.currentTime();
+      }
 
       // Set ready=true when loadstart fires
       const handleLoadStart = () => {
@@ -401,11 +414,33 @@ export function useVideoPlayer({
         dispatch({ type: "SET_READY", payload: true });
       };
 
+      // Restore playback state after source loads (only for quality switches)
+      const handleCanPlay = () => {
+        if (!playerRef.current) return;
+
+        if (isQualitySwitch) {
+          // Restore playback position
+          if (savedTime > 0) {
+            player.currentTime(savedTime);
+          }
+
+          // If video was paused before, pause it now (Stash pattern)
+          if (wasPaused) {
+            player.pause();
+          }
+        }
+      };
+
       player.one("loadstart", handleLoadStart);
+      player.one("canplay", handleCanPlay);
       player.src(sources);
       player.load();
-    } else {
-      console.log("[SOURCES] Source unchanged, skipping reload");
+
+      // Call play() immediately if video was playing (like Stash does)
+      // Only for quality switches - initial load uses AUTOPLAY effect
+      if (isQualitySwitch && !wasPaused) {
+        player.play().catch((err) => console.error("[VIDEO] Play failed:", err));
+      }
     }
 
     // Configure player
