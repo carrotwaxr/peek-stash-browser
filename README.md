@@ -307,7 +307,7 @@ Available versions are listed on [GitHub Releases](https://github.com/carrotwaxr
 
 This is **beta software**. Please help improve Peek by:
 
-1. **Testing core functionality** - See [Beta Testing Guide](https://carrotwaxr.github.io/peek-stash-browser/beta-testing/) for test scenarios
+1. **Testing core functionality** - See [Regression Testing Guide](https://carrotwaxr.github.io/peek-stash-browser/development/regression-testing/) for test scenarios
 2. **Reporting bugs** - [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues) with detailed reproduction steps
 3. **Requesting features** - Open an issue tagged as "enhancement"
 4. **Providing feedback** - What works well? What's confusing?
@@ -318,7 +318,7 @@ Full documentation: **[https://carrotwaxr.github.io/peek-stash-browser](https://
 
 - [Installation Guide](https://carrotwaxr.github.io/peek-stash-browser/getting-started/installation/)
 - [Configuration](https://carrotwaxr.github.io/peek-stash-browser/getting-started/configuration/)
-- [Beta Testing Guide](https://carrotwaxr.github.io/peek-stash-browser/beta-testing/)
+- [Regression Testing Guide](https://carrotwaxr.github.io/peek-stash-browser/development/regression-testing/)
 - [Troubleshooting](https://carrotwaxr.github.io/peek-stash-browser/reference/troubleshooting/)
 
 ## Requirements

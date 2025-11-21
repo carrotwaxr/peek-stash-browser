@@ -141,7 +141,7 @@ The `TranscodingManager` ([server/services/TranscodingManager.ts](server/service
 - **VOD trick**: Pre-generates full playlist (all segments 0-617) immediately for timeline controls
 - **Segment renaming**: FFmpeg outputs `segment_000.ts`, we rename to match timeline position (e.g., `segment_306.ts` when starting at 1232s)
 - **Smart seeking**: Reuses sessions when possible; on far seeks, restarts FFmpeg and preserves already-transcoded segments via `fs.renameSync()` (move, not copy)
-- **Auto-cleanup**: Sessions terminate after 30 minutes of inactivity
+- **Auto-cleanup**: Sessions terminate after 90 seconds of inactivity
 - **Retry logic**: Failed segments tracked with retry count (max 3 attempts)
 
 **Important**: This is NOT per-segment transcoding. Each session runs a single continuous FFmpeg process that outputs segments as playback progresses.

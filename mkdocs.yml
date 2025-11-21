@@ -118,6 +118,7 @@ nav:
       - Hidden Items: user-guide/hidden-items.md
   - Development:
       - Content Restrictions System: development/content-restrictions.md
+      - Regression Testing Guide: development/regression-testing.md
   - Reference:
       - Troubleshooting: reference/troubleshooting.md
       - FAQ: reference/faq.md
