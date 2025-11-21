@@ -379,6 +379,15 @@ export const findGroupsMinimal = async (
       logger.debug("Groups minimal cache miss", { userId, cacheVersion });
       filteredGroups = groups;
 
+      // Apply content restrictions and hidden entity filtering
+      // Hidden entities are ALWAYS filtered (for all users including admins)
+      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      filteredGroups = await userRestrictionService.filterGroupsForUser(
+        filteredGroups,
+        userId,
+        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+      );
+
       // Filter empty groups (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         filteredGroups =

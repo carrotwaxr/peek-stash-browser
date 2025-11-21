@@ -526,6 +526,15 @@ export const findStudiosMinimal = async (
       logger.debug("Studios minimal cache miss", { userId, cacheVersion });
       filteredStudios = studios;
 
+      // Apply content restrictions and hidden entity filtering
+      // Hidden entities are ALWAYS filtered (for all users including admins)
+      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      filteredStudios = await userRestrictionService.filterStudiosForUser(
+        filteredStudios,
+        userId,
+        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+      );
+
       // Filter empty studios (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline

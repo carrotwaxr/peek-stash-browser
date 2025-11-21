@@ -710,9 +710,17 @@ export const findTagsMinimal = async (
         ? await prisma.userContentRestriction.findMany({ where: { userId } })
         : [];
 
-    // Early return: If no restrictions, just return all tags (safe, nothing to leak)
+    // Apply hidden entity filtering (ALWAYS applied, even for admins and users without restrictions)
+    // This is separate from content restrictions
+    tags = await userRestrictionService.filterTagsForUser(
+      tags,
+      userId,
+      requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+    );
+
+    // Early return: If no restrictions, skip expensive empty entity filtering
     if (userRestrictions.length === 0) {
-      // No restrictions - skip expensive filtering entirely (all tags visible)
+      // No restrictions - skip expensive empty entity filtering (but hidden filtering already applied above)
     } else {
       // User has restrictions - must do full filtering for security
       // Use cached filtering from Priority 2

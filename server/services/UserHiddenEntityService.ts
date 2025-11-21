@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
 import { stashCacheManager } from "./StashCacheManager.js";
 
 const prisma = new PrismaClient();
@@ -55,8 +56,9 @@ class UserHiddenEntityService {
       },
     });
 
-    // Invalidate cache for this user
+    // Invalidate caches for this user
     this.hiddenIdsCache.delete(userId);
+    filteredEntityCacheService.invalidateUser(userId);
   }
 
   /**
@@ -75,8 +77,9 @@ class UserHiddenEntityService {
       },
     });
 
-    // Invalidate cache for this user
+    // Invalidate caches for this user
     this.hiddenIdsCache.delete(userId);
+    filteredEntityCacheService.invalidateUser(userId);
   }
 
   /**
@@ -91,8 +94,9 @@ class UserHiddenEntityService {
 
     const result = await prisma.userHiddenEntity.deleteMany({ where });
 
-    // Invalidate cache for this user
+    // Invalidate caches for this user
     this.hiddenIdsCache.delete(userId);
+    filteredEntityCacheService.invalidateUser(userId);
 
     return result.count;
   }
