@@ -21,6 +21,7 @@ const SceneGrid = ({
   totalPages = 1,
   onPageChange,
   onSceneClick,
+  onHideSuccess,
   emptyMessage = "No scenes found",
   emptyDescription = "Check your media library configuration",
   enableKeyboard = true,
@@ -142,6 +143,7 @@ const SceneGrid = ({
               key={scene.id}
               scene={scene}
               onClick={onSceneClick}
+              onHideSuccess={onHideSuccess}
               isSelected={selectedScenes.some((s) => s.id === scene.id)}
               onToggleSelect={handleToggleSelect}
               selectionMode={selectedScenes.length > 0}

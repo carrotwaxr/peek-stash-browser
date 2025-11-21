@@ -4,7 +4,7 @@ import GenderIcon from "./GenderIcon.jsx";
 import { GridCard } from "./GridCard.jsx";
 
 const PerformerCard = forwardRef(
-  ({ performer, referrerUrl, isTVMode, tabIndex, ...others }, ref) => {
+  ({ performer, referrerUrl, isTVMode, tabIndex, onHideSuccess, ...others }, ref) => {
     const navigate = useNavigate();
 
     return (
@@ -47,6 +47,7 @@ const PerformerCard = forwardRef(
           initialRating: performer.rating,
           initialFavorite: performer.favorite || false,
           initialOCounter: performer.o_counter,
+          onHideSuccess,
         }}
         ref={ref}
         referrerUrl={referrerUrl}

@@ -8,11 +8,17 @@ import {
   getAllUsers,
   getDefaultFilterPresets,
   getFilterPresets,
+  getHiddenEntities,
+  getHiddenEntityIds,
   getUserRestrictions,
   getUserSettings,
+  hideEntity,
   saveFilterPreset,
   setDefaultFilterPreset,
   syncFromStash,
+  unhideAllEntities,
+  unhideEntity,
+  updateHideConfirmation,
   updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
@@ -74,5 +80,21 @@ router.delete(
   requireAdmin,
   authenticated(deleteUserRestrictions)
 ); // Delete all user's content restrictions
+
+// Hidden entity routes (authenticated users only)
+router.post("/hidden-entities", authenticated(hideEntity)); // Hide an entity
+router.delete("/hidden-entities/all", authenticated(unhideAllEntities)); // Unhide all entities (optionally filtered by type) - must be before :entityType/:entityId route
+router.delete(
+  "/hidden-entities/:entityType/:entityId",
+  authenticated(unhideEntity)
+); // Unhide an entity
+router.get("/hidden-entities", authenticated(getHiddenEntities)); // Get all hidden entities (optionally filtered by type)
+router.get("/hidden-entities/ids", authenticated(getHiddenEntityIds)); // Get hidden entity IDs organized by type
+
+// Hide confirmation preference
+router.put(
+  "/hide-confirmation",
+  authenticated(updateHideConfirmation)
+); // Update hide confirmation preference
 
 export default router;

@@ -63,6 +63,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Update user state with partial data (for local preference updates)
+   * This allows updating specific user fields without a full auth refresh
+   */
+  const updateUser = (partialUser) => {
+    setUser((prev) => (prev ? { ...prev, ...partialUser } : null));
+  };
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -73,6 +81,7 @@ export const AuthProvider = ({ children }) => {
     user,
     login,
     logout,
+    updateUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -117,6 +117,7 @@ export const getUserSettings = async (
         filterPresets: true,
         minimumPlayPercent: true,
         syncToStash: true,
+        hideConfirmationDisabled: true,
       },
     });
 
@@ -136,6 +137,7 @@ export const getUserSettings = async (
         navPreferences: user.navPreferences || null,
         minimumPlayPercent: user.minimumPlayPercent,
         syncToStash: user.syncToStash,
+        hideConfirmationDisabled: user.hideConfirmationDisabled,
       },
     });
   } catch (error) {
@@ -1559,5 +1561,284 @@ export const deleteUserRestrictions = async (
   } catch (error) {
     console.error("Error deleting user restrictions:", error);
     res.status(500).json({ error: "Failed to delete content restrictions" });
+  }
+};
+
+/**
+ * Hide an entity for the current user
+ */
+export const hideEntity = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { entityType, entityId } = req.body;
+
+    if (!entityType || !entityId) {
+      return res
+        .status(400)
+        .json({ error: "Entity type and entity ID are required" });
+    }
+
+    // Validate entity type
+    const validTypes = [
+      "scene",
+      "performer",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+      "image",
+    ];
+    if (!validTypes.includes(entityType)) {
+      return res.status(400).json({ error: "Invalid entity type" });
+    }
+
+    // Import service
+    const { userHiddenEntityService } = await import(
+      "../services/UserHiddenEntityService.js"
+    );
+
+    await userHiddenEntityService.hideEntity(userId, entityType, entityId);
+
+    res.json({ success: true, message: "Entity hidden successfully" });
+  } catch (error) {
+    console.error("Error hiding entity:", error);
+    res.status(500).json({ error: "Failed to hide entity" });
+  }
+};
+
+/**
+ * Unhide (restore) an entity for the current user
+ */
+export const unhideEntity = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { entityType, entityId } = req.params;
+
+    if (!entityType || !entityId) {
+      return res
+        .status(400)
+        .json({ error: "Entity type and entity ID are required" });
+    }
+
+    // Validate entity type
+    const validTypes = [
+      "scene",
+      "performer",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+      "image",
+    ];
+    if (!validTypes.includes(entityType)) {
+      return res.status(400).json({ error: "Invalid entity type" });
+    }
+
+    // Import service
+    const { userHiddenEntityService } = await import(
+      "../services/UserHiddenEntityService.js"
+    );
+
+    await userHiddenEntityService.unhideEntity(userId, entityType as any, entityId);
+
+    res.json({ success: true, message: "Entity restored successfully" });
+  } catch (error) {
+    console.error("Error unhiding entity:", error);
+    res.status(500).json({ error: "Failed to restore entity" });
+  }
+};
+
+/**
+ * Unhide all entities for the current user
+ * Optionally filter by entity type
+ */
+export const unhideAllEntities = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { entityType } = req.query;
+
+    // Validate entity type if provided
+    if (entityType) {
+      const validTypes = [
+        "scene",
+        "performer",
+        "studio",
+        "tag",
+        "group",
+        "gallery",
+        "image",
+      ];
+      if (!validTypes.includes(entityType as string)) {
+        return res.status(400).json({ error: "Invalid entity type" });
+      }
+    }
+
+    // Import service
+    const { userHiddenEntityService } = await import(
+      "../services/UserHiddenEntityService.js"
+    );
+
+    const count = await userHiddenEntityService.unhideAll(
+      userId,
+      entityType as string | undefined
+    );
+
+    res.json({
+      success: true,
+      message: `${count} items restored successfully`,
+      count,
+    });
+  } catch (error) {
+    console.error("Error unhiding all entities:", error);
+    res.status(500).json({ error: "Failed to restore all items" });
+  }
+};
+
+/**
+ * Get all hidden entities for the current user
+ * Optionally filter by entity type
+ */
+export const getHiddenEntities = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { entityType } = req.query;
+
+    // Validate entity type if provided
+    if (entityType) {
+      const validTypes = [
+        "scene",
+        "performer",
+        "studio",
+        "tag",
+        "group",
+        "gallery",
+        "image",
+      ];
+      if (!validTypes.includes(entityType as string)) {
+        return res.status(400).json({ error: "Invalid entity type" });
+      }
+    }
+
+    // Import service
+    const { userHiddenEntityService } = await import(
+      "../services/UserHiddenEntityService.js"
+    );
+
+    const hiddenEntities = await userHiddenEntityService.getHiddenEntities(
+      userId,
+      entityType as any
+    );
+
+    res.json({ hiddenEntities });
+  } catch (error) {
+    console.error("Error getting hidden entities:", error);
+    res.status(500).json({ error: "Failed to get hidden entities" });
+  }
+};
+
+/**
+ * Get hidden entity IDs organized by type (for filtering)
+ */
+export const getHiddenEntityIds = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Import service
+    const { userHiddenEntityService } = await import(
+      "../services/UserHiddenEntityService.js"
+    );
+
+    const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
+
+    // Convert Sets to arrays for JSON serialization
+    const result = {
+      scenes: Array.from(hiddenIds.scenes),
+      performers: Array.from(hiddenIds.performers),
+      studios: Array.from(hiddenIds.studios),
+      tags: Array.from(hiddenIds.tags),
+      groups: Array.from(hiddenIds.groups),
+      galleries: Array.from(hiddenIds.galleries),
+      images: Array.from(hiddenIds.images),
+    };
+
+    res.json({ hiddenIds: result });
+  } catch (error) {
+    console.error("Error getting hidden entity IDs:", error);
+    res.status(500).json({ error: "Failed to get hidden entity IDs" });
+  }
+};
+
+/**
+ * Update hide confirmation preference
+ */
+export const updateHideConfirmation = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { hideConfirmationDisabled } = req.body;
+
+    if (typeof hideConfirmationDisabled !== "boolean") {
+      return res
+        .status(400)
+        .json({ error: "hideConfirmationDisabled must be a boolean" });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { hideConfirmationDisabled },
+    });
+
+    res.json({ success: true, hideConfirmationDisabled });
+  } catch (error) {
+    console.error("Error updating hide confirmation preference:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to update hide confirmation preference" });
   }
 };

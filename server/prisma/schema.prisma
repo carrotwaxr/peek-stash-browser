@@ -46,6 +46,10 @@ model User {
 
     // Content restrictions
     contentRestrictions UserContentRestriction[]
+
+    // Hidden entities (user-level hiding)
+    hiddenEntities UserHiddenEntity[]
+    hideConfirmationDisabled Boolean @default(false) // Don't show hide confirmation dialog
 }
 
 model WatchHistory {
@@ -333,6 +337,21 @@ model UserTagStats {
 enum UserRole {
     ADMIN
     USER
+}
+
+model UserHiddenEntity {
+    id          Int      @id @default(autoincrement())
+    userId      Int
+    entityType  String   // 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery' | 'image'
+    entityId    String   // Stash entity ID
+    hiddenAt    DateTime @default(now())
+
+    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, entityType, entityId])
+    @@index([userId])
+    @@index([entityType])
+    @@index([entityId])
 }
 
 // Track which data migrations have been applied

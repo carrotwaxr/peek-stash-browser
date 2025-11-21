@@ -115,6 +115,7 @@ nav:
       - Watch History: user-guide/watch-history.md
       - Keyboard Navigation: user-guide/keyboard-navigation.md
       - Playlists: user-guide/playlists.md
+      - Hidden Items: user-guide/hidden-items.md
   - Development:
       - Content Restrictions System: development/content-restrictions.md
   - Reference:

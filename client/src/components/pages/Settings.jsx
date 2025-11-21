@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Eye } from "lucide-react";
+import { Link } from "react-router-dom";
 import { migrateCarouselPreferences } from "../../constants/carousels.js";
 import { migrateNavPreferences } from "../../constants/navigation.js";
+import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
@@ -28,6 +30,7 @@ const api = axios.create({
 const Settings = () => {
   usePageTitle("My Settings");
   const { changeTheme, availableThemes, currentTheme } = useTheme();
+  const { hideConfirmationDisabled, updateHideConfirmation } = useHiddenEntities();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -1152,6 +1155,47 @@ const Settings = () => {
               navPreferences={navPreferences}
               onSave={saveNavPreferences}
             />
+          </Paper.Body>
+        </Paper>
+
+        {/* Hidden Items */}
+        <Paper className="mb-6">
+          <Paper.Header title="Hidden Items" />
+          <Paper.Body>
+            <div className="space-y-4">
+              <p style={{ color: "var(--text-secondary)" }}>
+                Manage items you've hidden from your library. Hidden items will
+                not appear in any views or searches.
+              </p>
+
+              {/* Link to Hidden Items page */}
+              <Link to="/hidden-items">
+                <Button variant="primary" icon={<Eye size={18} />}>
+                  View Hidden Items
+                </Button>
+              </Link>
+
+              {/* Hide confirmation toggle */}
+              <div className="pt-4 border-t" style={{ borderColor: "var(--border-color)" }}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideConfirmationDisabled}
+                    onChange={(e) => updateHideConfirmation(e.target.checked)}
+                    className="w-5 h-5 cursor-pointer"
+                    style={{ accentColor: "var(--accent-color)" }}
+                  />
+                  <div>
+                    <div style={{ color: "var(--text-primary)" }}>
+                      Don't ask for confirmation when hiding items
+                    </div>
+                    <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                      Skip the confirmation dialog when hiding entities
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
           </Paper.Body>
         </Paper>
 

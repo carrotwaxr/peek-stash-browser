@@ -18,6 +18,7 @@ export interface RequestUser {
   preferredPreviewQuality?: string | null;
   enableCast?: boolean;
   theme?: string | null;
+  hideConfirmationDisabled?: boolean;
 }
 
 /**
@@ -69,6 +70,7 @@ export const authenticateToken = async (
         preferredPreviewQuality: true,
         enableCast: true,
         theme: true,
+        hideConfirmationDisabled: true,
       },
     });
 

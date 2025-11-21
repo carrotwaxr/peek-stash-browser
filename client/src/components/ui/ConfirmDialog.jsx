@@ -20,9 +20,11 @@ const ConfirmDialog = ({
 
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
+  const handleConfirm = (e) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     onConfirm();
-    onClose();
+    // Don't call onClose here - let the caller handle closing after async operations
   };
 
   const confirmVariant = confirmStyle === "danger" ? "destructive" : "primary";
@@ -59,8 +61,8 @@ const ConfirmDialog = ({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-4">
-          <p style={{ color: "var(--text-secondary)" }}>{message}</p>
+        <div className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
+          {typeof message === "string" ? <p>{message}</p> : message}
         </div>
 
         {/* Footer */}

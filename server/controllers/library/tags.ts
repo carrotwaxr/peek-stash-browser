@@ -159,13 +159,14 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
       logger.debug("Tags cache miss", { userId, cacheVersion });
       filteredTags = tags;
 
-      // Apply content restrictions (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredTags = await userRestrictionService.filterTagsForUser(
-          filteredTags,
-          userId
-        );
-      }
+      // Apply content restrictions and hidden entity filtering
+      // Hidden entities are ALWAYS filtered (for all users including admins)
+      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      filteredTags = await userRestrictionService.filterTagsForUser(
+        filteredTags,
+        userId,
+        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+      );
 
       // Filter empty tags (non-admins only)
       // Skip filtering when fetching by specific IDs (detail page requests)

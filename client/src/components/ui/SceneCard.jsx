@@ -36,6 +36,7 @@ const SceneCard = forwardRef(
       selectionMode = false,
       autoplayOnScroll = false,
       hideRatingControls = false,
+      onHideSuccess,
     },
     ref
   ) => {
@@ -444,6 +445,7 @@ const SceneCard = forwardRef(
             initialFavorite={scene.favorite || false}
             initialOCounter={scene.o_counter}
             entityTitle={title}
+            onHideSuccess={onHideSuccess}
           />
         )}
       </div>

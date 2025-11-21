@@ -47,6 +47,18 @@ const SceneSearch = ({
   // Note: We don't fetch initial data here anymore.
   // SearchControls will trigger the initial query via onQueryChange based on URL params.
 
+  // Handle successful hide - remove scene from state
+  const handleHideSuccess = (sceneId) => {
+    setData((prevData) => {
+      if (!prevData) return prevData;
+      return {
+        ...prevData,
+        scenes: prevData.scenes.filter((s) => s.id !== sceneId),
+        count: Math.max(0, prevData.count - 1),
+      };
+    });
+  };
+
   const handleSceneClick = (scene) => {
     // Navigate to video player page with scene data and virtual playlist context
     const currentScenes = data?.scenes || [];
@@ -169,6 +181,7 @@ const SceneSearch = ({
           loading={isLoading}
           error={error}
           onSceneClick={handleSceneClick}
+          onHideSuccess={handleHideSuccess}
           emptyMessage="No scenes found"
           emptyDescription="Try adjusting your search filters"
           enableKeyboard={true}
