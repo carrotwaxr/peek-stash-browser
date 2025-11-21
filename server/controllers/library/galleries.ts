@@ -270,13 +270,14 @@ export const findGalleries = async (
       logger.debug("Galleries cache miss", { userId, cacheVersion });
       filteredGalleries = galleries;
 
-      // Apply content restrictions (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGalleries = await userRestrictionService.filterGalleriesForUser(
-          filteredGalleries,
-          userId
-        );
-      }
+      // Apply content restrictions and hidden entity filtering
+      // Hidden entities are ALWAYS filtered (for all users including admins)
+      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      filteredGalleries = await userRestrictionService.filterGalleriesForUser(
+        filteredGalleries,
+        userId,
+        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+      );
 
       // Filter empty galleries (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {

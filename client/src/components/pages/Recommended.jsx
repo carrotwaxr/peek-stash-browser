@@ -116,6 +116,12 @@ const Recommended = () => {
     }, 50);
   };
 
+  // Handle successful hide - remove scene from state
+  const handleHideSuccess = (sceneId) => {
+    setScenes((prev) => prev.filter((s) => s.id !== sceneId));
+    setTotalCount((prev) => Math.max(0, prev - 1));
+  };
+
   // Initial focus for TV mode
   useInitialFocus(
     pageRef,
@@ -155,6 +161,7 @@ const Recommended = () => {
           currentPage={page}
           totalPages={totalPages}
           onPageChange={handlePageChange}
+          onHideSuccess={handleHideSuccess}
           perPage={perPage}
           onPerPageChange={handlePerPageChange}
           totalCount={totalCount}

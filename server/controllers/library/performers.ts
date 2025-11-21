@@ -106,14 +106,15 @@ export const findPerformers = async (
       logger.debug("Performers cache miss", { userId, cacheVersion });
       filteredPerformers = performers;
 
-      // Apply content restrictions (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredPerformers =
-          await userRestrictionService.filterPerformersForUser(
-            filteredPerformers,
-            userId
-          );
-      }
+      // Apply content restrictions and hidden entity filtering
+      // Hidden entities are ALWAYS filtered (for all users including admins)
+      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      filteredPerformers =
+        await userRestrictionService.filterPerformersForUser(
+          filteredPerformers,
+          userId,
+          requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+        );
 
       // Filter empty performers (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {

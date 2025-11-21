@@ -60,6 +60,11 @@ const ScenesLikeThis = ({ sceneId }) => {
     fetchSimilarScenes(nextPage, true);
   };
 
+  // Handle successful hide - remove scene from state
+  const handleHideSuccess = (sceneId) => {
+    setScenes((prev) => prev.filter((s) => s.id !== sceneId));
+  };
+
   // Don't render anything if error or no results
   if (error) {
     return null; // Silently fail - this is a nice-to-have feature
@@ -89,6 +94,7 @@ const ScenesLikeThis = ({ sceneId }) => {
         currentPage={1}
         totalPages={1}
         onPageChange={null}
+        onHideSuccess={handleHideSuccess}
         enableKeyboard={false}
         emptyMessage="No similar scenes found"
         emptyDescription=""

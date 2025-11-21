@@ -1,8 +1,11 @@
 import { forwardRef, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
 import { libraryApi } from "../../services/api";
 import { CardCountIndicators } from "./CardCountIndicators";
+import EntityMenu from "./EntityMenu.jsx";
 import FavoriteButton from "./FavoriteButton";
+import HideConfirmationDialog from "./HideConfirmationDialog.jsx";
 import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
@@ -225,6 +228,7 @@ export const CardIndicators = ({ indicators }) => {
  * Card rating and favorite row (always fixed height for consistency)
  * Shows rating badge (left), O counter (center-right), and favorite button (right)
  * O Counter is interactive for scenes, display-only for other entities
+ * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
  */
 export const CardRatingRow = ({
   entityType,
@@ -233,12 +237,16 @@ export const CardRatingRow = ({
   initialFavorite,
   initialOCounter,
   entityTitle,
+  onHideSuccess,
 }) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
   const [oCounter, setOCounter] = useState(initialOCounter);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [hideDialogOpen, setHideDialogOpen] = useState(false);
+  const [pendingHide, setPendingHide] = useState(null);
   const badgeRef = useRef(null);
+  const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
 
   const handleRatingSave = async (newRating) => {
     setRating(newRating);
@@ -264,6 +272,47 @@ export const CardRatingRow = ({
     setOCounter(newCount);
   };
 
+  const handleHideClick = async (hideInfo) => {
+    // If confirmation is disabled, hide immediately without dialog
+    if (hideConfirmationDisabled) {
+      const success = await hideEntity({
+        ...hideInfo,
+        skipConfirmation: true,
+      });
+
+      if (success) {
+        // Notify parent to update state (remove item from grid)
+        onHideSuccess?.(entityId, entityType);
+      }
+    } else {
+      // Show confirmation dialog
+      setPendingHide(hideInfo);
+      setHideDialogOpen(true);
+    }
+  };
+
+  const handleHideConfirm = async (dontAskAgain) => {
+    if (!pendingHide) return;
+
+    const success = await hideEntity({
+      ...pendingHide,
+      skipConfirmation: dontAskAgain,
+    });
+
+    setHideDialogOpen(false);
+    setPendingHide(null);
+
+    if (success) {
+      // Notify parent to update state (remove item from grid)
+      onHideSuccess?.(entityId, entityType);
+    }
+  };
+
+  const handleHideCancel = () => {
+    setHideDialogOpen(false);
+    setPendingHide(null);
+  };
+
   // Check if this is a scene (only scenes allow interactive O counter)
   const isScene = entityType === "scene";
 
@@ -282,7 +331,7 @@ export const CardRatingRow = ({
           />
         </div>
 
-        {/* Right side: O Counter + Favorite */}
+        {/* Right side: O Counter + Favorite + EntityMenu */}
         <div className="flex items-center gap-2">
           <OCounterButton
             sceneId={isScene ? entityId : null}
@@ -298,6 +347,12 @@ export const CardRatingRow = ({
             size="small"
             variant="card"
           />
+          <EntityMenu
+            entityType={entityType}
+            entityId={entityId}
+            entityName={entityTitle}
+            onHide={handleHideClick}
+          />
         </div>
       </div>
 
@@ -309,6 +364,14 @@ export const CardRatingRow = ({
         entityType={entityType}
         entityTitle={entityTitle}
         anchorEl={badgeRef.current}
+      />
+
+      <HideConfirmationDialog
+        isOpen={hideDialogOpen}
+        onClose={handleHideCancel}
+        onConfirm={handleHideConfirm}
+        entityType={pendingHide?.entityType}
+        entityName={pendingHide?.entityName}
       />
     </>
   );

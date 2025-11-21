@@ -39,6 +39,9 @@ const ServerSettings = lazy(
   () => import("./components/pages/ServerSettings.jsx")
 );
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
+const HiddenItemsPage = lazy(
+  () => import("./components/pages/HiddenItemsPage.jsx")
+);
 
 // Loading fallback component
 const PageLoader = () => (
@@ -214,6 +217,14 @@ const AppContent = () => {
             element={
               <GlobalLayout>
                 <WatchHistory />
+              </GlobalLayout>
+            }
+          />
+          <Route
+            path="/hidden-items"
+            element={
+              <GlobalLayout>
+                <HiddenItemsPage />
               </GlobalLayout>
             }
           />

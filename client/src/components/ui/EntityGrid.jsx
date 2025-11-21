@@ -96,6 +96,12 @@ const EntityGrid = ({ entityType, filters, emptyMessage }) => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Handle successful hide - remove item from local state
+  const handleHideSuccess = (entityId) => {
+    setData((prevData) => prevData.filter((item) => item.id !== entityId));
+    setTotalCount((prevCount) => Math.max(0, prevCount - 1));
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center py-12">
@@ -116,12 +122,22 @@ const EntityGrid = ({ entityType, filters, emptyMessage }) => {
         {data.map((item) => {
           if (entityType === "performer") {
             return (
-              <PerformerCard key={item.id} performer={item} tabIndex={-1} />
+              <PerformerCard
+                key={item.id}
+                performer={item}
+                tabIndex={-1}
+                onHideSuccess={handleHideSuccess}
+              />
             );
           }
 
           return (
-            <EntityCard key={item.id} entity={item} entityType={entityType} />
+            <EntityCard
+              key={item.id}
+              entity={item}
+              entityType={entityType}
+              onHideSuccess={handleHideSuccess}
+            />
           );
         })}
       </div>
@@ -140,7 +156,7 @@ const EntityGrid = ({ entityType, filters, emptyMessage }) => {
 };
 
 // Card component for non-performer entities
-const EntityCard = forwardRef(({ entity, entityType, ...others }, ref) => {
+const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others }, ref) => {
   const navigate = useNavigate();
   let imagePath, title, subtitle, indicators, linkTo, description;
 
@@ -326,6 +342,7 @@ const EntityCard = forwardRef(({ entity, entityType, ...others }, ref) => {
         initialRating: entity.rating100 || entity.rating,
         initialFavorite: entity.favorite || false,
         initialOCounter: entity.o_counter,
+        onHideSuccess,
       }}
       ref={ref}
       subtitle={subtitle}

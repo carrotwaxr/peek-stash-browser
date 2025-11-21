@@ -894,13 +894,14 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       scenes = applyQuickSceneFilters(scenes, mergedFilter);
       scenes = applyExpensiveSceneFilters(scenes, mergedFilter);
 
-      // Step 5: Apply content restrictions
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        scenes = await userRestrictionService.filterScenesForUser(
-          scenes,
-          userId
-        );
-      }
+      // Step 5: Apply content restrictions and hidden entity filtering
+      // Hidden entities are ALWAYS filtered (for all users including admins)
+      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      scenes = await userRestrictionService.filterScenesForUser(
+        scenes,
+        userId,
+        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+      );
 
       // Step 6: Sort
       const groupIdForSort = scene_filter?.groups?.value?.[0];
@@ -950,13 +951,14 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       // Step 3: Apply quick filters (don't need user data)
       scenes = applyQuickSceneFilters(scenes, mergedFilter);
 
-      // Step 4: Apply content restrictions
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        scenes = await userRestrictionService.filterScenesForUser(
-          scenes,
-          userId
-        );
-      }
+      // Step 4: Apply content restrictions and hidden entity filtering
+      // Hidden entities are ALWAYS filtered (for all users including admins)
+      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      scenes = await userRestrictionService.filterScenesForUser(
+        scenes,
+        userId,
+        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+      );
 
       // Step 5: Sort (using quick sort fields only)
       const groupIdForSort = scene_filter?.groups?.value?.[0];
@@ -1053,8 +1055,14 @@ export const findSimilarScenes = async (
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    // Get all scenes from cache
-    const allScenes = stashCacheManager.getAllScenes();
+    // Get all scenes from cache and filter hidden entities
+    // All users (including admins) should have their hidden entities filtered
+    let allScenes = stashCacheManager.getAllScenes();
+    allScenes = await userRestrictionService.filterScenesForUser(
+      allScenes,
+      userId,
+      true // Skip content restrictions - just filter hidden entities
+    );
 
     // Find the current scene
     const currentScene = allScenes.find((s: NormalizedScene) => s.id === id);
@@ -1283,8 +1291,14 @@ export const getRecommendedScenes = async (
       })
     );
 
-    // Get all scenes
-    const allScenes = stashCacheManager.getAllScenes();
+    // Get all scenes and filter hidden entities
+    // All users (including admins) should have their hidden entities filtered
+    let allScenes = stashCacheManager.getAllScenes();
+    allScenes = await userRestrictionService.filterScenesForUser(
+      allScenes,
+      userId,
+      true // Skip content restrictions - just filter hidden entities
+    );
 
     // Helper to get tags by source (weighted to reduce squashing inflation)
     const getTagsBySource = (scene: NormalizedScene) => {
