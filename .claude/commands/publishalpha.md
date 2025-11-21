@@ -9,32 +9,36 @@ Follow these exact steps to publish an alpha release:
 1. **Ensure you're on master branch with latest changes**
    - Run `git checkout master && git pull origin master`
    - Verify working tree is clean
+   - Verify latest changes are merged to master
 
-2. **Determine the next alpha version number**
+2. **Determine the next version number**
    - Check latest version tags: `git tag --list "v*" --sort=-version:refname | head -5`
-   - Alpha versions use format: `vX.Y.Z-alpha.N` (e.g., `v1.6.0-alpha.1`)
-   - Use the next incremental alpha number for the current minor version
+   - Check current package.json versions
+   - Use standard semantic versioning (e.g., `v1.6.1`, `v1.6.2`, etc.)
+   - **No `-alpha.N` suffix** - just increment the patch/minor/major version
 
-3. **Update package.json files with new alpha version**
+3. **Update package.json files with new version**
    - Update `client/package.json` version field
    - Update `server/package.json` version field
-   - Use npm version command: `npm version X.Y.Z-alpha.N --no-git-tag-version`
+   - Use npm version command in each directory:
+     - `cd client && npm version X.Y.Z --no-git-tag-version`
+     - `cd server && npm version X.Y.Z --no-git-tag-version`
 
 4. **Update lock files**
    - Run `npm install` in both client/ and server/ directories
-   - This updates package-lock.json files
+   - This updates package-lock.json files with new version
 
 5. **Commit version bump**
    - Stage changes: `git add client/package.json server/package.json client/package-lock.json server/package-lock.json`
-   - Commit: `git commit -m "chore: bump version to X.Y.Z-alpha.N"`
+   - Commit: `git commit -m "chore: bump version to X.Y.Z"`
 
 6. **Push to master FIRST**
    - Run: `git push origin master`
-   - Wait for push to complete
+   - Wait for push to complete successfully
 
 7. **Create and push tag (ONLY ONCE)**
-   - Create tag: `git tag vX.Y.Z-alpha.N`
-   - Push tag: `git push origin vX.Y.Z-alpha.N`
+   - Create tag: `git tag vX.Y.Z`
+   - Push tag: `git push origin vX.Y.Z`
    - **IMPORTANT**: Only push the tag ONCE. If the workflow doesn't trigger, do NOT delete and re-push
 
 8. **Verify workflow triggered**
@@ -45,27 +49,26 @@ Follow these exact steps to publish an alpha release:
 9. **Monitor the build**
    - Watch the workflow run to ensure it completes successfully
    - Build should take approximately 5-10 minutes
-   - Check that Docker images are published with `:alpha` tag
+   - Check that Docker images are published
 
 10. **Verify the release**
     - Check GitHub Releases page
     - Verify Docker Hub has the new image tags
-    - Alpha releases are marked as "pre-release" on GitHub
+    - Releases are automatically created by the workflow
 
 ## Important Notes
 
 - **NEVER delete and re-push a tag** - GitHub Actions has event deduplication and will ignore subsequent pushes of the same tag name
-- If a workflow fails to trigger, use a different version number (e.g., bump to next alpha)
-- Alpha releases are automatically tagged as `:alpha` on Docker Hub
-- Alpha releases are marked as pre-releases on GitHub
+- If a workflow fails to trigger, use a different version number (e.g., bump to next patch version)
+- All releases use standard semantic versioning (no alpha/beta suffixes)
 - The workflow file is at `.github/workflows/docker-build.yml`
 
 ## Docker Tags Created
 
-Alpha releases create the following Docker tags:
-- `carrotwaxr/peek-stash-browser:X.Y.Z-alpha.N` (specific version)
+Each release creates the following Docker tags:
+- `carrotwaxr/peek-stash-browser:X.Y.Z` (specific version)
 - `carrotwaxr/peek-stash-browser:X.Y` (major.minor)
-- `carrotwaxr/peek-stash-browser:alpha` (latest alpha)
+- `carrotwaxr/peek-stash-browser:latest` (latest stable release)
 
 ## Troubleshooting
 
