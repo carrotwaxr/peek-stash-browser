@@ -468,6 +468,16 @@ export const findGalleriesMinimal = async (
     // Step 2: Merge with user data (for favorites)
     galleries = await mergeGalleriesWithUserData(galleries, userId);
 
+    // Step 2.5: Apply content restrictions and hidden entity filtering
+    // Hidden entities are ALWAYS filtered (for all users including admins)
+    // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+    const requestingUser = req.user;
+    galleries = await userRestrictionService.filterGalleriesForUser(
+      galleries,
+      userId,
+      requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+    );
+
     // Step 3: Apply search query if provided
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
@@ -478,7 +488,6 @@ export const findGalleriesMinimal = async (
     }
 
     // Step 3.5: Filter empty galleries (non-admins only)
-    const requestingUser = req.user;
     if (requestingUser && requestingUser.role !== "ADMIN") {
       galleries = emptyEntityFilterService.filterEmptyGalleries(galleries);
     }
