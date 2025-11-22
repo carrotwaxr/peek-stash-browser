@@ -75,3 +75,7 @@ site/
 
 # Claude Code local settings (user-specific)
 .claude/settings.local.json
+
+# Screenshot output directories and config (API keys, uploaded to ImageChest, not tracked in git)
+screenshots/output/
+screenshots/config.json

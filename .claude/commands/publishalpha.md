@@ -83,3 +83,65 @@ Each release creates the following Docker tags:
 2. Common issues: Docker Hub credentials, build errors, test failures
 3. Fix the issue on master branch
 4. Use next alpha version number for retry
+
+## Screenshot Gallery (Optional)
+
+After the GitHub Release is created, you can optionally publish a screenshot gallery:
+
+11. **Check if screenshots exist**
+    - Check if `screenshots/output/X.Y.Z/` directory exists
+    - If not, you'll need to capture screenshots first
+
+12. **Capture screenshots (if needed)**
+    - Ensure Peek is running locally with Docker: `docker-compose up -d`
+    - Configure screenshot IDs in `screenshots/config.json`:
+      - Set `sceneId`, `performerId`, `studioId`, etc. for detail pages
+      - Set `loginCredentials.username` and `loginCredentials.password` for auth
+    - Run: `npm run screenshots`
+    - Review screenshots in `screenshots/output/X.Y.Z/` directory
+
+13. **Publish screenshot gallery**
+    - Run: `npm run screenshots:publish`
+    - This will:
+      - Upload all screenshots to ImgBash
+      - Generate gallery HTML page
+      - Upload gallery page to ImgBash
+      - Output gallery URL
+    - Copy the gallery URL
+
+14. **Add gallery to GitHub Release**
+    - Go to GitHub Releases page
+    - Edit the release for vX.Y.Z
+    - Add gallery URL to release description:
+      ```markdown
+      ## Screenshots
+      
+      View screenshots for this release: [Screenshot Gallery](https://imgbash.com/...)
+      ```
+    - Save changes
+
+## Screenshot Configuration
+
+Before capturing screenshots, edit `screenshots/config.json` to configure:
+
+1. **Authentication**:
+   - `loginCredentials.username` - Username for screenshot user
+   - `loginCredentials.password` - Password for screenshot user
+
+2. **Detail Page IDs** (use content-restricted IDs for appropriate screenshots):
+   - `pages[].sceneId` - Scene ID for scene detail page
+   - `pages[].performerId` - Performer ID for performer detail page
+   - `pages[].studioId` - Studio ID for studio detail page
+   - `pages[].tagId` - Tag ID for tag detail page (if applicable)
+   - `pages[].galleryId` - Gallery ID for gallery detail page (if applicable)
+   - `pages[].groupId` - Group ID for group detail page (if applicable)
+
+3. **Base URL** (optional):
+   - `baseUrl` - Default: `http://localhost:6969`
+   - Change if Peek is running on different host/port
+
+**Notes**:
+- Screenshots are captured in headless Chrome via Playwright
+- Only viewport screenshots are captured (not full-page scroll)
+- Screenshots are organized by: page → viewport (mobile/tablet/desktop/4k) → theme (dark/light/blue)
+- Output directory is gitignored (not tracked in repository)
