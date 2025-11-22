@@ -1,0 +1,155 @@
+{
+  "baseUrl": "http://127.0.0.1:6969",
+  "loginCredentials": {
+    "username": "YourTestUser",
+    "password": "YourTestPassword"
+  },
+  "viewports": {
+    "mobile": { "width": 375, "height": 812 },
+    "tablet": { "width": 768, "height": 1024 },
+    "tablet-landscape": { "width": 1024, "height": 768 },
+    "desktop": { "width": 1920, "height": 1080 }
+  },
+  "themes": ["dark"],
+  "pages": [
+    {
+      "name": "home",
+      "path": "/",
+      "description": "Homepage with carousels",
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "scenes-grid",
+      "path": "/scenes",
+      "description": "Scenes grid view",
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "tags-grid",
+      "path": "/tags",
+      "description": "Tags grid view",
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "scene-detail",
+      "path": "/scene/{sceneId}",
+      "description": "Scene detail page (direct access)",
+      "sceneId": "YOUR_SCENE_ID",
+      "waitTime": 10000,
+      "fullPage": true
+    },
+    {
+      "name": "performer-detail",
+      "path": "/performer/{performerId}",
+      "description": "Performer detail page",
+      "performerId": "YOUR_PERFORMER_ID",
+      "waitTime": 10000,
+      "fullPage": true
+    },
+    {
+      "name": "studio-detail",
+      "path": "/studio/{studioId}",
+      "description": "Studio detail page",
+      "studioId": "YOUR_STUDIO_ID",
+      "waitTime": 10000,
+      "fullPage": true
+    },
+    {
+      "name": "tag-detail",
+      "path": "/tag/{tagId}",
+      "description": "Tag detail page",
+      "tagId": "YOUR_TAG_ID",
+      "waitTime": 10000,
+      "fullPage": true
+    },
+    {
+      "name": "collection-detail",
+      "path": "/collection/{groupId}",
+      "description": "Collection detail page",
+      "groupId": "YOUR_COLLECTION_ID",
+      "waitTime": 10000,
+      "fullPage": true
+    },
+    {
+      "name": "gallery-detail",
+      "path": "/gallery/{galleryId}",
+      "description": "Gallery detail page",
+      "galleryId": "YOUR_GALLERY_ID",
+      "waitTime": 10000,
+      "fullPage": true
+    },
+    {
+      "name": "gallery-lightbox",
+      "path": "/gallery/{galleryId}",
+      "description": "Gallery image lightbox",
+      "galleryId": "YOUR_GALLERY_ID",
+      "interactions": [
+        {
+          "action": "click",
+          "selector": "div.cursor-pointer",
+          "waitAfter": 1000
+        }
+      ],
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "performers-grid",
+      "path": "/performers",
+      "description": "Performers grid view",
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "studios-grid",
+      "path": "/studios",
+      "description": "Studios grid view",
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "playlists",
+      "path": "/playlists",
+      "description": "Playlists page",
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "playlist-detail",
+      "path": "/playlist/{playlistId}",
+      "description": "Playlist detail page",
+      "playlistId": "YOUR_PLAYLIST_ID",
+      "waitTime": 10000,
+      "fullPage": false
+    },
+    {
+      "name": "playlist-player",
+      "path": "/playlist/{playlistId}",
+      "description": "Playlist player mode (playing scene from playlist)",
+      "playlistId": "YOUR_PLAYLIST_ID",
+      "interactions": [
+        {
+          "action": "click",
+          "selector": "button[title='Play Playlist']",
+          "waitAfter": 2000
+        }
+      ],
+      "waitTime": 10000,
+      "fullPage": true
+    },
+    {
+      "name": "my-settings",
+      "path": "/my-settings",
+      "description": "User settings page",
+      "waitTime": 10000,
+      "fullPage": true
+    }
+  ],
+  "imagechest": {
+    "apiEndpoint": "https://api.imgchest.com/v1/post",
+    "apiToken": "YOUR_IMAGECHEST_API_TOKEN_HERE"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "peek-stash-browser-workspace",
+  "version": "1.6.1",
+  "private": true,
+  "description": "Peek Stash Browser - Workspace root",
+  "scripts": {
+    "screenshots": "node screenshots/capture.js",
+    "screenshots:publish": "node screenshots/publish.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "form-data": "^4.0.5",
+    "playwright": "^1.56.1"
+  }
+}
