@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Video: FFmpeg for HLS transcoding with quality presets (360p-1080p)
 - Deployment: Docker (dev: docker-compose, prod: single container with Nginx)
 
-**Dependency**: Consumes `stashapp-api` npm package (v0.3.16) for type-safe Stash GraphQL queries
+**Dependency**: Consumes `stashapp-api` npm package (v0.3.18) for type-safe Stash GraphQL queries
 
 ## Development Commands
 
