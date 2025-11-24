@@ -398,22 +398,25 @@ export function useVideoPlayer({
     const sourceSelector = player.sourceSelector();
 
     // Build sources array with labels (Stash pattern)
+    // Always provide ALL sources for auto-fallback (like Stash's sceneStreams)
     const sources = [];
 
-    // Always add Direct source first (let Video.js auto-detect MIME type)
+    // Add Direct source first (let Video.js auto-detect MIME type)
     sources.push({
       src: `/api/scene/${scene.id}/stream`,
       label: "Direct",
     });
 
-    // Add transcode quality if not direct play
-    if (!isDirectPlay) {
+    // Add all transcode qualities as fallbacks
+    // sourceSelector will auto-select based on what we set later
+    const qualities = ["1080p", "720p", "480p", "360p"];
+    qualities.forEach((q) => {
       sources.push({
-        src: `/api/scene/${scene.id}/stream.m3u8?quality=${quality}`,
-        label: quality, // "720p", "480p", etc.
+        src: `/api/scene/${scene.id}/stream.m3u8?quality=${q}`,
+        label: q,
         type: "application/x-mpegURL",
       });
-    }
+    });
 
     // Set ready=true when loadstart fires
     const handleLoadStart = () => {
