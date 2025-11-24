@@ -7,6 +7,7 @@ import axios from "axios";
 import videojs from "video.js";
 import {
   setupPlaylistControls,
+  setupSubtitles,
   togglePlaybackRateControl,
 } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
@@ -435,6 +436,11 @@ export function useVideoPlayer({
       player.one("canplay", handleCanPlay);
       player.src(sources);
       player.load();
+
+      // Setup subtitles if available
+      if (scene.captions && scene.captions.length > 0) {
+        setupSubtitles(player, scene.id, scene.captions);
+      }
 
       // Call play() immediately if video was playing (like Stash does)
       // Only for quality switches - initial load uses AUTOPLAY effect

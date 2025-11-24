@@ -160,3 +160,66 @@ export const streamHLSSegment = async (req: Request, res: Response) => {
     res.status(500).send("Internal server error");
   }
 };
+
+// ============================================================================
+// CAPTION PROXY
+// ============================================================================
+
+/**
+ * Proxy caption/subtitle files from Stash
+ * GET /api/scene/:sceneId/caption?lang=en&type=srt
+ *
+ * Stash stores captions as separate .vtt or .srt files alongside video files
+ * This endpoint proxies those files and converts SRT to VTT if needed
+ */
+export const getCaption = async (req: Request, res: Response) => {
+  try {
+    const { sceneId } = req.params;
+    const { lang, type } = req.query;
+
+    if (!lang || !type) {
+      return res.status(400).send("Missing lang or type parameter");
+    }
+
+    logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}`);
+
+    // Get Stash configuration
+    const stashUrl = process.env.STASH_URL?.replace('/graphql', '');
+    const apiKey = process.env.STASH_API_KEY;
+
+    if (!stashUrl || !apiKey) {
+      logger.error("[CAPTION] Stash configuration missing");
+      return res.status(500).send("Stash configuration missing");
+    }
+
+    // Construct Stash caption URL
+    const captionUrl = `${stashUrl}/scene/${sceneId}/caption?lang=${lang}&type=${type}`;
+    logger.debug(`[CAPTION] Fetching from Stash: ${captionUrl}`);
+
+    // Fetch caption from Stash with API key
+    const response = await fetch(captionUrl, {
+      headers: {
+        'ApiKey': apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      logger.warn(`[CAPTION] Stash returned ${response.status} for scene ${sceneId}`);
+      return res.status(response.status).send("Caption not found");
+    }
+
+    const captionData = await response.text();
+
+    // Stash automatically converts SRT to VTT if needed, so we can just serve it
+    res.setHeader("Content-Type", "text/vtt; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=31536000"); // Cache for 1 year
+    res.send(captionData);
+
+    logger.info(`[CAPTION] Served caption: scene=${sceneId}, lang=${lang}, size=${captionData.length} bytes`);
+  } catch (error) {
+    logger.error("[CAPTION] Error serving caption", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    res.status(500).send("Internal server error");
+  }
+};
