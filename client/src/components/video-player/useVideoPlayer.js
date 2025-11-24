@@ -175,48 +175,51 @@ export function useVideoPlayer({
         localStorage.setItem("videoPlayerMuted", player.muted().toString());
       });
 
-      // Fix popup menu hover behavior
-      // Keep menus open when moving mouse from button to menu
+      // Disable hover-to-open for popup menus (click-only)
+      // This prevents frustrating behavior where menus close when moving mouse
       setTimeout(() => {
         const menuButtons = player.el().querySelectorAll(
           ".vjs-menu-button-popup, .vjs-quality-selector, .vjs-subs-caps-button"
         );
 
         menuButtons.forEach((button) => {
-          const menu = button.querySelector(".vjs-menu");
-          if (!menu) return;
+          // Remove hover event listeners by cloning and replacing the node
+          const clone = button.cloneNode(true);
+          button.parentNode.replaceChild(clone, button);
 
-          let closeTimer = null;
+          // Re-add click handler for menu toggle
+          clone.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isOpen = clone.classList.contains("vjs-lock-showing");
 
-          const cancelClose = () => {
-            if (closeTimer) {
-              clearTimeout(closeTimer);
-              closeTimer = null;
-            }
-          };
+            // Close all other menus first
+            menuButtons.forEach((btn) => {
+              if (btn !== clone) {
+                btn.classList.remove("vjs-lock-showing");
+              }
+            });
 
-          const scheduleClose = () => {
-            cancelClose();
-            closeTimer = setTimeout(() => {
-              button.classList.remove("vjs-hover");
-            }, 300); // 300ms delay before closing
-          };
-
-          // When leaving button, delay the close
-          button.addEventListener("mouseleave", (e) => {
-            // Only schedule close if not moving to the menu
-            if (!menu.contains(e.relatedTarget)) {
-              scheduleClose();
+            // Toggle this menu
+            if (isOpen) {
+              clone.classList.remove("vjs-lock-showing");
+            } else {
+              clone.classList.add("vjs-lock-showing");
             }
           });
-
-          // When entering menu, cancel scheduled close
-          menu.addEventListener("mouseenter", cancelClose);
-
-          // When leaving menu, schedule close
-          menu.addEventListener("mouseleave", scheduleClose);
         });
-      }, 100); // Small delay to ensure DOM is ready
+
+        // Close menus when clicking outside
+        player.el().addEventListener("click", (e) => {
+          const clickedMenu = e.target.closest(
+            ".vjs-menu-button-popup, .vjs-quality-selector, .vjs-subs-caps-button"
+          );
+          if (!clickedMenu) {
+            menuButtons.forEach((btn) => {
+              btn.classList.remove("vjs-lock-showing");
+            });
+          }
+        });
+      }, 100);
     });
 
     // Cleanup

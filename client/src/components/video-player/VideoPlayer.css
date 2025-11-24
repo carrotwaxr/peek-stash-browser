@@ -338,28 +338,11 @@ section.video-container {
 }
 
 .video-js .vjs-quality-selector .vjs-menu {
-  bottom: 44px !important; /* Reduced gap - closer to button */
+  bottom: 48px !important;
   background: rgba(28, 28, 28, 0.95) !important;
   border-radius: 8px !important;
   padding: 8px 0 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Keep menu open when hovering between button and menu */
-.video-js .vjs-quality-selector:hover .vjs-menu,
-.video-js .vjs-quality-selector .vjs-menu:hover {
-  display: block !important;
-}
-
-/* Add invisible bridge to prevent menu from closing */
-.video-js .vjs-quality-selector .vjs-menu::before {
-  content: "" !important;
-  position: absolute !important;
-  bottom: -4px !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 4px !important;
-  background: transparent !important;
 }
 
 .video-js .vjs-quality-selector .vjs-menu .vjs-menu-content {
@@ -412,7 +395,7 @@ section.video-container {
    ============================================================================ */
 
 .video-js .vjs-menu-button-popup .vjs-menu {
-  bottom: 44px !important; /* Reduced gap - closer to button */
+  bottom: 48px !important;
   background: rgba(28, 28, 28, 0.95) !important;
   border-radius: 8px !important;
   padding: 8px 0 !important;
@@ -420,23 +403,6 @@ section.video-container {
   min-width: 120px !important; /* Prevent narrow menu */
   left: auto !important; /* Override default positioning */
   right: 0 !important; /* Align to button */
-}
-
-/* Keep menu open when hovering between button and menu */
-.video-js .vjs-menu-button-popup:hover .vjs-menu,
-.video-js .vjs-menu-button-popup .vjs-menu:hover {
-  display: block !important;
-}
-
-/* Add invisible bridge to prevent menu from closing */
-.video-js .vjs-menu-button-popup .vjs-menu::before {
-  content: "" !important;
-  position: absolute !important;
-  bottom: -4px !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 4px !important;
-  background: transparent !important;
 }
 
 .video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
@@ -683,7 +649,7 @@ section.video-container {
 
   /* Captions menu - adjust for mobile */
   .video-js .vjs-subs-caps-button .vjs-menu {
-    bottom: 36px !important; /* Above mobile control bar, closer to button */
+    bottom: 40px !important; /* Above mobile control bar */
     min-width: 200px !important; /* Wider touch targets */
   }
 
@@ -695,7 +661,7 @@ section.video-container {
   /* Quality and other popup menus - adjust for mobile */
   .video-js .vjs-quality-selector .vjs-menu,
   .video-js .vjs-menu-button-popup .vjs-menu {
-    bottom: 36px !important; /* Above mobile control bar */
+    bottom: 40px !important; /* Above mobile control bar */
   }
 
   /* Hide time divider and duration on very small screens */
@@ -724,29 +690,12 @@ section.video-container {
 }
 
 .video-js .vjs-subs-caps-button .vjs-menu {
-  bottom: 44px !important; /* Reduced gap - closer to button */
+  bottom: 48px !important;
   background: rgba(28, 28, 28, 0.95) !important;
   border-radius: 8px !important;
   padding: 8px 0 !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
   min-width: 180px !important; /* Wider for language names */
-}
-
-/* Keep menu open when hovering between button and menu */
-.video-js .vjs-subs-caps-button:hover .vjs-menu,
-.video-js .vjs-subs-caps-button .vjs-menu:hover {
-  display: block !important;
-}
-
-/* Add invisible bridge to prevent menu from closing */
-.video-js .vjs-subs-caps-button .vjs-menu::before {
-  content: "" !important;
-  position: absolute !important;
-  bottom: -4px !important; /* Bridge the gap */
-  left: 0 !important;
-  right: 0 !important;
-  height: 4px !important;
-  background: transparent !important;
 }
 
 .video-js .vjs-subs-caps-button .vjs-menu .vjs-menu-content {
