@@ -59,16 +59,23 @@ const SceneCard = forwardRef(
         ? formatResolution(scene.files[0].width, scene.files[0].height)
         : null;
 
-    // Build subtitle with studio and date (like Groups)
+    // Build subtitle with studio, code, and date (like Groups)
     const subtitle = (() => {
-      if (scene.studio && date) {
-        return `${scene.studio.name} • ${date}`;
-      } else if (scene.studio) {
-        return scene.studio.name;
-      } else if (date) {
-        return date;
+      const parts = [];
+
+      if (scene.studio) {
+        parts.push(scene.studio.name);
       }
-      return null;
+
+      if (scene.code) {
+        parts.push(scene.code);
+      }
+
+      if (date) {
+        parts.push(date);
+      }
+
+      return parts.length > 0 ? parts.join(' • ') : null;
     })();
 
     // Merge and deduplicate tags
