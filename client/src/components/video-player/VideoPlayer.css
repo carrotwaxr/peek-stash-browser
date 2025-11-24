@@ -66,7 +66,7 @@ section.video-container {
   pointer-events: auto !important;
   margin: 0 !important;
   padding: 0 !important;
-  order: 8 !important;
+  order: 7 !important;
 }
 
 .video-js .vjs-progress-holder {
@@ -334,7 +334,7 @@ section.video-container {
   font-size: 13px !important;
   font-weight: 500 !important;
   margin: 0 !important;
-  order: 7 !important;
+  order: 8 !important;
 }
 
 .video-js .vjs-quality-selector .vjs-menu {
@@ -378,16 +378,16 @@ section.video-container {
    RIGHT-ALIGNED CONTROLS - Playback speed and fullscreen
    ============================================================================ */
 
-/* Playback speed comes after progress bar */
+/* Playback speed comes after captions */
 .video-js .vjs-playback-rate {
   margin: 0 !important;
-  order: 9 !important;
+  order: 10 !important;
 }
 
 /* Fullscreen at the far right */
 .video-js .vjs-fullscreen-control {
   margin: 0 !important;
-  order: 10 !important;
+  order: 11 !important;
 }
 
 /* ============================================================================
@@ -403,12 +403,6 @@ section.video-container {
   min-width: 120px !important; /* Prevent narrow menu */
   left: auto !important; /* Override default positioning */
   right: 0 !important; /* Align to button */
-}
-
-/* Allow mouse to enter menu without it closing */
-.video-js .vjs-menu-button-popup:hover .vjs-menu,
-.video-js .vjs-menu-button-popup .vjs-menu:hover {
-  display: block !important;
 }
 
 .video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
@@ -653,6 +647,23 @@ section.video-container {
     bottom: 16px !important; /* Above 40px control bar */
   }
 
+  /* Captions menu - adjust for mobile */
+  .video-js .vjs-subs-caps-button .vjs-menu {
+    bottom: 40px !important; /* Above mobile control bar */
+    min-width: 200px !important; /* Wider touch targets */
+  }
+
+  .video-js .vjs-subs-caps-button .vjs-menu-item {
+    padding: 12px 40px 12px 16px !important; /* Larger touch targets */
+    font-size: 14px !important; /* Slightly larger on mobile */
+  }
+
+  /* Quality and other popup menus - adjust for mobile */
+  .video-js .vjs-quality-selector .vjs-menu,
+  .video-js .vjs-menu-button-popup .vjs-menu {
+    bottom: 40px !important; /* Above mobile control bar */
+  }
+
   /* Hide time divider and duration on very small screens */
   @media (max-width: 480px) {
     .video-js .vjs-time-divider,
@@ -672,11 +683,67 @@ section.video-container {
   display: none !important;
 }
 
-/* Hide captions/subtitles button (not implemented) */
-.video-js .vjs-subs-caps-button,
-.video-js .vjs-captions-button,
-.video-js .vjs-subtitles-button {
+/* ============================================================================
+   CLICK-ONLY MENUS - Disable hover behavior
+   ============================================================================ */
+
+/* Disable hover-to-open for all popup menus (click-only) */
+.video-js .vjs-menu-button-popup:not(.vjs-lock-showing):hover .vjs-menu,
+.video-js .vjs-quality-selector:not(.vjs-lock-showing):hover .vjs-menu,
+.video-js .vjs-subs-caps-button:not(.vjs-lock-showing):hover .vjs-menu {
   display: none !important;
+}
+
+/* Only show menu when explicitly opened (clicked) */
+.video-js .vjs-menu-button-popup.vjs-lock-showing .vjs-menu,
+.video-js .vjs-quality-selector.vjs-lock-showing .vjs-menu,
+.video-js .vjs-subs-caps-button.vjs-lock-showing .vjs-menu {
+  display: block !important;
+}
+
+/* Captions/subtitles button - styled like other menu buttons */
+.video-js .vjs-subs-caps-button {
+  margin: 0 !important;
+  order: 9 !important; /* After quality selector, before playback speed */
+}
+
+.video-js .vjs-subs-caps-button .vjs-menu {
+  bottom: 48px !important;
+  background: rgba(28, 28, 28, 0.95) !important;
+  border-radius: 8px !important;
+  padding: 8px 0 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  min-width: 180px !important; /* Wider for language names */
+}
+
+.video-js .vjs-subs-caps-button .vjs-menu .vjs-menu-content {
+  background: transparent !important;
+}
+
+.video-js .vjs-subs-caps-button .vjs-menu-item {
+  padding: 8px 40px 8px 16px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: white !important;
+  background: transparent !important;
+  white-space: nowrap !important;
+}
+
+.video-js .vjs-subs-caps-button .vjs-menu-item:hover,
+.video-js .vjs-subs-caps-button .vjs-menu-item:focus {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.video-js .vjs-subs-caps-button .vjs-menu-item.vjs-selected {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #3ea6ff !important;
+}
+
+.video-js .vjs-subs-caps-button .vjs-menu-item.vjs-selected:before {
+  content: "✓" !important;
+  position: absolute !important;
+  right: 16px !important;
+  font-size: 16px !important;
 }
 
 /* Hide chapters button (not supported) */

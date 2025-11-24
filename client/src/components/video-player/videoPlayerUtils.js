@@ -168,3 +168,80 @@ export const togglePlaybackRateControl = (player, show) => {
     }
   }
 };
+
+/**
+ * Setup subtitles/captions for a scene (matches Stash implementation)
+ * Adds text tracks to Video.js player from scene caption data
+ */
+export const setupSubtitles = (player, sceneId, captions) => {
+  if (!player || player.isDisposed()) return;
+  if (!captions || captions.length === 0) return;
+
+  // Remove existing remote text tracks
+  const existingTracks = player.remoteTextTracks();
+  for (let i = existingTracks.length - 1; i >= 0; i--) {
+    player.removeRemoteTextTrack(existingTracks[i]);
+  }
+
+  // Language map matching Stash's implementation
+  const languageMap = new Map([
+    ["de", "Deutsche"],
+    ["en", "English"],
+    ["es", "Español"],
+    ["fr", "Français"],
+    ["it", "Italiano"],
+    ["ja", "日本"],
+    ["ko", "한국인"],
+    ["nl", "Holandés"],
+    ["pt", "Português"],
+    ["ru", "Русский"],
+    ["00", "Unknown"],
+  ]);
+
+  // Get browser's default language code (same logic as Stash)
+  const getDefaultLanguageCode = () => {
+    let languageCode = window.navigator.language;
+
+    if (languageCode.indexOf("-") !== -1) {
+      languageCode = languageCode.split("-")[0];
+    }
+
+    if (languageCode.indexOf("_") !== -1) {
+      languageCode = languageCode.split("_")[0];
+    }
+
+    return languageCode;
+  };
+
+  const defaultLanguageCode = getDefaultLanguageCode();
+  let hasDefault = false;
+
+  // Add new tracks
+  captions.forEach((caption) => {
+    const lang = caption.language_code;
+    let label = lang;
+
+    if (languageMap.has(lang)) {
+      label = languageMap.get(lang);
+    }
+
+    // Include caption type in label (matching Stash)
+    label = label + " (" + caption.caption_type + ")";
+
+    // Set first matching browser language as default
+    const setAsDefault = !hasDefault && defaultLanguageCode === lang;
+    if (setAsDefault) {
+      hasDefault = true;
+    }
+
+    const trackOptions = {
+      kind: "captions", // Use "captions" not "subtitles" to match Stash
+      src: `/api/scene/${sceneId}/caption?lang=${lang}&type=${caption.caption_type}`,
+      srclang: lang,
+      label: label,
+      default: setAsDefault,
+    };
+
+    player.addRemoteTextTrack(trackOptions, false);
+  });
+};
