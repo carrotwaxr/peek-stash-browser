@@ -2,6 +2,7 @@
 
 **Branch**: `feature/hide-captions-when-unavailable`
 **Goal**: Make Peek's Video.js player look and behave EXACTLY like Stash's player
+**Status**: ✅ ALL PHASES COMPLETE - Ready for user testing
 
 ---
 
@@ -289,9 +290,11 @@ if (playlist && playlist.scenes && playlist.scenes.length > 1) {
 
 ---
 
-## Phase 6: Refactor Watch History Tracking 📝 TODO
+## Phase 6: Refactor Watch History Tracking ✅ COMPLETED
 
 **Goal**: Integrate `trackActivity` plugin with existing `useWatchHistory` hook.
+
+**Commit**: 67bee09
 
 ### Current Implementation (Peek):
 
@@ -360,9 +363,11 @@ useEffect(() => {
 
 ---
 
-## Phase 7: Port Stash CSS 📝 TODO
+## Phase 7: Port Stash CSS ✅ COMPLETED
 
 **Goal**: Update `VideoPlayer.css` to match Stash's `styles.scss`.
+
+**Commit**: 67bee09
 
 ### Key CSS Changes:
 
@@ -512,9 +517,11 @@ Convert SCSS to plain CSS and merge into `VideoPlayer.css`.
 
 ---
 
-## Phase 8: Remove Dead Code 📝 TODO
+## Phase 8: Remove Dead Code ✅ COMPLETED
 
 **Goal**: Clean up custom implementations replaced by plugins.
+
+**Commit**: 67bee09
 
 ### Files to Delete/Modify:
 
@@ -540,7 +547,9 @@ Convert SCSS to plain CSS and merge into `VideoPlayer.css`.
 
 ---
 
-## Phase 9: Testing Checklist 📝 TODO
+## Phase 9: Testing 🧪 IN PROGRESS
+
+**Status**: Docker environment running, ready for user testing
 
 ### Functionality Tests:
 
