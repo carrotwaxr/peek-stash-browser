@@ -66,7 +66,7 @@ section.video-container {
   pointer-events: auto !important;
   margin: 0 !important;
   padding: 0 !important;
-  order: 9 !important; /* After quality selector */
+  order: 7 !important;
 }
 
 .video-js .vjs-progress-holder {
@@ -334,7 +334,7 @@ section.video-container {
   font-size: 13px !important;
   font-weight: 500 !important;
   margin: 0 !important;
-  order: 8 !important; /* After captions button */
+  order: 8 !important;
 }
 
 .video-js .vjs-quality-selector .vjs-menu {
@@ -378,7 +378,7 @@ section.video-container {
    RIGHT-ALIGNED CONTROLS - Playback speed and fullscreen
    ============================================================================ */
 
-/* Playback speed comes after progress bar */
+/* Playback speed comes after captions */
 .video-js .vjs-playback-rate {
   margin: 0 !important;
   order: 10 !important;
@@ -686,7 +686,7 @@ section.video-container {
 /* Captions/subtitles button - styled like other menu buttons */
 .video-js .vjs-subs-caps-button {
   margin: 0 !important;
-  order: 7 !important; /* Between duration and quality selector */
+  order: 9 !important; /* After quality selector, before playback speed */
 }
 
 .video-js .vjs-subs-caps-button .vjs-menu {
