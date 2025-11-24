@@ -174,6 +174,49 @@ export function useVideoPlayer({
         localStorage.setItem("videoPlayerVolume", player.volume().toString());
         localStorage.setItem("videoPlayerMuted", player.muted().toString());
       });
+
+      // Fix popup menu hover behavior
+      // Keep menus open when moving mouse from button to menu
+      setTimeout(() => {
+        const menuButtons = player.el().querySelectorAll(
+          ".vjs-menu-button-popup, .vjs-quality-selector, .vjs-subs-caps-button"
+        );
+
+        menuButtons.forEach((button) => {
+          const menu = button.querySelector(".vjs-menu");
+          if (!menu) return;
+
+          let closeTimer = null;
+
+          const cancelClose = () => {
+            if (closeTimer) {
+              clearTimeout(closeTimer);
+              closeTimer = null;
+            }
+          };
+
+          const scheduleClose = () => {
+            cancelClose();
+            closeTimer = setTimeout(() => {
+              button.classList.remove("vjs-hover");
+            }, 300); // 300ms delay before closing
+          };
+
+          // When leaving button, delay the close
+          button.addEventListener("mouseleave", (e) => {
+            // Only schedule close if not moving to the menu
+            if (!menu.contains(e.relatedTarget)) {
+              scheduleClose();
+            }
+          });
+
+          // When entering menu, cancel scheduled close
+          menu.addEventListener("mouseenter", cancelClose);
+
+          // When leaving menu, schedule close
+          menu.addEventListener("mouseleave", scheduleClose);
+        });
+      }, 100); // Small delay to ensure DOM is ready
     });
 
     // Cleanup
