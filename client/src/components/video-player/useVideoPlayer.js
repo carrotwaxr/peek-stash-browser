@@ -81,8 +81,6 @@ export function useVideoPlayer({
   videoRef,
   playerRef,
   scene,
-  video,
-  sessionId,
   quality,
   isAutoFallback,
   ready,
@@ -350,13 +348,13 @@ export function useVideoPlayer({
   }, [scene?.id, dispatch]); // Only re-run when scene changes
 
   // ============================================================================
-  // VIDEO SOURCES LOADING
+  // VIDEO SOURCES LOADING (using sourceSelector plugin - Stash pattern)
   // ============================================================================
 
   useEffect(() => {
     const player = playerRef.current;
 
-    // Guard: Need player and scene (video/sessionId no longer needed for stateless)
+    // Guard: Need player and scene
     if (!player || !scene) {
       return;
     }
@@ -370,87 +368,43 @@ export function useVideoPlayer({
       player.poster(posterUrl);
     }
 
-    // Build sources with duration
-    const duration = firstFile?.duration;
+    // Get sourceSelector plugin
+    const sourceSelector = player.sourceSelector();
 
-    const sources = isDirectPlay
-      ? [
-          {
-            src: `/api/scene/${scene.id}/stream`,  // Direct video file (no .m3u8)
-            type: `video/${firstFile?.format}`,
-            duration,
-          },
-        ]
-      : [
-          {
-            src: `/api/scene/${scene.id}/stream.m3u8?quality=${quality}`,
-            type: "application/x-mpegURL",
-            duration,
-          },
-        ];
+    // Build sources array with labels (Stash pattern)
+    const sources = [];
 
-    // Check if source has changed before reloading
-    // Compare full URL path (excluding query params) to detect scene changes
-    const currentSrc = player.currentSrc();
-    const targetSrc = sources[0].src;
-    const currentPath = currentSrc ? currentSrc.split('?')[0] : '';
-    const targetPath = targetSrc.split('?')[0];
-    const needsReload = !currentSrc || currentPath !== targetPath;
+    // Always add Direct source first
+    sources.push({
+      src: `/api/scene/${scene.id}/stream`,
+      label: "Direct",
+      type: `video/${firstFile?.format || "mp4"}`,
+    });
 
-    if (needsReload) {
-      // Determine if this is a quality switch (user-initiated) vs initial load
-      // Quality switch: currentSrc exists and is different from target
-      // Initial load: no currentSrc (empty string)
-      const isQualitySwitch = currentSrc !== "";
+    // Add transcode quality if not direct play
+    if (!isDirectPlay) {
+      sources.push({
+        src: `/api/scene/${scene.id}/stream.m3u8?quality=${quality}`,
+        label: quality, // "720p", "480p", etc.
+        type: "application/x-mpegURL",
+      });
+    }
 
-      // Preserve playback state ONLY for quality switches (like Stash does)
-      // For initial loads, let the AUTOPLAY effect handle playback
-      let wasPaused = true;
-      let savedTime = 0;
+    // Set ready=true when loadstart fires
+    const handleLoadStart = () => {
+      if (!playerRef.current) return;
+      dispatch({ type: "SET_READY", payload: true });
+    };
 
-      if (isQualitySwitch) {
-        wasPaused = player.paused();
-        savedTime = player.currentTime();
-      }
+    player.one("loadstart", handleLoadStart);
 
-      // Set ready=true when loadstart fires
-      const handleLoadStart = () => {
-        if (!playerRef.current) return;
-        dispatch({ type: "SET_READY", payload: true });
-      };
+    // Set sources using sourceSelector plugin
+    // Plugin handles source switching, fallback, and playback state preservation
+    sourceSelector.setSources(sources);
 
-      // Restore playback state after source loads (only for quality switches)
-      const handleCanPlay = () => {
-        if (!playerRef.current) return;
-
-        if (isQualitySwitch) {
-          // Restore playback position
-          if (savedTime > 0) {
-            player.currentTime(savedTime);
-          }
-
-          // If video was paused before, pause it now (Stash pattern)
-          if (wasPaused) {
-            player.pause();
-          }
-        }
-      };
-
-      player.one("loadstart", handleLoadStart);
-      player.one("canplay", handleCanPlay);
-      player.src(sources);
-      player.load();
-
-      // Setup subtitles if available (Video.js automatically shows/hides caption button)
-      if (scene.captions && scene.captions.length > 0) {
-        setupSubtitles(player, scene.id, scene.captions);
-      }
-
-      // Call play() immediately if video was playing (like Stash does)
-      // Only for quality switches - initial load uses AUTOPLAY effect
-      if (isQualitySwitch && !wasPaused) {
-        player.play().catch((err) => console.error("[VIDEO] Play failed:", err));
-      }
+    // Setup subtitles if available (using sourceSelector for track management)
+    if (scene.captions && scene.captions.length > 0) {
+      setupSubtitles(player, scene.id, scene.captions);
     }
 
     // Configure player
@@ -619,30 +573,28 @@ export function useVideoPlayer({
     dispatch,
   ]);
 
-  // Update Video.js playlist controls when index changes
+  // Configure skipButtons plugin for playlist navigation (Stash pattern)
   useEffect(() => {
     const player = playerRef.current;
 
-    if (
-      !player ||
-      player.isDisposed?.() ||
-      !playlist ||
-      !playlist.scenes ||
-      playlist.scenes.length <= 1
-    ) {
+    if (!player || player.isDisposed?.()) {
       return;
     }
 
-    setupPlaylistControls(
-      player,
-      playlist,
-      currentIndex,
-      playPreviousInPlaylist,
-      playNextInPlaylist
-    );
+    const skipButtonsPlugin = player.skipButtons();
+
+    // Set handlers based on playlist availability
+    if (playlist && playlist.scenes && playlist.scenes.length > 1) {
+      skipButtonsPlugin.setForwardHandler(playNextInPlaylist);
+      skipButtonsPlugin.setBackwardHandler(playPreviousInPlaylist);
+    } else {
+      // Clear handlers if no playlist or single scene
+      skipButtonsPlugin.setForwardHandler(undefined);
+      skipButtonsPlugin.setBackwardHandler(undefined);
+    }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, video, playlist]);
+  }, [currentIndex, playlist]);
 
   // Return playlist navigation functions for use by media keys hook
   return {

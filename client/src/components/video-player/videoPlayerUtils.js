@@ -170,19 +170,16 @@ export const togglePlaybackRateControl = (player, show) => {
 };
 
 /**
- * Setup subtitles/captions for a scene (matches Stash implementation)
- * Adds text tracks to Video.js player from scene caption data
+ * Setup subtitles/captions for a scene (uses sourceSelector plugin - Stash pattern)
+ * Adds text tracks via sourceSelector for proper lifecycle management
  * Video.js automatically shows/hides the caption button based on available tracks
  */
 export const setupSubtitles = (player, sceneId, captions) => {
   if (!player || player.isDisposed()) return;
   if (!captions || captions.length === 0) return;
 
-  // Remove existing remote text tracks
-  const existingTracks = player.remoteTextTracks();
-  for (let i = existingTracks.length - 1; i >= 0; i--) {
-    player.removeRemoteTextTrack(existingTracks[i]);
-  }
+  // Get sourceSelector plugin for track management
+  const sourceSelector = player.sourceSelector();
 
   // Language map matching Stash's implementation
   const languageMap = new Map([
@@ -217,7 +214,7 @@ export const setupSubtitles = (player, sceneId, captions) => {
   const defaultLanguageCode = getDefaultLanguageCode();
   let hasDefault = false;
 
-  // Add new tracks
+  // Add tracks via sourceSelector (auto-cleanup on source change)
   captions.forEach((caption) => {
     const lang = caption.language_code;
     let label = lang;
@@ -243,6 +240,8 @@ export const setupSubtitles = (player, sceneId, captions) => {
       default: setAsDefault,
     };
 
-    player.addRemoteTextTrack(trackOptions, false);
+    // Use sourceSelector.addTextTrack for lifecycle management
+    // false = auto-cleanup on source change
+    sourceSelector.addTextTrack(trackOptions, false);
   });
 };
