@@ -1,5 +1,8 @@
 import videojs from "video.js";
 
+// Import duration middleware (registers via videojs.use)
+import "./durationMiddleware.js";
+
 // Set VideoJS global log level to reduce console spam
 videojs.log.level("warn");
 
