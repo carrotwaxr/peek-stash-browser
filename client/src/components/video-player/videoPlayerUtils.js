@@ -172,6 +172,7 @@ export const togglePlaybackRateControl = (player, show) => {
 /**
  * Setup subtitles/captions for a scene (matches Stash implementation)
  * Adds text tracks to Video.js player from scene caption data
+ * Video.js automatically shows/hides the caption button based on available tracks
  */
 export const setupSubtitles = (player, sceneId, captions) => {
   if (!player || player.isDisposed()) return;

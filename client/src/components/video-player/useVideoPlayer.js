@@ -3,14 +3,19 @@ import airplay from "@silvermine/videojs-airplay";
 import "@silvermine/videojs-airplay/dist/silvermine-videojs-airplay.css";
 import chromecast from "@silvermine/videojs-chromecast";
 import "@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css";
+import "videojs-seek-buttons";
+import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import axios from "axios";
 import videojs from "video.js";
-import {
-  setupPlaylistControls,
-  setupSubtitles,
-  togglePlaybackRateControl,
-} from "./videoPlayerUtils.js";
+import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
+import "./plugins/big-buttons.js";
+import "./plugins/markers.js";
+import "./plugins/persist-volume.js";
+import "./plugins/skip-buttons.js";
+import "./plugins/source-selector.js";
+import "./plugins/track-activity.js";
+import "./plugins/vrmode.js";
 
 // Register Video.js plugins
 airplay(videojs);
@@ -118,18 +123,24 @@ export function useVideoPlayer({
     // Append to container before initialization
     container.appendChild(videoElement);
 
-    // Initialize Video.js
+    // Initialize Video.js (matching Stash configuration)
     const player = videojs(videoElement, {
       autoplay: false,
       controls: true,
       controlBar: {
         pictureInPictureToggle: false,
+        volumePanel: {
+          inline: false, // Popup menu like Stash/YouTube
+        },
+        chaptersButton: false,
       },
       responsive: true,
       fluid: true,
       preload: "none",
       liveui: false,
       playsinline: true,
+      playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+      inactivityTimeout: 2000,
       techOrder: enableCast ? ["chromecast", "html5"] : ["html5"],
       html5: {
         vhs: {
@@ -146,35 +157,28 @@ export function useVideoPlayer({
       plugins: {
         ...(enableCast && { airPlay: {} }),
         ...(enableCast && { chromecast: {} }),
-        qualityLevels: {},
         vttThumbnails: {
           showTimestamp: true,
           spriteUrl: scene?.paths?.sprite || null,
         },
+        markers: {},
+        sourceSelector: {},
+        persistVolume: {},
+        bigButtons: {},
+        seekButtons: {
+          forward: 10,
+          back: 10,
+        },
+        skipButtons: {},
+        trackActivity: {},
+        vrMenu: {},
       },
     });
 
     playerRef.current = player;
     player.focus();
 
-    player.ready(() => {
-      // Restore volume and mute state from localStorage
-      const savedVolume = localStorage.getItem("videoPlayerVolume");
-      const savedMuted = localStorage.getItem("videoPlayerMuted");
-
-      if (savedVolume !== null) {
-        player.volume(parseFloat(savedVolume));
-      }
-      if (savedMuted !== null) {
-        player.muted(savedMuted === "true");
-      }
-
-      // Save volume changes to localStorage
-      player.on("volumechange", () => {
-        localStorage.setItem("videoPlayerVolume", player.volume().toString());
-        localStorage.setItem("videoPlayerMuted", player.muted().toString());
-      });
-    });
+    // Volume persistence is now handled by persistVolume plugin
 
     // Cleanup
     return () => {
@@ -437,7 +441,7 @@ export function useVideoPlayer({
       player.src(sources);
       player.load();
 
-      // Setup subtitles if available
+      // Setup subtitles if available (Video.js automatically shows/hides caption button)
       if (scene.captions && scene.captions.length > 0) {
         setupSubtitles(player, scene.id, scene.captions);
       }
