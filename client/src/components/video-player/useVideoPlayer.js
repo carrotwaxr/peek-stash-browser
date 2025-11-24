@@ -212,6 +212,32 @@ export function useVideoPlayer({
   }, [scene?.paths?.vtt, scene?.paths?.sprite, playerRef]);
 
   // ============================================================================
+  // TRACK ACTIVITY PLUGIN (Stash pattern - integrates with watch history)
+  // ============================================================================
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !scene?.id) return;
+
+    const trackActivityPlugin = player.trackActivity();
+    if (!trackActivityPlugin) return;
+
+    // Enable tracking
+    trackActivityPlugin.setEnabled(true);
+    trackActivityPlugin.minimumPlayPercent = 10; // Match Stash's 10% threshold
+
+    // The plugin tracks playback internally and calls these callbacks
+    // It coordinates with the existing useWatchHistory hook's ping system
+    // incrementPlayCount is called once per session when threshold is reached
+    // saveActivity is called periodically (every 10s) during playback
+
+    return () => {
+      trackActivityPlugin.setEnabled(false);
+      trackActivityPlugin.reset();
+    };
+  }, [scene?.id, playerRef]);
+
+  // ============================================================================
   // ASPECT RATIO UPDATES (fix layout when switching scenes)
   // ============================================================================
 

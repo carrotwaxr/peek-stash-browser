@@ -56,24 +56,26 @@ section.video-container {
 }
 
 /* ============================================================================
-   PROGRESS BAR - Full width above controls
+   PROGRESS BAR - Absolute positioned above controls (Stash pattern)
    ============================================================================ */
 
 .video-js .vjs-progress-control {
-  position: relative !important;
-  flex: 1 !important;
-  height: 6px !important;
+  position: absolute !important;
+  bottom: 2.5em !important; /* Float above controls */
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 3em !important;
   pointer-events: auto !important;
   margin: 0 !important;
   padding: 0 !important;
-  order: 7 !important;
 }
 
 .video-js .vjs-progress-holder {
   height: 6px !important;
-  margin: 0 !important;
+  margin: 0 15px !important; /* Side margins like Stash */
   padding: 0 !important;
-  width: 100% !important;
+  width: auto !important;
   font-size: inherit !important;
 }
 
@@ -808,4 +810,182 @@ section.video-container {
 
 .video-js .vjs-slider:focus {
   box-shadow: 0 0 0 2px var(--accent-primary) !important;
+}
+
+/* ============================================================================
+   STASH PLUGIN STYLES - Markers, Big Buttons, Source Selector, Skip Buttons
+   ============================================================================ */
+
+/* Big Buttons - Center overlay with seek and play/pause */
+.video-js .vjs-big-button-group {
+  display: none;
+  height: 80px;
+  justify-content: space-around;
+  opacity: 0;
+  position: absolute;
+  top: calc(50% - 40px);
+  width: 100%;
+  z-index: 1;
+}
+
+.video-js .vjs-big-button-group .vjs-button {
+  font-size: 4em;
+  height: 100%;
+  width: 80px;
+}
+
+.video-js .vjs-big-button-group .vjs-button .vjs-icon-placeholder::before {
+  height: 100%;
+  line-height: 80px;
+}
+
+@media (pointer: coarse) {
+  .video-js.vjs-touch-enabled.vjs-has-started .vjs-big-button-group {
+    display: flex;
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .video-js.vjs-touch-enabled.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-big-button-group {
+    opacity: 0;
+    pointer-events: none;
+    transition: visibility 1s, opacity 1s;
+    visibility: visible;
+  }
+
+  .video-js.vjs-touch-enabled .vjs-big-play-pause-button .vjs-icon-placeholder::before {
+    content: "\f101";
+    font-family: VideoJS;
+  }
+
+  .video-js.vjs-touch-enabled.vjs-playing .vjs-big-play-pause-button .vjs-icon-placeholder::before {
+    content: "\f103";
+  }
+
+  /* Hide regular seek buttons on touch screens */
+  .video-js.vjs-touch-enabled .vjs-control-bar .vjs-seek-button {
+    display: none;
+  }
+}
+
+/* Markers - Timeline markers with tooltips */
+.video-js .vjs-marker {
+  background-color: rgba(33, 33, 33, 0.8);
+  bottom: 0;
+  height: 100%;
+  left: 0;
+  opacity: 1;
+  position: absolute;
+  transition: opacity 0.2s ease;
+  visibility: hidden;
+  width: 6px;
+  z-index: 100;
+}
+
+.video-js .vjs-marker:hover {
+  cursor: pointer;
+  transform: scale(1.3, 1.3);
+}
+
+.video-js .vjs-marker-range {
+  background-color: rgba(255, 255, 255, 0.4);
+  border-radius: 2px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  height: 8px;
+  position: absolute;
+  transform: translateY(-28px);
+  transition: none;
+}
+
+.video-js .vjs-marker-tooltip {
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 0.3em;
+  color: #000;
+  float: right;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 0.6em;
+  padding: 6px 8px 8px 8px;
+  pointer-events: none;
+  position: absolute;
+  top: -3.4em;
+  visibility: hidden;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+/* Source Selector - Gear icon for Direct/Transcode */
+.video-js .vjs-source-selector .vjs-button > .vjs-icon-placeholder::before {
+  content: "\f110"; /* VideoJS gear icon */
+  font-family: VideoJS;
+}
+
+.video-js .vjs-source-selector.vjs-hover .vjs-menu {
+  display: none; /* Click-only behavior */
+}
+
+.video-js .vjs-source-selector .vjs-menu li {
+  font-size: 0.8em;
+}
+
+.video-js .vjs-source-selector .vjs-menu-item.vjs-source-menu-item-error:not(.vjs-selected) {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.video-js .vjs-source-selector .vjs-menu-item.vjs-source-menu-item-error {
+  font-style: italic;
+}
+
+/* Skip Buttons - Playlist navigation */
+.video-js .vjs-skip-button::before {
+  font-size: 1.8em;
+  line-height: 1.67;
+}
+
+.video-js.vjs-skip-buttons .vjs-icon-next-item,
+.video-js.vjs-skip-buttons .vjs-icon-previous-item {
+  display: none;
+}
+
+.video-js.vjs-skip-buttons-prev .vjs-icon-previous-item,
+.video-js.vjs-skip-buttons-next .vjs-icon-next-item {
+  display: inline-block;
+}
+
+/* VR Selector - VR mode toggle */
+.video-js .vjs-vr-selector .vjs-menu li {
+  font-size: 0.8em;
+}
+
+.video-js .vjs-vr-selector .vjs-button {
+  background: url("/vr.svg") center center no-repeat;
+  width: 50%;
+}
+
+/* Seek Buttons - videojs-seek-buttons styling */
+.video-js .vjs-seek-button.skip-back span.vjs-icon-placeholder::before {
+  transform: none;
+}
+
+.video-js .vjs-seek-button.skip-forward span.vjs-icon-placeholder::before {
+  transform: scale(-1, 1);
+}
+
+/* Mobile/Touch Optimizations for Stash Plugins */
+@media (max-width: 576px) {
+  .video-js .vjs-big-button-group .vjs-button {
+    font-size: 2em;
+    width: 50px;
+  }
+
+  .video-js .vjs-source-selector .vjs-menu {
+    z-index: 9999;
+  }
+
+  .video-js .vjs-source-selector .vjs-menu li {
+    font-size: 10px;
+  }
+
+  .video-js.vjs-touch-enabled .vjs-vtt-thumbnail-display {
+    bottom: 2.8em;
+  }
 }
