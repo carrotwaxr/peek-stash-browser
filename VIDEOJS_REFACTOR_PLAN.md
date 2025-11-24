@@ -663,7 +663,399 @@ Convert SCSS to plain CSS and merge into `VideoPlayer.css`.
 
 ---
 
-## Phase 10: Documentation Updates 📝 TODO
+## Phase 10: Implement Stash Stream Proxying 🎯 IN PROGRESS
+
+**Goal**: Replace Peek's entire transcoding system with simple proxy architecture that forwards all stream requests to Stash. Let Stash handle ALL codec detection, transcoding, and quality selection.
+
+**Status**: Research complete, implementation in progress
+
+### Background & Motivation
+
+**Current Architecture (Peek)**:
+- Peek manages its own FFmpeg-based transcoding system (TranscodingManager.ts, 800+ lines)
+- Manually constructs stream URLs for Direct/HLS qualities
+- Requires path mapping to access video files on disk
+- Duplicates Stash's battle-tested transcoding logic
+
+**Target Architecture (Stash Proxying)**:
+- Peek queries Stash's GraphQL `sceneStreams` field for all available stream endpoints
+- Proxies all stream requests to Stash's URLs (rewrites URLs to go through Peek)
+- Stash handles all transcoding, codec detection, quality selection, and format conversion
+- Peek never needs to know where video files are stored
+- Removes 800+ lines of complex transcoding code
+
+**Benefits**:
+- ✅ Simpler architecture (proxy vs manage transcoding)
+- ✅ More reliable (leverage Stash's battle-tested transcoding)
+- ✅ No FFmpeg dependency in Peek container
+- ✅ No path mapping needed for video files
+- ✅ Automatic support for all Stash's stream formats (Direct, HLS, MP4, WEBM, DASH, MKV)
+- ✅ Automatic support for all Stash's resolution levels (240p, 480p, 720p, 1080p, 2160p, ORIGINAL)
+- ✅ Easier deployment (smaller container, fewer dependencies)
+- ✅ Future Stash updates automatically propagate to Peek
+
+### Stash's Stream Generation System
+
+**GraphQL Type** (from Stash schema):
+```graphql
+type SceneStreamEndpoint {
+  url: String!
+  mime_type: String
+  label: String
+}
+
+type Scene {
+  # ... other fields
+  sceneStreams: [SceneStreamEndpoint!]!
+}
+```
+
+**How Stash Generates Streams** (from `internal/manager/scene.go:78-220`):
+
+Stash's `GetSceneStreamPaths()` function generates all available stream endpoints based on:
+1. **Direct stream**: Always available if video file exists
+2. **Transcoded streams**: Generated for each configured format and resolution
+3. **Resolution levels**: ORIGINAL, FOUR_K (2160p), FULL_HD (1080p), STANDARD_HD (720p), STANDARD (480p), LOW (240p)
+4. **Stream types**: HLS (.m3u8), MP4, WEBM, DASH (.mpd), MKV
+
+**Example sceneStreams array** (from Stash):
+```json
+[
+  {
+    "url": "http://stash:9999/scene/123/stream",
+    "mime_type": "video/mp4",
+    "label": "Direct stream"
+  },
+  {
+    "url": "http://stash:9999/scene/123/stream.m3u8",
+    "mime_type": "application/vnd.apple.mpegurl",
+    "label": "HLS"
+  },
+  {
+    "url": "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD_HD",
+    "mime_type": "application/vnd.apple.mpegurl",
+    "label": "720p"
+  },
+  {
+    "url": "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD",
+    "mime_type": "application/vnd.apple.mpegurl",
+    "label": "480p"
+  },
+  {
+    "url": "http://stash:9999/scene/123/stream.mp4?resolution=STANDARD",
+    "mime_type": "video/mp4",
+    "label": "480p MP4"
+  }
+]
+```
+
+**Stash's React Implementation** (from `ui/v2.5/src/components/ScenePlayer/ScenePlayer.tsx:609-628`):
+
+```typescript
+// Stash directly uses sceneStreams in Video.js
+sourceSelector.setSources(
+  scene.sceneStreams
+    .filter((stream) => {
+      const src = new URL(stream.url);
+      const isFileTranscode = !isDirect(src);
+      // Skip file transcodes on Safari (codec issues)
+      return !(isFileTranscode && isSafari);
+    })
+    .map((stream) => {
+      const src = new URL(stream.url);
+      return {
+        src: stream.url,
+        type: stream.mime_type ?? undefined,
+        label: stream.label ?? undefined,
+        offset: !isDirect(src), // Apply time offset for transcoded streams
+        duration,
+      };
+    })
+);
+```
+
+### Implementation Plan
+
+#### Step 1: Add sceneStreams to stashapp-api ✅ COMPLETE
+
+**File**: `c:\Users\charl\code\stashapp-api\src\operations\findScenes.graphql`
+
+**Changes**: Added `sceneStreams` field to GraphQL query (lines 121-125):
+```graphql
+sceneStreams {
+  url
+  mime_type
+  label
+}
+```
+
+**Next**: Rebuild and publish stashapp-api, then update Peek's dependency.
+
+#### Step 2: Create Proxy Endpoint in Peek Backend
+
+**File**: `peek-stash-browser/server/controllers/video.ts` (or new `server/controllers/stash-proxy.ts`)
+
+**New endpoint**: `GET /api/scene/:sceneId/proxy-stream/*`
+
+**Implementation**:
+```typescript
+import { Router } from 'express';
+import axios from 'axios';
+import { getStash } from '../services/stashApp.js';
+
+const router = Router();
+
+/**
+ * Proxy all stream requests to Stash
+ * Rewrites URLs from Stash's internal URLs to Peek's proxy URLs
+ *
+ * Examples:
+ * - /api/scene/123/proxy-stream/stream -> forwards to Stash /scene/123/stream
+ * - /api/scene/123/proxy-stream/stream.m3u8?resolution=STANDARD_HD -> forwards to Stash /scene/123/stream.m3u8?resolution=STANDARD_HD
+ * - /api/scene/123/proxy-stream/stream.mp4?resolution=STANDARD -> forwards to Stash /scene/123/stream.mp4?resolution=STANDARD
+ */
+router.get('/scene/:sceneId/proxy-stream/*', async (req, res) => {
+  try {
+    const { sceneId } = req.params;
+    const streamPath = req.params[0]; // Everything after proxy-stream/ (e.g., "stream.m3u8")
+    const queryString = req.url.split('?')[1] || '';
+
+    // Build Stash URL
+    const stash = getStash();
+    const stashBaseUrl = process.env.STASH_URL.replace('/graphql', ''); // http://stash:9999
+    const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${streamPath}${queryString ? '?' + queryString : ''}`;
+
+    console.log(`[Stream Proxy] Proxying: ${req.url} -> ${stashUrl}`);
+
+    // Forward request to Stash
+    const response = await axios.get(stashUrl, {
+      headers: {
+        'ApiKey': process.env.STASH_API_KEY,
+      },
+      responseType: 'stream', // Stream response directly to client
+      validateStatus: () => true, // Don't throw on non-200 status
+    });
+
+    // Forward headers from Stash
+    res.status(response.status);
+    Object.keys(response.headers).forEach(header => {
+      res.setHeader(header, response.headers[header]);
+    });
+
+    // Pipe response stream to client
+    response.data.pipe(res);
+
+  } catch (error) {
+    console.error('[Stream Proxy] Error:', error);
+    res.status(500).json({ error: 'Stream proxy failed' });
+  }
+});
+
+export default router;
+```
+
+**Register route** in `server/api.ts`:
+```typescript
+import stashProxyRouter from './controllers/stash-proxy.js';
+app.use('/api', authenticateToken, requireCacheReady, stashProxyRouter);
+```
+
+#### Step 3: Update Frontend to Use sceneStreams
+
+**File**: `peek-stash-browser/client/src/components/video-player/useVideoPlayer.js`
+
+**Current implementation** (lines 400-419, WRONG):
+```javascript
+// Manually constructing URLs - WRONG!
+const sources = [];
+
+sources.push({
+  src: `/api/scene/${scene.id}/stream`,
+  label: "Direct",
+});
+
+const qualities = ["1080p", "720p", "480p", "360p"];
+qualities.forEach((q) => {
+  sources.push({
+    src: `/api/scene/${scene.id}/stream.m3u8?quality=${q}`,
+    label: q,
+    type: "application/x-mpegURL",
+  });
+});
+```
+
+**Target implementation** (mimic Stash exactly):
+```javascript
+// Build sources from scene.sceneStreams (Stash pattern)
+const sourceSelector = player.sourceSelector();
+
+if (!scene.sceneStreams || scene.sceneStreams.length === 0) {
+  console.error('[VideoPlayer] No sceneStreams available for scene', scene.id);
+  return;
+}
+
+// Rewrite Stash URLs to use Peek's proxy
+const sources = scene.sceneStreams.map((stream) => {
+  const url = new URL(stream.url);
+
+  // Extract path after /scene/{id}/
+  // e.g., "stream.m3u8?resolution=STANDARD_HD" from "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD_HD"
+  const pathParts = url.pathname.split(`/scene/${scene.id}/`);
+  const streamPath = pathParts[1] || 'stream'; // "stream.m3u8" or "stream"
+  const queryString = url.search; // "?resolution=STANDARD_HD" or ""
+
+  // Rewrite to Peek's proxy endpoint
+  const proxiedUrl = `/api/scene/${scene.id}/proxy-stream/${streamPath}${queryString}`;
+
+  return {
+    src: proxiedUrl,
+    type: stream.mime_type || undefined,
+    label: stream.label || undefined,
+  };
+});
+
+console.log('[VideoPlayer] Setting sources from sceneStreams:', sources);
+
+// Set sources using sourceSelector plugin
+sourceSelector.setSources(sources);
+
+// Optional: Filter out file transcodes on Safari (like Stash does)
+// const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+// if (isSafari) {
+//   sources = sources.filter(s => !s.src.includes('stream.mp4') && !s.src.includes('stream.webm'));
+// }
+```
+
+**Remove all manual source construction logic** - let Stash define sources via sceneStreams.
+
+#### Step 4: Remove Peek's Transcoding System
+
+**Files to DELETE** (800+ lines total):
+- `server/services/TranscodingManager.ts` - Entire file (793 lines)
+- `server/controllers/video.ts` - Keep proxy endpoint, DELETE all transcoding logic
+- Any HLS session management code
+- Any FFmpeg spawn/management code
+
+**Environment variables to REMOVE**:
+- `STASH_MEDIA_PATH` - No longer needed (Peek never accesses video files)
+- `STASH_INTERNAL_PATH` - No longer needed
+- Path mapping system can be simplified (only needed for images, not videos)
+
+**Docker changes**:
+- Remove FFmpeg from `Dockerfile.production` (smaller container!)
+- Remove HLS cache volume mount (no longer needed)
+
+#### Step 5: Update User Preferences
+
+**Database changes** (Prisma schema):
+
+Current `User.preferredQuality` enum may be outdated. Since Stash now provides the quality labels dynamically, we can:
+
+1. **Option A**: Remove `preferredQuality` entirely and let users select quality per-session
+2. **Option B**: Store last-selected quality label as String (e.g., "720p", "Direct stream")
+
+**Recommendation**: Keep it simple - remove preferredQuality preference. Users select quality via sourceSelector gear menu, and Video.js remembers their choice via localStorage (sourceSelector plugin handles this).
+
+**Migration**: Remove `preferredQuality` field from User model (or mark as deprecated).
+
+#### Step 6: Testing Matrix
+
+Test all stream types and resolutions:
+
+**Direct Stream**:
+- [ ] Direct stream plays without errors
+- [ ] Codec auto-detected correctly
+- [ ] Seeking works correctly
+
+**HLS Streams**:
+- [ ] HLS 1080p plays
+- [ ] HLS 720p plays
+- [ ] HLS 480p plays
+- [ ] HLS 240p plays
+- [ ] Seeking works in HLS streams
+
+**MP4 Streams** (if Stash provides):
+- [ ] MP4 streams play
+- [ ] All resolutions work
+
+**WEBM Streams** (if Stash provides):
+- [ ] WEBM streams play
+- [ ] All resolutions work
+
+**Quality Switching**:
+- [ ] Gear icon shows all available streams from sceneStreams
+- [ ] Can switch between qualities
+- [ ] Playback position preserved during switch
+- [ ] Paused state preserved during switch
+
+**Error Handling**:
+- [ ] Codec errors trigger auto-fallback to next source
+- [ ] Errored sources shown in gear menu with strikethrough
+- [ ] Network errors handled gracefully
+
+**Performance**:
+- [ ] No buffering issues
+- [ ] Seeking is fast
+- [ ] Stream startup is quick
+
+### Code Removal Summary
+
+**Files to DELETE**:
+1. `server/services/TranscodingManager.ts` (793 lines)
+2. HLS session management code in `server/controllers/video.ts`
+
+**Lines to DELETE** (approximate):
+- TranscodingManager: 793 lines
+- Video controller transcoding logic: ~200 lines
+- Path mapping for videos: ~50 lines
+- FFmpeg utilities: ~100 lines
+- **Total**: ~1150 lines REMOVED
+
+**Lines to ADD**:
+- Proxy endpoint: ~40 lines
+- Frontend sceneStreams usage: ~20 lines (replacing ~40 lines)
+- **Total**: ~60 lines ADDED
+
+**Net code reduction**: ~1090 lines removed! 📉
+
+### Migration Path for Existing Users
+
+**For users upgrading from old Peek versions**:
+
+1. **Database migration**: Remove obsolete `preferredQuality` values
+2. **Clear HLS cache**: Old HLS segments no longer used
+3. **Update Docker**: Pull new image without FFmpeg
+4. **Environment cleanup**: Remove `STASH_MEDIA_PATH` and `STASH_INTERNAL_PATH` (optional, backward compatible)
+
+**Backward compatibility**:
+- Existing installations continue to work
+- Path mappings for images still functional
+- No breaking changes to API endpoints (old `/api/scene/:id/stream` now proxies to Stash)
+
+### Implementation Order
+
+1. ✅ **Add sceneStreams to stashapp-api** (DONE)
+2. **Rebuild and publish stashapp-api** → Update Peek's server/package.json
+3. **Create proxy endpoint** in Peek backend
+4. **Update frontend** to use sceneStreams
+5. **Test thoroughly** with all stream types
+6. **Remove transcoding system** (TranscodingManager, etc.)
+7. **Remove FFmpeg from Docker** (smaller container)
+8. **Update documentation** (CLAUDE.md, README.md)
+9. **Create migration guide** for existing users
+10. **Final testing** and user approval
+
+### Notes
+
+- This is a MAJOR architectural simplification
+- Removes most complex code in Peek (transcoding management)
+- Makes Peek a true "thin client" for Stash
+- All stream intelligence stays in Stash where it belongs
+- Peek focuses on multi-user, playlists, and UI improvements
+
+---
+
+## Phase 11: Documentation Updates 📝 TODO
 
 Update these files to reflect new architecture:
 
@@ -674,6 +1066,7 @@ Update Video Player section:
 - Document plugin architecture
 - Update file structure to show plugins folder
 - Add note about Video.js 7 version requirement
+- **Update Video Transcoding section** to document proxy architecture (no more TranscodingManager)
 
 ### README.md (if video player section exists)
 

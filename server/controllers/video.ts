@@ -223,3 +223,109 @@ export const getCaption = async (req: Request, res: Response) => {
     res.status(500).send("Internal server error");
   }
 };
+
+// ============================================================================
+// STASH STREAM PROXY (New Architecture)
+// ============================================================================
+
+/**
+ * Proxy all stream requests to Stash
+ * This is the new architecture where Peek proxies ALL streams to Stash
+ * instead of managing its own transcoding.
+ *
+ * GET /api/scene/:sceneId/proxy-stream/stream -> Stash /scene/:sceneId/stream (Direct)
+ * GET /api/scene/:sceneId/proxy-stream/stream.m3u8?resolution=STANDARD_HD -> Stash HLS 720p
+ * GET /api/scene/:sceneId/proxy-stream/stream.mp4?resolution=STANDARD -> Stash MP4 480p
+ * GET /api/scene/:sceneId/proxy-stream/hls/:segment.ts?resolution=STANDARD -> Stash HLS segment
+ *
+ * This replaces the old TranscodingManager system and lets Stash handle
+ * all codec detection, transcoding, and quality selection.
+ */
+export const proxyStashStream = async (req: Request, res: Response) => {
+  try {
+    const { sceneId, streamPath } = req.params;
+
+    // Parse query string from original request
+    const queryString = req.url.split('?')[1] || '';
+
+    // Build Stash URL
+    const stashBaseUrl = process.env.STASH_URL?.replace('/graphql', '');
+    if (!stashBaseUrl) {
+      logger.error("[PROXY] STASH_URL not configured");
+      return res.status(500).send("Stash URL not configured");
+    }
+
+    const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${streamPath}${queryString ? '?' + queryString : ''}`;
+
+    logger.info(`[PROXY] Proxying stream: ${req.url} -> ${stashUrl}`);
+
+    // Forward request to Stash using fetch
+    const response = await fetch(stashUrl, {
+      headers: {
+        'ApiKey': process.env.STASH_API_KEY || '',
+        'Range': req.headers.range || '', // Forward range requests for seeking
+      },
+    });
+
+    if (!response.ok) {
+      logger.warn(`[PROXY] Stash returned ${response.status} for ${stashUrl}`);
+      return res.status(response.status).send(`Stash stream error: ${response.statusText}`);
+    }
+
+    // Forward status code
+    res.status(response.status);
+
+    // Forward relevant headers from Stash
+    const headersToForward = [
+      'content-type',
+      'content-length',
+      'accept-ranges',
+      'content-range',
+      'cache-control',
+      'last-modified',
+      'etag',
+    ];
+
+    headersToForward.forEach(header => {
+      const value = response.headers.get(header);
+      if (value) {
+        res.setHeader(header, value);
+      }
+    });
+
+    // Stream response body to client
+    if (response.body) {
+      const reader = response.body.getReader();
+      const pump = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (!res.write(value)) {
+              // Backpressure - wait for drain
+              await new Promise(resolve => res.once('drain', resolve));
+            }
+          }
+          res.end();
+        } catch (error) {
+          logger.error("[PROXY] Error streaming response", { error });
+          if (!res.headersSent) {
+            res.status(500).send("Stream proxy error");
+          }
+        }
+      };
+      await pump();
+    } else {
+      res.end();
+    }
+
+    logger.debug(`[PROXY] Stream proxied successfully: ${streamPath}`);
+  } catch (error) {
+    logger.error("[PROXY] Error proxying stream", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    if (!res.headersSent) {
+      res.status(500).send("Stream proxy failed");
+    }
+  }
+};

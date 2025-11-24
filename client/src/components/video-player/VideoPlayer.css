@@ -17,21 +17,31 @@ section.video-container {
 }
 
 /* ============================================================================
-   CONTROL BAR - Transparent background with gradient
+   CONTROL BAR - Transparent background with gradient (Stash pattern)
    ============================================================================ */
 
 .video-js .vjs-control-bar {
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.6) 50%,
-    rgba(0, 0, 0, 0) 100%
-  ) !important;
-  height: 44px !important;
-  padding: 0 12px !important;
+  background: none !important;
+  font-size: 15px !important; /* Scales all control sizes */
+  padding: 0 !important;
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
+}
+
+/* Gradient overlay behind controls (Stash pattern) */
+.video-js .vjs-control-bar::before {
+  background: linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0) 100%
+  ) !important;
+  bottom: 0 !important;
+  content: "" !important;
+  height: 10rem !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  width: 100% !important;
+  z-index: -1 !important;
 }
 
 /* Hide control bar when user is inactive (YouTube behavior) */
@@ -168,273 +178,69 @@ section.video-container {
 }
 
 /* ============================================================================
-   CONTROL BUTTONS - Consistent sizing and alignment
+   CONTROL BUTTONS - Let Video.js and font-size: 15px handle sizing naturally
    ============================================================================ */
 
-.video-js .vjs-control {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 0 !important;
-}
+/* No custom control sizing - inherit from control bar's font-size: 15px */
 
-/* Button icons */
-.video-js .vjs-icon-placeholder {
-  font-size: 20px !important;
-  line-height: 1 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-/* Button icons - specific sizing */
-.video-js .vjs-icon-placeholder:before {
-  line-height: 1 !important;
-}
-
-/* Play/Pause button */
-.video-js .vjs-play-control {
-  margin: 0 !important;
-  order: 1 !important;
-}
-
-/* Volume control */
-.video-js .vjs-volume-panel {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  height: 48px !important;
-  margin: 0 !important;
-  order: 3 !important;
-  position: relative !important;
-  width: 156px !important; /* 48px button + 108px slider space */
-  min-width: 156px !important;
-  overflow: visible !important;
-}
-
-.video-js .vjs-mute-control {
-  margin: 0 !important;
-  position: absolute !important;
-  left: 0 !important;
-  top: 2px !important;
-  z-index: 2 !important;
-}
-
-/* Horizontal volume slider - often has class vjs-volume-panel-horizontal */
-.video-js .vjs-volume-panel.vjs-volume-panel-horizontal .vjs-volume-control,
+/* Volume control (Stash pattern - uses popup, configured via JS inline: false) */
 .video-js .vjs-volume-control {
-  position: absolute !important;
-  left: 48px !important;
-  width: 0 !important;
-  opacity: 0 !important;
-  overflow: visible !important;
-  transition:
-    width 0.2s ease,
-    opacity 0.2s ease !important;
+  z-index: 1 !important;
 }
 
-/* Show volume slider on hover (mouse/pointer devices) */
-.video-js .vjs-volume-panel:hover .vjs-volume-control,
-.video-js .vjs-volume-panel:focus-within .vjs-volume-control,
-.video-js .vjs-volume-panel.vjs-hover .vjs-volume-control {
-  width: 108px !important; /* 100px slider + 8px padding */
-  opacity: 1 !important;
-  overflow: visible !important;
-}
-
-/* Hide volume controls on touch devices (use device volume buttons) */
+/* Hide volume on touch devices */
 @media (hover: none) and (pointer: coarse) {
   .video-js .vjs-volume-panel {
     display: none !important;
   }
 }
 
-.video-js .vjs-volume-bar {
-  background: rgba(255, 255, 255, 0.2) !important;
-  height: 4px !important;
-  border-radius: 2px !important;
-  margin: 0 !important;
-  width: 100px !important;
-}
-
-.video-js .vjs-volume-control .vjs-volume-horizontal {
-  width: 100px !important;
-  padding: 0 8px !important;
-}
-
-.video-js .vjs-volume-level {
-  background-color: white !important;
-  height: 4px !important;
-  border-radius: 2px !important;
-}
-
-.video-js .vjs-volume-level:before {
-  font-size: 10px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-}
-
-/* Volume tooltip */
-.video-js .vjs-volume-tooltip {
-  font-size: 11px !important;
-  padding: 4px 8px !important;
-  font-family: var(--font-body) !important;
-  font-weight: 500 !important;
-  background: rgba(28, 28, 28, 0.95) !important;
-  border-radius: 4px !important;
-  pointer-events: none !important;
-}
-
 /* ============================================================================
-   TIME DISPLAY - Better typography
+   TIME CONTROLS (Stash pattern)
    ============================================================================ */
 
 .video-js .vjs-time-control {
-  min-width: auto !important;
-  height: 48px !important;
-  padding: 0 8px !important;
-  margin: 0 !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  line-height: 48px !important;
-  font-family: "Roboto", "YouTube Sans", sans-serif !important;
-  display: flex !important;
   align-items: center !important;
-}
-
-.video-js .vjs-current-time {
   display: flex !important;
-  align-items: center !important;
-  height: 48px !important;
-  order: 4 !important;
-}
-
-.video-js .vjs-time-divider {
-  min-width: auto !important;
+  justify-content: center !important;
+  min-width: 0 !important;
   padding: 0 4px !important;
-  height: 48px !important;
-  display: flex !important;
-  align-items: center !important;
-  line-height: 1 !important;
-  order: 5 !important;
+  pointer-events: none !important;
+}
+
+.video-js .vjs-time-control .vjs-control-text {
+  display: none !important;
 }
 
 .video-js .vjs-duration {
-  display: flex !important;
-  align-items: center !important;
-  height: 48px !important;
-  order: 6 !important;
+  margin-right: auto !important; /* Push right-side controls to the right (Stash pattern) */
+}
+
+.video-js .vjs-remaining-time {
+  display: none !important;
 }
 
 /* ============================================================================
-   QUALITY SELECTOR - Better styling
+   BUTTON ORDER - Remove order overrides, let JS plugins handle it
    ============================================================================ */
 
-.video-js .vjs-quality-selector {
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  margin: 0 !important;
-  order: 8 !important;
-}
-
-.video-js .vjs-quality-selector .vjs-menu {
-  bottom: 48px !important;
-  background: rgba(28, 28, 28, 0.95) !important;
-  border-radius: 8px !important;
-  padding: 8px 0 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-}
-
-.video-js .vjs-quality-selector .vjs-menu .vjs-menu-content {
-  background: transparent !important;
-}
-
-.video-js .vjs-quality-selector .vjs-menu-item {
-  padding: 8px 40px 8px 16px !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  color: white !important;
-  background: transparent !important;
-}
-
-.video-js .vjs-quality-selector .vjs-menu-item:hover,
-.video-js .vjs-quality-selector .vjs-menu-item:focus {
-  background: rgba(255, 255, 255, 0.1) !important;
-}
-
-.video-js .vjs-quality-selector .vjs-menu-item.vjs-selected {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #3ea6ff !important;
-}
-
-.video-js .vjs-quality-selector .vjs-menu-item.vjs-selected:before {
-  content: "✓" !important;
-  position: absolute !important;
-  right: 16px !important;
-  font-size: 16px !important;
-}
+/* Don't use CSS order - Video.js plugins insert buttons in correct order */
 
 /* ============================================================================
-   RIGHT-ALIGNED CONTROLS - Playback speed and fullscreen
-   ============================================================================ */
-
-/* Playback speed comes after captions */
-.video-js .vjs-playback-rate {
-  margin: 0 !important;
-  order: 10 !important;
-}
-
-/* Fullscreen at the far right */
-.video-js .vjs-fullscreen-control {
-  margin: 0 !important;
-  order: 11 !important;
-}
-
-/* ============================================================================
-   SETTINGS MENU (Playback Speed, etc.) - Better styling
+   POPUP MENUS - Playback Speed, Captions, etc. (Stash pattern)
    ============================================================================ */
 
 .video-js .vjs-menu-button-popup .vjs-menu {
-  bottom: 48px !important;
-  background: rgba(28, 28, 28, 0.95) !important;
-  border-radius: 8px !important;
-  padding: 8px 0 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-  min-width: 120px !important; /* Prevent narrow menu */
-  left: auto !important; /* Override default positioning */
-  right: 0 !important; /* Align to button */
+  width: 8em !important; /* Stash width for popup menus */
+  z-index: 10 !important; /* Above progress bar */
 }
 
 .video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
-  background: transparent !important;
+  max-height: 10em !important; /* Stash max height */
 }
 
-.video-js .vjs-menu-button-popup .vjs-menu-item {
-  padding: 8px 40px 8px 16px !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  color: white !important;
-  background: transparent !important;
-  white-space: nowrap !important; /* Prevent text wrapping */
-}
-
-.video-js .vjs-menu-button-popup .vjs-menu-item:hover,
-.video-js .vjs-menu-button-popup .vjs-menu-item:focus {
-  background: rgba(255, 255, 255, 0.1) !important;
-}
-
-.video-js .vjs-menu-button-popup .vjs-menu-item.vjs-selected {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #3ea6ff !important;
-}
-
-.video-js .vjs-menu-button-popup .vjs-menu-item.vjs-selected:before {
-  content: "✓" !important;
-  position: absolute !important;
-  right: 16px !important;
-  font-size: 16px !important;
+.video-js .vjs-menu-button-popup .vjs-menu li {
+  font-size: 0.8em !important; /* Stash font size */
 }
 
 
@@ -450,66 +256,16 @@ section.video-container {
 }
 
 /* ============================================================================
-   BIG PLAY BUTTON - Center positioned
+   BIG PLAY BUTTON (Stash pattern - no background, no border, large icon)
    ============================================================================ */
 
-.video-js .vjs-big-play-button {
-  width: 80px !important;
-  height: 80px !important;
-  border-radius: 50% !important;
-  background: rgba(0, 0, 0, 0.8) !important;
+.video-js .vjs-big-play-button,
+.video-js .vjs-big-play-button:hover,
+.video-js .vjs-big-play-button:focus,
+.video-js:hover .vjs-big-play-button {
+  background: none !important;
   border: none !important;
-  left: 50% !important;
-  top: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-/* Hide big play button when video has started - only show on initial load */
-.video-js.vjs-has-started .vjs-big-play-button {
-  display: none !important;
-}
-
-/* Never show during these states */
-.video-js.vjs-playing .vjs-big-play-button,
-.video-js.vjs-seeking .vjs-big-play-button,
-.video-js.vjs-scrubbing .vjs-big-play-button,
-.video-js.vjs-waiting.vjs-has-started .vjs-big-play-button,
-.video-js.vjs-paused.vjs-has-started .vjs-big-play-button {
-  display: none !important;
-}
-
-/* Override VideoJS's icon placeholder height only for big play button */
-.video-js .vjs-big-play-button > .vjs-icon-placeholder {
-  font-size: 56px !important;
-  line-height: 1 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  width: auto !important;
-  height: auto !important;
-  position: static !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.video-js .vjs-big-play-button > .vjs-icon-placeholder:before {
-  line-height: 1 !important;
-  position: static !important;
-  display: block !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.video-js:hover .vjs-big-play-button,
-.video-js .vjs-big-play-button:focus {
-  background: rgba(0, 0, 0, 0.95) !important;
-  transform: translate(-50%, -50%) scale(1.1) !important;
-  transition: all 0.2s ease !important;
+  font-size: 10em !important;
 }
 
 /* ============================================================================
@@ -535,103 +291,51 @@ section.video-container {
    MOBILE OPTIMIZATIONS
    ============================================================================ */
 
-@media (max-width: 768px) {
-  /* Control bar - smaller height and padding */
-  .video-js .vjs-control-bar {
-    height: 40px !important;
-    padding: 0 6px !important;
-    gap: 4px !important;
-  }
-
-  /* All control buttons - smaller and properly aligned */
+/* Compact controls on smaller screens (Stash pattern) */
+@media (max-width: 576px) {
   .video-js .vjs-control {
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
-    line-height: 36px !important;
+    width: 2.5em !important;
   }
 
-  /* Playlist buttons - override desktop 48px height */
-  .video-js .vjs-playlist-prev,
-  .video-js .vjs-playlist-next {
-    width: 36px !important;
-    height: 36px !important;
-    min-width: 36px !important;
+  .video-js .vjs-progress-control {
+    height: 2em !important;
+    width: 100% !important;
   }
 
-  /* Volume panel - override desktop 48px height */
-  .video-js .vjs-volume-panel {
-    height: 36px !important;
-  }
-
-  .video-js .vjs-icon-placeholder:before {
-    line-height: 1 !important;
-  }
-
-  /* Big play button - smaller */
-  .video-js .vjs-big-play-button {
-    width: 64px !important;
-    height: 64px !important;
-  }
-
-  .video-js .vjs-big-play-button > .vjs-icon-placeholder {
-    font-size: 40px !important;
-  }
-
-  /* Hide playback speed on mobile - not enough room */
   .video-js .vjs-playback-rate {
-    display: none !important;
+    width: 3em !important;
   }
 
-  /* Time display - smaller font */
-  .video-js .vjs-time-control {
-    font-size: 11px !important;
-    height: 36px !important;
-    line-height: 36px !important;
-    padding: 0 4px !important;
+  .video-js .vjs-button > .vjs-icon-placeholder::before,
+  .video-js .vjs-skip-button::before {
+    font-size: 1.5em !important;
+    line-height: 2 !important;
   }
 
-  .video-js .vjs-current-time,
-  .video-js .vjs-duration,
-  .video-js .vjs-time-divider {
-    height: 36px !important;
+  /* Smaller cast buttons */
+  .video-js .vjs-airplay-button .vjs-icon-placeholder,
+  .video-js .vjs-chromecast-button .vjs-icon-placeholder {
+    height: 1.4em !important;
+    width: 1.4em !important;
   }
 
-  /* Loading spinner - smaller */
-  .video-js .vjs-loading-spinner {
-    width: 48px !important;
-    height: 48px !important;
-    border-width: 3px !important;
-  }
-
-  /* VTT thumbnails - adjust position for smaller control bar */
-  .video-js .vjs-vtt-thumbnail-display {
-    bottom: 16px !important; /* Above 40px control bar */
-  }
-
-  /* Captions menu - adjust for mobile */
-  .video-js .vjs-subs-caps-button .vjs-menu {
-    bottom: 40px !important; /* Above mobile control bar */
-    min-width: 200px !important; /* Wider touch targets */
-  }
-
-  .video-js .vjs-subs-caps-button .vjs-menu-item {
-    padding: 12px 40px 12px 16px !important; /* Larger touch targets */
-    font-size: 14px !important; /* Slightly larger on mobile */
-  }
-
-  /* Quality and other popup menus - adjust for mobile */
-  .video-js .vjs-quality-selector .vjs-menu,
+  /* Menu adjustments */
   .video-js .vjs-menu-button-popup .vjs-menu {
-    bottom: 40px !important; /* Above mobile control bar */
+    width: 8em !important;
   }
 
-  /* Hide time divider and duration on very small screens */
-  @media (max-width: 480px) {
-    .video-js .vjs-time-divider,
-    .video-js .vjs-duration {
-      display: none !important;
-    }
+  .video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
+    max-height: 10em !important;
+  }
+
+  .video-js .vjs-menu li {
+    font-size: 10px !important;
+  }
+
+  /* Playback rate value */
+  .video-js .vjs-playback-rate .vjs-playback-rate-value {
+    font-size: 1em !important;
+    line-height: 2.97 !important;
   }
 }
 
@@ -646,67 +350,15 @@ section.video-container {
 }
 
 /* ============================================================================
-   CLICK-ONLY MENUS - Disable hover behavior
+   CLICK-ONLY MENUS - Disable hover behavior (Stash pattern)
    ============================================================================ */
 
-/* Disable hover-to-open for all popup menus (click-only) */
-.video-js .vjs-menu-button-popup:not(.vjs-lock-showing):hover .vjs-menu,
-.video-js .vjs-quality-selector:not(.vjs-lock-showing):hover .vjs-menu,
-.video-js .vjs-subs-caps-button:not(.vjs-lock-showing):hover .vjs-menu {
+/* Source selector menu - click only, no hover (matches Stash's approach) */
+.video-js .vjs-source-selector.vjs-hover .vjs-menu {
   display: none !important;
 }
 
-/* Only show menu when explicitly opened (clicked) */
-.video-js .vjs-menu-button-popup.vjs-lock-showing .vjs-menu,
-.video-js .vjs-quality-selector.vjs-lock-showing .vjs-menu,
-.video-js .vjs-subs-caps-button.vjs-lock-showing .vjs-menu {
-  display: block !important;
-}
-
-/* Captions/subtitles button - styled like other menu buttons */
-.video-js .vjs-subs-caps-button {
-  margin: 0 !important;
-  order: 9 !important; /* After quality selector, before playback speed */
-}
-
-.video-js .vjs-subs-caps-button .vjs-menu {
-  bottom: 48px !important;
-  background: rgba(28, 28, 28, 0.95) !important;
-  border-radius: 8px !important;
-  padding: 8px 0 !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-  min-width: 180px !important; /* Wider for language names */
-}
-
-.video-js .vjs-subs-caps-button .vjs-menu .vjs-menu-content {
-  background: transparent !important;
-}
-
-.video-js .vjs-subs-caps-button .vjs-menu-item {
-  padding: 8px 40px 8px 16px !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  color: white !important;
-  background: transparent !important;
-  white-space: nowrap !important;
-}
-
-.video-js .vjs-subs-caps-button .vjs-menu-item:hover,
-.video-js .vjs-subs-caps-button .vjs-menu-item:focus {
-  background: rgba(255, 255, 255, 0.1) !important;
-}
-
-.video-js .vjs-subs-caps-button .vjs-menu-item.vjs-selected {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #3ea6ff !important;
-}
-
-.video-js .vjs-subs-caps-button .vjs-menu-item.vjs-selected:before {
-  content: "✓" !important;
-  position: absolute !important;
-  right: 16px !important;
-  font-size: 16px !important;
-}
+/* Captions/subtitles button - inherits from standard menu styling */
 
 /* Hide chapters button (not supported) */
 .video-js .vjs-chapters-button {
@@ -750,22 +402,27 @@ section.video-container {
 
 .video-js .vjs-control,
 .video-js .vjs-progress-control,
-.video-js .vjs-volume-control,
-.video-js .vjs-menu {
+.video-js .vjs-volume-control {
   transition: all 0.2s ease !important;
 }
 
+/* No transition on menus - should appear instantly on click (Stash pattern) */
+
 /* ============================================================================
-   FOCUS STATES - Accessibility
+   FOCUS STATES - Accessibility (Stash pattern - minimal outlines)
    ============================================================================ */
 
-.video-js .vjs-control:focus {
-  outline: 2px solid var(--accent-primary) !important;
-  outline-offset: 2px !important;
+.video-js .vjs-button {
+  outline: none !important; /* Stash pattern */
 }
 
 .video-js .vjs-progress-control:focus-within {
   outline: none !important;
+}
+
+.video-js .vjs-slider {
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 
 .video-js .vjs-slider:focus {

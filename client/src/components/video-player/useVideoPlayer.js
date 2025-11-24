@@ -397,26 +397,65 @@ export function useVideoPlayer({
     // Get sourceSelector plugin
     const sourceSelector = player.sourceSelector();
 
-    // Build sources array with labels (Stash pattern)
-    // Always provide ALL sources for auto-fallback (like Stash's sceneStreams)
-    const sources = [];
+    // Build sources array from scene.sceneStreams (Stash pattern)
+    // sceneStreams contains ALL available stream formats from Stash:
+    // - Direct stream (original file)
+    // - HLS transcodes (various resolutions)
+    // - MP4/WEBM/DASH transcodes (if configured in Stash)
+    let sources = [];
 
-    // Add Direct source first (let Video.js auto-detect MIME type)
-    sources.push({
-      src: `/api/scene/${scene.id}/stream`,
-      label: "Direct",
-    });
+    if (scene.sceneStreams && scene.sceneStreams.length > 0) {
+      console.log(`[VideoPlayer] Using ${scene.sceneStreams.length} streams from Stash:`, scene.sceneStreams);
 
-    // Add all transcode qualities as fallbacks
-    // sourceSelector will auto-select based on what we set later
-    const qualities = ["1080p", "720p", "480p", "360p"];
-    qualities.forEach((q) => {
+      // Get video duration from first file (needed for HLS transcodes to show correct duration)
+      const duration = scene.files?.[0]?.duration || undefined;
+
+      // Helper to check if stream is Direct (not transcoded)
+      const isDirect = (url) => {
+        return (
+          url.pathname.endsWith('/stream') ||
+          url.pathname.endsWith('/stream.mpd') ||
+          url.pathname.endsWith('/stream.m3u8')
+        );
+      };
+
+      // Rewrite Stash URLs to use Peek's proxy
+      sources = scene.sceneStreams.map((stream) => {
+        try {
+          const url = new URL(stream.url);
+
+          // Extract path after /scene/{id}/
+          // e.g., "stream.m3u8" from "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD_HD"
+          const pathParts = url.pathname.split(`/scene/${scene.id}/`);
+          const streamPath = pathParts[1] || 'stream'; // "stream.m3u8" or "stream"
+          const queryString = url.search; // "?resolution=STANDARD_HD" or ""
+
+          // Rewrite to Peek's proxy endpoint
+          const proxiedUrl = `/api/scene/${scene.id}/proxy-stream/${streamPath}${queryString}`;
+
+          return {
+            src: proxiedUrl,
+            type: stream.mime_type || undefined,
+            label: stream.label || undefined,
+            offset: !isDirect(url), // Transcoded streams need time offset correction
+            duration, // Total video duration (fixes HLS duration incrementing)
+          };
+        } catch (error) {
+          console.error('[VideoPlayer] Error parsing stream URL:', stream.url, error);
+          return null;
+        }
+      }).filter(Boolean); // Remove any null entries from errors
+
+      console.log('[VideoPlayer] Proxied sources:', sources);
+    } else {
+      console.warn('[VideoPlayer] No sceneStreams available, falling back to legacy Direct stream');
+      // Fallback: Use legacy Direct stream if sceneStreams not available
+      // This maintains backward compatibility during transition
       sources.push({
-        src: `/api/scene/${scene.id}/stream.m3u8?quality=${q}`,
-        label: q,
-        type: "application/x-mpegURL",
+        src: `/api/scene/${scene.id}/stream`,
+        label: "Direct",
       });
-    });
+    }
 
     // Set ready=true when loadstart fires
     const handleLoadStart = () => {
