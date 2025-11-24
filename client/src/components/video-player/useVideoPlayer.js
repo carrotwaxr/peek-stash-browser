@@ -405,8 +405,6 @@ export function useVideoPlayer({
     let sources = [];
 
     if (scene.sceneStreams && scene.sceneStreams.length > 0) {
-      console.log(`[VideoPlayer] Using ${scene.sceneStreams.length} streams from Stash:`, scene.sceneStreams);
-
       // Get video duration from first file (needed for HLS transcodes to show correct duration)
       const duration = scene.files?.[0]?.duration || undefined;
 
@@ -445,8 +443,6 @@ export function useVideoPlayer({
           return null;
         }
       }).filter(Boolean); // Remove any null entries from errors
-
-      console.log('[VideoPlayer] Proxied sources:', sources);
     } else {
       console.warn('[VideoPlayer] No sceneStreams available, falling back to legacy Direct stream');
       // Fallback: Use legacy Direct stream if sceneStreams not available
