@@ -174,52 +174,6 @@ export function useVideoPlayer({
         localStorage.setItem("videoPlayerVolume", player.volume().toString());
         localStorage.setItem("videoPlayerMuted", player.muted().toString());
       });
-
-      // Disable hover-to-open for popup menus (click-only)
-      // This prevents frustrating behavior where menus close when moving mouse
-      setTimeout(() => {
-        const menuButtons = player.el().querySelectorAll(
-          ".vjs-menu-button-popup, .vjs-quality-selector, .vjs-subs-caps-button"
-        );
-
-        menuButtons.forEach((button) => {
-          // Remove hover event listeners by cloning and replacing the node
-          const clone = button.cloneNode(true);
-          button.parentNode.replaceChild(clone, button);
-
-          // Re-add click handler for menu toggle
-          clone.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const isOpen = clone.classList.contains("vjs-lock-showing");
-
-            // Close all other menus first
-            menuButtons.forEach((btn) => {
-              if (btn !== clone) {
-                btn.classList.remove("vjs-lock-showing");
-              }
-            });
-
-            // Toggle this menu
-            if (isOpen) {
-              clone.classList.remove("vjs-lock-showing");
-            } else {
-              clone.classList.add("vjs-lock-showing");
-            }
-          });
-        });
-
-        // Close menus when clicking outside
-        player.el().addEventListener("click", (e) => {
-          const clickedMenu = e.target.closest(
-            ".vjs-menu-button-popup, .vjs-quality-selector, .vjs-subs-caps-button"
-          );
-          if (!clickedMenu) {
-            menuButtons.forEach((btn) => {
-              btn.classList.remove("vjs-lock-showing");
-            });
-          }
-        });
-      }, 100);
     });
 
     // Cleanup

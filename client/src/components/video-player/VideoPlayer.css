@@ -683,6 +683,24 @@ section.video-container {
   display: none !important;
 }
 
+/* ============================================================================
+   CLICK-ONLY MENUS - Disable hover behavior
+   ============================================================================ */
+
+/* Disable hover-to-open for all popup menus (click-only) */
+.video-js .vjs-menu-button-popup:not(.vjs-lock-showing):hover .vjs-menu,
+.video-js .vjs-quality-selector:not(.vjs-lock-showing):hover .vjs-menu,
+.video-js .vjs-subs-caps-button:not(.vjs-lock-showing):hover .vjs-menu {
+  display: none !important;
+}
+
+/* Only show menu when explicitly opened (clicked) */
+.video-js .vjs-menu-button-popup.vjs-lock-showing .vjs-menu,
+.video-js .vjs-quality-selector.vjs-lock-showing .vjs-menu,
+.video-js .vjs-subs-caps-button.vjs-lock-showing .vjs-menu {
+  display: block !important;
+}
+
 /* Captions/subtitles button - styled like other menu buttons */
 .video-js .vjs-subs-caps-button {
   margin: 0 !important;
