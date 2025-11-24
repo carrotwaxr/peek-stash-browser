@@ -437,46 +437,6 @@ section.video-container {
   font-size: 16px !important;
 }
 
-/* ============================================================================
-   PLAYLIST NAVIGATION BUTTONS - Custom styling
-   ============================================================================ */
-
-.video-js .vjs-playlist-prev {
-  width: 48px !important;
-  height: 48px !important;
-  min-width: 48px !important;
-  margin: 0 !important;
-  order: 0 !important;
-}
-
-.video-js .vjs-playlist-next {
-  width: 48px !important;
-  height: 48px !important;
-  min-width: 48px !important;
-  margin: 0 !important;
-  order: 2 !important;
-}
-
-.video-js .vjs-playlist-prev .vjs-icon-placeholder,
-.video-js .vjs-playlist-next .vjs-icon-placeholder {
-  font-size: 20px !important;
-  line-height: 1 !important;
-}
-
-/* Playlist button content - custom icons */
-.video-js .vjs-playlist-prev .vjs-icon-placeholder::before {
-  content: "‹‹" !important;
-}
-
-.video-js .vjs-playlist-next .vjs-icon-placeholder::before {
-  content: "››" !important;
-}
-
-.video-js .vjs-playlist-prev:disabled,
-.video-js .vjs-playlist-next:disabled {
-  opacity: 0.3 !important;
-  cursor: not-allowed !important;
-}
 
 /* ============================================================================
    HOVER EFFECTS - Subtle YouTube-style interactions

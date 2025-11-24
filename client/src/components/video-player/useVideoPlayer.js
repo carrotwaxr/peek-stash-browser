@@ -400,11 +400,10 @@ export function useVideoPlayer({
     // Build sources array with labels (Stash pattern)
     const sources = [];
 
-    // Always add Direct source first
+    // Always add Direct source first (let Video.js auto-detect MIME type)
     sources.push({
       src: `/api/scene/${scene.id}/stream`,
       label: "Direct",
-      type: `video/${firstFile?.format || "mp4"}`,
     });
 
     // Add transcode quality if not direct play
