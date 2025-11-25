@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import useRatingHotkeys from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
@@ -9,41 +9,13 @@ import {
   RatingSlider,
 } from "../ui/index.js";
 
-/**
- * Quality presets in descending order of resolution
- * Must match the presets defined in TranscodingManager.ts and useVideoPlayer.js
- */
-const QUALITY_PRESETS = [
-  { height: 2160, quality: "2160p", label: "2160p (4K)" },
-  { height: 1080, quality: "1080p", label: "1080p" },
-  { height: 720, quality: "720p", label: "720p" },
-  { height: 480, quality: "480p", label: "480p" },
-  { height: 360, quality: "360p", label: "360p" },
-];
-
 const PlaybackControls = () => {
-  const { scene, sceneLoading, videoLoading, quality, oCounter, dispatch } =
+  const { scene, sceneLoading, videoLoading, oCounter, dispatch } =
     useScenePlayer();
 
   // Rating and favorite state
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
-
-  // Calculate available quality options based on source resolution
-  const availableQualities = useMemo(() => {
-    const sourceHeight = scene?.files?.[0]?.height || 1080;
-    // Filter to only include qualities <= source resolution (no upscaling)
-    return QUALITY_PRESETS.filter((preset) => preset.height <= sourceHeight);
-  }, [scene?.files]);
-
-  // Get source resolution for "Direct Play" label
-  const sourceResolution = useMemo(() => {
-    const sourceHeight = scene?.files?.[0]?.height;
-    if (sourceHeight) {
-      return `${sourceHeight}p`;
-    }
-    return "";
-  }, [scene?.files]);
 
   // Sync state when scene changes
   useEffect(() => {
@@ -106,39 +78,13 @@ const PlaybackControls = () => {
         }}
       >
         {/* Responsive Layout:
-            - XL+: Single row (Quality >> Rating >> O Counter >> Favorite >> Add to Playlist)
-            - SM to XL: Two rows (Row 1: Rating (50%) + O Counter + Favorite, Row 2: Quality + Add to Playlist)
-            - < SM: Three rows (Row 1: O Counter + Favorite centered, Row 2: Rating (full), Row 3: Quality + Add to Playlist)
+            - XL+: Single row (Rating >> O Counter >> Favorite >> Add to Playlist)
+            - SM to XL: Two rows (Row 1: Rating (50%) + O Counter + Favorite, Row 2: Add to Playlist)
+            - < SM: Three rows (Row 1: O Counter + Favorite centered, Row 2: Rating (full), Row 3: Add to Playlist)
         */}
 
         {/* XL+ Layout: Single row */}
         <div className="hidden xl:flex xl:items-center xl:gap-4">
-          <select
-            value={quality}
-            onChange={(e) =>
-              dispatch({ type: "SET_QUALITY", payload: e.target.value })
-            }
-            disabled={isLoading}
-            className="btn text-sm"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-primary)",
-              padding: "8px 12px",
-              opacity: isLoading ? 0.6 : 1,
-              cursor: isLoading ? "not-allowed" : "pointer",
-            }}
-          >
-            <option value="direct">
-              Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
-            </option>
-            {availableQualities.map((preset) => (
-              <option key={preset.quality} value={preset.quality}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
-
           <div
             className="flex-1 max-w-md"
             style={{ opacity: isLoading ? 0.6 : 1 }}
@@ -208,34 +154,8 @@ const PlaybackControls = () => {
             </div>
           </div>
 
-          {/* Row 2: Quality + Add to Playlist */}
-          <div className="flex items-center justify-between gap-4">
-            <select
-              value={quality}
-              onChange={(e) =>
-                dispatch({ type: "SET_QUALITY", payload: e.target.value })
-              }
-              disabled={isLoading}
-              className="btn text-sm"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-                padding: "8px 12px",
-                opacity: isLoading ? 0.6 : 1,
-                cursor: isLoading ? "not-allowed" : "pointer",
-              }}
-            >
-              <option value="direct">
-                Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
-              </option>
-              {availableQualities.map((preset) => (
-                <option key={preset.quality} value={preset.quality}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-
+          {/* Row 2: Add to Playlist */}
+          <div className="flex items-center justify-end">
             <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
           </div>
         </div>
@@ -272,34 +192,8 @@ const PlaybackControls = () => {
             />
           </div>
 
-          {/* Row 3: Quality + Add to Playlist */}
-          <div className="flex items-center justify-between gap-4">
-            <select
-              value={quality}
-              onChange={(e) =>
-                dispatch({ type: "SET_QUALITY", payload: e.target.value })
-              }
-              disabled={isLoading}
-              className="btn text-sm"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border-color)",
-                color: "var(--text-primary)",
-                padding: "8px 12px",
-                opacity: isLoading ? 0.6 : 1,
-                cursor: isLoading ? "not-allowed" : "pointer",
-              }}
-            >
-              <option value="direct">
-                Direct Play{sourceResolution ? ` (${sourceResolution})` : ""}
-              </option>
-              {availableQualities.map((preset) => (
-                <option key={preset.quality} value={preset.quality}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-
+          {/* Row 3: Add to Playlist */}
+          <div className="flex items-center justify-center">
             <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
           </div>
         </div>

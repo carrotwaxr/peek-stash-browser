@@ -286,17 +286,6 @@ export function useVideoPlayer({
   ]);
 
   // ============================================================================
-  // SCENE CHANGE DETECTION (from useVideoPlayerSources)
-  // ============================================================================
-
-  useEffect(() => {
-    if (scene?.id && scene.id !== prevSceneIdRef.current) {
-      dispatch({ type: "SET_READY", payload: false });
-      prevSceneIdRef.current = scene.id;
-    }
-  }, [scene?.id, dispatch]);
-
-  // ============================================================================
   // AUTO-FALLBACK ERROR HANDLER (set up once per scene)
   // ============================================================================
 
@@ -385,6 +374,17 @@ export function useVideoPlayer({
       return;
     }
 
+    // Don't re-initialize unless scene has changed (Stash line 568)
+    if (scene.id === prevSceneIdRef.current) {
+      return;
+    }
+
+    // Mark this scene as loaded
+    prevSceneIdRef.current = scene.id;
+
+    // Set ready=false at START of scene loading (Stash line 572)
+    dispatch({ type: "SET_READY", payload: false });
+
     const isDirectPlay = quality === "direct";
     const firstFile = scene?.files?.[0];
 
@@ -453,14 +453,6 @@ export function useVideoPlayer({
       });
     }
 
-    // Set ready=true when loadstart fires
-    const handleLoadStart = () => {
-      if (!playerRef.current) return;
-      dispatch({ type: "SET_READY", payload: true });
-    };
-
-    player.one("loadstart", handleLoadStart);
-
     // Set sources using sourceSelector plugin
     // Plugin handles source switching, fallback, and playback state preservation
     sourceSelector.setSources(sources);
@@ -475,6 +467,16 @@ export function useVideoPlayer({
     if (isDirectPlay) {
       player.playbackRates([0.5, 1, 1.25, 1.5, 2]);
     }
+
+    // Load the source (Stash line 693)
+    player.load();
+    player.focus();
+
+    // Use player.ready() callback like Stash does (line 696)
+    // This ensures player is truly ready to accept commands
+    player.ready(() => {
+      dispatch({ type: "SET_READY", payload: true });
+    });
 
     dispatch({ type: "SET_INITIALIZING", payload: false });
 
@@ -493,7 +495,7 @@ export function useVideoPlayer({
   }, [quality, updateQuality]);
 
   // ============================================================================
-  // AUTOPLAY AND RESUME (from useVideoPlayerSources)
+  // AUTOPLAY AND RESUME (Stash pattern - simple and clean)
   // ============================================================================
 
   useEffect(() => {
@@ -504,16 +506,16 @@ export function useVideoPlayer({
     const shouldResume = location.state?.shouldResume;
     const resumeTime = initialResumeTimeRef.current;
 
-    // Priority: Resume > Autoplay
+    // Handle resume playback before starting
     if (shouldResume && !hasResumedRef.current && resumeTime > 0) {
       hasResumedRef.current = true;
       player.currentTime(resumeTime);
-      player.play().catch((err) => console.error("Resume failed:", err));
-    } else {
-      player.play().catch((err) => console.error("Autoplay failed:", err));
     }
 
-    // Clear shouldAutoplay flag after triggering
+    // Just play - like Stash does
+    player.play();
+
+    // Clear autoplay flag
     dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: false });
   }, [
     ready,
