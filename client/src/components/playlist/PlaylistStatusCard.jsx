@@ -9,6 +9,7 @@ import {
   Shuffle,
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem.js";
 import { Button } from "../ui/index.js";
 
 /**
@@ -20,39 +21,45 @@ const PlaylistStatusCard = () => {
     playlist,
     currentIndex,
     gotoSceneIndex,
+    nextScene,
+    prevScene,
+    dispatch,
     toggleAutoplayNext,
     toggleShuffle,
     toggleRepeat,
   } = useScenePlayer();
-  const currentThumbnailRef = useRef(null);
-  const desktopScrollRef = useRef(null);
-  const mobileScrollRef = useRef(null);
+
+  // Auto-scroll to current thumbnail for both md (tablet) and mobile layouts
+  // This component is visible from sm to lg breakpoints (lg:hidden wrapper in Scene.jsx)
+  // containerRef = callback ref for JSX, containerElRef = regular ref for reading .current
+  const {
+    containerRef: mdScrollRef,
+    containerElRef: mdScrollElRef,
+    setCurrentItemRef: setMdCurrentRef,
+  } = useScrollToCurrentItem(currentIndex, { direction: "horizontal", delay: 150 });
+
+  const {
+    containerRef: smScrollRef,
+    containerElRef: smScrollElRef,
+    setCurrentItemRef: setSmCurrentRef,
+  } = useScrollToCurrentItem(currentIndex, { direction: "horizontal", delay: 150 });
+
+  // Drag-to-scroll state
   const isDragging = useRef(false);
   const startX = useRef(0);
-  const scrollLeft = useRef(0);
-  const scrollContainer = useRef(null); // Which container is being dragged
+  const scrollLeftPos = useRef(0);
+  const scrollContainer = useRef(null);
   const hasDragged = useRef(false);
 
-  // Scroll current thumbnail into view when currentIndex changes
-  useEffect(() => {
-    if (currentThumbnailRef.current) {
-      currentThumbnailRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
-    }
-  }, [currentIndex]);
-
-  // Add/remove document-level listeners for mouse events
+  // Add/remove document-level listeners for mouse events (drag-to-scroll)
   useEffect(() => {
     const handleMouseDown = (e) => {
-      // Check which container (if any) contains the mouse target
+      // Check if mouse is in either scroll container (use ElRef for reading .current)
       let activeContainer = null;
-      if (desktopScrollRef.current?.contains(e.target)) {
-        activeContainer = desktopScrollRef.current;
-      } else if (mobileScrollRef.current?.contains(e.target)) {
-        activeContainer = mobileScrollRef.current;
+      if (mdScrollElRef.current?.contains(e.target)) {
+        activeContainer = mdScrollElRef.current;
+      } else if (smScrollElRef.current?.contains(e.target)) {
+        activeContainer = smScrollElRef.current;
       }
 
       if (!activeContainer) return;
@@ -66,7 +73,7 @@ const PlaylistStatusCard = () => {
       hasDragged.current = false;
       scrollContainer.current = activeContainer;
       startX.current = e.clientX;
-      scrollLeft.current = activeContainer.scrollLeft;
+      scrollLeftPos.current = activeContainer.scrollLeft;
 
       activeContainer.style.cursor = "grabbing";
       activeContainer.style.userSelect = "none";
@@ -85,7 +92,7 @@ const PlaylistStatusCard = () => {
         hasDragged.current = true;
       }
 
-      scrollContainer.current.scrollLeft = scrollLeft.current + walk;
+      scrollContainer.current.scrollLeft = scrollLeftPos.current + walk;
     };
 
     const handleMouseUp = () => {
@@ -109,7 +116,7 @@ const PlaylistStatusCard = () => {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, []);
+  }, [mdScrollElRef, smScrollElRef]);
 
   if (!playlist || !playlist.scenes || playlist.scenes.length === 0) {
     return null;
@@ -156,16 +163,27 @@ const PlaylistStatusCard = () => {
     gotoSceneIndex(index, isPlaying);
   };
 
-  const handlePrevious = () => {
-    if (hasPrevious) {
-      navigateToScene(currentIndex - 1);
+  // Check if video is currently playing (for autoplay on navigation)
+  const isVideoPlaying = () => {
+    const videoElements = document.querySelectorAll("video");
+    for (const video of videoElements) {
+      if (!video.paused && !video.ended && video.readyState > 2) {
+        return true;
+      }
     }
+    return false;
+  };
+
+  const handlePrevious = () => {
+    const shouldAutoplay = isVideoPlaying();
+    dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: shouldAutoplay });
+    prevScene();
   };
 
   const handleNext = () => {
-    if (hasNext) {
-      navigateToScene(currentIndex + 1);
-    }
+    const shouldAutoplay = isVideoPlaying();
+    dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: shouldAutoplay });
+    nextScene();
   };
 
   const goToPlaylist = () => {
@@ -494,7 +512,7 @@ const PlaylistStatusCard = () => {
 
             {/* Thumbnail Strip */}
             <div
-              ref={desktopScrollRef}
+              ref={mdScrollRef}
               className="flex gap-2 overflow-x-auto flex-1 scroll-smooth playlist-thumbnail-scroll"
               style={{ cursor: "grab" }}
             >
@@ -505,7 +523,7 @@ const PlaylistStatusCard = () => {
                 return (
                   <Button
                     key={item.sceneId}
-                    ref={isCurrent ? currentThumbnailRef : null}
+                    ref={isCurrent ? setMdCurrentRef : null}
                     onClick={() => navigateToScene(index)}
                     variant="tertiary"
                     className="flex-shrink-0 overflow-hidden !p-0"
@@ -552,7 +570,7 @@ const PlaylistStatusCard = () => {
 
           {/* Mobile: Thumbnail strip only (buttons above) */}
           <div
-            ref={mobileScrollRef}
+            ref={smScrollRef}
             className="md:hidden overflow-x-auto scroll-smooth playlist-thumbnail-scroll"
             style={{ cursor: "grab" }}
           >
@@ -564,7 +582,7 @@ const PlaylistStatusCard = () => {
                 return (
                   <Button
                     key={item.sceneId}
-                    ref={isCurrent ? currentThumbnailRef : null}
+                    ref={isCurrent ? setSmCurrentRef : null}
                     onClick={() => navigateToScene(index)}
                     variant="tertiary"
                     className="flex-shrink-0 overflow-hidden !p-0"
