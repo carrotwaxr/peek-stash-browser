@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
 
 // ============================================================================
@@ -23,11 +24,16 @@ export const proxyStashStream = async (req: Request, res: Response) => {
     // Parse query string from original request
     const queryString = req.url.split('?')[1] || '';
 
-    // Build Stash URL
-    const stashBaseUrl = process.env.STASH_URL?.replace('/graphql', '');
-    if (!stashBaseUrl) {
-      logger.error("[PROXY] STASH_URL not configured");
-      return res.status(500).send("Stash URL not configured");
+    // Get Stash instance configuration
+    let stashBaseUrl: string;
+    let apiKey: string;
+
+    try {
+      stashBaseUrl = stashInstanceManager.getBaseUrl();
+      apiKey = stashInstanceManager.getApiKey();
+    } catch {
+      logger.error("[PROXY] No Stash instance configured");
+      return res.status(500).send("Stash not configured");
     }
 
     const stashUrl = `${stashBaseUrl}/scene/${sceneId}/${streamPath}${queryString ? '?' + queryString : ''}`;
@@ -37,7 +43,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
     // Forward request to Stash using fetch
     const response = await fetch(stashUrl, {
       headers: {
-        'ApiKey': process.env.STASH_API_KEY || '',
+        'ApiKey': apiKey,
         'Range': req.headers.range || '', // Forward range requests for seeking
       },
     });
@@ -127,12 +133,15 @@ export const getCaption = async (req: Request, res: Response) => {
 
     logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}`);
 
-    // Get Stash configuration
-    const stashUrl = process.env.STASH_URL?.replace('/graphql', '');
-    const apiKey = process.env.STASH_API_KEY;
+    // Get Stash instance configuration
+    let stashUrl: string;
+    let apiKey: string;
 
-    if (!stashUrl || !apiKey) {
-      logger.error("[CAPTION] Stash configuration missing");
+    try {
+      stashUrl = stashInstanceManager.getBaseUrl();
+      apiKey = stashInstanceManager.getApiKey();
+    } catch {
+      logger.error("[CAPTION] No Stash instance configured");
       return res.status(500).send("Stash configuration missing");
     }
 

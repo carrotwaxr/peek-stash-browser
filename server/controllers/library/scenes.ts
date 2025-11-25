@@ -2,8 +2,8 @@ import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
-import getStash from "../../stash.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { logger } from "../../utils/logger.js";
@@ -1010,7 +1010,7 @@ export const updateScene = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.id;
     const updateData = req.body;
 
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     const updatedScene = await stash.sceneUpdate({
       input: {
         id,

@@ -1,5 +1,5 @@
 import { stashCacheManager } from "../services/StashCacheManager.js";
-import getStash from "../stash.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -11,8 +11,8 @@ const testStashConnectivity = async (): Promise<void> => {
   try {
     logger.info("Running connectivity test to Stash server...");
 
-    // Get Stash instance (this validates env vars)
-    const stash = getStash();
+    // Get Stash instance from the manager
+    const stash = stashInstanceManager.getDefault();
 
     // Try a minimal GraphQL query (configuration is lightweight and doesn't require scanning)
     logger.info("Executing test query to Stash GraphQL endpoint...");
@@ -45,14 +45,14 @@ const testStashConnectivity = async (): Promise<void> => {
       if (errorMessage.includes("econnrefused")) {
         logger.error("Connection refused - Stash server is not reachable");
         logger.error("  → Verify Stash is running");
-        logger.error("  → Check STASH_URL environment variable");
-        logger.error("  → Test: curl -v " + process.env.STASH_URL);
+        logger.error("  → Check Stash instance URL in Server Settings");
+        logger.error("  → Test connectivity to Stash server");
       } else if (
         errorMessage.includes("enotfound") ||
         errorMessage.includes("getaddrinfo")
       ) {
         logger.error("DNS resolution failed - hostname not found");
-        logger.error("  → Check STASH_URL hostname is correct");
+        logger.error("  → Check Stash hostname in Server Settings");
         logger.error("  → Verify network/DNS configuration");
       } else if (errorMessage.includes("etimedout")) {
         logger.error("Connection timed out");
@@ -74,7 +74,7 @@ const testStashConnectivity = async (): Promise<void> => {
         errorMessage.includes("unauthorized")
       ) {
         logger.error("Authentication failed");
-        logger.error("  → Verify STASH_API_KEY is correct");
+        logger.error("  → Verify Stash API key is correct in Server Settings");
         logger.error("  → Check Stash Settings > Security > API Key");
       } else if (
         errorMessage.includes("403") ||
@@ -84,7 +84,7 @@ const testStashConnectivity = async (): Promise<void> => {
         logger.error("  → API key may not have required permissions");
       } else if (errorMessage.includes("404")) {
         logger.error("Endpoint not found");
-        logger.error("  → Verify STASH_URL includes /graphql endpoint");
+        logger.error("  → Verify Stash URL includes /graphql endpoint");
         logger.error("  → Example: http://stash:9999/graphql");
       } else {
         logger.error("Unexpected error during connectivity test");

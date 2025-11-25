@@ -3,6 +3,385 @@ import { setupApi } from "../../services/api.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { Button } from "../ui/index.js";
 
+// Step 1: Welcome screen - defined outside to avoid recreation on re-render
+const WelcomeStep = ({ theme, onNext }) => (
+  <div className="space-y-6">
+    <div className="text-center">
+      <h2
+        className="text-3xl font-bold mb-4"
+        style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+      >
+        Welcome to Peek Stash Browser
+      </h2>
+      <p
+        className="text-lg mb-6"
+        style={{
+          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+        }}
+      >
+        Let's get your system configured
+      </p>
+    </div>
+
+    <div
+      className="p-6 rounded-lg space-y-4"
+      style={{
+        backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+        borderColor: theme?.properties?.["--border-color"] || "#404040",
+      }}
+    >
+      <h3
+        className="text-xl font-semibold mb-3"
+        style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+      >
+        What we'll do:
+      </h3>
+      <ul
+        className="space-y-2 list-disc list-inside"
+        style={{
+          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+        }}
+      >
+        <li>Create an admin account to manage Peek</li>
+        <li>Complete setup and start browsing your Stash library</li>
+      </ul>
+
+      <div
+        className="mt-6 p-4 rounded border-l-4"
+        style={{
+          backgroundColor: theme?.properties?.["--bg-secondary"] || "#0a0a0a",
+          borderColor: theme?.properties?.["--accent-color"] || "#3b82f6",
+        }}
+      >
+        <p
+          className="text-sm font-semibold mb-2"
+          style={{
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+        >
+          Before you begin:
+        </p>
+        <p
+          className="text-sm"
+          style={{
+            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+          }}
+        >
+          Make sure your Stash server is running and accessible. Peek connects
+          to Stash via the STASH_URL and STASH_API_KEY environment variables.
+        </p>
+      </div>
+    </div>
+
+    <Button onClick={onNext} variant="primary" fullWidth size="lg">
+      Get Started
+    </Button>
+  </div>
+);
+
+// Step 2: Create Admin Account - defined outside to avoid recreation on re-render
+const AdminPasswordStep = ({
+  theme,
+  error,
+  loading,
+  adminPassword,
+  confirmPassword,
+  onAdminPasswordChange,
+  onConfirmPasswordChange,
+  onBack,
+  onSubmit,
+}) => (
+  <div className="space-y-6">
+    <div>
+      <h2
+        className="text-2xl font-bold mb-2"
+        style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+      >
+        Create Admin Account
+      </h2>
+      <p
+        style={{
+          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+        }}
+      >
+        Set a secure password for the admin account
+      </p>
+    </div>
+
+    {error && (
+      <div
+        className="p-4 rounded border-l-4"
+        style={{
+          backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+          borderColor: "#ef4444",
+        }}
+      >
+        <p style={{ color: "#ef4444" }}>{error}</p>
+      </div>
+    )}
+
+    <div className="space-y-4">
+      <div>
+        <label
+          className="block text-sm font-semibold mb-1"
+          style={{
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+        >
+          Username
+        </label>
+        <input
+          type="text"
+          value="admin"
+          disabled
+          className="w-full px-3 py-2 rounded opacity-60"
+          style={{
+            backgroundColor: theme?.properties?.["--bg-secondary"] || "#0a0a0a",
+            borderColor: theme?.properties?.["--border-color"] || "#404040",
+            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+          }}
+        />
+      </div>
+
+      <div>
+        <label
+          className="block text-sm font-semibold mb-1"
+          style={{
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+        >
+          Password
+        </label>
+        <input
+          type="password"
+          value={adminPassword}
+          onChange={onAdminPasswordChange}
+          className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+          style={{
+            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+            borderColor: theme?.properties?.["--border-color"] || "#404040",
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+          placeholder="Enter password"
+        />
+      </div>
+
+      <div>
+        <label
+          className="block text-sm font-semibold mb-1"
+          style={{
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+        >
+          Confirm Password
+        </label>
+        <input
+          type="password"
+          value={confirmPassword}
+          onChange={onConfirmPasswordChange}
+          className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+          style={{
+            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+            borderColor: theme?.properties?.["--border-color"] || "#404040",
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+          placeholder="Confirm password"
+        />
+      </div>
+    </div>
+
+    <div className="flex gap-4">
+      <Button onClick={onBack} variant="tertiary" fullWidth>
+        Back
+      </Button>
+      <Button
+        onClick={onSubmit}
+        disabled={loading || !adminPassword || !confirmPassword}
+        variant="primary"
+        fullWidth
+        size="lg"
+        loading={loading}
+      >
+        Create Admin User
+      </Button>
+    </div>
+  </div>
+);
+
+// Step 3: Stash Configuration - defined outside to avoid recreation on re-render
+const StashConfigStep = ({
+  theme,
+  error,
+  loading,
+  testing,
+  testSuccess,
+  stashUrl,
+  stashApiKey,
+  onStashUrlChange,
+  onStashApiKeyChange,
+  onTestConnection,
+  onBack,
+  onSubmit,
+}) => (
+  <div className="space-y-6">
+    <div>
+      <h2
+        className="text-2xl font-bold mb-2"
+        style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+      >
+        Connect to Stash
+      </h2>
+      <p
+        style={{
+          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+        }}
+      >
+        Enter your Stash server details to connect Peek to your library
+      </p>
+    </div>
+
+    {error && (
+      <div
+        className="p-4 rounded border-l-4"
+        style={{
+          backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+          borderColor: "#ef4444",
+        }}
+      >
+        <p style={{ color: "#ef4444" }}>{error}</p>
+      </div>
+    )}
+
+    {testSuccess && (
+      <div
+        className="p-4 rounded border-l-4"
+        style={{
+          backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+          borderColor: "#22c55e",
+        }}
+      >
+        <p style={{ color: "#22c55e" }}>Connection successful!</p>
+      </div>
+    )}
+
+    <div className="space-y-4">
+      <div>
+        <label
+          className="block text-sm font-semibold mb-1"
+          style={{
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+        >
+          Stash URL
+        </label>
+        <input
+          type="text"
+          value={stashUrl}
+          onChange={onStashUrlChange}
+          className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+          style={{
+            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+            borderColor: theme?.properties?.["--border-color"] || "#404040",
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+          placeholder="http://localhost:9999/graphql"
+        />
+        <p
+          className="text-xs mt-1"
+          style={{ color: theme?.properties?.["--text-secondary"] || "#b3b3b3" }}
+        >
+          The full URL to your Stash GraphQL endpoint (usually ends with /graphql)
+        </p>
+      </div>
+
+      <div>
+        <label
+          className="block text-sm font-semibold mb-1"
+          style={{
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+        >
+          API Key
+        </label>
+        <input
+          type="password"
+          value={stashApiKey}
+          onChange={onStashApiKeyChange}
+          className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
+          style={{
+            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
+            borderColor: theme?.properties?.["--border-color"] || "#404040",
+            color: theme?.properties?.["--text-primary"] || "#ffffff",
+          }}
+          placeholder="Your Stash API key"
+        />
+        <p
+          className="text-xs mt-1"
+          style={{ color: theme?.properties?.["--text-secondary"] || "#b3b3b3" }}
+        >
+          Found in Stash Settings → Security → API Key
+        </p>
+      </div>
+    </div>
+
+    <div className="flex gap-4">
+      <Button onClick={onBack} variant="tertiary" fullWidth>
+        Back
+      </Button>
+      <Button
+        onClick={onTestConnection}
+        disabled={testing || !stashUrl || !stashApiKey}
+        variant="secondary"
+        fullWidth
+        loading={testing}
+      >
+        Test Connection
+      </Button>
+    </div>
+
+    <Button
+      onClick={onSubmit}
+      disabled={loading || !testSuccess}
+      variant="primary"
+      fullWidth
+      size="lg"
+      loading={loading}
+    >
+      Save & Continue
+    </Button>
+  </div>
+);
+
+// Step 4: Complete - defined outside to avoid recreation on re-render
+const CompleteStep = ({ theme, onComplete }) => (
+  <div className="space-y-6 text-center">
+    <div
+      className="text-6xl mb-4"
+      style={{ color: theme?.properties?.["--accent-color"] || "#3b82f6" }}
+    >
+      ✓
+    </div>
+    <h2
+      className="text-3xl font-bold mb-4"
+      style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+    >
+      Setup Complete!
+    </h2>
+    <p
+      className="text-lg"
+      style={{
+        color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+      }}
+    >
+      Your Peek Stash Browser is now configured and ready to use
+    </p>
+
+    <Button onClick={onComplete} variant="primary" fullWidth size="lg">
+      Go to Login
+    </Button>
+  </div>
+);
+
 const SetupWizard = ({ onSetupComplete }) => {
   const { theme } = useTheme();
   const [currentStep, setCurrentStep] = useState(0);
@@ -13,88 +392,13 @@ const SetupWizard = ({ onSetupComplete }) => {
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const steps = ["Welcome", "Create Admin User", "Complete"];
+  // Stash configuration
+  const [stashUrl, setStashUrl] = useState("");
+  const [stashApiKey, setStashApiKey] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testSuccess, setTestSuccess] = useState(false);
 
-  // Step 1: Welcome screen
-  const WelcomeStep = () => (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2
-          className="text-3xl font-bold mb-4"
-          style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
-        >
-          Welcome to Peek Stash Browser
-        </h2>
-        <p
-          className="text-lg mb-6"
-          style={{
-            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-          }}
-        >
-          Let's get your system configured
-        </p>
-      </div>
-
-      <div
-        className="p-6 rounded-lg space-y-4"
-        style={{
-          backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-          borderColor: theme?.properties?.["--border-color"] || "#404040",
-        }}
-      >
-        <h3
-          className="text-xl font-semibold mb-3"
-          style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
-        >
-          What we'll do:
-        </h3>
-        <ul
-          className="space-y-2 list-disc list-inside"
-          style={{
-            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-          }}
-        >
-          <li>Create an admin account to manage Peek</li>
-          <li>Complete setup and start browsing your Stash library</li>
-        </ul>
-
-        <div
-          className="mt-6 p-4 rounded border-l-4"
-          style={{
-            backgroundColor: theme?.properties?.["--bg-secondary"] || "#0a0a0a",
-            borderColor: theme?.properties?.["--accent-color"] || "#3b82f6",
-          }}
-        >
-          <p
-            className="text-sm font-semibold mb-2"
-            style={{
-              color: theme?.properties?.["--text-primary"] || "#ffffff",
-            }}
-          >
-            Before you begin:
-          </p>
-          <p
-            className="text-sm"
-            style={{
-              color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-            }}
-          >
-            Make sure your Stash server is running and accessible. Peek connects
-            to Stash via the STASH_URL and STASH_API_KEY environment variables.
-          </p>
-        </div>
-      </div>
-
-      <Button
-        onClick={() => setCurrentStep(1)}
-        variant="primary"
-        fullWidth
-        size="lg"
-      >
-        Get Started
-      </Button>
-    </div>
-  );
+  const steps = ["Welcome", "Create Admin User", "Connect to Stash", "Complete"];
 
   const createAdminUser = async () => {
     if (adminPassword !== confirmPassword) {
@@ -127,166 +431,101 @@ const SetupWizard = ({ onSetupComplete }) => {
     }
   };
 
-  // Step 2: Create Admin Account
-  const AdminPasswordStep = () => (
-    <div className="space-y-6">
-      <div>
-        <h2
-          className="text-2xl font-bold mb-2"
-          style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
-        >
-          Create Admin Account
-        </h2>
-        <p
-          style={{
-            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-          }}
-        >
-          Set a secure password for the admin account
-        </p>
-      </div>
+  const testStashConnection = async () => {
+    setTesting(true);
+    setError("");
+    setTestSuccess(false);
 
-      {error && (
-        <div
-          className="p-4 rounded border-l-4"
-          style={{
-            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-            borderColor: "#ef4444",
-          }}
-        >
-          <p style={{ color: "#ef4444" }}>{error}</p>
-        </div>
-      )}
+    try {
+      const response = await setupApi.testStashConnection(stashUrl, stashApiKey);
 
-      <div className="space-y-4">
-        <div>
-          <label
-            className="block text-sm font-semibold mb-1"
-            style={{
-              color: theme?.properties?.["--text-primary"] || "#ffffff",
-            }}
-          >
-            Username
-          </label>
-          <input
-            type="text"
-            value="admin"
-            disabled
-            className="w-full px-3 py-2 rounded opacity-60"
-            style={{
-              backgroundColor:
-                theme?.properties?.["--bg-secondary"] || "#0a0a0a",
-              borderColor: theme?.properties?.["--border-color"] || "#404040",
-              color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-            }}
-          />
-        </div>
+      if (response.success) {
+        setTestSuccess(true);
+      } else {
+        setError(response.error || "Connection test failed");
+      }
+    } catch (err) {
+      setError(err.data?.error || err.message || "Connection test failed");
+    } finally {
+      setTesting(false);
+    }
+  };
 
-        <div>
-          <label
-            className="block text-sm font-semibold mb-1"
-            style={{
-              color: theme?.properties?.["--text-primary"] || "#ffffff",
-            }}
-          >
-            Password
-          </label>
-          <input
-            type="password"
-            value={adminPassword}
-            onChange={(e) => setAdminPassword(e.target.value)}
-            className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-              borderColor: theme?.properties?.["--border-color"] || "#404040",
-              color: theme?.properties?.["--text-primary"] || "#ffffff",
-            }}
-            placeholder="Enter password"
-          />
-        </div>
+  const createStashInstance = async () => {
+    setLoading(true);
+    setError("");
 
-        <div>
-          <label
-            className="block text-sm font-semibold mb-1"
-            style={{
-              color: theme?.properties?.["--text-primary"] || "#ffffff",
-            }}
-          >
-            Confirm Password
-          </label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full px-3 py-2 rounded border focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-              borderColor: theme?.properties?.["--border-color"] || "#404040",
-              color: theme?.properties?.["--text-primary"] || "#ffffff",
-            }}
-            placeholder="Confirm password"
-          />
-        </div>
-      </div>
+    try {
+      const response = await setupApi.createFirstStashInstance(
+        stashUrl,
+        stashApiKey
+      );
 
-      <div className="flex gap-4">
-        <Button onClick={() => setCurrentStep(0)} variant="tertiary" fullWidth>
-          Back
-        </Button>
-        <Button
-          onClick={createAdminUser}
-          disabled={loading || !adminPassword || !confirmPassword}
-          variant="primary"
-          fullWidth
-          size="lg"
-          loading={loading}
-        >
-          Create Admin User
-        </Button>
-      </div>
-    </div>
-  );
-
-  // Step 3: Complete
-  const CompleteStep = () => (
-    <div className="space-y-6 text-center">
-      <div
-        className="text-6xl mb-4"
-        style={{ color: theme?.properties?.["--accent-color"] || "#3b82f6" }}
-      >
-        ✓
-      </div>
-      <h2
-        className="text-3xl font-bold mb-4"
-        style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
-      >
-        Setup Complete!
-      </h2>
-      <p
-        className="text-lg"
-        style={{
-          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-        }}
-      >
-        Your Peek Stash Browser is now configured and ready to use
-      </p>
-
-      <Button onClick={onSetupComplete} variant="primary" fullWidth size="lg">
-        Go to Login
-      </Button>
-    </div>
-  );
+      if (response.success) {
+        setCurrentStep(3);
+      } else {
+        setError(response.error || "Failed to save Stash configuration");
+      }
+    } catch (err) {
+      setError(
+        err.data?.error ||
+          err.message ||
+          "Failed to save Stash configuration"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const renderStep = () => {
     switch (currentStep) {
       case 0:
-        return <WelcomeStep />;
+        return <WelcomeStep theme={theme} onNext={() => setCurrentStep(1)} />;
       case 1:
-        return <AdminPasswordStep />;
+        return (
+          <AdminPasswordStep
+            theme={theme}
+            error={error}
+            loading={loading}
+            adminPassword={adminPassword}
+            confirmPassword={confirmPassword}
+            onAdminPasswordChange={(e) => setAdminPassword(e.target.value)}
+            onConfirmPasswordChange={(e) => setConfirmPassword(e.target.value)}
+            onBack={() => setCurrentStep(0)}
+            onSubmit={createAdminUser}
+          />
+        );
       case 2:
-        return <CompleteStep />;
+        return (
+          <StashConfigStep
+            theme={theme}
+            error={error}
+            loading={loading}
+            testing={testing}
+            testSuccess={testSuccess}
+            stashUrl={stashUrl}
+            stashApiKey={stashApiKey}
+            onStashUrlChange={(e) => {
+              setStashUrl(e.target.value);
+              setTestSuccess(false); // Reset test status when URL changes
+            }}
+            onStashApiKeyChange={(e) => {
+              setStashApiKey(e.target.value);
+              setTestSuccess(false); // Reset test status when API key changes
+            }}
+            onTestConnection={testStashConnection}
+            onBack={() => {
+              setCurrentStep(1);
+              setError("");
+              setTestSuccess(false);
+            }}
+            onSubmit={createStashInstance}
+          />
+        );
+      case 3:
+        return <CompleteStep theme={theme} onComplete={onSetupComplete} />;
       default:
-        return <WelcomeStep />;
+        return <WelcomeStep theme={theme} onNext={() => setCurrentStep(1)} />;
     }
   };
 
@@ -299,7 +538,7 @@ const SetupWizard = ({ onSetupComplete }) => {
     >
       <div className="max-w-2xl w-full">
         {/* Progress indicator */}
-        {currentStep < 2 && (
+        {currentStep < 3 && (
           <div className="mb-8">
             <div className="flex justify-between mb-2">
               {steps.map((step, index) => (

@@ -4,9 +4,9 @@ import prisma from "../../prisma/singleton.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
-import getStash from "../../stash.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -649,7 +649,7 @@ export const updateStudio = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     const updatedStudio = await stash.studioUpdate({
       input: {
         id,

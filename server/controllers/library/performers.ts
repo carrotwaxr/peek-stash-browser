@@ -4,9 +4,9 @@ import prisma from "../../prisma/singleton.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
-import getStash from "../../stash.js";
 import type {
   NormalizedPerformer,
   PeekPerformerFilter,
@@ -709,7 +709,7 @@ export const updatePerformer = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     const updatedPerformer = await stash.performerUpdate({
       input: {
         id,

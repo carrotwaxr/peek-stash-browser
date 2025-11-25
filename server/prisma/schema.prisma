@@ -350,3 +350,16 @@ model DataMigration {
     name        String   @unique  // Migration identifier (e.g., "001_rebuild_user_stats")
     appliedAt   DateTime @default(now())
 }
+
+// Stash server instance configuration
+// Supports multiple Stash servers (multi-instance support in future commit)
+model StashInstance {
+    id        String   @id @default(uuid()) // Immutable UUID, used in all references
+    name      String   @default("Default")  // Display name only, can be renamed freely
+    url       String                        // GraphQL endpoint (e.g., http://stash:9999/graphql)
+    apiKey    String                        // API key for authentication
+    enabled   Boolean  @default(true)       // Can disable without deleting
+    priority  Int      @default(0)          // For ordering (lower = higher priority)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
