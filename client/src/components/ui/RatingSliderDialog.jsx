@@ -82,7 +82,7 @@ const RatingSliderDialog = ({
     }
   }, [isOpen, anchorEl]);
 
-  // Click outside to close
+  // Click outside or scroll to close
   useEffect(() => {
     if (!isOpen) return;
 
@@ -96,13 +96,21 @@ const RatingSliderDialog = ({
       }
     };
 
+    const handleScroll = () => {
+      onClose();
+    };
+
     // Slight delay to avoid immediate close from the opening click
     setTimeout(() => {
       document.addEventListener("mousedown", handleClickOutside);
     }, 10);
 
+    // Close on any scroll event (capture phase to catch all scroll events)
+    window.addEventListener("scroll", handleScroll, true);
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll, true);
     };
   }, [isOpen, onClose, anchorEl]);
 
