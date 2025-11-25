@@ -10,6 +10,7 @@ import {
   Shuffle,
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem.js";
 import { Button } from "../ui/index.js";
 
 /**
@@ -27,6 +28,10 @@ const PlaylistSidebar = ({ maxHeight }) => {
     toggleRepeat,
   } = useScenePlayer();
   const [isExpanded, setIsExpanded] = useState(true);
+
+  // Auto-scroll to current item when it changes
+  const { containerRef: listContainerRef, setCurrentItemRef } =
+    useScrollToCurrentItem(currentIndex, { direction: "vertical", delay: 150 });
 
   if (!playlist || !playlist.scenes || playlist.scenes.length === 0) {
     return null;
@@ -323,7 +328,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
           )}
 
           {/* Scene List */}
-          <div className="flex-1 overflow-y-auto">
+          <div ref={listContainerRef} className="flex-1 overflow-y-auto">
             {playlist.scenes.map((item, index) => {
               const scene = item.scene;
               const isCurrent = index === currentIndex;
@@ -331,6 +336,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
               return (
                 <div
                   key={item.sceneId}
+                  ref={isCurrent ? setCurrentItemRef : null}
                   onClick={() => navigateToScene(index)}
                   className="group cursor-pointer p-3 border-b transition-colors hover:bg-opacity-80"
                   style={{
