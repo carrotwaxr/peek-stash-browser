@@ -1,30 +1,12 @@
 import { Request, Response } from "express";
 import { promises as fs } from "fs";
 import os from "os";
-import path from "path";
 import { stashCacheManager } from "../services/StashCacheManager.js";
-import { transcodingManager } from "../services/TranscodingManager.js";
 import { logger } from "../utils/logger.js";
 
 /**
- * Transcoding session information from TranscodingManager.getStats()
- */
-interface TranscodingSessionInfo {
-  sessionId: string;
-  sceneId: string;
-  quality: string;
-  status?: string;
-  startTime: string;
-  lastAccess?: string;
-  currentSegment?: number;
-  totalSegments?: number;
-  completedSegments?: number;
-  ffmpegProcess?: { pid?: number; killed?: boolean } | null;
-}
-
-/**
  * Get comprehensive server statistics
- * Includes system metrics, cache stats, transcoding info, and database size
+ * Includes system metrics, cache stats, and database size
  */
 export const getStats = async (req: Request, res: Response) => {
   try {
@@ -45,21 +27,6 @@ export const getStats = async (req: Request, res: Response) => {
       };
     }
 
-    // Get transcoding stats with fallback
-    let transcodingStats;
-    try {
-      transcodingStats = transcodingManager.getStats();
-    } catch (err) {
-      logger.warn("Could not get transcoding stats", {
-        error: (err as Error).message,
-      });
-      transcodingStats = {
-        activeSessions: 0,
-        totalSessionsCreated: 0,
-        sessions: [],
-      };
-    }
-
     // Get database size with fallback
     const dbPath = process.env.DATABASE_URL?.replace("file:", "") || "";
     let dbSize = 0;
@@ -70,38 +37,6 @@ export const getStats = async (req: Request, res: Response) => {
       }
     } catch (err) {
       logger.debug("Could not get database size", {
-        error: (err as Error).message,
-      });
-    }
-
-    // Get transcoding cache size with fallback
-    const segmentsDir = path.join(
-      process.env.CONFIG_DIR || "/app/data",
-      "segments"
-    );
-    let transcodingCacheSize = 0;
-    let transcodingFileCount = 0;
-    try {
-      const files = await fs.readdir(segmentsDir);
-      for (const file of files) {
-        try {
-          const filePath = path.join(segmentsDir, file);
-          const stats = await fs.stat(filePath);
-          if (stats.isFile()) {
-            transcodingCacheSize += stats.size;
-            transcodingFileCount++;
-          }
-        } catch (err) {
-          // Skip individual file errors
-          logger.debug("Could not stat file", {
-            file,
-            error: (err as Error).message,
-          });
-        }
-      }
-    } catch (err) {
-      // Directory might not exist yet or not accessible
-      logger.debug("Could not read segments directory", {
         error: (err as Error).message,
       });
     }
@@ -157,39 +92,6 @@ export const getStats = async (req: Request, res: Response) => {
         sizeBytes: dbSize,
         path: dbPath,
       },
-
-      // Transcoding
-      transcoding: {
-        activeSessions: transcodingStats.activeSessions || 0,
-        totalSessions: transcodingStats.totalSessionsCreated || 0,
-        cacheSize: formatBytes(transcodingCacheSize),
-        cacheSizeBytes: transcodingCacheSize,
-        cacheFileCount: transcodingFileCount,
-        sessions: (transcodingStats.sessions || [])
-          .map((session: TranscodingSessionInfo) => {
-            try {
-              return {
-                sessionId: session.sessionId || "unknown",
-                sceneId: session.sceneId || "unknown",
-                quality: session.quality || "unknown",
-                startTime: session.startTime || new Date().toISOString(),
-                currentSegment: session.currentSegment || 0,
-                age: session.startTime
-                  ? formatDuration(
-                      Date.now() - new Date(session.startTime).getTime()
-                    )
-                  : "0s",
-                isActive: session.ffmpegProcess ? true : false,
-              };
-            } catch (err) {
-              logger.warn("Error processing session", {
-                error: (err as Error).message,
-              });
-              return null;
-            }
-          })
-          .filter(Boolean), // Remove any null entries from failed session processing
-      },
     };
 
     res.json(stats);
@@ -232,14 +134,6 @@ export const getStats = async (req: Request, res: Response) => {
         estimatedSize: "0 MB",
       },
       database: { size: "0 B", sizeBytes: 0, path: "" },
-      transcoding: {
-        activeSessions: 0,
-        totalSessions: 0,
-        cacheSize: "0 B",
-        cacheSizeBytes: 0,
-        cacheFileCount: 0,
-        sessions: [],
-      },
     });
   }
 };
@@ -271,14 +165,6 @@ function formatUptime(seconds: number): string {
   if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
 
   return parts.join(" ");
-}
-
-/**
- * Format duration (milliseconds) to human-readable format
- */
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  return formatUptime(seconds);
 }
 
 /**

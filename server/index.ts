@@ -9,7 +9,6 @@ import { validateStartup } from "./initializers/validate.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashCacheManager } from "./services/StashCacheManager.js";
 import { logger } from "./utils/logger.js";
-import { pathMapper } from "./utils/pathMapping.js";
 
 const prisma = new PrismaClient();
 
@@ -34,9 +33,6 @@ const main = async () => {
 
   // Run database migrations and seeding
   await initializeDatabase();
-
-  // Initialize path mapper (loads from database or migrates from env vars)
-  await pathMapper.initialize();
 
   setupAPI();
 
