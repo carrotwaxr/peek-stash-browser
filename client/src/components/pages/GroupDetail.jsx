@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
@@ -8,10 +8,12 @@ import { formatDuration } from "../../utils/format.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
+  EntityGrid,
   FavoriteButton,
   LoadingSpinner,
   PageHeader,
   RatingSlider,
+  TabNavigation,
 } from "../ui/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
@@ -19,10 +21,14 @@ const GroupDetail = () => {
   const { groupId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [group, setGroup] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Get active tab from URL or default to 'scenes'
+  const activeTab = searchParams.get('tab') || 'scenes';
 
   // Set page title to group name
   usePageTitle(group?.name || "Collection");
@@ -160,22 +166,48 @@ const GroupDetail = () => {
           <GroupDetails group={group} />
         </div>
 
-        {/* Scenes Section */}
+        {/* Tabbed Content Section */}
         <div className="mt-8">
-          <SceneSearch
-            context="scene_group"
-            initialSort="scene_index"
-            permanentFilters={{
-              groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" },
-            }}
-            permanentFiltersMetadata={{
-              groups: [
-                { id: groupId, name: group?.name || "Unknown Collection" },
-              ],
-            }}
-            title={`Scenes in ${group?.name || "this collection"}`}
-            captureReferrer={false}
+          <TabNavigation
+            tabs={[
+              { id: 'scenes', label: 'Scenes', count: group?.scene_count || 0 },
+              { id: 'performers', label: 'Performers', count: group?.performer_count || 0 },
+            ]}
+            defaultTab="scenes"
           />
+
+          {/* Tab Content */}
+          {activeTab === 'scenes' && (
+            <SceneSearch
+              context="scene_group"
+              initialSort="scene_index"
+              permanentFilters={{
+                groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" },
+              }}
+              permanentFiltersMetadata={{
+                groups: [
+                  { id: groupId, name: group?.name || "Unknown Collection" },
+                ],
+              }}
+              title={`Scenes in ${group?.name || "this collection"}`}
+              captureReferrer={false}
+            />
+          )}
+
+          {activeTab === 'performers' && (
+            <EntityGrid
+              entityType="performer"
+              filters={{
+                performer_filter: {
+                  groups: {
+                    value: [parseInt(groupId, 10)],
+                    modifier: "INCLUDES",
+                  },
+                },
+              }}
+              emptyMessage={`No performers found in "${group?.name}"`}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -309,14 +341,46 @@ const GroupImageFlipper = ({ group }) => {
 
 // Group Stats Component
 const GroupStats = ({ group }) => {
-  const StatField = ({ label, value, valueColor = "var(--text-primary)" }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'scenes';
+
+  const handleTabSwitch = (tabId) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (tabId === 'scenes') {
+      newParams.delete('tab');
+    } else {
+      newParams.set('tab', tabId);
+    }
+    setSearchParams(newParams);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  };
+
+  const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, isActive }) => {
     if (!value && value !== 0) return null;
+
+    const clickable = onClick && value > 0;
+
     return (
       <div className="flex justify-between">
         <span style={{ color: "var(--text-secondary)" }}>{label}</span>
-        <span className="font-medium" style={{ color: valueColor }}>
-          {value}
-        </span>
+        {clickable ? (
+          <button
+            onClick={onClick}
+            disabled={isActive}
+            className="font-medium transition-opacity hover:opacity-70 disabled:cursor-default disabled:opacity-100"
+            style={{
+              color: valueColor,
+              cursor: isActive ? 'default' : 'pointer',
+              textDecoration: isActive ? 'underline' : 'none',
+            }}
+          >
+            {value}
+          </button>
+        ) : (
+          <span className="font-medium" style={{ color: valueColor }}>
+            {value}
+          </span>
+        )}
       </div>
     );
   };
@@ -328,11 +392,15 @@ const GroupStats = ({ group }) => {
           label="Scenes:"
           value={group?.scene_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('scenes')}
+          isActive={activeTab === 'scenes'}
         />
         <StatField
           label="Performers:"
           value={group?.performer_count}
           valueColor="var(--accent-primary)"
+          onClick={() => handleTabSwitch('performers')}
+          isActive={activeTab === 'performers'}
         />
         <StatField
           label="Duration:"
