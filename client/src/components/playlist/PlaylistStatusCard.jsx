@@ -24,7 +24,8 @@ const PlaylistStatusCard = () => {
     toggleShuffle,
     toggleRepeat,
   } = useScenePlayer();
-  const currentThumbnailRef = useRef(null);
+  const desktopCurrentRef = useRef(null);
+  const mobileCurrentRef = useRef(null);
   const desktopScrollRef = useRef(null);
   const mobileScrollRef = useRef(null);
   const isDragging = useRef(false);
@@ -35,13 +36,24 @@ const PlaylistStatusCard = () => {
 
   // Scroll current thumbnail into view when currentIndex changes
   useEffect(() => {
-    if (currentThumbnailRef.current) {
-      currentThumbnailRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
-    }
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      // Scroll both desktop and mobile refs (only the visible one will have effect)
+      if (desktopCurrentRef.current) {
+        desktopCurrentRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+      }
+      if (mobileCurrentRef.current) {
+        mobileCurrentRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+      }
+    });
   }, [currentIndex]);
 
   // Add/remove document-level listeners for mouse events
@@ -505,7 +517,7 @@ const PlaylistStatusCard = () => {
                 return (
                   <Button
                     key={item.sceneId}
-                    ref={isCurrent ? currentThumbnailRef : null}
+                    ref={isCurrent ? desktopCurrentRef : null}
                     onClick={() => navigateToScene(index)}
                     variant="tertiary"
                     className="flex-shrink-0 overflow-hidden !p-0"
@@ -564,7 +576,7 @@ const PlaylistStatusCard = () => {
                 return (
                   <Button
                     key={item.sceneId}
-                    ref={isCurrent ? currentThumbnailRef : null}
+                    ref={isCurrent ? mobileCurrentRef : null}
                     onClick={() => navigateToScene(index)}
                     variant="tertiary"
                     className="flex-shrink-0 overflow-hidden !p-0"
