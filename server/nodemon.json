@@ -1,6 +1,24 @@
 {
-  "watch": ["./**/*.ts", "../.env"],
-  "ignore": ["data/**", "node_modules/**", "dist/**"],
+  "watch": [
+    "index.ts",
+    "api.ts",
+    "stash.ts",
+    "controllers",
+    "services",
+    "routes",
+    "middleware",
+    "utils",
+    "initializers",
+    "types",
+    "../.env"
+  ],
+  "ignore": [
+    "node_modules/**",
+    "dist/**",
+    "data/**",
+    "**/*.test.ts",
+    "prisma/migrations/**"
+  ],
   "ext": "ts",
   "exec": "node --loader ts-node/esm index.ts",
   "legacyWatch": true

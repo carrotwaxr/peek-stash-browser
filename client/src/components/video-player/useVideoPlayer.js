@@ -3,14 +3,19 @@ import airplay from "@silvermine/videojs-airplay";
 import "@silvermine/videojs-airplay/dist/silvermine-videojs-airplay.css";
 import chromecast from "@silvermine/videojs-chromecast";
 import "@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css";
+import "videojs-seek-buttons";
+import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import axios from "axios";
 import videojs from "video.js";
-import {
-  setupPlaylistControls,
-  setupSubtitles,
-  togglePlaybackRateControl,
-} from "./videoPlayerUtils.js";
+import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
+import "./plugins/big-buttons.js";
+import "./plugins/markers.js";
+import "./plugins/persist-volume.js";
+import "./plugins/skip-buttons.js";
+import "./plugins/source-selector.js";
+import "./plugins/track-activity.js";
+import "./plugins/vrmode.js";
 
 // Register Video.js plugins
 airplay(videojs);
@@ -76,8 +81,6 @@ export function useVideoPlayer({
   videoRef,
   playerRef,
   scene,
-  video,
-  sessionId,
   quality,
   isAutoFallback,
   ready,
@@ -118,18 +121,24 @@ export function useVideoPlayer({
     // Append to container before initialization
     container.appendChild(videoElement);
 
-    // Initialize Video.js
+    // Initialize Video.js (matching Stash configuration)
     const player = videojs(videoElement, {
       autoplay: false,
       controls: true,
       controlBar: {
         pictureInPictureToggle: false,
+        volumePanel: {
+          inline: false, // Popup menu like Stash/YouTube
+        },
+        chaptersButton: false,
       },
       responsive: true,
       fluid: true,
       preload: "none",
       liveui: false,
       playsinline: true,
+      playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+      inactivityTimeout: 2000,
       techOrder: enableCast ? ["chromecast", "html5"] : ["html5"],
       html5: {
         vhs: {
@@ -146,35 +155,28 @@ export function useVideoPlayer({
       plugins: {
         ...(enableCast && { airPlay: {} }),
         ...(enableCast && { chromecast: {} }),
-        qualityLevels: {},
         vttThumbnails: {
           showTimestamp: true,
           spriteUrl: scene?.paths?.sprite || null,
         },
+        markers: {},
+        sourceSelector: {},
+        persistVolume: {},
+        bigButtons: {},
+        seekButtons: {
+          forward: 10,
+          back: 10,
+        },
+        skipButtons: {},
+        trackActivity: {},
+        vrMenu: {},
       },
     });
 
     playerRef.current = player;
     player.focus();
 
-    player.ready(() => {
-      // Restore volume and mute state from localStorage
-      const savedVolume = localStorage.getItem("videoPlayerVolume");
-      const savedMuted = localStorage.getItem("videoPlayerMuted");
-
-      if (savedVolume !== null) {
-        player.volume(parseFloat(savedVolume));
-      }
-      if (savedMuted !== null) {
-        player.muted(savedMuted === "true");
-      }
-
-      // Save volume changes to localStorage
-      player.on("volumechange", () => {
-        localStorage.setItem("videoPlayerVolume", player.volume().toString());
-        localStorage.setItem("videoPlayerMuted", player.muted().toString());
-      });
-    });
+    // Volume persistence is now handled by persistVolume plugin
 
     // Cleanup
     return () => {
@@ -208,6 +210,32 @@ export function useVideoPlayer({
       vttPlugin.src(scene.paths.vtt, scene.paths.sprite);
     }
   }, [scene?.paths?.vtt, scene?.paths?.sprite, playerRef]);
+
+  // ============================================================================
+  // TRACK ACTIVITY PLUGIN (Stash pattern - integrates with watch history)
+  // ============================================================================
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !scene?.id) return;
+
+    const trackActivityPlugin = player.trackActivity();
+    if (!trackActivityPlugin) return;
+
+    // Enable tracking
+    trackActivityPlugin.setEnabled(true);
+    trackActivityPlugin.minimumPlayPercent = 10; // Match Stash's 10% threshold
+
+    // The plugin tracks playback internally and calls these callbacks
+    // It coordinates with the existing useWatchHistory hook's ping system
+    // incrementPlayCount is called once per session when threshold is reached
+    // saveActivity is called periodically (every 10s) during playback
+
+    return () => {
+      trackActivityPlugin.setEnabled(false);
+      trackActivityPlugin.reset();
+    };
+  }, [scene?.id, playerRef]);
 
   // ============================================================================
   // ASPECT RATIO UPDATES (fix layout when switching scenes)
@@ -256,17 +284,6 @@ export function useVideoPlayer({
     initialResumeTimeRef,
     dispatch,
   ]);
-
-  // ============================================================================
-  // SCENE CHANGE DETECTION (from useVideoPlayerSources)
-  // ============================================================================
-
-  useEffect(() => {
-    if (scene?.id && scene.id !== prevSceneIdRef.current) {
-      dispatch({ type: "SET_READY", payload: false });
-      prevSceneIdRef.current = scene.id;
-    }
-  }, [scene?.id, dispatch]);
 
   // ============================================================================
   // AUTO-FALLBACK ERROR HANDLER (set up once per scene)
@@ -346,16 +363,27 @@ export function useVideoPlayer({
   }, [scene?.id, dispatch]); // Only re-run when scene changes
 
   // ============================================================================
-  // VIDEO SOURCES LOADING
+  // VIDEO SOURCES LOADING (using sourceSelector plugin - Stash pattern)
   // ============================================================================
 
   useEffect(() => {
     const player = playerRef.current;
 
-    // Guard: Need player and scene (video/sessionId no longer needed for stateless)
+    // Guard: Need player and scene
     if (!player || !scene) {
       return;
     }
+
+    // Don't re-initialize unless scene has changed (Stash line 568)
+    if (scene.id === prevSceneIdRef.current) {
+      return;
+    }
+
+    // Mark this scene as loaded
+    prevSceneIdRef.current = scene.id;
+
+    // Set ready=false at START of scene loading (Stash line 572)
+    dispatch({ type: "SET_READY", payload: false });
 
     const isDirectPlay = quality === "direct";
     const firstFile = scene?.files?.[0];
@@ -366,87 +394,72 @@ export function useVideoPlayer({
       player.poster(posterUrl);
     }
 
-    // Build sources with duration
-    const duration = firstFile?.duration;
+    // Get sourceSelector plugin
+    const sourceSelector = player.sourceSelector();
 
-    const sources = isDirectPlay
-      ? [
-          {
-            src: `/api/scene/${scene.id}/stream`,  // Direct video file (no .m3u8)
-            type: `video/${firstFile?.format}`,
-            duration,
-          },
-        ]
-      : [
-          {
-            src: `/api/scene/${scene.id}/stream.m3u8?quality=${quality}`,
-            type: "application/x-mpegURL",
-            duration,
-          },
-        ];
+    // Build sources array from scene.sceneStreams (Stash pattern)
+    // sceneStreams contains ALL available stream formats from Stash:
+    // - Direct stream (original file)
+    // - HLS transcodes (various resolutions)
+    // - MP4/WEBM/DASH transcodes (if configured in Stash)
+    let sources = [];
 
-    // Check if source has changed before reloading
-    // Compare full URL path (excluding query params) to detect scene changes
-    const currentSrc = player.currentSrc();
-    const targetSrc = sources[0].src;
-    const currentPath = currentSrc ? currentSrc.split('?')[0] : '';
-    const targetPath = targetSrc.split('?')[0];
-    const needsReload = !currentSrc || currentPath !== targetPath;
+    if (scene.sceneStreams && scene.sceneStreams.length > 0) {
+      // Get video duration from first file (needed for HLS transcodes to show correct duration)
+      const duration = scene.files?.[0]?.duration || undefined;
 
-    if (needsReload) {
-      // Determine if this is a quality switch (user-initiated) vs initial load
-      // Quality switch: currentSrc exists and is different from target
-      // Initial load: no currentSrc (empty string)
-      const isQualitySwitch = currentSrc !== "";
-
-      // Preserve playback state ONLY for quality switches (like Stash does)
-      // For initial loads, let the AUTOPLAY effect handle playback
-      let wasPaused = true;
-      let savedTime = 0;
-
-      if (isQualitySwitch) {
-        wasPaused = player.paused();
-        savedTime = player.currentTime();
-      }
-
-      // Set ready=true when loadstart fires
-      const handleLoadStart = () => {
-        if (!playerRef.current) return;
-        dispatch({ type: "SET_READY", payload: true });
+      // Helper to check if stream is Direct (not transcoded)
+      const isDirect = (url) => {
+        return (
+          url.pathname.endsWith('/stream') ||
+          url.pathname.endsWith('/stream.mpd') ||
+          url.pathname.endsWith('/stream.m3u8')
+        );
       };
 
-      // Restore playback state after source loads (only for quality switches)
-      const handleCanPlay = () => {
-        if (!playerRef.current) return;
+      // Rewrite Stash URLs to use Peek's proxy
+      sources = scene.sceneStreams.map((stream) => {
+        try {
+          const url = new URL(stream.url);
 
-        if (isQualitySwitch) {
-          // Restore playback position
-          if (savedTime > 0) {
-            player.currentTime(savedTime);
-          }
+          // Extract path after /scene/{id}/
+          // e.g., "stream.m3u8" from "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD_HD"
+          const pathParts = url.pathname.split(`/scene/${scene.id}/`);
+          const streamPath = pathParts[1] || 'stream'; // "stream.m3u8" or "stream"
+          const queryString = url.search; // "?resolution=STANDARD_HD" or ""
 
-          // If video was paused before, pause it now (Stash pattern)
-          if (wasPaused) {
-            player.pause();
-          }
+          // Rewrite to Peek's proxy endpoint
+          const proxiedUrl = `/api/scene/${scene.id}/proxy-stream/${streamPath}${queryString}`;
+
+          return {
+            src: proxiedUrl,
+            type: stream.mime_type || undefined,
+            label: stream.label || undefined,
+            offset: !isDirect(url), // Transcoded streams need time offset correction
+            duration, // Total video duration (fixes HLS duration incrementing)
+          };
+        } catch (error) {
+          console.error('[VideoPlayer] Error parsing stream URL:', stream.url, error);
+          return null;
         }
-      };
+      }).filter(Boolean); // Remove any null entries from errors
+    } else {
+      console.warn('[VideoPlayer] No sceneStreams available, falling back to legacy Direct stream');
+      // Fallback: Use legacy Direct stream if sceneStreams not available
+      // This maintains backward compatibility during transition
+      sources.push({
+        src: `/api/scene/${scene.id}/stream`,
+        label: "Direct",
+      });
+    }
 
-      player.one("loadstart", handleLoadStart);
-      player.one("canplay", handleCanPlay);
-      player.src(sources);
-      player.load();
+    // Set sources using sourceSelector plugin
+    // Plugin handles source switching, fallback, and playback state preservation
+    sourceSelector.setSources(sources);
 
-      // Setup subtitles if available
-      if (scene.captions && scene.captions.length > 0) {
-        setupSubtitles(player, scene.id, scene.captions);
-      }
-
-      // Call play() immediately if video was playing (like Stash does)
-      // Only for quality switches - initial load uses AUTOPLAY effect
-      if (isQualitySwitch && !wasPaused) {
-        player.play().catch((err) => console.error("[VIDEO] Play failed:", err));
-      }
+    // Setup subtitles if available (using sourceSelector for track management)
+    if (scene.captions && scene.captions.length > 0) {
+      setupSubtitles(player, scene.id, scene.captions);
     }
 
     // Configure player
@@ -454,6 +467,16 @@ export function useVideoPlayer({
     if (isDirectPlay) {
       player.playbackRates([0.5, 1, 1.25, 1.5, 2]);
     }
+
+    // Load the source (Stash line 693)
+    player.load();
+    player.focus();
+
+    // Use player.ready() callback like Stash does (line 696)
+    // This ensures player is truly ready to accept commands
+    player.ready(() => {
+      dispatch({ type: "SET_READY", payload: true });
+    });
 
     dispatch({ type: "SET_INITIALIZING", payload: false });
 
@@ -472,7 +495,7 @@ export function useVideoPlayer({
   }, [quality, updateQuality]);
 
   // ============================================================================
-  // AUTOPLAY AND RESUME (from useVideoPlayerSources)
+  // AUTOPLAY AND RESUME (Stash pattern - simple and clean)
   // ============================================================================
 
   useEffect(() => {
@@ -483,16 +506,16 @@ export function useVideoPlayer({
     const shouldResume = location.state?.shouldResume;
     const resumeTime = initialResumeTimeRef.current;
 
-    // Priority: Resume > Autoplay
+    // Handle resume playback before starting
     if (shouldResume && !hasResumedRef.current && resumeTime > 0) {
       hasResumedRef.current = true;
       player.currentTime(resumeTime);
-      player.play().catch((err) => console.error("Resume failed:", err));
-    } else {
-      player.play().catch((err) => console.error("Autoplay failed:", err));
     }
 
-    // Clear shouldAutoplay flag after triggering
+    // Just play - like Stash does
+    player.play();
+
+    // Clear autoplay flag
     dispatch({ type: "SET_SHOULD_AUTOPLAY", payload: false });
   }, [
     ready,
@@ -615,30 +638,28 @@ export function useVideoPlayer({
     dispatch,
   ]);
 
-  // Update Video.js playlist controls when index changes
+  // Configure skipButtons plugin for playlist navigation (Stash pattern)
   useEffect(() => {
     const player = playerRef.current;
 
-    if (
-      !player ||
-      player.isDisposed?.() ||
-      !playlist ||
-      !playlist.scenes ||
-      playlist.scenes.length <= 1
-    ) {
+    if (!player || player.isDisposed?.()) {
       return;
     }
 
-    setupPlaylistControls(
-      player,
-      playlist,
-      currentIndex,
-      playPreviousInPlaylist,
-      playNextInPlaylist
-    );
+    const skipButtonsPlugin = player.skipButtons();
+
+    // Set handlers based on playlist availability
+    if (playlist && playlist.scenes && playlist.scenes.length > 1) {
+      skipButtonsPlugin.setForwardHandler(playNextInPlaylist);
+      skipButtonsPlugin.setBackwardHandler(playPreviousInPlaylist);
+    } else {
+      // Clear handlers if no playlist or single scene
+      skipButtonsPlugin.setForwardHandler(undefined);
+      skipButtonsPlugin.setBackwardHandler(undefined);
+    }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentIndex, video, playlist]);
+  }, [currentIndex, playlist]);
 
   // Return playlist navigation functions for use by media keys hook
   return {

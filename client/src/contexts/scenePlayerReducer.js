@@ -349,6 +349,13 @@ export function scenePlayerReducer(state, action) {
       };
     }
 
+    case "SET_CURRENT_INDEX": {
+      return {
+        ...state,
+        currentIndex: action.payload,
+      };
+    }
+
     // Player state
     case "SET_INITIALIZING":
       return {

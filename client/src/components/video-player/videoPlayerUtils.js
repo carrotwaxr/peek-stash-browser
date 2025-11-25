@@ -1,153 +1,10 @@
 import videojs from "video.js";
 
+// Import duration middleware (registers via videojs.use)
+import "./durationMiddleware.js";
+
 // Set VideoJS global log level to reduce console spam
 videojs.log.level("warn");
-
-/**
- * Setup playlist navigation buttons in Video.js control bar
- * Adds Previous/Next buttons for navigating between scenes
- */
-export const setupPlaylistControls = (
-  player,
-  playlist,
-  currentIndex,
-  onPrevious,
-  onNext
-) => {
-  const addButtons = () => {
-    // Check if controlBar exists
-    if (!player.controlBar || !player.controlBar.el) {
-      setTimeout(addButtons, 200);
-      return;
-    }
-
-    const controlBar = player.controlBar.el();
-    if (!controlBar) {
-      setTimeout(addButtons, 200);
-      return;
-    }
-
-    const playToggle = controlBar.querySelector(".vjs-play-control");
-
-    if (!playToggle) {
-      setTimeout(addButtons, 200);
-      return;
-    }
-
-    // Remove any existing playlist buttons first
-    const existingPrev = controlBar.querySelector(".vjs-playlist-prev");
-    const existingNext = controlBar.querySelector(".vjs-playlist-next");
-    if (existingPrev) existingPrev.remove();
-    if (existingNext) existingNext.remove();
-
-    const hasPrevious = currentIndex > 0;
-    const hasNext = currentIndex < playlist.scenes.length - 1;
-
-    // Create Previous button
-    const prevButton = document.createElement("button");
-    prevButton.className = "vjs-control vjs-button vjs-playlist-prev";
-    prevButton.title = hasPrevious ? "Previous Video" : "No previous video";
-    prevButton.disabled = !hasPrevious;
-    prevButton.innerHTML = `
-      <span class="vjs-icon-placeholder" aria-hidden="true"></span>
-      <span class="vjs-control-text" aria-live="polite">Previous Video</span>
-    `;
-
-    if (hasPrevious) {
-      prevButton.addEventListener("click", (e) => {
-        e.preventDefault();
-        onPrevious();
-      });
-    }
-
-    playToggle.parentNode.insertBefore(prevButton, playToggle);
-
-    // Create Next button
-    const nextButton = document.createElement("button");
-    nextButton.className = "vjs-control vjs-button vjs-playlist-next";
-    nextButton.title = hasNext ? "Next Video" : "No next video";
-    nextButton.disabled = !hasNext;
-    nextButton.innerHTML = `
-      <span class="vjs-icon-placeholder" aria-hidden="true"></span>
-      <span class="vjs-control-text" aria-live="polite">Next Video</span>
-    `;
-
-    if (hasNext) {
-      nextButton.addEventListener("click", (e) => {
-        e.preventDefault();
-        onNext();
-      });
-    }
-
-    playToggle.parentNode.insertBefore(nextButton, playToggle.nextSibling);
-  };
-
-  player.ready(() => {
-    setTimeout(addButtons, 100);
-  });
-};
-
-/**
- * Setup seeking handlers for transcoded content
- * Uses smart seeking on backend to reuse segments when possible
- */
-export const setupTranscodedSeeking = (player, sessionId, api) => {
-  let isTranscodedSeeking = false;
-  let lastSeekTime = 0;
-  let hasPlayedOnce = false;
-  let currentSessionId = sessionId; // Track current session ID
-  const SEEK_THRESHOLD = 12; // Match backend smart seek threshold (3 segments × 4s)
-
-  // Enable seeking only after playback has started
-  player.one("playing", () => {
-    hasPlayedOnce = true;
-  });
-
-  player.on("seeking", () => {
-    if (isTranscodedSeeking) {
-      return;
-    }
-
-    if (!hasPlayedOnce) {
-      return;
-    }
-
-    const currentTime = player.currentTime();
-    const seekDistance = Math.abs(currentTime - lastSeekTime);
-
-    if (seekDistance > SEEK_THRESHOLD) {
-      isTranscodedSeeking = true;
-      const targetSeekTime = currentTime; // Save the target time
-
-      api
-        .post("/video/seek", {
-          sessionId: currentSessionId,
-          startTime: targetSeekTime,
-        })
-        .then((response) => {
-          const newSessionId = response.data.sessionId;
-          const sessionChanged = newSessionId !== currentSessionId;
-
-          if (sessionChanged) {
-            // Backend started transcoding from new position, but we keep using the same playlist
-            // The playlist represents segments 0-end, so Video.js will request the correct segment
-            // Backend's segment renaming will catch up before Video.js requests it
-            // Update session ID for future seeks
-            currentSessionId = newSessionId;
-          }
-
-          // In both cases, just let Video.js handle the seek
-          // It will request the correct segment based on the target time
-          isTranscodedSeeking = false;
-
-          lastSeekTime = targetSeekTime;
-        })
-        .catch(() => {
-          isTranscodedSeeking = false;
-        });
-    }
-  });
-};
 
 /**
  * Show or hide the playback rate control
@@ -170,18 +27,16 @@ export const togglePlaybackRateControl = (player, show) => {
 };
 
 /**
- * Setup subtitles/captions for a scene (matches Stash implementation)
- * Adds text tracks to Video.js player from scene caption data
+ * Setup subtitles/captions for a scene (uses sourceSelector plugin - Stash pattern)
+ * Adds text tracks via sourceSelector for proper lifecycle management
+ * Video.js automatically shows/hides the caption button based on available tracks
  */
 export const setupSubtitles = (player, sceneId, captions) => {
   if (!player || player.isDisposed()) return;
   if (!captions || captions.length === 0) return;
 
-  // Remove existing remote text tracks
-  const existingTracks = player.remoteTextTracks();
-  for (let i = existingTracks.length - 1; i >= 0; i--) {
-    player.removeRemoteTextTrack(existingTracks[i]);
-  }
+  // Get sourceSelector plugin for track management
+  const sourceSelector = player.sourceSelector();
 
   // Language map matching Stash's implementation
   const languageMap = new Map([
@@ -216,7 +71,7 @@ export const setupSubtitles = (player, sceneId, captions) => {
   const defaultLanguageCode = getDefaultLanguageCode();
   let hasDefault = false;
 
-  // Add new tracks
+  // Add tracks via sourceSelector (auto-cleanup on source change)
   captions.forEach((caption) => {
     const lang = caption.language_code;
     let label = lang;
@@ -242,6 +97,8 @@ export const setupSubtitles = (player, sceneId, captions) => {
       default: setAsDefault,
     };
 
-    player.addRemoteTextTrack(trackOptions, false);
+    // Use sourceSelector.addTextTrack for lifecycle management
+    // false = auto-cleanup on source change
+    sourceSelector.addTextTrack(trackOptions, false);
   });
 };

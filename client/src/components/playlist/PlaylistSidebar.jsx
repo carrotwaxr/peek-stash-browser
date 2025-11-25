@@ -81,7 +81,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
       }
     }
 
-    // Navigate with autoplay flag if video is currently playing
+    // Navigate with autoplay flag
     gotoSceneIndex(index, isPlaying);
   };
 

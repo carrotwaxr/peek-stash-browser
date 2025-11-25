@@ -8,7 +8,7 @@
     "build": "tsc",
     "serve": "node dist/index.js",
     "start": "node dist/index.js",
-    "dev": "nodemon --legacy-watch --watch './**/*.ts' --watch '../.env' --ext ts --exec 'node --loader ts-node/esm' index.ts",
+    "dev": "nodemon",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{js,ts,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,ts,json,md}\"",
@@ -54,6 +54,6 @@
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "stashapp-api": "^0.3.18"
+    "stashapp-api": "^0.3.20"
   }
 }

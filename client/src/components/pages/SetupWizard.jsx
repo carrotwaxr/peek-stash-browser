@@ -9,24 +9,11 @@ const SetupWizard = ({ onSetupComplete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Step 2: Discovered libraries
-  const [_stashLibraries, setStashLibraries] = useState([]);
-
-  // Step 3: Path mappings
-  const [pathMappings, setPathMappings] = useState([]);
-  const [validationResults, setValidationResults] = useState({});
-
-  // Step 4: Admin password
+  // Admin credentials
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const steps = [
-    "Welcome",
-    "Discover Libraries",
-    "Configure Paths",
-    "Create Admin User",
-    "Complete",
-  ];
+  const steps = ["Welcome", "Create Admin User", "Complete"];
 
   // Step 1: Welcome screen
   const WelcomeStep = () => (
@@ -67,10 +54,8 @@ const SetupWizard = ({ onSetupComplete }) => {
             color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
           }}
         >
-          <li>Discover your Stash library paths automatically</li>
-          <li>Map Stash paths to Peek's Docker container paths</li>
-          <li>Create an admin account</li>
-          <li>Complete setup and start browsing</li>
+          <li>Create an admin account to manage Peek</li>
+          <li>Complete setup and start browsing your Stash library</li>
         </ul>
 
         <div
@@ -94,8 +79,8 @@ const SetupWizard = ({ onSetupComplete }) => {
               color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
             }}
           >
-            Make sure you have set up Docker volume mounts for your Stash media
-            directories. Peek needs to access the same files that Stash uses.
+            Make sure your Stash server is running and accessible. Peek connects
+            to Stash via the STASH_URL and STASH_API_KEY environment variables.
           </p>
         </div>
       </div>
@@ -110,142 +95,6 @@ const SetupWizard = ({ onSetupComplete }) => {
       </Button>
     </div>
   );
-
-  // Step 2: Discover libraries
-  const discoverLibraries = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await setupApi.discoverStashLibraries();
-
-      if (response.success) {
-        setStashLibraries(response.libraries || []);
-
-        // Initialize path mappings with discovered libraries
-        const initialMappings = (response.libraries || []).map((lib) => ({
-          stashPath: lib.path,
-          peekPath: "", // User needs to fill this in
-          excludeVideo: lib.excludeVideo,
-        }));
-        setPathMappings(initialMappings);
-
-        setCurrentStep(2);
-      } else {
-        setError("Failed to discover libraries");
-      }
-    } catch {
-      setError(
-        "Failed to connect to Stash server. Check STASH_URL and STASH_API_KEY."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const DiscoverStep = () => (
-    <div className="space-y-6">
-      <div>
-        <h2
-          className="text-2xl font-bold mb-2"
-          style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
-        >
-          Discover Libraries
-        </h2>
-        <p
-          style={{
-            color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-          }}
-        >
-          We'll query your Stash server to find configured library paths
-        </p>
-      </div>
-
-      {error && (
-        <div
-          className="p-4 rounded border-l-4"
-          style={{
-            backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-            borderColor: "#ef4444",
-          }}
-        >
-          <p style={{ color: "#ef4444" }}>{error}</p>
-        </div>
-      )}
-
-      <Button
-        onClick={discoverLibraries}
-        disabled={loading}
-        variant="primary"
-        fullWidth
-        size="lg"
-        loading={loading}
-      >
-        Discover Stash Libraries
-      </Button>
-
-      <Button onClick={() => setCurrentStep(0)} variant="tertiary" fullWidth>
-        Back
-      </Button>
-    </div>
-  );
-
-  // Step 3: Configure path mappings
-  const testPath = async (index) => {
-    const mapping = pathMappings[index];
-    if (!mapping.peekPath) return;
-
-    setLoading(true);
-    try {
-      const result = await setupApi.testPath(mapping.peekPath);
-      setValidationResults({
-        ...validationResults,
-        [index]: result,
-      });
-    } catch {
-      setValidationResults({
-        ...validationResults,
-        [index]: { success: false, message: "Failed to test path" },
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updatePeekPath = (index, value) => {
-    const updated = [...pathMappings];
-    updated[index].peekPath = value;
-    setPathMappings(updated);
-
-    // Clear validation when path changes
-    if (validationResults[index]) {
-      const updated = { ...validationResults };
-      delete updated[index];
-      setValidationResults(updated);
-    }
-  };
-
-  const savePathMappings = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      // Save each mapping that has a peek path configured
-      for (const mapping of pathMappings) {
-        if (mapping.peekPath) {
-          await setupApi.addPathMapping(mapping.stashPath, mapping.peekPath);
-        }
-      }
-
-      setCurrentStep(3);
-    } catch (err) {
-      setError(
-        "Failed to save path mappings: " + (err.message || "Unknown error")
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const createAdminUser = async () => {
     if (adminPassword !== confirmPassword) {
@@ -262,21 +111,12 @@ const SetupWizard = ({ onSetupComplete }) => {
     setError("");
 
     try {
-      // Create first admin user via setup API
-      const response = await fetch("/api/setup/create-admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: "admin",
-          password: adminPassword,
-        }),
-      });
+      const response = await setupApi.createFirstAdmin("admin", adminPassword);
 
-      if (response.ok) {
-        setCurrentStep(4);
+      if (response.success) {
+        setCurrentStep(2);
       } else {
-        const data = await response.json();
-        setError(data.error || "Failed to create admin user");
+        setError(response.error || "Failed to create admin user");
       }
     } catch (err) {
       setError(
@@ -287,54 +127,8 @@ const SetupWizard = ({ onSetupComplete }) => {
     }
   };
 
-  // Step 5: Complete
-  const CompleteStep = () => (
-    <div className="space-y-6 text-center">
-      <div
-        className="text-6xl mb-4"
-        style={{ color: theme?.properties?.["--accent-color"] || "#3b82f6" }}
-      >
-        ✓
-      </div>
-      <h2
-        className="text-3xl font-bold mb-4"
-        style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
-      >
-        Setup Complete!
-      </h2>
-      <p
-        className="text-lg"
-        style={{
-          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-        }}
-      >
-        Your Peek Stash Browser is now configured and ready to use
-      </p>
-
-      <Button onClick={onSetupComplete} variant="primary" fullWidth size="lg">
-        Go to Login
-      </Button>
-    </div>
-  );
-
-  const renderStep = () => {
-    switch (currentStep) {
-      case 0:
-        return <WelcomeStep />;
-      case 1:
-        return <DiscoverStep />;
-      case 2:
-        return renderPathMappingStep();
-      case 3:
-        return renderAdminPasswordStep();
-      case 4:
-        return <CompleteStep />;
-      default:
-        return <WelcomeStep />;
-    }
-  };
-
-  const renderAdminPasswordStep = () => (
+  // Step 2: Create Admin Account
+  const AdminPasswordStep = () => (
     <div className="space-y-6">
       <div>
         <h2
@@ -436,7 +230,7 @@ const SetupWizard = ({ onSetupComplete }) => {
       </div>
 
       <div className="flex gap-4">
-        <Button onClick={() => setCurrentStep(2)} variant="tertiary" fullWidth>
+        <Button onClick={() => setCurrentStep(0)} variant="tertiary" fullWidth>
           Back
         </Button>
         <Button
@@ -453,193 +247,47 @@ const SetupWizard = ({ onSetupComplete }) => {
     </div>
   );
 
-  const renderPathMappingStep = () => {
-    const hasLibraries = pathMappings.length > 0;
-    const allMapped = pathMappings.every((m) => m.peekPath);
-
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2
-            className="text-2xl font-bold mb-2"
-            style={{
-              color: theme?.properties?.["--text-primary"] || "#ffffff",
-            }}
-          >
-            Configure Path Mappings
-          </h2>
-          <p
-            style={{
-              color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
-            }}
-          >
-            Map each Stash library path to where Peek can access it
-          </p>
-        </div>
-
-        {!hasLibraries && (
-          <div
-            className="p-4 rounded border-l-4"
-            style={{
-              backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-              borderColor: "#f59e0b",
-            }}
-          >
-            <p style={{ color: "#f59e0b" }}>
-              No libraries found. You can skip this step and configure paths
-              later in Settings.
-            </p>
-          </div>
-        )}
-
-        {error && (
-          <div
-            className="p-4 rounded border-l-4"
-            style={{
-              backgroundColor: theme?.properties?.["--bg-card"] || "#1f1f1f",
-              borderColor: "#ef4444",
-            }}
-          >
-            <p style={{ color: "#ef4444" }}>{error}</p>
-          </div>
-        )}
-
-        <div className="space-y-4">
-          {pathMappings.map((mapping, index) => {
-            const validation = validationResults[index];
-            const libraryType =
-              !mapping.excludeVideo && !mapping.excludeImage
-                ? "Video & Image"
-                : !mapping.excludeVideo
-                  ? "Video"
-                  : !mapping.excludeImage
-                    ? "Image"
-                    : "Unknown";
-
-            return (
-              <div
-                key={mapping.stashPath}
-                className="p-4 rounded-lg space-y-3"
-                style={{
-                  backgroundColor:
-                    theme?.properties?.["--bg-card"] || "#1f1f1f",
-                  borderColor:
-                    theme?.properties?.["--border-color"] || "#404040",
-                }}
-              >
-                <div>
-                  <label
-                    className="block text-sm font-semibold mb-1"
-                    style={{
-                      color: theme?.properties?.["--text-primary"] || "#ffffff",
-                    }}
-                  >
-                    Stash Path{" "}
-                    <span
-                      className="text-xs font-normal px-2 py-0.5 rounded"
-                      style={{
-                        backgroundColor:
-                          theme?.properties?.["--bg-secondary"] || "#0a0a0a",
-                        color:
-                          theme?.properties?.["--text-secondary"] || "#b3b3b3",
-                      }}
-                    >
-                      {libraryType}
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={mapping.stashPath}
-                    disabled
-                    className="w-full px-3 py-2 rounded opacity-60"
-                    style={{
-                      backgroundColor:
-                        theme?.properties?.["--bg-secondary"] || "#0a0a0a",
-                      borderColor:
-                        theme?.properties?.["--border-color"] || "#404040",
-                      color:
-                        theme?.properties?.["--text-secondary"] || "#b3b3b3",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label
-                    className="block text-sm font-semibold mb-1"
-                    style={{
-                      color: theme?.properties?.["--text-primary"] || "#ffffff",
-                    }}
-                  >
-                    Peek Path (Docker mount point)
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={mapping.peekPath}
-                      onChange={(e) => updatePeekPath(index, e.target.value)}
-                      placeholder="/app/media"
-                      className="flex-1 px-3 py-2 rounded border focus:outline-none focus:ring-2"
-                      style={{
-                        backgroundColor:
-                          theme?.properties?.["--bg-card"] || "#1f1f1f",
-                        borderColor:
-                          theme?.properties?.["--border-color"] || "#404040",
-                        color:
-                          theme?.properties?.["--text-primary"] || "#ffffff",
-                      }}
-                    />
-                    <Button
-                      onClick={() => testPath(index)}
-                      disabled={!mapping.peekPath || loading}
-                      variant="primary"
-                    >
-                      Test
-                    </Button>
-                  </div>
-
-                  {validation && (
-                    <p
-                      className="text-sm mt-1"
-                      style={{
-                        color: validation.exists
-                          ? validation.readable
-                            ? "#10b981"
-                            : "#f59e0b"
-                          : "#ef4444",
-                      }}
-                    >
-                      {validation.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="flex gap-4 mt-6">
-          <Button
-            onClick={() => setCurrentStep(1)}
-            disabled={loading}
-            variant="tertiary"
-            fullWidth
-            size="lg"
-          >
-            Back
-          </Button>
-          <Button
-            onClick={savePathMappings}
-            disabled={loading || (!hasLibraries ? false : !allMapped)}
-            variant="primary"
-            fullWidth
-            size="lg"
-            loading={loading}
-          >
-            {hasLibraries ? "Continue" : "Skip"}
-          </Button>
-        </div>
+  // Step 3: Complete
+  const CompleteStep = () => (
+    <div className="space-y-6 text-center">
+      <div
+        className="text-6xl mb-4"
+        style={{ color: theme?.properties?.["--accent-color"] || "#3b82f6" }}
+      >
+        ✓
       </div>
-    );
+      <h2
+        className="text-3xl font-bold mb-4"
+        style={{ color: theme?.properties?.["--text-primary"] || "#ffffff" }}
+      >
+        Setup Complete!
+      </h2>
+      <p
+        className="text-lg"
+        style={{
+          color: theme?.properties?.["--text-secondary"] || "#b3b3b3",
+        }}
+      >
+        Your Peek Stash Browser is now configured and ready to use
+      </p>
+
+      <Button onClick={onSetupComplete} variant="primary" fullWidth size="lg">
+        Go to Login
+      </Button>
+    </div>
+  );
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return <WelcomeStep />;
+      case 1:
+        return <AdminPasswordStep />;
+      case 2:
+        return <CompleteStep />;
+      default:
+        return <WelcomeStep />;
+    }
   };
 
   return (
@@ -651,7 +299,7 @@ const SetupWizard = ({ onSetupComplete }) => {
     >
       <div className="max-w-2xl w-full">
         {/* Progress indicator */}
-        {currentStep < 4 && (
+        {currentStep < 2 && (
           <div className="mb-8">
             <div className="flex justify-between mb-2">
               {steps.map((step, index) => (

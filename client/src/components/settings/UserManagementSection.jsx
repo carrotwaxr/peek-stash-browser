@@ -1,0 +1,340 @@
+import { useState } from "react";
+import { formatDate } from "../../utils/date.js";
+import ContentRestrictionsModal from "./ContentRestrictionsModal.jsx";
+import CreateUserModal from "./CreateUserModal.jsx";
+import SyncFromStashModal from "./SyncFromStashModal.jsx";
+import { Button, Paper } from "../ui/index.js";
+
+const UserManagementSection = ({
+  users,
+  currentUser,
+  onUsersChanged,
+  onMessage,
+  onError,
+  api,
+}) => {
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncTargetUser, setSyncTargetUser] = useState(null);
+  const [showRestrictionsModal, setShowRestrictionsModal] = useState(false);
+  const [restrictionsTargetUser, setRestrictionsTargetUser] = useState(null);
+
+  const deleteUser = async (userId, username) => {
+    if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/user/${userId}`);
+      onMessage(`User "${username}" deleted successfully!`);
+      onUsersChanged();
+    } catch (err) {
+      onError(err.response?.data?.error || "Failed to delete user");
+    }
+  };
+
+  const changeUserRole = async (userId, username, currentRole) => {
+    const newRole = currentRole === "ADMIN" ? "USER" : "ADMIN";
+
+    if (!confirm(`Change "${username}" from ${currentRole} to ${newRole}?`)) {
+      return;
+    }
+
+    try {
+      await api.put(`/user/${userId}/role`, { role: newRole });
+      onMessage(`User "${username}" role changed to ${newRole}!`);
+      onUsersChanged();
+    } catch (err) {
+      onError(err.response?.data?.error || "Failed to change user role");
+    }
+  };
+
+  const toggleSyncToStash = async (userId, username, currentSyncToStash) => {
+    const newSyncToStash = !currentSyncToStash;
+
+    try {
+      await api.put(`/user/${userId}/settings`, {
+        syncToStash: newSyncToStash,
+      });
+      onMessage(
+        `Stash sync ${newSyncToStash ? "enabled" : "disabled"} for "${username}"!`
+      );
+      onUsersChanged();
+    } catch (err) {
+      onError(err.response?.data?.error || "Failed to update sync setting");
+    }
+  };
+
+  const openSyncModal = (user) => {
+    setSyncTargetUser(user);
+    setShowSyncModal(true);
+  };
+
+  const openRestrictionsModal = (user) => {
+    setRestrictionsTargetUser(user);
+    setShowRestrictionsModal(true);
+  };
+
+  return (
+    <>
+      <Paper className="mb-6">
+        <Paper.Header>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <Paper.Title>User Management</Paper.Title>
+              <Paper.Subtitle className="mt-1">
+                Manage user accounts and permissions
+              </Paper.Subtitle>
+            </div>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              variant="primary"
+              className="w-full md:w-auto"
+            >
+              + Create User
+            </Button>
+          </div>
+        </Paper.Header>
+        <Paper.Body padding="none">
+          {/* Sync to Stash Warning */}
+          <div
+            className="px-6 py-4 text-sm"
+            style={{
+              backgroundColor: "rgba(245, 158, 11, 0.1)",
+              borderBottom: "1px solid var(--border-color)",
+              color: "rgb(245, 158, 11)",
+            }}
+          >
+            <div className="font-semibold mb-1">Sync to Stash Policy</div>
+            <div
+              className="text-xs leading-relaxed"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              When enabled, user ratings and favorites will sync to Stash.
+              <br />
+              <strong>O Counters AGGREGATE</strong> (multiple users increment
+              the same counter).
+              <br />
+              <strong>Ratings OVERWRITE</strong> (last user to rate wins, no
+              aggregation).
+              <br />
+              Be cautious enabling for multiple users to avoid conflicts.
+            </div>
+          </div>
+
+          {/* User Table */}
+          <div className="overflow-x-auto">
+            <div
+              className="md:hidden px-4 py-3 text-xs"
+              style={{
+                color: "var(--text-muted)",
+                borderBottom: "1px solid var(--border-color)",
+              }}
+            >
+              Swipe to see more
+            </div>
+            <table className="w-full" style={{ minWidth: "800px" }}>
+              <thead>
+                <tr
+                  style={{
+                    borderBottom: "1px solid var(--border-color)",
+                  }}
+                >
+                  <th
+                    className="text-left px-6 py-4 font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Username
+                  </th>
+                  <th
+                    className="text-left px-6 py-4 font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Role
+                  </th>
+                  <th
+                    className="text-center px-6 py-4 font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Sync to Stash
+                  </th>
+                  <th
+                    className="text-left px-6 py-4 font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Created
+                  </th>
+                  <th
+                    className="text-right px-6 py-4 font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr
+                    key={user.id}
+                    style={{
+                      borderBottom: "1px solid var(--border-color)",
+                    }}
+                  >
+                    <td
+                      className="px-6 py-4"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{user.username}</span>
+                        {user.id === currentUser?.id && (
+                          <span
+                            className="text-xs px-2 py-0.5 rounded"
+                            style={{
+                              backgroundColor: "rgba(59, 130, 246, 0.1)",
+                              color: "rgb(59, 130, 246)",
+                            }}
+                          >
+                            You
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className="text-sm px-2 py-1 rounded"
+                        style={{
+                          backgroundColor:
+                            user.role === "ADMIN"
+                              ? "var(--accent-primary)"
+                              : "var(--bg-secondary)",
+                          color:
+                            user.role === "ADMIN"
+                              ? "white"
+                              : "var(--text-secondary)",
+                        }}
+                      >
+                        {user.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <input
+                        type="checkbox"
+                        checked={user.syncToStash || false}
+                        onChange={() =>
+                          toggleSyncToStash(
+                            user.id,
+                            user.username,
+                            user.syncToStash
+                          )
+                        }
+                        className="w-4 h-4 rounded cursor-pointer"
+                        style={{
+                          accentColor: "var(--primary-color)",
+                        }}
+                        title={
+                          user.syncToStash
+                            ? "Syncing activity to Stash"
+                            : "Not syncing to Stash"
+                        }
+                      />
+                    </td>
+                    <td
+                      className="px-6 py-4 text-sm"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {formatDate(user.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2 flex-wrap">
+                        <Button
+                          onClick={() => openSyncModal(user)}
+                          variant="tertiary"
+                          size="sm"
+                          className="px-3 py-1 text-sm whitespace-nowrap"
+                        >
+                          Sync from Stash
+                        </Button>
+                        <Button
+                          onClick={() => openRestrictionsModal(user)}
+                          variant="tertiary"
+                          size="sm"
+                          className="px-3 py-1 text-sm whitespace-nowrap"
+                          title="Manage content restrictions for this user"
+                        >
+                          Content Restrictions
+                        </Button>
+                        <Button
+                          onClick={() =>
+                            changeUserRole(user.id, user.username, user.role)
+                          }
+                          disabled={user.id === currentUser?.id}
+                          variant="secondary"
+                          size="sm"
+                          className="px-3 py-1 text-sm whitespace-nowrap"
+                        >
+                          Change Role
+                        </Button>
+                        <Button
+                          onClick={() => deleteUser(user.id, user.username)}
+                          disabled={user.id === currentUser?.id}
+                          variant="destructive"
+                          size="sm"
+                          className="px-3 py-1 text-sm whitespace-nowrap"
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Paper.Body>
+      </Paper>
+
+      {/* Modals */}
+      {showCreateModal && (
+        <CreateUserModal
+          onClose={() => setShowCreateModal(false)}
+          onUserCreated={(username) => {
+            onMessage(`User "${username}" created successfully!`);
+            onUsersChanged();
+          }}
+          api={api}
+        />
+      )}
+
+      {showSyncModal && syncTargetUser && (
+        <SyncFromStashModal
+          user={syncTargetUser}
+          onClose={() => {
+            setShowSyncModal(false);
+            setSyncTargetUser(null);
+          }}
+          onSyncComplete={(username) => {
+            onMessage(`Successfully synced data from Stash for ${username}!`);
+          }}
+          api={api}
+        />
+      )}
+
+      {showRestrictionsModal && restrictionsTargetUser && (
+        <ContentRestrictionsModal
+          user={restrictionsTargetUser}
+          onClose={() => {
+            setShowRestrictionsModal(false);
+            setRestrictionsTargetUser(null);
+          }}
+          onSave={() => {
+            onMessage(
+              `Content restrictions updated for ${restrictionsTargetUser.username}!`
+            );
+          }}
+        />
+      )}
+    </>
+  );
+};
+
+export default UserManagementSection;
