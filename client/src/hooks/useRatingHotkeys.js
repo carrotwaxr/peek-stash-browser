@@ -2,6 +2,20 @@ import { useEffect, useRef } from "react";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts.js";
 
 /**
+ * Global rating mode state - shared across hooks
+ * This allows useMediaKeys to check if we're in rating mode before handling
+ * keys like 'f' (fullscreen) and '0-9' (seek) that conflict with rating hotkeys.
+ */
+let globalRatingMode = false;
+let globalRatingModeTimeout = null;
+
+/**
+ * Check if currently in rating mode (for use by other hooks like useMediaKeys)
+ * @returns {boolean} True if in rating mode
+ */
+export const isInRatingMode = () => globalRatingMode;
+
+/**
  * Hook for rating and favorite keyboard shortcuts (Stash-compatible)
  *
  * Provides "r + key" hotkey support for setting ratings and toggling favorites.
@@ -50,6 +64,40 @@ export const useRatingHotkeys = ({
   // Build shortcuts object dynamically based on rating mode state
   const shortcuts = {};
 
+  // Helper to enter rating mode (updates both local and global state)
+  const enterRatingMode = () => {
+    inRatingModeRef.current = true;
+    globalRatingMode = true;
+
+    // Clear any existing timeout
+    if (ratingModeTimeoutRef.current) {
+      clearTimeout(ratingModeTimeoutRef.current);
+    }
+    if (globalRatingModeTimeout) {
+      clearTimeout(globalRatingModeTimeout);
+    }
+
+    // Exit rating mode after 1 second (matching Stash behavior)
+    const timeout = setTimeout(() => {
+      inRatingModeRef.current = false;
+      globalRatingMode = false;
+    }, 1000);
+    ratingModeTimeoutRef.current = timeout;
+    globalRatingModeTimeout = timeout;
+  };
+
+  // Helper to exit rating mode (updates both local and global state)
+  const exitRatingMode = () => {
+    inRatingModeRef.current = false;
+    globalRatingMode = false;
+    if (ratingModeTimeoutRef.current) {
+      clearTimeout(ratingModeTimeoutRef.current);
+    }
+    if (globalRatingModeTimeout) {
+      clearTimeout(globalRatingModeTimeout);
+    }
+  };
+
   // Always register 'r' key to trigger rating mode
   shortcuts["r"] = () => {
     // Blur active element to prevent video player number keys from interfering
@@ -57,33 +105,16 @@ export const useRatingHotkeys = ({
       document.activeElement.blur();
     }
 
-    // Enter rating mode
-    inRatingModeRef.current = true;
-
-    // Clear any existing timeout
-    if (ratingModeTimeoutRef.current) {
-      clearTimeout(ratingModeTimeoutRef.current);
-    }
-
-    // Exit rating mode after 1 second (matching Stash behavior)
-    ratingModeTimeoutRef.current = setTimeout(() => {
-      inRatingModeRef.current = false;
-    }, 1000);
+    enterRatingMode();
   };
 
   // Register number keys (0-5) - these only work in rating mode
   Object.keys(ratingMap).forEach((key) => {
     shortcuts[key] = () => {
-      // Only handle if in rating mode
       if (inRatingModeRef.current) {
         const ratingValue = ratingMap[key];
         setRating(ratingValue);
-
-        // Exit rating mode immediately after setting rating
-        inRatingModeRef.current = false;
-        if (ratingModeTimeoutRef.current) {
-          clearTimeout(ratingModeTimeoutRef.current);
-        }
+        exitRatingMode();
       }
     };
   });
@@ -91,20 +122,16 @@ export const useRatingHotkeys = ({
   // Register 'f' key for favorite toggle (only if callback provided)
   if (toggleFavorite) {
     shortcuts["f"] = () => {
-      // Only handle if in rating mode
       if (inRatingModeRef.current) {
         toggleFavorite();
-
-        // Exit rating mode immediately after toggling favorite
-        inRatingModeRef.current = false;
-        if (ratingModeTimeoutRef.current) {
-          clearTimeout(ratingModeTimeoutRef.current);
-        }
+        exitRatingMode();
       }
     };
   }
 
   // Register keyboard shortcuts
+  // Note: Video player shortcuts (useMediaKeys) check isInRatingMode() before handling
+  // conflicting keys (f, 0-5), so we use regular context here
   useKeyboardShortcuts(shortcuts, {
     enabled,
     context: "rating-hotkeys",

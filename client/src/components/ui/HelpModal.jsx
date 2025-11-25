@@ -117,6 +117,17 @@ const HelpModal = ({ onClose }) => {
     ],
     scene: [
       {
+        category: "Rating",
+        items: [
+          {
+            keys: ["r 1-5"],
+            description: "Set rating (20%, 40%, 60%, 80%, 100%)",
+          },
+          { keys: ["r 0"], description: "Clear rating" },
+          { keys: ["r f"], description: "Toggle Favorite" },
+        ],
+      },
+      {
         category: "Playback Control",
         items: [
           { keys: ["Space", "K"], description: "Play / Pause" },
@@ -155,6 +166,13 @@ const HelpModal = ({ onClose }) => {
       {
         category: "Display",
         items: [{ keys: ["F"], description: "Toggle fullscreen" }],
+      },
+      {
+        category: "Playlist Navigation",
+        items: [
+          { keys: ["Shift+N"], description: "Next scene in playlist" },
+          { keys: ["Shift+P"], description: "Previous scene in playlist" },
+        ],
       },
     ],
     global: [
@@ -454,7 +472,7 @@ const HelpModal = ({ onClose }) => {
                   </h2>
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                     {currentPage === "scene"
-                      ? "Control video playback and navigation with these keyboard shortcuts"
+                      ? "Control video playback with these shortcuts. Press R followed by 1-5 to set rating, R then 0 to clear, or R then F to toggle favorite."
                       : [
                             "performer",
                             "studio",

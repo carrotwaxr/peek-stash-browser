@@ -61,13 +61,20 @@ export const useKeyboardShortcuts = (
       const handler = shortcutsRef.current[keyCombo];
 
       if (handler) {
-        // Prevent default browser behavior for this shortcut
-        event.preventDefault();
-        event.stopPropagation();
-
-        // Execute the handler
+        // Execute the handler first - it may return false to indicate it didn't handle
+        // (e.g., video player 'f' handler returns early when in rating mode)
         try {
-          handler(event);
+          const result = handler(event);
+
+          // If handler returns false, don't stop propagation - let other handlers try
+          // This allows rating hotkeys to handle 'f' when video player defers
+          if (result === false) {
+            return;
+          }
+
+          // Handler handled it - prevent default and stop propagation
+          event.preventDefault();
+          event.stopPropagation();
         } catch (error) {
           console.error(
             `[useKeyboardShortcuts:${context}] Error handling "${keyCombo}":`,

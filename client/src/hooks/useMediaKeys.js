@@ -1,9 +1,13 @@
 import { useEffect, useMemo } from "react";
 import { useVideoPlayerShortcuts } from "./useKeyboardShortcuts.js";
+import { isInRatingMode } from "./useRatingHotkeys.js";
 
 /**
  * Hook for video player keyboard shortcuts
  * Uses the new useKeyboardShortcuts hook with YouTube-standard shortcuts
+ *
+ * Note: Keys that conflict with rating hotkeys (f, 0-5) check isInRatingMode()
+ * and skip handling when in rating mode, allowing useRatingHotkeys to handle them.
  *
  * @param {Object} options Configuration options
  * @param {Object} options.playerRef Ref to Video.js player instance
@@ -129,12 +133,32 @@ export const usePlaylistMediaKeys = ({
       },
 
       // Number keys for percentage jumps (0-9)
-      "0": () => jumpToPercentage(playerRef, 0),
-      "1": () => jumpToPercentage(playerRef, 10),
-      "2": () => jumpToPercentage(playerRef, 20),
-      "3": () => jumpToPercentage(playerRef, 30),
-      "4": () => jumpToPercentage(playerRef, 40),
-      "5": () => jumpToPercentage(playerRef, 50),
+      // Note: 0-5 conflict with rating hotkeys (r + 0-5 = set rating)
+      // Return false when in rating mode to let event propagate to rating hotkeys
+      "0": () => {
+        if (isInRatingMode()) return false;
+        jumpToPercentage(playerRef, 0);
+      },
+      "1": () => {
+        if (isInRatingMode()) return false;
+        jumpToPercentage(playerRef, 10);
+      },
+      "2": () => {
+        if (isInRatingMode()) return false;
+        jumpToPercentage(playerRef, 20);
+      },
+      "3": () => {
+        if (isInRatingMode()) return false;
+        jumpToPercentage(playerRef, 30);
+      },
+      "4": () => {
+        if (isInRatingMode()) return false;
+        jumpToPercentage(playerRef, 40);
+      },
+      "5": () => {
+        if (isInRatingMode()) return false;
+        jumpToPercentage(playerRef, 50);
+      },
       "6": () => jumpToPercentage(playerRef, 60),
       "7": () => jumpToPercentage(playerRef, 70),
       "8": () => jumpToPercentage(playerRef, 80),
@@ -191,7 +215,10 @@ export const usePlaylistMediaKeys = ({
       // DISPLAY CONTROL
       // ============================================================================
 
+      // Note: 'f' conflicts with rating hotkey (r + f = toggle favorite)
+      // Return false when in rating mode to let event propagate to rating hotkeys
       f: () => {
+        if (isInRatingMode()) return false;
         const player = playerRef.current;
         if (player) {
           if (player.isFullscreen()) {
