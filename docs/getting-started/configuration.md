@@ -2,23 +2,22 @@
 
 Peek Stash Browser is configured through environment variables and the setup wizard. This page documents all available configuration options.
 
+## Stash Connection (Setup Wizard)
+
+As of v2.0, Stash connection details are configured via the **Setup Wizard** and stored in the database:
+
+- **Stash URL**: Your Stash GraphQL endpoint (e.g., `http://192.168.1.100:9999/graphql`)
+- **Stash API Key**: API key from Stash Settings → Security
+
+The wizard runs automatically on first access. No environment variables needed for Stash connection!
+
+> **Upgrading from v1.x?** Your existing `STASH_URL` and `STASH_API_KEY` environment variables will auto-migrate to the database on first start. You can remove them from your container configuration after successful migration.
+
 ## Required Environment Variables
 
-These environment variables **must** be set for Peek to function:
-
-| Variable        | Description                 | Example                             |
-| --------------- | --------------------------- | ----------------------------------- |
-| `STASH_URL`     | Your Stash GraphQL endpoint | `http://192.168.1.100:9999/graphql` |
-| `STASH_API_KEY` | API key from Stash settings | `eyJhbGciOiJIUzI1NiIsInR5cCI6...`   |
-| `JWT_SECRET`    | JWT signing key             | Generate with `openssl rand -base64 32` |
-
-### Getting Your Stash API Key
-
-1. Open Stash web interface
-2. Navigate to **Settings** → **Security**
-3. In the **API Key** section, click **Generate**
-4. Copy the generated key
-5. Use this key as `STASH_API_KEY`
+| Variable     | Description     | Example                             |
+| ------------ | --------------- | ----------------------------------- |
+| `JWT_SECRET` | JWT signing key | Generate with `openssl rand -base64 32` |
 
 ### Generating JWT Secret
 
@@ -46,67 +45,16 @@ These settings have sensible defaults but can be customized:
 | `TMP_DIR`            | Transcoding temp directory | `/app/tmp`                             | Needs fast I/O               |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
 
-## Path Mapping
+## Video Streaming (v2.0+)
 
-Peek needs to access the same media files that Stash manages. There are two ways to configure path mappings:
+As of v2.0, **Peek streams video directly through Stash** - no local media access required!
 
-### Setup Wizard (Recommended)
+- Videos are proxied through the Stash API
+- No media volume mounts needed
+- No path mapping configuration required
+- Simpler container setup
 
-The **5-step setup wizard** is the recommended way to configure path mappings for new installations:
-
-1. **Auto-Discovery**: Peek queries your Stash server via GraphQL to discover all library paths
-2. **Path Mapping**: You map each Stash library path to where Peek can access it in the container
-3. **Database Storage**: Mappings are stored in the database (no environment variables needed)
-4. **Path Validation**: Test each path to ensure Peek can access the files
-5. **Multi-Library Support**: Configure multiple library paths (videos, images, etc.)
-
-**Access the wizard:**
-- First-time installations show the wizard automatically at `http://your-server:6969`
-- Existing installations can manage mappings in Settings → Path Mappings
-
-### Upgrading from Environment Variables
-
-If you have an existing installation using `STASH_INTERNAL_PATH` and `STASH_MEDIA_PATH` environment variables:
-
-1. **Access Peek** in your browser
-2. **Complete the setup wizard** - it will guide you through path mapping
-3. **Remove old environment variables** from your container configuration:
-   - `STASH_INTERNAL_PATH`
-   - `STASH_MEDIA_PATH`
-4. **Restart container**
-
-The setup wizard replaces these environment variables with database-stored mappings that support multiple libraries.
-
-### Path Mapping Example
-
-**Setup:**
-```yaml
-# Stash Docker container
-volumes:
-  - /mnt/user/videos:/data
-
-# Peek Docker container
-volumes:
-  - /mnt/user/videos:/app/media:ro
-```
-
-**In Setup Wizard:**
-- Stash reports library path: `/data`
-- You configure Peek path: `/app/media`
-- Peek translates `/data/scenes/video.mp4` → `/app/media/scenes/video.mp4`
-
-**Multiple Libraries Example:**
-```yaml
-# Stash has two libraries: /data and /images
-# Peek Docker container
-volumes:
-  - /mnt/user/stash/videos:/app/media:ro
-  - /mnt/user/stash/images:/app/images:ro
-```
-
-**In Setup Wizard:**
-- Library 1: `/data` → `/app/media`
-- Library 2: `/images` → `/app/images`
+This is a significant simplification from v1.x which required mounting media directories and configuring path mappings.
 
 ## Security Settings
 
@@ -119,35 +67,29 @@ volumes:
     - Set `SECURE_COOKIES=true` when using HTTPS
     - Don't expose Peek directly to the internet without a reverse proxy
     - Admin credentials are created during setup wizard (no default passwords)
+    - Stash API key is stored securely in the database (not in environment variables)
 
 ## Example Configurations
 
-### Minimal Production Configuration
+### Minimal Production Configuration (v2.0+)
 
 ```bash
 # Required
-STASH_URL=http://192.168.1.100:9999/graphql
-STASH_API_KEY=your_api_key_here
 JWT_SECRET=your_very_long_random_secret_key_here
 
-# Path mappings configured via setup wizard (stored in database)
+# Stash connection configured via Setup Wizard (stored in database)
 # All other settings use defaults
 ```
 
 ### Complete Production Configuration
 
 ```bash
-# Stash Integration (Required)
-STASH_URL=http://192.168.1.100:9999/graphql
-STASH_API_KEY=your_api_key_here
+# Authentication (Required)
 JWT_SECRET=your_very_long_random_secret_key_here
 
 # Database (Optional - defaults shown)
 DATABASE_URL=file:/app/data/peek-stash-browser.db
 CONFIG_DIR=/app/data
-
-# Storage (Optional)
-TMP_DIR=/app/tmp
 
 # Security (Optional)
 SECURE_COOKIES=true
@@ -155,15 +97,13 @@ SECURE_COOKIES=true
 # Environment (Optional)
 NODE_ENV=production
 
-# Path mappings configured via setup wizard (stored in database)
+# Stash connection configured via Setup Wizard (stored in database)
 ```
 
 ### Development Configuration
 
 ```bash
-# Stash Integration
-STASH_URL=http://localhost:9999/graphql
-STASH_API_KEY=your_development_api_key
+# Authentication
 JWT_SECRET=dev-secret-change-in-production
 
 # Database (local SQLite file)
@@ -172,7 +112,7 @@ DATABASE_URL=file:./data/peek-db.db
 # Development
 NODE_ENV=development
 
-# Path mappings configured via setup wizard
+# Stash connection configured via Setup Wizard
 ```
 
 
@@ -186,14 +126,9 @@ services:
     ports:
       - "6969:80"
     volumes:
-      - /mnt/user/videos:/app/media:ro
       - peek-data:/app/data
     environment:
-      # Required
-      - STASH_URL=http://stash:9999/graphql
-      - STASH_API_KEY=${STASH_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
-
       # Optional
       - NODE_ENV=production
       - SECURE_COOKIES=false
@@ -203,8 +138,8 @@ volumes:
   peek-data:
 ```
 
-!!! tip "Path Mappings"
-    Path mappings are configured via the setup wizard and stored in the database (in the `peek-data` volume). No environment variables needed!
+!!! tip "Stash Connection"
+    Stash URL and API key are configured via the Setup Wizard on first access and stored in the database.
 
 ## Troubleshooting Configuration Issues
 
@@ -212,8 +147,8 @@ volumes:
 
 Check:
 
-- `STASH_URL` is accessible from the Peek container
-- `STASH_API_KEY` is correct and not expired
+- Stash URL is accessible from the Peek container
+- Stash API key is correct and not expired
 - Stash GraphQL API is enabled
 
 Test connectivity:
@@ -222,25 +157,15 @@ Test connectivity:
 docker exec peek-stash-browser curl http://your-stash-ip:9999/graphql
 ```
 
+You can update Stash connection details in Settings → Stash Configuration.
+
 ### Videos Won't Play
 
 Check:
 
-- Media volume is mounted correctly to container
-- Path mappings are configured correctly in Settings → Path Mappings
-- File permissions allow reading (use `:ro` for read-only mounts)
-
-Verify path mapping:
-
-```bash
-# Check if media is accessible in container
-docker exec peek-stash-browser ls -la /app/media
-
-# Check path mappings in database
-docker exec peek-stash-browser cat /app/data/peek-stash-browser.db
-```
-
-Use the "Test Path" button in Settings → Path Mappings to verify each path.
+- Stash connection is configured correctly (Settings → Stash Configuration)
+- Stash server is running and accessible
+- The scene exists in Stash and has a valid video file
 
 ### Authentication Issues
 

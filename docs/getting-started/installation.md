@@ -9,7 +9,6 @@ Before installing Peek, ensure you have:
 - **Stash Server** running with GraphQL API enabled
 - **Docker** installed (Docker Compose only needed for development)
 - **Network access** from container to Stash server
-- **Storage space** for SQLite database and transcoding temp files
 
 ### Stash Configuration
 
@@ -18,47 +17,7 @@ Before installing Peek, ensure you have:
 3. **Note GraphQL endpoint** (usually `http://stash-ip:9999/graphql`)
 4. **Ensure network access** from your Docker host to Stash
 
-## Understanding Path Mapping
-
-Peek needs to access the same media files that Stash manages. How you configure this depends on your setup:
-
-### Scenario 1: Peek and Stash on Same Machine
-
-**Example**: Both running in Docker on the same host
-
-```bash
-# Simple - just mount the same directory both containers use (read-only recommended)
--v /mnt/media:/app/media:ro
-```
-
-### Scenario 2: Peek on Windows, Stash on Network Server
-
-**Example**: Stash on unRAID/NAS, Peek on Windows desktop
-
-If your network shares are password-protected, use Docker volumes:
-
-```powershell
-# One-time: Create Docker volume for password-protected SMB share
-docker volume create peek-media `
-  --driver local `
-  --opt type=cifs `
-  --opt device=//192.168.1.100/media `
-  --opt o=username=youruser,password=yourpass
-
-# Then use the volume in docker run (read-only recommended)
--v peek-media:/app/media:ro
-```
-
-See [Windows Installation Examples](#windows-examples) below for complete examples.
-
-### Scenario 3: Multiple Stash Libraries
-
-**Example**: Stash has separate folders for videos and images
-
-The setup wizard will auto-discover all your Stash libraries and help you map each one:
-
-- `/data` (videos) → `/app/media`
-- `/images` (images) → `/app/images`
+> **Note**: As of v2.0, Peek streams video directly through Stash - no media volume mounts required!
 
 ## Installation Methods
 
@@ -105,13 +64,11 @@ You do NOT need to restart Docker or unRAID - the template is picked up automati
 1. Go to Docker tab → Add Container
 2. Select "peek-stash-browser" from User Templates dropdown
 3. Configure required settings:
-   - **Stash GraphQL URL**: `http://your-unraid-ip:9999/graphql`
-   - **Stash API Key**: Get from Stash Settings → Security
    - **JWT Secret**: Generate with `openssl rand -hex 32` in unRAID terminal
-   - **Media Directory**: Path to your Stash media (e.g., `/mnt/user/videos`)
    - **App Data Directory**: Path for Peek data (e.g., `/mnt/user/appdata/peek-stash-browser`)
 4. Click Apply
 5. Access at `http://your-unraid-ip:6969`
+6. Complete the Setup Wizard to connect to your Stash server
 
 ### Option 2: Docker (Single Container)
 
@@ -125,66 +82,28 @@ docker pull carrotwaxr/peek-stash-browser:latest
 # Generate JWT secret
 export JWT_SECRET=$(openssl rand -base64 32)
 
-# Run with single library
+# Run Peek
 docker run -d \
   --name peek-stash-browser \
   -p 6969:80 \
-  -v /path/to/your/media:/app/media:ro \
   -v peek-data:/app/data \
-  -e STASH_URL="http://your-stash-server:9999/graphql" \
-  -e STASH_API_KEY="your_stash_api_key" \
-  -e JWT_SECRET="${JWT_SECRET}" \
-  carrotwaxr/peek-stash-browser:latest
-
-# Run with multiple libraries (if Stash has separate video/image libraries)
-docker run -d \
-  --name peek-stash-browser \
-  -p 6969:80 \
-  -v /path/to/stash/videos:/app/media:ro \
-  -v /path/to/stash/images:/app/images:ro \
-  -v /path/to/stash/other:/app/other:ro \
-  -v peek-data:/app/data \
-  -e STASH_URL="http://your-stash-server:9999/graphql" \
-  -e STASH_API_KEY="your_stash_api_key" \
   -e JWT_SECRET="${JWT_SECRET}" \
   carrotwaxr/peek-stash-browser:latest
 ```
 
 **Volume Mounts**:
 
-- `/path/to/your/media` - Your media files (read-only recommended with `:ro`)
 - `peek-data` - Database and app data (Docker named volume)
-
-!!! tip "Multiple Libraries"
-If Stash has multiple library paths, mount each one separately. The setup wizard will auto-discover them and help you configure the mappings.
 
 **Required Environment Variables**:
 
-- `STASH_URL` - Your Stash GraphQL endpoint
-- `STASH_API_KEY` - API key from Stash settings
 - `JWT_SECRET` - Secret for JWT authentication (recommended to set manually)
+
+> **Note**: Stash URL and API key are configured via the Setup Wizard on first access - no environment variables needed!
 
 See [Configuration Guide](configuration.md) for all environment variables.
 
 #### Windows Examples
-
-Windows users with network shares (SMB/CIFS) need special configuration for password-protected shares.
-
-!!! warning "Windows Network Shares"
-Docker Desktop on Windows cannot directly mount password-protected network shares using drive letters (Z:, X:, etc.).
-Use Docker volumes with CIFS credentials instead.
-
-**Step 1: Find your UNC path**
-
-If you have a mapped drive, find its UNC path:
-
-```powershell
-# In PowerShell
-net use Z:
-# Look for "Remote name" in the output (e.g., \\192.168.1.100\media)
-```
-
-**Step 2: Create Docker volumes (one-time setup)**
 
 ```powershell
 # Pull the latest image from Docker Hub
@@ -196,62 +115,14 @@ $bytes = New-Object byte[] 32
 $rng.GetBytes($bytes)
 $jwt = [Convert]::ToBase64String($bytes)
 
-# For single library:
-docker volume create peek-media `
-  --driver local `
-  --opt type=cifs `
-  --opt device=//192.168.1.100/stash `
-  --opt o=username=youruser,password=yourpass
-
-# For multiple libraries (create one volume per library):
-docker volume create peek-videos `
-  --driver local `
-  --opt type=cifs `
-  --opt device=//192.168.1.100/stash/videos `
-  --opt o=username=youruser,password=yourpass
-
-docker volume create peek-images `
-  --driver local `
-  --opt type=cifs `
-  --opt device=//192.168.1.100/stash/images `
-  --opt o=username=youruser,password=yourpass
-
-# Create volume for Peek data (persists database)
-docker volume create peek-data
-```
-
-!!! tip "Volumes persist across reboots!"
-These volumes are created once and survive container restarts, system reboots, and Docker Desktop restarts.
-
-**Step 3: Run Peek container**
-
-```powershell
-# Single library
+# Run Peek
 docker run -d `
     --name peek-stash-browser `
     -p 6969:80 `
-    -v peek-media:/app/media:ro `
     -v peek-data:/app/data `
-    -e STASH_URL=http://192.168.1.100:9999/graphql `
-    -e STASH_API_KEY=your_api_key_here `
-    -e JWT_SECRET=$jwt `
-    carrotwaxr/peek-stash-browser:latest
-
-# Multiple libraries
-docker run -d `
-    --name peek-stash-browser `
-    -p 6969:80 `
-    -v peek-videos:/app/media:ro `
-    -v peek-images:/app/images:ro `
-    -v peek-data:/app/data `
-    -e STASH_URL=http://192.168.1.100:9999/graphql `
-    -e STASH_API_KEY=your_api_key_here `
     -e JWT_SECRET=$jwt `
     carrotwaxr/peek-stash-browser:latest
 ```
-
-!!! tip "Multiple Libraries"
-    Create one Docker volume for each Stash library path. Media volumes are mounted read-only (`:ro`) to prevent accidental modifications. The setup wizard will auto-discover all libraries and help you map them.
 
 **Managing the container:**
 
@@ -275,14 +146,10 @@ docker pull carrotwaxr/peek-stash-browser:latest
 # Then re-run the docker run command above
 ```
 
-!!! success "Volumes are preserved!"
+!!! success "Data persists across updates!"
 Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
 
 #### Linux/macOS Examples
-
-Linux and macOS users can mount directories directly without the complexity of network share authentication.
-
-**Step 1: Pull image and generate JWT secret**
 
 ```bash
 # Pull the latest image from Docker Hub
@@ -290,41 +157,15 @@ docker pull carrotwaxr/peek-stash-browser:latest
 
 # Generate a secure random JWT secret
 export JWT_SECRET=$(openssl rand -base64 32)
-```
 
-**Step 2: Run Peek container**
-
-```bash
-# Single Stash library
+# Run Peek
 docker run -d \
     --name peek-stash-browser \
     -p 6969:80 \
-    -v /path/to/stash/media:/app/media:ro \
     -v peek-data:/app/data \
-    -e STASH_URL=http://192.168.1.100:9999/graphql \
-    -e STASH_API_KEY=your_api_key_here \
-    -e JWT_SECRET="${JWT_SECRET}" \
-    carrotwaxr/peek-stash-browser:latest
-
-# Multiple Stash libraries (videos + images + other)
-docker run -d \
-    --name peek-stash-browser \
-    -p 6969:80 \
-    -v /path/to/stash/videos:/app/media:ro \
-    -v /path/to/stash/images:/app/images:ro \
-    -v /path/to/stash/other:/app/other:ro \
-    -v peek-data:/app/data \
-    -e STASH_URL=http://192.168.1.100:9999/graphql \
-    -e STASH_API_KEY=your_api_key_here \
     -e JWT_SECRET="${JWT_SECRET}" \
     carrotwaxr/peek-stash-browser:latest
 ```
-
-!!! tip "Read-only mounts recommended"
-Use `:ro` flag on media mounts to prevent accidental modifications to your Stash library
-
-!!! tip "Multiple Libraries"
-Mount each Stash library path separately. The setup wizard will auto-discover all libraries and help you map them.
 
 **Managing the container:**
 
@@ -370,10 +211,8 @@ This method is for development with hot reloading enabled
 2. **Configure environment** (edit `.env`):
 
    ```bash
-   STASH_URL=http://your-stash-server:9999/graphql
-   STASH_API_KEY=your_stash_api_key
+   JWT_SECRET=your-dev-secret-here
    DATABASE_URL=file:./data/peek-stash-browser.db
-   TMP_DIR=/path/to/temp/directory
    ```
 
 3. **Start services**:
@@ -389,16 +228,12 @@ This method is for development with hot reloading enabled
 After installation, access Peek in your browser for the first-time setup:
 
 1. Navigate to `http://localhost:6969` (or your server IP)
-2. **Complete the 5-step setup wizard**:
+2. **Complete the 4-step setup wizard**:
    - **Welcome**: Introduction to Peek
-   - **Discover Libraries**: Auto-discover Stash library paths
-   - **Configure Paths**: Map Stash paths to Peek container paths
-   - **Create Admin**: Set your admin password
+   - **Create Admin**: Set your admin username and password
+   - **Connect to Stash**: Enter your Stash URL and API key
    - **Complete**: Setup finished!
 3. **Login** with your newly created admin credentials
-
-!!! tip "Path Mapping Made Easy"
-The wizard auto-discovers your Stash library paths and helps you map them correctly!
 
 ## Updating Peek
 
@@ -432,10 +267,7 @@ To update your Docker container to the latest version:
     docker run -d \
       --name peek-stash-browser \
       -p 6969:80 \
-      -v /path/to/stash/media:/app/media:ro \
       -v peek-data:/app/data \
-      -e STASH_URL=http://192.168.1.100:9999/graphql \
-      -e STASH_API_KEY=your_api_key_here \
       -e JWT_SECRET="${JWT_SECRET}" \
       carrotwaxr/peek-stash-browser:latest
     ```
@@ -453,16 +285,13 @@ To update your Docker container to the latest version:
     docker run -d `
       --name peek-stash-browser `
       -p 6969:80 `
-      -v peek-media:/app/media:ro `
       -v peek-data:/app/data `
-      -e STASH_URL=http://192.168.1.100:9999/graphql `
-      -e STASH_API_KEY=your_api_key_here `
       -e JWT_SECRET=$jwt `
       carrotwaxr/peek-stash-browser:latest
     ```
 
 !!! success "Your data persists across updates"
-    Database, user settings, path mappings, and playlists are stored in the `peek-data` volume and will not be lost.
+    Database, user settings, Stash configuration, and playlists are stored in the `peek-data` volume and will not be lost.
 
 ### Version Pinning
 

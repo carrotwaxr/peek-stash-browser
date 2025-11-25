@@ -10,35 +10,37 @@
   <Support>https://github.com/carrotwaxr/peek-stash-browser/issues</Support>
   <Project>https://github.com/carrotwaxr/peek-stash-browser</Project>
   <Overview>
-    Peek Stash Browser is a modern web application for browsing and streaming your Stash media library with real-time HLS transcoding.
+    Peek Stash Browser is a modern web application for browsing and streaming your Stash media library.
 
     Features:
     - Modern React frontend with responsive design
-    - Real-time HLS video transcoding with FFmpeg
-    - Adaptive bitrate streaming (360p/480p/720p/1080p)
+    - Video streaming proxied through Stash (no local media access needed)
+    - Adaptive quality selection (Direct, 1080p, 720p, 480p, 360p)
     - JWT-based authentication with admin/user roles
     - Advanced filtering and search
-    - Full VOD controls with seeking support
-    - 5-step setup wizard for easy first-time configuration
+    - Subtitle/caption support
+    - 4-step setup wizard for easy first-time configuration
 
     This is a single-container solution that includes:
     - Frontend web interface (React + Vite)
     - Backend API server (Node.js/Express + TypeScript)
     - SQLite database for user data
-    - HLS transcoding with on-demand segment generation
 
     First-Time Setup:
-    After installation, access http://[IP]:6969 and complete the 5-step setup wizard:
+    After installation, access http://[IP]:6969 and complete the 4-step setup wizard:
     1. Welcome screen
-    2. Auto-discover Stash libraries via GraphQL
-    3. Configure path mappings (Stash paths to Peek container paths)
-    4. Create admin account (username + password)
-    5. Setup complete!
+    2. Create admin account (username + password)
+    3. Connect to Stash (URL + API key)
+    4. Setup complete!
 
     Requirements:
     - Existing Stash server with GraphQL API enabled
-    - Media files accessible to unRAID (same location as Stash)
-    - At least 2GB RAM recommended for transcoding
+    - Network access from Peek to Stash server
+    - At least 1GB RAM recommended
+
+    Upgrading from v1.x:
+    Your existing STASH_URL and STASH_API_KEY will auto-migrate to the database on first start.
+    After successful migration, you can remove these env vars from your container config.
   </Overview>
   <Category>MediaApp:Video MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:80]</WebUI>
@@ -64,11 +66,6 @@
     </Publish>
   </Networking>
   <Data>
-    <Volume>
-      <HostDir>/mnt/user/videos</HostDir>
-      <ContainerDir>/app/media</ContainerDir>
-      <Mode>ro</Mode>
-    </Volume>
     <Volume>
       <HostDir>/mnt/user/appdata/peek-stash-browser</HostDir>
       <ContainerDir>/app/data</ContainerDir>
@@ -114,11 +111,10 @@
   </Environment>
   <Labels/>
   <Config Name="Web UI Port" Target="80" Default="6969" Mode="tcp" Description="Web interface port - access Peek at http://[IP]:6969" Type="Port" Display="always" Required="true" Mask="false">6969</Config>
-  <Config Name="Media Directory" Target="/app/media" Default="/mnt/user/videos" Mode="ro" Description="Path to your media files - MUST be the same path Stash uses (read-only). Example: /mnt/user/videos. Path mapping configured via setup wizard." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/videos</Config>
-  <Config Name="App Data Directory" Target="/app/data" Default="/mnt/user/appdata/peek-stash-browser" Mode="rw" Description="Peek configuration, database, and HLS transcoding cache. Requires read/write access." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser</Config>
-  <Config Name="Stash GraphQL URL" Target="STASH_URL" Default="http://10.0.0.4:9999/graphql" Mode="" Description="Your Stash server's GraphQL endpoint. Use the unRAID server IP or hostname. Example: http://10.0.0.4:9999/graphql" Type="Variable" Display="always" Required="true" Mask="false">http://10.0.0.4:9999/graphql</Config>
-  <Config Name="Stash API Key" Target="STASH_API_KEY" Default="" Mode="" Description="Your Stash API key from Settings &gt; Security &gt; API Key. REQUIRED for authentication." Type="Variable" Display="always" Required="true" Mask="true"></Config>
-  <Config Name="JWT Secret Key" Target="JWT_SECRET" Default="" Mode="" Description="Secure random string for JWT authentication. Generate a strong random string (e.g., openssl rand -hex 32). CHANGE THIS!" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="App Data Directory" Target="/app/data" Default="/mnt/user/appdata/peek-stash-browser" Mode="rw" Description="Peek configuration and database. Requires read/write access." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/peek-stash-browser</Config>
+  <Config Name="JWT Secret Key" Target="JWT_SECRET" Default="" Mode="" Description="Secure random string for JWT authentication. Generate with: openssl rand -hex 32" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="Stash GraphQL URL (Legacy)" Target="STASH_URL" Default="" Mode="" Description="MIGRATION ONLY: Leave blank for new installs - configured via Setup Wizard. Existing v1.x installs: keep your value, it will auto-migrate to database on first start." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Stash API Key (Legacy)" Target="STASH_API_KEY" Default="" Mode="" Description="MIGRATION ONLY: Leave blank for new installs - configured via Setup Wizard. Existing v1.x installs: keep your value, it will auto-migrate to database on first start." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-db.db" Mode="" Description="SQLite database file path. Leave as default unless you know what you're doing." Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-db.db</Config>
   <Config Name="Config Directory" Target="CONFIG_DIR" Default="/app/data" Mode="" Description="Directory for config and HLS cache. Should match App Data Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/data</Config>
   <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment mode. Leave as 'production' for normal use." Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
