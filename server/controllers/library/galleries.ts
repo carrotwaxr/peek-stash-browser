@@ -4,8 +4,8 @@ import prisma from "../../prisma/singleton.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
-import getStash from "../../stash.js";
 import {
   CriterionModifier,
   NormalizedGallery,
@@ -537,7 +537,7 @@ export const getGalleryImages = async (
     }
 
     // Query images filtered by gallery
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     const result = await stash.findImages({
       filter: {
         per_page: -1, // Get all images

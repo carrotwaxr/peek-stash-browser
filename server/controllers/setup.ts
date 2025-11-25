@@ -1,6 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
+import { StashApp } from "stashapp-api";
+import { stashCacheManager } from "../services/StashCacheManager.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
 
 const prisma = new PrismaClient();
@@ -28,22 +31,29 @@ const getDefaultCarouselPreferences = (): CarouselPreference[] => [
 
 /**
  * Check setup status (for determining if wizard is needed)
- * Currently just checks if at least one user exists
+ * Checks for both user existence and Stash instance configuration
  */
 export const getSetupStatus = async (req: Request, res: Response) => {
   try {
     // Check if at least one user exists
     const userCount = await prisma.user.count();
-    const hasUser = userCount > 0;
+    const hasUsers = userCount > 0;
 
-    // Setup is complete if users exist
-    // Future: Will also check for Stash instance configuration
-    const setupComplete = hasUser;
+    // Check if at least one Stash instance is configured
+    const stashInstanceCount = await prisma.stashInstance.count({
+      where: { enabled: true },
+    });
+    const hasStashInstance = stashInstanceCount > 0;
+
+    // Setup is complete if both users and Stash instance exist
+    const setupComplete = hasUsers && hasStashInstance;
 
     res.json({
       setupComplete,
-      hasUsers: hasUser,
+      hasUsers,
+      hasStashInstance,
       userCount,
+      stashInstanceCount,
     });
   } catch (error) {
     logger.error("Failed to get setup status", { error });
@@ -115,6 +125,237 @@ export const createFirstAdmin = async (req: Request, res: Response) => {
     logger.error("Failed to create first admin user", { error });
     res.status(500).json({
       error: "Failed to create admin user",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/**
+ * Test connection to a Stash server
+ * POST /api/setup/test-stash-connection
+ */
+export const testStashConnection = async (req: Request, res: Response) => {
+  try {
+    const { url, apiKey } = req.body;
+
+    if (!url || !apiKey) {
+      return res.status(400).json({
+        error: "URL and API key are required",
+      });
+    }
+
+    // Validate URL format
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({
+        error: "Invalid URL format. Expected: http://hostname:port/graphql",
+      });
+    }
+
+    logger.info("Testing Stash connection", {
+      url,
+      urlLength: url?.length,
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
+      apiKeyLength: apiKey?.length,
+      apiKeyPreview: apiKey ? `${apiKey.substring(0, 20)}...` : "NOT SET",
+    });
+
+    // Try to connect to Stash
+    logger.debug("Initializing StashApp with provided credentials");
+    const testStash = StashApp.init({ url, apiKey });
+    logger.debug("StashApp initialized, calling configuration()");
+
+    try {
+      const result = await testStash.configuration();
+
+      if (result && result.configuration) {
+        logger.info("Stash connection test successful");
+        res.json({
+          success: true,
+          message: "Connection successful",
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: "Connected but received empty configuration",
+        });
+      }
+    } catch (error) {
+      // Get the full error details including cause
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const errorCause = error instanceof Error && (error as any).cause ? String((error as any).cause) : "";
+      const fullError = errorCause ? `${errorMessage}: ${errorCause}` : errorMessage;
+
+      logger.error("Stash connection test failed", {
+        error: errorMessage,
+        cause: errorCause,
+        fullError
+      });
+
+      // Provide user-friendly error messages
+      let friendlyMessage = "Connection failed";
+      const checkString = fullError.toLowerCase();
+
+      if (checkString.includes("econnrefused")) {
+        friendlyMessage = "Connection refused. Is Stash running?";
+      } else if (checkString.includes("enotfound") || checkString.includes("getaddrinfo")) {
+        friendlyMessage = "Host not found. Check the hostname.";
+      } else if (checkString.includes("401") || checkString.includes("unauthorized")) {
+        friendlyMessage = "Authentication failed. Check your API key.";
+      } else if (checkString.includes("404")) {
+        friendlyMessage = "Endpoint not found. Make sure URL ends with /graphql";
+      } else if (checkString.includes("etimedout")) {
+        friendlyMessage = "Connection timed out. Check network connectivity.";
+      } else if (checkString.includes("fetch failed")) {
+        // Generic fetch error - try to give more context
+        friendlyMessage = "Network error connecting to Stash. Check the URL and ensure Stash is accessible from the server.";
+      }
+
+      res.status(400).json({
+        success: false,
+        error: friendlyMessage,
+        details: fullError,
+      });
+    }
+  } catch (error) {
+    logger.error("Error testing Stash connection", { error });
+    res.status(500).json({
+      error: "Internal server error",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/**
+ * Create first Stash instance (public endpoint for setup wizard)
+ * Only works if NO Stash instances exist yet
+ * POST /api/setup/create-stash-instance
+ */
+export const createFirstStashInstance = async (req: Request, res: Response) => {
+  try {
+    // Check if any Stash instances already exist
+    const instanceCount = await prisma.stashInstance.count();
+
+    if (instanceCount > 0) {
+      return res.status(403).json({
+        error:
+          "A Stash instance already exists. Use Server Settings to manage instances.",
+      });
+    }
+
+    const { name, url, apiKey } = req.body;
+
+    if (!url || !apiKey) {
+      return res.status(400).json({
+        error: "URL and API key are required",
+      });
+    }
+
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch {
+      return res.status(400).json({
+        error: "Invalid URL format. Expected: http://hostname:port/graphql",
+      });
+    }
+
+    // Test connection before saving
+    const testStash = StashApp.init({ url, apiKey });
+    try {
+      await testStash.configuration();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error("Stash connection validation failed", { error: errorMessage });
+      return res.status(400).json({
+        error: "Could not connect to Stash server",
+        details: errorMessage,
+      });
+    }
+
+    // Create Stash instance
+    const instance = await prisma.stashInstance.create({
+      data: {
+        name: name || "Default",
+        url,
+        apiKey,
+        enabled: true,
+        priority: 0,
+      },
+      select: {
+        id: true,
+        name: true,
+        url: true,
+        enabled: true,
+        createdAt: true,
+      },
+    });
+
+    logger.info("First Stash instance created via setup wizard", {
+      instanceId: instance.id,
+      instanceName: instance.name,
+    });
+
+    // Reload the StashInstanceManager to pick up the new instance
+    await stashInstanceManager.reload();
+
+    // Initialize the Stash cache now that we have an instance
+    // This runs in the background - we don't want to block the response
+    logger.info("Triggering Stash cache initialization...");
+    stashCacheManager.reinitialize().catch((err) => {
+      logger.error("Failed to initialize Stash cache after instance creation", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    res.status(201).json({
+      success: true,
+      instance,
+    });
+  } catch (error) {
+    logger.error("Failed to create Stash instance", { error });
+    res.status(500).json({
+      error: "Failed to create Stash instance",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/**
+ * Get current Stash instance info (for Server Settings display)
+ * GET /api/setup/stash-instance
+ * Requires authentication
+ */
+export const getStashInstance = async (req: Request, res: Response) => {
+  try {
+    const instances = await prisma.stashInstance.findMany({
+      select: {
+        id: true,
+        name: true,
+        url: true,
+        enabled: true,
+        priority: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { priority: "asc" },
+    });
+
+    // For commit 1, we only support one instance
+    const instance = instances[0] || null;
+
+    res.json({
+      instance,
+      instanceCount: instances.length,
+    });
+  } catch (error) {
+    logger.error("Failed to get Stash instance", { error });
+    res.status(500).json({
+      error: "Failed to get Stash instance",
       message: error instanceof Error ? error.message : String(error),
     });
   }

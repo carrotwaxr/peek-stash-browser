@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import prisma from "../prisma/singleton.js";
-import getStash from "../stash.js";
-import { logger } from "../utils/logger.js";
 import { filteredEntityCacheService } from "../services/FilteredEntityCacheService.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import { logger } from "../utils/logger.js";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -102,7 +102,7 @@ export async function updateSceneRating(
     // Sync rating to Stash if enabled (only rating, NOT favorite for scenes)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         await stash.sceneUpdate({
           input: {
             id: sceneId,
@@ -203,7 +203,7 @@ export async function updatePerformerRating(
     // Sync to Stash if enabled (performer supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
       try {
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         await stash.performerUpdate({
           input: {
             id: performerId,
@@ -305,7 +305,7 @@ export async function updateStudioRating(
     // Sync to Stash if enabled (studio supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
       try {
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         await stash.studioUpdate({
           input: {
             id: studioId,
@@ -402,7 +402,7 @@ export async function updateTagRating(
     // Sync favorite only to Stash if enabled (tags don't have rating100 in Stash)
     if (user?.syncToStash && favorite !== undefined) {
       try {
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         await stash.tagUpdate({
           input: {
             id: tagId,
@@ -502,7 +502,7 @@ export async function updateGalleryRating(
     // Sync rating only to Stash if enabled (galleries don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         await stash.galleryUpdate({
           input: {
             id: galleryId,
@@ -597,7 +597,7 @@ export async function updateGroupRating(
     // Sync rating only to Stash if enabled (groups don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         await stash.groupUpdate({
           input: {
             id: groupId,
@@ -692,7 +692,7 @@ export async function updateImageRating(
     // Sync rating only to Stash if enabled (images don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         await stash.imageUpdate({
           input: {
             id: imageId,

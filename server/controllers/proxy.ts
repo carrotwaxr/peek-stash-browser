@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import http from "http";
 import https from "https";
 import { URL } from "url";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -16,11 +17,14 @@ export const proxyScenePreview = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing scene ID" });
     }
 
-    const stashUrl = process.env.STASH_URL?.replace("/graphql", "");
-    const apiKey = process.env.STASH_API_KEY;
+    let stashUrl: string;
+    let apiKey: string;
 
-    if (!stashUrl || !apiKey) {
-      logger.error("STASH_URL or STASH_API_KEY not configured");
+    try {
+      stashUrl = stashInstanceManager.getBaseUrl();
+      apiKey = stashInstanceManager.getApiKey();
+    } catch {
+      logger.error("No Stash instance configured");
       return res.status(500).json({ error: "Stash configuration missing" });
     }
 
@@ -97,11 +101,14 @@ export const proxySceneWebp = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Missing scene ID" });
     }
 
-    const stashUrl = process.env.STASH_URL?.replace("/graphql", "");
-    const apiKey = process.env.STASH_API_KEY;
+    let stashUrl: string;
+    let apiKey: string;
 
-    if (!stashUrl || !apiKey) {
-      logger.error("STASH_URL or STASH_API_KEY not configured");
+    try {
+      stashUrl = stashInstanceManager.getBaseUrl();
+      apiKey = stashInstanceManager.getApiKey();
+    } catch {
+      logger.error("No Stash instance configured");
       return res.status(500).json({ error: "Stash configuration missing" });
     }
 
@@ -180,11 +187,14 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
         .json({ error: "Missing or invalid path parameter" });
     }
 
-    const stashUrl = process.env.STASH_URL?.replace("/graphql", "");
-    const apiKey = process.env.STASH_API_KEY;
+    let stashUrl: string;
+    let apiKey: string;
 
-    if (!stashUrl || !apiKey) {
-      logger.error("STASH_URL or STASH_API_KEY not configured");
+    try {
+      stashUrl = stashInstanceManager.getBaseUrl();
+      apiKey = stashInstanceManager.getApiKey();
+    } catch {
+      logger.error("No Stash instance configured");
       return res.status(500).json({ error: "Stash configuration missing" });
     }
 

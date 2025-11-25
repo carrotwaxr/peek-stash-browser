@@ -6,7 +6,6 @@ import type {
   Studio,
   Tag,
 } from "stashapp-api";
-import getStash from "../stash.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
@@ -25,6 +24,7 @@ import {
   transformTag,
 } from "../utils/pathMapping.js";
 import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
+import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
  * Server-wide cache state
@@ -149,7 +149,7 @@ class StashCacheManager {
 
     try {
       logger.info("Starting cache refresh - fetching entities from Stash");
-      const stash = getStash();
+      const stash = stashInstanceManager.getDefault();
 
       // Fetch entities individually with detailed progress logging
       logger.info("Fetching scenes (compact)...");
@@ -544,6 +544,36 @@ class StashCacheManager {
         1024
       ).toFixed(2)} MB`, // Rough estimate: 3KB per scene, 1KB per gallery
     };
+  }
+
+  /**
+   * Reinitialize the cache after Stash instance changes
+   * Called when a new StashInstance is created, updated, or deleted
+   * Unlike initialize(), this can be called multiple times
+   */
+  async reinitialize(): Promise<void> {
+    logger.info("Reinitializing Stash cache due to instance change...");
+
+    // Clear existing interval if any
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+
+    // Reset state to allow reinitialization
+    this.cache.isInitialized = false;
+
+    // Check if we have any Stash instances configured
+    if (!stashInstanceManager.hasInstances()) {
+      logger.warn(
+        "No Stash instances configured - cache will remain empty until instance is added"
+      );
+      this.cache.isInitialized = true;
+      return;
+    }
+
+    // Perform the initialization
+    await this.initialize();
   }
 
   /**

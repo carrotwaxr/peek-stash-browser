@@ -446,7 +446,7 @@ export const commonFilters = {
 export const setupApi = {
   /**
    * Get setup status
-   * @returns {Promise<{setupComplete: boolean, hasUsers: boolean, userCount: number}>}
+   * @returns {Promise<{setupComplete: boolean, hasUsers: boolean, hasStashInstance: boolean, userCount: number}>}
    */
   getSetupStatus: () => apiGet("/setup/status"),
 
@@ -458,6 +458,25 @@ export const setupApi = {
    */
   createFirstAdmin: (username, password) =>
     apiPost("/setup/create-admin", { username, password }),
+
+  /**
+   * Test connection to a Stash server
+   * @param {string} url - Stash GraphQL URL (e.g., http://localhost:9999/graphql)
+   * @param {string} apiKey - Stash API key
+   * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+   */
+  testStashConnection: (url, apiKey) =>
+    apiPost("/setup/test-stash-connection", { url, apiKey }),
+
+  /**
+   * Create the first Stash instance (only works if no instances exist)
+   * @param {string} url - Stash GraphQL URL
+   * @param {string} apiKey - Stash API key
+   * @param {string} name - Instance name (optional, defaults to "Default")
+   * @returns {Promise<{success: boolean, instance: Object}>}
+   */
+  createFirstStashInstance: (url, apiKey, name = "Default") =>
+    apiPost("/setup/create-stash-instance", { url, apiKey, name }),
 };
 
 /**

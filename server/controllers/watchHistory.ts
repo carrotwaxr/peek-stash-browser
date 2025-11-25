@@ -2,8 +2,8 @@ import { WatchHistory } from "@prisma/client";
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { userStatsService } from "../services/UserStatsService.js";
-import getStash from "../stash.js";
 import { logger } from "../utils/logger.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
@@ -55,7 +55,7 @@ export async function pingWatchHistory(
     }
 
     // Get scene duration from Stash
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     let sceneDuration = 0;
     try {
       const sceneData = await stash.findScenes({ ids: [sceneId] });
@@ -384,7 +384,7 @@ export async function incrementOCounter(
     if (user.syncToStash) {
       try {
         logger.info("Syncing O counter increment to Stash", { sceneId });
-        const stash = getStash();
+        const stash = stashInstanceManager.getDefault();
         const result = await stash.sceneIncrementO({ id: sceneId });
         logger.info("Successfully incremented O counter in Stash", {
           sceneId,

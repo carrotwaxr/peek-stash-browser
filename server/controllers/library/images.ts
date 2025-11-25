@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
-import getStash from "../../stash.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { CriterionModifier } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { transformImage } from "../../utils/pathMapping.js";
@@ -37,7 +37,7 @@ export async function calculateEntityImageCount(
     }
 
     // Step 2: Get all images from matching galleries in a single query
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     const galleryIds = matchingGalleries.map((g) => g.id);
 
     if (galleryIds.length === 0) {
@@ -133,7 +133,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 2: Get all images from matching galleries (single query with all gallery IDs)
     const step2Start = Date.now();
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     const allImagesMap = new Map(); // Use map for de-duplication
 
     try {

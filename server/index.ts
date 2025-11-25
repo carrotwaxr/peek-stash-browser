@@ -5,9 +5,11 @@ import { fileURLToPath } from "url";
 import { setupAPI } from "./initializers/api.js";
 import { initializeCache } from "./initializers/cache.js";
 import { initializeDatabase } from "./initializers/database.js";
+import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashCacheManager } from "./services/StashCacheManager.js";
+import { stashInstanceManager } from "./services/StashInstanceManager.js";
 import { logger } from "./utils/logger.js";
 
 const prisma = new PrismaClient();
@@ -34,13 +36,28 @@ const main = async () => {
   // Run database migrations and seeding
   await initializeDatabase();
 
+  // Initialize Stash instances (migrate from env vars if needed)
+  const stashConfig = await initializeStashInstances();
+
+  // Initialize the StashInstanceManager with database config
+  await stashInstanceManager.initialize();
+
+  // Start API server (needed for setup wizard if no Stash configured)
   setupAPI();
 
-  // Initialize cache FIRST (needed for data migrations that access scene data)
-  await initializeCache();
+  // Only initialize cache if we have Stash instances configured
+  if (stashConfig.needsSetup) {
+    logger.warn("=".repeat(60));
+    logger.warn("No Stash instance configured - setup wizard required");
+    logger.warn("Access the web UI to complete setup");
+    logger.warn("=".repeat(60));
+  } else {
+    // Initialize cache FIRST (needed for data migrations that access scene data)
+    await initializeCache();
 
-  // Run one-time data migrations AFTER cache is ready (e.g., backfill stats for v1.4.x)
-  await dataMigrationService.runPendingMigrations();
+    // Run one-time data migrations AFTER cache is ready (e.g., backfill stats for v1.4.x)
+    await dataMigrationService.runPendingMigrations();
+  }
 };
 
 main().catch(async (e) => {

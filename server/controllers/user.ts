@@ -954,9 +954,11 @@ export const syncFromStash = async (
       groups: { rating: true }, // Groups only have rating, no favorite
     };
 
-    // Import stash singleton
-    const getStash = (await import("../stash.js")).default;
-    const stash = getStash();
+    // Get Stash instance from manager
+    const { stashInstanceManager } = await import(
+      "../services/StashInstanceManager.js"
+    );
+    const stash = stashInstanceManager.getDefault();
 
     const stats = {
       scenes: { checked: 0, updated: 0, created: 0 },

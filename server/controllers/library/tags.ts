@@ -4,9 +4,9 @@ import prisma from "../../prisma/singleton.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
-import getStash from "../../stash.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -856,7 +856,7 @@ export const updateTag = async (req: AuthenticatedRequest, res: Response) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const stash = getStash();
+    const stash = stashInstanceManager.getDefault();
     const updatedTag = await stash.tagUpdate({
       input: {
         id,

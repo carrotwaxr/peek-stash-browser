@@ -2,19 +2,19 @@
  * Utility functions for working with Stash URLs
  */
 
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
+
 /**
- * Strips /graphql from the STASH_URL environment variable to get the base Stash URL
+ * Gets the base Stash URL from the current instance configuration
  * @returns Base Stash URL (e.g., http://localhost:9999)
  */
 export function getStashBaseUrl(): string | null {
-  const stashUrl = process.env.STASH_URL;
-
-  if (!stashUrl) {
+  try {
+    return stashInstanceManager.getBaseUrl();
+  } catch {
+    // No instance configured
     return null;
   }
-
-  // Remove /graphql suffix if present
-  return stashUrl.replace(/\/graphql\/?$/, '');
 }
 
 /**

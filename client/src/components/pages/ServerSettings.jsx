@@ -5,6 +5,7 @@ import packageJson from "../../../package.json";
 import { useAuth } from "../../hooks/useAuth.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import ServerStatsSection from "../settings/ServerStatsSection.jsx";
+import StashInstanceSection from "../settings/StashInstanceSection.jsx";
 import UserManagementSection from "../settings/UserManagementSection.jsx";
 import VersionInfoSection from "../settings/VersionInfoSection.jsx";
 import { PageHeader, PageLayout } from "../ui/index.js";
@@ -113,6 +114,9 @@ const ServerSettings = () => {
           onError={showError}
           api={api}
         />
+
+        {/* Stash Instance Section */}
+        <StashInstanceSection api={api} />
 
         {/* Server Statistics Section */}
         <ServerStatsSection />

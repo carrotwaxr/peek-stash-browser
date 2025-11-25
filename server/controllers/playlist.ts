@@ -50,8 +50,10 @@ export const getUserPlaylists = async (
         const sceneIds = playlist.items.map((item) => item.sceneId);
 
         try {
-          const getStash = (await import("../stash.js")).default;
-          const stash = getStash();
+          const { stashInstanceManager } = await import(
+            "../services/StashInstanceManager.js"
+          );
+          const stash = stashInstanceManager.getDefault();
 
           const scenesResponse = await stash.findScenes({
             scene_ids: sceneIds.map((id) => parseInt(id)),
@@ -135,9 +137,11 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
     if (playlist.items.length > 0) {
       const sceneIds = playlist.items.map((item) => item.sceneId);
 
-      // Import getStash and fetch scenes
-      const getStash = (await import("../stash.js")).default;
-      const stash = getStash();
+      // Get Stash instance and fetch scenes
+      const { stashInstanceManager } = await import(
+        "../services/StashInstanceManager.js"
+      );
+      const stash = stashInstanceManager.getDefault();
 
       try {
         const scenesResponse = await stash.findScenes({
