@@ -186,7 +186,7 @@ const StudioCard = forwardRef(
           {
             type: "GALLERIES",
             count: studio.gallery_count,
-            onClick: studio.gallery_count > 0 ? () => navigate(`/galleries?studioId=${studio.id}`) : undefined,
+            onClick: studio.gallery_count > 0 ? () => navigate(`/galleries?studioIds=${studio.id}`) : undefined,
           },
           {
             type: "PERFORMERS",
