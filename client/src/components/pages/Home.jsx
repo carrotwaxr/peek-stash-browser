@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
+import * as LucideIcons from "lucide-react";
 import {
   CAROUSEL_DEFINITIONS,
   migrateCarouselPreferences,
@@ -9,6 +10,7 @@ import { useAsyncData } from "../../hooks/useApi.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { libraryApi } from "../../services/api.js";
 import {
   BulkActionBar,
   ContinueWatchingCarousel,
@@ -18,18 +20,25 @@ import {
   SceneCarousel,
 } from "../ui/index.js";
 
-const api = axios.create({
+const axiosApi = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
 
 const SCENES_PER_CAROUSEL = 12;
 
+/**
+ * Check if an ID is a custom carousel (prefixed with "custom-")
+ */
+const isCustomCarousel = (id) => id && id.startsWith("custom-");
+
 const Home = () => {
   usePageTitle(); // Sets "Peek"
   const navigate = useNavigate();
+  const location = useLocation();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
   const [carouselPreferences, setCarouselPreferences] = useState([]);
+  const [customCarousels, setCustomCarousels] = useState([]);
   const [_loadingPreferences, setLoadingPreferences] = useState(true);
   const [selectedScenes, setSelectedScenes] = useState([]);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -37,13 +46,22 @@ const Home = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    const loadPreferences = async () => {
+    const loadData = async () => {
       try {
-        const response = await api.get("/user/settings");
+        // Load user preferences
+        const response = await axiosApi.get("/user/settings");
         const prefs = migrateCarouselPreferences(
           response.data.settings.carouselPreferences
         );
         setCarouselPreferences(prefs);
+
+        // Load custom carousels
+        try {
+          const { carousels } = await libraryApi.getCarousels();
+          setCustomCarousels(carousels || []);
+        } catch (err) {
+          console.error("Failed to load custom carousels:", err);
+        }
       } catch {
         // Fallback to all enabled if fetch fails
         setCarouselPreferences(migrateCarouselPreferences([]));
@@ -52,8 +70,10 @@ const Home = () => {
       }
     };
 
-    loadPreferences();
-  }, []);
+    loadData();
+    // Re-fetch when navigating to homepage (location.key changes on each navigation)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   const createSceneClickHandler = (scenes, carouselTitle) => (scene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
@@ -93,13 +113,51 @@ const Home = () => {
     setSelectedScenes([]);
   };
 
-  // Filter and sort carousels based on user preferences
-  const activeCarousels = CAROUSEL_DEFINITIONS.map((def) => {
-    const pref = carouselPreferences.find((p) => p.id === def.fetchKey);
-    return { ...def, preference: pref };
-  })
-    .filter((def) => def.preference?.enabled !== false)
-    .sort((a, b) => (a.preference?.order || 0) - (b.preference?.order || 0));
+  const handleInitializing = useCallback((initializing) => {
+    if (initializing) {
+      setIsInitializing(true);
+      setInitMessage("Server is loading cache, please wait...");
+    } else {
+      setIsInitializing(false);
+      setInitMessage(null);
+    }
+  }, []);
+
+  // Build the list of active carousels (hardcoded + custom)
+  const activeCarousels = carouselPreferences
+    .filter((pref) => pref.enabled !== false)
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map((pref) => {
+      // Check if it's a custom carousel
+      if (isCustomCarousel(pref.id)) {
+        const carouselId = pref.id.replace("custom-", "");
+        const customCarousel = customCarousels.find((c) => c.id === carouselId);
+        if (customCarousel) {
+          const IconComponent = LucideIcons[customCarousel.icon] || LucideIcons.Film;
+          return {
+            type: "custom",
+            id: carouselId,
+            prefId: pref.id,
+            title: customCarousel.title,
+            iconComponent: IconComponent,
+            iconProps: { className: "w-6 h-6", style: { color: "var(--accent-primary)" } },
+          };
+        }
+        return null; // Custom carousel not found
+      }
+
+      // Hardcoded carousel
+      const def = CAROUSEL_DEFINITIONS.find((d) => d.fetchKey === pref.id);
+      if (def) {
+        return {
+          type: "hardcoded",
+          ...def,
+          prefId: pref.id,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean); // Remove nulls
 
   return (
     <PageLayout className="max-w-none">
@@ -139,14 +197,34 @@ const Home = () => {
         </div>
       )}
 
-      {activeCarousels.map((def) => {
+      {activeCarousels.map((carousel) => {
+        // Render custom carousel
+        if (carousel.type === "custom") {
+          const { id, title, iconComponent: IconComponent, iconProps } = carousel;
+          const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
+
+          return (
+            <CustomCarousel
+              key={carousel.prefId}
+              carouselId={id}
+              title={title}
+              icon={icon}
+              createSceneClickHandler={createSceneClickHandler}
+              selectedScenes={selectedScenes}
+              onToggleSelect={handleToggleSelect}
+              onInitializing={handleInitializing}
+            />
+          );
+        }
+
+        // Render hardcoded carousel
         const {
           title,
           iconComponent: IconComponent,
           iconProps,
           fetchKey,
           isSpecial,
-        } = def;
+        } = carousel;
         const icon = IconComponent ? <IconComponent {...iconProps} /> : null;
 
         // Special handling for Continue Watching carousel
@@ -156,15 +234,7 @@ const Home = () => {
               key={fetchKey}
               selectedScenes={selectedScenes}
               onToggleSelect={handleToggleSelect}
-              onInitializing={(initializing) => {
-                if (initializing) {
-                  setIsInitializing(true);
-                  setInitMessage("Server is loading cache, please wait...");
-                } else {
-                  setIsInitializing(false);
-                  setInitMessage(null);
-                }
-              }}
+              onInitializing={handleInitializing}
             />
           );
         }
@@ -180,15 +250,7 @@ const Home = () => {
             carouselQueries={carouselQueries}
             selectedScenes={selectedScenes}
             onToggleSelect={handleToggleSelect}
-            onInitializing={(initializing) => {
-              if (initializing) {
-                setIsInitializing(true);
-                setInitMessage("Server is loading cache, please wait...");
-              } else {
-                setIsInitializing(false);
-                setInitMessage(null);
-              }
-            }}
+            onInitializing={handleInitializing}
           />
         );
       })}
@@ -204,6 +266,9 @@ const Home = () => {
   );
 };
 
+/**
+ * HomeCarousel - Renders a hardcoded carousel using useHomeCarouselQueries
+ */
 const HomeCarousel = ({
   title,
   icon,
@@ -264,6 +329,96 @@ const HomeCarousel = ({
       titleIcon={icon}
       scenes={scenes || []}
       onSceneClick={createSceneClickHandler(scenes || [], title)}
+      selectedScenes={selectedScenes}
+      onToggleSelect={onToggleSelect}
+    />
+  );
+};
+
+/**
+ * CustomCarousel - Renders a user-defined custom carousel
+ * Fetches scenes from /api/carousels/:id/execute
+ */
+const CustomCarousel = ({
+  carouselId,
+  title,
+  icon,
+  createSceneClickHandler,
+  selectedScenes,
+  onToggleSelect,
+  onInitializing,
+}) => {
+  const [scenes, setScenes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const fetchCarousel = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { scenes: fetchedScenes } = await libraryApi.executeCarousel(carouselId);
+      setScenes(fetchedScenes || []);
+      setError(null);
+      onInitializing(false);
+    } catch (err) {
+      // Check if server is initializing
+      if (err.response?.status === 503) {
+        setError({ isInitializing: true, message: err.message });
+      } else {
+        setError(err);
+        console.error(`Failed to load custom carousel "${title}":`, err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [carouselId, onInitializing, title]);
+
+  useEffect(() => {
+    fetchCarousel();
+  }, [fetchCarousel]);
+
+  // Handle server initialization state with retry
+  useEffect(() => {
+    if (error?.isInitializing) {
+      if (retryCount < 60) {
+        onInitializing(true);
+        const timer = setTimeout(() => {
+          setRetryCount((prev) => prev + 1);
+          fetchCarousel();
+        }, 5000);
+        return () => clearTimeout(timer);
+      } else {
+        onInitializing(false);
+        console.error(
+          `[${title}] Failed to load after ${retryCount} retries:`,
+          error
+        );
+      }
+    } else if (!error) {
+      setRetryCount(0);
+    }
+  }, [error, retryCount, onInitializing, title, fetchCarousel]);
+
+  // Silently skip failed carousels (non-initialization errors only)
+  if (error && !error.isInitializing) {
+    return null;
+  }
+
+  // During initialization, show loading skeletons
+  const isInitializing = error?.isInitializing;
+
+  // Don't render if no scenes and not loading/initializing
+  if (!loading && !isInitializing && scenes.length === 0) {
+    return null;
+  }
+
+  return (
+    <SceneCarousel
+      loading={loading || isInitializing}
+      title={title}
+      titleIcon={icon}
+      scenes={scenes}
+      onSceneClick={createSceneClickHandler(scenes, title)}
       selectedScenes={selectedScenes}
       onToggleSelect={onToggleSelect}
     />

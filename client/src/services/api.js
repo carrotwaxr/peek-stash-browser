@@ -336,6 +336,67 @@ export const libraryApi = {
 
     return method(entityId, { favorite });
   },
+
+  // ============================================================================
+  // CUSTOM CAROUSELS
+  // ============================================================================
+
+  /**
+   * Get all custom carousels for the current user
+   * @returns {Promise<{carousels: Array}>}
+   */
+  getCarousels: () => apiGet("/carousels"),
+
+  /**
+   * Get a single carousel by ID
+   * @param {string} id - Carousel ID
+   * @returns {Promise<{carousel: Object}>}
+   */
+  getCarousel: (id) => apiGet(`/carousels/${id}`),
+
+  /**
+   * Create a new custom carousel
+   * @param {Object} data - Carousel data
+   * @param {string} data.title - Carousel title
+   * @param {string} data.icon - Lucide icon name
+   * @param {Object} data.rules - Filter rules (buildSceneFilter output format)
+   * @param {string} data.sort - Sort field
+   * @param {string} data.direction - Sort direction (ASC/DESC)
+   * @returns {Promise<{carousel: Object}>}
+   */
+  createCarousel: (data) => apiPost("/carousels", data),
+
+  /**
+   * Update an existing carousel
+   * @param {string} id - Carousel ID
+   * @param {Object} data - Updated carousel data
+   * @returns {Promise<{carousel: Object}>}
+   */
+  updateCarousel: (id, data) => apiPut(`/carousels/${id}`, data),
+
+  /**
+   * Delete a carousel
+   * @param {string} id - Carousel ID
+   * @returns {Promise<{success: boolean, message: string}>}
+   */
+  deleteCarousel: (id) => apiDelete(`/carousels/${id}`),
+
+  /**
+   * Preview carousel results without saving
+   * @param {Object} data - Query parameters
+   * @param {Object} data.rules - Filter rules
+   * @param {string} data.sort - Sort field
+   * @param {string} data.direction - Sort direction
+   * @returns {Promise<{scenes: Array}>}
+   */
+  previewCarousel: (data) => apiPost("/carousels/preview", data),
+
+  /**
+   * Execute a carousel by ID and get its scenes
+   * @param {string} id - Carousel ID
+   * @returns {Promise<{carousel: Object, scenes: Array}>}
+   */
+  executeCarousel: (id) => apiGet(`/carousels/${id}/execute`),
 };
 
 // Helper functions for common filtering patterns

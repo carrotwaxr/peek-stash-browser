@@ -12,6 +12,7 @@ import {
 import * as statsController from "../controllers/stats.js";
 import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import authRoutes from "../routes/auth.js";
+import carouselRoutes from "../routes/carousel.js";
 import customThemeRoutes from "../routes/customTheme.js";
 import libraryGalleriesRoutes from "../routes/library/galleries.js";
 import libraryGroupsRoutes from "../routes/library/groups.js";
@@ -110,6 +111,9 @@ export const setupAPI = () => {
 
   // Playlist routes (protected)
   app.use("/api/playlists", playlistRoutes);
+
+  // Custom carousel routes (protected)
+  app.use("/api/carousels", carouselRoutes);
 
   // Watch history routes (protected)
   app.use("/api/watch-history", watchHistoryRoutes);

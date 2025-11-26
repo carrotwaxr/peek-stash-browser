@@ -50,6 +50,9 @@ model User {
     // Hidden entities (user-level hiding)
     hiddenEntities UserHiddenEntity[]
     hideConfirmationDisabled Boolean @default(false) // Don't show hide confirmation dialog
+
+    // Custom carousels
+    customCarousels UserCarousel[]
 }
 
 model WatchHistory {
@@ -362,4 +365,25 @@ model StashInstance {
     priority  Int      @default(0)          // For ordering (lower = higher priority)
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+}
+
+// User-defined custom carousels for homepage
+// Each carousel is a saved scene query with display settings
+model UserCarousel {
+    id        String   @id @default(uuid())
+    userId    Int
+    title     String
+    icon      String   @default("Film")     // Lucide icon name (e.g., "Film", "Heart", "Star")
+
+    // Query definition (same format as buildSceneFilter output)
+    rules     Json                          // Scene filter object for findScenes API
+    sort      String   @default("random")   // Sort field (random, created_at, rating, etc.)
+    direction String   @default("DESC")     // Sort direction (ASC or DESC)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }

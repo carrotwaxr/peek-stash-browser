@@ -112,6 +112,7 @@ nav:
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
   - User Guide:
+      - Custom Carousels: user-guide/custom-carousels.md
       - Watch History: user-guide/watch-history.md
       - Keyboard Navigation: user-guide/keyboard-navigation.md
       - Playlists: user-guide/playlists.md

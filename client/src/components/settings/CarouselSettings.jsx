@@ -1,62 +1,121 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+} from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { Button } from "../ui/index.js";
+import { libraryApi } from "../../services/api.js";
 
 /**
  * Carousel metadata mapping fetchKey to display information
+ * Only includes active hardcoded carousels
  */
 const CAROUSEL_METADATA = {
   continueWatching: {
     title: "Continue Watching",
     description: "Resume your in-progress scenes",
   },
-  highRatedScenes: { title: "High Rated", description: "Top rated scenes" },
   recentlyAddedScenes: {
     title: "Recently Added",
     description: "Newly added content",
   },
-  longScenes: {
-    title: "Feature Length",
-    description: "Longer duration scenes",
-  },
-  highBitrateScenes: {
-    title: "High Bitrate",
-    description: "Highest quality videos",
-  },
-  barelyLegalScenes: {
-    title: "Barely Legal",
-    description: "18 year old performers",
+  highRatedScenes: {
+    title: "High Rated",
+    description: "Top rated scenes",
   },
   favoritePerformerScenes: {
     title: "Favorite Performers",
     description: "Scenes with your favorite performers",
   },
-  favoriteStudioScenes: {
-    title: "Favorite Studios",
-    description: "Content from your favorite studios",
-  },
   favoriteTagScenes: {
     title: "Favorite Tags",
     description: "Scenes with your favorite tags",
   },
+  favoriteStudioScenes: {
+    title: "Favorite Studios",
+    description: "Content from your favorite studios",
+  },
 };
+
+// Maximum custom carousels allowed
+const MAX_CUSTOM_CAROUSELS = 15;
+
+/**
+ * Check if an ID is a custom carousel (prefixed with "custom-")
+ */
+const isCustomCarousel = (id) => id && id.startsWith("custom-");
 
 /**
  * CarouselSettings Component
  * Allows users to enable/disable and reorder homepage carousels using up/down buttons
+ * Now supports custom user-defined carousels with edit/delete functionality
  */
 const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
+  const navigate = useNavigate();
   const [preferences, setPreferences] = useState([]);
+  const [customCarousels, setCustomCarousels] = useState([]);
+  const [loadingCustom, setLoadingCustom] = useState(true);
   const [hasChanges, setHasChanges] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
+  // Load custom carousels from API
   useEffect(() => {
-    // Sort by order on initial load
-    const sorted = [...carouselPreferences].sort((a, b) => a.order - b.order);
-    setPreferences(sorted);
-  }, [carouselPreferences]);
+    const loadCustomCarousels = async () => {
+      try {
+        const { carousels } = await libraryApi.getCarousels();
+        setCustomCarousels(carousels || []);
+      } catch (err) {
+        console.error("Failed to load custom carousels:", err);
+      } finally {
+        setLoadingCustom(false);
+      }
+    };
+
+    loadCustomCarousels();
+  }, []);
+
+  // Merge hardcoded + custom preferences when both are ready
+  useEffect(() => {
+    if (loadingCustom) return;
+
+    // Start with saved preferences
+    let merged = [...carouselPreferences].sort((a, b) => a.order - b.order);
+
+    // Add any custom carousels that aren't in preferences yet
+    customCarousels.forEach((carousel) => {
+      const customId = `custom-${carousel.id}`;
+      if (!merged.find((p) => p.id === customId)) {
+        merged.push({
+          id: customId,
+          enabled: true,
+          order: merged.length,
+        });
+      }
+    });
+
+    // Remove preferences for deleted custom carousels
+    const customIds = new Set(customCarousels.map((c) => `custom-${c.id}`));
+    merged = merged.filter(
+      (pref) => !isCustomCarousel(pref.id) || customIds.has(pref.id)
+    );
+
+    // Re-sort by order
+    merged.sort((a, b) => a.order - b.order);
+    merged = merged.map((pref, idx) => ({ ...pref, order: idx }));
+
+    setPreferences(merged);
+  }, [carouselPreferences, customCarousels, loadingCustom]);
 
   const moveUp = (index) => {
-    if (index === 0) return; // Already at top
+    if (index === 0) return;
 
     const newPreferences = [...preferences];
     [newPreferences[index - 1], newPreferences[index]] = [
@@ -64,7 +123,6 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
       newPreferences[index - 1],
     ];
 
-    // Update order values
     const reordered = newPreferences.map((pref, idx) => ({
       ...pref,
       order: idx,
@@ -75,7 +133,7 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   };
 
   const moveDown = (index) => {
-    if (index === preferences.length - 1) return; // Already at bottom
+    if (index === preferences.length - 1) return;
 
     const newPreferences = [...preferences];
     [newPreferences[index], newPreferences[index + 1]] = [
@@ -83,7 +141,6 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
       newPreferences[index],
     ];
 
-    // Update order values
     const reordered = newPreferences.map((pref, idx) => ({
       ...pref,
       order: idx,
@@ -112,27 +169,125 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
     setHasChanges(false);
   };
 
+  const handleCreateCarousel = () => {
+    navigate("/my-settings/carousels/new");
+  };
+
+  const handleEditCarousel = (carouselId) => {
+    // carouselId is the full "custom-{uuid}" format, extract the uuid
+    const actualId = carouselId.replace("custom-", "");
+    navigate(`/my-settings/carousels/${actualId}/edit`);
+  };
+
+  const handleDeleteCarousel = async (carouselId) => {
+    const actualId = carouselId.replace("custom-", "");
+
+    setDeletingId(carouselId);
+    try {
+      await libraryApi.deleteCarousel(actualId);
+
+      // Remove from custom carousels list
+      setCustomCarousels((prev) => prev.filter((c) => c.id !== actualId));
+
+      // Remove from preferences
+      const updatedPrefs = preferences
+        .filter((p) => p.id !== carouselId)
+        .map((p, idx) => ({ ...p, order: idx }));
+      setPreferences(updatedPrefs);
+
+      // Save the updated preferences immediately
+      onSave(updatedPrefs);
+    } catch (err) {
+      console.error("Failed to delete carousel:", err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  /**
+   * Get display info for a carousel preference
+   */
+  const getCarouselInfo = (prefId) => {
+    if (isCustomCarousel(prefId)) {
+      const actualId = prefId.replace("custom-", "");
+      const carousel = customCarousels.find((c) => c.id === actualId);
+      if (carousel) {
+        const IconComponent = LucideIcons[carousel.icon] || LucideIcons.Film;
+        return {
+          title: carousel.title,
+          description: "Custom carousel",
+          isCustom: true,
+          icon: IconComponent,
+        };
+      }
+      return {
+        title: "Unknown Carousel",
+        description: "Custom carousel not found",
+        isCustom: true,
+        icon: LucideIcons.AlertCircle,
+      };
+    }
+
+    const metadata = CAROUSEL_METADATA[prefId];
+    return {
+      title: metadata?.title || prefId,
+      description: metadata?.description || "",
+      isCustom: false,
+      icon: null,
+    };
+  };
+
+  const customCarouselCount = customCarousels.length;
+  const canCreateMore = customCarouselCount < MAX_CUSTOM_CAROUSELS;
+
+  if (loadingCustom) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--accent-primary)" }} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      <div>
-        <h3
-          className="text-lg font-semibold mb-2"
-          style={{ color: "var(--text-primary)" }}
+      <div className="flex items-start justify-between">
+        <div>
+          <h3
+            className="text-lg font-semibold mb-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Homepage Carousels
+          </h3>
+          <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
+            Use arrow buttons to reorder carousels, click the eye icon to toggle
+            visibility
+          </p>
+        </div>
+
+        <Button
+          variant="primary"
+          onClick={handleCreateCarousel}
+          disabled={!canCreateMore}
+          icon={<Plus className="w-4 h-4" />}
+          title={
+            canCreateMore
+              ? "Create a new custom carousel"
+              : `Maximum ${MAX_CUSTOM_CAROUSELS} custom carousels reached`
+          }
         >
-          Homepage Carousels
-        </h3>
-        <p className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
-          Use arrow buttons to reorder carousels, click the eye icon to toggle
-          visibility
-        </p>
+          Create Carousel
+        </Button>
       </div>
+
+      {customCarouselCount > 0 && (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {customCarouselCount} of {MAX_CUSTOM_CAROUSELS} custom carousels used
+        </p>
+      )}
 
       <div className="space-y-2">
         {preferences.map((pref, index) => {
-          const metadata = CAROUSEL_METADATA[pref.id] || {
-            title: pref.id,
-            description: "",
-          };
+          const info = getCarouselInfo(pref.id);
 
           return (
             <div
@@ -167,35 +322,90 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
                   />
                 </div>
 
-                <div className="flex-1">
+                {/* Custom carousel icon */}
+                {info.isCustom && info.icon && (
                   <div
-                    className="font-medium"
-                    style={{ color: "var(--text-primary)" }}
+                    className="w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: "var(--bg-secondary)" }}
                   >
-                    {metadata.title}
+                    <info.icon
+                      className="w-5 h-5"
+                      style={{ color: "var(--accent-primary)" }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="font-medium"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {info.title}
+                    </div>
+                    {info.isCustom && (
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: "var(--accent-primary)",
+                          color: "var(--text-on-accent)",
+                        }}
+                      >
+                        Custom
+                      </span>
+                    )}
                   </div>
                   <div
                     className="text-sm"
                     style={{ color: "var(--text-secondary)" }}
                   >
-                    {metadata.description}
+                    {info.description}
                   </div>
                 </div>
               </div>
 
-              <Button
-                onClick={() => toggleEnabled(pref.id)}
-                variant={pref.enabled ? "primary" : "secondary"}
-                className="p-2"
-                icon={
-                  pref.enabled ? (
-                    <Eye className="w-5 h-5" />
-                  ) : (
-                    <EyeOff className="w-5 h-5" />
-                  )
-                }
-                title={pref.enabled ? "Hide carousel" : "Show carousel"}
-              />
+              <div className="flex items-center space-x-2">
+                {/* Edit button for custom carousels */}
+                {info.isCustom && (
+                  <>
+                    <Button
+                      onClick={() => handleEditCarousel(pref.id)}
+                      variant="secondary"
+                      className="p-2"
+                      icon={<Pencil className="w-4 h-4" />}
+                      title="Edit carousel"
+                    />
+                    <Button
+                      onClick={() => handleDeleteCarousel(pref.id)}
+                      variant="secondary"
+                      className="p-2"
+                      disabled={deletingId === pref.id}
+                      icon={
+                        deletingId === pref.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )
+                      }
+                      title="Delete carousel"
+                    />
+                  </>
+                )}
+
+                <Button
+                  onClick={() => toggleEnabled(pref.id)}
+                  variant={pref.enabled ? "primary" : "secondary"}
+                  className="p-2"
+                  icon={
+                    pref.enabled ? (
+                      <Eye className="w-5 h-5" />
+                    ) : (
+                      <EyeOff className="w-5 h-5" />
+                    )
+                  }
+                  title={pref.enabled ? "Hide carousel" : "Show carousel"}
+                />
+              </div>
             </div>
           );
         })}

@@ -65,6 +65,11 @@ export const CAROUSEL_DEFINITIONS = [
 ];
 
 /**
+ * Check if an ID is a custom carousel (prefixed with "custom-")
+ */
+const isCustomCarousel = (id) => id && id.startsWith("custom-");
+
+/**
  * Migrate carousel preferences to include any new carousels
  * @param {Array} savedPreferences - Preferences from backend
  * @returns {Array} - Migrated preferences with all carousels
@@ -81,12 +86,16 @@ export const migrateCarouselPreferences = (savedPreferences) => {
     }));
   }
 
-  // Filter out removed carousels (barelyLegalScenes, longScenes, highBitrateScenes)
-  const validIds = new Set(CAROUSEL_DEFINITIONS.map((def) => def.fetchKey));
-  prefs = prefs.filter((pref) => validIds.has(pref.id));
+  // Keep custom carousels (prefixed with "custom-") separate
+  const customPrefs = prefs.filter((pref) => isCustomCarousel(pref.id));
+  const hardcodedPrefs = prefs.filter((pref) => !isCustomCarousel(pref.id));
 
-  // Migrate: Add any new carousels that don't exist in saved preferences
-  const existingIds = new Set(prefs.map((p) => p.id));
+  // Filter out removed hardcoded carousels (barelyLegalScenes, longScenes, highBitrateScenes)
+  const validIds = new Set(CAROUSEL_DEFINITIONS.map((def) => def.fetchKey));
+  let validHardcoded = hardcodedPrefs.filter((pref) => validIds.has(pref.id));
+
+  // Migrate: Add any new hardcoded carousels that don't exist in saved preferences
+  const existingIds = new Set(validHardcoded.map((p) => p.id));
   const missingCarousels = CAROUSEL_DEFINITIONS.filter(
     (def) => !existingIds.has(def.fetchKey)
   );
@@ -96,10 +105,13 @@ export const migrateCarouselPreferences = (savedPreferences) => {
     const newPref = {
       id: def.fetchKey,
       enabled: true,
-      order: def.fetchKey === "continueWatching" ? -1 : prefs.length,
+      order: def.fetchKey === "continueWatching" ? -1 : validHardcoded.length,
     };
-    prefs.push(newPref);
+    validHardcoded.push(newPref);
   });
+
+  // Combine hardcoded and custom carousels
+  prefs = [...validHardcoded, ...customPrefs];
 
   // Re-normalize order values
   prefs.sort((a, b) => a.order - b.order);
