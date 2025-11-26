@@ -245,17 +245,6 @@ section.video-container {
 
 
 /* ============================================================================
-   HOVER EFFECTS - Subtle YouTube-style interactions
-   ============================================================================ */
-
-.video-js .vjs-control:not(:disabled):hover,
-.video-js .vjs-control:not(:disabled):focus {
-  background: rgba(255, 255, 255, 0.1) !important;
-  border-radius: 4px !important;
-  transition: background 0.1s ease !important;
-}
-
-/* ============================================================================
    BIG PLAY BUTTON (Stash pattern - no background, no border, large icon)
    ============================================================================ */
 
