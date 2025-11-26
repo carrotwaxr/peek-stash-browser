@@ -742,7 +742,7 @@ export function applyExpensiveSceneFilters(
 /**
  * Sort scenes
  */
-function sortScenes(
+export function sortScenes(
   scenes: NormalizedScene[],
   sortField: string,
   direction: string,

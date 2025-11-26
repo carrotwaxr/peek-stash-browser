@@ -416,14 +416,28 @@ Before beginning regression testing:
 
 #### 8.2 Carousel Preferences
 
-**Location**: Settings page → Carousel Settings section
+**Location**: Settings page → Homepage Carousels section
 
-- [ ] Can toggle carousels on/off (Recently Watched, Top Rated, etc.)
-- [ ] Can reorder carousels (drag-and-drop or up/down buttons)
-- [ ] Can configure number of items per carousel
-- [ ] Changes reflect immediately on home page
+- [ ] Can toggle hardcoded carousels on/off (Continue Watching, High Rated, etc.)
+- [ ] Can reorder carousels with up/down buttons
+- [ ] Changes reflect on home page after save
 
-#### 8.3 Navigation Preferences
+#### 8.3 Custom Carousels
+
+**Location**: Settings page → Homepage Carousels → Create Carousel
+
+- [ ] Can create custom carousel with title and icon
+- [ ] Can add filter rules (performers, tags, rating, etc.)
+- [ ] Preview shows matching scenes before save
+- [ ] Save is disabled until preview succeeds
+- [ ] Can edit existing custom carousel
+- [ ] Can delete custom carousel
+- [ ] Custom carousel appears on homepage
+- [ ] Maximum 15 custom carousels enforced
+- [ ] Filter options are sorted alphabetically
+- [ ] Scene titles use basename fallback when no title
+
+#### 8.4 Navigation Preferences
 
 **Location**: Settings page → Navigation Settings section
 
@@ -431,7 +445,7 @@ Before beginning regression testing:
 - [ ] Can toggle top bar elements (show/hide search, user menu, etc.)
 - [ ] Can configure keyboard shortcuts (if customizable)
 
-#### 8.4 Filter Presets
+#### 8.5 Filter Presets
 
 **Location**: Settings page → Filter Presets section
 
@@ -441,7 +455,7 @@ Before beginning regression testing:
 - [ ] Can set default filter preset (auto-loads on scenes page)
 - [ ] Can export/import filter presets (JSON file)
 
-#### 8.5 Hidden Items (User Feature)
+#### 8.6 Hidden Items (User Feature)
 
 **Location**: Settings page → link to Hidden Items page
 

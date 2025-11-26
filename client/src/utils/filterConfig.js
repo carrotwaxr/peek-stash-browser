@@ -2545,3 +2545,425 @@ export const buildGalleryFilter = (filters) => {
 
   return galleryFilter;
 };
+
+// ============================================================================
+// CAROUSEL BUILDER HELPERS
+// ============================================================================
+
+/**
+ * Filter definitions for the carousel builder rule selector.
+ * Each definition describes a filter that can be used as a carousel rule.
+ *
+ * Structure:
+ * - key: The filter key (matches buildSceneFilter's expected input)
+ * - label: Display label in the rule dropdown
+ * - type: Input type (searchable-select, range, checkbox, select, text)
+ * - entityType: For searchable-select, which entity to search
+ * - modifierOptions: Available comparison modifiers
+ * - defaultModifier: Default modifier when creating new rule
+ * - options: For select type, the available options
+ * - min/max: For range type, the bounds
+ * - valueUnit: Optional unit label (e.g., "minutes")
+ */
+export const CAROUSEL_FILTER_DEFINITIONS = [
+  // Sorted alphabetically by label
+  {
+    key: "bitrate",
+    label: "Bitrate",
+    type: "range",
+    min: 0,
+    max: 100,
+    step: 1,
+    valueUnit: "Mbps",
+  },
+  {
+    key: "groupIds",
+    label: "Collections",
+    type: "searchable-select",
+    entityType: "groups",
+    multi: true,
+    modifierOptions: [
+      { value: "INCLUDES", label: "in any of" },
+      { value: "EXCLUDES", label: "not in" },
+    ],
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "createdAt",
+    label: "Created Date",
+    type: "date-range",
+  },
+  {
+    key: "details",
+    label: "Details Contains",
+    type: "text",
+    placeholder: "Search details...",
+  },
+  {
+    key: "duration",
+    label: "Duration",
+    type: "range",
+    min: 1,
+    max: 300,
+    step: 1,
+    valueUnit: "minutes",
+  },
+  {
+    key: "performerFavorite",
+    label: "Favorite Performers",
+    type: "checkbox",
+  },
+  {
+    key: "favorite",
+    label: "Favorite Scenes",
+    type: "checkbox",
+  },
+  {
+    key: "studioFavorite",
+    label: "Favorite Studios",
+    type: "checkbox",
+  },
+  {
+    key: "tagFavorite",
+    label: "Favorite Tags",
+    type: "checkbox",
+  },
+  {
+    key: "lastPlayedAt",
+    label: "Last Played Date",
+    type: "date-range",
+  },
+  {
+    key: "oCount",
+    label: "O Count",
+    type: "range",
+    min: 0,
+    max: 300,
+    step: 1,
+  },
+  {
+    key: "performerAge",
+    label: "Performer Age",
+    type: "range",
+    min: 18,
+    max: 100,
+    step: 1,
+  },
+  {
+    key: "performerCount",
+    label: "Performer Count",
+    type: "range",
+    min: 0,
+    max: 20,
+    step: 1,
+  },
+  {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    modifierOptions: [
+      { value: "INCLUDES", label: "includes any of" },
+      { value: "INCLUDES_ALL", label: "includes all of" },
+      { value: "EXCLUDES", label: "excludes" },
+    ],
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "playCount",
+    label: "Play Count",
+    type: "range",
+    min: 0,
+    max: 1000,
+    step: 1,
+  },
+  {
+    key: "playDuration",
+    label: "Play Duration",
+    type: "range",
+    min: 1,
+    max: 300,
+    step: 1,
+    valueUnit: "minutes",
+  },
+  {
+    key: "rating",
+    label: "Rating",
+    type: "range",
+    min: 0,
+    max: 100,
+    step: 1,
+  },
+  {
+    key: "resolution",
+    label: "Resolution",
+    type: "select",
+    options: [
+      { value: "VERY_LOW", label: "144p" },
+      { value: "LOW", label: "240p" },
+      { value: "R360P", label: "360p" },
+      { value: "STANDARD", label: "480p" },
+      { value: "WEB_HD", label: "540p" },
+      { value: "STANDARD_HD", label: "720p" },
+      { value: "FULL_HD", label: "1080p" },
+      { value: "QUAD_HD", label: "1440p" },
+      { value: "FOUR_K", label: "4K" },
+      { value: "EIGHT_K", label: "8K" },
+    ],
+    modifierOptions: [
+      { value: "EQUALS", label: "equals" },
+      { value: "NOT_EQUALS", label: "not equals" },
+      { value: "GREATER_THAN", label: "greater than" },
+      { value: "LESS_THAN", label: "less than" },
+    ],
+    defaultModifier: "GREATER_THAN",
+  },
+  {
+    key: "date",
+    label: "Scene Date",
+    type: "date-range",
+  },
+  {
+    key: "studioId",
+    label: "Studio",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: false,
+    supportsHierarchy: true,
+  },
+  {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    modifierOptions: [
+      { value: "INCLUDES", label: "includes any of" },
+      { value: "INCLUDES_ALL", label: "includes all of" },
+      { value: "EXCLUDES", label: "excludes" },
+    ],
+    defaultModifier: "INCLUDES_ALL",
+    supportsHierarchy: true,
+  },
+  {
+    key: "title",
+    label: "Title Contains",
+    type: "text",
+    placeholder: "Search title...",
+  },
+];
+
+/**
+ * Get a carousel filter definition by key
+ */
+export const getCarouselFilterDefinition = (key) => {
+  return CAROUSEL_FILTER_DEFINITIONS.find((f) => f.key === key);
+};
+
+/**
+ * Convert carousel rules (stored format) to filter state (UI format).
+ * The stored format is the API-ready filter object.
+ * The UI format matches what buildSceneFilter expects as input.
+ *
+ * Example:
+ * Input (stored rules):
+ *   { performers: { value: ['1', '2'], modifier: 'INCLUDES' } }
+ * Output (UI state):
+ *   { performerIds: ['1', '2'], performerIdsModifier: 'INCLUDES' }
+ */
+export const carouselRulesToFilterState = (rules) => {
+  const filterState = {};
+
+  if (!rules || typeof rules !== "object") {
+    return filterState;
+  }
+
+  // Performers
+  if (rules.performers) {
+    filterState.performerIds = rules.performers.value || [];
+    filterState.performerIdsModifier = rules.performers.modifier || "INCLUDES";
+  }
+
+  // Studios
+  if (rules.studios) {
+    // Single studio stored as array with one element
+    filterState.studioId = rules.studios.value?.[0] || "";
+    if (rules.studios.depth !== undefined) {
+      filterState.studioIdDepth = rules.studios.depth;
+    }
+  }
+
+  // Tags
+  if (rules.tags) {
+    filterState.tagIds = rules.tags.value || [];
+    filterState.tagIdsModifier = rules.tags.modifier || "INCLUDES_ALL";
+    if (rules.tags.depth !== undefined) {
+      filterState.tagIdsDepth = rules.tags.depth;
+    }
+  }
+
+  // Groups
+  if (rules.groups) {
+    filterState.groupIds = rules.groups.value || [];
+    filterState.groupIdsModifier = rules.groups.modifier || "INCLUDES";
+  }
+
+  // Rating
+  if (rules.rating100) {
+    const r = rules.rating100;
+    if (r.modifier === "BETWEEN") {
+      filterState.rating = { min: r.value, max: r.value2 };
+    } else if (r.modifier === "GREATER_THAN") {
+      filterState.rating = { min: r.value + 1 };
+    } else if (r.modifier === "LESS_THAN") {
+      filterState.rating = { max: r.value - 1 };
+    }
+  }
+
+  // O Counter
+  if (rules.o_counter) {
+    const o = rules.o_counter;
+    if (o.modifier === "BETWEEN") {
+      filterState.oCount = { min: o.value, max: o.value2 };
+    } else if (o.modifier === "GREATER_THAN") {
+      filterState.oCount = { min: o.value + 1 };
+    } else if (o.modifier === "LESS_THAN") {
+      filterState.oCount = { max: o.value - 1 };
+    }
+  }
+
+  // Duration (convert from seconds to minutes)
+  if (rules.duration) {
+    const d = rules.duration;
+    if (d.modifier === "BETWEEN") {
+      filterState.duration = {
+        min: Math.round(d.value / 60),
+        max: Math.round(d.value2 / 60),
+      };
+    } else if (d.modifier === "GREATER_THAN") {
+      filterState.duration = { min: Math.round((d.value + 1) / 60) };
+    } else if (d.modifier === "LESS_THAN") {
+      filterState.duration = { max: Math.round((d.value - 1) / 60) };
+    }
+  }
+
+  // Play Count
+  if (rules.play_count) {
+    const p = rules.play_count;
+    if (p.modifier === "BETWEEN") {
+      filterState.playCount = { min: p.value, max: p.value2 };
+    } else if (p.modifier === "GREATER_THAN") {
+      filterState.playCount = { min: p.value + 1 };
+    } else if (p.modifier === "LESS_THAN") {
+      filterState.playCount = { max: p.value - 1 };
+    }
+  }
+
+  // Play Duration (convert from seconds to minutes)
+  if (rules.play_duration) {
+    const pd = rules.play_duration;
+    if (pd.modifier === "BETWEEN") {
+      filterState.playDuration = {
+        min: Math.round(pd.value / 60),
+        max: Math.round(pd.value2 / 60),
+      };
+    } else if (pd.modifier === "GREATER_THAN") {
+      filterState.playDuration = { min: Math.round((pd.value + 1) / 60) };
+    } else if (pd.modifier === "LESS_THAN") {
+      filterState.playDuration = { max: Math.round((pd.value - 1) / 60) };
+    }
+  }
+
+  // Performer Count
+  if (rules.performer_count) {
+    const pc = rules.performer_count;
+    if (pc.modifier === "BETWEEN") {
+      filterState.performerCount = { min: pc.value, max: pc.value2 };
+    } else if (pc.modifier === "GREATER_THAN") {
+      filterState.performerCount = { min: pc.value + 1 };
+    } else if (pc.modifier === "LESS_THAN") {
+      filterState.performerCount = { max: pc.value - 1 };
+    }
+  }
+
+  // Bitrate (convert from bps to Mbps)
+  if (rules.bitrate) {
+    const b = rules.bitrate;
+    if (b.modifier === "BETWEEN") {
+      filterState.bitrate = {
+        min: Math.round(b.value / 1000000),
+        max: Math.round(b.value2 / 1000000),
+      };
+    } else if (b.modifier === "GREATER_THAN") {
+      filterState.bitrate = { min: Math.round((b.value + 1) / 1000000) };
+    } else if (b.modifier === "LESS_THAN") {
+      filterState.bitrate = { max: Math.round((b.value - 1) / 1000000) };
+    }
+  }
+
+  // Boolean filters
+  if (rules.favorite === true) {
+    filterState.favorite = true;
+  }
+  if (rules.performer_favorite === true) {
+    filterState.performerFavorite = true;
+  }
+  if (rules.studio_favorite === true) {
+    filterState.studioFavorite = true;
+  }
+  if (rules.tag_favorite === true) {
+    filterState.tagFavorite = true;
+  }
+
+  // Resolution
+  if (rules.resolution) {
+    filterState.resolution = rules.resolution.value;
+    filterState.resolutionModifier = rules.resolution.modifier || "EQUALS";
+  }
+
+  // Text filters
+  if (rules.title) {
+    filterState.title = rules.title.value;
+  }
+  if (rules.details) {
+    filterState.details = rules.details.value;
+  }
+
+  // Date range filters
+  if (rules.date) {
+    filterState.date = dateRangeFromApi(rules.date);
+  }
+  if (rules.created_at) {
+    filterState.createdAt = dateRangeFromApi(rules.created_at);
+  }
+  if (rules.last_played_at) {
+    filterState.lastPlayedAt = dateRangeFromApi(rules.last_played_at);
+  }
+
+  return filterState;
+};
+
+/**
+ * Helper to convert API date filter to UI date range format
+ */
+const dateRangeFromApi = (dateFilter) => {
+  if (!dateFilter) return {};
+
+  if (dateFilter.modifier === "BETWEEN") {
+    return { min: dateFilter.value, max: dateFilter.value2 };
+  } else if (dateFilter.modifier === "GREATER_THAN") {
+    return { min: dateFilter.value };
+  } else if (dateFilter.modifier === "LESS_THAN") {
+    return { max: dateFilter.value };
+  }
+  return {};
+};
+
+/**
+ * Count active filters in a carousel's rules
+ */
+export const countCarouselRules = (rules) => {
+  if (!rules || typeof rules !== "object") return 0;
+  return Object.keys(rules).length;
+};

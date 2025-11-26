@@ -8,62 +8,70 @@ Allow users to create custom homepage carousels using a visual query builder. Us
 
 **Visual Query Builder** - Inspired by Plex Smart Collections and Jellyfin Smart Playlists, use a visual rule-based interface instead of JSON/code editing.
 
-**DRY Architecture** - Share filter schema between Scene Search and Carousel Builder so new scene filters automatically work in both systems.
+**DRY Architecture** - Extend existing `filterConfig.js` with metadata needed for carousel builder. Scene Search and Carousel Builder share the same filter definitions, so new filters automatically work in both systems.
 
-**Mobile-Friendly** - Full-page editor (not modal) for better mobile UX.
+**Scene Search Parity** - The carousel builder should support ALL filter capabilities from Scene Search. Users should be able to reproduce any Scene Search query as a carousel.
+
+**Mobile-Friendly** - Full-page editor (not modal) for better mobile UX. Up/down buttons for reordering (not drag-and-drop).
 
 ## UI/UX Design
 
-### Carousel Settings Page (`/settings/carousels`)
+### Carousel Settings Page (existing `/settings` page, Carousels section)
 
 **Layout:**
 - List of all carousels (hardcoded + custom)
-- Hardcoded carousels: Toggle visibility, reorder, cannot edit/delete
+- Hardcoded carousels: Toggle visibility, reorder (up/down buttons), cannot edit/delete
 - Custom carousels: Toggle visibility, reorder, edit, delete
 - "Create Custom Carousel" button (disabled if at 15 custom limit)
-- Drag-and-drop reordering for all carousels
+- Shows count: "X/15 custom carousels"
 
 **Custom Carousel Cards:**
 ```
-┌─────────────────────────────────────────┐
-│ 🎬 My Favorite Action Scenes       [≡]  │
-│ 3 rules • Sort: Random • 12 scenes      │
-│ [Edit] [Preview] [Delete] [Toggle ●]    │
-└─────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│ [↑][↓] 🎬 My Favorite Action Scenes            [👁] │
+│        3 rules • Sort: Random                       │
+│        [Edit] [Delete]                              │
+│        ⚠️ Query failed - click Edit to fix (if broken)
+└─────────────────────────────────────────────────────┘
 ```
 
 ### Carousel Builder Page (`/settings/carousels/new` or `/settings/carousels/:id/edit`)
 
 **Header:**
+- Back button
 - Title input field
 - Icon selector (curated Lucide icon picker)
-- Back button
 
 **Query Builder:**
 ```
-Match [Any ▾] of the following rules:
-┌─────────────────────────────────────────┐
-│ [Performers ▾] [includes ▾] [Select...] [×] │
-│ [Rating ▾] [greater than ▾] [80____]   [×] │
-│ [Tags ▾] [excludes ▾] [Select...]      [×] │
-└─────────────────────────────────────────┘
+Filter Rules (ALL must match):
+┌─────────────────────────────────────────────────────┐
+│ [Performers ▾] [includes ▾] [Select...]         [×] │
+│ [Rating ▾] [greater than ▾] [80____]            [×] │
+│ [Tags ▾] [excludes ▾] [Select...]               [×] │
+└─────────────────────────────────────────────────────┘
 [+ Add Rule]
 
 Sort by: [Random ▾] [Descending ▾]
-Limit: 12 scenes (fixed)
+Limit: 12 scenes (fixed, not editable)
 
 [Preview Results] [Save Carousel] [Cancel]
 ```
 
+**Validation:**
+- Preview must succeed before Save is enabled
+- At least one rule required
+- Title required (non-empty)
+
 **Icon Selector:**
 - Grid of ~50 curated Lucide icons relevant to media browsing
-- Categories: Film, TV, Music, Gaming, Genres, Moods, etc.
-- Selected icons: Film, Heart, Star, Flame, Zap, Trophy, Calendar, Clock, Eye, Play, etc.
+- Search/filter by name
+- Selected icon highlighted
 
 **Preview Results:**
-- Opens preview modal/section showing matching scenes
-- Uses same SceneGrid component as Scene Search
-- Shows count: "Found 847 scenes matching rules (showing 12)"
+- Inline section (not modal) showing matching scenes
+- Uses same SceneCard component as Scene Search
+- Shows: "Showing 12 scenes" (no total count query)
 
 ## Architecture
 
@@ -72,15 +80,12 @@ Limit: 12 scenes (fixed)
 ```prisma
 model UserCarousel {
   id        String   @id @default(uuid())
-  userId    String
+  userId    Int
   title     String
-  icon      String   // Lucide icon name (e.g., "Film", "Heart")
-  enabled   Boolean  @default(true)
-  order     Int      // Sort position among ALL carousels
+  icon      String   @default("Film")  // Lucide icon name
 
-  // Query definition
-  matchMode String   @default("ANY") // "ANY" or "ALL"
-  rules     Json     // Array of filter rules
+  // Query definition (matches Scene Search filter format)
+  rules     Json     // Scene filter object (same format as buildSceneFilter output)
   sort      String   @default("random")
   direction String   @default("DESC")
 
@@ -90,95 +95,86 @@ model UserCarousel {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([userId, order])
 }
 ```
 
 **Rules JSON Structure:**
+Stored in the same format as `buildSceneFilter()` output, making it directly usable:
 ```json
-[
-  {
-    "field": "performers",
-    "modifier": "INCLUDES",
-    "value": ["performer-id-1", "performer-id-2"]
+{
+  "tags": {
+    "value": ["tag-id-1", "tag-id-2"],
+    "modifier": "INCLUDES"
   },
-  {
-    "field": "rating100",
-    "modifier": "GREATER_THAN",
-    "value": 80
+  "rating100": {
+    "value": 79,
+    "modifier": "GREATER_THAN"
   },
-  {
-    "field": "tags",
-    "modifier": "EXCLUDES",
-    "value": ["tag-id-1"]
+  "performers": {
+    "value": ["performer-id-1"],
+    "modifier": "INCLUDES"
   }
-]
+}
 ```
+
+This is the same format used by Scene Search, so no conversion needed.
+
+### ID Strategy
+
+- **Hardcoded carousels**: Use `fetchKey` strings (e.g., `"continueWatching"`, `"highRatedScenes"`)
+- **Custom carousels**: Use UUID prefixed with `"custom-"` (e.g., `"custom-a1b2c3d4-e5f6-..."`)
+- **`User.carouselPreferences`**: Single source of truth for order/visibility of ALL carousels
+  ```json
+  [
+    { "id": "continueWatching", "enabled": true, "order": 0 },
+    { "id": "custom-uuid-123", "enabled": true, "order": 1 },
+    { "id": "highRatedScenes", "enabled": false, "order": 2 }
+  ]
+  ```
 
 ### API Endpoints
 
-**Carousel Management:**
+**Carousel CRUD:**
 - `GET /api/carousels` - List user's custom carousels
-- `POST /api/carousels` - Create new carousel (max 15)
+- `POST /api/carousels` - Create new carousel (max 15 enforced)
 - `GET /api/carousels/:id` - Get single carousel
 - `PUT /api/carousels/:id` - Update carousel
 - `DELETE /api/carousels/:id` - Delete carousel
-- `PUT /api/carousels/reorder` - Bulk update order (all carousels)
 
 **Preview:**
 - `POST /api/carousels/preview` - Preview results without saving
-  - Body: `{ rules, matchMode, sort, direction }`
-  - Returns: `{ count, scenes }` (paginated to 12)
+  - Body: `{ rules, sort, direction }`
+  - Returns: `{ scenes: [...] }` (12 scenes)
 
-### Shared Filter Schema
+### Extending filterConfig.js (DRY Approach)
 
-**Location:** `client/src/utils/filterSchema.js`
+Instead of creating a new `filterSchema.js`, extend existing `SCENE_FILTER_OPTIONS` with metadata for the carousel builder:
 
-**Structure:**
 ```javascript
-export const SCENE_FILTERS = [
-  {
-    key: "performers",
-    label: "Performers",
-    type: "entity-multi",
-    modifiers: ["INCLUDES", "INCLUDES_ALL", "EXCLUDES"],
-    entityType: "performer",
-    valueComponent: "PerformerPicker"
-  },
-  {
-    key: "rating100",
-    label: "Rating",
-    type: "number",
-    modifiers: ["GREATER_THAN", "LESS_THAN", "EQUALS", "NOT_EQUALS", "BETWEEN"],
-    min: 0,
-    max: 100,
-    valueComponent: "NumberInput"
-  },
-  {
-    key: "tags",
-    label: "Tags",
-    type: "entity-multi",
-    modifiers: ["INCLUDES", "INCLUDES_ALL", "EXCLUDES"],
-    entityType: "tag",
-    valueComponent: "TagPicker"
-  },
-  // ... all other scene filters
-];
+// Add to each filter option in SCENE_FILTER_OPTIONS:
+{
+  key: "performerIds",
+  label: "Performers",
+  type: "searchable-select",
+  entityType: "performers",
+  multi: true,
+  defaultValue: [],
+  placeholder: "Select performers...",
+  modifierOptions: MULTI_MODIFIER_OPTIONS,
+  modifierKey: "performerIdsModifier",
+  defaultModifier: "INCLUDES",
 
-export const SCENE_SORT_OPTIONS = [
-  { value: "random", label: "Random" },
-  { value: "created_at", label: "Created At" },
-  { value: "rating100", label: "Rating" },
-  { value: "date", label: "Date" },
-  { value: "o_counter", label: "O Counter" },
-  // ... all other sort options from filterConfig.js
-];
+  // NEW: Carousel builder metadata
+  carouselSupported: true,  // Include in carousel builder
+  carouselLabel: "Performers",  // Display name in rule dropdown
+}
 ```
 
-**Migration from `filterConfig.js`:**
-1. Extract filter definitions into structured schema
-2. Add metadata for carousel builder (type, modifiers, value component)
-3. Update Scene Search to consume shared schema (ensure no regressions)
+**Helper function to get carousel-compatible filters:**
+```javascript
+export const getCarouselFilters = () =>
+  SCENE_FILTER_OPTIONS.filter(f => f.carouselSupported !== false && f.type !== 'section-header');
+```
 
 ### Frontend Components
 
@@ -186,539 +182,273 @@ export const SCENE_SORT_OPTIONS = [
 ```
 client/src/components/
   carousel-builder/
-    CarouselBuilder.jsx       - Main editor page
-    CarouselList.jsx          - Settings list view
-    FilterBuilder.jsx         - Rule builder container
-    FilterRule.jsx            - Single rule editor
-    FilterValueSelector.jsx   - Value input (switches based on filter type)
+    CarouselBuilder.jsx       - Main editor page (full-page)
+    CarouselPreview.jsx       - Preview results section
     IconPicker.jsx            - Lucide icon grid selector
-    PreviewModal.jsx          - Preview results modal
+    RuleBuilder.jsx           - Container for filter rules
+    RuleRow.jsx               - Single rule editor row
 
-  filter-components/          - Shared with Scene Search
-    PerformerPicker.jsx
-    TagPicker.jsx
-    StudioPicker.jsx
-    NumberInput.jsx
-    DatePicker.jsx
+  settings/
+    CarouselSettings.jsx      - Update existing to handle custom carousels
 ```
 
-**FilterBuilder Component:**
-```jsx
-<FilterBuilder
-  rules={rules}
-  matchMode={matchMode}
-  onRulesChange={setRules}
-  onMatchModeChange={setMatchMode}
-/>
-```
-
-**FilterRule Component:**
-```jsx
-<FilterRule
-  rule={rule}
-  onChange={handleRuleChange}
-  onRemove={handleRuleRemove}
-  filterSchema={SCENE_FILTERS}
-/>
-```
-
-**Icon Picker Component:**
-- Grid of 50-60 curated Lucide icons
-- Search/filter by name
-- Selected icon highlighted
-- Preview shows icon + carousel title
-
-**Curated Icon List:**
-```javascript
-export const CAROUSEL_ICONS = [
-  // Film & Video
-  "Film", "Video", "Play", "PlayCircle", "Clapperboard",
-
-  // Favorites & Collections
-  "Heart", "Star", "Bookmark", "Award", "Trophy",
-
-  // Time & Recency
-  "Clock", "Calendar", "TrendingUp", "Zap", "Flame",
-
-  // Moods & Genres
-  "Smile", "Frown", "Angry", "Meh", "PartyPopper",
-
-  // Discovery
-  "Eye", "Sparkles", "Target", "Compass", "Search",
-
-  // Quality & Rating
-  "ThumbsUp", "Crown", "Shield", "Diamond", "Gem",
-
-  // Media Types
-  "Users", "User", "Building", "Tag", "Folder",
-
-  // Additional
-  "Camera", "Tv", "Monitor", "Smartphone", "Headphones"
-];
-```
+**Reuse existing filter components:**
+- `SearchableSelect` - For entity pickers (performers, tags, studios, groups)
+- Range inputs, date pickers, etc. from Scene Search
 
 ### Homepage Integration
 
-**Updated Flow:**
+**Updated Home.jsx flow:**
 
-1. **Fetch All Carousels:**
+1. Fetch user settings (includes `carouselPreferences`)
+2. Fetch custom carousels from `/api/carousels`
+3. Merge hardcoded + custom carousel definitions
+4. Sort by user preferences
+5. Filter to enabled only
+6. Render each carousel, handling errors gracefully
+
 ```javascript
-// Fetch hardcoded definitions
-const hardcodedCarousels = CAROUSEL_DEFINITIONS;
-
-// Fetch user's custom carousels
-const customCarousels = await fetch('/api/carousels');
-
-// Merge and sort by user preferences
-const allCarousels = [...hardcodedCarousels, ...customCarousels]
-  .map(def => ({
-    ...def,
-    preference: userCarouselPrefs[def.id] || { enabled: true, order: 999 }
-  }))
-  .filter(def => def.preference.enabled)
-  .sort((a, b) => a.preference.order - b.preference.order);
-```
-
-2. **Dynamic Query Building:**
-```javascript
-// For custom carousels, build query from rules
-carouselQueries[customCarousel.id] = async () => {
-  const filter = buildFilterFromRules({
-    rules: customCarousel.rules,
-    matchMode: customCarousel.matchMode,
-    sort: customCarousel.sort,
-    direction: customCarousel.direction,
-    page: 1,
-    per_page: 12
-  });
-
-  const response = await libraryApi.findScenes(filter);
-  return response?.findScenes?.scenes || [];
-};
-```
-
-3. **buildFilterFromRules Function:**
-```javascript
-function buildFilterFromRules({ rules, matchMode, sort, direction, page, per_page }) {
-  const scene_filter = {};
-
-  // Convert rules array to scene_filter object
-  rules.forEach(rule => {
-    scene_filter[rule.field] = {
-      modifier: rule.modifier,
-      value: rule.value,
-      ...(rule.value2 && { value2: rule.value2 }) // For BETWEEN modifier
-    };
-  });
-
-  // Add match mode (ANY/ALL) to filter
-  // Backend interprets this for multi-rule combinations
-  scene_filter._matchMode = matchMode;
-
-  return {
-    filter: {
-      page,
-      per_page,
-      sort,
-      direction
-    },
-    scene_filter
-  };
-}
-```
-
-### Backend Implementation
-
-**Carousel Controller** (`server/controllers/carousel.ts`):
-
-```typescript
-// List user's carousels
-export const listCarousels = async (req: AuthenticatedRequest, res: Response) => {
-  const carousels = await prisma.userCarousel.findMany({
-    where: { userId: req.user!.id },
-    orderBy: { order: 'asc' }
-  });
-  res.json(carousels);
-};
-
-// Create carousel
-export const createCarousel = async (req: AuthenticatedRequest, res: Response) => {
-  const { title, icon, rules, matchMode, sort, direction } = req.body;
-
-  // Check max limit (15)
-  const count = await prisma.userCarousel.count({
-    where: { userId: req.user!.id }
-  });
-
-  if (count >= 15) {
-    return res.status(400).json({ error: 'Maximum 15 custom carousels allowed' });
+// For custom carousels, query function is built dynamically:
+const buildCustomCarouselQuery = (carousel) => async () => {
+  try {
+    const response = await libraryApi.findScenes({
+      filter: {
+        page: 1,
+        per_page: 12,
+        sort: carousel.sort,
+        direction: carousel.direction,
+      },
+      scene_filter: carousel.rules,
+    });
+    return { scenes: response?.findScenes?.scenes || [], error: null };
+  } catch (error) {
+    return { scenes: [], error: error.message };
   }
-
-  // Get next order position
-  const maxOrder = await prisma.userCarousel.findFirst({
-    where: { userId: req.user!.id },
-    orderBy: { order: 'desc' },
-    select: { order: true }
-  });
-
-  const carousel = await prisma.userCarousel.create({
-    data: {
-      userId: req.user!.id,
-      title,
-      icon: icon || 'Film',
-      rules,
-      matchMode: matchMode || 'ANY',
-      sort: sort || 'random',
-      direction: direction || 'DESC',
-      order: (maxOrder?.order ?? -1) + 1
-    }
-  });
-
-  res.json(carousel);
-};
-
-// Preview carousel results
-export const previewCarousel = async (req: AuthenticatedRequest, res: Response) => {
-  const { rules, matchMode, sort, direction } = req.body;
-
-  // Build filter from rules (same as homepage would)
-  const filter = buildFilterFromRules({
-    rules,
-    matchMode,
-    sort,
-    direction,
-    page: 1,
-    per_page: 12
-  });
-
-  // Execute scene query (reuse existing findScenes controller)
-  const result = await findScenesWithFilter(req.user!.id, filter);
-
-  res.json({
-    count: result.count,
-    scenes: result.scenes
-  });
 };
 ```
 
-**Scene Filter Updates** (`server/controllers/library/scenes.ts`):
+**Error handling on homepage:**
+- If a custom carousel query fails, show friendly error card:
+  ```
+  ┌─────────────────────────────────────────────────────┐
+  │ ⚠️ "My Action Scenes" couldn't load                 │
+  │ The query may need to be updated.                   │
+  │ [Edit Carousel]                                     │
+  └─────────────────────────────────────────────────────┘
+  ```
 
-Add support for `_matchMode` in `scene_filter`:
+### Preference Migration
 
-```typescript
-// Current: ALL filters are AND-ed together
-// Enhancement: Support ANY (OR) logic
-
-if (scene_filter._matchMode === 'ANY') {
-  // Match if ANY filter passes
-  filteredScenes = allScenes.filter(scene => {
-    return Object.entries(scene_filter)
-      .filter(([key]) => key !== '_matchMode')
-      .some(([filterKey, filterValue]) => {
-        return applyFilter(scene, filterKey, filterValue);
-      });
-  });
-} else {
-  // Default: Match if ALL filters pass (existing logic)
-  filteredScenes = applyAllFilters(allScenes, scene_filter);
-}
-```
-
-### User Preference Storage
-
-**Merged Carousel Preferences:**
-
-Update `User.carouselPreferences` JSON structure:
-
-```json
-{
-  "hardcoded-carousel-id": {
-    "enabled": true,
-    "order": 0
-  },
-  "custom-carousel-uuid-1": {
-    "enabled": true,
-    "order": 1
-  },
-  "custom-carousel-uuid-2": {
-    "enabled": false,
-    "order": 2
-  }
-}
-```
-
-**Reordering:**
-- Single endpoint updates ALL carousel orders (hardcoded + custom)
-- `PUT /api/user/settings/carousel-order`
-- Body: `{ order: ["id1", "id2", "id3", ...] }`
+Update `migrateCarouselPreferences()` in `carousels.js`:
+- Keep existing logic for hardcoded carousels
+- Preserve custom carousel preferences (don't remove unknown IDs that start with "custom-")
+- Clean up preferences for deleted custom carousels (carousel no longer exists in DB)
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Database & API)
+### Phase 1: Database & API Foundation
 
 **Tasks:**
-1. Create `UserCarousel` Prisma model
-2. Generate migration
-3. Create carousel CRUD endpoints
-4. Create preview endpoint
-5. Add max carousel limit (15) validation
+1. Add `UserCarousel` model to Prisma schema
+2. Add `userCarousels` relation to User model
+3. Generate and run migration
+4. Create `server/controllers/carousel.ts` with CRUD operations
+5. Create `server/routes/carousel.ts` and wire up routes
+6. Add preview endpoint
+7. Add max 15 carousel limit validation
+8. Add unit tests for carousel controller
 
 **Files:**
 - `server/prisma/schema.prisma`
-- `server/controllers/carousel.ts`
-- `server/routes/carousel.ts`
+- `server/controllers/carousel.ts` (new)
+- `server/routes/carousel.ts` (new)
+- `server/api.ts` (add routes)
 
-### Phase 2: Shared Filter Schema (DRY)
+### Phase 2: Filter Schema Extension (DRY)
 
 **Tasks:**
-6. Extract filter definitions from `filterConfig.js`
-7. Create `filterSchema.js` with structured metadata
-8. Update Scene Search to consume shared schema
-9. Test Scene Search for regressions
-10. Add unit tests for filter schema
+9. Add `carouselSupported` flag to all `SCENE_FILTER_OPTIONS` entries
+10. Add `getCarouselFilters()` helper function
+11. Clean up dead carousel metadata in `CarouselSettings.jsx` (longScenes, highBitrateScenes, barelyLegalScenes)
+12. Add unit tests for filter schema helpers
+13. Verify Scene Search still works (regression test)
 
 **Files:**
-- `client/src/utils/filterSchema.js`
-- `client/src/components/scene-search/SceneSearch.jsx` (update)
+- `client/src/utils/filterConfig.js` (extend)
+- `client/src/components/settings/CarouselSettings.jsx` (cleanup)
 
 ### Phase 3: Carousel Builder UI
 
 **Tasks:**
-11. Create `IconPicker` component with curated Lucide icons
-12. Create `FilterBuilder` component (rule container)
-13. Create `FilterRule` component (single rule editor)
-14. Create `FilterValueSelector` (switches on filter type)
-15. Create `CarouselBuilder` page (main editor)
-16. Add form validation and error handling
-17. Wire up save/cancel/preview actions
+14. Create `IconPicker.jsx` with curated Lucide icon list
+15. Create `RuleRow.jsx` - single filter rule editor
+16. Create `RuleBuilder.jsx` - container managing multiple rules
+17. Create `CarouselPreview.jsx` - preview results display
+18. Create `CarouselBuilder.jsx` - main full-page editor
+19. Add route `/settings/carousels/new` and `/settings/carousels/:id/edit`
+20. Wire up Preview button (must succeed to enable Save)
+21. Wire up Save/Cancel actions
+22. Add form validation (title required, at least one rule)
 
 **Files:**
-- `client/src/components/carousel-builder/IconPicker.jsx`
-- `client/src/components/carousel-builder/FilterBuilder.jsx`
-- `client/src/components/carousel-builder/FilterRule.jsx`
-- `client/src/components/carousel-builder/FilterValueSelector.jsx`
-- `client/src/components/carousel-builder/CarouselBuilder.jsx`
+- `client/src/components/carousel-builder/IconPicker.jsx` (new)
+- `client/src/components/carousel-builder/RuleRow.jsx` (new)
+- `client/src/components/carousel-builder/RuleBuilder.jsx` (new)
+- `client/src/components/carousel-builder/CarouselPreview.jsx` (new)
+- `client/src/components/carousel-builder/CarouselBuilder.jsx` (new)
+- `client/src/App.jsx` (add routes)
 
 ### Phase 4: Carousel Management UI
 
 **Tasks:**
-18. Create `CarouselList` component (settings page)
-19. Add drag-and-drop reordering (react-beautiful-dnd or @dnd-kit)
-20. Add edit/delete/toggle actions
-21. Add "Create Custom Carousel" button
-22. Display carousel count (X/15)
-23. Add confirmation modals for delete
+23. Update `CarouselSettings.jsx` to fetch and display custom carousels
+24. Add Edit/Delete buttons for custom carousels
+25. Add "Create Custom Carousel" button with count (X/15)
+26. Add delete confirmation modal
+27. Add broken carousel indicator (warning icon + "Edit to fix")
+28. Integrate custom carousel IDs into reorder/toggle logic
+29. Update preference save to include custom carousel IDs
 
 **Files:**
-- `client/src/components/carousel-builder/CarouselList.jsx`
-- `client/src/components/pages/Settings.jsx` (add route)
+- `client/src/components/settings/CarouselSettings.jsx` (major update)
 
 ### Phase 5: Homepage Integration
 
 **Tasks:**
-24. Update `CAROUSEL_DEFINITIONS` to include dynamic fetch
-25. Fetch custom carousels from API
-26. Merge hardcoded + custom carousels
-27. Update `useHomeCarouselQueries` for dynamic query building
-28. Add `buildFilterFromRules` utility function
-29. Handle carousel loading/error states
-30. Update carousel preference migration logic
+30. Fetch custom carousels in `Home.jsx`
+31. Merge hardcoded + custom carousels
+32. Build dynamic query functions for custom carousels
+33. Add error state rendering for failed carousels
+34. Update `migrateCarouselPreferences()` to handle custom carousel IDs
+35. Add "Edit Carousel" link from error state
+36. Test carousel rendering with various rule combinations
 
 **Files:**
-- `client/src/constants/carousels.js` (update)
-- `client/src/hooks/useHomeCarouselQueries.js` (update)
 - `client/src/components/pages/Home.jsx` (update)
-- `client/src/utils/carouselHelpers.js` (new)
+- `client/src/constants/carousels.js` (update migration)
+- `client/src/hooks/useHomeCarouselQueries.js` (may need updates)
 
-### Phase 6: Backend Filter Enhancement
-
-**Tasks:**
-31. Add `_matchMode` support to scene filtering pipeline
-32. Implement ANY (OR) logic for rules
-33. Test with various rule combinations
-34. Verify user restrictions still apply correctly
-35. Test performance with expensive filters
-
-**Files:**
-- `server/controllers/library/scenes.ts` (update)
-
-### Phase 7: Testing & Polish
+### Phase 6: Testing & Polish
 
 **Tasks:**
-36. Test carousel creation with all filter types
-37. Test carousel editing and deletion
-38. Test reordering (drag-and-drop)
-39. Test preview functionality
-40. Test max carousel limit enforcement
-41. Test with user restrictions and hidden entities
-42. Mobile responsiveness testing
-43. Add loading states and error handling
-44. Add empty states ("No custom carousels yet")
+37. Test carousel creation with all filter types
+38. Test carousel editing and deletion
+39. Test reordering (up/down buttons)
+40. Test preview functionality
+41. Test max 15 carousel limit enforcement
+42. Test with user content restrictions
+43. Test with hidden entities
+44. Test broken carousel handling (delete referenced entity)
+45. Mobile responsiveness testing
+46. Add loading states
+47. Add empty states ("No custom carousels yet")
+48. Final regression test on Scene Search
 
-## Data Flow Examples
+## Error Handling Strategy
 
-### Example 1: Creating "Best Action Scenes" Carousel
+### Builder Errors
+- **Preview fails**: Show error message, keep Save disabled
+- **Save fails**: Show error toast, don't navigate away
+- **Invalid rules**: Validation prevents save
 
-**User Actions:**
-1. Goes to Settings → Carousels
-2. Clicks "Create Custom Carousel"
-3. Enters title: "Best Action Scenes"
-4. Selects icon: "Zap"
-5. Adds rules:
-   - Tags includes "Action"
-   - Rating greater than 80
-6. Sets sort: "Rating" DESC
-7. Clicks "Preview Results" → sees 847 matching scenes
-8. Clicks "Save Carousel"
+### Homepage Errors
+- **Query fails**: Show friendly error card with "Edit Carousel" link
+- **Carousel deleted but in preferences**: Clean up on next preference save
 
-**Backend:**
-```sql
-INSERT INTO UserCarousel (
-  id, userId, title, icon, rules, matchMode, sort, direction, order
-) VALUES (
-  'uuid-123',
-  'user-456',
-  'Best Action Scenes',
-  'Zap',
-  '[{"field":"tags","modifier":"INCLUDES","value":["tag-action"]},{"field":"rating100","modifier":"GREATER_THAN","value":80}]',
-  'ALL',
-  'rating100',
-  'DESC',
-  5
-);
-```
+### Settings Errors
+- **Broken carousel**: Show warning icon, "Query failed - Edit to fix"
+- **Load fails**: Show error message, retry button
 
-**Homepage Rendering:**
+## Curated Icon List
+
 ```javascript
-const customCarousel = {
-  id: 'uuid-123',
-  title: 'Best Action Scenes',
-  icon: 'Zap',
-  fetchKey: 'custom-uuid-123' // Generated
-};
+export const CAROUSEL_ICONS = [
+  // Film & Video
+  "Film", "Video", "Play", "PlayCircle", "Clapperboard", "Tv", "Monitor",
 
-carouselQueries['custom-uuid-123'] = async () => {
-  const filter = {
-    filter: { page: 1, per_page: 12, sort: 'rating100', direction: 'DESC' },
-    scene_filter: {
-      tags: { modifier: 'INCLUDES', value: ['tag-action'] },
-      rating100: { modifier: 'GREATER_THAN', value: 80 },
-      _matchMode: 'ALL'
-    }
-  };
+  // Favorites & Collections
+  "Heart", "Star", "Bookmark", "Award", "Trophy", "Crown", "Gem",
 
-  const response = await libraryApi.findScenes(filter);
-  return response?.findScenes?.scenes || [];
-};
+  // Time & Recency
+  "Clock", "Calendar", "TrendingUp", "Zap", "Flame", "Hourglass",
+
+  // Discovery & Search
+  "Eye", "Sparkles", "Target", "Compass", "Search", "Filter",
+
+  // Quality & Rating
+  "ThumbsUp", "ThumbsDown", "Shield", "Diamond", "Medal",
+
+  // People & Groups
+  "Users", "User", "UserCheck", "UsersRound",
+
+  // Organization
+  "Building", "Tag", "Folder", "FolderHeart", "Library", "Layers",
+
+  // Misc Media
+  "Camera", "Headphones", "Music", "Mic", "Radio",
+
+  // Actions & States
+  "Check", "X", "AlertCircle", "Info", "HelpCircle",
+
+  // Fun & Mood
+  "Smile", "PartyPopper", "Gift", "Cake", "Sun", "Moon"
+];
 ```
-
-### Example 2: Editing Existing Carousel
-
-**User Actions:**
-1. Goes to Settings → Carousels
-2. Clicks "Edit" on "Best Action Scenes"
-3. Changes icon to "Flame"
-4. Adds rule: O Counter greater than 0
-5. Changes sort to "Random"
-6. Clicks "Save"
-
-**API Call:**
-```
-PUT /api/carousels/uuid-123
-Body: {
-  title: "Best Action Scenes",
-  icon: "Flame",
-  rules: [
-    { field: "tags", modifier: "INCLUDES", value: ["tag-action"] },
-    { field: "rating100", modifier: "GREATER_THAN", value: 80 },
-    { field: "o_counter", modifier: "GREATER_THAN", value: 0 }
-  ],
-  matchMode: "ALL",
-  sort: "random",
-  direction: "DESC"
-}
-```
-
-## Key Design Decisions
-
-### 1. Separate Hardcoded vs Custom Carousels
-- Hardcoded carousels cannot be edited/deleted (only toggle visibility)
-- Custom carousels fully editable
-- Both share same order/visibility preference system
-
-### 2. Fixed 12-Scene Limit
-- Keeps homepage consistent and performant
-- Matches existing carousel behavior
-- Users can click carousel to see full search results
-
-### 3. Random Sort Default
-- Provides discovery and variety
-- Different scenes shown each page load
-- Users can override with any sort option
-
-### 4. Full-Page Builder (Not Modal)
-- Better mobile UX with more space
-- Easier to manage complex rule sets
-- Follows settings pattern (full-page editors)
-
-### 5. Curated Icon Set
-- ~50-60 relevant Lucide icons
-- Prevents overwhelming choice
-- Ensures icons make sense for media context
-
-### 6. Manual Preview (Not Auto)
-- Reduces API calls during editing
-- User controls when to test query
-- Shows full count + sample results
-
-### 7. 15 Carousel Maximum
-- Prevents homepage from becoming overwhelming
-- Encourages thoughtful curation
-- Can be increased if needed
-
-## Future Enhancements
-
-**Phase 2 Features (Not in Initial Release):**
-- Carousel templates (pre-built popular queries)
-- Duplicate carousel
-- Export/import carousel JSON
-- Carousel analytics (views, clicks)
-- Scheduled carousels (time-based visibility)
-- Shared carousels between users (admin-created)
 
 ## Testing Checklist
 
+### Carousel Builder
 - [ ] Create carousel with single rule
-- [ ] Create carousel with multiple rules (ANY mode)
-- [ ] Create carousel with multiple rules (ALL mode)
-- [ ] Test all filter types (entity, number, date, boolean)
-- [ ] Test all modifiers (INCLUDES, EXCLUDES, GREATER_THAN, etc.)
-- [ ] Edit existing carousel
-- [ ] Delete carousel
-- [ ] Reorder carousels (drag-and-drop)
-- [ ] Toggle carousel visibility
-- [ ] Test max 15 carousel limit
-- [ ] Preview carousel results
-- [ ] Test random sort
-- [ ] Test with user restrictions
-- [ ] Test with hidden entities
-- [ ] Test mobile responsiveness
-- [ ] Test carousel on homepage
-- [ ] Test empty states
-- [ ] Test error handling
-- [ ] Test icon picker
-- [ ] Verify Scene Search still works (no regressions)
+- [ ] Create carousel with multiple rules (all filter types)
+- [ ] Test each filter type works correctly
+- [ ] Test each modifier works correctly
+- [ ] Preview shows correct results
+- [ ] Save disabled until preview succeeds
+- [ ] Edit existing carousel loads correctly
+- [ ] Cancel returns without saving
+- [ ] Icon picker works
+- [ ] Title validation (required)
+- [ ] Sort/direction options work
 
-## Success Metrics
+### Carousel Management
+- [ ] List shows hardcoded + custom carousels
+- [ ] Reorder with up/down buttons works
+- [ ] Toggle visibility works
+- [ ] Edit button navigates to builder
+- [ ] Delete button shows confirmation
+- [ ] Delete removes carousel
+- [ ] Max 15 limit enforced
+- [ ] Broken carousel shows warning
 
-- Users can create custom carousels without coding
-- Filter changes in Scene Search automatically work in carousel builder
-- Homepage loads efficiently with custom carousels
-- Mobile-friendly carousel builder
-- User restrictions and hidden entities respected in custom carousels
+### Homepage
+- [ ] Custom carousels render correctly
+- [ ] Random sort shows different scenes on refresh
+- [ ] Error state shows for broken carousels
+- [ ] "Edit Carousel" link works from error state
+- [ ] Disabled carousels don't show
+- [ ] Order matches user preferences
+
+### Regression Tests
+- [ ] Scene Search still works with all filters
+- [ ] Hardcoded carousels still work
+- [ ] Existing carousel preferences preserved
+- [ ] Content restrictions apply to custom carousels
+- [ ] Hidden entities excluded from custom carousels
+
+### Mobile
+- [ ] Builder UI responsive
+- [ ] Icon picker usable on mobile
+- [ ] Rule rows don't overflow
+- [ ] Preview scrollable
 
 ---
 
 **Document Created:** 2025-01-21
-**Implementation Status:** Planning Phase
-**Estimated Effort:** Large (2-3 weeks full-time)
+**Document Updated:** 2025-01-26
+**Implementation Status:** Planning Phase - Refined
+**Key Decisions:**
+- ALL mode only (matches Scene Search behavior)
+- Expose all Scene Search filters
+- Up/down buttons for reordering (not drag-and-drop)
+- Preview must succeed before save enabled
+- Graceful error handling on homepage

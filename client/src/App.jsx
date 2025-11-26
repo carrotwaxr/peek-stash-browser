@@ -42,6 +42,9 @@ const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
 const HiddenItemsPage = lazy(
   () => import("./components/pages/HiddenItemsPage.jsx")
 );
+const CarouselBuilder = lazy(
+  () => import("./components/carousel-builder/CarouselBuilder.jsx")
+);
 
 // Loading fallback component
 const PageLoader = () => (
@@ -257,6 +260,22 @@ const AppContent = () => {
             element={
               <GlobalLayout>
                 <Scene />
+              </GlobalLayout>
+            }
+          />
+          <Route
+            path="/my-settings/carousels/new"
+            element={
+              <GlobalLayout>
+                <CarouselBuilder />
+              </GlobalLayout>
+            }
+          />
+          <Route
+            path="/my-settings/carousels/:id/edit"
+            element={
+              <GlobalLayout>
+                <CarouselBuilder />
               </GlobalLayout>
             }
           />
