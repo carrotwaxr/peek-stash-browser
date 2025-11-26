@@ -8,6 +8,7 @@ import { GridCard } from "./GridCard.jsx";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 import Pagination from "./Pagination.jsx";
 import PerformerCard from "./PerformerCard.jsx";
+import { TooltipEntityGrid } from "./TooltipEntityGrid.jsx";
 
 /**
  * EntityGrid - Generic grid component for displaying entities (galleries, images, groups, etc.)
@@ -161,7 +162,7 @@ const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others },
   let imagePath, title, subtitle, indicators, linkTo, description;
 
   switch (entityType) {
-    case "gallery":
+    case "gallery": {
       imagePath = entity.paths?.cover || null;
       title = galleryTitle(entity);
       description = entity.description;
@@ -178,6 +179,25 @@ const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others },
         }
         return null;
       })();
+      // Build rich tooltip content for performers and tags
+      const performersTooltip =
+        entity.performers &&
+        entity.performers.length > 0 && (
+          <TooltipEntityGrid
+            entityType="performer"
+            entities={entity.performers}
+            title="Performers"
+          />
+        );
+      const tagsTooltip =
+        entity.tags &&
+        entity.tags.length > 0 && (
+          <TooltipEntityGrid
+            entityType="tag"
+            entities={entity.tags}
+            title="Tags"
+          />
+        );
       indicators = [
         {
           type: "IMAGES",
@@ -187,9 +207,28 @@ const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others },
               ? "1 Image"
               : `${entity.image_count} Images`,
         },
+        {
+          type: "PERFORMERS",
+          count: entity.performers?.length || 0,
+          tooltipContent: performersTooltip,
+          onClick:
+            entity.performers?.length > 0
+              ? () => navigate(`/performers?galleryId=${entity.id}`)
+              : undefined,
+        },
+        {
+          type: "TAGS",
+          count: entity.tags?.length || 0,
+          tooltipContent: tagsTooltip,
+          onClick:
+            entity.tags?.length > 0
+              ? () => navigate(`/tags?galleryId=${entity.id}`)
+              : undefined,
+        },
       ];
       linkTo = `/gallery/${entity.id}`;
       break;
+    }
 
     case "group":
       imagePath = entity.front_image_path || entity.back_image_path;
@@ -243,13 +282,6 @@ const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others },
       break;
 
     case "studio":
-      console.log('[EntityGrid] Studio entity:', {
-        id: entity.id,
-        name: entity.name,
-        tags: entity.tags,
-        tagsLength: entity.tags?.length,
-        tag_count: entity.tag_count,
-      });
       imagePath = entity.image_path;
       title = entity.name;
       description = entity.details;
@@ -271,7 +303,6 @@ const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others },
               : undefined,
         },
       ];
-      console.log('[EntityGrid] Studio indicators:', indicators);
       linkTo = `/studio/${entity.id}`;
       break;
 

@@ -16,6 +16,7 @@ import {
   PageHeader,
   PageLayout,
   SearchControls,
+  TooltipEntityGrid,
 } from "../ui/index.js";
 
 const Galleries = () => {
@@ -155,6 +156,7 @@ const Galleries = () => {
 
 const GalleryCard = forwardRef(
   ({ gallery, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
+    const navigate = useNavigate();
     const coverImage = gallery.paths?.cover || null;
     const title = galleryTitle(gallery);
     const date = gallery.date
@@ -173,6 +175,27 @@ const GalleryCard = forwardRef(
       return null;
     })();
 
+    // Build rich tooltip content for performers and tags
+    const performersTooltip =
+      gallery.performers &&
+      gallery.performers.length > 0 && (
+        <TooltipEntityGrid
+          entityType="performer"
+          entities={gallery.performers}
+          title="Performers"
+        />
+      );
+
+    const tagsTooltip =
+      gallery.tags &&
+      gallery.tags.length > 0 && (
+        <TooltipEntityGrid
+          entityType="tag"
+          entities={gallery.tags}
+          title="Tags"
+        />
+      );
+
     return (
       <GridCard
         description={gallery.description}
@@ -186,6 +209,24 @@ const GalleryCard = forwardRef(
               gallery.image_count === 1
                 ? "1 Image"
                 : `${gallery.image_count} Images`,
+          },
+          {
+            type: "PERFORMERS",
+            count: gallery.performers?.length || 0,
+            tooltipContent: performersTooltip,
+            onClick:
+              gallery.performers?.length > 0
+                ? () => navigate(`/performers?galleryId=${gallery.id}`)
+                : undefined,
+          },
+          {
+            type: "TAGS",
+            count: gallery.tags?.length || 0,
+            tooltipContent: tagsTooltip,
+            onClick:
+              gallery.tags?.length > 0
+                ? () => navigate(`/tags?galleryId=${gallery.id}`)
+                : undefined,
           },
         ]}
         linkTo={`/gallery/${gallery.id}`}
