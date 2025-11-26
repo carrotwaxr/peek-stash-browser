@@ -116,19 +116,35 @@ cd client && npm run knip       # Find unused files/exports/types
 
 ### Database Management
 
+**CRITICAL: Always use proper migrations. Never use `prisma db push` in production.**
+
 ```bash
-# Run migrations
-cd server && npx prisma migrate dev
+# Create a new migration (development only)
+cd server && npx prisma migrate dev --name descriptive_name
+
+# Apply pending migrations (production)
+cd server && npx prisma migrate deploy
 
 # Generate Prisma client (after schema changes)
 cd server && npx prisma generate
 
-# Reset database (DESTRUCTIVE)
+# Reset database (DESTRUCTIVE - development only)
 cd server && npx prisma migrate reset
 
 # View database in Prisma Studio
 cd server && npx prisma studio
+
+# Check migration status
+cd server && npx prisma migrate status
 ```
+
+**Migration workflow for schema changes:**
+1. Edit `server/prisma/schema.prisma`
+2. Run `npx prisma migrate dev --name descriptive_name` - creates migration SQL and applies it
+3. Commit both `schema.prisma` AND the new migration folder in `prisma/migrations/`
+4. The Docker startup script (`docker/start.sh`) runs `prisma migrate deploy` to apply migrations
+
+**WARNING**: Never use `prisma db push` for production databases. It doesn't create migration files and can cause data loss with `--accept-data-loss`. The baseline migration (`0_baseline`) was created to fix databases that were incorrectly managed with `db push`.
 
 ## Architecture Overview
 
@@ -472,11 +488,33 @@ JWT-based authentication with role-based access control:
 
 ### Adding a new Prisma model
 
-1. Edit `server/prisma/schema.prisma`
-2. Run `npx prisma migrate dev --name descriptive_migration_name`
-3. Prisma Client auto-regenerates with new types
-4. Update TypeScript code to use new model
-5. Restart server to apply changes
+**CRITICAL: Follow this workflow exactly to avoid breaking user databases.**
+
+1. **Edit schema**: Add/modify models in `server/prisma/schema.prisma`
+
+2. **Create migration**: Run from `server/` directory:
+   ```bash
+   npx prisma migrate dev --name descriptive_name
+   ```
+   This creates a new folder in `prisma/migrations/` with the SQL.
+
+3. **Verify migration SQL**: Check the generated `migration.sql` file looks correct
+
+4. **Commit BOTH files**:
+   ```bash
+   git add prisma/schema.prisma prisma/migrations/YYYYMMDD_descriptive_name/
+   git commit -m "feat: add NewModel to database schema"
+   ```
+
+5. **Test locally**: Restart Docker to verify migration applies correctly
+
+6. **Production deployment**: The `docker/start.sh` script automatically runs `prisma migrate deploy` on container startup
+
+**Common mistakes to avoid:**
+- Never run `prisma db push` - it doesn't create migrations
+- Never skip committing the migration folder
+- Never manually edit migration SQL after it's been deployed
+- Always test migrations against a copy of production data before releasing
 
 ### Updating Stash GraphQL queries (via stashapp-api)
 
@@ -658,4 +696,9 @@ When working on this codebase:
 5. **Path handling**: Remember POSIX format for all internal paths
 6. **Watch cache**: Changes to Stash queries may require cache invalidation/refresh
 7. **Version sync**: Keep client and server package.json versions in sync
-8. **Database changes**: Always use Prisma migrations (never manual SQL)
+8. **Database changes - CRITICAL**:
+   - ALWAYS use `npx prisma migrate dev --name <name>` to create migrations
+   - NEVER use `prisma db push` - it doesn't create migration files and can cause data loss
+   - ALWAYS commit both `schema.prisma` AND the migration folder
+   - The baseline migration `0_baseline` represents the v2.0.0 schema - never modify it
+   - Future schema changes MUST have their own migration files
