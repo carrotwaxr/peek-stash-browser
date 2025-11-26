@@ -82,6 +82,7 @@ const Playlists = () => {
     } catch {
       showError("Failed to delete playlist");
     } finally {
+      setDeleteConfirmOpen(false);
       setPlaylistToDelete(null);
     }
   };
