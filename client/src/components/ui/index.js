@@ -23,6 +23,7 @@ export { default as EmptyState } from "./EmptyState.jsx";
 export { default as EntityGrid } from "./EntityGrid.jsx";
 export { default as EntityMenu } from "./EntityMenu.jsx";
 export { default as ErrorMessage } from "./ErrorMessage.jsx";
+export { default as ExternalPlayerButton } from "./ExternalPlayerButton.jsx";
 export { default as FavoriteButton } from "./FavoriteButton.jsx";
 export { default as HideConfirmationDialog } from "./HideConfirmationDialog.jsx";
 export { FilterControl, FilterPanel, SortControl } from "./FilterControls.jsx";
