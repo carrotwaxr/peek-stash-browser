@@ -862,6 +862,9 @@ const SearchControls = ({
             modifierOptions,
             modifierKey,
             defaultModifier,
+            supportsHierarchy,
+            hierarchyKey,
+            hierarchyLabel,
             ...filterProps
           } = rest;
 
@@ -875,6 +878,14 @@ const SearchControls = ({
               modifierValue={filters[modifierKey] || defaultModifier}
               onModifierChange={(value) =>
                 modifierKey && handleFilterChange(modifierKey, value)
+              }
+              supportsHierarchy={supportsHierarchy}
+              hierarchyLabel={hierarchyLabel}
+              hierarchyValue={hierarchyKey ? filters[hierarchyKey] : undefined}
+              onHierarchyChange={
+                hierarchyKey
+                  ? (value) => handleFilterChange(hierarchyKey, value)
+                  : undefined
               }
               {...filterProps}
             />

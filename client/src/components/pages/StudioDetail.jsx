@@ -28,14 +28,31 @@ const StudioDetail = () => {
   const { studioId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [studio, setStudio] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
+  // Include sub-studios toggle state (from URL param or default false)
+  const includeSubStudios = searchParams.get("includeSubStudios") === "true";
+
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get("tab") || "scenes";
+
+  // Handler for toggling include sub-studios
+  const handleIncludeSubStudiosChange = (checked) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (checked) {
+      newParams.set("includeSubStudios", "true");
+    } else {
+      newParams.delete("includeSubStudios");
+    }
+    setSearchParams(newParams);
+  };
+
+  // Check if studio has children (for showing toggle)
+  const hasChildren = studio?.child_studios && studio.child_studios.length > 0;
 
   // Set page title to studio name
   usePageTitle(studio?.name || "Studio");
@@ -173,6 +190,32 @@ const StudioDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
+          {/* Include Sub-Studios Toggle - only show if studio has children */}
+          {hasChildren && (
+            <div className="mb-4 flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeSubStudios}
+                  onChange={(e) =>
+                    handleIncludeSubStudiosChange(e.target.checked)
+                  }
+                  className="w-4 h-4 rounded border-2 cursor-pointer"
+                  style={{
+                    borderColor: "var(--border-color)",
+                    accentColor: "var(--accent-primary)",
+                  }}
+                />
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Include sub-studios ({studio.child_studios.length})
+                </span>
+              </label>
+            </div>
+          )}
+
           <TabNavigation
             tabs={[
               { id: "scenes", label: "Scenes", count: studio.scene_count || 0 },
@@ -199,11 +242,13 @@ const StudioDetail = () => {
           {/* Tab Content */}
           {activeTab === "scenes" && (
             <SceneSearch
+              key={`scenes-${includeSubStudios}`}
               context="scene_studio"
               permanentFilters={{
                 studios: {
                   value: [parseInt(studioId, 10)],
                   modifier: "INCLUDES",
+                  ...(includeSubStudios && { depth: -1 }),
                 },
               }}
               permanentFiltersMetadata={{
@@ -211,19 +256,21 @@ const StudioDetail = () => {
                   { id: studioId, name: studio?.name || "Unknown Studio" },
                 ],
               }}
-              title={`Scenes from ${studio?.name || "this studio"}`}
+              title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
               captureReferrer={false}
             />
           )}
 
           {activeTab === "galleries" && (
             <EntityGrid
+              key={`galleries-${includeSubStudios}`}
               entityType="gallery"
               filters={{
                 gallery_filter: {
                   studios: {
                     value: [parseInt(studioId, 10)],
                     modifier: "INCLUDES",
+                    ...(includeSubStudios && { depth: -1 }),
                   },
                 },
               }}
@@ -232,7 +279,11 @@ const StudioDetail = () => {
           )}
 
           {activeTab === "images" && (
-            <ImagesTab studioId={studioId} studioName={studio?.name} />
+            <ImagesTab
+              studioId={studioId}
+              studioName={studio?.name}
+              includeSubStudios={includeSubStudios}
+            />
           )}
 
           {activeTab === "performers" && (
@@ -630,7 +681,7 @@ const StudioDetails = ({ studio }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ studioId, studioName }) => {
+const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
   const [images, setImages] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -653,6 +704,7 @@ const ImagesTab = ({ studioId, studioName }) => {
             studios: {
               value: [parseInt(studioId, 10)],
               modifier: "INCLUDES",
+              ...(includeSubStudios && { depth: -1 }),
             },
           },
         });
@@ -666,7 +718,7 @@ const ImagesTab = ({ studioId, studioName }) => {
     };
 
     fetchImages();
-  }, [studioId, currentPage]);
+  }, [studioId, currentPage, includeSubStudios]);
 
   if (isLoading) {
     return (

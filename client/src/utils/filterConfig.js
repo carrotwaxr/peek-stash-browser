@@ -235,6 +235,9 @@ export const SCENE_FILTER_OPTIONS = [
     multi: false,
     defaultValue: "",
     placeholder: "Select studio...",
+    supportsHierarchy: true,
+    hierarchyKey: "studioIdDepth",
+    hierarchyLabel: "Include sub-studios",
   },
   {
     key: "tagIds",
@@ -247,6 +250,9 @@ export const SCENE_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
+    supportsHierarchy: true,
+    hierarchyKey: "tagIdsDepth",
+    hierarchyLabel: "Include sub-tags",
   },
   {
     key: "groupIds",
@@ -500,6 +506,9 @@ export const PERFORMER_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
+    supportsHierarchy: true,
+    hierarchyKey: "tagIdsDepth",
+    hierarchyLabel: "Include sub-tags",
   },
   {
     key: "gender",
@@ -1151,6 +1160,9 @@ export const GALLERY_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "studioIdsModifier",
     defaultModifier: "INCLUDES",
+    supportsHierarchy: true,
+    hierarchyKey: "studioIdsDepth",
+    hierarchyLabel: "Include sub-studios",
   },
   {
     key: "tagIds",
@@ -1163,6 +1175,9 @@ export const GALLERY_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
+    supportsHierarchy: true,
+    hierarchyKey: "tagIdsDepth",
+    hierarchyLabel: "Include sub-tags",
   },
   {
     key: "rating",
@@ -1216,6 +1231,7 @@ export const buildSceneFilter = (filters) => {
   }
 
   // Studios: Merge permanent + UI filters
+  // Supports hierarchical filtering via depth parameter
   const studioIds = [];
   if (filters.studios?.value) {
     studioIds.push(...filters.studios.value);
@@ -1228,9 +1244,17 @@ export const buildSceneFilter = (filters) => {
       value: [...new Set(studioIds)], // Remove duplicates
       modifier: "INCLUDES",
     };
+    // Pass through depth for hierarchical filtering
+    // Priority: permanent filters > UI filters
+    if (filters.studios?.depth !== undefined) {
+      sceneFilter.studios.depth = filters.studios.depth;
+    } else if (filters.studioIdDepth !== undefined) {
+      sceneFilter.studios.depth = filters.studioIdDepth;
+    }
   }
 
   // Tags: Merge permanent + UI filters
+  // Supports hierarchical filtering via depth parameter
   const tagIds = [];
   if (filters.tags?.value) {
     tagIds.push(...filters.tags.value);
@@ -1244,6 +1268,13 @@ export const buildSceneFilter = (filters) => {
       modifier:
         filters.tagIdsModifier || filters.tags?.modifier || "INCLUDES_ALL",
     };
+    // Pass through depth for hierarchical filtering
+    // Priority: permanent filters > UI filters
+    if (filters.tags?.depth !== undefined) {
+      sceneFilter.tags.depth = filters.tags.depth;
+    } else if (filters.tagIdsDepth !== undefined) {
+      sceneFilter.tags.depth = filters.tagIdsDepth;
+    }
   }
 
   // Collections/Groups: Merge permanent + UI filters
@@ -1619,11 +1650,16 @@ export const buildPerformerFilter = (filters) => {
   }
 
   // Tags filter
+  // Supports hierarchical filtering via depth parameter
   if (filters.tagIds && filters.tagIds.length > 0) {
     performerFilter.tags = {
       value: filters.tagIds.map(String),
       modifier: filters.tagIdsModifier || "INCLUDES_ALL",
     };
+    // Pass through depth for hierarchical filtering
+    if (filters.tagIdsDepth !== undefined) {
+      performerFilter.tags.depth = filters.tagIdsDepth;
+    }
   }
 
   // Select filters with EQUALS modifier
@@ -2474,11 +2510,16 @@ export const buildGalleryFilter = (filters) => {
   }
 
   // Studio filter
+  // Supports hierarchical filtering via depth parameter
   if (filters.studioIds && filters.studioIds.length > 0) {
     galleryFilter.studios = {
       value: filters.studioIds.map(String),
       modifier: filters.studioIdsModifier || "INCLUDES",
     };
+    // Pass through depth for hierarchical filtering
+    if (filters.studioIdsDepth !== undefined) {
+      galleryFilter.studios.depth = filters.studioIdsDepth;
+    }
   }
 
   // Performers filter
@@ -2490,11 +2531,16 @@ export const buildGalleryFilter = (filters) => {
   }
 
   // Tags filter
+  // Supports hierarchical filtering via depth parameter
   if (filters.tagIds && filters.tagIds.length > 0) {
     galleryFilter.tags = {
       value: filters.tagIds.map(String),
       modifier: filters.tagIdsModifier || "INCLUDES",
     };
+    // Pass through depth for hierarchical filtering
+    if (filters.tagIdsDepth !== undefined) {
+      galleryFilter.tags.depth = filters.tagIdsDepth;
+    }
   }
 
   return galleryFilter;
