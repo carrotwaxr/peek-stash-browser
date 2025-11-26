@@ -15,6 +15,7 @@ import "./plugins/persist-volume.js";
 import "./plugins/skip-buttons.js";
 import "./plugins/source-selector.js";
 import "./plugins/track-activity.js";
+import "./plugins/volume-progress-fix.js";
 import "./plugins/vrmode.js";
 
 // Register Video.js plugins
@@ -169,6 +170,7 @@ export function useVideoPlayer({
         },
         skipButtons: {},
         trackActivity: {},
+        volumeProgressFix: {},
         vrMenu: {},
       },
     });
