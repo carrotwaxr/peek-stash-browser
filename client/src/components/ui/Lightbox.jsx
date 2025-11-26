@@ -402,21 +402,21 @@ const Lightbox = ({
         </button>
       )}
 
+      {/* Loading spinner - centered in viewport, not in image container */}
+      {!imageLoaded && (
+        <div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+          style={{ color: "var(--text-primary)" }}
+        >
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-current" />
+        </div>
+      )}
+
       {/* Image container */}
       <div
         className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Loading spinner */}
-        {!imageLoaded && (
-          <div
-            className="absolute inset-0 flex items-center justify-center"
-            style={{ color: "var(--text-primary)" }}
-          >
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-current" />
-          </div>
-        )}
-
         {/* Image */}
         <img
           src={imageSrc}
