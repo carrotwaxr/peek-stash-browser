@@ -116,6 +116,7 @@ nav:
       - Keyboard Navigation: user-guide/keyboard-navigation.md
       - Playlists: user-guide/playlists.md
       - Hidden Items: user-guide/hidden-items.md
+      - External Player: user-guide/external-player.md
   - Development:
       - Content Restrictions System: development/content-restrictions.md
       - Regression Testing Guide: development/regression-testing.md
