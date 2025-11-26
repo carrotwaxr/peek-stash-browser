@@ -13,6 +13,7 @@ import {
   NormalizedTag,
   PeekGalleryFilter,
 } from "../../types/index.js";
+import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { convertToProxyUrl } from "../../utils/pathMapping.js";
@@ -148,9 +149,19 @@ export function applyGalleryFilters(
   }
 
   // Filter by studio
-  if (filters.studios) {
-    const studioIds = new Set(filters.studios.value);
-    filtered = filtered.filter((g) => g.studio && studioIds.has(g.studio.id));
+  // Supports hierarchical filtering via depth parameter
+  if (filters.studios && filters.studios.value) {
+    const { value: studioIds, depth } = filters.studios;
+    // Expand studio IDs to include descendants if depth is specified
+    const expandedStudioIds = new Set(
+      expandStudioIds(
+        studioIds.map((id: string) => String(id)),
+        depth ?? 0
+      )
+    );
+    filtered = filtered.filter(
+      (g) => g.studio && expandedStudioIds.has(String(g.studio.id))
+    );
   }
 
   // Filter by performers
@@ -162,9 +173,19 @@ export function applyGalleryFilters(
   }
 
   // Filter by tags
-  if (filters.tags) {
-    const tagIds = new Set(filters.tags.value);
-    filtered = filtered.filter((g) => g.tags?.some((t) => tagIds.has(t.id)));
+  // Supports hierarchical filtering via depth parameter
+  if (filters.tags && filters.tags.value) {
+    const { value: tagIds, depth } = filters.tags;
+    // Expand tag IDs to include descendants if depth is specified
+    const expandedTagIds = new Set(
+      expandTagIds(
+        tagIds.map((id: string) => String(id)),
+        depth ?? 0
+      )
+    );
+    filtered = filtered.filter((g) =>
+      g.tags?.some((t) => expandedTagIds.has(String(t.id)))
+    );
   }
 
   return filtered;

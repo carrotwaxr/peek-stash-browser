@@ -61,6 +61,11 @@ export const FilterControl = ({
   modifierOptions, // for multi-criterion modifiers
   modifierValue, // current modifier value
   onModifierChange, // modifier change handler
+  // Hierarchy support for tags/studios
+  supportsHierarchy = false,
+  hierarchyLabel = "Include children",
+  hierarchyValue, // current depth value (undefined/0 = off, -1 = all)
+  onHierarchyChange, // hierarchy change handler
 }) => {
   // Standardized styles for all inputs in the filter panel
   const baseInputStyle = {
@@ -154,6 +159,26 @@ export const FilterControl = ({
               multi={multi}
               placeholder={placeholder || `Select ${label}...`}
             />
+            {/* Hierarchy checkbox (for tags/studios) */}
+            {supportsHierarchy && onHierarchyChange && (
+              <label className="flex items-center cursor-pointer mt-1">
+                <input
+                  type="checkbox"
+                  checked={hierarchyValue === -1}
+                  onChange={(e) => onHierarchyChange(e.target.checked ? -1 : undefined)}
+                  className="w-4 h-4 rounded border cursor-pointer"
+                  style={{
+                    accentColor: "var(--accent-primary)",
+                  }}
+                />
+                <span
+                  className="ml-2 text-xs"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  {hierarchyLabel}
+                </span>
+              </label>
+            )}
           </div>
         );
       case "number":

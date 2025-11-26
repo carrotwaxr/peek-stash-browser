@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from "../../middleware/auth.js";
 import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { CriterionModifier } from "../../types/index.js";
+import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { transformImage } from "../../utils/pathMapping.js";
 
@@ -109,16 +110,28 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     if (image_filter?.tags) {
-      const tagIds = new Set(image_filter.tags.value.map(String));
+      // Expand tag IDs to include descendants if depth is specified
+      const expandedTagIds = new Set(
+        expandTagIds(
+          image_filter.tags.value.map(String),
+          image_filter.tags.depth ?? 0
+        )
+      );
       matchingGalleries = matchingGalleries.filter((g) =>
-        g.tags?.some((t) => tagIds.has(String(t.id)))
+        g.tags?.some((t) => expandedTagIds.has(String(t.id)))
       );
     }
 
     if (image_filter?.studios) {
-      const studioIds = new Set(image_filter.studios.value.map(String));
+      // Expand studio IDs to include descendants if depth is specified
+      const expandedStudioIds = new Set(
+        expandStudioIds(
+          image_filter.studios.value.map(String),
+          image_filter.studios.depth ?? 0
+        )
+      );
       matchingGalleries = matchingGalleries.filter(
-        (g) => g.studio && studioIds.has(String(g.studio.id))
+        (g) => g.studio && expandedStudioIds.has(String(g.studio.id))
       );
     }
 

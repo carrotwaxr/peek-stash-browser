@@ -22,14 +22,31 @@ const TagDetail = () => {
   const { tagId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [tag, setTag] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
+  // Include sub-tags toggle state (from URL param or default false)
+  const includeSubTags = searchParams.get('includeSubTags') === 'true';
+
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get('tab') || 'scenes';
+
+  // Handler for toggling include sub-tags
+  const handleIncludeSubTagsChange = (checked) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (checked) {
+      newParams.set('includeSubTags', 'true');
+    } else {
+      newParams.delete('includeSubTags');
+    }
+    setSearchParams(newParams);
+  };
+
+  // Check if tag has children (for showing toggle)
+  const hasChildren = tag?.children && tag.children.length > 0;
 
   // Set page title to tag name
   usePageTitle(tag?.name || "Tag");
@@ -202,6 +219,30 @@ const TagDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
+          {/* Include Sub-Tags Toggle - only show if tag has children */}
+          {hasChildren && (
+            <div className="mb-4 flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeSubTags}
+                  onChange={(e) => handleIncludeSubTagsChange(e.target.checked)}
+                  className="w-4 h-4 rounded border-2 cursor-pointer"
+                  style={{
+                    borderColor: "var(--border-color)",
+                    accentColor: "var(--accent-primary)",
+                  }}
+                />
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Include sub-tags ({tag.children.length})
+                </span>
+              </label>
+            </div>
+          )}
+
           <TabNavigation
             tabs={[
               { id: 'scenes', label: 'Scenes', count: tag.scene_count || 0 },
@@ -217,26 +258,33 @@ const TagDetail = () => {
           {/* Tab Content */}
           {activeTab === 'scenes' && (
             <SceneSearch
+              key={`scenes-${includeSubTags}`}
               context="scene_tag"
               permanentFilters={{
-                tags: { value: [parseInt(tagId, 10)], modifier: "INCLUDES" },
+                tags: {
+                  value: [parseInt(tagId, 10)],
+                  modifier: "INCLUDES",
+                  ...(includeSubTags && { depth: -1 }),
+                },
               }}
               permanentFiltersMetadata={{
                 tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
               }}
-              title={`Scenes tagged with ${tag?.name || "this tag"}`}
+              title={`Scenes tagged with ${tag?.name || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
               captureReferrer={false}
             />
           )}
 
           {activeTab === 'galleries' && (
             <EntityGrid
+              key={`galleries-${includeSubTags}`}
               entityType="gallery"
               filters={{
                 gallery_filter: {
                   tags: {
                     value: [parseInt(tagId, 10)],
                     modifier: "INCLUDES",
+                    ...(includeSubTags && { depth: -1 }),
                   },
                 },
               }}
@@ -245,7 +293,7 @@ const TagDetail = () => {
           )}
 
           {activeTab === 'images' && (
-            <ImagesTab tagId={tagId} tagName={tag?.name} />
+            <ImagesTab tagId={tagId} tagName={tag?.name} includeSubTags={includeSubTags} />
           )}
 
           {activeTab === 'performers' && (
@@ -510,7 +558,7 @@ const TagDetails = ({ tag }) => {
 };
 
 // Images Tab Component with Lightbox
-const ImagesTab = ({ tagId, tagName }) => {
+const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
   const [images, setImages] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -533,6 +581,7 @@ const ImagesTab = ({ tagId, tagName }) => {
             tags: {
               value: [parseInt(tagId, 10)],
               modifier: "INCLUDES",
+              ...(includeSubTags && { depth: -1 }),
             },
           },
         });
@@ -546,7 +595,7 @@ const ImagesTab = ({ tagId, tagName }) => {
     };
 
     fetchImages();
-  }, [tagId, currentPage]);
+  }, [tagId, currentPage, includeSubTags]);
 
   if (isLoading) {
     return (

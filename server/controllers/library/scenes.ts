@@ -6,6 +6,7 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
+import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -210,9 +211,18 @@ export function applyQuickSceneFilters(
   }
 
   // Filter by tags (squashed: scene + performers + studio tags)
+  // Supports hierarchical filtering via depth parameter
   if (filters.tags) {
-    const { value: tagIds, modifier } = filters.tags;
+    const { value: tagIds, modifier, depth } = filters.tags;
     if (!tagIds || tagIds.length === 0) return filtered;
+
+    // Expand tag IDs to include descendants if depth is specified
+    // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
+    const expandedTagIds = expandTagIds(
+      tagIds.map((id) => String(id)),
+      depth ?? 0
+    );
+
     filtered = filtered.filter((s) => {
       // Collect all tag IDs from scene, performers, and studio
       const allTagIds = new Set<string>();
@@ -230,34 +240,50 @@ export function applyQuickSceneFilters(
         s.studio.tags.forEach((t) => allTagIds.add(String(t.id)));
       }
 
-      const filterTagIds = tagIds.map((id) => String(id));
-
       if (modifier === "INCLUDES") {
-        return filterTagIds.some((id: string) => allTagIds.has(id));
+        return expandedTagIds.some((id: string) => allTagIds.has(id));
       }
       if (modifier === "INCLUDES_ALL") {
-        return filterTagIds.every((id: string) => allTagIds.has(id));
+        // For INCLUDES_ALL with hierarchy, we check that the scene has at least
+        // one tag from each original filter tag's expanded set
+        return tagIds.every((originalTagId) => {
+          const expandedForThisTag = expandTagIds(
+            [String(originalTagId)],
+            depth ?? 0
+          );
+          return expandedForThisTag.some((id) => allTagIds.has(id));
+        });
       }
       if (modifier === "EXCLUDES") {
-        return !filterTagIds.some((id: string) => allTagIds.has(id));
+        return !expandedTagIds.some((id: string) => allTagIds.has(id));
       }
       return true;
     });
   }
 
   // Filter by studios
+  // Supports hierarchical filtering via depth parameter
   if (filters.studios) {
-    const { value: studioIds, modifier } = filters.studios;
+    const { value: studioIds, modifier, depth } = filters.studios;
     if (!studioIds || studioIds.length === 0) return filtered;
+
+    // Expand studio IDs to include descendants if depth is specified
+    // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
+    const expandedStudioIds = new Set(
+      expandStudioIds(
+        studioIds.map((id) => String(id)),
+        depth ?? 0
+      )
+    );
+
     filtered = filtered.filter((s) => {
       if (!s.studio) return modifier === "EXCLUDES";
-      const filterStudioIds = studioIds.map((id) => String(id));
       const studioId = String(s.studio.id);
       if (modifier === "INCLUDES") {
-        return filterStudioIds.includes(studioId);
+        return expandedStudioIds.has(studioId);
       }
       if (modifier === "EXCLUDES") {
-        return !filterStudioIds.includes(studioId);
+        return !expandedStudioIds.has(studioId);
       }
       return true;
     });
