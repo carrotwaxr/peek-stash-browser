@@ -11,6 +11,7 @@ import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
 import {
   Button,
+  ExternalPlayerButton,
   Navigation,
   RecommendedSidebar,
   ScenesLikeThis,
@@ -131,6 +132,10 @@ const SceneContent = ({ location }) => {
               <span>←</span>
               <span className="whitespace-nowrap">Back to Scenes</span>
             </Button>
+            <ExternalPlayerButton
+              sceneId={scene?.id}
+              title={displayTitle}
+            />
             <ViewInStashButton stashUrl={scene?.stashUrl} size={20} />
           </div>
           <h1
