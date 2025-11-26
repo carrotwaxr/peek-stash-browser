@@ -22,6 +22,10 @@ import {
   carouselRulesToFilterState,
 } from "../../utils/filterConfig.js";
 
+// Simple ID generator for rule keys (doesn't need to be cryptographically secure)
+let ruleIdCounter = 0;
+const generateRuleId = () => `rule-${++ruleIdCounter}`;
+
 /**
  * CarouselBuilder Component
  * Full-page editor for creating and editing custom carousels.
@@ -84,7 +88,7 @@ const CarouselBuilder = () => {
     // Entity selection rules
     if (filterState.performerIds?.length > 0) {
       ruleList.push({
-        id: crypto.randomUUID(),
+        id: generateRuleId(),
         filterKey: "performerIds",
         value: filterState.performerIds,
         modifier: filterState.performerIdsModifier || "INCLUDES",
@@ -93,7 +97,7 @@ const CarouselBuilder = () => {
 
     if (filterState.studioId) {
       ruleList.push({
-        id: crypto.randomUUID(),
+        id: generateRuleId(),
         filterKey: "studioId",
         value: filterState.studioId,
         depth: filterState.studioIdDepth,
@@ -102,7 +106,7 @@ const CarouselBuilder = () => {
 
     if (filterState.tagIds?.length > 0) {
       ruleList.push({
-        id: crypto.randomUUID(),
+        id: generateRuleId(),
         filterKey: "tagIds",
         value: filterState.tagIds,
         modifier: filterState.tagIdsModifier || "INCLUDES_ALL",
@@ -112,7 +116,7 @@ const CarouselBuilder = () => {
 
     if (filterState.groupIds?.length > 0) {
       ruleList.push({
-        id: crypto.randomUUID(),
+        id: generateRuleId(),
         filterKey: "groupIds",
         value: filterState.groupIds,
         modifier: filterState.groupIdsModifier || "INCLUDES",
@@ -124,7 +128,7 @@ const CarouselBuilder = () => {
       (key) => {
         if (filterState[key]?.min !== undefined || filterState[key]?.max !== undefined) {
           ruleList.push({
-            id: crypto.randomUUID(),
+            id: generateRuleId(),
             filterKey: key,
             value: filterState[key],
           });
@@ -136,7 +140,7 @@ const CarouselBuilder = () => {
     ["favorite", "performerFavorite", "studioFavorite", "tagFavorite"].forEach((key) => {
       if (filterState[key] === true) {
         ruleList.push({
-          id: crypto.randomUUID(),
+          id: generateRuleId(),
           filterKey: key,
           value: true,
         });
@@ -146,7 +150,7 @@ const CarouselBuilder = () => {
     // Resolution
     if (filterState.resolution) {
       ruleList.push({
-        id: crypto.randomUUID(),
+        id: generateRuleId(),
         filterKey: "resolution",
         value: filterState.resolution,
         modifier: filterState.resolutionModifier || "EQUALS",
@@ -157,7 +161,7 @@ const CarouselBuilder = () => {
     ["title", "details"].forEach((key) => {
       if (filterState[key]) {
         ruleList.push({
-          id: crypto.randomUUID(),
+          id: generateRuleId(),
           filterKey: key,
           value: filterState[key],
         });
@@ -168,7 +172,7 @@ const CarouselBuilder = () => {
     ["date", "createdAt", "lastPlayedAt"].forEach((key) => {
       if (filterState[key]?.min || filterState[key]?.max) {
         ruleList.push({
-          id: crypto.randomUUID(),
+          id: generateRuleId(),
           filterKey: key,
           value: filterState[key],
         });
@@ -243,7 +247,7 @@ const CarouselBuilder = () => {
     }
 
     const newRule = {
-      id: crypto.randomUUID(),
+      id: generateRuleId(),
       filterKey: availableFilter.key,
       value: availableFilter.type === "checkbox" ? true : availableFilter.multi ? [] : "",
       modifier: availableFilter.defaultModifier,
