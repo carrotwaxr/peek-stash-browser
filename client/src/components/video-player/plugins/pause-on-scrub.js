@@ -13,9 +13,9 @@ import videojs from "video.js";
  * - This creates dozens of concurrent requests in seconds
  *
  * The Solution:
- * - Intercept scrubbing by hooking into the SeekBar component
- * - During scrub: only update the visual progress bar, don't actually seek
- * - On scrub end: perform a single seek to the final position
+ * - Override player.currentTime() to intercept seek calls
+ * - When player.scrubbing() is true, defer the seek
+ * - When scrubbing ends, perform the final seek
  * - Resume playback after a short debounce if video was playing
  *
  * This matches behavior in YouTube, Netflix, and other major players.
@@ -29,165 +29,102 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
 
     // State
     this.wasPlayingBeforeScrub = false;
-    this.isScrubbing = false;
     this.pendingSeekTime = null;
     this.resumeTimeout = null;
     this.originalCurrentTime = null;
+    this.wasScrubbing = false;
 
-    // Bind methods
-    this.onSeekBarMouseDown = this.onSeekBarMouseDown.bind(this);
-    this.onDocumentMouseUp = this.onDocumentMouseUp.bind(this);
-    this.onSeekBarTouchStart = this.onSeekBarTouchStart.bind(this);
-    this.onDocumentTouchEnd = this.onDocumentTouchEnd.bind(this);
-    this.onSeekBarMouseMove = this.onSeekBarMouseMove.bind(this);
+    console.log("[pauseOnScrub] Plugin constructor called");
 
-    // Initialize when player is ready
-    player.ready(() => {
-      this.setupEventListeners();
-    });
+    // Bind event handlers
+    this.onTimeUpdate = this.onTimeUpdate.bind(this);
+
+    // Override currentTime immediately
+    this.installCurrentTimeOverride();
+
+    // Listen to timeupdate to detect when scrubbing ends
+    // This fires continuously and lets us detect the transition from scrubbing=true to false
+    player.on("timeupdate", this.onTimeUpdate);
+
+    console.log("[pauseOnScrub] Plugin initialized");
   }
 
   /**
-   * Set up event listeners on the seek bar
+   * Install the currentTime override to intercept seeks during scrubbing
    */
-  setupEventListeners() {
-    const seekBar = this.player.controlBar?.progressControl?.seekBar;
-    if (!seekBar) {
-      // Retry if control bar isn't ready yet
-      this.player.one("loadedmetadata", () => this.setupEventListeners());
-      return;
-    }
+  installCurrentTimeOverride() {
+    if (this.originalCurrentTime) return; // Already installed
 
-    const seekBarEl = seekBar.el();
+    this.originalCurrentTime = this.player.currentTime.bind(this.player);
+    const self = this;
 
-    // Mouse events - capture phase to intercept before Video.js
-    seekBarEl.addEventListener("mousedown", this.onSeekBarMouseDown, true);
-    document.addEventListener("mouseup", this.onDocumentMouseUp);
-    document.addEventListener("mousemove", this.onSeekBarMouseMove);
-
-    // Touch events for mobile
-    seekBarEl.addEventListener("touchstart", this.onSeekBarTouchStart, {
-      passive: true,
-      capture: true,
-    });
-    document.addEventListener("touchend", this.onDocumentTouchEnd);
-    document.addEventListener("touchcancel", this.onDocumentTouchEnd);
-    document.addEventListener("touchmove", this.onSeekBarMouseMove, {
-      passive: true,
-    });
-  }
-
-  /**
-   * Called when user starts dragging the seek bar (mouse)
-   */
-  onSeekBarMouseDown(event) {
-    // Only respond to left mouse button
-    if (event.button !== 0) return;
-    this.startScrubbing();
-  }
-
-  /**
-   * Called when mouse moves (during scrub, intercept seeking)
-   */
-  onSeekBarMouseMove() {
-    if (!this.isScrubbing) return;
-
-    // During scrub, intercept currentTime calls to prevent actual seeking
-    // Video.js will call currentTime() but we'll store it instead of executing
-  }
-
-  /**
-   * Called when mouse button is released
-   */
-  onDocumentMouseUp() {
-    if (this.isScrubbing) {
-      this.stopScrubbing();
-    }
-  }
-
-  /**
-   * Called when user starts touching the seek bar (mobile)
-   */
-  onSeekBarTouchStart() {
-    this.startScrubbing();
-  }
-
-  /**
-   * Called when touch ends
-   */
-  onDocumentTouchEnd() {
-    if (this.isScrubbing) {
-      this.stopScrubbing();
-    }
-  }
-
-  /**
-   * Start scrubbing - intercept currentTime calls
-   */
-  startScrubbing() {
-    // Clear any pending resume
-    if (this.resumeTimeout) {
-      clearTimeout(this.resumeTimeout);
-      this.resumeTimeout = null;
-    }
-
-    // Store current playback state
-    this.wasPlayingBeforeScrub = !this.player.paused() && !this.player.ended();
-    this.isScrubbing = true;
-
-    // Store the current time as fallback
-    this.pendingSeekTime = this.player.currentTime();
-
-    // Intercept currentTime setter to defer seeks
-    // This is the key: we override currentTime() to capture but not execute seeks
-    if (!this.originalCurrentTime) {
-      this.originalCurrentTime = this.player.currentTime.bind(this.player);
-
-      const self = this;
-      this.player.currentTime = function (time) {
-        if (time !== undefined && self.isScrubbing) {
-          // During scrub: capture the time but don't seek
-          self.pendingSeekTime = time;
-          return time;
-        }
-        // Not scrubbing or getting time: use original
-        return self.originalCurrentTime(time);
-      };
-    }
-
-    // Pause if playing (reduces buffering during scrub)
-    if (this.wasPlayingBeforeScrub) {
-      this.player.pause();
-    }
-  }
-
-  /**
-   * Stop scrubbing - perform the deferred seek and optionally resume
-   */
-  stopScrubbing() {
-    this.isScrubbing = false;
-
-    // Restore original currentTime
-    if (this.originalCurrentTime) {
-      // Perform the actual seek to final position
-      if (this.pendingSeekTime !== null) {
-        this.originalCurrentTime(this.pendingSeekTime);
+    this.player.currentTime = function (time) {
+      // If getting current time (no argument), always use original
+      if (time === undefined) {
+        return self.originalCurrentTime();
       }
 
-      this.player.currentTime = this.originalCurrentTime;
-      this.originalCurrentTime = null;
-    }
+      // Check if we're scrubbing using Video.js's state
+      const isScrubbing = self.player.scrubbing();
 
-    this.pendingSeekTime = null;
+      if (isScrubbing) {
+        // Track that we started scrubbing (for detecting wasPlaying state)
+        if (!self.wasScrubbing) {
+          self.wasScrubbing = true;
+          self.wasPlayingBeforeScrub = !self.player.paused() && !self.player.ended();
+          console.log("[pauseOnScrub] Scrub started, wasPlaying:", self.wasPlayingBeforeScrub);
+        }
+
+        // During scrub: capture the time but don't actually seek
+        console.log(`[pauseOnScrub] INTERCEPTED seek to ${time.toFixed(2)}`);
+        self.pendingSeekTime = time;
+        return time;
+      }
+
+      // Not scrubbing - pass through to original
+      return self.originalCurrentTime(time);
+    };
+
+    console.log("[pauseOnScrub] currentTime override installed");
+  }
+
+  /**
+   * Called on timeupdate - detect when scrubbing ends
+   */
+  onTimeUpdate() {
+    // Detect transition from scrubbing to not scrubbing
+    if (this.wasScrubbing && !this.player.scrubbing()) {
+      this.finalizeScrub();
+    }
+  }
+
+  /**
+   * Finalize the scrub - seek to final position and resume if needed
+   */
+  finalizeScrub() {
+    console.log("[pauseOnScrub] Scrub ended, seeking to final position:", this.pendingSeekTime);
+
+    this.wasScrubbing = false;
+
+    // Perform the actual seek if we have a pending time
+    if (this.pendingSeekTime !== null) {
+      const finalTime = this.pendingSeekTime;
+      this.pendingSeekTime = null;
+      this.originalCurrentTime(finalTime);
+    }
 
     // Resume playback after debounce if we paused
     if (this.wasPlayingBeforeScrub) {
+      // Clear any existing timeout
+      if (this.resumeTimeout) {
+        clearTimeout(this.resumeTimeout);
+      }
+
       this.resumeTimeout = setTimeout(() => {
-        if (!this.isScrubbing) {
-          this.player.play().catch(() => {
-            // Ignore play errors (e.g., if video ended during scrub)
-          });
-        }
+        console.log("[pauseOnScrub] Resuming playback");
+        this.player.play().catch(() => {
+          // Ignore play errors (e.g., user paused manually)
+        });
         this.wasPlayingBeforeScrub = false;
         this.resumeTimeout = null;
       }, this.resumeDelay);
@@ -198,29 +135,19 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
    * Clean up when plugin is disposed
    */
   dispose() {
-    // Restore original currentTime if we modified it
+    // Restore original currentTime
     if (this.originalCurrentTime) {
       this.player.currentTime = this.originalCurrentTime;
       this.originalCurrentTime = null;
     }
 
-    // Clear timeout
+    // Clear resume timeout
     if (this.resumeTimeout) {
       clearTimeout(this.resumeTimeout);
     }
 
     // Remove event listeners
-    const seekBar = this.player.controlBar?.progressControl?.seekBar;
-    if (seekBar) {
-      const seekBarEl = seekBar.el();
-      seekBarEl.removeEventListener("mousedown", this.onSeekBarMouseDown, true);
-      seekBarEl.removeEventListener("touchstart", this.onSeekBarTouchStart, true);
-    }
-    document.removeEventListener("mouseup", this.onDocumentMouseUp);
-    document.removeEventListener("mousemove", this.onSeekBarMouseMove);
-    document.removeEventListener("touchend", this.onDocumentTouchEnd);
-    document.removeEventListener("touchcancel", this.onDocumentTouchEnd);
-    document.removeEventListener("touchmove", this.onSeekBarMouseMove);
+    this.player.off("timeupdate", this.onTimeUpdate);
 
     super.dispose();
   }
