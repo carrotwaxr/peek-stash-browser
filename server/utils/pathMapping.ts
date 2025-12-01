@@ -150,6 +150,24 @@ export const transformTag = <T extends Partial<Tag>>(tag: T): T => {
 };
 
 /**
+ * Strip API key from a Stash URL
+ * Stash includes apikey in query params, we don't want to expose this to the client
+ */
+const stripApiKeyFromUrl = (url: string): string => {
+  try {
+    if (!url || typeof url !== "string") return url;
+
+    const urlObj = new URL(url);
+    urlObj.searchParams.delete("apikey");
+
+    return urlObj.toString();
+  } catch {
+    // If URL parsing fails, try simple regex removal
+    return url.replace(/[?&]apikey=[^&]+/gi, "");
+  }
+};
+
+/**
  * Transform complete scene object to add API keys to all image/video URLs
  * Works with both full Scene objects and compact Scene variants
  */
@@ -168,6 +186,21 @@ export const transformScene = <T extends Partial<Scene>>(scene: T): T => {
         },
         {} as Record<string, string>
       ) as T["paths"];
+    }
+
+    // Transform sceneStreams to strip API keys from URLs
+    // The client will use Peek's proxy endpoint which will re-add the API key
+    if (
+      scene.sceneStreams &&
+      Array.isArray(scene.sceneStreams) &&
+      scene.sceneStreams.length > 0
+    ) {
+      mutated.sceneStreams = scene.sceneStreams.map(
+        (stream: { url: string; mime_type?: string | null; label?: string | null }) => ({
+          ...stream,
+          url: stripApiKeyFromUrl(stream.url),
+        })
+      ) as T["sceneStreams"];
     }
 
     // Transform performers to add API key to image_path
