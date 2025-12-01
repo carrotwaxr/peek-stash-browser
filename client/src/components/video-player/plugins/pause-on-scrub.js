@@ -34,8 +34,6 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
     this.originalCurrentTime = null;
     this.wasScrubbing = false;
 
-    console.log("[pauseOnScrub] Plugin constructor called");
-
     // Bind event handlers
     this.onTimeUpdate = this.onTimeUpdate.bind(this);
 
@@ -45,8 +43,6 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
     // Listen to timeupdate to detect when scrubbing ends
     // This fires continuously and lets us detect the transition from scrubbing=true to false
     player.on("timeupdate", this.onTimeUpdate);
-
-    console.log("[pauseOnScrub] Plugin initialized");
   }
 
   /**
@@ -72,11 +68,9 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
         if (!self.wasScrubbing) {
           self.wasScrubbing = true;
           self.wasPlayingBeforeScrub = !self.player.paused() && !self.player.ended();
-          console.log("[pauseOnScrub] Scrub started, wasPlaying:", self.wasPlayingBeforeScrub);
         }
 
         // During scrub: capture the time but don't actually seek
-        console.log(`[pauseOnScrub] INTERCEPTED seek to ${time.toFixed(2)}`);
         self.pendingSeekTime = time;
         return time;
       }
@@ -84,8 +78,6 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
       // Not scrubbing - pass through to original
       return self.originalCurrentTime(time);
     };
-
-    console.log("[pauseOnScrub] currentTime override installed");
   }
 
   /**
@@ -102,8 +94,6 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
    * Finalize the scrub - seek to final position and resume if needed
    */
   finalizeScrub() {
-    console.log("[pauseOnScrub] Scrub ended, seeking to final position:", this.pendingSeekTime);
-
     this.wasScrubbing = false;
 
     // Perform the actual seek if we have a pending time
@@ -121,7 +111,6 @@ class PauseOnScrubPlugin extends videojs.getPlugin("plugin") {
       }
 
       this.resumeTimeout = setTimeout(() => {
-        console.log("[pauseOnScrub] Resuming playback");
         this.player.play().catch(() => {
           // Ignore play errors (e.g., user paused manually)
         });
