@@ -11,6 +11,7 @@ import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils.js
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
 import "./plugins/markers.js";
+import "./plugins/pause-on-scrub.js";
 import "./plugins/persist-volume.js";
 import "./plugins/skip-buttons.js";
 import "./plugins/source-selector.js";
@@ -161,6 +162,7 @@ export function useVideoPlayer({
           spriteUrl: scene?.paths?.sprite || null,
         },
         markers: {},
+        pauseOnScrub: {},
         sourceSelector: {},
         persistVolume: {},
         bigButtons: {},
