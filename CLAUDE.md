@@ -71,7 +71,7 @@ Key models: User, WatchHistory, Playlist, PlaylistItem, *Rating tables, PathMapp
 
 Use `/publish-peek` command. Workflow:
 1. Bump version in both client/package.json and server/package.json
-2. Commit version bump to master
+2. Commit version bump to main
 3. Create and push git tag (e.g., v1.5.3)
 4. GitHub Actions builds Docker image and creates release
 
