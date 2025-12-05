@@ -5,6 +5,7 @@ import {
   createFirstStashInstance,
   getSetupStatus,
   getStashInstance,
+  resetSetup,
   testStashConnection,
 } from "../controllers/setup.js";
 
@@ -15,6 +16,7 @@ router.get("/status", getSetupStatus);
 router.post("/create-admin", createFirstAdmin);
 router.post("/test-stash-connection", testStashConnection);
 router.post("/create-stash-instance", createFirstStashInstance);
+router.post("/reset", resetSetup);
 
 // Protected routes (require authentication)
 router.get("/stash-instance", authenticateToken, getStashInstance);

@@ -538,6 +538,12 @@ export const setupApi = {
    */
   createFirstStashInstance: (url, apiKey, name = "Default") =>
     apiPost("/setup/create-stash-instance", { url, apiKey, name }),
+
+  /**
+   * Reset setup state for recovery (only works if setup is incomplete)
+   * @returns {Promise<{success: boolean, message: string, deleted: {users: number, stashInstances: number}}>}
+   */
+  resetSetup: () => apiPost("/setup/reset", {}),
 };
 
 /**
