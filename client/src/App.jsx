@@ -1,12 +1,12 @@
 import { Suspense, lazy, useEffect, useState } from "react";
-import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import { Route, BrowserRouter as Router, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Login from "./components/pages/Login.jsx";
 import SetupWizard from "./components/pages/SetupWizard.jsx";
 import { GlobalLayout } from "./components/ui/index.js";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
-import { useAuth } from "./hooks/useAuth.js";
+import { SetupGuard, LoginGuard, ProtectedRoute } from "./components/guards/RouteGuards.jsx";
 import { setupApi } from "./services/api.js";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
 import "./themes/base.css";
@@ -53,9 +53,8 @@ const PageLoader = () => (
   </div>
 );
 
-// Main app component with authentication
+// Main app component with authentication and routing
 const AppContent = () => {
-  const { isAuthenticated, isLoading } = useAuth();
   const [setupStatus, setSetupStatus] = useState(null);
   const [checkingSetup, setCheckingSetup] = useState(true);
 
@@ -67,7 +66,7 @@ const AppContent = () => {
       } catch (error) {
         console.error("Failed to check setup status:", error);
         // If check fails, assume setup is not complete
-        setSetupStatus({ setupComplete: false });
+        setSetupStatus({ setupComplete: false, hasUsers: false, hasStashInstance: false });
       } finally {
         setCheckingSetup(false);
       }
@@ -76,209 +75,272 @@ const AppContent = () => {
     checkSetup();
   }, []);
 
-  if (isLoading || checkingSetup) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl">Loading...</div>
-      </div>
-    );
-  }
+  // Handler for when setup completes - triggers re-check and navigation
+  const handleSetupComplete = () => {
+    setSetupStatus({ ...setupStatus, setupComplete: true });
+    // Navigate to home after setup (user is already logged in via auto-login)
+    window.location.href = "/";
+  };
 
-  // Show setup wizard if setup is not complete
-  if (!setupStatus?.setupComplete) {
-    return (
-      <SetupWizard
-        onSetupComplete={() => {
-          setSetupStatus({ setupComplete: true });
-        }}
-      />
-    );
-  }
+  // Handler for successful login - navigate to home
+  const handleLoginSuccess = () => {
+    window.location.href = "/";
+  };
 
-  if (!isAuthenticated) {
-    return <Login onLoginSuccess={() => window.location.reload()} />;
-  }
+  // Ensure setupStatus has defaults to prevent null access in guards
+  const safeSetupStatus = setupStatus || { setupComplete: false, hasUsers: false, hasStashInstance: false };
 
   return (
     <Router>
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          {/* Setup wizard route */}
+          <Route
+            path="/setup"
+            element={
+              <SetupGuard setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <SetupWizard
+                  setupStatus={safeSetupStatus}
+                  onSetupComplete={handleSetupComplete}
+                />
+              </SetupGuard>
+            }
+          />
+
+          {/* Login route */}
+          <Route
+            path="/login"
+            element={
+              <LoginGuard setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <Login onLoginSuccess={handleLoginSuccess} />
+              </LoginGuard>
+            }
+          />
+
+          {/* Protected app routes */}
           <Route
             path="/"
             element={
-              <GlobalLayout>
-                <Home />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Home />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/scenes"
             element={
-              <GlobalLayout>
-                <Scenes />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Scenes />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/recommended"
             element={
-              <GlobalLayout>
-                <Recommended />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Recommended />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/performers"
             element={
-              <GlobalLayout>
-                <Performers />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Performers />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/studios"
             element={
-              <GlobalLayout>
-                <Studios />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Studios />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/tags"
             element={
-              <GlobalLayout>
-                <Tags />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Tags />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/collections"
             element={
-              <GlobalLayout>
-                <Groups />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Groups />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/galleries"
             element={
-              <GlobalLayout>
-                <Galleries />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Galleries />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/gallery/:galleryId"
             element={
-              <GlobalLayout>
-                <GalleryDetail />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <GalleryDetail />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/performer/:performerId"
             element={
-              <GlobalLayout>
-                <PerformerDetail />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <PerformerDetail />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/studio/:studioId"
             element={
-              <GlobalLayout>
-                <StudioDetail />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <StudioDetail />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/tag/:tagId"
             element={
-              <GlobalLayout>
-                <TagDetail />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <TagDetail />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/collection/:groupId"
             element={
-              <GlobalLayout>
-                <GroupDetail />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <GroupDetail />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/my-settings"
             element={
-              <GlobalLayout>
-                <Settings />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Settings />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/watch-history"
             element={
-              <GlobalLayout>
-                <WatchHistory />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <WatchHistory />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/hidden-items"
             element={
-              <GlobalLayout>
-                <HiddenItemsPage />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <HiddenItemsPage />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/server-settings"
             element={
-              <GlobalLayout>
-                <ServerSettings />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <ServerSettings />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/playlists"
             element={
-              <GlobalLayout>
-                <Playlists />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Playlists />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/playlist/:playlistId"
             element={
-              <GlobalLayout>
-                <PlaylistDetail />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <PlaylistDetail />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/scene/:sceneId"
             element={
-              <GlobalLayout>
-                <Scene />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Scene />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/my-settings/carousels/new"
             element={
-              <GlobalLayout>
-                <CarouselBuilder />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <CarouselBuilder />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/my-settings/carousels/:id/edit"
             element={
-              <GlobalLayout>
-                <CarouselBuilder />
-              </GlobalLayout>
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <CarouselBuilder />
+                </GlobalLayout>
+              </ProtectedRoute>
             }
           />
+
+          {/* Catch-all redirect - send unknown routes to home (guards will handle auth) */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </Router>

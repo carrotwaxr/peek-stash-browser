@@ -360,3 +360,64 @@ export const getStashInstance = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * Reset setup state for recovery from partial setup
+ * Deletes all users and Stash instances to allow fresh setup
+ * POST /api/setup/reset
+ *
+ * SECURITY: Only works if setup is incomplete AND there's at most 1 user.
+ * This prevents accidental data loss on systems with multiple users.
+ */
+export const resetSetup = async (req: Request, res: Response) => {
+  try {
+    // Check current setup state
+    const userCount = await prisma.user.count();
+    const stashInstanceCount = await prisma.stashInstance.count();
+    const setupComplete = userCount > 0 && stashInstanceCount > 0;
+
+    // Strict guard: multiple users means the system is in use
+    if (userCount > 1) {
+      return res.status(403).json({
+        error: "Cannot reset: multiple users exist. This system appears to be in use.",
+      });
+    }
+
+    // Only allow reset if setup is incomplete
+    if (setupComplete) {
+      return res.status(403).json({
+        error: "Cannot reset a fully configured system. Use Server Settings to manage configuration.",
+      });
+    }
+
+    // Log BEFORE deleting for audit trail
+    logger.warn("Setup reset initiated - deleting all data", {
+      userCount,
+      stashInstanceCount,
+    });
+
+    // Delete all users and stash instances
+    await prisma.user.deleteMany({});
+    await prisma.stashInstance.deleteMany({});
+
+    logger.info("Setup state reset complete", {
+      deletedUsers: userCount,
+      deletedInstances: stashInstanceCount,
+    });
+
+    res.json({
+      success: true,
+      message: "Setup state has been reset. You can now start fresh.",
+      deleted: {
+        users: userCount,
+        stashInstances: stashInstanceCount,
+      },
+    });
+  } catch (error) {
+    logger.error("Failed to reset setup state", { error });
+    res.status(500).json({
+      error: "Failed to reset setup state",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
