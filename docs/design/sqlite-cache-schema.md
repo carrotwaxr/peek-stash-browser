@@ -418,12 +418,152 @@ Junction tables add ~10-20% overhead for relationships.
 2. Clean up old code paths
 3. Performance tuning
 
-## Open Questions
+## Resolved Questions
 
-1. **Full-text search**: Use SQLite FTS5 for title search? Or LIKE queries sufficient?
-2. **Performer tags**: Do we need to cache performer→tag relationships for filtering?
-3. **Image caching**: Should we cache Images like we cache Scenes?
-4. **Multi-instance**: How do junction tables work with multiple Stash instances?
+1. **Full-text search**: ✅ Use SQLite FTS5 for title/name search (see FTS5 section below)
+2. **Performer tags**: TBD - defer until needed
+3. **Image caching**: ✅ Yes, cache Images as separate entity (see CachedImage below)
+4. **Multi-instance**: TBD - current design supports it via stashInstanceId
+
+## FTS5 Full-Text Search
+
+SQLite FTS5 provides fast, sophisticated text search with:
+- Word stemming (searching "running" matches "run")
+- Relevance ranking
+- Prefix matching ("test*" matches "testing")
+- Boolean operators (AND, OR, NOT)
+
+### FTS5 Virtual Tables
+
+```sql
+-- Create FTS5 virtual table for scene search
+CREATE VIRTUAL TABLE scene_fts USING fts5(
+  id,
+  title,
+  details,
+  content='CachedScene',
+  content_rowid='rowid'
+);
+
+-- Create FTS5 virtual table for performer search
+CREATE VIRTUAL TABLE performer_fts USING fts5(
+  id,
+  name,
+  aliases,
+  content='CachedPerformer',
+  content_rowid='rowid'
+);
+
+-- Triggers to keep FTS index in sync
+CREATE TRIGGER scene_fts_insert AFTER INSERT ON CachedScene BEGIN
+  INSERT INTO scene_fts(rowid, id, title, details)
+  VALUES (new.rowid, new.id, new.title, json_extract(new.data, '$.details'));
+END;
+
+CREATE TRIGGER scene_fts_delete AFTER DELETE ON CachedScene BEGIN
+  INSERT INTO scene_fts(scene_fts, rowid, id, title, details)
+  VALUES ('delete', old.rowid, old.id, old.title, json_extract(old.data, '$.details'));
+END;
+
+CREATE TRIGGER scene_fts_update AFTER UPDATE ON CachedScene BEGIN
+  INSERT INTO scene_fts(scene_fts, rowid, id, title, details)
+  VALUES ('delete', old.rowid, old.id, old.title, json_extract(old.data, '$.details'));
+  INSERT INTO scene_fts(rowid, id, title, details)
+  VALUES (new.rowid, new.id, new.title, json_extract(new.data, '$.details'));
+END;
+```
+
+### FTS5 Query Example
+
+```sql
+-- Search for scenes matching "blonde teacher"
+SELECT s.id, s.data, rank
+FROM scene_fts
+INNER JOIN CachedScene s ON scene_fts.id = s.id
+WHERE scene_fts MATCH 'blonde teacher'
+  AND s.deletedAt IS NULL
+ORDER BY rank
+LIMIT 50;
+```
+
+Note: Prisma doesn't support FTS5 virtual tables directly. We'll create these via raw SQL migrations.
+
+## CachedImage Entity
+
+```prisma
+model CachedImage {
+  id            String    @id                    // Stash image ID
+  stashInstanceId String?
+
+  // === Indexed fields ===
+  title         String?
+  date          String?
+  studioId      String?
+  rating100     Int?
+  oCounter      Int       @default(0)
+  organized     Boolean   @default(false)
+
+  // File info (for display)
+  width         Int?
+  height        Int?
+  fileSize      Int?                             // bytes
+
+  // === Full entity data ===
+  data          String                           // JSON blob
+
+  // === Sync metadata ===
+  stashCreatedAt  DateTime?
+  stashUpdatedAt  DateTime?
+  syncedAt        DateTime  @default(now())
+  deletedAt       DateTime?
+
+  // Relationships
+  performers    ImagePerformer[]
+  tags          ImageTag[]
+  galleries     ImageGallery[]
+
+  @@index([studioId])
+  @@index([date])
+  @@index([rating100])
+  @@index([deletedAt])
+  @@index([stashUpdatedAt])
+}
+
+model ImagePerformer {
+  imageId       String
+  performerId   String
+
+  image         CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  performer     CachedPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, performerId])
+  @@index([performerId])
+}
+
+model ImageTag {
+  imageId       String
+  tagId         String
+
+  image         CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  tag           CachedTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, tagId])
+  @@index([tagId])
+}
+
+model ImageGallery {
+  imageId       String
+  galleryId     String
+
+  image         CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  gallery       CachedGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, galleryId])
+  @@index([galleryId])
+}
+```
+
+Note: CachedPerformer and CachedTag need updated to include the new Image relations.
 
 ## Next Steps
 
