@@ -317,13 +317,52 @@ Before I recommend a specific approach, I need clarity on:
 
 ---
 
+## Decision: SQLite Entity Cache
+
+After discussion, we've decided on **Approach B: SQLite Entity Cache** for the following reasons:
+
+### Why SQLite?
+
+1. **The pagination + filtering problem**: If we paginate from Stash then apply user restrictions, we get fewer results than requested (e.g., request 50, restrictions remove 10, return 40). This breaks pagination. We need the full dataset locally.
+
+2. **Memory doesn't scale**: Current in-memory approach fails at ~50-100k scenes due to Node.js string limits and memory pressure.
+
+3. **Minimal duplication**: ~50-100MB for 100k scenes (vs 500MB+ in Stash). We store only what Peek needs.
+
+4. **Offline resilience**: Peek can serve browse requests even if Stash is temporarily unavailable.
+
+5. **Native binary compatible**: SQLite works everywhere - no Redis/external dependencies.
+
+### Sync Strategy
+
+- **Polling + scan events**: Poll for changes every 15-30 minutes
+- **Scan-triggered**: Subscribe to `scanCompleteSubscribe` to sync after Stash scans
+- **Manual trigger**: Admins can trigger sync on-demand
+- **Incremental**: Use `updated_at` timestamps to sync only changed entities
+- **Full refresh fallback**: If incremental fails or data seems inconsistent
+
+### Entity Handling
+
+- **Soft delete**: Mark entities as deleted rather than hard-deleting
+  - Preserves Peek-specific data (watch history, ratings) if entity is re-added
+  - Allows user to see "X scenes were removed from Stash"
+- **Orphan detection**: Periodic check for entities in Peek but not in Stash
+
+### Key Features to Preserve
+
+- ✅ User restrictions (cascade filtering)
+- ✅ Stats/aggregations (computed from local DB)
+- ✅ Fast browsing (SQL pagination with indexes)
+- ⚠️ Offline resilience (partial - can browse cached data)
+
 ## Next Steps
 
-After discussing these questions, I'll:
-1. Select the most appropriate approach
-2. Create a detailed implementation plan
-3. Prototype the critical path
-4. Test with large synthetic datasets
+1. Design the SQLite schema for cached entities
+2. Create migration strategy from in-memory to SQLite
+3. Implement incremental sync logic
+4. Add scanCompleteSubscribe WebSocket listener
+5. Update all 18+ dependent files to query SQLite instead of Maps
+6. Test with synthetic 100k+ scene dataset
 
 ---
 
