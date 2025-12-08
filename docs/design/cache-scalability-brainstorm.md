@@ -340,7 +340,7 @@ After discussion, we've decided on **Approach B: SQLite Entity Cache** for the f
 |---------|------|------|
 | Startup | Full/Incremental | Peek server starts (full if first run) |
 | Scan complete | Incremental | Stash finishes scan (via WebSocket subscription) |
-| Polling | Incremental | Every N minutes (configurable, default 15, range 1-60) |
+| Polling | Incremental | Every N minutes (configurable, default 60, range 5-120) |
 | Manual | Full/Incremental | Admin triggers via UI |
 | Plugin webhook | Incremental | Optional - if Stash plugin installed |
 
