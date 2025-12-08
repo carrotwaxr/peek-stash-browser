@@ -335,11 +335,22 @@ After discussion, we've decided on **Approach B: SQLite Entity Cache** for the f
 
 ### Sync Strategy
 
-- **Polling + scan events**: Poll for changes every 15-30 minutes
-- **Scan-triggered**: Subscribe to `scanCompleteSubscribe` to sync after Stash scans
-- **Manual trigger**: Admins can trigger sync on-demand
-- **Incremental**: Use `updated_at` timestamps to sync only changed entities
-- **Full refresh fallback**: If incremental fails or data seems inconsistent
+**Sync Triggers:**
+| Trigger | Type | When |
+|---------|------|------|
+| Startup | Full/Incremental | Peek server starts (full if first run) |
+| Scan complete | Incremental | Stash finishes scan (via WebSocket subscription) |
+| Polling | Incremental | Every N minutes (configurable, default 15, range 1-60) |
+| Manual | Full/Incremental | Admin triggers via UI |
+| Plugin webhook | Incremental | Optional - if Stash plugin installed |
+
+**Sync Types:**
+- **Incremental**: Query entities where `updated_at > lastSyncTime`, upsert changes
+- **Full**: Paginated fetch of everything, used on first run or recovery
+
+**Optional Real-Time Enhancement:**
+A simple Stash plugin can POST to Peek on entity changes, enabling near real-time sync.
+This is optional - polling works without it, plugin makes it faster.
 
 ### Entity Handling
 
