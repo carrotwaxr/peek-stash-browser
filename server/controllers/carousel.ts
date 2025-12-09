@@ -4,6 +4,7 @@ import type { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
 import { userRestrictionService } from "../services/UserRestrictionService.js";
+import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 import {
@@ -19,6 +20,9 @@ const MAX_CAROUSELS_PER_USER = 15;
 
 // Number of scenes to return for carousel preview/display
 const CAROUSEL_SCENE_LIMIT = 12;
+
+// Feature flag for SQL query builder
+const USE_SQL_QUERY_BUILDER = process.env.USE_SQL_QUERY_BUILDER !== "false";
 
 /**
  * Get all custom carousels for the current user
@@ -288,6 +292,9 @@ export const previewCarousel = async (
 /**
  * Execute a carousel's scene query
  * This is also exported for use by the homepage to render carousel scenes
+ *
+ * OPTIMIZED: For carousels without filters, uses DB pagination with pre-computed exclusions
+ * For carousels with filters, still needs to load scenes but uses optimized exclusion checking
  */
 export async function executeCarouselQuery(
   userId: number,
@@ -297,15 +304,108 @@ export async function executeCarouselQuery(
 ): Promise<NormalizedScene[]> {
   const startTime = Date.now();
 
-  // Get all scenes from cache
+  // NEW: Use SQL query builder if enabled
+  if (USE_SQL_QUERY_BUILDER) {
+    logger.info("executeCarouselQuery: using SQL query builder path");
+
+    // Get exclusions
+    const excludedIds = await userRestrictionService.getExcludedSceneIds(
+      userId,
+      false
+    );
+
+    // Execute query
+    const result = await sceneQueryBuilder.execute({
+      userId,
+      filters: rules,
+      excludedSceneIds: excludedIds,
+      sort,
+      sortDirection: direction.toUpperCase() as "ASC" | "DESC",
+      page: 1,
+      perPage: CAROUSEL_SCENE_LIMIT,
+      // Use different seed per carousel load for variety
+      randomSeed: sort === 'random' ? userId + Date.now() : userId,
+    });
+
+    const scenes = addStreamabilityInfo(result.scenes);
+
+    logger.info("executeCarouselQuery complete (SQL path)", {
+      totalTimeMs: Date.now() - startTime,
+      resultCount: scenes.length,
+    });
+
+    return scenes;
+  }
+
+  // Check if carousel has any actual filters
+  const hasFilters = rules && Object.keys(rules).length > 0;
+
+  // Check for expensive filters that need user data
+  const hasExpensiveFilters =
+    rules?.favorite !== undefined ||
+    rules?.rating100 !== undefined ||
+    rules?.o_counter !== undefined ||
+    rules?.play_count !== undefined ||
+    rules?.play_duration !== undefined ||
+    rules?.last_played_at !== undefined ||
+    rules?.last_o_at !== undefined ||
+    rules?.performer_favorite !== undefined ||
+    rules?.studio_favorite !== undefined ||
+    rules?.tag_favorite !== undefined;
+
+  // Check if sort field is supported by DB
+  const dbSortFields = new Set(['created_at', 'updated_at', 'date', 'title', 'duration', 'random']);
+  const canUseDbSort = dbSortFields.has(sort);
+
+  // FAST PATH: No filters, DB-supported sort
+  if (!hasFilters && canUseDbSort) {
+    logger.info('executeCarouselQuery: using FAST PATH (no filters)');
+
+    // Pre-compute exclusions
+    const exclusionStart = Date.now();
+    const excludeIds = await userRestrictionService.getExcludedSceneIds(userId, false);
+    logger.info(`executeCarouselQuery: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+
+    // Get scenes with DB pagination (only need CAROUSEL_SCENE_LIMIT scenes)
+    const dbStart = Date.now();
+    const { scenes } = await cachedEntityQueryService.getScenesPaginated({
+      page: 1,
+      perPage: CAROUSEL_SCENE_LIMIT,
+      sortField: sort,
+      sortDirection: direction.toUpperCase() as 'ASC' | 'DESC',
+      excludeIds,
+    });
+    logger.info(`executeCarouselQuery: DB pagination took ${Date.now() - dbStart}ms`);
+
+    // Merge with user data
+    const mergeStart = Date.now();
+    const scenesWithUserData = await mergeScenesWithUserData(scenes, userId);
+    logger.info(`executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`);
+
+    // Add streamability info
+    const finalScenes = addStreamabilityInfo(scenesWithUserData);
+
+    logger.info(`executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (FAST PATH)`);
+    return finalScenes;
+  }
+
+  // STANDARD PATH: Has filters, need to load more scenes
+  logger.info(`executeCarouselQuery: using STANDARD PATH (hasFilters=${hasFilters}, hasExpensiveFilters=${hasExpensiveFilters})`);
+
+  // Pre-compute exclusions at DB level (much faster than in-memory filtering)
+  const exclusionStart = Date.now();
+  const excludeIds = await userRestrictionService.getExcludedSceneIds(userId, false);
+  logger.info(`executeCarouselQuery: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+
+  // Get scenes from cache (lightweight browse query)
   const cacheStart = Date.now();
   let scenes = await cachedEntityQueryService.getAllScenes();
   logger.info(`executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`);
 
-  // Apply user content restrictions (hidden entities, exclusions)
-  const restrictionStart = Date.now();
-  scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
-  logger.info(`executeCarouselQuery: filterScenesForUser took ${Date.now() - restrictionStart}ms`);
+  // Apply pre-computed exclusions (fast Set lookup instead of nested entity checks)
+  const filterStart = Date.now();
+  scenes = scenes.filter(s => !excludeIds.has(s.id));
+  logger.info(`executeCarouselQuery: applied ${excludeIds.size} exclusions in ${Date.now() - filterStart}ms, ${scenes.length} scenes remaining`);
 
   // Apply the carousel's filter rules (quick filters that don't need user data)
   const quickFilterStart = Date.now();
@@ -329,7 +429,7 @@ export async function executeCarouselQuery(
   scenes = sortScenes(scenes, sort, direction);
 
   // Limit to carousel size
-  logger.info(`executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms`);
+  logger.info(`executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms (STANDARD PATH)`);
   return scenes.slice(0, CAROUSEL_SCENE_LIMIT);
 }
 

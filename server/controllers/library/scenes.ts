@@ -4,11 +4,15 @@ import prisma from "../../prisma/singleton.js";
 import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+
+// Feature flag for SQL query builder
+const USE_SQL_QUERY_BUILDER = process.env.USE_SQL_QUERY_BUILDER !== "false";
 
 /**
  * Seeded random number generator for consistent shuffling per user
@@ -850,6 +854,10 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
   const requestStart = Date.now();
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const { filter, scene_filter, ids } = req.body;
 
     const sortField = filter?.sort || "created_at";
@@ -861,19 +869,79 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
     const requestingUser = req.user;
 
+    // NEW: Use SQL query builder if enabled
+    if (USE_SQL_QUERY_BUILDER && !searchQuery) {
+      logger.info("findScenes: using SQL query builder path");
+
+      // Get excluded scene IDs
+      const excludedIds = await userRestrictionService.getExcludedSceneIds(
+        userId,
+        requestingUser?.role === 'ADMIN'
+      );
+
+      // Build filters object
+      const filters: PeekSceneFilter = { ...scene_filter };
+      if (ids && ids.length > 0) {
+        filters.ids = { value: ids, modifier: "INCLUDES" };
+      }
+
+      // Execute query
+      const result = await sceneQueryBuilder.execute({
+        userId,
+        filters,
+        excludedSceneIds: excludedIds,
+        sort: sortField,
+        sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
+        page,
+        perPage,
+        randomSeed: userId, // Stable random per user
+      });
+
+      // Add streamability info
+      const scenes = addStreamabilityInfo(result.scenes);
+
+      logger.info("findScenes complete (SQL path)", {
+        totalTimeMs: Date.now() - requestStart,
+        resultCount: scenes.length,
+        total: result.total,
+      });
+
+      return res.json({
+        findScenes: {
+          count: result.total,
+          scenes,
+        },
+      });
+    }
+
     // Check if we can use the FAST PATH (pure DB pagination)
-    // Fast path requires: no search, no filters, simple sort field, admin user (no restrictions)
+    // Fast path requires: no search, no filters, simple sort field
+    // Now works for ALL users (admins and regular users) with pre-computed exclusions
     const dbSortFields = new Set(['created_at', 'updated_at', 'date', 'title', 'duration', 'filesize', 'bitrate', 'framerate']);
+
+    // Check if scene_filter has any actual filter properties (not just an empty object)
+    const hasSceneFilters = scene_filter && Object.keys(scene_filter).length > 0;
+
     const canUseDbPagination =
       !searchQuery &&
       !ids &&
-      !scene_filter &&
-      dbSortFields.has(sortField) &&
-      requestingUser?.role === 'ADMIN';
+      !hasSceneFilters &&
+      dbSortFields.has(sortField);
+
+    // Debug logging to understand why fast path is/isn't used
+    logger.info(`findScenes: fast path check - searchQuery=${!!searchQuery}, ids=${!!ids}, hasSceneFilters=${hasSceneFilters}, sortField=${sortField}, inDbSortFields=${dbSortFields.has(sortField)}, canUse=${canUseDbPagination}`);
 
     if (canUseDbPagination) {
-      // FAST PATH: Pure database pagination (sub-second response)
-      logger.info('findScenes: using FAST PATH (DB pagination)');
+      // FAST PATH: Database pagination with pre-computed exclusions (sub-second response)
+      logger.info('findScenes: using FAST PATH (DB pagination with exclusions)');
+
+      // Pre-compute excluded scene IDs at DB level (much faster than loading all scenes)
+      const exclusionStart = Date.now();
+      const excludeIds = await userRestrictionService.getExcludedSceneIds(
+        userId,
+        requestingUser?.role === 'ADMIN' // Skip content restrictions for admins (but still apply hidden entities)
+      );
+      logger.info(`findScenes: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
 
       const dbStart = Date.now();
       const { scenes: paginatedScenes, total } = await cachedEntityQueryService.getScenesPaginated({
@@ -881,6 +949,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         perPage,
         sortField,
         sortDirection: sortDirection.toUpperCase() as 'ASC' | 'DESC',
+        excludeIds,
       });
       logger.info(`findScenes: DB pagination took ${Date.now() - dbStart}ms`);
 
@@ -903,6 +972,14 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // STANDARD PATH: Load all scenes and filter in memory
+    // Pre-compute excluded scene IDs at DB level (fast Set lookup instead of nested entity checks)
+    const exclusionStart = Date.now();
+    const excludeIds = await userRestrictionService.getExcludedSceneIds(
+      userId,
+      requestingUser?.role === 'ADMIN' // Skip content restrictions for admins
+    );
+    logger.info(`findScenes: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+
     // Step 1: Get all scenes from cache
     const cacheStart = Date.now();
     let scenes = await cachedEntityQueryService.getAllScenes();
@@ -917,6 +994,11 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         },
       });
     }
+
+    // Apply pre-computed exclusions immediately (fast Set lookup)
+    const preFilterStart = Date.now();
+    scenes = scenes.filter(s => !excludeIds.has(s.id));
+    logger.info(`findScenes: applied ${excludeIds.size} exclusions in ${Date.now() - preFilterStart}ms, ${scenes.length} scenes remaining`);
 
     // Determine if we can use optimized pipeline
     // Expensive sort fields require user data, so we must merge all scenes first
@@ -980,16 +1062,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       scenes = applyExpensiveSceneFilters(scenes, mergedFilter);
       logger.info(`findScenes: filters took ${Date.now() - filterStart}ms`);
 
-      // Step 5: Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      const restrictionStart = Date.now();
-      scenes = await userRestrictionService.filterScenesForUser(
-        scenes,
-        userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
-      );
-      logger.info(`findScenes: restrictions took ${Date.now() - restrictionStart}ms`);
+      // Note: Exclusions already applied via pre-computed excludeIds above
 
       // Step 6: Sort
       const sortStart = Date.now();
@@ -1045,18 +1118,9 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       scenes = await applyQuickSceneFilters(scenes, mergedFilter);
       logger.info(`findScenes: quick filters took ${Date.now() - filterStart}ms`);
 
-      // Step 4: Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      const restrictionStart = Date.now();
-      scenes = await userRestrictionService.filterScenesForUser(
-        scenes,
-        userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
-      );
-      logger.info(`findScenes: restrictions took ${Date.now() - restrictionStart}ms`);
+      // Note: Exclusions already applied via pre-computed excludeIds above
 
-      // Step 5: Sort (using quick sort fields only)
+      // Step 4: Sort (using quick sort fields only)
       const sortStart = Date.now();
       const groupIdForSort = scene_filter?.groups?.value?.[0];
       scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
