@@ -5,6 +5,7 @@ import prisma from "../prisma/singleton.js";
 import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
 import { userRestrictionService } from "../services/UserRestrictionService.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
+import { logger } from "../utils/logger.js";
 import {
   mergeScenesWithUserData,
   applyQuickSceneFilters,
@@ -294,20 +295,32 @@ export async function executeCarouselQuery(
   sort: string,
   direction: string
 ): Promise<NormalizedScene[]> {
+  const startTime = Date.now();
+
   // Get all scenes from cache
+  const cacheStart = Date.now();
   let scenes = await cachedEntityQueryService.getAllScenes();
+  logger.info(`executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`);
 
   // Apply user content restrictions (hidden entities, exclusions)
+  const restrictionStart = Date.now();
   scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
+  logger.info(`executeCarouselQuery: filterScenesForUser took ${Date.now() - restrictionStart}ms`);
 
   // Apply the carousel's filter rules (quick filters that don't need user data)
+  const quickFilterStart = Date.now();
   scenes = await applyQuickSceneFilters(scenes, rules);
+  logger.info(`executeCarouselQuery: applyQuickSceneFilters took ${Date.now() - quickFilterStart}ms`);
 
   // Merge with user-specific data (ratings, watch history, favorites)
+  const mergeStart = Date.now();
   scenes = await mergeScenesWithUserData(scenes, userId);
+  logger.info(`executeCarouselQuery: mergeScenesWithUserData took ${Date.now() - mergeStart}ms`);
 
   // Apply filters that require user data (favorite, rating, play_count, etc.)
+  const expensiveFilterStart = Date.now();
   scenes = applyExpensiveSceneFilters(scenes, rules);
+  logger.info(`executeCarouselQuery: applyExpensiveSceneFilters took ${Date.now() - expensiveFilterStart}ms`);
 
   // Add streamability info
   scenes = addStreamabilityInfo(scenes);
@@ -316,6 +329,7 @@ export async function executeCarouselQuery(
   scenes = sortScenes(scenes, sort, direction);
 
   // Limit to carousel size
+  logger.info(`executeCarouselQuery: TOTAL took ${Date.now() - startTime}ms`);
   return scenes.slice(0, CAROUSEL_SCENE_LIMIT);
 }
 

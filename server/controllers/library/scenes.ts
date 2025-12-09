@@ -182,6 +182,11 @@ export async function applyQuickSceneFilters(
   if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
     const idSet = new Set(filters.ids);
     filtered = filtered.filter((s) => idSet.has(s.id));
+    // Populate sceneStreams for detail views (browse queries return empty streams for performance)
+    filtered = filtered.map((s) => ({
+      ...s,
+      sceneStreams: s.sceneStreams?.length ? s.sceneStreams : cachedEntityQueryService.generateSceneStreams(s.id),
+    }));
   }
 
   // Filter by performers

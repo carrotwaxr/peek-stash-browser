@@ -652,8 +652,9 @@ class CachedEntityQueryService {
    * Generate scene stream URLs on-demand
    * All scenes have the same stream formats - only the ID varies
    * This eliminates storing ~4.4KB of redundant JSON per scene
+   * Public so it can be used to populate streams for scene detail views
    */
-  private generateSceneStreams(sceneId: string): Array<{url: string; mime_type: string; label: string}> {
+  public generateSceneStreams(sceneId: string): Array<{url: string; mime_type: string; label: string}> {
     const formats = [
       { ext: '', mime: 'video/mp4', label: 'Direct stream', resolution: null },
       { ext: '.mp4', mime: 'video/mp4', label: 'MP4', resolution: 'ORIGINAL' },
