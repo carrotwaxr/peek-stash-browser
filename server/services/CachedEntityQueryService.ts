@@ -648,6 +648,39 @@ class CachedEntityQueryService {
 
   // ==================== Data Transform Helpers ====================
 
+  /**
+   * Generate scene stream URLs on-demand
+   * All scenes have the same stream formats - only the ID varies
+   * This eliminates storing ~4.4KB of redundant JSON per scene
+   */
+  private generateSceneStreams(sceneId: string): Array<{url: string; mime_type: string; label: string}> {
+    const formats = [
+      { ext: '', mime: 'video/mp4', label: 'Direct stream', resolution: null },
+      { ext: '.mp4', mime: 'video/mp4', label: 'MP4', resolution: 'ORIGINAL' },
+      { ext: '.mp4', mime: 'video/mp4', label: 'MP4 Standard (480p)', resolution: 'STANDARD' },
+      { ext: '.mp4', mime: 'video/mp4', label: 'MP4 Low (240p)', resolution: 'LOW' },
+      { ext: '.webm', mime: 'video/webm', label: 'WEBM', resolution: 'ORIGINAL' },
+      { ext: '.webm', mime: 'video/webm', label: 'WEBM Standard (480p)', resolution: 'STANDARD' },
+      { ext: '.webm', mime: 'video/webm', label: 'WEBM Low (240p)', resolution: 'LOW' },
+      { ext: '.m3u8', mime: 'application/vnd.apple.mpegurl', label: 'HLS', resolution: 'ORIGINAL' },
+      { ext: '.m3u8', mime: 'application/vnd.apple.mpegurl', label: 'HLS Standard (480p)', resolution: 'STANDARD' },
+      { ext: '.m3u8', mime: 'application/vnd.apple.mpegurl', label: 'HLS Low (240p)', resolution: 'LOW' },
+      { ext: '.mpd', mime: 'application/dash+xml', label: 'DASH', resolution: 'ORIGINAL' },
+      { ext: '.mpd', mime: 'application/dash+xml', label: 'DASH Standard (480p)', resolution: 'STANDARD' },
+      { ext: '.mpd', mime: 'application/dash+xml', label: 'DASH Low (240p)', resolution: 'LOW' },
+    ];
+
+    return formats.map(f => {
+      const basePath = `/scene/${sceneId}/stream${f.ext}`;
+      const fullPath = f.resolution ? `${basePath}?resolution=${f.resolution}` : basePath;
+      return {
+        url: `/api/proxy/stash?path=${encodeURIComponent(fullPath)}`,
+        mime_type: f.mime,
+        label: f.label,
+      };
+    });
+  }
+
   private transformScene(scene: any): NormalizedScene {
     return {
       // User fields (defaults first, then override with actual values)
