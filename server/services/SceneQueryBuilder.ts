@@ -678,6 +678,9 @@ class SceneQueryBuilder {
 
     const scenes = rows.map((row) => this.transformRow(row));
 
+    // Populate relations
+    await this.populateRelations(scenes);
+
     logger.info("SceneQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
       resultCount: scenes.length,
@@ -698,7 +701,8 @@ class SceneQueryBuilder {
     // Determine last_o_at from o_history
     const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
 
-    return {
+    // Create scene object with studioId preserved for population
+    const scene: any = {
       id: row.id,
       title: row.title || null,
       code: row.code || null,
@@ -707,6 +711,9 @@ class SceneQueryBuilder {
       organized: row.organized === 1,
       created_at: row.stashCreatedAt || null,
       updated_at: row.stashUpdatedAt || null,
+
+      // Store studioId for later population
+      studioId: row.studioId,
 
       // User data - prefer Peek user data over Stash data
       rating: row.userRating != null ? Math.round(row.userRating / 20) : null,
@@ -753,7 +760,143 @@ class SceneQueryBuilder {
       tags: [],
       groups: [],
       galleries: [],
-    } as unknown as NormalizedScene;
+    };
+
+    return scene as NormalizedScene;
+  }
+
+  /**
+   * Populate scene relations (performers, tags, studio, groups, galleries)
+   * Called after main query with just the scene IDs we need
+   */
+  async populateRelations(scenes: NormalizedScene[]): Promise<void> {
+    if (scenes.length === 0) return;
+
+    const sceneIds = scenes.map((s) => s.id);
+    const studioIds = scenes.map((s) => (s as any).studioId).filter(Boolean) as string[];
+
+    // Batch load all relations in parallel
+    const [performers, tags, groups, galleries, studios] = await Promise.all([
+      prisma.scenePerformer.findMany({
+        where: { sceneId: { in: sceneIds } },
+        include: { performer: true },
+      }),
+      prisma.sceneTag.findMany({
+        where: { sceneId: { in: sceneIds } },
+        include: { tag: true },
+      }),
+      prisma.sceneGroup.findMany({
+        where: { sceneId: { in: sceneIds } },
+        include: { group: true },
+      }),
+      prisma.sceneGallery.findMany({
+        where: { sceneId: { in: sceneIds } },
+        include: { gallery: true },
+      }),
+      studioIds.length > 0
+        ? prisma.cachedStudio.findMany({
+            where: { id: { in: studioIds } },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    // Build lookup maps
+    const performersByScene = new Map<string, any[]>();
+    for (const sp of performers) {
+      const list = performersByScene.get(sp.sceneId) || [];
+      list.push(this.transformCachedPerformer(sp.performer));
+      performersByScene.set(sp.sceneId, list);
+    }
+
+    const tagsByScene = new Map<string, any[]>();
+    for (const st of tags) {
+      const list = tagsByScene.get(st.sceneId) || [];
+      list.push(this.transformCachedTag(st.tag));
+      tagsByScene.set(st.sceneId, list);
+    }
+
+    const groupsByScene = new Map<string, any[]>();
+    for (const sg of groups) {
+      const list = groupsByScene.get(sg.sceneId) || [];
+      list.push({
+        ...this.transformCachedGroup(sg.group),
+        scene_index: sg.sceneIndex,
+      });
+      groupsByScene.set(sg.sceneId, list);
+    }
+
+    const galleriesByScene = new Map<string, any[]>();
+    for (const sg of galleries) {
+      const list = galleriesByScene.get(sg.sceneId) || [];
+      list.push(this.transformCachedGallery(sg.gallery));
+      galleriesByScene.set(sg.sceneId, list);
+    }
+
+    const studiosById = new Map<string, any>();
+    for (const studio of studios) {
+      studiosById.set(studio.id, this.transformCachedStudio(studio));
+    }
+
+    // Populate scenes
+    for (const scene of scenes) {
+      scene.performers = performersByScene.get(scene.id) || [];
+      scene.tags = tagsByScene.get(scene.id) || [];
+      scene.groups = groupsByScene.get(scene.id) || [];
+      scene.galleries = galleriesByScene.get(scene.id) || [];
+      const sceneAny = scene as any;
+      if (sceneAny.studioId) {
+        scene.studio = studiosById.get(sceneAny.studioId) || null;
+      }
+    }
+  }
+
+  // Helper transforms for cached entities
+  private transformCachedPerformer(p: any): any {
+    return {
+      id: p.id,
+      name: p.name,
+      disambiguation: p.disambiguation,
+      gender: p.gender,
+      image_path: p.imagePath,
+      favorite: p.favorite,
+      rating100: p.rating100,
+    };
+  }
+
+  private transformCachedTag(t: any): any {
+    return {
+      id: t.id,
+      name: t.name,
+      image_path: t.imagePath,
+      favorite: t.favorite,
+    };
+  }
+
+  private transformCachedStudio(s: any): any {
+    return {
+      id: s.id,
+      name: s.name,
+      image_path: s.imagePath,
+      favorite: s.favorite,
+      parent_studio: s.parentId ? { id: s.parentId } : null,
+    };
+  }
+
+  private transformCachedGroup(g: any): any {
+    return {
+      id: g.id,
+      name: g.name,
+      front_image_path: g.frontImagePath,
+      back_image_path: g.backImagePath,
+    };
+  }
+
+  private transformCachedGallery(g: any): any {
+    return {
+      id: g.id,
+      title: g.title,
+      cover: g.coverPath ? { paths: { thumbnail: g.coverPath } } : null,
+    };
   }
 
   /**
