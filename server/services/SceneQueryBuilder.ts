@@ -269,6 +269,169 @@ class SceneQueryBuilder {
     }
   }
 
+  /**
+   * Build favorite filter clause
+   */
+  private buildFavoriteFilter(favorite: boolean | undefined): FilterClause {
+    if (favorite === undefined) {
+      return { sql: "", params: [] };
+    }
+
+    if (favorite) {
+      return { sql: "r.favorite = 1", params: [] };
+    } else {
+      return { sql: "(r.favorite = 0 OR r.favorite IS NULL)", params: [] };
+    }
+  }
+
+  /**
+   * Build rating filter clause
+   */
+  private buildRatingFilter(
+    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "GREATER_THAN" } = filter;
+    const col = "COALESCE(r.rating, 0)";
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${col} = ?`, params: [value] };
+
+      case "NOT_EQUALS":
+        return { sql: `${col} != ?`, params: [value] };
+
+      case "GREATER_THAN":
+        return { sql: `${col} > ?`, params: [value] };
+
+      case "LESS_THAN":
+        return { sql: `${col} < ?`, params: [value] };
+
+      case "BETWEEN":
+        if (value2 === undefined || value2 === null) {
+          return { sql: `${col} >= ?`, params: [value] };
+        }
+        return { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] };
+
+      case "NOT_BETWEEN":
+        if (value2 === undefined || value2 === null) {
+          return { sql: `${col} < ?`, params: [value] };
+        }
+        return { sql: `(${col} < ? OR ${col} > ?)`, params: [value, value2] };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build play count filter clause
+   */
+  private buildPlayCountFilter(
+    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "GREATER_THAN" } = filter;
+    const col = "COALESCE(w.playCount, 0)";
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${col} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${col} != ?`, params: [value] };
+      case "GREATER_THAN":
+        return { sql: `${col} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${col} < ?`, params: [value] };
+      case "BETWEEN":
+        return value2 !== undefined && value2 !== null
+          ? { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] }
+          : { sql: `${col} >= ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build o_counter filter clause
+   */
+  private buildOCounterFilter(
+    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "GREATER_THAN" } = filter;
+    const col = "COALESCE(w.oCount, 0)";
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${col} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${col} != ?`, params: [value] };
+      case "GREATER_THAN":
+        return { sql: `${col} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${col} < ?`, params: [value] };
+      case "BETWEEN":
+        return value2 !== undefined && value2 !== null
+          ? { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] }
+          : { sql: `${col} >= ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build ORDER BY clause
+   */
+  private buildSortClause(
+    sort: string,
+    direction: "ASC" | "DESC",
+    randomSeed?: number
+  ): string {
+    const dir = direction === "ASC" ? "ASC" : "DESC";
+
+    // Map sort field names to SQL expressions
+    const sortMap: Record<string, string> = {
+      // Scene metadata
+      created_at: `s.stashCreatedAt ${dir}`,
+      updated_at: `s.stashUpdatedAt ${dir}`,
+      date: `s.date ${dir}`,
+      title: `s.title ${dir}`,
+      duration: `s.duration ${dir}`,
+      filesize: `s.fileSize ${dir}`,
+      bitrate: `s.fileBitRate ${dir}`,
+      framerate: `s.fileFrameRate ${dir}`,
+
+      // Stash ratings (not user ratings)
+      rating: `s.rating100 ${dir}`,
+
+      // User data - prefer user values
+      last_played_at: `w.lastPlayedAt ${dir}`,
+      play_count: `COALESCE(w.playCount, 0) ${dir}`,
+      play_duration: `COALESCE(w.playDuration, 0) ${dir}`,
+      o_counter: `COALESCE(w.oCount, 0) ${dir}`,
+      user_rating: `COALESCE(r.rating, 0) ${dir}`,
+      resume_time: `COALESCE(w.resumeTime, 0) ${dir}`,
+
+      // Random with deterministic seed for stable pagination
+      random: `((CAST(substr(s.id, 1, 8) AS INTEGER) * 1103515245 + ${randomSeed || 12345}) % 2147483647) ${dir}`,
+    };
+
+    const sortExpr = sortMap[sort] || sortMap["created_at"];
+
+    // Add secondary sort by id for stable ordering
+    return `${sortExpr}, s.id ${dir}`;
+  }
+
   async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
     const startTime = Date.now();
     const { userId, page, perPage, excludedSceneIds, filters } = options;
@@ -314,9 +477,43 @@ class SceneQueryBuilder {
       }
     }
 
+    // User data filters
+    const favoriteFilter = this.buildFavoriteFilter(filters?.favorite);
+    if (favoriteFilter.sql) {
+      whereClauses.push(favoriteFilter);
+    }
+
+    if (filters?.rating100) {
+      const ratingFilter = this.buildRatingFilter(filters.rating100);
+      if (ratingFilter.sql) {
+        whereClauses.push(ratingFilter);
+      }
+    }
+
+    if (filters?.play_count) {
+      const playCountFilter = this.buildPlayCountFilter(filters.play_count);
+      if (playCountFilter.sql) {
+        whereClauses.push(playCountFilter);
+      }
+    }
+
+    if (filters?.o_counter) {
+      const oCounterFilter = this.buildOCounterFilter(filters.o_counter);
+      if (oCounterFilter.sql) {
+        whereClauses.push(oCounterFilter);
+      }
+    }
+
     // Combine WHERE clauses
     const whereSQL = whereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
     const whereParams = whereClauses.flatMap((c) => c.params);
+
+    // Build sort clause
+    const sortClause = this.buildSortClause(
+      options.sort,
+      options.sortDirection,
+      options.randomSeed
+    );
 
     // Build full query
     const offset = (page - 1) * perPage;
@@ -324,7 +521,7 @@ class SceneQueryBuilder {
       SELECT ${this.SELECT_COLUMNS}
       ${fromClause.sql}
       WHERE ${whereSQL}
-      ORDER BY s.stashCreatedAt DESC
+      ORDER BY ${sortClause}
       LIMIT ? OFFSET ?
     `;
 
@@ -333,6 +530,8 @@ class SceneQueryBuilder {
     logger.info("SceneQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
       excludedCount: excludedSceneIds?.size || 0,
+      sort: options.sort,
+      sortDirection: options.sortDirection,
       paramCount: params.length,
     });
 
