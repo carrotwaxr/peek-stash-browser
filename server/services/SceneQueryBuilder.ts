@@ -127,9 +127,86 @@ class SceneQueryBuilder {
     return { scenes, total };
   }
 
-  // Placeholder transform - will be implemented in Task 3
+  /**
+   * Transform a raw database row into a NormalizedScene
+   */
   private transformRow(row: any): NormalizedScene {
-    return row as NormalizedScene;
+    // Parse JSON fields
+    const oHistory = this.parseJsonArray(row.userOHistory);
+    const playHistory = this.parseJsonArray(row.userPlayHistory);
+
+    // Determine last_o_at from o_history
+    const lastOAt = oHistory.length > 0 ? oHistory[oHistory.length - 1] : null;
+
+    return {
+      id: row.id,
+      title: row.title || null,
+      code: row.code || null,
+      date: row.date || null,
+      details: row.details || null,
+      organized: row.organized === 1,
+      created_at: row.stashCreatedAt || null,
+      updated_at: row.stashUpdatedAt || null,
+
+      // User data - prefer Peek user data over Stash data
+      rating: row.userRating != null ? Math.round(row.userRating / 20) : null,
+      rating100: row.userRating ?? null,
+      favorite: row.userFavorite === 1,
+      o_counter: row.userOCount ?? row.stashOCounter ?? 0,
+      play_count: row.userPlayCount ?? row.stashPlayCount ?? 0,
+      play_duration: row.userPlayDuration ?? row.stashPlayDuration ?? 0,
+      resume_time: row.userResumeTime ?? 0,
+      play_history: playHistory,
+      o_history: oHistory.map((ts: string) => new Date(ts)),
+      last_played_at: row.userLastPlayedAt || null,
+      last_o_at: lastOAt,
+
+      // File data - build from individual columns
+      files: row.filePath ? [{
+        path: row.filePath,
+        duration: row.duration,
+        bit_rate: row.fileBitRate,
+        frame_rate: row.fileFrameRate,
+        width: row.fileWidth,
+        height: row.fileHeight,
+        video_codec: row.fileVideoCodec,
+        audio_codec: row.fileAudioCodec,
+        size: row.fileSize ? Number(row.fileSize) : null,
+      }] : [],
+
+      // Paths
+      paths: {
+        screenshot: row.pathScreenshot || null,
+        preview: row.pathPreview || null,
+        stream: row.pathStream || null,
+        sprite: row.pathSprite || null,
+        vtt: row.pathVtt || null,
+        caption: row.pathCaption || null,
+      },
+
+      // Empty sceneStreams - generated on demand
+      sceneStreams: [],
+
+      // Relations - populated separately after query
+      studio: null,
+      performers: [],
+      tags: [],
+      groups: [],
+      galleries: [],
+    } as unknown as NormalizedScene;
+  }
+
+  /**
+   * Safely parse a JSON array string
+   */
+  private parseJsonArray(json: string | null): string[] {
+    if (!json) return [];
+    try {
+      const parsed = JSON.parse(json);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 }
 
