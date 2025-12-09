@@ -842,6 +842,7 @@ function getFieldValue(
  * Simplified findScenes using cache with pagination-aware filtering
  */
 export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
+  const requestStart = Date.now();
   try {
     const userId = req.user?.id;
     const { filter, scene_filter, ids } = req.body;
@@ -853,7 +854,9 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all scenes from cache
+    const cacheStart = Date.now();
     let scenes = await cachedEntityQueryService.getAllScenes();
+    logger.debug(`findScenes: cache fetch took ${Date.now() - cacheStart}ms for ${scenes.length} scenes`);
 
     if (scenes.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -898,7 +901,9 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       // (Required when sorting/filtering by user-specific data)
 
       // Step 2: Merge with user data (all scenes)
+      const mergeStart = Date.now();
       scenes = await mergeScenesWithUserData(scenes, userId);
+      logger.debug(`findScenes: merge user data took ${Date.now() - mergeStart}ms`);
 
       // Step 3: Apply search query
       if (searchQuery) {
@@ -923,21 +928,27 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       // Step 4: Apply all filters (quick + expensive)
+      const filterStart = Date.now();
       scenes = await applyQuickSceneFilters(scenes, mergedFilter);
       scenes = applyExpensiveSceneFilters(scenes, mergedFilter);
+      logger.debug(`findScenes: filters took ${Date.now() - filterStart}ms`);
 
       // Step 5: Apply content restrictions and hidden entity filtering
       // Hidden entities are ALWAYS filtered (for all users including admins)
       // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      const restrictionStart = Date.now();
       scenes = await userRestrictionService.filterScenesForUser(
         scenes,
         userId,
         requestingUser?.role === "ADMIN" // Skip content restrictions for admins
       );
+      logger.debug(`findScenes: restrictions took ${Date.now() - restrictionStart}ms`);
 
       // Step 6: Sort
+      const sortStart = Date.now();
       const groupIdForSort = scene_filter?.groups?.value?.[0];
       scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
+      logger.debug(`findScenes: sort took ${Date.now() - sortStart}ms`);
 
       // Step 7: Paginate
       const total = scenes.length;
@@ -947,6 +958,8 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
       // Step 8: Add streamability information
       const scenesWithStreamability = addStreamabilityInfo(paginatedScenes);
+
+      logger.debug(`findScenes: TOTAL request took ${Date.now() - requestStart}ms (expensive pipeline)`);
 
       return res.json({
         findScenes: {
@@ -981,20 +994,26 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       // Step 3: Apply quick filters (don't need user data)
+      const filterStart = Date.now();
       scenes = await applyQuickSceneFilters(scenes, mergedFilter);
+      logger.debug(`findScenes: quick filters took ${Date.now() - filterStart}ms`);
 
       // Step 4: Apply content restrictions and hidden entity filtering
       // Hidden entities are ALWAYS filtered (for all users including admins)
       // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+      const restrictionStart = Date.now();
       scenes = await userRestrictionService.filterScenesForUser(
         scenes,
         userId,
         requestingUser?.role === "ADMIN" // Skip content restrictions for admins
       );
+      logger.debug(`findScenes: restrictions took ${Date.now() - restrictionStart}ms`);
 
       // Step 5: Sort (using quick sort fields only)
+      const sortStart = Date.now();
       const groupIdForSort = scene_filter?.groups?.value?.[0];
       scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
+      logger.debug(`findScenes: sort took ${Date.now() - sortStart}ms`);
 
       // Step 6: Paginate BEFORE merging user data
       const total = scenes.length;
@@ -1003,10 +1022,12 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       const paginatedScenes = scenes.slice(startIndex, endIndex);
 
       // Step 7: Merge user data (ONLY for paginated scenes - huge win!)
+      const mergeStart = Date.now();
       const scenesWithUserData = await mergeScenesWithUserData(
         paginatedScenes,
         userId
       );
+      logger.debug(`findScenes: merge user data took ${Date.now() - mergeStart}ms (${paginatedScenes.length} scenes)`);
 
       // Step 8: Apply expensive filters (shouldn't match anything since no expensive filters)
       // Included for completeness, will be no-op
@@ -1017,6 +1038,8 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
       // Step 9: Add streamability information
       const scenesWithStreamability = addStreamabilityInfo(finalScenes);
+
+      logger.debug(`findScenes: TOTAL request took ${Date.now() - requestStart}ms (optimized pipeline)`);
 
       return res.json({
         findScenes: {

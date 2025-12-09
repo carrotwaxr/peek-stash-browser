@@ -794,10 +794,28 @@ class CachedEntityQueryService {
     };
   }
 
-  private transformUrl(path: string | null): string | null {
-    if (!path) return null;
-    // Replace Stash host with proxy prefix
-    return `/api/proxy/stash${path}`;
+  private transformUrl(urlOrPath: string | null): string | null {
+    if (!urlOrPath) return null;
+
+    // If it's already a proxy URL, return as-is
+    if (urlOrPath.startsWith("/api/proxy/stash")) {
+      return urlOrPath;
+    }
+
+    // If it's a full URL (http://...), extract path + query
+    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
+      try {
+        const url = new URL(urlOrPath);
+        const pathWithQuery = url.pathname + url.search;
+        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+      } catch {
+        // If URL parsing fails, treat as path
+        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+      }
+    }
+
+    // Otherwise treat as path and encode it
+    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
   }
 }
 
