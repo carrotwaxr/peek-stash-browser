@@ -390,6 +390,108 @@ class SceneQueryBuilder {
   }
 
   /**
+   * Build ID filter clause (for specific scene IDs)
+   */
+  private buildIdFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | string[] | undefined | null
+  ): FilterClause {
+    // Handle both array and object formats
+    const ids = Array.isArray(filter) ? filter : filter?.value;
+    if (!ids || ids.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const modifier = Array.isArray(filter) ? "INCLUDES" : filter?.modifier || "INCLUDES";
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return { sql: `s.id IN (${placeholders})`, params: ids };
+      case "EXCLUDES":
+        return { sql: `s.id NOT IN (${placeholders})`, params: ids };
+      default:
+        return { sql: `s.id IN (${placeholders})`, params: ids };
+    }
+  }
+
+  /**
+   * Build duration filter clause
+   */
+  private buildDurationFilter(
+    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "GREATER_THAN" } = filter;
+    const col = "COALESCE(s.duration, 0)";
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${col} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${col} != ?`, params: [value] };
+      case "GREATER_THAN":
+        return { sql: `${col} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${col} < ?`, params: [value] };
+      case "BETWEEN":
+        return value2 !== undefined && value2 !== null
+          ? { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] }
+          : { sql: `${col} >= ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build resolution filter clause
+   */
+  private buildResolutionFilter(
+    filter: { value?: string | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value) {
+      return { sql: "", params: [] };
+    }
+
+    // Resolution values: "144p", "240p", "360p", "480p", "720p", "1080p", "4k", "5k", "6k", "8k"
+    const resolutionMap: Record<string, number> = {
+      "144p": 144,
+      "240p": 240,
+      "360p": 360,
+      "480p": 480,
+      "540p": 540,
+      "720p": 720,
+      "1080p": 1080,
+      "1440p": 1440,
+      "4k": 2160,
+      "5k": 2880,
+      "6k": 3240,
+      "8k": 4320,
+    };
+
+    const height = resolutionMap[filter.value.toLowerCase()];
+    if (!height) {
+      return { sql: "", params: [] };
+    }
+
+    const { modifier = "EQUALS" } = filter;
+    const col = "COALESCE(s.fileHeight, 0)";
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${col} = ?`, params: [height] };
+      case "GREATER_THAN":
+        return { sql: `${col} > ?`, params: [height] };
+      case "LESS_THAN":
+        return { sql: `${col} < ?`, params: [height] };
+      default:
+        return { sql: `${col} >= ?`, params: [height] };
+    }
+  }
+
+  /**
    * Build ORDER BY clause
    */
   private buildSortClause(
@@ -446,6 +548,29 @@ class SceneQueryBuilder {
     const exclusionFilter = this.buildExclusionFilter(excludedSceneIds || new Set());
     if (exclusionFilter.sql) {
       whereClauses.push(exclusionFilter);
+    }
+
+    // ID filter
+    if (filters?.ids) {
+      const idFilter = this.buildIdFilter(filters.ids);
+      if (idFilter.sql) {
+        whereClauses.push(idFilter);
+      }
+    }
+
+    // Metadata filters
+    if (filters?.duration) {
+      const durationFilter = this.buildDurationFilter(filters.duration);
+      if (durationFilter.sql) {
+        whereClauses.push(durationFilter);
+      }
+    }
+
+    if (filters?.resolution) {
+      const resolutionFilter = this.buildResolutionFilter(filters.resolution);
+      if (resolutionFilter.sql) {
+        whereClauses.push(resolutionFilter);
+      }
     }
 
     // Add entity filters
