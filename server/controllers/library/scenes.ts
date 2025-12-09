@@ -858,6 +858,51 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
+    const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
+    const requestingUser = req.user;
+
+    // Check if we can use the FAST PATH (pure DB pagination)
+    // Fast path requires: no search, no filters, simple sort field, admin user (no restrictions)
+    const dbSortFields = new Set(['created_at', 'updated_at', 'date', 'title', 'duration', 'filesize', 'bitrate', 'framerate']);
+    const canUseDbPagination =
+      !searchQuery &&
+      !ids &&
+      !scene_filter &&
+      dbSortFields.has(sortField) &&
+      requestingUser?.role === 'ADMIN';
+
+    if (canUseDbPagination) {
+      // FAST PATH: Pure database pagination (sub-second response)
+      logger.info('findScenes: using FAST PATH (DB pagination)');
+
+      const dbStart = Date.now();
+      const { scenes: paginatedScenes, total } = await cachedEntityQueryService.getScenesPaginated({
+        page,
+        perPage,
+        sortField,
+        sortDirection: sortDirection.toUpperCase() as 'ASC' | 'DESC',
+      });
+      logger.info(`findScenes: DB pagination took ${Date.now() - dbStart}ms`);
+
+      // Merge user data for paginated scenes only
+      const mergeStart = Date.now();
+      const scenesWithUserData = await mergeScenesWithUserData(paginatedScenes, userId);
+      logger.info(`findScenes: merge user data took ${Date.now() - mergeStart}ms (${paginatedScenes.length} scenes)`);
+
+      // Add streamability info
+      const scenesWithStreamability = addStreamabilityInfo(scenesWithUserData);
+
+      logger.info(`findScenes: TOTAL request took ${Date.now() - requestStart}ms (FAST PATH)`);
+
+      return res.json({
+        findScenes: {
+          count: total,
+          scenes: scenesWithStreamability,
+        },
+      });
+    }
+
+    // STANDARD PATH: Load all scenes and filter in memory
     // Step 1: Get all scenes from cache
     const cacheStart = Date.now();
     let scenes = await cachedEntityQueryService.getAllScenes();
@@ -897,9 +942,6 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       scene_filter?.performer_favorite !== undefined ||
       scene_filter?.studio_favorite !== undefined ||
       scene_filter?.tag_favorite !== undefined;
-
-    const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
-    const requestingUser = req.user;
 
     if (requiresUserDataForSort || hasExpensiveFilters) {
       // OLD PIPELINE: Merge all → filter → sort → paginate

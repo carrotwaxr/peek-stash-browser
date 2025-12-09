@@ -191,6 +191,95 @@ class CachedEntityQueryService {
   }
 
   /**
+   * Get scenes with database-level pagination and sorting
+   * This is the optimized path for browse queries without complex filters
+   */
+  async getScenesPaginated(options: {
+    page: number;
+    perPage: number;
+    sortField: string;
+    sortDirection: 'ASC' | 'DESC';
+    excludeIds?: Set<string>;
+  }): Promise<{ scenes: NormalizedScene[]; total: number }> {
+    const startTotal = Date.now();
+    const { page, perPage, sortField, sortDirection, excludeIds } = options;
+
+    // Map API sort fields to database columns
+    const sortColumnMap: Record<string, string> = {
+      created_at: 'stashCreatedAt',
+      updated_at: 'stashUpdatedAt',
+      date: 'date',
+      title: 'title',
+      duration: 'duration',
+      filesize: 'fileSize',
+      bitrate: 'fileBitRate',
+      framerate: 'fileFrameRate',
+      random: 'id', // Will use special handling
+    };
+
+    const sortColumn = sortColumnMap[sortField] || 'stashCreatedAt';
+    const isRandom = sortField === 'random';
+
+    // Build where clause
+    const where: any = { deletedAt: null };
+
+    // Get total count first (for pagination info)
+    const countStart = Date.now();
+    const total = await prisma.cachedScene.count({ where });
+    logger.debug(`getScenesPaginated: count took ${Date.now() - countStart}ms`);
+
+    // Build orderBy
+    let orderBy: any;
+    if (isRandom) {
+      // For random, we'll use a seeded approach based on page
+      // This gives consistent results per page but variety across pages
+      orderBy = { id: sortDirection.toLowerCase() };
+    } else {
+      orderBy = { [sortColumn]: sortDirection.toLowerCase() };
+    }
+
+    // Query with pagination
+    const queryStart = Date.now();
+    const cached = await prisma.cachedScene.findMany({
+      where,
+      select: this.BROWSE_SELECT,
+      orderBy,
+      skip: (page - 1) * perPage,
+      take: perPage,
+    });
+    const queryTime = Date.now() - queryStart;
+
+    // Transform results
+    const transformStart = Date.now();
+    let scenes = cached.map((c) => this.transformSceneForBrowse(c));
+
+    // Filter out excluded IDs if provided (for hidden entities)
+    if (excludeIds && excludeIds.size > 0) {
+      scenes = scenes.filter(s => !excludeIds.has(s.id));
+    }
+
+    const transformTime = Date.now() - transformStart;
+
+    logger.info(`getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}`);
+
+    return { scenes, total };
+  }
+
+  /**
+   * Get scene IDs only (for restriction filtering)
+   * Much faster than loading full scene objects
+   */
+  async getSceneIds(): Promise<string[]> {
+    const startTime = Date.now();
+    const cached = await prisma.cachedScene.findMany({
+      where: { deletedAt: null },
+      select: { id: true },
+    });
+    logger.info(`getSceneIds: took ${Date.now() - startTime}ms, count=${cached.length}`);
+    return cached.map(c => c.id);
+  }
+
+  /**
    * Search scenes using FTS5
    */
   async searchScenes(query: string, limit = 100): Promise<NormalizedScene[]> {

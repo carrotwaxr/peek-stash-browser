@@ -460,6 +460,12 @@ model CachedScene {
     @@index([deletedAt])
     @@index([oCounter])
     @@index([playCount])
+    // Compound indexes for efficient browse queries (deletedAt filter + sort)
+    @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "CachedScene_browse_idx")
+    @@index([deletedAt, stashUpdatedAt(sort: Desc)], map: "CachedScene_browse_updated_idx")
+    @@index([deletedAt, date(sort: Desc)], map: "CachedScene_browse_date_idx")
+    @@index([deletedAt, title], map: "CachedScene_browse_title_idx")
+    @@index([deletedAt, duration(sort: Desc)], map: "CachedScene_browse_duration_idx")
 }
 
 model CachedPerformer {
