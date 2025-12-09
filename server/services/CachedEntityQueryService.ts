@@ -9,6 +9,7 @@
  */
 
 import prisma from "../prisma/singleton.js";
+import { stashInstanceManager } from "./StashInstanceManager.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
@@ -653,8 +654,16 @@ class CachedEntityQueryService {
    * All scenes have the same stream formats - only the ID varies
    * This eliminates storing ~4.4KB of redundant JSON per scene
    * Public so it can be used to populate streams for scene detail views
+   *
+   * Returns absolute Stash URLs (without API key) matching original Stash format.
+   * The client will rewrite these to Peek proxy endpoints.
    */
   public generateSceneStreams(sceneId: string): Array<{url: string; mime_type: string; label: string}> {
+    // Get Stash base URL (without /graphql path)
+    const config = stashInstanceManager.getDefaultConfig();
+    const stashUrl = new URL(config.url);
+    const baseUrl = `${stashUrl.protocol}//${stashUrl.host}`;
+
     const formats = [
       { ext: '', mime: 'video/mp4', label: 'Direct stream', resolution: null },
       { ext: '.mp4', mime: 'video/mp4', label: 'MP4', resolution: 'ORIGINAL' },
@@ -672,10 +681,12 @@ class CachedEntityQueryService {
     ];
 
     return formats.map(f => {
-      const basePath = `/scene/${sceneId}/stream${f.ext}`;
-      const fullPath = f.resolution ? `${basePath}?resolution=${f.resolution}` : basePath;
+      const streamPath = `/scene/${sceneId}/stream${f.ext}`;
+      const fullUrl = f.resolution
+        ? `${baseUrl}${streamPath}?resolution=${f.resolution}`
+        : `${baseUrl}${streamPath}`;
       return {
-        url: `/api/proxy/stash?path=${encodeURIComponent(fullPath)}`,
+        url: fullUrl,
         mime_type: f.mime,
         label: f.label,
       };
