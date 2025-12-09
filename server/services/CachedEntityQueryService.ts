@@ -86,6 +86,43 @@ const DEFAULT_GROUP_USER_FIELDS = {
 };
 
 class CachedEntityQueryService {
+  // Columns to select for browse queries (excludes heavy streams/data columns)
+  private readonly BROWSE_SELECT = {
+    id: true,
+    stashInstanceId: true,
+    title: true,
+    code: true,
+    date: true,
+    studioId: true,
+    rating100: true,
+    duration: true,
+    organized: true,
+    details: true,
+    filePath: true,
+    fileBitRate: true,
+    fileFrameRate: true,
+    fileWidth: true,
+    fileHeight: true,
+    fileVideoCodec: true,
+    fileAudioCodec: true,
+    fileSize: true,
+    pathScreenshot: true,
+    pathPreview: true,
+    pathSprite: true,
+    pathVtt: true,
+    pathChaptersVtt: true,
+    pathStream: true,
+    pathCaption: true,
+    // Explicitly NOT selecting: streams, data
+    oCounter: true,
+    playCount: true,
+    playDuration: true,
+    stashCreatedAt: true,
+    stashUpdatedAt: true,
+    syncedAt: true,
+    deletedAt: true,
+  } as const;
+
   // ==================== Scene Queries ====================
 
   /**
@@ -93,11 +130,21 @@ class CachedEntityQueryService {
    * Returns scenes with default user fields (not merged with user-specific data)
    */
   async getAllScenes(): Promise<NormalizedScene[]> {
+    const startTotal = Date.now();
+
+    const queryStart = Date.now();
     const cached = await prisma.cachedScene.findMany({
       where: { deletedAt: null },
     });
+    const queryTime = Date.now() - queryStart;
 
-    return cached.map((c) => this.transformScene(c));
+    const transformStart = Date.now();
+    const result = cached.map((c) => this.transformScene(c));
+    const transformTime = Date.now() - transformStart;
+
+    logger.info(`getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+
+    return result;
   }
 
   /**
@@ -192,11 +239,21 @@ class CachedEntityQueryService {
    * Get all performers from cache
    */
   async getAllPerformers(): Promise<NormalizedPerformer[]> {
+    const startTotal = Date.now();
+
+    const queryStart = Date.now();
     const cached = await prisma.cachedPerformer.findMany({
       where: { deletedAt: null },
     });
+    const queryTime = Date.now() - queryStart;
 
-    return cached.map((c) => this.transformPerformer(c));
+    const transformStart = Date.now();
+    const result = cached.map((c) => this.transformPerformer(c));
+    const transformTime = Date.now() - transformStart;
+
+    logger.info(`getAllPerformers: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+
+    return result;
   }
 
   /**
@@ -269,11 +326,21 @@ class CachedEntityQueryService {
    * Get all studios from cache
    */
   async getAllStudios(): Promise<NormalizedStudio[]> {
+    const startTotal = Date.now();
+
+    const queryStart = Date.now();
     const cached = await prisma.cachedStudio.findMany({
       where: { deletedAt: null },
     });
+    const queryTime = Date.now() - queryStart;
 
-    return cached.map((c) => this.transformStudio(c));
+    const transformStart = Date.now();
+    const result = cached.map((c) => this.transformStudio(c));
+    const transformTime = Date.now() - transformStart;
+
+    logger.info(`getAllStudios: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+
+    return result;
   }
 
   /**
@@ -317,11 +384,21 @@ class CachedEntityQueryService {
    * Get all tags from cache
    */
   async getAllTags(): Promise<NormalizedTag[]> {
+    const startTotal = Date.now();
+
+    const queryStart = Date.now();
     const cached = await prisma.cachedTag.findMany({
       where: { deletedAt: null },
     });
+    const queryTime = Date.now() - queryStart;
 
-    return cached.map((c) => this.transformTag(c));
+    const transformStart = Date.now();
+    const result = cached.map((c) => this.transformTag(c));
+    const transformTime = Date.now() - transformStart;
+
+    logger.info(`getAllTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+
+    return result;
   }
 
   /**
