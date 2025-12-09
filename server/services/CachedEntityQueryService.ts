@@ -710,6 +710,67 @@ class CachedEntityQueryService {
     } as unknown as NormalizedScene;
   }
 
+  /**
+   * Transform scene for browse queries (no streams - generated on demand)
+   */
+  private transformSceneForBrowse(scene: any): NormalizedScene {
+    return {
+      // User fields (defaults first, then override with actual values)
+      ...DEFAULT_SCENE_USER_FIELDS,
+
+      id: scene.id,
+      title: scene.title,
+      code: scene.code,
+      date: scene.date,
+      details: scene.details,
+      rating100: scene.rating100,
+      organized: scene.organized,
+
+      // File metadata
+      files: scene.filePath ? [{
+        path: scene.filePath,
+        duration: scene.duration,
+        bit_rate: scene.fileBitRate,
+        frame_rate: scene.fileFrameRate,
+        width: scene.fileWidth,
+        height: scene.fileHeight,
+        video_codec: scene.fileVideoCodec,
+        audio_codec: scene.fileAudioCodec,
+        size: scene.fileSize ? Number(scene.fileSize) : null,
+      }] : [],
+
+      // Transformed URLs
+      paths: {
+        screenshot: this.transformUrl(scene.pathScreenshot),
+        preview: this.transformUrl(scene.pathPreview),
+        sprite: this.transformUrl(scene.pathSprite),
+        vtt: this.transformUrl(scene.pathVtt),
+        chapters_vtt: this.transformUrl(scene.pathChaptersVtt),
+        stream: this.transformUrl(scene.pathStream),
+        caption: this.transformUrl(scene.pathCaption),
+      },
+
+      // Empty sceneStreams for browse - generated on demand for playback
+      sceneStreams: [],
+
+      // Stash counters (override defaults)
+      o_counter: scene.oCounter ?? 0,
+      play_count: scene.playCount ?? 0,
+      play_duration: scene.playDuration ?? 0,
+
+      // Timestamps
+      created_at: scene.stashCreatedAt?.toISOString() ?? null,
+      updated_at: scene.stashUpdatedAt?.toISOString() ?? null,
+
+      // Nested entities (empty - loaded separately or via include)
+      studio: null,
+      performers: [],
+      tags: [],
+      groups: [],
+      galleries: [],
+    } as unknown as NormalizedScene;
+  }
+
   private transformSceneWithRelations(scene: any): NormalizedScene {
     const base = this.transformScene(scene);
 
