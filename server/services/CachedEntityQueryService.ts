@@ -135,11 +135,12 @@ class CachedEntityQueryService {
     const queryStart = Date.now();
     const cached = await prisma.cachedScene.findMany({
       where: { deletedAt: null },
+      select: this.BROWSE_SELECT,
     });
     const queryTime = Date.now() - queryStart;
 
     const transformStart = Date.now();
-    const result = cached.map((c) => this.transformScene(c));
+    const result = cached.map((c) => this.transformSceneForBrowse(c));
     const transformTime = Date.now() - transformStart;
 
     logger.info(`getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
