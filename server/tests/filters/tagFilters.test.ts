@@ -16,24 +16,24 @@ describe("Tag Filters", () => {
   });
 
   describe("ID Filter", () => {
-    it("should filter tags by single ID", () => {
+    it("should filter tags by single ID", async () => {
       const filter: PeekTagFilter = {
         ids: [mockTags[0].id],
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       expect(result.length).toBe(1);
       expect(result[0].id).toBe(mockTags[0].id);
     });
 
-    it("should filter tags by multiple IDs", () => {
+    it("should filter tags by multiple IDs", async () => {
       const targetIds = [mockTags[0].id, mockTags[5].id, mockTags[10].id];
       const filter: PeekTagFilter = {
         ids: targetIds,
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       expect(result.length).toBe(3);
       result.forEach((tag) => {
@@ -41,34 +41,34 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should return empty array when filtering by non-existent ID", () => {
+    it("should return empty array when filtering by non-existent ID", async () => {
       const filter: PeekTagFilter = {
         ids: ["nonexistent-id"],
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       expect(result.length).toBe(0);
     });
 
-    it("should return all tags when ids is empty array", () => {
+    it("should return all tags when ids is empty array", async () => {
       const filter: PeekTagFilter = {
         ids: [],
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       expect(result.length).toBe(mockTags.length);
     });
   });
 
   describe("Favorite Filter", () => {
-    it("should filter favorite tags when favorite=true", () => {
+    it("should filter favorite tags when favorite=true", async () => {
       const filter: PeekTagFilter = {
         favorite: true,
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.favorite).toBe(true);
@@ -77,12 +77,12 @@ describe("Tag Filters", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it("should filter non-favorite tags when favorite=false", () => {
+    it("should filter non-favorite tags when favorite=false", async () => {
       const filter: PeekTagFilter = {
         favorite: false,
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.favorite).toBe(false);
@@ -91,21 +91,21 @@ describe("Tag Filters", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it("should return all tags when favorite filter not specified", () => {
-      const result = applyTagFilters(mockTags, {});
+    it("should return all tags when favorite filter not specified", async () => {
+      const result = await applyTagFilters(mockTags, {});
 
       expect(result.length).toBe(mockTags.length);
     });
   });
 
   describe("Rating Filter", () => {
-    it("should filter by rating100 with GREATER_THAN modifier", () => {
+    it("should filter by rating100 with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekTagFilter = {
         rating100: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const rating = tag.rating100 || 0;
@@ -113,40 +113,40 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by rating100 with EQUALS modifier", () => {
+    it("should filter by rating100 with EQUALS modifier", async () => {
       const rating = 80;
       const filter: PeekTagFilter = {
         rating100: { value: rating, modifier: "EQUALS" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.rating100).toBe(rating);
       });
     });
 
-    it("should filter by rating100 with NOT_EQUALS modifier", () => {
+    it("should filter by rating100 with NOT_EQUALS modifier", async () => {
       const rating = 0;
       const filter: PeekTagFilter = {
         rating100: { value: rating, modifier: "NOT_EQUALS" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.rating100).not.toBe(rating);
       });
     });
 
-    it("should filter by rating100 with BETWEEN modifier", () => {
+    it("should filter by rating100 with BETWEEN modifier", async () => {
       const min = 20;
       const max = 80;
       const filter: PeekTagFilter = {
         rating100: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const rating = tag.rating100 || 0;
@@ -157,13 +157,13 @@ describe("Tag Filters", () => {
   });
 
   describe("O Counter Filter", () => {
-    it("should filter by o_counter with GREATER_THAN modifier", () => {
+    it("should filter by o_counter with GREATER_THAN modifier", async () => {
       const threshold = 5;
       const filter: PeekTagFilter = {
         o_counter: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const oCounter = tag.o_counter || 0;
@@ -171,27 +171,27 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by o_counter with EQUALS modifier", () => {
+    it("should filter by o_counter with EQUALS modifier", async () => {
       const count = 10;
       const filter: PeekTagFilter = {
         o_counter: { value: count, modifier: "EQUALS" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.o_counter).toBe(count);
       });
     });
 
-    it("should filter by o_counter with BETWEEN modifier", () => {
+    it("should filter by o_counter with BETWEEN modifier", async () => {
       const min = 5;
       const max = 20;
       const filter: PeekTagFilter = {
         o_counter: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const oCounter = tag.o_counter || 0;
@@ -202,13 +202,13 @@ describe("Tag Filters", () => {
   });
 
   describe("Play Count Filter", () => {
-    it("should filter by play_count with GREATER_THAN modifier", () => {
+    it("should filter by play_count with GREATER_THAN modifier", async () => {
       const threshold = 10;
       const filter: PeekTagFilter = {
         play_count: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const playCount = tag.play_count || 0;
@@ -216,13 +216,13 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by play_count with LESS_THAN modifier", () => {
+    it("should filter by play_count with LESS_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekTagFilter = {
         play_count: { value: threshold, modifier: "LESS_THAN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const playCount = tag.play_count || 0;
@@ -230,14 +230,14 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by play_count with BETWEEN modifier", () => {
+    it("should filter by play_count with BETWEEN modifier", async () => {
       const min = 20;
       const max = 60;
       const filter: PeekTagFilter = {
         play_count: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const playCount = tag.play_count || 0;
@@ -248,13 +248,13 @@ describe("Tag Filters", () => {
   });
 
   describe("Scene Count Filter", () => {
-    it("should filter by scene_count with GREATER_THAN modifier", () => {
+    it("should filter by scene_count with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekTagFilter = {
         scene_count: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const sceneCount = tag.scene_count || 0;
@@ -262,13 +262,13 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by scene_count with LESS_THAN modifier", () => {
+    it("should filter by scene_count with LESS_THAN modifier", async () => {
       const threshold = 100;
       const filter: PeekTagFilter = {
         scene_count: { value: threshold, modifier: "LESS_THAN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const sceneCount = tag.scene_count || 0;
@@ -276,14 +276,14 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by scene_count with BETWEEN modifier", () => {
+    it("should filter by scene_count with BETWEEN modifier", async () => {
       const min = 30;
       const max = 150;
       const filter: PeekTagFilter = {
         scene_count: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         const sceneCount = tag.scene_count || 0;
@@ -294,7 +294,7 @@ describe("Tag Filters", () => {
   });
 
   describe("Text Search Filters", () => {
-    it("should filter by name (case-insensitive)", () => {
+    it("should filter by name (case-insensitive)", async () => {
       const searchTerm = "Tag";
       const filter: PeekTagFilter = {
         name: {
@@ -303,7 +303,7 @@ describe("Tag Filters", () => {
         },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.name.toLowerCase()).toContain(searchTerm.toLowerCase());
@@ -312,7 +312,7 @@ describe("Tag Filters", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it("should filter by description (case-insensitive)", () => {
+    it("should filter by description (case-insensitive)", async () => {
       const mockTagWithDescription = createMockTag({
         id: "description-test",
         description: "This is a test tag with special description",
@@ -326,7 +326,7 @@ describe("Tag Filters", () => {
         },
       };
 
-      const result = applyTagFilters(tagsWithDescription, filter);
+      const result = await applyTagFilters(tagsWithDescription, filter);
 
       result.forEach((tag) => {
         expect((tag.description || "").toLowerCase()).toContain("special");
@@ -337,7 +337,7 @@ describe("Tag Filters", () => {
   });
 
   describe("Date Filters", () => {
-    it("should filter by created_at with GREATER_THAN modifier", () => {
+    it("should filter by created_at with GREATER_THAN modifier", async () => {
       const threshold = new Date(Date.now() - 60 * 86400000); // 60 days ago
       const filter: PeekTagFilter = {
         created_at: {
@@ -346,7 +346,7 @@ describe("Tag Filters", () => {
         },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.created_at).toBeTruthy();
@@ -355,7 +355,7 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by created_at with BETWEEN modifier", () => {
+    it("should filter by created_at with BETWEEN modifier", async () => {
       const min = new Date(Date.now() - 90 * 86400000);
       const max = new Date(Date.now() - 30 * 86400000);
       const filter: PeekTagFilter = {
@@ -366,7 +366,7 @@ describe("Tag Filters", () => {
         },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.created_at).toBeTruthy();
@@ -376,7 +376,7 @@ describe("Tag Filters", () => {
       });
     });
 
-    it("should filter by updated_at with LESS_THAN modifier", () => {
+    it("should filter by updated_at with LESS_THAN modifier", async () => {
       const threshold = new Date(Date.now() - 7 * 86400000); // 7 days ago
       const filter: PeekTagFilter = {
         updated_at: {
@@ -385,7 +385,7 @@ describe("Tag Filters", () => {
         },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.updated_at).toBeTruthy();
@@ -396,14 +396,14 @@ describe("Tag Filters", () => {
   });
 
   describe("Multiple Combined Filters", () => {
-    it("should apply multiple filters together (AND logic)", () => {
+    it("should apply multiple filters together (AND logic)", async () => {
       const filter: PeekTagFilter = {
         favorite: true,
         rating100: { value: 60, modifier: "GREATER_THAN" },
         scene_count: { value: 30, modifier: "GREATER_THAN" },
       };
 
-      const result = applyTagFilters(mockTags, filter);
+      const result = await applyTagFilters(mockTags, filter);
 
       result.forEach((tag) => {
         expect(tag.favorite).toBe(true);
@@ -414,19 +414,19 @@ describe("Tag Filters", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle null filter gracefully", () => {
-      const result = applyTagFilters(mockTags, null);
+    it("should handle null filter gracefully", async () => {
+      const result = await applyTagFilters(mockTags, null);
 
       expect(result.length).toBe(mockTags.length);
     });
 
-    it("should handle undefined filter gracefully", () => {
-      const result = applyTagFilters(mockTags, undefined);
+    it("should handle undefined filter gracefully", async () => {
+      const result = await applyTagFilters(mockTags, undefined);
 
       expect(result.length).toBe(mockTags.length);
     });
 
-    it("should handle tags with missing created_at when filtering by date", () => {
+    it("should handle tags with missing created_at when filtering by date", async () => {
       const tagWithoutDate = createMockTag({
         id: "no-date",
         created_at: undefined,
@@ -440,20 +440,20 @@ describe("Tag Filters", () => {
         },
       };
 
-      const result = applyTagFilters(tagsWithMissing, filter);
+      const result = await applyTagFilters(tagsWithMissing, filter);
 
       // Tag without created_at should be excluded
       expect(result.every((t) => t.id !== "no-date")).toBe(true);
     });
 
-    it("should handle tags without ratings correctly", () => {
+    it("should handle tags without ratings correctly", async () => {
       const tagsWithNullRatings = mockTags.filter((t) => !t.rating100);
 
       const filter: PeekTagFilter = {
         rating100: { value: 0, modifier: "GREATER_THAN" },
       };
 
-      const result = applyTagFilters(tagsWithNullRatings, filter);
+      const result = await applyTagFilters(tagsWithNullRatings, filter);
 
       // Tags with null ratings should be treated as 0
       expect(result.length).toBe(0);

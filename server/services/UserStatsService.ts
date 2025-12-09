@@ -1,6 +1,6 @@
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
-import { stashCacheManager } from "./StashCacheManager.js";
+import { cachedEntityQueryService } from "./CachedEntityQueryService.js";
 
 /**
  * UserStatsService
@@ -142,7 +142,7 @@ class UserStatsService {
   ): Promise<void> {
     try {
       // Get scene from cache to find all related entities
-      const scene = stashCacheManager.getScene(sceneId);
+      const scene = await cachedEntityQueryService.getScene(sceneId);
       if (!scene) {
         logger.warn("Scene not found in cache for stats update", { sceneId });
         return;
@@ -355,8 +355,13 @@ class UserStatsService {
         }
       >();
 
+      // Batch load all scenes for the watch history
+      const sceneIds = watchHistory.map((wh) => wh.sceneId);
+      const scenes = await cachedEntityQueryService.getScenesByIds(sceneIds);
+      const sceneMap = new Map(scenes.map((s) => [s.id, s]));
+
       for (const wh of watchHistory) {
-        const scene = stashCacheManager.getScene(wh.sceneId);
+        const scene = sceneMap.get(wh.sceneId);
         if (!scene) continue;
 
         // Parse O history for timestamps

@@ -2,7 +2,7 @@ import type { Response } from "express";
 import type { Prisma } from "@prisma/client";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
-import { stashCacheManager } from "../services/StashCacheManager.js";
+import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
 import { userRestrictionService } from "../services/UserRestrictionService.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
 import {
@@ -295,13 +295,13 @@ export async function executeCarouselQuery(
   direction: string
 ): Promise<NormalizedScene[]> {
   // Get all scenes from cache
-  let scenes = stashCacheManager.getAllScenes();
+  let scenes = await cachedEntityQueryService.getAllScenes();
 
   // Apply user content restrictions (hidden entities, exclusions)
   scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
 
   // Apply the carousel's filter rules (quick filters that don't need user data)
-  scenes = applyQuickSceneFilters(scenes, rules);
+  scenes = await applyQuickSceneFilters(scenes, rules);
 
   // Merge with user-specific data (ratings, watch history, favorites)
   scenes = await mergeScenesWithUserData(scenes, userId);

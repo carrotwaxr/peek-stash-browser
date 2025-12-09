@@ -1,9 +1,9 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import {
@@ -79,10 +79,10 @@ async function mergeImagesWithUserData(
 /**
  * Apply gallery filters
  */
-export function applyGalleryFilters(
+export async function applyGalleryFilters(
   galleries: NormalizedGallery[],
   filters: PeekGalleryFilter | null | undefined
-): NormalizedGallery[] {
+): Promise<NormalizedGallery[]> {
   if (!filters) return galleries;
 
   let filtered = galleries;
@@ -154,7 +154,7 @@ export function applyGalleryFilters(
     const { value: studioIds, depth } = filters.studios;
     // Expand studio IDs to include descendants if depth is specified
     const expandedStudioIds = new Set(
-      expandStudioIds(
+      await expandStudioIds(
         studioIds.map((id: string) => String(id)),
         depth ?? 0
       )
@@ -178,7 +178,7 @@ export function applyGalleryFilters(
     const { value: tagIds, depth } = filters.tags;
     // Expand tag IDs to include descendants if depth is specified
     const expandedTagIds = new Set(
-      expandTagIds(
+      await expandTagIds(
         tagIds.map((id: string) => String(id)),
         depth ?? 0
       )
@@ -260,7 +260,7 @@ export const findGalleries = async (
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
-    let galleries = stashCacheManager.getAllGalleries();
+    let galleries = await cachedEntityQueryService.getAllGalleries();
 
     if (galleries.length === 0) {
       logger.warn("Gallery cache not initialized, returning empty result");
@@ -277,7 +277,7 @@ export const findGalleries = async (
 
     // Step 2.5: Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
 
     // Try to get filtered galleries from cache
     let filteredGalleries = filteredEntityCacheService.get(
@@ -340,7 +340,7 @@ export const findGalleries = async (
 
     // Step 4: Apply filters (merge root-level ids with gallery_filter)
     const mergedFilter = { ...gallery_filter, ids: ids || gallery_filter?.ids };
-    galleries = applyGalleryFilters(galleries, mergedFilter);
+    galleries = await applyGalleryFilters(galleries, mergedFilter);
 
     // Step 5: Sort
     galleries = sortGalleries(galleries, sortField, sortDirection);
@@ -385,7 +385,7 @@ export const findGalleryById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    let gallery = stashCacheManager.getGallery(id);
+    let gallery = await cachedEntityQueryService.getGallery(id);
 
     if (!gallery) {
       return res.status(404).json({ error: "Gallery not found" });
@@ -401,8 +401,12 @@ export const findGalleryById = async (
 
     // Hydrate performers with full cached data
     if (mergedGallery.performers && mergedGallery.performers.length > 0) {
+      const performerIds = mergedGallery.performers.map((p) => p.id);
+      const cachedPerformers = await cachedEntityQueryService.getPerformersByIds(performerIds);
+      const performerMap = new Map(cachedPerformers.map((p) => [p.id, p]));
+
       mergedGallery.performers = mergedGallery.performers.map((performer) => {
-        const cachedPerformer = stashCacheManager.getPerformer(performer.id);
+        const cachedPerformer = performerMap.get(performer.id);
         if (cachedPerformer) {
           // Return full performer data from cache
           return cachedPerformer;
@@ -421,7 +425,7 @@ export const findGalleryById = async (
 
     // Hydrate studio with full cached data
     if (mergedGallery.studio && mergedGallery.studio.id) {
-      const cachedStudio = stashCacheManager.getStudio(mergedGallery.studio.id);
+      const cachedStudio = await cachedEntityQueryService.getStudio(mergedGallery.studio.id);
       if (cachedStudio) {
         // Type assertion: Gallery.studio typed as Studio, but we hydrate with NormalizedStudio
         mergedGallery.studio =
@@ -436,8 +440,12 @@ export const findGalleryById = async (
 
     // Hydrate tags with full cached data
     if (mergedGallery.tags && mergedGallery.tags.length > 0) {
+      const tagIds = mergedGallery.tags.map((t) => t.id);
+      const cachedTags = await cachedEntityQueryService.getTagsByIds(tagIds);
+      const tagMap = new Map(cachedTags.map((t) => [t.id, t]));
+
       mergedGallery.tags = mergedGallery.tags.map((tag) => {
-        const cachedTag = stashCacheManager.getTag(tag.id);
+        const cachedTag = tagMap.get(tag.id);
         if (cachedTag) {
           return cachedTag;
         }
@@ -477,7 +485,7 @@ export const findGalleriesMinimal = async (
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
-    let galleries = stashCacheManager.getAllGalleries();
+    let galleries = await cachedEntityQueryService.getAllGalleries();
 
     if (galleries.length === 0) {
       logger.warn("Gallery cache not initialized, returning empty result");

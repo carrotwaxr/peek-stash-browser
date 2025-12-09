@@ -11,7 +11,7 @@
  *   1, 2, 3...: Specific depth levels
  */
 
-import { stashCacheManager } from "../services/StashCacheManager.js";
+import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
 
 /**
  * Get all descendant tag IDs for a given tag ID
@@ -20,10 +20,10 @@ import { stashCacheManager } from "../services/StashCacheManager.js";
  * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
  * @returns Set of tag IDs including the original and all descendants up to depth
  */
-export function getDescendantTagIds(
+export async function getDescendantTagIds(
   tagId: string,
   depth: number
-): Set<string> {
+): Promise<Set<string>> {
   const result = new Set<string>();
   result.add(tagId);
 
@@ -32,7 +32,7 @@ export function getDescendantTagIds(
     return result;
   }
 
-  const allTags = stashCacheManager.getAllTags();
+  const allTags = await cachedEntityQueryService.getAllTags();
 
   // Build a map of tag ID to its children for O(1) lookups
   const childrenMap = new Map<string, string[]>();
@@ -77,10 +77,10 @@ export function getDescendantTagIds(
  * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
  * @returns Set of studio IDs including the original and all descendants up to depth
  */
-export function getDescendantStudioIds(
+export async function getDescendantStudioIds(
   studioId: string,
   depth: number
-): Set<string> {
+): Promise<Set<string>> {
   const result = new Set<string>();
   result.add(studioId);
 
@@ -89,7 +89,7 @@ export function getDescendantStudioIds(
     return result;
   }
 
-  const allStudios = stashCacheManager.getAllStudios();
+  const allStudios = await cachedEntityQueryService.getAllStudios();
 
   // Build a map of studio ID to its children for O(1) lookups
   const childrenMap = new Map<string, string[]>();
@@ -134,14 +134,14 @@ export function getDescendantStudioIds(
  * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
  * @returns Array of expanded tag IDs (original + descendants)
  */
-export function expandTagIds(tagIds: string[], depth: number): string[] {
+export async function expandTagIds(tagIds: string[], depth: number): Promise<string[]> {
   if (depth === 0 || !tagIds || tagIds.length === 0) {
     return tagIds;
   }
 
   const expandedSet = new Set<string>();
   for (const tagId of tagIds) {
-    const descendants = getDescendantTagIds(String(tagId), depth);
+    const descendants = await getDescendantTagIds(String(tagId), depth);
     for (const id of descendants) {
       expandedSet.add(id);
     }
@@ -157,14 +157,14 @@ export function expandTagIds(tagIds: string[], depth: number): string[] {
  * @param depth - How deep to traverse (-1 for infinite, 0 for none, N for N levels)
  * @returns Array of expanded studio IDs (original + descendants)
  */
-export function expandStudioIds(studioIds: string[], depth: number): string[] {
+export async function expandStudioIds(studioIds: string[], depth: number): Promise<string[]> {
   if (depth === 0 || !studioIds || studioIds.length === 0) {
     return studioIds;
   }
 
   const expandedSet = new Set<string>();
   for (const studioId of studioIds) {
-    const descendants = getDescendantStudioIds(String(studioId), depth);
+    const descendants = await getDescendantStudioIds(String(studioId), depth);
     for (const id of descendants) {
       expandedSet.add(id);
     }

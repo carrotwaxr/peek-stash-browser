@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
@@ -170,10 +170,10 @@ export function addStreamabilityInfo(
  * Apply quick scene filters (don't require merged user data)
  * These filters only access data already present in the scene object from cache
  */
-export function applyQuickSceneFilters(
+export async function applyQuickSceneFilters(
   scenes: NormalizedScene[],
   filters: PeekSceneFilter | null | undefined
-): NormalizedScene[] {
+): Promise<NormalizedScene[]> {
   if (!filters) return scenes;
 
   let filtered = scenes;
@@ -218,10 +218,19 @@ export function applyQuickSceneFilters(
 
     // Expand tag IDs to include descendants if depth is specified
     // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
-    const expandedTagIds = expandTagIds(
+    const expandedTagIds = await expandTagIds(
       tagIds.map((id) => String(id)),
       depth ?? 0
     );
+
+    // Pre-compute expanded sets for each individual tag (needed for INCLUDES_ALL)
+    const expandedTagSets = new Map<string, string[]>();
+    if (modifier === "INCLUDES_ALL") {
+      for (const originalTagId of tagIds) {
+        const expanded = await expandTagIds([String(originalTagId)], depth ?? 0);
+        expandedTagSets.set(String(originalTagId), expanded);
+      }
+    }
 
     filtered = filtered.filter((s) => {
       // Collect all tag IDs from scene, performers, and studio
@@ -247,10 +256,7 @@ export function applyQuickSceneFilters(
         // For INCLUDES_ALL with hierarchy, we check that the scene has at least
         // one tag from each original filter tag's expanded set
         return tagIds.every((originalTagId) => {
-          const expandedForThisTag = expandTagIds(
-            [String(originalTagId)],
-            depth ?? 0
-          );
+          const expandedForThisTag = expandedTagSets.get(String(originalTagId)) || [];
           return expandedForThisTag.some((id) => allTagIds.has(id));
         });
       }
@@ -270,7 +276,7 @@ export function applyQuickSceneFilters(
     // Expand studio IDs to include descendants if depth is specified
     // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
     const expandedStudioIds = new Set(
-      expandStudioIds(
+      await expandStudioIds(
         studioIds.map((id) => String(id)),
         depth ?? 0
       )
@@ -847,7 +853,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all scenes from cache
-    let scenes = stashCacheManager.getAllScenes();
+    let scenes = await cachedEntityQueryService.getAllScenes();
 
     if (scenes.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -917,7 +923,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       // Step 4: Apply all filters (quick + expensive)
-      scenes = applyQuickSceneFilters(scenes, mergedFilter);
+      scenes = await applyQuickSceneFilters(scenes, mergedFilter);
       scenes = applyExpensiveSceneFilters(scenes, mergedFilter);
 
       // Step 5: Apply content restrictions and hidden entity filtering
@@ -975,7 +981,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       // Step 3: Apply quick filters (don't need user data)
-      scenes = applyQuickSceneFilters(scenes, mergedFilter);
+      scenes = await applyQuickSceneFilters(scenes, mergedFilter);
 
       // Step 4: Apply content restrictions and hidden entity filtering
       // Hidden entities are ALWAYS filtered (for all users including admins)
@@ -1083,7 +1089,7 @@ export const findSimilarScenes = async (
 
     // Get all scenes from cache and filter hidden entities
     // All users (including admins) should have their hidden entities filtered
-    let allScenes = stashCacheManager.getAllScenes();
+    let allScenes = await cachedEntityQueryService.getAllScenes();
     allScenes = await userRestrictionService.filterScenesForUser(
       allScenes,
       userId,
@@ -1319,7 +1325,7 @@ export const getRecommendedScenes = async (
 
     // Get all scenes and filter hidden entities
     // All users (including admins) should have their hidden entities filtered
-    let allScenes = stashCacheManager.getAllScenes();
+    let allScenes = await cachedEntityQueryService.getAllScenes();
     allScenes = await userRestrictionService.filterScenesForUser(
       allScenes,
       userId,

@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Request, Response } from "express";
 import { StashApp } from "stashapp-api";
-import { stashCacheManager } from "../services/StashCacheManager.js";
+import { stashSyncService } from "../services/StashSyncService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
 
@@ -306,7 +306,7 @@ export const createFirstStashInstance = async (req: Request, res: Response) => {
     // Initialize the Stash cache now that we have an instance
     // This runs in the background - we don't want to block the response
     logger.info("Triggering Stash cache initialization...");
-    stashCacheManager.reinitialize().catch((err) => {
+    stashSyncService.fullSync().catch((err) => {
       logger.error("Failed to initialize Stash cache after instance creation", {
         error: err instanceof Error ? err.message : String(err),
       });

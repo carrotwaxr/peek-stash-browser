@@ -8,8 +8,8 @@ import { initializeDatabase } from "./initializers/database.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
-import { stashCacheManager } from "./services/StashCacheManager.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
+import { stashSyncService } from "./services/StashSyncService.js";
 import { logger } from "./utils/logger.js";
 
 const prisma = new PrismaClient();
@@ -70,11 +70,11 @@ main().catch(async (e) => {
 
 // Cleanup on exit
 process.on("SIGTERM", async () => {
-  stashCacheManager.cleanup();
+  stashSyncService.abort();
   await prisma.$disconnect();
 });
 
 process.on("SIGINT", async () => {
-  stashCacheManager.cleanup();
+  stashSyncService.abort();
   await prisma.$disconnect();
 });

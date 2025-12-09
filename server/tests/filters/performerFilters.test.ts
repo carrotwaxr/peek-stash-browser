@@ -24,25 +24,25 @@ describe("Performer Filters", () => {
   });
 
   describe("ID Filter", () => {
-    it("should filter performers by single ID", () => {
+    it("should filter performers by single ID", async () => {
       const targetId = mockPerformers[0].id;
       const filter: PeekPerformerFilter = {
         ids: [targetId],
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe(targetId);
     });
 
-    it("should filter performers by multiple IDs", () => {
+    it("should filter performers by multiple IDs", async () => {
       const targetIds = [mockPerformers[0].id, mockPerformers[5].id, mockPerformers[10].id];
       const filter: PeekPerformerFilter = {
         ids: targetIds,
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       expect(result).toHaveLength(3);
       result.forEach((performer) => {
@@ -50,34 +50,34 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should return all performers when ids array is empty", () => {
+    it("should return all performers when ids array is empty", async () => {
       const filter: PeekPerformerFilter = {
         ids: [],
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       expect(result).toHaveLength(mockPerformers.length);
     });
 
-    it("should return empty array when no performers match the IDs", () => {
+    it("should return empty array when no performers match the IDs", async () => {
       const filter: PeekPerformerFilter = {
         ids: ["non-existent-id"],
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       expect(result).toHaveLength(0);
     });
   });
 
   describe("Favorite Filter", () => {
-    it("should filter favorite performers when favorite=true", () => {
+    it("should filter favorite performers when favorite=true", async () => {
       const filter: PeekPerformerFilter = {
         favorite: true,
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.favorite).toBe(true);
@@ -86,12 +86,12 @@ describe("Performer Filters", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it("should filter non-favorite performers when favorite=false", () => {
+    it("should filter non-favorite performers when favorite=false", async () => {
       const filter: PeekPerformerFilter = {
         favorite: false,
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.favorite).toBe(false);
@@ -100,44 +100,44 @@ describe("Performer Filters", () => {
       expect(result.length).toBeGreaterThan(0);
     });
 
-    it("should return all performers when favorite filter not specified", () => {
-      const result = applyPerformerFilters(mockPerformers, {});
+    it("should return all performers when favorite filter not specified", async () => {
+      const result = await applyPerformerFilters(mockPerformers, {});
 
       expect(result).toHaveLength(mockPerformers.length);
     });
   });
 
   describe("Gender Filter", () => {
-    it("should filter by gender with EQUALS modifier", () => {
+    it("should filter by gender with EQUALS modifier", async () => {
       const filter: PeekPerformerFilter = {
         gender: { value: "FEMALE", modifier: "EQUALS" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.gender).toBe("FEMALE");
       });
     });
 
-    it("should filter by gender with NOT_EQUALS modifier", () => {
+    it("should filter by gender with NOT_EQUALS modifier", async () => {
       const filter: PeekPerformerFilter = {
         gender: { value: "MALE", modifier: "NOT_EQUALS" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.gender).not.toBe("MALE");
       });
     });
 
-    it("should filter non-binary performers", () => {
+    it("should filter non-binary performers", async () => {
       const filter: PeekPerformerFilter = {
         gender: { value: "NON_BINARY", modifier: "EQUALS" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.gender).toBe("NON_BINARY");
@@ -146,7 +146,7 @@ describe("Performer Filters", () => {
   });
 
   describe("Tags Filter", () => {
-    it("should filter by tags with INCLUDES_ALL modifier", () => {
+    it("should filter by tags with INCLUDES_ALL modifier", async () => {
       const performer1 = createMockPerformer({
         id: "p1",
         tags: [mockTags[0], mockTags[1], mockTags[2]],
@@ -168,14 +168,14 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(testPerformers, filter);
+      const result = await applyPerformerFilters(testPerformers, filter);
 
       expect(result).toHaveLength(2);
       expect(result.map((p) => p.id)).toContain("p1");
       expect(result.map((p) => p.id)).toContain("p2");
     });
 
-    it("should filter by tags with INCLUDES modifier", () => {
+    it("should filter by tags with INCLUDES modifier", async () => {
       const performer1 = createMockPerformer({
         id: "p1",
         tags: [mockTags[0], mockTags[1]],
@@ -197,14 +197,14 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(testPerformers, filter);
+      const result = await applyPerformerFilters(testPerformers, filter);
 
       expect(result).toHaveLength(2);
       expect(result.map((p) => p.id)).toContain("p1");
       expect(result.map((p) => p.id)).toContain("p2");
     });
 
-    it("should filter by tags with EXCLUDES modifier", () => {
+    it("should filter by tags with EXCLUDES modifier", async () => {
       const performer1 = createMockPerformer({
         id: "p1",
         tags: [mockTags[0], mockTags[1]],
@@ -226,14 +226,14 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(testPerformers, filter);
+      const result = await applyPerformerFilters(testPerformers, filter);
 
       expect(result).toHaveLength(2);
       expect(result.map((p) => p.id)).toContain("p2");
       expect(result.map((p) => p.id)).toContain("p3");
     });
 
-    it("should return all performers when tags array is empty", () => {
+    it("should return all performers when tags array is empty", async () => {
       const filter: PeekPerformerFilter = {
         tags: {
           value: [],
@@ -241,20 +241,20 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       expect(result).toHaveLength(mockPerformers.length);
     });
   });
 
   describe("Rating Filter", () => {
-    it("should filter by rating100 with GREATER_THAN modifier", () => {
+    it("should filter by rating100 with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
         rating100: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const rating = performer.rating100 || 0;
@@ -262,13 +262,13 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by rating100 with LESS_THAN modifier", () => {
+    it("should filter by rating100 with LESS_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
         rating100: { value: threshold, modifier: "LESS_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const rating = performer.rating100 || 0;
@@ -276,40 +276,40 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by rating100 with EQUALS modifier", () => {
+    it("should filter by rating100 with EQUALS modifier", async () => {
       const rating = 80;
       const filter: PeekPerformerFilter = {
         rating100: { value: rating, modifier: "EQUALS" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.rating100).toBe(rating);
       });
     });
 
-    it("should filter by rating100 with NOT_EQUALS modifier", () => {
+    it("should filter by rating100 with NOT_EQUALS modifier", async () => {
       const rating = 0;
       const filter: PeekPerformerFilter = {
         rating100: { value: rating, modifier: "NOT_EQUALS" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.rating100).not.toBe(rating);
       });
     });
 
-    it("should filter by rating100 with BETWEEN modifier", () => {
+    it("should filter by rating100 with BETWEEN modifier", async () => {
       const min = 20;
       const max = 80;
       const filter: PeekPerformerFilter = {
         rating100: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const rating = performer.rating100 || 0;
@@ -320,13 +320,13 @@ describe("Performer Filters", () => {
   });
 
   describe("O Counter Filter", () => {
-    it("should filter by o_counter with GREATER_THAN modifier", () => {
+    it("should filter by o_counter with GREATER_THAN modifier", async () => {
       const threshold = 10;
       const filter: PeekPerformerFilter = {
         o_counter: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const oCounter = performer.o_counter || 0;
@@ -334,13 +334,13 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by o_counter with LESS_THAN modifier", () => {
+    it("should filter by o_counter with LESS_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
         o_counter: { value: threshold, modifier: "LESS_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const oCounter = performer.o_counter || 0;
@@ -348,27 +348,27 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by o_counter with EQUALS modifier", () => {
+    it("should filter by o_counter with EQUALS modifier", async () => {
       const count = 25;
       const filter: PeekPerformerFilter = {
         o_counter: { value: count, modifier: "EQUALS" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.o_counter).toBe(count);
       });
     });
 
-    it("should filter by o_counter with BETWEEN modifier", () => {
+    it("should filter by o_counter with BETWEEN modifier", async () => {
       const min = 10;
       const max = 50;
       const filter: PeekPerformerFilter = {
         o_counter: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const oCounter = performer.o_counter || 0;
@@ -379,13 +379,13 @@ describe("Performer Filters", () => {
   });
 
   describe("Play Count Filter", () => {
-    it("should filter by play_count with GREATER_THAN modifier", () => {
+    it("should filter by play_count with GREATER_THAN modifier", async () => {
       const threshold = 20;
       const filter: PeekPerformerFilter = {
         play_count: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const playCount = performer.play_count || 0;
@@ -393,13 +393,13 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by play_count with LESS_THAN modifier", () => {
+    it("should filter by play_count with LESS_THAN modifier", async () => {
       const threshold = 100;
       const filter: PeekPerformerFilter = {
         play_count: { value: threshold, modifier: "LESS_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const playCount = performer.play_count || 0;
@@ -407,14 +407,14 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by play_count with BETWEEN modifier", () => {
+    it("should filter by play_count with BETWEEN modifier", async () => {
       const min = 20;
       const max = 80;
       const filter: PeekPerformerFilter = {
         play_count: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const playCount = performer.play_count || 0;
@@ -425,13 +425,13 @@ describe("Performer Filters", () => {
   });
 
   describe("Scene Count Filter", () => {
-    it("should filter by scene_count with GREATER_THAN modifier", () => {
+    it("should filter by scene_count with GREATER_THAN modifier", async () => {
       const threshold = 50;
       const filter: PeekPerformerFilter = {
         scene_count: { value: threshold, modifier: "GREATER_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const sceneCount = performer.scene_count || 0;
@@ -439,13 +439,13 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by scene_count with LESS_THAN modifier", () => {
+    it("should filter by scene_count with LESS_THAN modifier", async () => {
       const threshold = 100;
       const filter: PeekPerformerFilter = {
         scene_count: { value: threshold, modifier: "LESS_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const sceneCount = performer.scene_count || 0;
@@ -453,27 +453,27 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by scene_count with EQUALS modifier", () => {
+    it("should filter by scene_count with EQUALS modifier", async () => {
       const count = 75;
       const filter: PeekPerformerFilter = {
         scene_count: { value: count, modifier: "EQUALS" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.scene_count).toBe(count);
       });
     });
 
-    it("should filter by scene_count with BETWEEN modifier", () => {
+    it("should filter by scene_count with BETWEEN modifier", async () => {
       const min = 30;
       const max = 100;
       const filter: PeekPerformerFilter = {
         scene_count: { value: min, value2: max, modifier: "BETWEEN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         const sceneCount = performer.scene_count || 0;
@@ -484,7 +484,7 @@ describe("Performer Filters", () => {
   });
 
   describe("Date Filters", () => {
-    it("should filter by created_at with GREATER_THAN modifier", () => {
+    it("should filter by created_at with GREATER_THAN modifier", async () => {
       const threshold = new Date(Date.now() - 180 * 86400000); // 180 days ago
       const filter: PeekPerformerFilter = {
         created_at: {
@@ -493,7 +493,7 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.created_at).toBeTruthy();
@@ -502,7 +502,7 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by created_at with LESS_THAN modifier", () => {
+    it("should filter by created_at with LESS_THAN modifier", async () => {
       const threshold = new Date(Date.now() - 30 * 86400000); // 30 days ago
       const filter: PeekPerformerFilter = {
         created_at: {
@@ -511,7 +511,7 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.created_at).toBeTruthy();
@@ -520,7 +520,7 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by created_at with BETWEEN modifier", () => {
+    it("should filter by created_at with BETWEEN modifier", async () => {
       const min = new Date(Date.now() - 180 * 86400000);
       const max = new Date(Date.now() - 30 * 86400000);
       const filter: PeekPerformerFilter = {
@@ -531,7 +531,7 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.created_at).toBeTruthy();
@@ -541,7 +541,7 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should filter by updated_at with GREATER_THAN modifier", () => {
+    it("should filter by updated_at with GREATER_THAN modifier", async () => {
       const threshold = new Date(Date.now() - 90 * 86400000); // 90 days ago
       const filter: PeekPerformerFilter = {
         updated_at: {
@@ -550,7 +550,7 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.updated_at).toBeTruthy();
@@ -559,7 +559,7 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should exclude performers with null created_at when filter is applied", () => {
+    it("should exclude performers with null created_at when filter is applied", async () => {
       const performerWithNull = createMockPerformer({
         id: "null_created",
         created_at: null,
@@ -574,7 +574,7 @@ describe("Performer Filters", () => {
         },
       };
 
-      const result = applyPerformerFilters(testPerformers, filter);
+      const result = await applyPerformerFilters(testPerformers, filter);
 
       // Performer with null created_at should not be in results
       expect(result.find((p) => p.id === "null_created")).toBeUndefined();
@@ -582,14 +582,14 @@ describe("Performer Filters", () => {
   });
 
   describe("Multiple Combined Filters", () => {
-    it("should apply multiple filters together (AND logic)", () => {
+    it("should apply multiple filters together (AND logic)", async () => {
       const filter: PeekPerformerFilter = {
         favorite: true,
         rating100: { value: 60, modifier: "GREATER_THAN" },
         scene_count: { value: 50, modifier: "GREATER_THAN" },
       };
 
-      const result = applyPerformerFilters(mockPerformers, filter);
+      const result = await applyPerformerFilters(mockPerformers, filter);
 
       result.forEach((performer) => {
         expect(performer.favorite).toBe(true);
@@ -598,7 +598,7 @@ describe("Performer Filters", () => {
       });
     });
 
-    it("should combine gender and tags filters", () => {
+    it("should combine gender and tags filters", async () => {
       const performer1 = createMockPerformer({
         id: "p1",
         gender: "FEMALE",
@@ -621,7 +621,7 @@ describe("Performer Filters", () => {
         tags: { value: [mockTags[0].id], modifier: "INCLUDES" },
       };
 
-      const result = applyPerformerFilters(testPerformers, filter);
+      const result = await applyPerformerFilters(testPerformers, filter);
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("p1");
@@ -629,34 +629,34 @@ describe("Performer Filters", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle null/undefined filters", () => {
-      const result1 = applyPerformerFilters(mockPerformers, null);
-      const result2 = applyPerformerFilters(mockPerformers, undefined);
+    it("should handle null/undefined filters", async () => {
+      const result1 = await applyPerformerFilters(mockPerformers, null);
+      const result2 = await applyPerformerFilters(mockPerformers, undefined);
 
       expect(result1).toHaveLength(mockPerformers.length);
       expect(result2).toHaveLength(mockPerformers.length);
     });
 
-    it("should handle empty filter object", () => {
-      const result = applyPerformerFilters(mockPerformers, {});
+    it("should handle empty filter object", async () => {
+      const result = await applyPerformerFilters(mockPerformers, {});
 
       expect(result).toHaveLength(mockPerformers.length);
     });
 
-    it("should handle performers with null ratings correctly", () => {
+    it("should handle performers with null ratings correctly", async () => {
       const performersWithNullRatings = mockPerformers.filter((p) => !p.rating100);
 
       const filter: PeekPerformerFilter = {
         rating100: { value: 0, modifier: "GREATER_THAN" },
       };
 
-      const result = applyPerformerFilters(performersWithNullRatings, filter);
+      const result = await applyPerformerFilters(performersWithNullRatings, filter);
 
       // Performers with null ratings should be treated as 0
       expect(result.length).toBe(0);
     });
 
-    it("should handle performers with zero scene_count correctly", () => {
+    it("should handle performers with zero scene_count correctly", async () => {
       const performerWithZeroScenes = createMockPerformer({
         id: "zero_scenes",
         scene_count: 0,
@@ -666,7 +666,7 @@ describe("Performer Filters", () => {
         scene_count: { value: 0, modifier: "EQUALS" },
       };
 
-      const result = applyPerformerFilters([performerWithZeroScenes], filter);
+      const result = await applyPerformerFilters([performerWithZeroScenes], filter);
 
       expect(result).toHaveLength(1);
       expect(result[0].scene_count).toBe(0);

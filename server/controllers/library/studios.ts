@@ -1,9 +1,9 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
@@ -67,7 +67,7 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all studios from cache
-    let studios = stashCacheManager.getAllStudios();
+    let studios = await cachedEntityQueryService.getAllStudios();
 
     if (studios.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -82,7 +82,7 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Apply content restrictions & empty entity filtering with caching
     // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
 
     // Try to get filtered studios from cache
     let filteredStudios = filteredEntityCacheService.get(
@@ -108,15 +108,15 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       // Filter empty studios (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = stashCacheManager.getAllScenes();
+        let visibleScenes = await cachedEntityQueryService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = stashCacheManager.getAllGalleries();
-        let allGroups = stashCacheManager.getAllGroups();
+        let allGalleries = await cachedEntityQueryService.getAllGalleries();
+        let allGroups = await cachedEntityQueryService.getAllGroups();
 
         // Apply user restrictions to groups/galleries FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(
@@ -507,12 +507,12 @@ export const findStudiosMinimal = async (
     const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
-    let studios = stashCacheManager.getAllStudios();
+    let studios = await cachedEntityQueryService.getAllStudios();
 
     // Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
     const userId = req.user?.id;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
 
     // Try to get filtered studios from cache
     let filteredStudios = filteredEntityCacheService.get(
@@ -538,15 +538,15 @@ export const findStudiosMinimal = async (
       // Filter empty studios (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = stashCacheManager.getAllScenes();
+        let visibleScenes = await cachedEntityQueryService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = stashCacheManager.getAllGalleries();
-        let allGroups = stashCacheManager.getAllGroups();
+        let allGalleries = await cachedEntityQueryService.getAllGalleries();
+        let allGroups = await cachedEntityQueryService.getAllGroups();
 
         // Apply user restrictions to groups/galleries FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(

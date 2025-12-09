@@ -387,3 +387,437 @@ model UserCarousel {
 
     @@index([userId])
 }
+
+// ============================================================================
+// CACHED STASH ENTITIES
+// These tables store synced data from Stash for scalable querying
+// ============================================================================
+
+model CachedScene {
+    id              String    @id                    // Stash scene ID
+    stashInstanceId String?                          // Which Stash server
+
+    // === Core fields (indexed) ===
+    title           String?
+    code            String?
+    date            String?                          // YYYY-MM-DD
+    studioId        String?
+    rating100       Int?
+    duration        Int?                             // seconds (from primary file)
+    organized       Boolean   @default(false)
+
+    // === Content fields ===
+    details         String?                          // Scene description
+
+    // === Primary file metadata ===
+    filePath        String?                          // Primary file path
+    fileBitRate     Int?                             // bits/second
+    fileFrameRate   Float?                           // fps
+    fileWidth       Int?                             // pixels
+    fileHeight      Int?                             // pixels
+    fileVideoCodec  String?                          // e.g., "h264", "hevc"
+    fileAudioCodec  String?                          // e.g., "aac", "ac3"
+    fileSize        BigInt?                          // bytes (can be > 4GB)
+
+    // === Stash paths (raw, transformed at read time) ===
+    pathScreenshot  String?                          // Screenshot URL path
+    pathPreview     String?                          // Preview video path
+    pathSprite      String?                          // Sprite sheet path
+    pathVtt         String?                          // VTT chapter path
+    pathChaptersVtt String?                          // Chapters VTT path
+    pathStream      String?                          // Primary stream path
+    pathCaption     String?                          // Caption path
+
+    // === Stream data (small JSON array) ===
+    streams         String?                          // JSON: [{url, mime_type, label}]
+
+    // === Stash counter data ===
+    oCounter        Int       @default(0)            // Stash o_counter
+    playCount       Int       @default(0)            // Stash play_count
+    playDuration    Float     @default(0)            // Stash play_duration
+
+    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
+    data            String    @default("{}")         // DEPRECATED: JSON blob
+
+    // === Sync metadata ===
+    stashCreatedAt  DateTime?
+    stashUpdatedAt  DateTime?
+    syncedAt        DateTime  @default(now())
+    deletedAt       DateTime?
+
+    // === Junction table relations ===
+    performers      ScenePerformer[]
+    tags            SceneTag[]
+    groups          SceneGroup[]
+    galleries       SceneGallery[]
+
+    @@index([studioId])
+    @@index([date])
+    @@index([stashCreatedAt])
+    @@index([stashUpdatedAt])
+    @@index([rating100])
+    @@index([duration])
+    @@index([deletedAt])
+    @@index([oCounter])
+    @@index([playCount])
+}
+
+model CachedPerformer {
+    id              String    @id
+    stashInstanceId String?
+
+    // === Core fields ===
+    name            String
+    disambiguation  String?
+    gender          String?
+    birthdate       String?
+    favorite        Boolean   @default(false)
+    rating100       Int?
+    sceneCount      Int       @default(0)
+    imageCount      Int       @default(0)
+    galleryCount    Int       @default(0)
+
+    // === Extended fields ===
+    details         String?                          // Biography
+    aliasList       String?                          // JSON array of aliases
+    country         String?
+    ethnicity       String?
+    hairColor       String?
+    eyeColor        String?
+    heightCm        Int?                             // Height in cm
+    weightKg        Int?                             // Weight in kg
+    measurements    String?                          // e.g., "34D-24-34"
+    tattoos         String?
+    piercings       String?
+    careerLength    String?
+    deathDate       String?
+    url             String?                          // Homepage
+
+    // === Stash paths (raw, transformed at read time) ===
+    imagePath       String?                          // Profile image path
+
+    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
+    data            String    @default("{}")         // DEPRECATED: JSON blob
+
+    // === Sync metadata ===
+    stashCreatedAt  DateTime?
+    stashUpdatedAt  DateTime?
+    syncedAt        DateTime  @default(now())
+    deletedAt       DateTime?
+
+    // === Relations ===
+    scenes          ScenePerformer[]
+    images          ImagePerformer[]
+
+    @@index([name])
+    @@index([gender])
+    @@index([favorite])
+    @@index([rating100])
+    @@index([sceneCount])
+    @@index([stashUpdatedAt])
+    @@index([deletedAt])
+}
+
+model CachedStudio {
+    id              String    @id
+    stashInstanceId String?
+
+    // === Core fields ===
+    name            String
+    parentId        String?
+    favorite        Boolean   @default(false)
+    rating100       Int?
+    sceneCount      Int       @default(0)
+    imageCount      Int       @default(0)
+    galleryCount    Int       @default(0)
+
+    // === Extended fields ===
+    details         String?                          // Studio description
+    url             String?                          // Studio website
+
+    // === Stash paths (raw, transformed at read time) ===
+    imagePath       String?                          // Logo image path
+
+    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
+    data            String    @default("{}")         // DEPRECATED: JSON blob
+
+    // === Sync metadata ===
+    stashCreatedAt  DateTime?
+    stashUpdatedAt  DateTime?
+    syncedAt        DateTime  @default(now())
+    deletedAt       DateTime?
+
+    @@index([name])
+    @@index([parentId])
+    @@index([favorite])
+    @@index([rating100])
+    @@index([sceneCount])
+    @@index([stashUpdatedAt])
+    @@index([deletedAt])
+}
+
+model CachedTag {
+    id              String    @id
+    stashInstanceId String?
+
+    // === Core fields ===
+    name            String
+    favorite        Boolean   @default(false)
+    sceneCount      Int       @default(0)
+    imageCount      Int       @default(0)
+
+    // === Extended fields ===
+    description     String?                          // Tag description
+    parentIds       String?                          // JSON array of parent tag IDs
+
+    // === Stash paths (raw, transformed at read time) ===
+    imagePath       String?                          // Tag image path
+
+    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
+    data            String    @default("{}")         // DEPRECATED: JSON blob
+
+    // === Sync metadata ===
+    stashCreatedAt  DateTime?
+    stashUpdatedAt  DateTime?
+    syncedAt        DateTime  @default(now())
+    deletedAt       DateTime?
+
+    // === Relations ===
+    scenes          SceneTag[]
+    images          ImageTag[]
+
+    @@index([name])
+    @@index([favorite])
+    @@index([sceneCount])
+    @@index([stashUpdatedAt])
+    @@index([deletedAt])
+}
+
+model CachedGroup {
+    id              String    @id
+    stashInstanceId String?
+
+    // === Core fields ===
+    name            String
+    date            String?
+    studioId        String?
+    rating100       Int?
+    duration        Int?
+    sceneCount      Int       @default(0)
+
+    // === Extended fields ===
+    director        String?
+    synopsis        String?
+    urls            String?                          // JSON array of URLs
+
+    // === Stash paths (raw, transformed at read time) ===
+    frontImagePath  String?                          // Front cover image
+    backImagePath   String?                          // Back cover image
+
+    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
+    data            String    @default("{}")         // DEPRECATED: JSON blob
+
+    // === Sync metadata ===
+    stashCreatedAt  DateTime?
+    stashUpdatedAt  DateTime?
+    syncedAt        DateTime  @default(now())
+    deletedAt       DateTime?
+
+    // === Relations ===
+    scenes          SceneGroup[]
+
+    @@index([name])
+    @@index([date])
+    @@index([studioId])
+    @@index([rating100])
+    @@index([sceneCount])
+    @@index([stashUpdatedAt])
+    @@index([deletedAt])
+}
+
+model CachedGallery {
+    id              String    @id
+    stashInstanceId String?
+
+    // === Core fields ===
+    title           String?
+    date            String?
+    studioId        String?
+    rating100       Int?
+    imageCount      Int       @default(0)
+
+    // === Extended fields ===
+    details         String?                          // Gallery description
+    url             String?                          // Gallery URL
+    code            String?                          // Gallery code
+
+    // === File metadata ===
+    folderPath      String?                          // Folder path if folder-based
+
+    // === Stash paths (raw, transformed at read time) ===
+    coverPath       String?                          // Cover image path
+
+    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
+    data            String    @default("{}")         // DEPRECATED: JSON blob
+
+    // === Sync metadata ===
+    stashCreatedAt  DateTime?
+    stashUpdatedAt  DateTime?
+    syncedAt        DateTime  @default(now())
+    deletedAt       DateTime?
+
+    // === Relations ===
+    scenes          SceneGallery[]
+    images          ImageGallery[]
+
+    @@index([title])
+    @@index([date])
+    @@index([studioId])
+    @@index([rating100])
+    @@index([imageCount])
+    @@index([stashUpdatedAt])
+    @@index([deletedAt])
+}
+
+model CachedImage {
+    id              String    @id
+    stashInstanceId String?
+
+    // === Core fields ===
+    title           String?
+    date            String?
+    studioId        String?
+    rating100       Int?
+    oCounter        Int       @default(0)
+    organized       Boolean   @default(false)
+
+    // === File metadata ===
+    filePath        String?                          // Image file path
+    width           Int?
+    height          Int?
+    fileSize        BigInt?                          // bytes
+
+    // === Stash paths (raw, transformed at read time) ===
+    pathThumbnail   String?                          // Thumbnail URL path
+    pathPreview     String?                          // Preview URL path
+    pathImage       String?                          // Full image URL path
+
+    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
+    data            String    @default("{}")         // DEPRECATED: JSON blob
+
+    // === Sync metadata ===
+    stashCreatedAt  DateTime?
+    stashUpdatedAt  DateTime?
+    syncedAt        DateTime  @default(now())
+    deletedAt       DateTime?
+
+    // === Relations ===
+    performers      ImagePerformer[]
+    tags            ImageTag[]
+    galleries       ImageGallery[]
+
+    @@index([studioId])
+    @@index([date])
+    @@index([rating100])
+    @@index([stashUpdatedAt])
+    @@index([deletedAt])
+}
+
+// Junction tables for efficient many-to-many queries
+
+model ScenePerformer {
+    sceneId         String
+    performerId     String
+    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    performer       CachedPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+
+    @@id([sceneId, performerId])
+    @@index([performerId])
+}
+
+model SceneTag {
+    sceneId         String
+    tagId           String
+    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    tag             CachedTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([sceneId, tagId])
+    @@index([tagId])
+}
+
+model SceneGroup {
+    sceneId         String
+    groupId         String
+    sceneIndex      Int?
+    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    group           CachedGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+    @@id([sceneId, groupId])
+    @@index([groupId])
+}
+
+model SceneGallery {
+    sceneId         String
+    galleryId       String
+    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    gallery         CachedGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+    @@id([sceneId, galleryId])
+    @@index([galleryId])
+}
+
+model ImagePerformer {
+    imageId         String
+    performerId     String
+    image           CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+    performer       CachedPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+
+    @@id([imageId, performerId])
+    @@index([performerId])
+}
+
+model ImageTag {
+    imageId         String
+    tagId           String
+    image           CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+    tag             CachedTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([imageId, tagId])
+    @@index([tagId])
+}
+
+model ImageGallery {
+    imageId         String
+    galleryId       String
+    image           CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+    gallery         CachedGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+    @@id([imageId, galleryId])
+    @@index([galleryId])
+}
+
+// Sync state tracking per entity type
+model SyncState {
+    id                    Int       @id @default(autoincrement())
+    stashInstanceId       String?
+    entityType            String                     // 'scene', 'performer', etc.
+
+    lastFullSync          DateTime?
+    lastIncrementalSync   DateTime?
+    lastSyncCount         Int       @default(0)
+    lastSyncDurationMs    Int?
+    lastError             String?
+    totalEntities         Int       @default(0)
+
+    @@unique([stashInstanceId, entityType])
+}
+
+// Sync settings (admin configurable)
+model SyncSettings {
+    id                    Int       @id @default(1)  // Singleton
+    syncIntervalMinutes   Int       @default(60)     // Default 60 min (current behavior)
+    enableScanSubscription Boolean  @default(true)   // Subscribe to scanCompleteSubscribe
+    enablePluginWebhook   Boolean   @default(false)  // Accept webhook from Stash plugin
+
+    updatedAt             DateTime  @updatedAt
+}
