@@ -718,13 +718,8 @@ class CachedEntityQueryService {
         caption: this.transformUrl(scene.pathCaption),
       },
 
-      // Parse streams JSON
-      sceneStreams: scene.streams
-        ? JSON.parse(scene.streams).map((s: any) => ({
-            ...s,
-            url: this.transformUrl(s.url),
-          }))
-        : [],
+      // Generate streams on-demand (no longer stored in DB)
+      sceneStreams: this.generateSceneStreams(scene.id),
 
       // Stash counters (override defaults)
       o_counter: scene.oCounter ?? 0,
