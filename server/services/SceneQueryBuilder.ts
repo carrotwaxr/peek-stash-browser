@@ -72,50 +72,95 @@ class SceneQueryBuilder {
     };
   }
 
+  /**
+   * Build exclusion filter clause
+   * Excludes scenes by ID (from user restrictions)
+   */
+  private buildExclusionFilter(excludedIds: Set<string>): FilterClause {
+    if (!excludedIds || excludedIds.size === 0) {
+      return { sql: "", params: [] };
+    }
+
+    // For large exclusion sets, use a subquery approach
+    // SQLite handles IN clauses well up to ~1000 items
+    const ids = Array.from(excludedIds);
+
+    if (ids.length <= 500) {
+      // Direct IN clause for smaller sets
+      const placeholders = ids.map(() => "?").join(", ");
+      return {
+        sql: `s.id NOT IN (${placeholders})`,
+        params: ids,
+      };
+    }
+
+    // For larger sets, we'll need to use a different approach
+    // This is a pragmatic limit - if you have >500 exclusions,
+    // consider pre-computing a materialized view
+    const placeholders = ids.slice(0, 500).map(() => "?").join(", ");
+    logger.warn("Exclusion set truncated to 500 items", {
+      originalSize: ids.length,
+    });
+    return {
+      sql: `s.id NOT IN (${placeholders})`,
+      params: ids.slice(0, 500),
+    };
+  }
+
   async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage } = options;
+    const { userId, page, perPage, excludedSceneIds } = options;
 
     // Build FROM clause
     const fromClause = this.buildFromClause(userId);
 
-    // Build WHERE clause (just base for now)
-    const whereClause = this.buildBaseWhere();
+    // Build WHERE clauses
+    const whereClauses: FilterClause[] = [this.buildBaseWhere()];
+
+    // Add exclusion filter
+    const exclusionFilter = this.buildExclusionFilter(excludedSceneIds || new Set());
+    if (exclusionFilter.sql) {
+      whereClauses.push(exclusionFilter);
+    }
+
+    // Combine WHERE clauses
+    const whereSQL = whereClauses.map((c) => c.sql).filter(Boolean).join(" AND ");
+    const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build full query
     const offset = (page - 1) * perPage;
     const sql = `
       SELECT ${this.SELECT_COLUMNS}
       ${fromClause.sql}
-      WHERE ${whereClause.sql}
+      WHERE ${whereSQL}
       ORDER BY s.stashCreatedAt DESC
       LIMIT ? OFFSET ?
     `;
 
-    const params = [...fromClause.params, ...whereClause.params, perPage, offset];
+    const params = [...fromClause.params, ...whereParams, perPage, offset];
 
     logger.info("SceneQueryBuilder.execute", {
-      sql: sql.replace(/\s+/g, " ").trim(),
+      whereClauseCount: whereClauses.length,
+      excludedCount: excludedSceneIds?.size || 0,
       paramCount: params.length,
     });
 
     // Execute query
     const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
-    // Count query (same WHERE, no LIMIT/OFFSET)
+    // Count query
     const countSql = `
       SELECT COUNT(DISTINCT s.id) as total
       ${fromClause.sql}
-      WHERE ${whereClause.sql}
+      WHERE ${whereSQL}
     `;
-    const countParams = [...fromClause.params, ...whereClause.params];
+    const countParams = [...fromClause.params, ...whereParams];
     const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
       countSql,
       ...countParams
     );
     const total = Number(countResult[0]?.total || 0);
 
-    // Transform rows (placeholder - just return raw for now)
     const scenes = rows.map((row) => this.transformRow(row));
 
     logger.info("SceneQueryBuilder.execute complete", {
