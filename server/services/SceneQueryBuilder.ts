@@ -107,9 +107,171 @@ class SceneQueryBuilder {
     };
   }
 
+  /**
+   * Build performer filter clause
+   * Supports INCLUDES, INCLUDES_ALL, EXCLUDES modifiers
+   */
+  private buildPerformerFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        // Scene has ANY of these performers
+        return {
+          sql: `s.id IN (SELECT sceneId FROM ScenePerformer WHERE performerId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        // Scene has ALL of these performers
+        return {
+          sql: `s.id IN (
+            SELECT sceneId FROM ScenePerformer
+            WHERE performerId IN (${placeholders})
+            GROUP BY sceneId
+            HAVING COUNT(DISTINCT performerId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        // Scene has NONE of these performers
+        return {
+          sql: `s.id NOT IN (SELECT sceneId FROM ScenePerformer WHERE performerId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        logger.warn("Unknown performer filter modifier", { modifier });
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build tag filter clause
+   */
+  private buildTagFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `s.id IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        return {
+          sql: `s.id IN (
+            SELECT sceneId FROM SceneTag
+            WHERE tagId IN (${placeholders})
+            GROUP BY sceneId
+            HAVING COUNT(DISTINCT tagId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `s.id NOT IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build studio filter clause
+   */
+  private buildStudioFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `s.studioId IN (${placeholders})`,
+          params: ids,
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `(s.studioId IS NULL OR s.studioId NOT IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build group filter clause
+   */
+  private buildGroupFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `s.id IN (SELECT sceneId FROM SceneGroup WHERE groupId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        return {
+          sql: `s.id IN (
+            SELECT sceneId FROM SceneGroup
+            WHERE groupId IN (${placeholders})
+            GROUP BY sceneId
+            HAVING COUNT(DISTINCT groupId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `s.id NOT IN (SELECT sceneId FROM SceneGroup WHERE groupId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
   async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, excludedSceneIds } = options;
+    const { userId, page, perPage, excludedSceneIds, filters } = options;
 
     // Build FROM clause
     const fromClause = this.buildFromClause(userId);
@@ -121,6 +283,35 @@ class SceneQueryBuilder {
     const exclusionFilter = this.buildExclusionFilter(excludedSceneIds || new Set());
     if (exclusionFilter.sql) {
       whereClauses.push(exclusionFilter);
+    }
+
+    // Add entity filters
+    if (filters?.performers) {
+      const performerFilter = this.buildPerformerFilter(filters.performers);
+      if (performerFilter.sql) {
+        whereClauses.push(performerFilter);
+      }
+    }
+
+    if (filters?.tags) {
+      const tagFilter = this.buildTagFilter(filters.tags);
+      if (tagFilter.sql) {
+        whereClauses.push(tagFilter);
+      }
+    }
+
+    if (filters?.studios) {
+      const studioFilter = this.buildStudioFilter(filters.studios);
+      if (studioFilter.sql) {
+        whereClauses.push(studioFilter);
+      }
+    }
+
+    if (filters?.groups) {
+      const groupFilter = this.buildGroupFilter(filters.groups);
+      if (groupFilter.sql) {
+        whereClauses.push(groupFilter);
+      }
     }
 
     // Combine WHERE clauses
