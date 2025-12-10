@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
@@ -19,8 +19,8 @@ import { calculateEntityImageCount } from "./images.js";
  */
 async function enhanceTagsWithPerformerScenes(tags: NormalizedTag[]): Promise<NormalizedTag[]> {
   // Get all scenes and performers from cache
-  const allScenes = await cachedEntityQueryService.getAllScenes();
-  const allPerformers = await cachedEntityQueryService.getAllPerformers();
+  const allScenes = await stashEntityService.getAllScenes();
+  const allPerformers = await stashEntityService.getAllPerformers();
 
   // Build a map of performer ID -> set of tag IDs
   const performerTagsMap = new Map<string, Set<string>>();
@@ -130,7 +130,7 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all tags from cache
-    let tags = await cachedEntityQueryService.getAllTags();
+    let tags = await stashEntityService.getAllTags();
 
     if (tags.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -145,7 +145,7 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Apply content restrictions & empty entity filtering with caching
     // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
-    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
 
     // Try to get filtered tags from cache
@@ -177,17 +177,17 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         !isFetchingByIds
       ) {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = await cachedEntityQueryService.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = await cachedEntityQueryService.getAllGalleries();
-        let allGroups = await cachedEntityQueryService.getAllGroups();
-        let allStudios = await cachedEntityQueryService.getAllStudios();
-        let allPerformers = await cachedEntityQueryService.getAllPerformers();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
+        let allStudios = await stashEntityService.getAllStudios();
+        let allPerformers = await stashEntityService.getAllPerformers();
 
         // Apply user restrictions to all entity types FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(
@@ -521,7 +521,7 @@ export async function applyTagFilters(
       (filters.performers.value || []).map(String)
     );
     if (performerIdSet.size > 0) {
-      const allPerformers = await cachedEntityQueryService.getAllPerformers();
+      const allPerformers = await stashEntityService.getAllPerformers();
       const matchingPerformers = allPerformers.filter((p: any) =>
         performerIdSet.has(String(p.id))
       );
@@ -542,7 +542,7 @@ export async function applyTagFilters(
   if (filters.studios) {
     const studioIdSet = new Set((filters.studios.value || []).map(String));
     if (studioIdSet.size > 0) {
-      const allStudios = await cachedEntityQueryService.getAllStudios();
+      const allStudios = await stashEntityService.getAllStudios();
 
       // Get all tag IDs directly from matching studios
       const tagIdSet = new Set<string>();
@@ -565,8 +565,8 @@ export async function applyTagFilters(
       (filters.scenes_filter.id.value || []).map(String)
     );
     if (sceneIdSet.size > 0) {
-      const allScenes = await cachedEntityQueryService.getAllScenes();
-      const allPerformers = await cachedEntityQueryService.getAllPerformers();
+      const allScenes = await stashEntityService.getAllScenes();
+      const allPerformers = await stashEntityService.getAllPerformers();
       const matchingScenes = allScenes.filter((s: any) =>
         sceneIdSet.has(String(s.id))
       );
@@ -600,8 +600,8 @@ export async function applyTagFilters(
       (filters.scenes_filter.groups.value || []).map(String)
     );
     if (groupIdSet.size > 0) {
-      const allScenes = await cachedEntityQueryService.getAllScenes();
-      const allPerformers = await cachedEntityQueryService.getAllPerformers();
+      const allScenes = await stashEntityService.getAllScenes();
+      const allPerformers = await stashEntityService.getAllPerformers();
       const matchingScenes = allScenes.filter((scene: any) => {
         if (!scene.groups) return false;
         return scene.groups.some((g: any) => groupIdSet.has(String(g.id)));
@@ -709,11 +709,11 @@ export const findTagsMinimal = async (
     const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
-    let tags = await cachedEntityQueryService.getAllTags();
+    let tags = await stashEntityService.getAllTags();
 
     const requestingUser = req.user;
     const userId = req.user?.id;
-    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // OPTIMIZATION: Skip expensive filtering only if user has NO content restrictions
     // Check if user has any restrictions configured
@@ -748,10 +748,10 @@ export const findTagsMinimal = async (
         filteredTags = tags;
 
         // Get all entities from cache
-        let allGalleries = await cachedEntityQueryService.getAllGalleries();
-        let allGroups = await cachedEntityQueryService.getAllGroups();
-        let allStudios = await cachedEntityQueryService.getAllStudios();
-        let allPerformers = await cachedEntityQueryService.getAllPerformers();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
+        let allStudios = await stashEntityService.getAllStudios();
+        let allPerformers = await stashEntityService.getAllPerformers();
 
         // Apply user restrictions to all entity types FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(

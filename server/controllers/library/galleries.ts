@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
@@ -260,7 +260,7 @@ export const findGalleries = async (
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
-    let galleries = await cachedEntityQueryService.getAllGalleries();
+    let galleries = await stashEntityService.getAllGalleries();
 
     if (galleries.length === 0) {
       logger.warn("Gallery cache not initialized, returning empty result");
@@ -277,7 +277,7 @@ export const findGalleries = async (
 
     // Step 2.5: Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
-    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered galleries from cache
     let filteredGalleries = filteredEntityCacheService.get(
@@ -361,7 +361,7 @@ export const findGalleries = async (
     ];
 
     if (studioIds.length > 0) {
-      const studios = await cachedEntityQueryService.getStudiosByIds(studioIds);
+      const studios = await stashEntityService.getStudiosByIds(studioIds);
       const studioMap = new Map(studios.map((s) => [s.id, s]));
 
       for (const gallery of paginatedGalleries) {
@@ -408,7 +408,7 @@ export const findGalleryById = async (
     const userId = req.user?.id;
     const { id } = req.params;
 
-    let gallery = await cachedEntityQueryService.getGallery(id);
+    let gallery = await stashEntityService.getGallery(id);
 
     if (!gallery) {
       return res.status(404).json({ error: "Gallery not found" });
@@ -425,7 +425,7 @@ export const findGalleryById = async (
     // Hydrate performers with full cached data
     if (mergedGallery.performers && mergedGallery.performers.length > 0) {
       const performerIds = mergedGallery.performers.map((p) => p.id);
-      const cachedPerformers = await cachedEntityQueryService.getPerformersByIds(performerIds);
+      const cachedPerformers = await stashEntityService.getPerformersByIds(performerIds);
       const performerMap = new Map(cachedPerformers.map((p) => [p.id, p]));
 
       mergedGallery.performers = mergedGallery.performers.map((performer) => {
@@ -448,7 +448,7 @@ export const findGalleryById = async (
 
     // Hydrate studio with full cached data
     if (mergedGallery.studio && mergedGallery.studio.id) {
-      const cachedStudio = await cachedEntityQueryService.getStudio(mergedGallery.studio.id);
+      const cachedStudio = await stashEntityService.getStudio(mergedGallery.studio.id);
       if (cachedStudio) {
         // Type assertion: Gallery.studio typed as Studio, but we hydrate with NormalizedStudio
         mergedGallery.studio =
@@ -464,7 +464,7 @@ export const findGalleryById = async (
     // Hydrate tags with full cached data
     if (mergedGallery.tags && mergedGallery.tags.length > 0) {
       const tagIds = mergedGallery.tags.map((t) => t.id);
-      const cachedTags = await cachedEntityQueryService.getTagsByIds(tagIds);
+      const cachedTags = await stashEntityService.getTagsByIds(tagIds);
       const tagMap = new Map(cachedTags.map((t) => [t.id, t]));
 
       mergedGallery.tags = mergedGallery.tags.map((tag) => {
@@ -508,7 +508,7 @@ export const findGalleriesMinimal = async (
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
-    let galleries = await cachedEntityQueryService.getAllGalleries();
+    let galleries = await stashEntityService.getAllGalleries();
 
     if (galleries.length === 0) {
       logger.warn("Gallery cache not initialized, returning empty result");

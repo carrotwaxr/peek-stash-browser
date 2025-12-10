@@ -2,7 +2,7 @@ import type { Response } from "express";
 import type { Prisma } from "@prisma/client";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
-import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../services/StashEntityService.js";
 import { userRestrictionService } from "../services/UserRestrictionService.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
@@ -368,7 +368,7 @@ export async function executeCarouselQuery(
 
     // Get scenes with DB pagination (only need CAROUSEL_SCENE_LIMIT scenes)
     const dbStart = Date.now();
-    const { scenes } = await cachedEntityQueryService.getScenesPaginated({
+    const { scenes } = await stashEntityService.getScenesPaginated({
       page: 1,
       perPage: CAROUSEL_SCENE_LIMIT,
       sortField: sort,
@@ -399,7 +399,7 @@ export async function executeCarouselQuery(
 
   // Get scenes from cache (lightweight browse query)
   const cacheStart = Date.now();
-  let scenes = await cachedEntityQueryService.getAllScenes();
+  let scenes = await stashEntityService.getAllScenes();
   logger.info(`executeCarouselQuery: getAllScenes took ${Date.now() - cacheStart}ms`);
 
   // Apply pre-computed exclusions (fast Set lookup instead of nested entity checks)

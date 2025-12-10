@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
@@ -98,7 +98,7 @@ export async function applyGroupFilters(
   // Uses efficient SQL join query instead of loading all scenes
   if (filters.performers && filters.performers.value) {
     const performerIds = filters.performers.value.map(String);
-    const groupIdsWithPerformers = await cachedEntityQueryService.getGroupIdsByPerformers(performerIds);
+    const groupIdsWithPerformers = await stashEntityService.getGroupIdsByPerformers(performerIds);
     filtered = filtered.filter((g) => groupIdsWithPerformers.has(g.id));
   }
 
@@ -207,7 +207,7 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
-    let groups = await cachedEntityQueryService.getAllGroups();
+    let groups = await stashEntityService.getAllGroups();
 
     if (groups.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -224,7 +224,7 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 2.5: Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
-    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered groups from cache
     let filteredGroups = filteredEntityCacheService.get(
@@ -337,7 +337,7 @@ export const findGroupsMinimal = async (
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
-    let groups = await cachedEntityQueryService.getAllGroups();
+    let groups = await stashEntityService.getAllGroups();
 
     if (groups.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -351,7 +351,7 @@ export const findGroupsMinimal = async (
 
     // Step 2.5: Apply empty entity filtering with caching
     const requestingUser = req.user;
-    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered groups from cache
     let filteredGroups = filteredEntityCacheService.get(

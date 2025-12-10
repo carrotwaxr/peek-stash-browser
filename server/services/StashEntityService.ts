@@ -1,11 +1,11 @@
 /**
- * Cached Entity Query Service
+ * Stash Entity Service
  *
- * Provides methods to query cached entities from SQLite database.
+ * Provides methods to query Stash entities from SQLite database.
  * Replaces direct StashCacheManager access with database queries.
  *
- * This is a transitional layer that maintains compatibility with existing
- * controller patterns while using the new SQLite cache.
+ * This service maintains compatibility with existing controller patterns
+ * while using the new SQLite-backed architecture.
  */
 
 import { Prisma } from "@prisma/client";
@@ -87,7 +87,7 @@ const DEFAULT_GROUP_USER_FIELDS = {
   favorite: false,
 };
 
-class CachedEntityQueryService {
+class StashEntityService {
   // Columns to select for browse queries (excludes heavy streams/data columns)
   private readonly BROWSE_SELECT = {
     id: true,
@@ -135,7 +135,7 @@ class CachedEntityQueryService {
     const startTotal = Date.now();
 
     const queryStart = Date.now();
-    const cached = await prisma.cachedScene.findMany({
+    const cached = await prisma.stashScene.findMany({
       where: { deletedAt: null },
       select: this.BROWSE_SELECT,
     });
@@ -154,7 +154,7 @@ class CachedEntityQueryService {
    * Get scene by ID (includes related entities)
    */
   async getScene(id: string): Promise<NormalizedScene | null> {
-    const cached = await prisma.cachedScene.findFirst({
+    const cached = await prisma.stashScene.findFirst({
       where: { id, deletedAt: null },
       include: {
         performers: { include: { performer: true } },
@@ -172,7 +172,7 @@ class CachedEntityQueryService {
    * Get scenes by IDs
    */
   async getScenesByIds(ids: string[]): Promise<NormalizedScene[]> {
-    const cached = await prisma.cachedScene.findMany({
+    const cached = await prisma.stashScene.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
@@ -186,7 +186,7 @@ class CachedEntityQueryService {
    * Get total scene count
    */
   async getSceneCount(): Promise<number> {
-    return prisma.cachedScene.count({
+    return prisma.stashScene.count({
       where: { deletedAt: null },
     });
   }
@@ -230,7 +230,7 @@ class CachedEntityQueryService {
 
     // Get total count first (for pagination info) - respecting exclusions
     const countStart = Date.now();
-    const total = await prisma.cachedScene.count({ where });
+    const total = await prisma.stashScene.count({ where });
     logger.debug(`getScenesPaginated: count took ${Date.now() - countStart}ms (excludeIds: ${excludeIds?.size || 0})`);
 
     // Build orderBy
@@ -245,7 +245,7 @@ class CachedEntityQueryService {
 
     // Query with pagination - exclusions already applied in where clause
     const queryStart = Date.now();
-    const cached = await prisma.cachedScene.findMany({
+    const cached = await prisma.stashScene.findMany({
       where,
       select: this.BROWSE_SELECT,
       orderBy,
@@ -270,7 +270,7 @@ class CachedEntityQueryService {
    */
   async getSceneIds(): Promise<string[]> {
     const startTime = Date.now();
-    const cached = await prisma.cachedScene.findMany({
+    const cached = await prisma.stashScene.findMany({
       where: { deletedAt: null },
       select: { id: true },
     });
@@ -287,7 +287,7 @@ class CachedEntityQueryService {
       const results = await prisma.$queryRaw<any[]>`
         SELECT s.*
         FROM scene_fts
-        INNER JOIN CachedScene s ON scene_fts.id = s.id
+        INNER JOIN StashScene s ON scene_fts.id = s.id
         WHERE scene_fts MATCH ${query}
           AND s.deletedAt IS NULL
         ORDER BY rank
@@ -309,7 +309,7 @@ class CachedEntityQueryService {
     query: string,
     limit: number
   ): Promise<NormalizedScene[]> {
-    const cached = await prisma.cachedScene.findMany({
+    const cached = await prisma.stashScene.findMany({
       where: {
         deletedAt: null,
         OR: [
@@ -332,7 +332,7 @@ class CachedEntityQueryService {
     const startTotal = Date.now();
 
     const queryStart = Date.now();
-    const cached = await prisma.cachedPerformer.findMany({
+    const cached = await prisma.stashPerformer.findMany({
       where: { deletedAt: null },
     });
     const queryTime = Date.now() - queryStart;
@@ -350,7 +350,7 @@ class CachedEntityQueryService {
    * Get performer by ID
    */
   async getPerformer(id: string): Promise<NormalizedPerformer | null> {
-    const cached = await prisma.cachedPerformer.findFirst({
+    const cached = await prisma.stashPerformer.findFirst({
       where: { id, deletedAt: null },
     });
 
@@ -362,7 +362,7 @@ class CachedEntityQueryService {
    * Get performers by IDs
    */
   async getPerformersByIds(ids: string[]): Promise<NormalizedPerformer[]> {
-    const cached = await prisma.cachedPerformer.findMany({
+    const cached = await prisma.stashPerformer.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
@@ -376,7 +376,7 @@ class CachedEntityQueryService {
    * Get total performer count
    */
   async getPerformerCount(): Promise<number> {
-    return prisma.cachedPerformer.count({
+    return prisma.stashPerformer.count({
       where: { deletedAt: null },
     });
   }
@@ -389,7 +389,7 @@ class CachedEntityQueryService {
       const results = await prisma.$queryRaw<any[]>`
         SELECT p.*
         FROM performer_fts
-        INNER JOIN CachedPerformer p ON performer_fts.id = p.id
+        INNER JOIN StashPerformer p ON performer_fts.id = p.id
         WHERE performer_fts MATCH ${query}
           AND p.deletedAt IS NULL
         ORDER BY rank
@@ -399,7 +399,7 @@ class CachedEntityQueryService {
       return results.map((r) => this.transformPerformer(r));
     } catch (error) {
       logger.warn("FTS5 performer search failed, falling back to LIKE", { error });
-      const cached = await prisma.cachedPerformer.findMany({
+      const cached = await prisma.stashPerformer.findMany({
         where: {
           deletedAt: null,
           name: { contains: query },
@@ -419,7 +419,7 @@ class CachedEntityQueryService {
     const startTotal = Date.now();
 
     const queryStart = Date.now();
-    const cached = await prisma.cachedStudio.findMany({
+    const cached = await prisma.stashStudio.findMany({
       where: { deletedAt: null },
     });
     const queryTime = Date.now() - queryStart;
@@ -437,7 +437,7 @@ class CachedEntityQueryService {
    * Get studio by ID
    */
   async getStudio(id: string): Promise<NormalizedStudio | null> {
-    const cached = await prisma.cachedStudio.findFirst({
+    const cached = await prisma.stashStudio.findFirst({
       where: { id, deletedAt: null },
     });
 
@@ -449,7 +449,7 @@ class CachedEntityQueryService {
    * Get studios by IDs
    */
   async getStudiosByIds(ids: string[]): Promise<NormalizedStudio[]> {
-    const cached = await prisma.cachedStudio.findMany({
+    const cached = await prisma.stashStudio.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
@@ -463,7 +463,7 @@ class CachedEntityQueryService {
    * Get total studio count
    */
   async getStudioCount(): Promise<number> {
-    return prisma.cachedStudio.count({
+    return prisma.stashStudio.count({
       where: { deletedAt: null },
     });
   }
@@ -477,7 +477,7 @@ class CachedEntityQueryService {
     const startTotal = Date.now();
 
     const queryStart = Date.now();
-    const cached = await prisma.cachedTag.findMany({
+    const cached = await prisma.stashTag.findMany({
       where: { deletedAt: null },
     });
     const queryTime = Date.now() - queryStart;
@@ -495,7 +495,7 @@ class CachedEntityQueryService {
    * Get tag by ID
    */
   async getTag(id: string): Promise<NormalizedTag | null> {
-    const cached = await prisma.cachedTag.findFirst({
+    const cached = await prisma.stashTag.findFirst({
       where: { id, deletedAt: null },
     });
 
@@ -507,7 +507,7 @@ class CachedEntityQueryService {
    * Get tags by IDs
    */
   async getTagsByIds(ids: string[]): Promise<NormalizedTag[]> {
-    const cached = await prisma.cachedTag.findMany({
+    const cached = await prisma.stashTag.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
@@ -521,7 +521,7 @@ class CachedEntityQueryService {
    * Get total tag count
    */
   async getTagCount(): Promise<number> {
-    return prisma.cachedTag.count({
+    return prisma.stashTag.count({
       where: { deletedAt: null },
     });
   }
@@ -532,7 +532,7 @@ class CachedEntityQueryService {
    * Get all galleries from cache
    */
   async getAllGalleries(): Promise<NormalizedGallery[]> {
-    const cached = await prisma.cachedGallery.findMany({
+    const cached = await prisma.stashGallery.findMany({
       where: { deletedAt: null },
       include: {
         performers: { include: { performer: true } },
@@ -546,7 +546,7 @@ class CachedEntityQueryService {
    * Get gallery by ID
    */
   async getGallery(id: string): Promise<NormalizedGallery | null> {
-    const cached = await prisma.cachedGallery.findFirst({
+    const cached = await prisma.stashGallery.findFirst({
       where: { id, deletedAt: null },
       include: {
         performers: { include: { performer: true } },
@@ -561,7 +561,7 @@ class CachedEntityQueryService {
    * Get galleries by IDs
    */
   async getGalleriesByIds(ids: string[]): Promise<NormalizedGallery[]> {
-    const cached = await prisma.cachedGallery.findMany({
+    const cached = await prisma.stashGallery.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
@@ -578,7 +578,7 @@ class CachedEntityQueryService {
    * Get total gallery count
    */
   async getGalleryCount(): Promise<number> {
-    return prisma.cachedGallery.count({
+    return prisma.stashGallery.count({
       where: { deletedAt: null },
     });
   }
@@ -589,7 +589,7 @@ class CachedEntityQueryService {
    * Get all groups from cache
    */
   async getAllGroups(): Promise<NormalizedGroup[]> {
-    const cached = await prisma.cachedGroup.findMany({
+    const cached = await prisma.stashGroup.findMany({
       where: { deletedAt: null },
     });
 
@@ -600,7 +600,7 @@ class CachedEntityQueryService {
    * Get group by ID
    */
   async getGroup(id: string): Promise<NormalizedGroup | null> {
-    const cached = await prisma.cachedGroup.findFirst({
+    const cached = await prisma.stashGroup.findFirst({
       where: { id, deletedAt: null },
     });
 
@@ -612,7 +612,7 @@ class CachedEntityQueryService {
    * Get groups by IDs
    */
   async getGroupsByIds(ids: string[]): Promise<NormalizedGroup[]> {
-    const cached = await prisma.cachedGroup.findMany({
+    const cached = await prisma.stashGroup.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
@@ -626,7 +626,7 @@ class CachedEntityQueryService {
    * Get total group count
    */
   async getGroupCount(): Promise<number> {
-    return prisma.cachedGroup.count({
+    return prisma.stashGroup.count({
       where: { deletedAt: null },
     });
   }
@@ -637,7 +637,7 @@ class CachedEntityQueryService {
    * Get all images from cache
    */
   async getAllImages(): Promise<any[]> {
-    const cached = await prisma.cachedImage.findMany({
+    const cached = await prisma.stashImage.findMany({
       where: { deletedAt: null },
     });
 
@@ -648,7 +648,7 @@ class CachedEntityQueryService {
    * Get image by ID
    */
   async getImage(id: string): Promise<any | null> {
-    const cached = await prisma.cachedImage.findFirst({
+    const cached = await prisma.stashImage.findFirst({
       where: { id, deletedAt: null },
     });
 
@@ -660,7 +660,7 @@ class CachedEntityQueryService {
    * Get images by IDs
    */
   async getImagesByIds(ids: string[]): Promise<any[]> {
-    const cached = await prisma.cachedImage.findMany({
+    const cached = await prisma.stashImage.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
@@ -674,7 +674,7 @@ class CachedEntityQueryService {
    * Get total image count
    */
   async getImageCount(): Promise<number> {
-    return prisma.cachedImage.count({
+    return prisma.stashImage.count({
       where: { deletedAt: null },
     });
   }
@@ -795,7 +795,7 @@ class CachedEntityQueryService {
   /**
    * Get performer IDs that appear in scenes from specific studios.
    * Used for filtering performers by studio on detail pages.
-   * Schema dependencies: ScenePerformer.performerId, CachedScene.studioId
+   * Schema dependencies: ScenePerformer.performerId, StashScene.studioId
    */
   async getPerformerIdsByStudios(studioIds: string[]): Promise<Set<string>> {
     if (studioIds.length === 0) return new Set();
@@ -804,7 +804,7 @@ class CachedEntityQueryService {
     const results = await prisma.$queryRaw<{ performerId: string }[]>`
       SELECT DISTINCT sp.performerId
       FROM ScenePerformer sp
-      INNER JOIN CachedScene cs ON sp.sceneId = cs.id
+      INNER JOIN StashScene cs ON sp.sceneId = cs.id
       WHERE cs.studioId IN (${Prisma.join(studioIds)})
         AND cs.deletedAt IS NULL
     `;
@@ -1197,4 +1197,4 @@ class CachedEntityQueryService {
 }
 
 // Export singleton instance
-export const cachedEntityQueryService = new CachedEntityQueryService();
+export const stashEntityService = new StashEntityService();

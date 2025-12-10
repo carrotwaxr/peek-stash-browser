@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
-import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../services/StashEntityService.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -103,7 +103,7 @@ export const requireCacheReady = async (
   res: Response,
   next: NextFunction
 ) => {
-  const isReady = await cachedEntityQueryService.isReady();
+  const isReady = await stashEntityService.isReady();
   if (!isReady) {
     return res.status(503).json({
       error: "Server is initializing",

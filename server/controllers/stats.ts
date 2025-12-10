@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { promises as fs } from "fs";
 import os from "os";
-import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../services/StashEntityService.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import { logger } from "../utils/logger.js";
 
@@ -15,9 +15,9 @@ export const getStats = async (req: Request, res: Response) => {
     let cacheStats;
     try {
       const [counts, isReady, lastRefreshed] = await Promise.all([
-        cachedEntityQueryService.getStats(),
-        cachedEntityQueryService.isReady(),
-        cachedEntityQueryService.getLastRefreshed(),
+        stashEntityService.getStats(),
+        stashEntityService.isReady(),
+        stashEntityService.getLastRefreshed(),
       ]);
       cacheStats = {
         isInitialized: isReady,

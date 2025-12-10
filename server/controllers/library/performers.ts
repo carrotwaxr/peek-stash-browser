@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
@@ -78,7 +78,7 @@ export const findPerformers = async (
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all performers from cache
-    let performers = await cachedEntityQueryService.getAllPerformers();
+    let performers = await stashEntityService.getAllPerformers();
 
     if (performers.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -93,7 +93,7 @@ export const findPerformers = async (
     // Step 2: Apply content restrictions & empty entity filtering with caching
     // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
-    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered performers from cache
     let filteredPerformers = filteredEntityCacheService.get(
@@ -120,15 +120,15 @@ export const findPerformers = async (
       // Filter empty performers (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = await cachedEntityQueryService.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = await cachedEntityQueryService.getAllGalleries();
-        let allGroups = await cachedEntityQueryService.getAllGroups();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
 
         // Apply user restrictions to groups/galleries FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(
@@ -320,7 +320,7 @@ export async function applyPerformerFilters(
   // Uses efficient SQL join query instead of loading all scenes
   if (filters.studios && filters.studios.value) {
     const studioIds = filters.studios.value.map(String);
-    const performerIdsInStudios = await cachedEntityQueryService.getPerformerIdsByStudios(studioIds);
+    const performerIdsInStudios = await stashEntityService.getPerformerIdsByStudios(studioIds);
     filtered = filtered.filter((p) => performerIdsInStudios.has(p.id));
   }
 
@@ -330,7 +330,7 @@ export async function applyPerformerFilters(
   // Uses efficient SQL join query instead of loading all scenes
   if (filters.groups && filters.groups.value) {
     const groupIds = filters.groups.value.map(String);
-    const performerIdsInGroups = await cachedEntityQueryService.getPerformerIdsByGroups(groupIds);
+    const performerIdsInGroups = await stashEntityService.getPerformerIdsByGroups(groupIds);
     filtered = filtered.filter((p) => performerIdsInGroups.has(p.id));
   }
 
@@ -565,12 +565,12 @@ export const findPerformersMinimal = async (
     const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
-    let performers = await cachedEntityQueryService.getAllPerformers();
+    let performers = await stashEntityService.getAllPerformers();
 
     // Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
     const userId = req.user?.id;
-    const cacheVersion = await cachedEntityQueryService.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered performers from cache
     let filteredPerformers = filteredEntityCacheService.get(
@@ -597,15 +597,15 @@ export const findPerformersMinimal = async (
       // Filter empty performers (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = await cachedEntityQueryService.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = await cachedEntityQueryService.getAllGalleries();
-        let allGroups = await cachedEntityQueryService.getAllGroups();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
 
         // Apply user restrictions to groups/galleries FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(

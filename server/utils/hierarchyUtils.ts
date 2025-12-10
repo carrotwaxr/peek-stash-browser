@@ -11,7 +11,7 @@
  *   1, 2, 3...: Specific depth levels
  */
 
-import { cachedEntityQueryService } from "../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../services/StashEntityService.js";
 
 /**
  * Get all descendant tag IDs for a given tag ID
@@ -32,7 +32,7 @@ export async function getDescendantTagIds(
     return result;
   }
 
-  const allTags = await cachedEntityQueryService.getAllTags();
+  const allTags = await stashEntityService.getAllTags();
 
   // Build a map of tag ID to its children for O(1) lookups
   const childrenMap = new Map<string, string[]>();
@@ -89,7 +89,7 @@ export async function getDescendantStudioIds(
     return result;
   }
 
-  const allStudios = await cachedEntityQueryService.getAllStudios();
+  const allStudios = await stashEntityService.getAllStudios();
 
   // Build a map of studio ID to its children for O(1) lookups
   const childrenMap = new Map<string, string[]>();
@@ -188,7 +188,7 @@ export async function hydrateTagRelationships<T extends { id: string; name?: str
 ): Promise<(T & { children: { id: string; name: string }[] })[]> {
   // Fetch ALL tags from cache to build complete name lookup
   // This ensures we can resolve parent names even for single-item requests
-  const allTags = await cachedEntityQueryService.getAllTags();
+  const allTags = await stashEntityService.getAllTags();
   const tagNameMap = new Map<string, string>();
   for (const tag of allTags) {
     tagNameMap.set(tag.id, tag.name || "Unknown");
@@ -237,7 +237,7 @@ export async function hydrateEntityTags<T extends { tags?: { id: string; name?: 
   entities: T[]
 ): Promise<T[]> {
   // Get all tags to build name lookup
-  const allTags = await cachedEntityQueryService.getAllTags();
+  const allTags = await stashEntityService.getAllTags();
   const tagNameMap = new Map<string, string>();
   for (const tag of allTags) {
     tagNameMap.set(tag.id, tag.name || "Unknown");
@@ -268,7 +268,7 @@ export async function hydrateStudioRelationships<T extends { id: string; name?: 
 ): Promise<(T & { child_studios: { id: string; name: string }[] })[]> {
   // Fetch ALL studios from cache to build complete name lookup
   // This ensures we can resolve parent names even for single-item requests
-  const allStudios = await cachedEntityQueryService.getAllStudios();
+  const allStudios = await stashEntityService.getAllStudios();
   const studioNameMap = new Map<string, string>();
   for (const studio of allStudios) {
     studioNameMap.set(studio.id, studio.name || "Unknown");

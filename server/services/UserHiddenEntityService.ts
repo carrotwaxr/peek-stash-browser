@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { cachedEntityQueryService } from "./CachedEntityQueryService.js";
+import { stashEntityService } from "./StashEntityService.js";
 import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
 
 const prisma = new PrismaClient();
@@ -133,22 +133,22 @@ class UserHiddenEntityService {
 
         switch (hidden.entityType) {
           case "scene":
-            entity = await cachedEntityQueryService.getScene(hidden.entityId);
+            entity = await stashEntityService.getScene(hidden.entityId);
             break;
           case "performer":
-            entity = await cachedEntityQueryService.getPerformer(hidden.entityId);
+            entity = await stashEntityService.getPerformer(hidden.entityId);
             break;
           case "studio":
-            entity = await cachedEntityQueryService.getStudio(hidden.entityId);
+            entity = await stashEntityService.getStudio(hidden.entityId);
             break;
           case "tag":
-            entity = await cachedEntityQueryService.getTag(hidden.entityId);
+            entity = await stashEntityService.getTag(hidden.entityId);
             break;
           case "group":
-            entity = await cachedEntityQueryService.getGroup(hidden.entityId);
+            entity = await stashEntityService.getGroup(hidden.entityId);
             break;
           case "gallery":
-            entity = await cachedEntityQueryService.getGallery(hidden.entityId);
+            entity = await stashEntityService.getGallery(hidden.entityId);
             break;
           // image type doesn't have a cache getter
         }

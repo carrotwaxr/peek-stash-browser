@@ -1,6 +1,6 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
-import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { CriterionModifier } from "../../types/index.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
@@ -17,7 +17,7 @@ export async function calculateEntityImageCount(
 ): Promise<number> {
   try {
     // Step 1: Find galleries matching the entity
-    const allGalleries = await cachedEntityQueryService.getAllGalleries();
+    const allGalleries = await stashEntityService.getAllGalleries();
     let matchingGalleries = allGalleries;
 
     if (entityType === "performer") {
@@ -99,7 +99,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 1: Find galleries matching the entity filter
     const step1Start = Date.now();
-    const allGalleries = await cachedEntityQueryService.getAllGalleries();
+    const allGalleries = await stashEntityService.getAllGalleries();
     let matchingGalleries = allGalleries;
 
     if (image_filter?.performers) {

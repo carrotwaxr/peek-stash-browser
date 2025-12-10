@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { cachedEntityQueryService } from "../../services/CachedEntityQueryService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
@@ -189,7 +189,7 @@ export async function applyQuickSceneFilters(
     // Populate sceneStreams for detail views (browse queries return empty streams for performance)
     filtered = filtered.map((s) => ({
       ...s,
-      sceneStreams: s.sceneStreams?.length ? s.sceneStreams : cachedEntityQueryService.generateSceneStreams(s.id),
+      sceneStreams: s.sceneStreams?.length ? s.sceneStreams : stashEntityService.generateSceneStreams(s.id),
     }));
   }
 
@@ -944,7 +944,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       logger.info(`findScenes: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
 
       const dbStart = Date.now();
-      const { scenes: paginatedScenes, total } = await cachedEntityQueryService.getScenesPaginated({
+      const { scenes: paginatedScenes, total } = await stashEntityService.getScenesPaginated({
         page,
         perPage,
         sortField,
@@ -982,7 +982,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 1: Get all scenes from cache
     const cacheStart = Date.now();
-    let scenes = await cachedEntityQueryService.getAllScenes();
+    let scenes = await stashEntityService.getAllScenes();
     logger.info(`findScenes: cache fetch took ${Date.now() - cacheStart}ms for ${scenes.length} scenes`);
 
     if (scenes.length === 0) {
@@ -1223,7 +1223,7 @@ export const findSimilarScenes = async (
 
     // Get all scenes from cache and filter hidden entities
     // All users (including admins) should have their hidden entities filtered
-    let allScenes = await cachedEntityQueryService.getAllScenes();
+    let allScenes = await stashEntityService.getAllScenes();
     allScenes = await userRestrictionService.filterScenesForUser(
       allScenes,
       userId,
@@ -1459,7 +1459,7 @@ export const getRecommendedScenes = async (
 
     // Get all scenes and filter hidden entities
     // All users (including admins) should have their hidden entities filtered
-    let allScenes = await cachedEntityQueryService.getAllScenes();
+    let allScenes = await stashEntityService.getAllScenes();
     allScenes = await userRestrictionService.filterScenesForUser(
       allScenes,
       userId,

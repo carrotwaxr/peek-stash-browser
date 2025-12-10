@@ -2,7 +2,7 @@
  * Query Builders for SQLite Cache
  *
  * Helper functions to build Prisma where clauses from UI filter objects.
- * Used by CachedEntityQueryService for database-level filtering.
+ * Used by StashEntityService for database-level filtering.
  *
  * Note: Complex filters (performers, tags, groups via junction tables)
  * are still applied in JavaScript for now. These query builders handle
