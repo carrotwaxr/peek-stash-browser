@@ -496,9 +496,6 @@ model StashPerformer {
     deathDate       String?
     url             String?                          // Homepage
 
-    // === Tags (JSON array of tag IDs) ===
-    tagIds          String?                          // JSON array of tag IDs
-
     // === Stash paths (raw, transformed at read time) ===
     imagePath       String?                          // Profile image path
 
@@ -538,9 +535,6 @@ model StashStudio {
     // === Extended fields ===
     details         String?                          // Studio description
     url             String?                          // Studio website
-
-    // === Tags (JSON array of tag IDs) ===
-    tagIds          String?                          // JSON array of tag IDs
 
     // === Stash paths (raw, transformed at read time) ===
     imagePath       String?                          // Logo image path
@@ -620,9 +614,6 @@ model StashGroup {
     synopsis        String?
     urls            String?                          // JSON array of URLs
 
-    // === Tags (JSON array of tag IDs) ===
-    tagIds          String?                          // JSON array of tag IDs
-
     // === Stash paths (raw, transformed at read time) ===
     frontImagePath  String?                          // Front cover image
     backImagePath   String?                          // Back cover image
@@ -662,9 +653,6 @@ model StashGallery {
     details         String?                          // Gallery description
     url             String?                          // Gallery URL
     code            String?                          // Gallery code
-
-    // === Tags (JSON array of tag IDs) ===
-    tagIds          String?                          // JSON array of tag IDs
 
     // === File metadata ===
     folderPath      String?                          // Folder path if folder-based
