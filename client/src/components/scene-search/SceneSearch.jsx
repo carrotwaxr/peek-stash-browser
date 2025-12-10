@@ -6,7 +6,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
@@ -162,7 +162,7 @@ const SceneSearch = ({
     <PageLayout>
       <PageHeader title={title} subtitle={subtitle} />
 
-      {initMessage && <CacheLoadingBanner message={initMessage} />}
+      {initMessage && <SyncProgressBanner message={initMessage} />}
 
       <SearchControls
         artifactType="scene"

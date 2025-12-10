@@ -10,7 +10,7 @@ import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js"
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   GridCard,
   PageHeader,
@@ -107,7 +107,7 @@ const Galleries = () => {
           subtitle="Browse image galleries in your library"
         />
 
-        {initMessage && <CacheLoadingBanner message={initMessage} />}
+        {initMessage && <SyncProgressBanner message={initMessage} />}
 
         <SearchControls
           artifactType="gallery"

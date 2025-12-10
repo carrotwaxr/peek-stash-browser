@@ -9,7 +9,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   GridCard,
   PageHeader,
@@ -112,7 +112,7 @@ const Tags = () => {
       <div ref={pageRef}>
         <PageHeader title="Tags" subtitle="Browse tags in your library" />
 
-        {initMessage && <CacheLoadingBanner message={initMessage} />}
+        {initMessage && <SyncProgressBanner message={initMessage} />}
 
         {/* Controls Section */}
         <SearchControls

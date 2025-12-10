@@ -4,7 +4,7 @@ import LoadingSpinner from "./LoadingSpinner.jsx";
  * Reusable banner component for cache initialization state
  * Shows a prominent info banner with spinner when cache is loading
  */
-const CacheLoadingBanner = ({ message, className = "" }) => {
+const SyncProgressBanner = ({ message, className = "" }) => {
   return (
     <div
       className={`mb-6 px-6 py-4 rounded-lg border-l-4 ${className}`}
@@ -18,10 +18,10 @@ const CacheLoadingBanner = ({ message, className = "" }) => {
         <LoadingSpinner size="md" />
         <div>
           <p className="font-semibold" style={{ color: "var(--text-primary)" }}>
-            {message || "Server is loading cache, please wait..."}
+            {message || "Syncing library, please wait..."}
           </p>
           <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-            This may take a minute on first startup. Checking every 5 seconds...
+            This may take a minute on first sync. Checking every 5 seconds...
           </p>
         </div>
       </div>
@@ -29,4 +29,4 @@ const CacheLoadingBanner = ({ message, className = "" }) => {
   );
 };
 
-export default CacheLoadingBanner;
+export default SyncProgressBanner;
