@@ -14,6 +14,8 @@ export {
   CardIndicators,
   CardRatingRow,
   CardTitle,
+  LazyImage,
+  useLazyLoad,
 } from "./CardComponents.jsx";
 export { CardCountIndicators } from "./CardCountIndicators.jsx";
 export { default as CardStatusIcons } from "./CardStatusIcons.jsx";
