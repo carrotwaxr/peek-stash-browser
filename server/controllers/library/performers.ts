@@ -13,6 +13,7 @@ import type {
 } from "../../types/index.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { calculateEntityImageCount } from "./images.js";
 
 /**
@@ -205,9 +206,12 @@ export const findPerformers = async (
     const endIndex = startIndex + perPage;
     let paginatedPerformers = performers.slice(startIndex, endIndex);
 
-    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
-    // This accounts for Gallery→Image relationships, not just direct image tagging
+    // Step 8: For single-entity requests (detail pages), hydrate tags and calculate accurate image_count
     if (ids && ids.length === 1 && paginatedPerformers.length === 1) {
+      // Hydrate tags with names
+      paginatedPerformers = await hydrateEntityTags(paginatedPerformers);
+
+      // Calculate accurate image_count (accounts for Gallery→Image relationships)
       const performer = paginatedPerformers[0];
       const actualImageCount = await calculateEntityImageCount(
         "performer",
@@ -313,23 +317,21 @@ export async function applyPerformerFilters(
   // Filter by studios
   // Note: Performers don't have a direct studio relationship in Stash
   // We need to filter by performers who appear in scenes from specific studios
-  // This requires checking the scenes cache
+  // Uses efficient SQL join query instead of loading all scenes
   if (filters.studios && filters.studios.value) {
-    const studioIds = new Set(filters.studios.value.map(String));
-    const allScenes = await cachedEntityQueryService.getAllScenes();
-
-    // Build a set of performer IDs that appear in scenes from the specified studios
-    const performerIdsInStudios = new Set<string>();
-    allScenes.forEach((scene) => {
-      if (scene.studio && studioIds.has(String(scene.studio.id))) {
-        scene.performers?.forEach((performer) => {
-          performerIdsInStudios.add(String(performer.id));
-        });
-      }
-    });
-
-    // Filter performers to only those who appear in scenes from the specified studios
+    const studioIds = filters.studios.value.map(String);
+    const performerIdsInStudios = await cachedEntityQueryService.getPerformerIdsByStudios(studioIds);
     filtered = filtered.filter((p) => performerIdsInStudios.has(p.id));
+  }
+
+  // Filter by groups
+  // Note: Performers don't have a direct group relationship in Stash
+  // We need to filter by performers who appear in scenes from specific groups
+  // Uses efficient SQL join query instead of loading all scenes
+  if (filters.groups && filters.groups.value) {
+    const groupIds = filters.groups.value.map(String);
+    const performerIdsInGroups = await cachedEntityQueryService.getPerformerIdsByGroups(groupIds);
+    filtered = filtered.filter((p) => performerIdsInGroups.has(p.id));
   }
 
   // Filter by rating100

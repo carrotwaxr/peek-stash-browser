@@ -6,6 +6,7 @@ import { emptyEntityFilterService } from "../../services/EmptyEntityFilterServic
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
+import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -94,30 +95,10 @@ export async function applyGroupFilters(
   // Filter by performers
   // Note: Groups/Collections don't have direct performer relationships in Stash
   // We need to check which groups contain scenes with these performers
+  // Uses efficient SQL join query instead of loading all scenes
   if (filters.performers && filters.performers.value) {
-    const performerIds = new Set(filters.performers.value.map(String));
-    const allScenes = await cachedEntityQueryService.getAllScenes();
-
-    // Build a set of group IDs that contain scenes with these performers
-    const groupIdsWithPerformers = new Set<string>();
-    allScenes.forEach((scene) => {
-      if (scene.performers && scene.performers.length > 0) {
-        const sceneHasPerformer = scene.performers.some((p) =>
-          performerIds.has(String(p.id))
-        );
-        if (sceneHasPerformer && scene.groups && scene.groups.length > 0) {
-          scene.groups.forEach((group: any) => {
-            // Handle both nested { group: { id } } and flattened { id } structures
-            const groupId = group.group?.id || group.id;
-            if (groupId) {
-              groupIdsWithPerformers.add(String(groupId));
-            }
-          });
-        }
-      }
-    });
-
-    // Filter groups to only those that contain scenes with the specified performers
+    const performerIds = filters.performers.value.map(String);
+    const groupIdsWithPerformers = await cachedEntityQueryService.getGroupIdsByPerformers(performerIds);
     filtered = filtered.filter((g) => groupIdsWithPerformers.has(g.id));
   }
 
@@ -313,7 +294,12 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     const total = groups.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedGroups = groups.slice(startIndex, endIndex);
+    let paginatedGroups = groups.slice(startIndex, endIndex);
+
+    // Step 7: For single-entity requests (detail pages), hydrate tags with names
+    if (ids && ids.length === 1 && paginatedGroups.length === 1) {
+      paginatedGroups = await hydrateEntityTags(paginatedGroups);
+    }
 
     // Add stashUrl to each group
     const groupsWithStashUrl = paginatedGroups.map(group => ({
