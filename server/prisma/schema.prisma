@@ -436,9 +436,6 @@ model StashScene {
     playCount       Int       @default(0)            // Stash play_count
     playDuration    Float     @default(0)            // Stash play_duration
 
-    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
-    data            String    @default("{}")         // DEPRECATED: JSON blob
-
     // === Sync metadata ===
     stashCreatedAt  DateTime?
     stashUpdatedAt  DateTime?
@@ -499,9 +496,6 @@ model StashPerformer {
     // === Stash paths (raw, transformed at read time) ===
     imagePath       String?                          // Profile image path
 
-    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
-    data            String    @default("{}")         // DEPRECATED: JSON blob
-
     // === Sync metadata ===
     stashCreatedAt  DateTime?
     stashUpdatedAt  DateTime?
@@ -539,9 +533,6 @@ model StashStudio {
     // === Stash paths (raw, transformed at read time) ===
     imagePath       String?                          // Logo image path
 
-    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
-    data            String    @default("{}")         // DEPRECATED: JSON blob
-
     // === Sync metadata ===
     stashCreatedAt  DateTime?
     stashUpdatedAt  DateTime?
@@ -574,9 +565,6 @@ model StashTag {
 
     // === Stash paths (raw, transformed at read time) ===
     imagePath       String?                          // Tag image path
-
-    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
-    data            String    @default("{}")         // DEPRECATED: JSON blob
 
     // === Sync metadata ===
     stashCreatedAt  DateTime?
@@ -618,9 +606,6 @@ model StashGroup {
     frontImagePath  String?                          // Front cover image
     backImagePath   String?                          // Back cover image
 
-    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
-    data            String    @default("{}")         // DEPRECATED: JSON blob
-
     // === Sync metadata ===
     stashCreatedAt  DateTime?
     stashUpdatedAt  DateTime?
@@ -659,9 +644,6 @@ model StashGallery {
 
     // === Stash paths (raw, transformed at read time) ===
     coverPath       String?                          // Cover image path
-
-    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
-    data            String    @default("{}")         // DEPRECATED: JSON blob
 
     // === Sync metadata ===
     stashCreatedAt  DateTime?
@@ -705,9 +687,6 @@ model StashImage {
     pathThumbnail   String?                          // Thumbnail URL path
     pathPreview     String?                          // Preview URL path
     pathImage       String?                          // Full image URL path
-
-    // === Legacy JSON blob (kept for backward compatibility, will be removed) ===
-    data            String    @default("{}")         // DEPRECATED: JSON blob
 
     // === Sync metadata ===
     stashCreatedAt  DateTime?
