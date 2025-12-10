@@ -110,9 +110,6 @@ vi.mock("../../prisma/singleton.js", () => ({
         },
       ]),
     },
-    pathMapping: {
-      findMany: vi.fn().mockResolvedValue([]),
-    },
     $queryRaw: vi.fn(),
   },
 }));

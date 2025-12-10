@@ -53,9 +53,6 @@ async function main() {
     console.log('Backing up stashInstances...');
     backup.stashInstances = await prisma.stashInstance.findMany();
 
-    // PathMapping table removed from schema
-    backup.pathMappings = [];
-
     console.log('Backing up syncSettings...');
     try {
       backup.syncSettings = await prisma.syncSettings.findMany();
@@ -81,7 +78,6 @@ async function main() {
     console.log('  Playlists:', backup.playlists.length);
     console.log('  PlaylistItems:', backup.playlistItems.length);
     console.log('  StashInstances:', backup.stashInstances.length);
-    console.log('  PathMappings:', backup.pathMappings.length);
 
   } catch (e) {
     console.error('Error:', e.message);
