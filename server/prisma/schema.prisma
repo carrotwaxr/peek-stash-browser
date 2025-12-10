@@ -482,6 +482,7 @@ model CachedPerformer {
     sceneCount      Int       @default(0)
     imageCount      Int       @default(0)
     galleryCount    Int       @default(0)
+    groupCount      Int       @default(0)
 
     // === Extended fields ===
     details         String?                          // Biography
@@ -499,6 +500,9 @@ model CachedPerformer {
     deathDate       String?
     url             String?                          // Homepage
 
+    // === Tags (JSON array of tag IDs) ===
+    tagIds          String?                          // JSON array of tag IDs
+
     // === Stash paths (raw, transformed at read time) ===
     imagePath       String?                          // Profile image path
 
@@ -514,6 +518,7 @@ model CachedPerformer {
     // === Relations ===
     scenes          ScenePerformer[]
     images          ImagePerformer[]
+    galleries       GalleryPerformer[]
 
     @@index([name])
     @@index([gender])
@@ -536,10 +541,15 @@ model CachedStudio {
     sceneCount      Int       @default(0)
     imageCount      Int       @default(0)
     galleryCount    Int       @default(0)
+    performerCount  Int       @default(0)
+    groupCount      Int       @default(0)
 
     // === Extended fields ===
     details         String?                          // Studio description
     url             String?                          // Studio website
+
+    // === Tags (JSON array of tag IDs) ===
+    tagIds          String?                          // JSON array of tag IDs
 
     // === Stash paths (raw, transformed at read time) ===
     imagePath       String?                          // Logo image path
@@ -571,9 +581,15 @@ model CachedTag {
     favorite        Boolean   @default(false)
     sceneCount      Int       @default(0)
     imageCount      Int       @default(0)
+    galleryCount    Int       @default(0)
+    performerCount  Int       @default(0)
+    studioCount     Int       @default(0)
+    groupCount      Int       @default(0)
+    sceneMarkerCount Int      @default(0)
 
     // === Extended fields ===
     description     String?                          // Tag description
+    aliases         String?                          // JSON array of alias strings
     parentIds       String?                          // JSON array of parent tag IDs
 
     // === Stash paths (raw, transformed at read time) ===
@@ -610,11 +626,15 @@ model CachedGroup {
     rating100       Int?
     duration        Int?
     sceneCount      Int       @default(0)
+    performerCount  Int       @default(0)
 
     // === Extended fields ===
     director        String?
     synopsis        String?
     urls            String?                          // JSON array of URLs
+
+    // === Tags (JSON array of tag IDs) ===
+    tagIds          String?                          // JSON array of tag IDs
 
     // === Stash paths (raw, transformed at read time) ===
     frontImagePath  String?                          // Front cover image
@@ -657,6 +677,9 @@ model CachedGallery {
     url             String?                          // Gallery URL
     code            String?                          // Gallery code
 
+    // === Tags (JSON array of tag IDs) ===
+    tagIds          String?                          // JSON array of tag IDs
+
     // === File metadata ===
     folderPath      String?                          // Folder path if folder-based
 
@@ -675,6 +698,7 @@ model CachedGallery {
     // === Relations ===
     scenes          SceneGallery[]
     images          ImageGallery[]
+    performers      GalleryPerformer[]
 
     @@index([title])
     @@index([date])
@@ -800,6 +824,16 @@ model ImageGallery {
 
     @@id([imageId, galleryId])
     @@index([galleryId])
+}
+
+model GalleryPerformer {
+    galleryId       String
+    performerId     String
+    gallery         CachedGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+    performer       CachedPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+
+    @@id([galleryId, performerId])
+    @@index([performerId])
 }
 
 // Sync state tracking per entity type

@@ -39,7 +39,6 @@ type EntityType = "scene" | "performer" | "studio" | "tag" | "group" | "gallery"
 
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
-const _PROGRESS_LOG_INTERVAL = 100; // Log progress every N items (reserved for future use)
 
 /**
  * Validate that an entity ID is safe for SQL insertion.
@@ -577,17 +576,16 @@ class StashSyncService extends EventEmitter {
           ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
           : undefined;
 
-        logger.info(`Fetching scenes page ${page}...`);
+        logger.debug(`Fetching scenes page ${page}...`);
         const fetchStart = Date.now();
         const result = await stash.findScenesCompact({
           filter: { page, per_page: this.PAGE_SIZE },
           scene_filter: sceneFilter as any,
         });
-        logger.info(`Fetched page ${page} in ${Date.now() - fetchStart}ms`);
+        logger.debug(`Fetched page ${page} in ${Date.now() - fetchStart}ms`);
 
         const scenes = result.findScenes.scenes;
         totalCount = result.findScenes.count;
-        logger.info(`Got ${scenes.length} scenes (total: ${totalCount})`);
 
         if (scenes.length === 0) break;
 
@@ -602,8 +600,8 @@ class StashSyncService extends EventEmitter {
           total: totalCount,
         } as SyncProgress);
 
-        // Log batch completion
-        logger.info(`Scenes batch complete: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
+        // Log batch completion at debug level
+        logger.debug(`Scenes: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
 
         if (totalSynced >= totalCount) break;
         page++;
@@ -616,11 +614,14 @@ class StashSyncService extends EventEmitter {
         total: totalSynced,
       } as SyncProgress);
 
+      const durationMs = Date.now() - startTime;
+      logger.info(`Scenes synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
       return {
         entityType: "scene",
         synced: totalSynced,
         deleted: 0,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (error) {
       this.emit("progress", {
@@ -820,11 +821,6 @@ class StashSyncService extends EventEmitter {
 
     await Promise.all(inserts);
 
-    // Log progress
-    const currentTotal = batchStart + validScenes.length;
-    logger.info(
-      `Scenes: ${currentTotal}/${totalCount} (${Math.round((currentTotal / totalCount) * 100)}%)`
-    );
   }
 
   // ==================== Performer Sync ====================
@@ -876,7 +872,7 @@ class StashSyncService extends EventEmitter {
           total: totalCount,
         } as SyncProgress);
 
-        logger.info(`Performers: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
+        logger.debug(`Performers: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
 
         if (totalSynced >= totalCount) break;
         page++;
@@ -889,11 +885,14 @@ class StashSyncService extends EventEmitter {
         total: totalSynced,
       } as SyncProgress);
 
+      const durationMs = Date.now() - startTime;
+      logger.info(`Performers synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
       return {
         entityType: "performer",
         synced: totalSynced,
         deleted: 0,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (error) {
       this.emit("progress", {
@@ -920,6 +919,8 @@ class StashSyncService extends EventEmitter {
 
     const values = validPerformers
       .map((performer) => {
+        // Extract tag IDs as JSON array
+        const tagIds = performer.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(performer.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -932,6 +933,7 @@ class StashSyncService extends EventEmitter {
       ${performer.scene_count ?? 0},
       ${performer.image_count ?? 0},
       ${performer.gallery_count ?? 0},
+      ${(performer as any).group_count ?? 0},
       ${this.escapeNullable(performer.details)},
       ${this.escapeNullable(JSON.stringify(performer.alias_list || []))},
       ${this.escapeNullable(performer.country)},
@@ -946,6 +948,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(performer.career_length)},
       ${this.escapeNullable(performer.death_date)},
       ${this.escapeNullable(performer.url)},
+      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(performer.image_path)},
       '{}',
       ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
@@ -959,9 +962,9 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO CachedPerformer (
       id, stashInstanceId, name, disambiguation, gender, birthdate, favorite,
-      rating100, sceneCount, imageCount, galleryCount, details, aliasList,
+      rating100, sceneCount, imageCount, galleryCount, groupCount, details, aliasList,
       country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements,
-      tattoos, piercings, careerLength, deathDate, url, imagePath, data,
+      tattoos, piercings, careerLength, deathDate, url, tagIds, imagePath, data,
       stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -974,6 +977,7 @@ class StashSyncService extends EventEmitter {
       sceneCount = excluded.sceneCount,
       imageCount = excluded.imageCount,
       galleryCount = excluded.galleryCount,
+      groupCount = excluded.groupCount,
       details = excluded.details,
       aliasList = excluded.aliasList,
       country = excluded.country,
@@ -988,6 +992,7 @@ class StashSyncService extends EventEmitter {
       careerLength = excluded.careerLength,
       deathDate = excluded.deathDate,
       url = excluded.url,
+      tagIds = excluded.tagIds,
       imagePath = excluded.imagePath,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
@@ -1045,7 +1050,7 @@ class StashSyncService extends EventEmitter {
           total: totalCount,
         } as SyncProgress);
 
-        logger.info(`Studios: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
+        logger.debug(`Studios: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
 
         if (totalSynced >= totalCount) break;
         page++;
@@ -1058,11 +1063,14 @@ class StashSyncService extends EventEmitter {
         total: totalSynced,
       } as SyncProgress);
 
+      const durationMs = Date.now() - startTime;
+      logger.info(`Studios synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
       return {
         entityType: "studio",
         synced: totalSynced,
         deleted: 0,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1089,6 +1097,8 @@ class StashSyncService extends EventEmitter {
 
     const values = validStudios
       .map((studio) => {
+        // Extract tag IDs as JSON array
+        const tagIds = studio.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(studio.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1099,8 +1109,11 @@ class StashSyncService extends EventEmitter {
       ${studio.scene_count ?? 0},
       ${studio.image_count ?? 0},
       ${studio.gallery_count ?? 0},
+      ${(studio as any).performer_count ?? 0},
+      ${(studio as any).group_count ?? 0},
       ${this.escapeNullable(studio.details)},
       ${this.escapeNullable(studio.url)},
+      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(studio.image_path)},
       '{}',
       ${studio.created_at ? `'${studio.created_at}'` : "NULL"},
@@ -1114,7 +1127,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO CachedStudio (
       id, stashInstanceId, name, parentId, favorite, rating100, sceneCount,
-      imageCount, galleryCount, details, url, imagePath, data, stashCreatedAt,
+      imageCount, galleryCount, performerCount, groupCount, details, url, tagIds, imagePath, data, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1125,8 +1138,11 @@ class StashSyncService extends EventEmitter {
       sceneCount = excluded.sceneCount,
       imageCount = excluded.imageCount,
       galleryCount = excluded.galleryCount,
+      performerCount = excluded.performerCount,
+      groupCount = excluded.groupCount,
       details = excluded.details,
       url = excluded.url,
+      tagIds = excluded.tagIds,
       imagePath = excluded.imagePath,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
@@ -1184,7 +1200,7 @@ class StashSyncService extends EventEmitter {
           total: totalCount,
         } as SyncProgress);
 
-        logger.info(`Tags: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
+        logger.debug(`Tags: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
 
         if (totalSynced >= totalCount) break;
         page++;
@@ -1197,11 +1213,14 @@ class StashSyncService extends EventEmitter {
         total: totalSynced,
       } as SyncProgress);
 
+      const durationMs = Date.now() - startTime;
+      logger.info(`Tags synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
       return {
         entityType: "tag",
         synced: totalSynced,
         deleted: 0,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1226,6 +1245,7 @@ class StashSyncService extends EventEmitter {
     const values = validTags
       .map((tag) => {
         const parentIds = tag.parents?.map((p) => p.id) || [];
+        const aliases = (tag as any).aliases || [];
         return `(
       '${this.escape(tag.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1233,7 +1253,13 @@ class StashSyncService extends EventEmitter {
       ${tag.favorite ? 1 : 0},
       ${tag.scene_count ?? 0},
       ${tag.image_count ?? 0},
+      ${(tag as any).gallery_count ?? 0},
+      ${(tag as any).performer_count ?? 0},
+      ${(tag as any).studio_count ?? 0},
+      ${(tag as any).group_count ?? 0},
+      ${(tag as any).scene_marker_count ?? 0},
       ${this.escapeNullable(tag.description)},
+      ${this.escapeNullable(JSON.stringify(aliases))},
       ${this.escapeNullable(JSON.stringify(parentIds))},
       ${this.escapeNullable(tag.image_path)},
       '{}',
@@ -1247,15 +1273,22 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO CachedTag (
-      id, stashInstanceId, name, favorite, sceneCount, imageCount, description,
-      parentIds, imagePath, data, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+      id, stashInstanceId, name, favorite, sceneCount, imageCount, galleryCount,
+      performerCount, studioCount, groupCount, sceneMarkerCount, description,
+      aliases, parentIds, imagePath, data, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       favorite = excluded.favorite,
       sceneCount = excluded.sceneCount,
       imageCount = excluded.imageCount,
+      galleryCount = excluded.galleryCount,
+      performerCount = excluded.performerCount,
+      studioCount = excluded.studioCount,
+      groupCount = excluded.groupCount,
+      sceneMarkerCount = excluded.sceneMarkerCount,
       description = excluded.description,
+      aliases = excluded.aliases,
       parentIds = excluded.parentIds,
       imagePath = excluded.imagePath,
       stashCreatedAt = excluded.stashCreatedAt,
@@ -1314,7 +1347,7 @@ class StashSyncService extends EventEmitter {
           total: totalCount,
         } as SyncProgress);
 
-        logger.info(`Groups: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
+        logger.debug(`Groups: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
 
         if (totalSynced >= totalCount) break;
         page++;
@@ -1327,11 +1360,14 @@ class StashSyncService extends EventEmitter {
         total: totalSynced,
       } as SyncProgress);
 
+      const durationMs = Date.now() - startTime;
+      logger.info(`Groups synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
       return {
         entityType: "group",
         synced: totalSynced,
         deleted: 0,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1357,6 +1393,8 @@ class StashSyncService extends EventEmitter {
       .map((group) => {
         const duration = group.duration || null;
         const urls = group.urls || [];
+        // Extract tag IDs as JSON array
+        const tagIds = group.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(group.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1366,9 +1404,11 @@ class StashSyncService extends EventEmitter {
       ${group.rating100 ?? "NULL"},
       ${duration ? Math.round(duration) : "NULL"},
       ${group.scene_count ?? 0},
+      ${(group as any).performer_count ?? 0},
       ${this.escapeNullable(group.director)},
       ${this.escapeNullable(group.synopsis)},
       ${this.escapeNullable(JSON.stringify(urls))},
+      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(group.front_image_path)},
       ${this.escapeNullable(group.back_image_path)},
       '{}',
@@ -1383,7 +1423,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO CachedGroup (
       id, stashInstanceId, name, date, studioId, rating100, duration, sceneCount,
-      director, synopsis, urls, frontImagePath, backImagePath, data, stashCreatedAt,
+      performerCount, director, synopsis, urls, tagIds, frontImagePath, backImagePath, data, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1393,9 +1433,11 @@ class StashSyncService extends EventEmitter {
       rating100 = excluded.rating100,
       duration = excluded.duration,
       sceneCount = excluded.sceneCount,
+      performerCount = excluded.performerCount,
       director = excluded.director,
       synopsis = excluded.synopsis,
       urls = excluded.urls,
+      tagIds = excluded.tagIds,
       frontImagePath = excluded.frontImagePath,
       backImagePath = excluded.backImagePath,
       stashCreatedAt = excluded.stashCreatedAt,
@@ -1454,7 +1496,7 @@ class StashSyncService extends EventEmitter {
           total: totalCount,
         } as SyncProgress);
 
-        logger.info(`Galleries: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
+        logger.debug(`Galleries: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
 
         if (totalSynced >= totalCount) break;
         page++;
@@ -1467,11 +1509,14 @@ class StashSyncService extends EventEmitter {
         total: totalSynced,
       } as SyncProgress);
 
+      const durationMs = Date.now() - startTime;
+      logger.info(`Galleries synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
       return {
         entityType: "gallery",
         synced: totalSynced,
         deleted: 0,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1499,6 +1544,8 @@ class StashSyncService extends EventEmitter {
     const values = validGalleries
       .map((gallery) => {
         const folder = gallery.folder;
+        // Extract tag IDs as JSON array
+        const tagIds = gallery.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(gallery.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1510,8 +1557,9 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(gallery.details)},
       ${this.escapeNullable(gallery.url)},
       ${this.escapeNullable(gallery.code)},
+      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(folder?.path)},
-      ${this.escapeNullable(gallery.cover?.paths?.thumbnail)},
+      ${this.escapeNullable(gallery.paths?.cover)},
       '{}',
       ${gallery.created_at ? `'${gallery.created_at}'` : "NULL"},
       ${gallery.updated_at ? `'${gallery.updated_at}'` : "NULL"},
@@ -1524,7 +1572,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO CachedGallery (
       id, stashInstanceId, title, date, studioId, rating100, imageCount,
-      details, url, code, folderPath, coverPath, data, stashCreatedAt, stashUpdatedAt,
+      details, url, code, tagIds, folderPath, coverPath, data, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1536,6 +1584,7 @@ class StashSyncService extends EventEmitter {
       details = excluded.details,
       url = excluded.url,
       code = excluded.code,
+      tagIds = excluded.tagIds,
       folderPath = excluded.folderPath,
       coverPath = excluded.coverPath,
       stashCreatedAt = excluded.stashCreatedAt,
@@ -1543,6 +1592,39 @@ class StashSyncService extends EventEmitter {
       syncedAt = excluded.syncedAt,
       deletedAt = NULL
   `);
+
+    // Sync gallery performers (junction table)
+    const performerInserts: { galleryId: string; performerId: string }[] = [];
+    for (const gallery of validGalleries) {
+      if (gallery.performers && gallery.performers.length > 0) {
+        for (const performer of gallery.performers) {
+          if (validateEntityId(performer.id)) {
+            performerInserts.push({
+              galleryId: gallery.id,
+              performerId: performer.id,
+            });
+          }
+        }
+      }
+    }
+
+    // Delete existing gallery-performer relationships for these galleries
+    const galleryIds = validGalleries.map((g) => `'${this.escape(g.id)}'`).join(",");
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM GalleryPerformer WHERE galleryId IN (${galleryIds})
+    `);
+
+    // Insert new gallery-performer relationships
+    if (performerInserts.length > 0) {
+      const performerValues = performerInserts
+        .map((p) => `('${this.escape(p.galleryId)}', '${this.escape(p.performerId)}')`)
+        .join(",\n");
+
+      await prisma.$executeRawUnsafe(`
+        INSERT OR IGNORE INTO GalleryPerformer (galleryId, performerId)
+        VALUES ${performerValues}
+      `);
+    }
   }
 
   // ==================== Image Sync ====================
@@ -1594,7 +1676,7 @@ class StashSyncService extends EventEmitter {
           total: totalCount,
         } as SyncProgress);
 
-        logger.info(`Images: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
+        logger.debug(`Images: ${totalSynced}/${totalCount} (${Math.round((totalSynced / totalCount) * 100)}%)`);
 
         if (totalSynced >= totalCount) break;
         page++;
@@ -1607,11 +1689,14 @@ class StashSyncService extends EventEmitter {
         total: totalSynced,
       } as SyncProgress);
 
+      const durationMs = Date.now() - startTime;
+      logger.info(`Images synced: ${totalSynced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
       return {
         entityType: "image",
         synced: totalSynced,
         deleted: 0,
-        durationMs: Date.now() - startTime,
+        durationMs,
       };
     } catch (error) {
       this.emit("progress", {

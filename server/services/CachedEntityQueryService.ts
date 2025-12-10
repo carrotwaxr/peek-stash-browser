@@ -8,6 +8,7 @@
  * controller patterns while using the new SQLite cache.
  */
 
+import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import type {
@@ -192,7 +193,8 @@ class CachedEntityQueryService {
 
   /**
    * Get scenes with database-level pagination and sorting
-   * This is the optimized path for browse queries without complex filters
+   * This is the optimized path for browse queries
+   * Supports efficient exclusion filtering using NOT IN at the database level
    */
   async getScenesPaginated(options: {
     page: number;
@@ -220,13 +222,16 @@ class CachedEntityQueryService {
     const sortColumn = sortColumnMap[sortField] || 'stashCreatedAt';
     const isRandom = sortField === 'random';
 
-    // Build where clause
+    // Build where clause with exclusions at DB level
     const where: any = { deletedAt: null };
+    if (excludeIds && excludeIds.size > 0) {
+      where.id = { notIn: Array.from(excludeIds) };
+    }
 
-    // Get total count first (for pagination info)
+    // Get total count first (for pagination info) - respecting exclusions
     const countStart = Date.now();
     const total = await prisma.cachedScene.count({ where });
-    logger.debug(`getScenesPaginated: count took ${Date.now() - countStart}ms`);
+    logger.debug(`getScenesPaginated: count took ${Date.now() - countStart}ms (excludeIds: ${excludeIds?.size || 0})`);
 
     // Build orderBy
     let orderBy: any;
@@ -238,7 +243,7 @@ class CachedEntityQueryService {
       orderBy = { [sortColumn]: sortDirection.toLowerCase() };
     }
 
-    // Query with pagination
+    // Query with pagination - exclusions already applied in where clause
     const queryStart = Date.now();
     const cached = await prisma.cachedScene.findMany({
       where,
@@ -251,16 +256,10 @@ class CachedEntityQueryService {
 
     // Transform results
     const transformStart = Date.now();
-    let scenes = cached.map((c) => this.transformSceneForBrowse(c));
-
-    // Filter out excluded IDs if provided (for hidden entities)
-    if (excludeIds && excludeIds.size > 0) {
-      scenes = scenes.filter(s => !excludeIds.has(s.id));
-    }
-
+    const scenes = cached.map((c) => this.transformSceneForBrowse(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}`);
+    logger.info(`getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}, excluded=${excludeIds?.size || 0}`);
 
     return { scenes, total };
   }
@@ -535,6 +534,9 @@ class CachedEntityQueryService {
   async getAllGalleries(): Promise<NormalizedGallery[]> {
     const cached = await prisma.cachedGallery.findMany({
       where: { deletedAt: null },
+      include: {
+        performers: { include: { performer: true } },
+      },
     });
 
     return cached.map((c) => this.transformGallery(c));
@@ -546,6 +548,9 @@ class CachedEntityQueryService {
   async getGallery(id: string): Promise<NormalizedGallery | null> {
     const cached = await prisma.cachedGallery.findFirst({
       where: { id, deletedAt: null },
+      include: {
+        performers: { include: { performer: true } },
+      },
     });
 
     if (!cached) return null;
@@ -560,6 +565,9 @@ class CachedEntityQueryService {
       where: {
         id: { in: ids },
         deletedAt: null,
+      },
+      include: {
+        performers: { include: { performer: true } },
       },
     });
 
@@ -782,6 +790,69 @@ class CachedEntityQueryService {
     });
   }
 
+  // ==================== Relationship Queries (for filtering) ====================
+
+  /**
+   * Get performer IDs that appear in scenes from specific studios.
+   * Used for filtering performers by studio on detail pages.
+   * Schema dependencies: ScenePerformer.performerId, CachedScene.studioId
+   */
+  async getPerformerIdsByStudios(studioIds: string[]): Promise<Set<string>> {
+    if (studioIds.length === 0) return new Set();
+
+    const startTime = Date.now();
+    const results = await prisma.$queryRaw<{ performerId: string }[]>`
+      SELECT DISTINCT sp.performerId
+      FROM ScenePerformer sp
+      INNER JOIN CachedScene cs ON sp.sceneId = cs.id
+      WHERE cs.studioId IN (${Prisma.join(studioIds)})
+        AND cs.deletedAt IS NULL
+    `;
+    logger.debug(`getPerformerIdsByStudios: ${Date.now() - startTime}ms, studios=${studioIds.length}, performers=${results.length}`);
+
+    return new Set(results.map(r => r.performerId));
+  }
+
+  /**
+   * Get performer IDs that appear in scenes from specific groups.
+   * Used for filtering performers by group on detail pages.
+   * Schema dependencies: ScenePerformer.performerId, SceneGroup.groupId
+   */
+  async getPerformerIdsByGroups(groupIds: string[]): Promise<Set<string>> {
+    if (groupIds.length === 0) return new Set();
+
+    const startTime = Date.now();
+    const results = await prisma.$queryRaw<{ performerId: string }[]>`
+      SELECT DISTINCT sp.performerId
+      FROM ScenePerformer sp
+      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId
+      WHERE sg.groupId IN (${Prisma.join(groupIds)})
+    `;
+    logger.debug(`getPerformerIdsByGroups: ${Date.now() - startTime}ms, groups=${groupIds.length}, performers=${results.length}`);
+
+    return new Set(results.map(r => r.performerId));
+  }
+
+  /**
+   * Get group IDs that contain scenes with specific performers.
+   * Used for filtering groups by performer on detail pages.
+   * Schema dependencies: SceneGroup.groupId, ScenePerformer.performerId
+   */
+  async getGroupIdsByPerformers(performerIds: string[]): Promise<Set<string>> {
+    if (performerIds.length === 0) return new Set();
+
+    const startTime = Date.now();
+    const results = await prisma.$queryRaw<{ groupId: string }[]>`
+      SELECT DISTINCT sg.groupId
+      FROM SceneGroup sg
+      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId
+      WHERE sp.performerId IN (${Prisma.join(performerIds)})
+    `;
+    logger.debug(`getGroupIdsByPerformers: ${Date.now() - startTime}ms, performers=${performerIds.length}, groups=${results.length}`);
+
+    return new Set(results.map(r => r.groupId));
+  }
+
   private transformScene(scene: any): NormalizedScene {
     return {
       // User fields (defaults first, then override with actual values)
@@ -831,8 +902,8 @@ class CachedEntityQueryService {
       created_at: scene.stashCreatedAt?.toISOString() ?? null,
       updated_at: scene.stashUpdatedAt?.toISOString() ?? null,
 
-      // Nested entities (empty - loaded separately or via include)
-      studio: null,
+      // Nested entities - studio from studioId, others empty (loaded separately or via include)
+      studio: scene.studioId ? { id: scene.studioId } : null,
       performers: [],
       tags: [],
       groups: [],
@@ -892,8 +963,8 @@ class CachedEntityQueryService {
       created_at: scene.stashCreatedAt?.toISOString() ?? null,
       updated_at: scene.stashUpdatedAt?.toISOString() ?? null,
 
-      // Nested entities (empty - loaded separately or via include)
-      studio: null,
+      // Nested entities - studio from studioId, others empty (loaded separately or via include)
+      studio: scene.studioId ? { id: scene.studioId } : null,
       performers: [],
       tags: [],
       groups: [],
@@ -931,6 +1002,8 @@ class CachedEntityQueryService {
   }
 
   private transformPerformer(performer: any): NormalizedPerformer {
+    // Parse tag IDs and create tag objects (will be hydrated later)
+    const tagIds = performer.tagIds ? JSON.parse(performer.tagIds) : [];
     return {
       ...DEFAULT_PERFORMER_USER_FIELDS,
       id: performer.id,
@@ -943,6 +1016,7 @@ class CachedEntityQueryService {
       scene_count: performer.sceneCount ?? 0,
       image_count: performer.imageCount ?? 0,
       gallery_count: performer.galleryCount ?? 0,
+      group_count: performer.groupCount ?? 0,
       details: performer.details,
       alias_list: performer.aliasList ? JSON.parse(performer.aliasList) : [],
       country: performer.country,
@@ -957,6 +1031,8 @@ class CachedEntityQueryService {
       career_length: performer.careerLength,
       death_date: performer.deathDate,
       url: performer.url,
+      // Tags as array of {id} objects - will be hydrated with names in controller
+      tags: tagIds.map((id: string) => ({ id })),
       image_path: this.transformUrl(performer.imagePath),
       created_at: performer.stashCreatedAt?.toISOString() ?? null,
       updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
@@ -964,6 +1040,8 @@ class CachedEntityQueryService {
   }
 
   private transformStudio(studio: any): NormalizedStudio {
+    // Parse tag IDs and create tag objects (will be hydrated later)
+    const tagIds = studio.tagIds ? JSON.parse(studio.tagIds) : [];
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
       id: studio.id,
@@ -974,8 +1052,12 @@ class CachedEntityQueryService {
       scene_count: studio.sceneCount ?? 0,
       image_count: studio.imageCount ?? 0,
       gallery_count: studio.galleryCount ?? 0,
+      performer_count: studio.performerCount ?? 0,
+      group_count: studio.groupCount ?? 0,
       details: studio.details,
       url: studio.url,
+      // Tags as array of {id} objects - will be hydrated with names in controller
+      tags: tagIds.map((id: string) => ({ id })),
       image_path: this.transformUrl(studio.imagePath),
       created_at: studio.stashCreatedAt?.toISOString() ?? null,
       updated_at: studio.stashUpdatedAt?.toISOString() ?? null,
@@ -990,7 +1072,13 @@ class CachedEntityQueryService {
       favorite: tag.favorite ?? false,
       scene_count: tag.sceneCount ?? 0,
       image_count: tag.imageCount ?? 0,
+      gallery_count: tag.galleryCount ?? 0,
+      performer_count: tag.performerCount ?? 0,
+      studio_count: tag.studioCount ?? 0,
+      group_count: tag.groupCount ?? 0,
+      scene_marker_count: tag.sceneMarkerCount ?? 0,
       description: tag.description,
+      aliases: tag.aliases ? JSON.parse(tag.aliases) : [],
       parents: tag.parentIds ? JSON.parse(tag.parentIds).map((id: string) => ({ id })) : [],
       image_path: this.transformUrl(tag.imagePath),
       created_at: tag.stashCreatedAt?.toISOString() ?? null,
@@ -999,6 +1087,8 @@ class CachedEntityQueryService {
   }
 
   private transformGroup(group: any): NormalizedGroup {
+    // Parse tag IDs and create tag objects (will be hydrated later)
+    const tagIds = group.tagIds ? JSON.parse(group.tagIds) : [];
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
       id: group.id,
@@ -1008,9 +1098,12 @@ class CachedEntityQueryService {
       rating100: group.rating100,
       duration: group.duration,
       scene_count: group.sceneCount ?? 0,
+      performer_count: group.performerCount ?? 0,
       director: group.director,
       synopsis: group.synopsis,
       urls: group.urls ? JSON.parse(group.urls) : [],
+      // Tags as array of {id} objects - will be hydrated with names in controller
+      tags: tagIds.map((id: string) => ({ id })),
       front_image_path: this.transformUrl(group.frontImagePath),
       back_image_path: this.transformUrl(group.backImagePath),
       created_at: group.stashCreatedAt?.toISOString() ?? null,
@@ -1019,6 +1112,16 @@ class CachedEntityQueryService {
   }
 
   private transformGallery(gallery: any): NormalizedGallery {
+    const coverUrl = this.transformUrl(gallery.coverPath);
+    // Parse tag IDs and create tag objects (will be hydrated later)
+    const tagIds = gallery.tagIds ? JSON.parse(gallery.tagIds) : [];
+
+    // Transform performers from junction table
+    const performers = gallery.performers?.map((gp: any) => ({
+      id: gp.performer.id,
+      name: gp.performer.name,
+    })) || [];
+
     return {
       ...DEFAULT_GALLERY_USER_FIELDS,
       id: gallery.id,
@@ -1031,7 +1134,13 @@ class CachedEntityQueryService {
       url: gallery.url,
       code: gallery.code,
       folder: gallery.folderPath ? { path: gallery.folderPath } : null,
-      cover: gallery.coverPath ? { paths: { thumbnail: this.transformUrl(gallery.coverPath) } } : null,
+      cover: coverUrl ? { paths: { thumbnail: coverUrl } } : null,
+      // Frontend expects gallery.paths.cover for the cover image
+      paths: coverUrl ? { cover: coverUrl } : null,
+      // Tags as array of {id} objects - will be hydrated with names in controller
+      tags: tagIds.map((id: string) => ({ id })),
+      // Performers from junction table
+      performers,
       created_at: gallery.stashCreatedAt?.toISOString() ?? null,
       updated_at: gallery.stashUpdatedAt?.toISOString() ?? null,
     } as unknown as NormalizedGallery;
