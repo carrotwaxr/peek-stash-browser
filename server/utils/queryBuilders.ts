@@ -140,8 +140,8 @@ export function applyBooleanFilter<T extends Record<string, unknown>>(
 export function buildSceneIndexedWhere(
   filters: Record<string, any> | undefined,
   hiddenSceneIds?: string[]
-): Prisma.CachedSceneWhereInput {
-  let where: Prisma.CachedSceneWhereInput = {
+): Prisma.StashSceneWhereInput {
+  let where: Prisma.StashSceneWhereInput = {
     deletedAt: null,
   };
 
@@ -159,17 +159,17 @@ export function buildSceneIndexedWhere(
 
   // Date filter
   if (filters.date) {
-    where = applyDateFilter(where, "date", filters.date) as Prisma.CachedSceneWhereInput;
+    where = applyDateFilter(where, "date", filters.date) as Prisma.StashSceneWhereInput;
   }
 
   // Rating filter
   if (filters.rating100) {
-    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.CachedSceneWhereInput;
+    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.StashSceneWhereInput;
   }
 
   // Duration filter (in seconds)
   if (filters.duration) {
-    where = applyNumericFilter(where, "duration", filters.duration) as Prisma.CachedSceneWhereInput;
+    where = applyNumericFilter(where, "duration", filters.duration) as Prisma.StashSceneWhereInput;
   }
 
   // Organized filter
@@ -186,8 +186,8 @@ export function buildSceneIndexedWhere(
 export function buildPerformerIndexedWhere(
   filters: Record<string, any> | undefined,
   hiddenPerformerIds?: string[]
-): Prisma.CachedPerformerWhereInput {
-  let where: Prisma.CachedPerformerWhereInput = {
+): Prisma.StashPerformerWhereInput {
+  let where: Prisma.StashPerformerWhereInput = {
     deletedAt: null,
   };
 
@@ -200,7 +200,7 @@ export function buildPerformerIndexedWhere(
 
   // Name filter
   if (filters.name) {
-    where = applyStringFilter(where, "name", filters.name) as Prisma.CachedPerformerWhereInput;
+    where = applyStringFilter(where, "name", filters.name) as Prisma.StashPerformerWhereInput;
   }
 
   // Gender filter
@@ -215,12 +215,12 @@ export function buildPerformerIndexedWhere(
 
   // Rating filter
   if (filters.rating100) {
-    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.CachedPerformerWhereInput;
+    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.StashPerformerWhereInput;
   }
 
   // Scene count filter
   if (filters.scene_count) {
-    where = applyNumericFilter(where, "sceneCount", filters.scene_count) as Prisma.CachedPerformerWhereInput;
+    where = applyNumericFilter(where, "sceneCount", filters.scene_count) as Prisma.StashPerformerWhereInput;
   }
 
   return where;
@@ -232,8 +232,8 @@ export function buildPerformerIndexedWhere(
 export function buildStudioIndexedWhere(
   filters: Record<string, any> | undefined,
   hiddenStudioIds?: string[]
-): Prisma.CachedStudioWhereInput {
-  let where: Prisma.CachedStudioWhereInput = {
+): Prisma.StashStudioWhereInput {
+  let where: Prisma.StashStudioWhereInput = {
     deletedAt: null,
   };
 
@@ -246,7 +246,7 @@ export function buildStudioIndexedWhere(
 
   // Name filter
   if (filters.name) {
-    where = applyStringFilter(where, "name", filters.name) as Prisma.CachedStudioWhereInput;
+    where = applyStringFilter(where, "name", filters.name) as Prisma.StashStudioWhereInput;
   }
 
   // Parent filter
@@ -268,12 +268,12 @@ export function buildStudioIndexedWhere(
 
   // Rating filter
   if (filters.rating100) {
-    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.CachedStudioWhereInput;
+    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.StashStudioWhereInput;
   }
 
   // Scene count filter
   if (filters.scene_count) {
-    where = applyNumericFilter(where, "sceneCount", filters.scene_count) as Prisma.CachedStudioWhereInput;
+    where = applyNumericFilter(where, "sceneCount", filters.scene_count) as Prisma.StashStudioWhereInput;
   }
 
   return where;
@@ -285,8 +285,8 @@ export function buildStudioIndexedWhere(
 export function buildTagIndexedWhere(
   filters: Record<string, any> | undefined,
   hiddenTagIds?: string[]
-): Prisma.CachedTagWhereInput {
-  let where: Prisma.CachedTagWhereInput = {
+): Prisma.StashTagWhereInput {
+  let where: Prisma.StashTagWhereInput = {
     deletedAt: null,
   };
 
@@ -299,7 +299,7 @@ export function buildTagIndexedWhere(
 
   // Name filter
   if (filters.name) {
-    where = applyStringFilter(where, "name", filters.name) as Prisma.CachedTagWhereInput;
+    where = applyStringFilter(where, "name", filters.name) as Prisma.StashTagWhereInput;
   }
 
   // Favorite filter
@@ -309,7 +309,7 @@ export function buildTagIndexedWhere(
 
   // Scene count filter
   if (filters.scene_count) {
-    where = applyNumericFilter(where, "sceneCount", filters.scene_count) as Prisma.CachedTagWhereInput;
+    where = applyNumericFilter(where, "sceneCount", filters.scene_count) as Prisma.StashTagWhereInput;
   }
 
   return where;
@@ -321,8 +321,8 @@ export function buildTagIndexedWhere(
 export function buildGroupIndexedWhere(
   filters: Record<string, any> | undefined,
   hiddenGroupIds?: string[]
-): Prisma.CachedGroupWhereInput {
-  let where: Prisma.CachedGroupWhereInput = {
+): Prisma.StashGroupWhereInput {
+  let where: Prisma.StashGroupWhereInput = {
     deletedAt: null,
   };
 
@@ -335,7 +335,7 @@ export function buildGroupIndexedWhere(
 
   // Name filter
   if (filters.name) {
-    where = applyStringFilter(where, "name", filters.name) as Prisma.CachedGroupWhereInput;
+    where = applyStringFilter(where, "name", filters.name) as Prisma.StashGroupWhereInput;
   }
 
   // Studio filter
@@ -345,12 +345,12 @@ export function buildGroupIndexedWhere(
 
   // Date filter
   if (filters.date) {
-    where = applyDateFilter(where, "date", filters.date) as Prisma.CachedGroupWhereInput;
+    where = applyDateFilter(where, "date", filters.date) as Prisma.StashGroupWhereInput;
   }
 
   // Rating filter
   if (filters.rating100) {
-    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.CachedGroupWhereInput;
+    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.StashGroupWhereInput;
   }
 
   return where;
@@ -362,8 +362,8 @@ export function buildGroupIndexedWhere(
 export function buildGalleryIndexedWhere(
   filters: Record<string, any> | undefined,
   hiddenGalleryIds?: string[]
-): Prisma.CachedGalleryWhereInput {
-  let where: Prisma.CachedGalleryWhereInput = {
+): Prisma.StashGalleryWhereInput {
+  let where: Prisma.StashGalleryWhereInput = {
     deletedAt: null,
   };
 
@@ -376,7 +376,7 @@ export function buildGalleryIndexedWhere(
 
   // Title filter
   if (filters.title) {
-    where = applyStringFilter(where, "title", filters.title) as Prisma.CachedGalleryWhereInput;
+    where = applyStringFilter(where, "title", filters.title) as Prisma.StashGalleryWhereInput;
   }
 
   // Studio filter
@@ -386,17 +386,17 @@ export function buildGalleryIndexedWhere(
 
   // Date filter
   if (filters.date) {
-    where = applyDateFilter(where, "date", filters.date) as Prisma.CachedGalleryWhereInput;
+    where = applyDateFilter(where, "date", filters.date) as Prisma.StashGalleryWhereInput;
   }
 
   // Rating filter
   if (filters.rating100) {
-    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.CachedGalleryWhereInput;
+    where = applyNumericFilter(where, "rating100", filters.rating100) as Prisma.StashGalleryWhereInput;
   }
 
   // Image count filter
   if (filters.image_count) {
-    where = applyNumericFilter(where, "imageCount", filters.image_count) as Prisma.CachedGalleryWhereInput;
+    where = applyNumericFilter(where, "imageCount", filters.image_count) as Prisma.StashGalleryWhereInput;
   }
 
   return where;
