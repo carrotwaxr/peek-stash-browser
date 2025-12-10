@@ -347,7 +347,7 @@ export function createMockTags(count: number): NormalizedTag[] {
 /**
  * Create an array of mock groups with various characteristics
  */
-export function _createMockGroups(count: number): NormalizedGroup[] {
+export function createMockGroups(count: number): NormalizedGroup[] {
   const groups: NormalizedGroup[] = [];
 
   for (let i = 0; i < count; i++) {

@@ -5,6 +5,20 @@
  */
 import { describe, it, expect, beforeEach, vi, afterEach, type Mock } from "vitest";
 
+// Mock StashInstanceManager to provide a default config for stream URL generation
+vi.mock("../StashInstanceManager.js", () => ({
+  stashInstanceManager: {
+    getDefaultConfig: () => ({
+      id: "test-instance",
+      name: "Test Stash",
+      url: "http://localhost:9999/graphql",
+      apiKey: "test-api-key",
+    }),
+    getAllConfigs: () => [],
+    loadFromDatabase: async () => undefined,
+  },
+}));
+
 // Mock the prisma module with inline factory
 vi.mock("../../prisma/singleton.js", () => ({
   default: {

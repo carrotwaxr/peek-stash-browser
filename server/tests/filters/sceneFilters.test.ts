@@ -4,7 +4,22 @@
  * Tests the scene filtering implementation in controllers/library/scenes.ts
  * Uses mock data to validate filter behavior without database dependency
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// Mock StashInstanceManager to provide a default config for stream URL generation
+vi.mock("../../services/StashInstanceManager.js", () => ({
+  stashInstanceManager: {
+    getDefaultConfig: vi.fn().mockReturnValue({
+      id: "test-instance",
+      name: "Test Stash",
+      url: "http://localhost:9999/graphql",
+      apiKey: "test-api-key",
+    }),
+    getAllConfigs: vi.fn().mockReturnValue([]),
+    loadFromDatabase: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { applyQuickSceneFilters } from "../../controllers/library/scenes.js";
 import {
