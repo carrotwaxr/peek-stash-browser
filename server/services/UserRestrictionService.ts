@@ -84,10 +84,10 @@ class UserRestrictionService {
       }
     }
 
-    // 3. Scenes with hidden studios (direct column on CachedScene)
+    // 3. Scenes with hidden studios (direct column on StashScene)
     if (hiddenIds.studios.size > 0) {
       const studioArray = Array.from(hiddenIds.studios);
-      const scenesWithHiddenStudios = await prisma.cachedScene.findMany({
+      const scenesWithHiddenStudios = await prisma.stashScene.findMany({
         where: {
           studioId: { in: studioArray },
           deletedAt: null,
@@ -163,7 +163,7 @@ class UserRestrictionService {
             const includedSceneIds = new Set(scenesInIncludedGroups.map(sg => sg.sceneId));
 
             // Get all scene IDs and exclude those NOT in the included groups
-            const allSceneIds = await prisma.cachedScene.findMany({
+            const allSceneIds = await prisma.stashScene.findMany({
               where: { deletedAt: null },
               select: { id: true },
             });
@@ -191,7 +191,7 @@ class UserRestrictionService {
             });
             const includedSceneIds = new Set(scenesWithIncludedTags.map(st => st.sceneId));
 
-            const allSceneIds = await prisma.cachedScene.findMany({
+            const allSceneIds = await prisma.stashScene.findMany({
               where: { deletedAt: null },
               select: { id: true },
             });
@@ -204,7 +204,7 @@ class UserRestrictionService {
         } else if (restriction.entityType === "studios") {
           if (restriction.mode === "EXCLUDE") {
             // Exclude scenes from these studios
-            const scenesFromExcludedStudios = await prisma.cachedScene.findMany({
+            const scenesFromExcludedStudios = await prisma.stashScene.findMany({
               where: {
                 studioId: { in: entityIds },
                 deletedAt: null,
@@ -216,7 +216,7 @@ class UserRestrictionService {
             }
           } else if (restriction.mode === "INCLUDE") {
             // Only include scenes from these studios - exclude all others
-            const scenesFromIncludedStudios = await prisma.cachedScene.findMany({
+            const scenesFromIncludedStudios = await prisma.stashScene.findMany({
               where: {
                 studioId: { in: entityIds },
                 deletedAt: null,
@@ -225,7 +225,7 @@ class UserRestrictionService {
             });
             const includedSceneIds = new Set(scenesFromIncludedStudios.map(s => s.id));
 
-            const allSceneIds = await prisma.cachedScene.findMany({
+            const allSceneIds = await prisma.stashScene.findMany({
               where: { deletedAt: null },
               select: { id: true },
             });
@@ -253,7 +253,7 @@ class UserRestrictionService {
             });
             const includedSceneIds = new Set(scenesWithIncludedGalleries.map(sg => sg.sceneId));
 
-            const allSceneIds = await prisma.cachedScene.findMany({
+            const allSceneIds = await prisma.stashScene.findMany({
               where: { deletedAt: null },
               select: { id: true },
             });
@@ -275,7 +275,7 @@ class UserRestrictionService {
             });
             const scenesWithGroupsSet = new Set(scenesWithGroups.map(sg => sg.sceneId));
 
-            const allSceneIds = await prisma.cachedScene.findMany({
+            const allSceneIds = await prisma.stashScene.findMany({
               where: { deletedAt: null },
               select: { id: true },
             });
@@ -292,7 +292,7 @@ class UserRestrictionService {
             });
             const scenesWithTagsSet = new Set(scenesWithTags.map(st => st.sceneId));
 
-            const allSceneIds = await prisma.cachedScene.findMany({
+            const allSceneIds = await prisma.stashScene.findMany({
               where: { deletedAt: null },
               select: { id: true },
             });
@@ -303,7 +303,7 @@ class UserRestrictionService {
             }
           } else if (restriction.entityType === "studios") {
             // Find scenes with no studio
-            const scenesWithoutStudio = await prisma.cachedScene.findMany({
+            const scenesWithoutStudio = await prisma.stashScene.findMany({
               where: {
                 OR: [
                   { studioId: null },
@@ -324,7 +324,7 @@ class UserRestrictionService {
             });
             const scenesWithGalleriesSet = new Set(scenesWithGalleries.map(sg => sg.sceneId));
 
-            const allSceneIds = await prisma.cachedScene.findMany({
+            const allSceneIds = await prisma.stashScene.findMany({
               where: { deletedAt: null },
               select: { id: true },
             });
