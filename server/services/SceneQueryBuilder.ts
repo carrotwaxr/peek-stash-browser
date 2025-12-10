@@ -36,7 +36,7 @@ export interface SceneQueryResult {
  * Builds and executes SQL queries for scene filtering
  */
 class SceneQueryBuilder {
-  // Column list for SELECT - all CachedScene fields plus user data
+  // Column list for SELECT - all StashScene fields plus user data
   private readonly SELECT_COLUMNS = `
     s.id, s.title, s.code, s.date, s.studioId, s.rating100 AS stashRating100,
     s.duration, s.organized, s.details, s.filePath, s.fileBitRate,
@@ -57,7 +57,7 @@ class SceneQueryBuilder {
   private buildFromClause(userId: number): { sql: string; params: number[] } {
     return {
       sql: `
-        FROM CachedScene s
+        FROM StashScene s
         LEFT JOIN SceneRating r ON s.id = r.sceneId AND r.userId = ?
         LEFT JOIN WatchHistory w ON s.id = w.sceneId AND w.userId = ?
       `.trim(),
@@ -705,7 +705,7 @@ class SceneQueryBuilder {
 
       const countSql = `
         SELECT COUNT(*) as total
-        FROM CachedScene s
+        FROM StashScene s
         WHERE ${baseWhereSQL || "1=1"}
       `;
       const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
@@ -854,27 +854,27 @@ class SceneQueryBuilder {
     // Load actual entities (only those that exist)
     const [performers, tags, groups, galleries, studios] = await Promise.all([
       performerIds.length > 0
-        ? prisma.cachedPerformer.findMany({
+        ? prisma.stashPerformer.findMany({
             where: { id: { in: performerIds } },
           })
         : Promise.resolve([]),
       tagIds.length > 0
-        ? prisma.cachedTag.findMany({
+        ? prisma.stashTag.findMany({
             where: { id: { in: tagIds } },
           })
         : Promise.resolve([]),
       groupIds.length > 0
-        ? prisma.cachedGroup.findMany({
+        ? prisma.stashGroup.findMany({
             where: { id: { in: groupIds } },
           })
         : Promise.resolve([]),
       galleryIds.length > 0
-        ? prisma.cachedGallery.findMany({
+        ? prisma.stashGallery.findMany({
             where: { id: { in: galleryIds } },
           })
         : Promise.resolve([]),
       studioIds.length > 0
-        ? prisma.cachedStudio.findMany({
+        ? prisma.stashStudio.findMany({
             where: { id: { in: studioIds } },
           })
         : Promise.resolve([]),
@@ -883,27 +883,27 @@ class SceneQueryBuilder {
     // Build entity lookup maps by ID
     const performersById = new Map<string, any>();
     for (const performer of performers) {
-      performersById.set(performer.id, this.transformCachedPerformer(performer));
+      performersById.set(performer.id, this.transformStashPerformer(performer));
     }
 
     const tagsById = new Map<string, any>();
     for (const tag of tags) {
-      tagsById.set(tag.id, this.transformCachedTag(tag));
+      tagsById.set(tag.id, this.transformStashTag(tag));
     }
 
     const groupsById = new Map<string, any>();
     for (const group of groups) {
-      groupsById.set(group.id, this.transformCachedGroup(group));
+      groupsById.set(group.id, this.transformStashGroup(group));
     }
 
     const galleriesById = new Map<string, any>();
     for (const gallery of galleries) {
-      galleriesById.set(gallery.id, this.transformCachedGallery(gallery));
+      galleriesById.set(gallery.id, this.transformStashGallery(gallery));
     }
 
     const studiosById = new Map<string, any>();
     for (const studio of studios) {
-      studiosById.set(studio.id, this.transformCachedStudio(studio));
+      studiosById.set(studio.id, this.transformStashStudio(studio));
     }
 
     // Build scene-to-entities maps using junction tables
@@ -957,8 +957,8 @@ class SceneQueryBuilder {
     }
   }
 
-  // Helper transforms for cached entities - all image URLs need proxy treatment
-  private transformCachedPerformer(p: any): any {
+  // Helper transforms for Stash entities - all image URLs need proxy treatment
+  private transformStashPerformer(p: any): any {
     return {
       id: p.id,
       name: p.name,
@@ -970,7 +970,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformCachedTag(t: any): any {
+  private transformStashTag(t: any): any {
     return {
       id: t.id,
       name: t.name,
@@ -979,7 +979,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformCachedStudio(s: any): any {
+  private transformStashStudio(s: any): any {
     return {
       id: s.id,
       name: s.name,
@@ -989,7 +989,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformCachedGroup(g: any): any {
+  private transformStashGroup(g: any): any {
     return {
       id: g.id,
       name: g.name,
@@ -998,7 +998,7 @@ class SceneQueryBuilder {
     };
   }
 
-  private transformCachedGallery(g: any): any {
+  private transformStashGallery(g: any): any {
     return {
       id: g.id,
       title: g.title,
