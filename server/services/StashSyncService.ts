@@ -108,15 +108,16 @@ class StashSyncService extends EventEmitter {
       logger.info("Starting full sync...");
 
       // Sync each entity type in order (dependencies first)
+      // Tags must be synced first since other entities reference them via junction tables
       // Save state after each entity so restarts don't re-sync completed types
       let result: SyncResult;
 
-      result = await this.syncStudios(stashInstanceId, true);
+      result = await this.syncTags(stashInstanceId, true);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
-      result = await this.syncTags(stashInstanceId, true);
+      result = await this.syncStudios(stashInstanceId, true);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
@@ -408,15 +409,16 @@ class StashSyncService extends EventEmitter {
       logger.info("Starting incremental sync", { since: lastSync.toISOString() });
 
       // Sync each entity type (only changed)
+      // Tags must be synced first since other entities reference them via junction tables
       // Save state after each entity so restarts are efficient
       let result: SyncResult;
 
-      result = await this.syncStudios(stashInstanceId, false, lastSync);
+      result = await this.syncTags(stashInstanceId, false, lastSync);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "incremental", result);
       this.checkAbort();
 
-      result = await this.syncTags(stashInstanceId, false, lastSync);
+      result = await this.syncStudios(stashInstanceId, false, lastSync);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "incremental", result);
       this.checkAbort();
