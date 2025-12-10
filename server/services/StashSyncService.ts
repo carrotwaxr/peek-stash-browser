@@ -985,6 +985,31 @@ class StashSyncService extends EventEmitter {
       syncedAt = excluded.syncedAt,
       deletedAt = NULL
   `);
+
+    // Sync performer tags to PerformerTag junction table
+    for (const performer of validPerformers) {
+      const performerTags = (performer as any).tags;
+      if (performerTags && Array.isArray(performerTags) && performerTags.length > 0) {
+        const performerId = performer.id;
+
+        // Delete existing tags for this performer
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM PerformerTag WHERE performerId = '${this.escape(performerId)}'`
+        );
+
+        // Insert new tags (filter to valid tag IDs)
+        const validTags = performerTags.filter((t: any) => t?.id && validateEntityId(t.id));
+        if (validTags.length > 0) {
+          const tagValues = validTags
+            .map((t: any) => `('${this.escape(performerId)}', '${this.escape(t.id)}')`)
+            .join(", ");
+
+          await prisma.$executeRawUnsafe(
+            `INSERT OR IGNORE INTO PerformerTag (performerId, tagId) VALUES ${tagValues}`
+          );
+        }
+      }
+    }
   }
 
   // ==================== Studio Sync ====================
@@ -1120,6 +1145,31 @@ class StashSyncService extends EventEmitter {
       syncedAt = excluded.syncedAt,
       deletedAt = NULL
   `);
+
+    // Sync studio tags to StudioTag junction table
+    for (const studio of validStudios) {
+      const studioTags = (studio as any).tags;
+      if (studioTags && Array.isArray(studioTags) && studioTags.length > 0) {
+        const studioId = studio.id;
+
+        // Delete existing tags for this studio
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM StudioTag WHERE studioId = '${this.escape(studioId)}'`
+        );
+
+        // Insert new tags (filter to valid tag IDs)
+        const validTags = studioTags.filter((t: any) => t?.id && validateEntityId(t.id));
+        if (validTags.length > 0) {
+          const tagValues = validTags
+            .map((t: any) => `('${this.escape(studioId)}', '${this.escape(t.id)}')`)
+            .join(", ");
+
+          await prisma.$executeRawUnsafe(
+            `INSERT OR IGNORE INTO StudioTag (studioId, tagId) VALUES ${tagValues}`
+          );
+        }
+      }
+    }
   }
 
   // ==================== Tag Sync ====================
@@ -1391,6 +1441,31 @@ class StashSyncService extends EventEmitter {
       syncedAt = excluded.syncedAt,
       deletedAt = NULL
   `);
+
+    // Sync group tags to GroupTag junction table
+    for (const group of validGroups) {
+      const groupTags = (group as any).tags;
+      if (groupTags && Array.isArray(groupTags) && groupTags.length > 0) {
+        const groupId = group.id;
+
+        // Delete existing tags for this group
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM GroupTag WHERE groupId = '${this.escape(groupId)}'`
+        );
+
+        // Insert new tags (filter to valid tag IDs)
+        const validTags = groupTags.filter((t: any) => t?.id && validateEntityId(t.id));
+        if (validTags.length > 0) {
+          const tagValues = validTags
+            .map((t: any) => `('${this.escape(groupId)}', '${this.escape(t.id)}')`)
+            .join(", ");
+
+          await prisma.$executeRawUnsafe(
+            `INSERT OR IGNORE INTO GroupTag (groupId, tagId) VALUES ${tagValues}`
+          );
+        }
+      }
+    }
   }
 
   // ==================== Gallery Sync ====================
@@ -1562,6 +1637,39 @@ class StashSyncService extends EventEmitter {
       await prisma.$executeRawUnsafe(`
         INSERT OR IGNORE INTO GalleryPerformer (galleryId, performerId)
         VALUES ${performerValues}
+      `);
+    }
+
+    // Sync gallery tags to GalleryTag junction table
+    const tagInserts: { galleryId: string; tagId: string }[] = [];
+    for (const gallery of validGalleries) {
+      const galleryTags = (gallery as any).tags;
+      if (galleryTags && Array.isArray(galleryTags) && galleryTags.length > 0) {
+        for (const tag of galleryTags) {
+          if (tag?.id && validateEntityId(tag.id)) {
+            tagInserts.push({
+              galleryId: gallery.id,
+              tagId: tag.id,
+            });
+          }
+        }
+      }
+    }
+
+    // Delete existing gallery-tag relationships for these galleries
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM GalleryTag WHERE galleryId IN (${galleryIds})
+    `);
+
+    // Insert new gallery-tag relationships
+    if (tagInserts.length > 0) {
+      const tagValues = tagInserts
+        .map((t) => `('${this.escape(t.galleryId)}', '${this.escape(t.tagId)}')`)
+        .join(",\n");
+
+      await prisma.$executeRawUnsafe(`
+        INSERT OR IGNORE INTO GalleryTag (galleryId, tagId)
+        VALUES ${tagValues}
       `);
     }
   }

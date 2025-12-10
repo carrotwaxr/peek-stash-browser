@@ -110,7 +110,6 @@ const mockCachedScene = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-  data: "{}",
 };
 
 const mockCachedPerformer = {
@@ -147,7 +146,6 @@ const mockCachedPerformer = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-  data: "{}",
 };
 
 const mockCachedStudio = {
@@ -163,7 +161,6 @@ const mockCachedStudio = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-  data: "{}",
 };
 
 const mockCachedTag = {
@@ -177,7 +174,6 @@ const mockCachedTag = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-  data: "{}",
 };
 
 const mockCachedGallery = {
@@ -195,7 +191,6 @@ const mockCachedGallery = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-  data: "{}",
 };
 
 const mockCachedGroup = {
@@ -214,7 +209,6 @@ const mockCachedGroup = {
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
   syncedAt: new Date(),
   deletedAt: null,
-  data: "{}",
 };
 
 describe("StashEntityService", () => {
