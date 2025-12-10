@@ -393,7 +393,7 @@ model UserCarousel {
 // These tables store synced data from Stash for scalable querying
 // ============================================================================
 
-model CachedScene {
+model StashScene {
     id              String    @id                    // Stash scene ID
     stashInstanceId String?                          // Which Stash server
 
@@ -461,14 +461,14 @@ model CachedScene {
     @@index([oCounter])
     @@index([playCount])
     // Compound indexes for efficient browse queries (deletedAt filter + sort)
-    @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "CachedScene_browse_idx")
-    @@index([deletedAt, stashUpdatedAt(sort: Desc)], map: "CachedScene_browse_updated_idx")
-    @@index([deletedAt, date(sort: Desc)], map: "CachedScene_browse_date_idx")
-    @@index([deletedAt, title], map: "CachedScene_browse_title_idx")
-    @@index([deletedAt, duration(sort: Desc)], map: "CachedScene_browse_duration_idx")
+    @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "StashScene_browse_idx")
+    @@index([deletedAt, stashUpdatedAt(sort: Desc)], map: "StashScene_browse_updated_idx")
+    @@index([deletedAt, date(sort: Desc)], map: "StashScene_browse_date_idx")
+    @@index([deletedAt, title], map: "StashScene_browse_title_idx")
+    @@index([deletedAt, duration(sort: Desc)], map: "StashScene_browse_duration_idx")
 }
 
-model CachedPerformer {
+model StashPerformer {
     id              String    @id
     stashInstanceId String?
 
@@ -529,7 +529,7 @@ model CachedPerformer {
     @@index([deletedAt])
 }
 
-model CachedStudio {
+model StashStudio {
     id              String    @id
     stashInstanceId String?
 
@@ -572,7 +572,7 @@ model CachedStudio {
     @@index([deletedAt])
 }
 
-model CachedTag {
+model StashTag {
     id              String    @id
     stashInstanceId String?
 
@@ -615,7 +615,7 @@ model CachedTag {
     @@index([deletedAt])
 }
 
-model CachedGroup {
+model StashGroup {
     id              String    @id
     stashInstanceId String?
 
@@ -661,7 +661,7 @@ model CachedGroup {
     @@index([deletedAt])
 }
 
-model CachedGallery {
+model StashGallery {
     id              String    @id
     stashInstanceId String?
 
@@ -709,7 +709,7 @@ model CachedGallery {
     @@index([deletedAt])
 }
 
-model CachedImage {
+model StashImage {
     id              String    @id
     stashInstanceId String?
 
@@ -758,8 +758,8 @@ model CachedImage {
 model ScenePerformer {
     sceneId         String
     performerId     String
-    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-    performer       CachedPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+    scene           StashScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    performer       StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
 
     @@id([sceneId, performerId])
     @@index([performerId])
@@ -768,8 +768,8 @@ model ScenePerformer {
 model SceneTag {
     sceneId         String
     tagId           String
-    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-    tag             CachedTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+    scene           StashScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    tag             StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
     @@id([sceneId, tagId])
     @@index([tagId])
@@ -779,8 +779,8 @@ model SceneGroup {
     sceneId         String
     groupId         String
     sceneIndex      Int?
-    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-    group           CachedGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+    scene           StashScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    group           StashGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
     @@id([sceneId, groupId])
     @@index([groupId])
@@ -789,8 +789,8 @@ model SceneGroup {
 model SceneGallery {
     sceneId         String
     galleryId       String
-    scene           CachedScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-    gallery         CachedGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+    scene           StashScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+    gallery         StashGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
 
     @@id([sceneId, galleryId])
     @@index([galleryId])
@@ -799,8 +799,8 @@ model SceneGallery {
 model ImagePerformer {
     imageId         String
     performerId     String
-    image           CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
-    performer       CachedPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+    image           StashImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+    performer       StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
 
     @@id([imageId, performerId])
     @@index([performerId])
@@ -809,8 +809,8 @@ model ImagePerformer {
 model ImageTag {
     imageId         String
     tagId           String
-    image           CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
-    tag             CachedTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+    image           StashImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+    tag             StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
     @@id([imageId, tagId])
     @@index([tagId])
@@ -819,8 +819,8 @@ model ImageTag {
 model ImageGallery {
     imageId         String
     galleryId       String
-    image           CachedImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
-    gallery         CachedGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+    image           StashImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+    gallery         StashGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
 
     @@id([imageId, galleryId])
     @@index([galleryId])
@@ -829,8 +829,8 @@ model ImageGallery {
 model GalleryPerformer {
     galleryId       String
     performerId     String
-    gallery         CachedGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-    performer       CachedPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+    gallery         StashGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+    performer       StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
 
     @@id([galleryId, performerId])
     @@index([performerId])
