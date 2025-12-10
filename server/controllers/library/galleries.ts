@@ -351,6 +351,29 @@ export const findGalleries = async (
     const endIndex = startIndex + perPage;
     const paginatedGalleries = galleries.slice(startIndex, endIndex);
 
+    // Step 7: Hydrate studios with full data (name, etc.)
+    const studioIds = [
+      ...new Set(
+        paginatedGalleries
+          .map((g) => g.studio?.id)
+          .filter((id): id is string => !!id)
+      ),
+    ];
+
+    if (studioIds.length > 0) {
+      const studios = await cachedEntityQueryService.getStudiosByIds(studioIds);
+      const studioMap = new Map(studios.map((s) => [s.id, s]));
+
+      for (const gallery of paginatedGalleries) {
+        if (gallery.studio?.id) {
+          const fullStudio = studioMap.get(gallery.studio.id);
+          if (fullStudio) {
+            gallery.studio = fullStudio;
+          }
+        }
+      }
+    }
+
     // Add stashUrl to each gallery
     const galleriesWithStashUrl = paginatedGalleries.map((gallery) => ({
       ...gallery,

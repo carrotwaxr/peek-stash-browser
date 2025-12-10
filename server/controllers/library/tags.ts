@@ -8,6 +8,7 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
+import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { calculateEntityImageCount } from "./images.js";
@@ -306,8 +307,19 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    // Step 9: Hydrate parent/child relationships with names
+    // For single-tag requests (detail pages), hydrate relationships using ALL tags for accurate lookup
+    // For multi-tag requests (grid pages), hydrate using paginated tags only (children will be incomplete but that's ok)
+    const hydratedTags = await hydrateTagRelationships(
+      ids && ids.length === 1 ? tags : paginatedTags
+    );
+    // If we hydrated all tags, extract just the paginated ones
+    const finalTags = ids && ids.length === 1
+      ? hydratedTags.filter((t) => paginatedTags.some((p) => p.id === t.id))
+      : hydratedTags;
+
     // Add stashUrl to each tag
-    const tagsWithStashUrl = paginatedTags.map(tag => ({
+    const tagsWithStashUrl = finalTags.map(tag => ({
       ...tag,
       stashUrl: buildStashEntityUrl('tag', tag.id),
     }));

@@ -8,6 +8,7 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
+import { hydrateEntityTags, hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { calculateEntityImageCount } from "./images.js";
@@ -191,8 +192,12 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     let paginatedStudios = studios.slice(startIndex, endIndex);
 
-    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
+    // Step 8: For single-entity requests (detail pages), hydrate tags and calculate accurate image_count
     if (ids && ids.length === 1 && paginatedStudios.length === 1) {
+      // Hydrate tags with names
+      paginatedStudios = await hydrateEntityTags(paginatedStudios);
+
+      // Calculate accurate image_count (accounts for Gallery→Image relationships)
       const studio = paginatedStudios[0];
       const actualImageCount = await calculateEntityImageCount(
         "studio",
@@ -212,8 +217,19 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    // Step 9: Hydrate parent/child relationships with names
+    // For single-studio requests (detail pages), hydrate relationships using ALL studios for accurate lookup
+    // For multi-studio requests (grid pages), hydrate using paginated studios only (children will be incomplete but that's ok)
+    const hydratedStudios = await hydrateStudioRelationships(
+      ids && ids.length === 1 ? studios : paginatedStudios
+    );
+    // If we hydrated all studios, extract just the paginated ones
+    const finalStudios = ids && ids.length === 1
+      ? hydratedStudios.filter((s) => paginatedStudios.some((p) => p.id === s.id))
+      : hydratedStudios;
+
     // Add stashUrl to each studio
-    const studiosWithStashUrl = paginatedStudios.map(studio => ({
+    const studiosWithStashUrl = finalStudios.map(studio => ({
       ...studio,
       stashUrl: buildStashEntityUrl('studio', studio.id),
     }));
