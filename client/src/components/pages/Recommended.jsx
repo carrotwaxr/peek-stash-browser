@@ -65,7 +65,7 @@ const Recommended = () => {
           err.response?.status === 503 && err.response?.data?.ready === false;
 
         if (isInitializing && retryCount < MAX_RETRIES) {
-          setInitMessage("Server is loading cache, please wait...");
+          setInitMessage("Server is syncing library, please wait...");
           retryCount++;
           setTimeout(() => {
             fetchRecommended();

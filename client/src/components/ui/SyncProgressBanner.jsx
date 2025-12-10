@@ -1,8 +1,8 @@
 import LoadingSpinner from "./LoadingSpinner.jsx";
 
 /**
- * Reusable banner component for cache initialization state
- * Shows a prominent info banner with spinner when cache is loading
+ * Reusable banner component for library sync state
+ * Shows a prominent info banner with spinner when library is syncing
  */
 const SyncProgressBanner = ({ message, className = "" }) => {
   return (

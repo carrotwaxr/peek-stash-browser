@@ -113,7 +113,7 @@ const SceneSearch = ({
       // If server is initializing, show a message and retry after delay
       // Increased retry limit to 60 (5 minutes at 5s intervals) to match server retry logic
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000); // Retry every 5 seconds

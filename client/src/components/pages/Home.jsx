@@ -116,7 +116,7 @@ const Home = () => {
   const handleInitializing = useCallback((initializing) => {
     if (initializing) {
       setIsInitializing(true);
-      setInitMessage("Server is loading cache, please wait...");
+      setInitMessage("Server is syncing library, please wait...");
     } else {
       setIsInitializing(false);
       setInitMessage(null);
@@ -183,7 +183,7 @@ const Home = () => {
                 className="font-semibold"
                 style={{ color: "var(--text-primary)" }}
               >
-                {initMessage || "Server is loading cache, please wait..."}
+                {initMessage || "Server is syncing library, please wait..."}
               </p>
               <p
                 className="text-sm mt-1"

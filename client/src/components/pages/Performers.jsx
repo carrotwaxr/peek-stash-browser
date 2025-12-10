@@ -58,7 +58,7 @@ const Performers = () => {
     } catch (err) {
       // If server is initializing, show a message and retry after delay
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000); // Retry every 5 seconds

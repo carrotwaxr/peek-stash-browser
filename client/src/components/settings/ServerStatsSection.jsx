@@ -185,7 +185,7 @@ const ServerStatsSection = () => {
                 : stats.cache?.lastRefreshed
                   ? "Initializing"
                   : "Not Loaded"}
-              {stats.cache?.isRefreshing && " (Syncing from Stash...)"}
+              {stats.cache?.isRefreshing && " (Syncing library from Stash...)"}
             </span>
             <div className="flex items-center gap-2">
               {stats.cache?.lastRefreshed && (

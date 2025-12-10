@@ -54,7 +54,7 @@ const Galleries = () => {
       setIsLoading(false);
     } catch (err) {
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000);
