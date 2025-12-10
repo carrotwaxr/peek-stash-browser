@@ -72,7 +72,7 @@ const Home = () => {
 
     loadData();
     // Re-fetch when navigating to homepage (location.key changes on each navigation)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [location.key]);
 
   const createSceneClickHandler = (scenes, carouselTitle) => (scene) => {

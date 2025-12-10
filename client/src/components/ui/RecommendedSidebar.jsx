@@ -41,20 +41,6 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
     }
   }, [sceneId]);
 
-  const formatDuration = (seconds) => {
-    if (!seconds) return "?:??";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
-  };
-
   const handleSceneClick = (scene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
     navigate(`/scene/${scene.id}`, {
@@ -173,6 +159,23 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
       </div>
     </div>
   );
+};
+
+/**
+ * Format duration in seconds to HH:MM:SS or MM:SS
+ */
+const formatDuration = (seconds) => {
+  if (!seconds) return "?:??";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 };
 
 /**

@@ -638,8 +638,8 @@ class StashSyncService extends EventEmitter {
   private async processScenesBatch(
     scenes: Scene[],
     stashInstanceId: string | undefined,
-    batchStart: number,
-    totalCount: number
+    _batchStart: number,
+    _totalCount: number
   ): Promise<void> {
     // Skip empty batches
     if (scenes.length === 0) return;

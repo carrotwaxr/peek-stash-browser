@@ -23,7 +23,7 @@ import "./plugins/vrmode.js";
 airplay(videojs);
 chromecast(videojs);
 
-const api = axios.create({
+const _api = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
@@ -66,6 +66,7 @@ function getBestTranscodeQuality(sourceHeight) {
  * @param {number} sourceHeight - Height of the source video
  * @returns {Array<{quality: string, height: number}>} Available quality options
  */
+// eslint-disable-next-line no-unused-vars
 function getAvailableQualities(sourceHeight) {
   return QUALITY_PRESETS.filter(preset => preset.height <= sourceHeight);
 }
@@ -84,7 +85,7 @@ export function useVideoPlayer({
   playerRef,
   scene,
   quality,
-  isAutoFallback,
+  isAutoFallback, // eslint-disable-line no-unused-vars
   ready,
   shouldAutoplay,
   playlist,
@@ -400,7 +401,7 @@ export function useVideoPlayer({
     dispatch({ type: "SET_READY", payload: false });
 
     const isDirectPlay = quality === "direct";
-    const firstFile = scene?.files?.[0];
+    // const firstFile = scene?.files?.[0]; // Unused - keeping for future use
 
     // Set poster
     const posterUrl = scene?.paths?.screenshot;

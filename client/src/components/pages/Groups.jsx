@@ -79,7 +79,7 @@ const Groups = () => {
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    tvNavigation,
+    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({

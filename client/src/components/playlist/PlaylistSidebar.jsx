@@ -40,7 +40,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
   const totalScenes = playlist.scenes.length;
   const position = currentIndex + 1;
   const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
-  const currentScene = playlist.scenes[currentIndex];
+  const _currentScene = playlist.scenes[currentIndex];
 
   // Find next scene for "Up Next" preview
   const nextSceneIndex = currentIndex + 1;

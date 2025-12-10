@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { getOrderedNavItems } from "../../constants/navigation.js";
 import { useAuth } from "../../hooks/useAuth.js";
@@ -139,7 +139,7 @@ const Sidebar = ({ navPreferences = [] }) => {
         }
 
         case "Enter":
-        case " ":
+        case " ": {
           e.preventDefault();
           e.stopPropagation();
           const item = allNavItems[focusedIndex];
@@ -157,6 +157,7 @@ const Sidebar = ({ navPreferences = [] }) => {
             }
           }
           break;
+        }
       }
     };
 

@@ -537,7 +537,7 @@ const PerformerDetails = ({ performer }) => {
   );
 };
 
-const PerformerStats = ({ performer, performerId }) => {
+const PerformerStats = ({ performer, performerId: _performerId }) => { // eslint-disable-line no-unused-vars
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 

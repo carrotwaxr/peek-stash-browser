@@ -4,6 +4,7 @@
  * Creates realistic test data based on TypeScript models from stashapp-api
  * and Peek's Normalized types.
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import type {
   NormalizedGallery,
   NormalizedGroup,
@@ -346,7 +347,7 @@ export function createMockTags(count: number): NormalizedTag[] {
 /**
  * Create an array of mock groups with various characteristics
  */
-export function createMockGroups(count: number): NormalizedGroup[] {
+export function _createMockGroups(count: number): NormalizedGroup[] {
   const groups: NormalizedGroup[] = [];
 
   for (let i = 0; i < count; i++) {

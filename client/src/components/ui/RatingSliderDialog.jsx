@@ -47,7 +47,7 @@ const RatingSliderDialog = ({
       const popoverWidth = 280; // Match the width in the popover style
       const popoverHeight = 240; // Approximate height of popover
       const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
+      const _viewportHeight = window.innerHeight;
       const gap = 8;
 
       // Calculate left position, ensuring it doesn't go off-screen

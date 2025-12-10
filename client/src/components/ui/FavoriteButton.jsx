@@ -8,7 +8,7 @@ const FavoriteButton = ({
   isFavorite,
   onChange,
   size = "small",
-  variant = "card",
+  variant = "card", // eslint-disable-line no-unused-vars
   className = "",
   disabled = false,
 }) => {

@@ -81,7 +81,7 @@ const Performers = () => {
   const {
     isTVMode,
     tvNavigation,
-    gridNavigation,
+    _gridNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({

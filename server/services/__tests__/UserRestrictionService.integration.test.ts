@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { userRestrictionService } from '../UserRestrictionService.js';
 import { emptyEntityFilterService } from '../EmptyEntityFilterService.js';

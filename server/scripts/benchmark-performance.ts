@@ -43,7 +43,7 @@ async function fetchWithTiming(
     });
     const ms = performance.now() - start;
     return { ms, status: response.status, ok: response.ok };
-  } catch (error) {
+  } catch {
     const ms = performance.now() - start;
     return { ms, status: 0, ok: false };
   }
@@ -106,17 +106,16 @@ async function runBenchmark(
   };
 }
 
-async function loginAndGetCookie(): Promise<string | null> {
-  // Try to login - adjust credentials as needed
-  const response = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: "admin", password: "admin" }),
-  });
-
-  const setCookie = response.headers.get("set-cookie");
-  return setCookie;
-}
+// Unused helper - kept for future authentication benchmarks
+// async function loginAndGetCookie(): Promise<string | null> {
+//   const response = await fetch(`${BASE_URL}/api/auth/login`, {
+//     method: "POST",
+//     headers: { "Content-Type": "application/json" },
+//     body: JSON.stringify({ username: "admin", password: "admin" }),
+//   });
+//   const setCookie = response.headers.get("set-cookie");
+//   return setCookie;
+// }
 
 async function main() {
   console.log("=".repeat(70));

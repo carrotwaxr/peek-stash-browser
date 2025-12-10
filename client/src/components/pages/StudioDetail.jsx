@@ -382,7 +382,7 @@ const StudioImage = ({ studio }) => {
 };
 
 // Studio Stats Component
-const StudioStats = ({ studio, studioId }) => {
+const StudioStats = ({ studio, studioId: _studioId }) => { // eslint-disable-line no-unused-vars
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "scenes";
 

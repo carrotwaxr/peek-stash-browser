@@ -19,7 +19,7 @@ import { TooltipEntityGrid } from "./TooltipEntityGrid.jsx";
  * @param {string} [props.emptyMessage] - Message to display when no results
  */
 const EntityGrid = ({ entityType, filters, emptyMessage }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigate();  // eslint-disable-line no-unused-vars
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState([]);

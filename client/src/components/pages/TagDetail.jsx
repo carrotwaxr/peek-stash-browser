@@ -403,7 +403,7 @@ const TagImage = ({ tag }) => {
 };
 
 // Tag Stats Component
-const TagStats = ({ tag, tagId }) => {
+const TagStats = ({ tag, tagId: _tagId }) => { // eslint-disable-line no-unused-vars
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 
