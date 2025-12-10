@@ -20,37 +20,37 @@ const hasStashConfig = !!(process.env.STASH_URL && process.env.STASH_API_KEY);
 // Mock prisma to avoid database operations during tests
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
-    cachedScene: {
+    stashScene: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
-    cachedPerformer: {
+    stashPerformer: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
-    cachedStudio: {
+    stashStudio: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
-    cachedTag: {
+    stashTag: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
-    cachedGallery: {
+    stashGallery: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
-    cachedGroup: {
+    stashGroup: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
-    cachedImage: {
+    stashImage: {
       upsert: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
