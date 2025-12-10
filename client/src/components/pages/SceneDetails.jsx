@@ -1,7 +1,32 @@
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { Paper } from "../ui/index.js";
+import { Paper, useLazyLoad } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
+
+/**
+ * LazyThumbnail - Lazy-loaded thumbnail for performer images
+ */
+const LazyThumbnail = ({ src, alt, fallback, className }) => {
+  const [ref, shouldLoad] = useLazyLoad();
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{ backgroundColor: "var(--bg-secondary)" }}
+    >
+      {shouldLoad && src ? (
+        <img src={src} alt={alt} className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <span className="text-2xl" style={{ color: "var(--text-muted)" }}>
+            {fallback}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";
@@ -212,29 +237,12 @@ const SceneDetails = ({
                           to={`/performer/${performer.id}`}
                           className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                         >
-                          <div
+                          <LazyThumbnail
+                            src={performer.image_path}
+                            alt={performer.name}
+                            fallback={performer.gender === "MALE" ? "♂" : "♀"}
                             className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
-                            style={{
-                              backgroundColor: "var(--border-color)",
-                            }}
-                          >
-                            {performer.image_path ? (
-                              <img
-                                src={performer.image_path}
-                                alt={performer.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span
-                                  className="text-4xl"
-                                  style={{ color: "var(--text-secondary)" }}
-                                >
-                                  {performer.gender === "MALE" ? "♂" : "♀"}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          />
                           <span
                             className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
                             style={{ color: "var(--text-primary)" }}

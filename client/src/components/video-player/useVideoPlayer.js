@@ -330,7 +330,17 @@ export function useVideoPlayer({
 
       // Preserve current playback position (exactly like Stash does)
       const currentTime = player.currentTime();
-      const hlsUrl = `/api/scene/${scene.id}/stream.m3u8?quality=${bestQuality}`;
+
+      // Map quality preset to Stash resolution parameter
+      const qualityToResolution = {
+        '2160p': 'FOUR_K',
+        '1080p': 'FULL_HD',
+        '720p': 'STANDARD_HD',
+        '480p': 'STANDARD',
+        '360p': 'LOW',
+      };
+      const resolution = qualityToResolution[bestQuality] || 'STANDARD_HD';
+      const hlsUrl = `/api/scene/${scene.id}/proxy-stream/stream.m3u8?resolution=${resolution}`;
 
       console.log(`[AUTO-FALLBACK] Trying next source: '${bestQuality} Transcode'`);
 
