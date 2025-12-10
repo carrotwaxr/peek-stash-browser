@@ -43,6 +43,7 @@ class SceneQueryBuilder {
     s.fileFrameRate, s.fileWidth, s.fileHeight, s.fileVideoCodec,
     s.fileAudioCodec, s.fileSize, s.pathScreenshot, s.pathPreview,
     s.pathSprite, s.pathVtt, s.pathChaptersVtt, s.pathStream, s.pathCaption,
+    s.streams,
     s.oCounter AS stashOCounter, s.playCount AS stashPlayCount,
     s.playDuration AS stashPlayDuration, s.stashCreatedAt, s.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
@@ -661,28 +662,72 @@ class SceneQueryBuilder {
     });
 
     // Execute query
+    const queryStart = Date.now();
     const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
+    const queryMs = Date.now() - queryStart;
 
-    // Count query
-    const countSql = `
-      SELECT COUNT(DISTINCT s.id) as total
-      ${fromClause.sql}
-      WHERE ${whereSQL}
-    `;
-    const countParams = [...fromClause.params, ...whereParams];
-    const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
-      countSql,
-      ...countParams
-    );
-    const total = Number(countResult[0]?.total || 0);
+    // Count query - use simplified count without JOINs when possible
+    // The JOINs are only needed for user data filtering, not for count
+    const countStart = Date.now();
+    let total: number;
 
+    // Check if we have any user-data filters that require the JOINs
+    const hasUserDataFilters =
+      filters?.favorite !== undefined ||
+      filters?.rating100 !== undefined ||
+      filters?.play_count !== undefined ||
+      filters?.o_counter !== undefined;
+
+    if (hasUserDataFilters) {
+      // Need full JOINs for accurate count with user data filters
+      const countSql = `
+        SELECT COUNT(DISTINCT s.id) as total
+        ${fromClause.sql}
+        WHERE ${whereSQL}
+      `;
+      const countParams = [...fromClause.params, ...whereParams];
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...countParams
+      );
+      total = Number(countResult[0]?.total || 0);
+    } else {
+      // Fast path: count without JOINs (user data not needed for filtering)
+      // Build WHERE clause without user data conditions
+      const baseWhereClauses = whereClauses.filter(
+        (c) => !c.sql.includes("r.") && !c.sql.includes("w.")
+      );
+      const baseWhereSQL = baseWhereClauses
+        .map((c) => c.sql)
+        .filter(Boolean)
+        .join(" AND ");
+      const baseWhereParams = baseWhereClauses.flatMap((c) => c.params);
+
+      const countSql = `
+        SELECT COUNT(*) as total
+        FROM CachedScene s
+        WHERE ${baseWhereSQL || "1=1"}
+      `;
+      const countResult = await prisma.$queryRawUnsafe<{ total: number }[]>(
+        countSql,
+        ...baseWhereParams
+      );
+      total = Number(countResult[0]?.total || 0);
+    }
+    const countMs = Date.now() - countStart;
+
+    const transformStart = Date.now();
     const scenes = rows.map((row) => this.transformRow(row));
+    const transformMs = Date.now() - transformStart;
 
     // Populate relations
+    const relationsStart = Date.now();
     await this.populateRelations(scenes);
+    const relationsMs = Date.now() - relationsStart;
 
     logger.info("SceneQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
+      breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: scenes.length,
       total,
     });
@@ -731,6 +776,7 @@ class SceneQueryBuilder {
       // File data - build from individual columns
       files: row.filePath ? [{
         path: row.filePath,
+        basename: row.filePath.split('/').pop()?.split('\\').pop() || row.filePath,
         duration: row.duration,
         bit_rate: row.fileBitRate,
         frame_rate: row.fileFrameRate,
@@ -741,18 +787,19 @@ class SceneQueryBuilder {
         size: row.fileSize ? Number(row.fileSize) : null,
       }] : [],
 
-      // Paths
+      // Paths - transform to proxy URLs
       paths: {
-        screenshot: row.pathScreenshot || null,
-        preview: row.pathPreview || null,
-        stream: row.pathStream || null,
-        sprite: row.pathSprite || null,
-        vtt: row.pathVtt || null,
-        caption: row.pathCaption || null,
+        screenshot: this.transformUrl(row.pathScreenshot),
+        preview: this.transformUrl(row.pathPreview),
+        stream: this.transformUrl(row.pathStream),
+        sprite: this.transformUrl(row.pathSprite),
+        vtt: this.transformUrl(row.pathVtt),
+        chapters_vtt: this.transformUrl(row.pathChaptersVtt),
+        caption: this.transformUrl(row.pathCaption),
       },
 
-      // Empty sceneStreams - generated on demand
-      sceneStreams: [],
+      // Parse sceneStreams from JSON
+      sceneStreams: this.parseSceneStreams(row.streams),
 
       // Relations - populated separately after query
       studio: null,
@@ -776,23 +823,56 @@ class SceneQueryBuilder {
     const studioIds = scenes.map((s) => (s as any).studioId).filter(Boolean) as string[];
 
     // Batch load all relations in parallel
-    const [performers, tags, groups, galleries, studios] = await Promise.all([
+    // First get junction table records, then load entities separately
+    // This avoids Prisma errors from orphaned junction records
+    const [
+      performerJunctions,
+      tagJunctions,
+      groupJunctions,
+      galleryJunctions,
+    ] = await Promise.all([
       prisma.scenePerformer.findMany({
         where: { sceneId: { in: sceneIds } },
-        include: { performer: true },
       }),
       prisma.sceneTag.findMany({
         where: { sceneId: { in: sceneIds } },
-        include: { tag: true },
       }),
       prisma.sceneGroup.findMany({
         where: { sceneId: { in: sceneIds } },
-        include: { group: true },
       }),
       prisma.sceneGallery.findMany({
         where: { sceneId: { in: sceneIds } },
-        include: { gallery: true },
       }),
+    ]);
+
+    // Collect unique entity IDs from junction tables
+    const performerIds = [...new Set(performerJunctions.map((j) => j.performerId))];
+    const tagIds = [...new Set(tagJunctions.map((j) => j.tagId))];
+    const groupIds = [...new Set(groupJunctions.map((j) => j.groupId))];
+    const galleryIds = [...new Set(galleryJunctions.map((j) => j.galleryId))];
+
+    // Load actual entities (only those that exist)
+    const [performers, tags, groups, galleries, studios] = await Promise.all([
+      performerIds.length > 0
+        ? prisma.cachedPerformer.findMany({
+            where: { id: { in: performerIds } },
+          })
+        : Promise.resolve([]),
+      tagIds.length > 0
+        ? prisma.cachedTag.findMany({
+            where: { id: { in: tagIds } },
+          })
+        : Promise.resolve([]),
+      groupIds.length > 0
+        ? prisma.cachedGroup.findMany({
+            where: { id: { in: groupIds } },
+          })
+        : Promise.resolve([]),
+      galleryIds.length > 0
+        ? prisma.cachedGallery.findMany({
+            where: { id: { in: galleryIds } },
+          })
+        : Promise.resolve([]),
       studioIds.length > 0
         ? prisma.cachedStudio.findMany({
             where: { id: { in: studioIds } },
@@ -800,41 +880,68 @@ class SceneQueryBuilder {
         : Promise.resolve([]),
     ]);
 
-    // Build lookup maps
-    const performersByScene = new Map<string, any[]>();
-    for (const sp of performers) {
-      const list = performersByScene.get(sp.sceneId) || [];
-      list.push(this.transformCachedPerformer(sp.performer));
-      performersByScene.set(sp.sceneId, list);
+    // Build entity lookup maps by ID
+    const performersById = new Map<string, any>();
+    for (const performer of performers) {
+      performersById.set(performer.id, this.transformCachedPerformer(performer));
     }
 
-    const tagsByScene = new Map<string, any[]>();
-    for (const st of tags) {
-      const list = tagsByScene.get(st.sceneId) || [];
-      list.push(this.transformCachedTag(st.tag));
-      tagsByScene.set(st.sceneId, list);
+    const tagsById = new Map<string, any>();
+    for (const tag of tags) {
+      tagsById.set(tag.id, this.transformCachedTag(tag));
     }
 
-    const groupsByScene = new Map<string, any[]>();
-    for (const sg of groups) {
-      const list = groupsByScene.get(sg.sceneId) || [];
-      list.push({
-        ...this.transformCachedGroup(sg.group),
-        scene_index: sg.sceneIndex,
-      });
-      groupsByScene.set(sg.sceneId, list);
+    const groupsById = new Map<string, any>();
+    for (const group of groups) {
+      groupsById.set(group.id, this.transformCachedGroup(group));
     }
 
-    const galleriesByScene = new Map<string, any[]>();
-    for (const sg of galleries) {
-      const list = galleriesByScene.get(sg.sceneId) || [];
-      list.push(this.transformCachedGallery(sg.gallery));
-      galleriesByScene.set(sg.sceneId, list);
+    const galleriesById = new Map<string, any>();
+    for (const gallery of galleries) {
+      galleriesById.set(gallery.id, this.transformCachedGallery(gallery));
     }
 
     const studiosById = new Map<string, any>();
     for (const studio of studios) {
       studiosById.set(studio.id, this.transformCachedStudio(studio));
+    }
+
+    // Build scene-to-entities maps using junction tables
+    // (Only include entities that actually exist - handles orphaned junctions)
+    const performersByScene = new Map<string, any[]>();
+    for (const junction of performerJunctions) {
+      const performer = performersById.get(junction.performerId);
+      if (!performer) continue; // Skip orphaned junction records
+      const list = performersByScene.get(junction.sceneId) || [];
+      list.push(performer);
+      performersByScene.set(junction.sceneId, list);
+    }
+
+    const tagsByScene = new Map<string, any[]>();
+    for (const junction of tagJunctions) {
+      const tag = tagsById.get(junction.tagId);
+      if (!tag) continue; // Skip orphaned junction records
+      const list = tagsByScene.get(junction.sceneId) || [];
+      list.push(tag);
+      tagsByScene.set(junction.sceneId, list);
+    }
+
+    const groupsByScene = new Map<string, any[]>();
+    for (const junction of groupJunctions) {
+      const group = groupsById.get(junction.groupId);
+      if (!group) continue; // Skip orphaned junction records
+      const list = groupsByScene.get(junction.sceneId) || [];
+      list.push({ ...group, scene_index: junction.sceneIndex });
+      groupsByScene.set(junction.sceneId, list);
+    }
+
+    const galleriesByScene = new Map<string, any[]>();
+    for (const junction of galleryJunctions) {
+      const gallery = galleriesById.get(junction.galleryId);
+      if (!gallery) continue; // Skip orphaned junction records
+      const list = galleriesByScene.get(junction.sceneId) || [];
+      list.push(gallery);
+      galleriesByScene.set(junction.sceneId, list);
     }
 
     // Populate scenes
@@ -850,14 +957,14 @@ class SceneQueryBuilder {
     }
   }
 
-  // Helper transforms for cached entities
+  // Helper transforms for cached entities - all image URLs need proxy treatment
   private transformCachedPerformer(p: any): any {
     return {
       id: p.id,
       name: p.name,
       disambiguation: p.disambiguation,
       gender: p.gender,
-      image_path: p.imagePath,
+      image_path: this.transformUrl(p.imagePath),
       favorite: p.favorite,
       rating100: p.rating100,
     };
@@ -867,7 +974,7 @@ class SceneQueryBuilder {
     return {
       id: t.id,
       name: t.name,
-      image_path: t.imagePath,
+      image_path: this.transformUrl(t.imagePath),
       favorite: t.favorite,
     };
   }
@@ -876,7 +983,7 @@ class SceneQueryBuilder {
     return {
       id: s.id,
       name: s.name,
-      image_path: s.imagePath,
+      image_path: this.transformUrl(s.imagePath),
       favorite: s.favorite,
       parent_studio: s.parentId ? { id: s.parentId } : null,
     };
@@ -886,8 +993,8 @@ class SceneQueryBuilder {
     return {
       id: g.id,
       name: g.name,
-      front_image_path: g.frontImagePath,
-      back_image_path: g.backImagePath,
+      front_image_path: this.transformUrl(g.frontImagePath),
+      back_image_path: this.transformUrl(g.backImagePath),
     };
   }
 
@@ -895,7 +1002,7 @@ class SceneQueryBuilder {
     return {
       id: g.id,
       title: g.title,
-      cover: g.coverPath ? { paths: { thumbnail: g.coverPath } } : null,
+      cover: g.coverPath ? { paths: { thumbnail: this.transformUrl(g.coverPath) } } : null,
     };
   }
 
@@ -910,6 +1017,47 @@ class SceneQueryBuilder {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Parse sceneStreams JSON and keep the raw stream URLs
+   * The frontend will handle URL rewriting to proxy-stream endpoint
+   */
+  private parseSceneStreams(json: string | null): any[] {
+    if (!json) return [];
+    try {
+      const parsed = JSON.parse(json);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Transform a Stash URL/path to a proxy URL
+   */
+  private transformUrl(urlOrPath: string | null): string | null {
+    if (!urlOrPath) return null;
+
+    // If it's already a proxy URL, return as-is
+    if (urlOrPath.startsWith("/api/proxy/stash")) {
+      return urlOrPath;
+    }
+
+    // If it's a full URL (http://...), extract path + query
+    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
+      try {
+        const url = new URL(urlOrPath);
+        const pathWithQuery = url.pathname + url.search;
+        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+      } catch {
+        // If URL parsing fails, treat as path
+        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+      }
+    }
+
+    // Otherwise treat as path and encode it
+    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
   }
 }
 
