@@ -698,7 +698,6 @@ class StashSyncService extends EventEmitter {
       ${scene.o_counter ?? 0},
       ${scene.play_count ?? 0},
       ${scene.play_duration ?? 0},
-      '{}',
       ${scene.created_at ? `'${scene.created_at}'` : "NULL"},
       ${scene.updated_at ? `'${scene.updated_at}'` : "NULL"},
       datetime('now'),
@@ -708,12 +707,12 @@ class StashSyncService extends EventEmitter {
       .join(",\n");
 
     await prisma.$executeRawUnsafe(`
-    INSERT INTO CachedScene (
+    INSERT INTO StashScene (
       id, stashInstanceId, title, code, date, studioId, rating100, duration,
       organized, details, filePath, fileBitRate, fileFrameRate, fileWidth,
       fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
       pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption,
-      streams, oCounter, playCount, playDuration, data, stashCreatedAt, stashUpdatedAt,
+      streams, oCounter, playCount, playDuration, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${sceneValues}
     ON CONFLICT(id) DO UPDATE SET
@@ -919,8 +918,6 @@ class StashSyncService extends EventEmitter {
 
     const values = validPerformers
       .map((performer) => {
-        // Extract tag IDs as JSON array
-        const tagIds = performer.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(performer.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -930,10 +927,6 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(performer.birthdate)},
       ${performer.favorite ? 1 : 0},
       ${performer.rating100 ?? "NULL"},
-      ${performer.scene_count ?? 0},
-      ${performer.image_count ?? 0},
-      ${performer.gallery_count ?? 0},
-      ${(performer as any).group_count ?? 0},
       ${this.escapeNullable(performer.details)},
       ${this.escapeNullable(JSON.stringify(performer.alias_list || []))},
       ${this.escapeNullable(performer.country)},
@@ -948,9 +941,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(performer.career_length)},
       ${this.escapeNullable(performer.death_date)},
       ${this.escapeNullable(performer.url)},
-      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(performer.image_path)},
-      '{}',
       ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
       ${performer.updated_at ? `'${performer.updated_at}'` : "NULL"},
       datetime('now'),
@@ -960,11 +951,11 @@ class StashSyncService extends EventEmitter {
       .join(",\n");
 
     await prisma.$executeRawUnsafe(`
-    INSERT INTO CachedPerformer (
+    INSERT INTO StashPerformer (
       id, stashInstanceId, name, disambiguation, gender, birthdate, favorite,
-      rating100, sceneCount, imageCount, galleryCount, groupCount, details, aliasList,
+      rating100, details, aliasList,
       country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements,
-      tattoos, piercings, careerLength, deathDate, url, tagIds, imagePath, data,
+      tattoos, piercings, careerLength, deathDate, url, imagePath,
       stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -974,10 +965,6 @@ class StashSyncService extends EventEmitter {
       birthdate = excluded.birthdate,
       favorite = excluded.favorite,
       rating100 = excluded.rating100,
-      sceneCount = excluded.sceneCount,
-      imageCount = excluded.imageCount,
-      galleryCount = excluded.galleryCount,
-      groupCount = excluded.groupCount,
       details = excluded.details,
       aliasList = excluded.aliasList,
       country = excluded.country,
@@ -992,7 +979,6 @@ class StashSyncService extends EventEmitter {
       careerLength = excluded.careerLength,
       deathDate = excluded.deathDate,
       url = excluded.url,
-      tagIds = excluded.tagIds,
       imagePath = excluded.imagePath,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
@@ -1097,8 +1083,6 @@ class StashSyncService extends EventEmitter {
 
     const values = validStudios
       .map((studio) => {
-        // Extract tag IDs as JSON array
-        const tagIds = studio.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(studio.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1106,16 +1090,9 @@ class StashSyncService extends EventEmitter {
       ${studio.parent_studio?.id ? `'${this.escape(studio.parent_studio.id)}'` : "NULL"},
       ${studio.favorite ? 1 : 0},
       ${studio.rating100 ?? "NULL"},
-      ${studio.scene_count ?? 0},
-      ${studio.image_count ?? 0},
-      ${studio.gallery_count ?? 0},
-      ${(studio as any).performer_count ?? 0},
-      ${(studio as any).group_count ?? 0},
       ${this.escapeNullable(studio.details)},
       ${this.escapeNullable(studio.url)},
-      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(studio.image_path)},
-      '{}',
       ${studio.created_at ? `'${studio.created_at}'` : "NULL"},
       ${studio.updated_at ? `'${studio.updated_at}'` : "NULL"},
       datetime('now'),
@@ -1125,9 +1102,9 @@ class StashSyncService extends EventEmitter {
       .join(",\n");
 
     await prisma.$executeRawUnsafe(`
-    INSERT INTO CachedStudio (
-      id, stashInstanceId, name, parentId, favorite, rating100, sceneCount,
-      imageCount, galleryCount, performerCount, groupCount, details, url, tagIds, imagePath, data, stashCreatedAt,
+    INSERT INTO StashStudio (
+      id, stashInstanceId, name, parentId, favorite, rating100,
+      details, url, imagePath, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1135,14 +1112,8 @@ class StashSyncService extends EventEmitter {
       parentId = excluded.parentId,
       favorite = excluded.favorite,
       rating100 = excluded.rating100,
-      sceneCount = excluded.sceneCount,
-      imageCount = excluded.imageCount,
-      galleryCount = excluded.galleryCount,
-      performerCount = excluded.performerCount,
-      groupCount = excluded.groupCount,
       details = excluded.details,
       url = excluded.url,
-      tagIds = excluded.tagIds,
       imagePath = excluded.imagePath,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
@@ -1251,18 +1222,10 @@ class StashSyncService extends EventEmitter {
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
       ${this.escapeNullable(tag.name)},
       ${tag.favorite ? 1 : 0},
-      ${tag.scene_count ?? 0},
-      ${tag.image_count ?? 0},
-      ${(tag as any).gallery_count ?? 0},
-      ${(tag as any).performer_count ?? 0},
-      ${(tag as any).studio_count ?? 0},
-      ${(tag as any).group_count ?? 0},
-      ${(tag as any).scene_marker_count ?? 0},
       ${this.escapeNullable(tag.description)},
       ${this.escapeNullable(JSON.stringify(aliases))},
       ${this.escapeNullable(JSON.stringify(parentIds))},
       ${this.escapeNullable(tag.image_path)},
-      '{}',
       ${tag.created_at ? `'${tag.created_at}'` : "NULL"},
       ${tag.updated_at ? `'${tag.updated_at}'` : "NULL"},
       datetime('now'),
@@ -1272,21 +1235,13 @@ class StashSyncService extends EventEmitter {
       .join(",\n");
 
     await prisma.$executeRawUnsafe(`
-    INSERT INTO CachedTag (
-      id, stashInstanceId, name, favorite, sceneCount, imageCount, galleryCount,
-      performerCount, studioCount, groupCount, sceneMarkerCount, description,
-      aliases, parentIds, imagePath, data, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+    INSERT INTO StashTag (
+      id, stashInstanceId, name, favorite, description,
+      aliases, parentIds, imagePath, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       favorite = excluded.favorite,
-      sceneCount = excluded.sceneCount,
-      imageCount = excluded.imageCount,
-      galleryCount = excluded.galleryCount,
-      performerCount = excluded.performerCount,
-      studioCount = excluded.studioCount,
-      groupCount = excluded.groupCount,
-      sceneMarkerCount = excluded.sceneMarkerCount,
       description = excluded.description,
       aliases = excluded.aliases,
       parentIds = excluded.parentIds,
@@ -1393,8 +1348,6 @@ class StashSyncService extends EventEmitter {
       .map((group) => {
         const duration = group.duration || null;
         const urls = group.urls || [];
-        // Extract tag IDs as JSON array
-        const tagIds = group.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(group.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1403,15 +1356,11 @@ class StashSyncService extends EventEmitter {
       ${group.studio?.id ? `'${this.escape(group.studio.id)}'` : "NULL"},
       ${group.rating100 ?? "NULL"},
       ${duration ? Math.round(duration) : "NULL"},
-      ${group.scene_count ?? 0},
-      ${(group as any).performer_count ?? 0},
       ${this.escapeNullable(group.director)},
       ${this.escapeNullable(group.synopsis)},
       ${this.escapeNullable(JSON.stringify(urls))},
-      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(group.front_image_path)},
       ${this.escapeNullable(group.back_image_path)},
-      '{}',
       ${group.created_at ? `'${group.created_at}'` : "NULL"},
       ${group.updated_at ? `'${group.updated_at}'` : "NULL"},
       datetime('now'),
@@ -1421,9 +1370,9 @@ class StashSyncService extends EventEmitter {
       .join(",\n");
 
     await prisma.$executeRawUnsafe(`
-    INSERT INTO CachedGroup (
-      id, stashInstanceId, name, date, studioId, rating100, duration, sceneCount,
-      performerCount, director, synopsis, urls, tagIds, frontImagePath, backImagePath, data, stashCreatedAt,
+    INSERT INTO StashGroup (
+      id, stashInstanceId, name, date, studioId, rating100, duration,
+      director, synopsis, urls, frontImagePath, backImagePath, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1432,12 +1381,9 @@ class StashSyncService extends EventEmitter {
       studioId = excluded.studioId,
       rating100 = excluded.rating100,
       duration = excluded.duration,
-      sceneCount = excluded.sceneCount,
-      performerCount = excluded.performerCount,
       director = excluded.director,
       synopsis = excluded.synopsis,
       urls = excluded.urls,
-      tagIds = excluded.tagIds,
       frontImagePath = excluded.frontImagePath,
       backImagePath = excluded.backImagePath,
       stashCreatedAt = excluded.stashCreatedAt,
@@ -1544,8 +1490,6 @@ class StashSyncService extends EventEmitter {
     const values = validGalleries
       .map((gallery) => {
         const folder = gallery.folder;
-        // Extract tag IDs as JSON array
-        const tagIds = gallery.tags?.map(t => t.id) || [];
         return `(
       '${this.escape(gallery.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1553,14 +1497,11 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(gallery.date)},
       ${gallery.studio?.id ? `'${this.escape(gallery.studio.id)}'` : "NULL"},
       ${gallery.rating100 ?? "NULL"},
-      ${gallery.image_count ?? 0},
       ${this.escapeNullable(gallery.details)},
       ${this.escapeNullable(gallery.url)},
       ${this.escapeNullable(gallery.code)},
-      ${this.escapeNullable(JSON.stringify(tagIds))},
       ${this.escapeNullable(folder?.path)},
       ${this.escapeNullable(gallery.paths?.cover)},
-      '{}',
       ${gallery.created_at ? `'${gallery.created_at}'` : "NULL"},
       ${gallery.updated_at ? `'${gallery.updated_at}'` : "NULL"},
       datetime('now'),
@@ -1570,9 +1511,9 @@ class StashSyncService extends EventEmitter {
       .join(",\n");
 
     await prisma.$executeRawUnsafe(`
-    INSERT INTO CachedGallery (
-      id, stashInstanceId, title, date, studioId, rating100, imageCount,
-      details, url, code, tagIds, folderPath, coverPath, data, stashCreatedAt, stashUpdatedAt,
+    INSERT INTO StashGallery (
+      id, stashInstanceId, title, date, studioId, rating100,
+      details, url, code, folderPath, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1580,11 +1521,9 @@ class StashSyncService extends EventEmitter {
       date = excluded.date,
       studioId = excluded.studioId,
       rating100 = excluded.rating100,
-      imageCount = excluded.imageCount,
       details = excluded.details,
       url = excluded.url,
       code = excluded.code,
-      tagIds = excluded.tagIds,
       folderPath = excluded.folderPath,
       coverPath = excluded.coverPath,
       stashCreatedAt = excluded.stashCreatedAt,
@@ -1747,7 +1686,6 @@ class StashSyncService extends EventEmitter {
         ${this.escapeNullable(paths?.thumbnail)},
         ${this.escapeNullable(paths?.preview)},
         ${this.escapeNullable(paths?.image)},
-        '{}',
         ${image.created_at ? `'${image.created_at}'` : 'NULL'},
         ${image.updated_at ? `'${image.updated_at}'` : 'NULL'},
         datetime('now'),
@@ -1756,10 +1694,10 @@ class StashSyncService extends EventEmitter {
     }).join(',\n');
 
     await prisma.$executeRawUnsafe(`
-      INSERT INTO CachedImage (
+      INSERT INTO StashImage (
         id, stashInstanceId, title, date, studioId, rating100, oCounter, organized,
         filePath, width, height, fileSize, pathThumbnail, pathPreview, pathImage,
-        data, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+        stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
       ) VALUES ${values}
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
@@ -2002,43 +1940,43 @@ class StashSyncService extends EventEmitter {
 
     switch (entityType) {
       case "scene":
-        await prisma.cachedScene.update({
+        await prisma.stashScene.update({
           where: { id: entityId },
           data: { deletedAt: now },
         });
         break;
       case "performer":
-        await prisma.cachedPerformer.update({
+        await prisma.stashPerformer.update({
           where: { id: entityId },
           data: { deletedAt: now },
         });
         break;
       case "studio":
-        await prisma.cachedStudio.update({
+        await prisma.stashStudio.update({
           where: { id: entityId },
           data: { deletedAt: now },
         });
         break;
       case "tag":
-        await prisma.cachedTag.update({
+        await prisma.stashTag.update({
           where: { id: entityId },
           data: { deletedAt: now },
         });
         break;
       case "group":
-        await prisma.cachedGroup.update({
+        await prisma.stashGroup.update({
           where: { id: entityId },
           data: { deletedAt: now },
         });
         break;
       case "gallery":
-        await prisma.cachedGallery.update({
+        await prisma.stashGallery.update({
           where: { id: entityId },
           data: { deletedAt: now },
         });
         break;
       case "image":
-        await prisma.cachedImage.update({
+        await prisma.stashImage.update({
           where: { id: entityId },
           data: { deletedAt: now },
         });
