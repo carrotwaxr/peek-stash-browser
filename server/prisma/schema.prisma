@@ -479,10 +479,6 @@ model StashPerformer {
     birthdate       String?
     favorite        Boolean   @default(false)
     rating100       Int?
-    sceneCount      Int       @default(0)
-    imageCount      Int       @default(0)
-    galleryCount    Int       @default(0)
-    groupCount      Int       @default(0)
 
     // === Extended fields ===
     details         String?                          // Biography
@@ -525,7 +521,6 @@ model StashPerformer {
     @@index([gender])
     @@index([favorite])
     @@index([rating100])
-    @@index([sceneCount])
     @@index([stashUpdatedAt])
     @@index([deletedAt])
 }
@@ -539,11 +534,6 @@ model StashStudio {
     parentId        String?
     favorite        Boolean   @default(false)
     rating100       Int?
-    sceneCount      Int       @default(0)
-    imageCount      Int       @default(0)
-    galleryCount    Int       @default(0)
-    performerCount  Int       @default(0)
-    groupCount      Int       @default(0)
 
     // === Extended fields ===
     details         String?                          // Studio description
@@ -571,7 +561,6 @@ model StashStudio {
     @@index([parentId])
     @@index([favorite])
     @@index([rating100])
-    @@index([sceneCount])
     @@index([stashUpdatedAt])
     @@index([deletedAt])
 }
@@ -583,13 +572,6 @@ model StashTag {
     // === Core fields ===
     name            String
     favorite        Boolean   @default(false)
-    sceneCount      Int       @default(0)
-    imageCount      Int       @default(0)
-    galleryCount    Int       @default(0)
-    performerCount  Int       @default(0)
-    studioCount     Int       @default(0)
-    groupCount      Int       @default(0)
-    sceneMarkerCount Int      @default(0)
 
     // === Extended fields ===
     description     String?                          // Tag description
@@ -618,7 +600,6 @@ model StashTag {
 
     @@index([name])
     @@index([favorite])
-    @@index([sceneCount])
     @@index([stashUpdatedAt])
     @@index([deletedAt])
 }
@@ -633,8 +614,6 @@ model StashGroup {
     studioId        String?
     rating100       Int?
     duration        Int?
-    sceneCount      Int       @default(0)
-    performerCount  Int       @default(0)
 
     // === Extended fields ===
     director        String?
@@ -665,7 +644,6 @@ model StashGroup {
     @@index([date])
     @@index([studioId])
     @@index([rating100])
-    @@index([sceneCount])
     @@index([stashUpdatedAt])
     @@index([deletedAt])
 }
@@ -679,7 +657,6 @@ model StashGallery {
     date            String?
     studioId        String?
     rating100       Int?
-    imageCount      Int       @default(0)
 
     // === Extended fields ===
     details         String?                          // Gallery description
@@ -714,7 +691,6 @@ model StashGallery {
     @@index([date])
     @@index([studioId])
     @@index([rating100])
-    @@index([imageCount])
     @@index([stashUpdatedAt])
     @@index([deletedAt])
 }
