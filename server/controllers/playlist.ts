@@ -3,7 +3,7 @@ import { Scene } from "stashapp-api";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import type { NormalizedScene } from "../types/index.js";
-import { transformScene } from "../utils/pathMapping.js";
+import { transformScene } from "../utils/stashUrlProxy.js";
 
 /**
  * Get all playlists for current user

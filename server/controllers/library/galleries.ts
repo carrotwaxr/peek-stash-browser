@@ -16,7 +16,7 @@ import {
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import { convertToProxyUrl } from "../../utils/pathMapping.js";
+import { convertToProxyUrl } from "../../utils/stashUrlProxy.js";
 import { mergePerformersWithUserData } from "./performers.js";
 import { mergeStudiosWithUserData } from "./studios.js";
 import { mergeTagsWithUserData } from "./tags.js";

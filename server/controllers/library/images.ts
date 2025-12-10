@@ -5,7 +5,7 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { CriterionModifier } from "../../types/index.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
-import { transformImage } from "../../utils/pathMapping.js";
+import { transformImage } from "../../utils/stashUrlProxy.js";
 
 /**
  * Calculate actual image count for an entity by querying galleries→images
