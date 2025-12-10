@@ -519,6 +519,7 @@ model StashPerformer {
     scenes          ScenePerformer[]
     images          ImagePerformer[]
     galleries       GalleryPerformer[]
+    tags            PerformerTag[]
 
     @@index([name])
     @@index([gender])
@@ -562,6 +563,9 @@ model StashStudio {
     stashUpdatedAt  DateTime?
     syncedAt        DateTime  @default(now())
     deletedAt       DateTime?
+
+    // === Relations ===
+    tags            StudioTag[]
 
     @@index([name])
     @@index([parentId])
@@ -607,6 +611,10 @@ model StashTag {
     // === Relations ===
     scenes          SceneTag[]
     images          ImageTag[]
+    performers      PerformerTag[]
+    studios         StudioTag[]
+    galleries       GalleryTag[]
+    groups          GroupTag[]
 
     @@index([name])
     @@index([favorite])
@@ -651,6 +659,7 @@ model StashGroup {
 
     // === Relations ===
     scenes          SceneGroup[]
+    tags            GroupTag[]
 
     @@index([name])
     @@index([date])
@@ -699,6 +708,7 @@ model StashGallery {
     scenes          SceneGallery[]
     images          ImageGallery[]
     performers      GalleryPerformer[]
+    tags            GalleryTag[]
 
     @@index([title])
     @@index([date])
@@ -834,6 +844,46 @@ model GalleryPerformer {
 
     @@id([galleryId, performerId])
     @@index([performerId])
+}
+
+model PerformerTag {
+    performerId     String
+    tagId           String
+    performer       StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+    tag             StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([performerId, tagId])
+    @@index([tagId])
+}
+
+model StudioTag {
+    studioId        String
+    tagId           String
+    studio          StashStudio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+    tag             StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([studioId, tagId])
+    @@index([tagId])
+}
+
+model GalleryTag {
+    galleryId       String
+    tagId           String
+    gallery         StashGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+    tag             StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([galleryId, tagId])
+    @@index([tagId])
+}
+
+model GroupTag {
+    groupId         String
+    tagId           String
+    group           StashGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+    tag             StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+    @@id([groupId, tagId])
+    @@index([tagId])
 }
 
 // Sync state tracking per entity type
