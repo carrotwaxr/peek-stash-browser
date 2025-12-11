@@ -24,9 +24,10 @@ import {
  * - When autoplayOnScroll=false on touch-only devices: No preview (static screenshot)
  *
  * Performance optimizations:
- * - Screenshots use native browser lazy loading (loading="lazy")
+ * - Screenshots use IntersectionObserver for true lazy loading (only load when visible)
  * - Animations only fetched when user hovers or scrolls into view
  * - Results cached to prevent re-fetching on subsequent interactions
+ * - Combined with backend concurrency limiting to prevent overwhelming Stash
  *
  * @param {Object} scene - Scene object with paths.preview, paths.webp, paths.sprite, paths.vtt
  * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (typically for 1-column mobile layouts)
@@ -54,6 +55,7 @@ const SceneCardPreview = ({
   const [containerElement, setContainerElement] = useState(null);
   const [previewDataLoaded, setPreviewDataLoaded] = useState(false);
   const [activePreviewType, setActivePreviewType] = useState(null); // Track which type is actually being used (after fallback)
+  const [shouldLoadScreenshot, setShouldLoadScreenshot] = useState(false); // True lazy loading for screenshots
   const intervalRef = useRef(null);
 
   // Determine preview type based on user preference
@@ -82,6 +84,28 @@ const SceneCardPreview = ({
 
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
+
+  // True lazy loading for screenshots - only load when card enters viewport
+  // This prevents the browser from queuing all 24+ images at once
+  useEffect(() => {
+    if (!containerElement || shouldLoadScreenshot) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoadScreenshot(true);
+          observer.disconnect(); // Only need to trigger once
+        }
+      },
+      {
+        rootMargin: "200px", // Start loading slightly before visible
+        threshold: 0,
+      }
+    );
+    observer.observe(containerElement);
+
+    return () => observer.disconnect();
+  }, [containerElement, shouldLoadScreenshot]);
 
   // Intersection Observer for scroll-based autoplay (when autoplayOnScroll is enabled)
   useEffect(() => {
@@ -319,13 +343,13 @@ const SceneCardPreview = ({
       onMouseEnter={() => hasHoverCapability && setIsHovering(true)}
       onMouseLeave={() => hasHoverCapability && setIsHovering(false)}
     >
-      {/* Always show screenshot as base layer (lazy loaded) */}
+      {/* Screenshot base layer - true lazy loading via IntersectionObserver */}
+      {/* Only set src when card enters viewport to prevent browser from queuing all images */}
       <img
-        src={scene?.paths?.screenshot}
+        src={shouldLoadScreenshot ? scene?.paths?.screenshot : undefined}
         alt={scene?.title || "Scene"}
         className="w-full h-full object-contain pointer-events-none"
         style={{ backgroundColor: "var(--bg-secondary)" }}
-        loading="lazy"
       />
 
       {/* Overlay: Video preview (MP4, high quality) */}

@@ -1,11 +1,11 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { CriterionModifier } from "../../types/index.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
-import { transformImage } from "../../utils/pathMapping.js";
+import { transformImage } from "../../utils/stashUrlProxy.js";
 
 /**
  * Calculate actual image count for an entity by querying galleries→images
@@ -17,7 +17,7 @@ export async function calculateEntityImageCount(
 ): Promise<number> {
   try {
     // Step 1: Find galleries matching the entity
-    const allGalleries = stashCacheManager.getAllGalleries();
+    const allGalleries = await stashEntityService.getAllGalleries();
     let matchingGalleries = allGalleries;
 
     if (entityType === "performer") {
@@ -99,7 +99,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 1: Find galleries matching the entity filter
     const step1Start = Date.now();
-    const allGalleries = stashCacheManager.getAllGalleries();
+    const allGalleries = await stashEntityService.getAllGalleries();
     let matchingGalleries = allGalleries;
 
     if (image_filter?.performers) {
@@ -112,7 +112,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     if (image_filter?.tags) {
       // Expand tag IDs to include descendants if depth is specified
       const expandedTagIds = new Set(
-        expandTagIds(
+        await expandTagIds(
           image_filter.tags.value.map(String),
           image_filter.tags.depth ?? 0
         )
@@ -125,7 +125,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     if (image_filter?.studios) {
       // Expand studio IDs to include descendants if depth is specified
       const expandedStudioIds = new Set(
-        expandStudioIds(
+        await expandStudioIds(
           image_filter.studios.value.map(String),
           image_filter.studios.depth ?? 0
         )

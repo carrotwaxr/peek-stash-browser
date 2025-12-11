@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { stashEntityService } from "./StashEntityService.js";
 import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
-import { stashCacheManager } from "./StashCacheManager.js";
 
 const prisma = new PrismaClient();
 
@@ -127,39 +127,41 @@ class UserHiddenEntityService {
     });
 
     // Enrich with entity details from cache
-    const enriched = hiddenEntities.map((hidden) => {
-      let entity = null;
+    const enriched = await Promise.all(
+      hiddenEntities.map(async (hidden) => {
+        let entity = null;
 
-      switch (hidden.entityType) {
-        case "scene":
-          entity = stashCacheManager.getScene(hidden.entityId);
-          break;
-        case "performer":
-          entity = stashCacheManager.getPerformer(hidden.entityId);
-          break;
-        case "studio":
-          entity = stashCacheManager.getStudio(hidden.entityId);
-          break;
-        case "tag":
-          entity = stashCacheManager.getTag(hidden.entityId);
-          break;
-        case "group":
-          entity = stashCacheManager.getGroup(hidden.entityId);
-          break;
-        case "gallery":
-          entity = stashCacheManager.getGallery(hidden.entityId);
-          break;
-        // image type doesn't have a cache getter
-      }
+        switch (hidden.entityType) {
+          case "scene":
+            entity = await stashEntityService.getScene(hidden.entityId);
+            break;
+          case "performer":
+            entity = await stashEntityService.getPerformer(hidden.entityId);
+            break;
+          case "studio":
+            entity = await stashEntityService.getStudio(hidden.entityId);
+            break;
+          case "tag":
+            entity = await stashEntityService.getTag(hidden.entityId);
+            break;
+          case "group":
+            entity = await stashEntityService.getGroup(hidden.entityId);
+            break;
+          case "gallery":
+            entity = await stashEntityService.getGallery(hidden.entityId);
+            break;
+          // image type doesn't have a cache getter
+        }
 
-      return {
-        id: hidden.id,
-        entityType: hidden.entityType as EntityType,
-        entityId: hidden.entityId,
-        hiddenAt: hidden.hiddenAt,
-        entity,
-      };
-    });
+        return {
+          id: hidden.id,
+          entityType: hidden.entityType as EntityType,
+          entityId: hidden.entityId,
+          hiddenAt: hidden.hiddenAt,
+          entity,
+        };
+      })
+    );
 
     // Filter out entities that no longer exist in Stash cache
     return enriched.filter((item) => item.entity !== null);

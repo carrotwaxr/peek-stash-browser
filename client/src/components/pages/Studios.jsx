@@ -8,7 +8,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   GridCard,
   PageHeader,
@@ -57,7 +57,7 @@ const Studios = () => {
     } catch (err) {
       // If server is initializing, show a message and retry after delay
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000); // Retry every 5 seconds
@@ -79,7 +79,7 @@ const Studios = () => {
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    tvNavigation,
+    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -114,7 +114,7 @@ const Studios = () => {
           subtitle="Browse studios and production companies in your library"
         />
 
-        {initMessage && <CacheLoadingBanner message={initMessage} />}
+        {initMessage && <SyncProgressBanner message={initMessage} />}
 
         {/* Controls Section */}
         <SearchControls

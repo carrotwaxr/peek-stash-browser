@@ -1,5 +1,6 @@
 import { AlertCircle, Eye, Loader2, ImageOff } from "lucide-react";
 import { getSceneTitle } from "../../utils/format.js";
+import { useLazyLoad } from "../ui/CardComponents.jsx";
 
 /**
  * CarouselPreview Component
@@ -101,9 +102,11 @@ const CarouselPreview = ({ scenes, error, loading }) => {
  */
 const PreviewCard = ({ scene }) => {
   const thumbnailUrl = scene.paths?.screenshot;
+  const [ref, shouldLoad] = useLazyLoad();
 
   return (
     <div
+      ref={ref}
       className="rounded-lg overflow-hidden border"
       style={{
         backgroundColor: "var(--bg-secondary)",
@@ -112,12 +115,11 @@ const PreviewCard = ({ scene }) => {
     >
       {/* Thumbnail */}
       <div className="aspect-video relative bg-black/50">
-        {thumbnailUrl ? (
+        {shouldLoad && thumbnailUrl ? (
           <img
             src={thumbnailUrl}
             alt={scene.title || "Scene thumbnail"}
             className="w-full h-full object-cover"
-            loading="lazy"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

@@ -6,7 +6,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
@@ -33,7 +33,7 @@ const SceneSearch = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();  // eslint-disable-line no-unused-vars
 
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const columns = useGridColumns("scenes");
@@ -113,7 +113,7 @@ const SceneSearch = ({
       // If server is initializing, show a message and retry after delay
       // Increased retry limit to 60 (5 minutes at 5s intervals) to match server retry logic
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000); // Retry every 5 seconds
@@ -162,7 +162,7 @@ const SceneSearch = ({
     <PageLayout>
       <PageHeader title={title} subtitle={subtitle} />
 
-      {initMessage && <CacheLoadingBanner message={initMessage} />}
+      {initMessage && <SyncProgressBanner message={initMessage} />}
 
       <SearchControls
         artifactType="scene"

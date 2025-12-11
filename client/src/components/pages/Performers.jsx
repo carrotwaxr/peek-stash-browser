@@ -9,7 +9,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   PageHeader,
   PageLayout,
@@ -58,7 +58,7 @@ const Performers = () => {
     } catch (err) {
       // If server is initializing, show a message and retry after delay
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000); // Retry every 5 seconds
@@ -81,7 +81,7 @@ const Performers = () => {
   const {
     isTVMode,
     tvNavigation,
-    gridNavigation,
+    _gridNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -139,7 +139,7 @@ const Performers = () => {
           subtitle="Browse performers in your library"
         />
 
-        {initMessage && <CacheLoadingBanner message={initMessage} />}
+        {initMessage && <SyncProgressBanner message={initMessage} />}
 
         {/* Controls Section */}
         <SearchControls

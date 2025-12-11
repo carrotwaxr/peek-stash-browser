@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
-import { stashCacheManager } from "../services/StashCacheManager.js";
+import { stashEntityService } from "../services/StashEntityService.js";
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -98,12 +98,13 @@ export const requireAdmin = (
   next();
 };
 
-export const requireCacheReady = (
+export const requireCacheReady = async (
   _req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  if (!stashCacheManager.isReady()) {
+  const isReady = await stashEntityService.isReady();
+  if (!isReady) {
     return res.status(503).json({
       error: "Server is initializing",
       message: "Cache is still loading. Please wait a moment and try again.",

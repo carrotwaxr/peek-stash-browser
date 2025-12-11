@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useLazyLoad } from "./CardComponents.jsx";
 
 /**
  * RecommendedSidebar - Compact vertical list of recommended scenes for sidebar
@@ -39,20 +40,6 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
       fetchRecommendedScenes();
     }
   }, [sceneId]);
-
-  const formatDuration = (seconds) => {
-    if (!seconds) return "?:??";
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-        .toString()
-        .padStart(2, "0")}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, "0")}`;
-  };
 
   const handleSceneClick = (scene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
@@ -128,46 +115,12 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
               }}
             >
               <div className="flex gap-3">
-                {/* Thumbnail */}
-                <div
-                  className="relative flex-shrink-0 overflow-hidden"
-                  style={{
-                    width: "140px",
-                    height: "80px",
-                    backgroundColor: "var(--border-color)",
-                  }}
-                >
-                  {thumbnail ? (
-                    <img
-                      src={thumbnail}
-                      alt={scene.title || "Scene"}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span
-                        className="text-2xl"
-                        style={{ color: "var(--text-secondary)" }}
-                      >
-                        🎬
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Duration badge */}
-                  {duration && (
-                    <div
-                      className="absolute bottom-1 right-1 px-1.5 py-0.5 text-xs font-medium rounded"
-                      style={{
-                        backgroundColor: "rgba(0, 0, 0, 0.8)",
-                        color: "white",
-                      }}
-                    >
-                      {formatDuration(duration)}
-                    </div>
-                  )}
-                </div>
+                {/* Thumbnail with lazy loading */}
+                <SidebarThumbnail
+                  thumbnail={thumbnail}
+                  alt={scene.title || "Scene"}
+                  duration={duration}
+                />
 
                 {/* Info */}
                 <div className="flex-1 py-2 pr-2 min-w-0">
@@ -204,6 +157,72 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
           );
         })}
       </div>
+    </div>
+  );
+};
+
+/**
+ * Format duration in seconds to HH:MM:SS or MM:SS
+ */
+const formatDuration = (seconds) => {
+  if (!seconds) return "?:??";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+};
+
+/**
+ * SidebarThumbnail - Lazy-loaded thumbnail for sidebar items
+ */
+const SidebarThumbnail = ({ thumbnail, alt, duration }) => {
+  const [ref, shouldLoad] = useLazyLoad();
+
+  return (
+    <div
+      ref={ref}
+      className="relative flex-shrink-0 overflow-hidden"
+      style={{
+        width: "140px",
+        height: "80px",
+        backgroundColor: "var(--border-color)",
+      }}
+    >
+      {shouldLoad && thumbnail ? (
+        <img
+          src={thumbnail}
+          alt={alt}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <span
+            className="text-2xl"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            🎬
+          </span>
+        </div>
+      )}
+
+      {/* Duration badge */}
+      {duration && (
+        <div
+          className="absolute bottom-1 right-1 px-1.5 py-0.5 text-xs font-medium rounded"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            color: "white",
+          }}
+        >
+          {formatDuration(duration)}
+        </div>
+      )}
     </div>
   );
 };

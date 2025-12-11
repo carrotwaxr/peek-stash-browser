@@ -10,7 +10,7 @@ import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js"
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   GridCard,
   PageHeader,
@@ -54,7 +54,7 @@ const Galleries = () => {
       setIsLoading(false);
     } catch (err) {
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000);
@@ -74,7 +74,7 @@ const Galleries = () => {
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    tvNavigation,
+    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -107,7 +107,7 @@ const Galleries = () => {
           subtitle="Browse image galleries in your library"
         />
 
-        {initMessage && <CacheLoadingBanner message={initMessage} />}
+        {initMessage && <SyncProgressBanner message={initMessage} />}
 
         <SearchControls
           artifactType="gallery"

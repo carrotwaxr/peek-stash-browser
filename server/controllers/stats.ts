@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { promises as fs } from "fs";
 import os from "os";
-import { stashCacheManager } from "../services/StashCacheManager.js";
+import { stashEntityService } from "../services/StashEntityService.js";
+import { stashSyncService } from "../services/StashSyncService.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -13,7 +14,26 @@ export const getStats = async (req: Request, res: Response) => {
     // Get cache stats with fallback
     let cacheStats;
     try {
-      cacheStats = stashCacheManager.getStats();
+      const [counts, isReady, lastRefreshed] = await Promise.all([
+        stashEntityService.getStats(),
+        stashEntityService.isReady(),
+        stashEntityService.getLastRefreshed(),
+      ]);
+      cacheStats = {
+        isInitialized: isReady,
+        isRefreshing: stashSyncService.isSyncing(),
+        lastRefreshed: lastRefreshed?.toISOString() || null,
+        counts: {
+          scenes: counts.scenes,
+          performers: counts.performers,
+          studios: counts.studios,
+          tags: counts.tags,
+          galleries: counts.galleries,
+          groups: counts.groups,
+          images: counts.images,
+        },
+        estimatedCacheSize: "N/A (SQLite)", // Size now in DB
+      };
     } catch (err) {
       logger.warn("Could not get cache stats", {
         error: (err as Error).message,
@@ -22,7 +42,7 @@ export const getStats = async (req: Request, res: Response) => {
         isInitialized: false,
         isRefreshing: false,
         lastRefreshed: null,
-        counts: { scenes: 0, performers: 0, studios: 0, tags: 0 },
+        counts: { scenes: 0, performers: 0, studios: 0, tags: 0, galleries: 0, groups: 0, images: 0 },
         estimatedCacheSize: "0 MB",
       };
     }
@@ -174,7 +194,10 @@ function formatUptime(seconds: number): string {
 export const refreshCache = async (req: Request, res: Response) => {
   try {
     logger.info("Manual cache refresh triggered by admin");
-    await stashCacheManager.refreshCache();
+    // Trigger a full sync (non-blocking - runs in background)
+    stashSyncService.fullSync().catch((err: Error) => {
+      logger.error("Background full sync failed", { error: err.message });
+    });
 
     res.json({
       success: true,

@@ -22,7 +22,7 @@ import {
   transformScene,
   transformStudio,
   transformTag,
-} from "../utils/pathMapping.js";
+} from "../utils/stashUrlProxy.js";
 import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 

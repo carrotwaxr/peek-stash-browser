@@ -387,6 +387,11 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
   const { theme } = useTheme();
   const { login } = useAuth();
   const [currentStep, setCurrentStep] = useState(() => {
+    // If both users and stash instance exist, go straight to complete
+    if (setupStatus?.hasUsers && setupStatus?.hasStashInstance) {
+      return 3; // Skip to Complete
+    }
+    // If users exist but no stash instance, skip to Stash config
     if (setupStatus?.hasUsers && !setupStatus?.hasStashInstance) {
       return 2; // Skip to Stash config
     }
@@ -441,7 +446,12 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
         // Clear password from memory immediately for security
         setAdminPassword("");
         setConfirmPassword("");
-        setCurrentStep(2);
+        // Skip Stash config step if instance already exists (e.g., from env vars)
+        if (setupStatus?.hasStashInstance) {
+          setCurrentStep(3); // Go to Complete
+        } else {
+          setCurrentStep(2); // Go to Stash config
+        }
       } else {
         setError(response.error || "Failed to create admin user");
       }

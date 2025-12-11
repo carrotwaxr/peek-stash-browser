@@ -1,14 +1,18 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
+
+// Feature flag for SQL query builder
+const USE_SQL_QUERY_BUILDER = process.env.USE_SQL_QUERY_BUILDER !== "false";
 
 /**
  * Seeded random number generator for consistent shuffling per user
@@ -170,10 +174,10 @@ export function addStreamabilityInfo(
  * Apply quick scene filters (don't require merged user data)
  * These filters only access data already present in the scene object from cache
  */
-export function applyQuickSceneFilters(
+export async function applyQuickSceneFilters(
   scenes: NormalizedScene[],
   filters: PeekSceneFilter | null | undefined
-): NormalizedScene[] {
+): Promise<NormalizedScene[]> {
   if (!filters) return scenes;
 
   let filtered = scenes;
@@ -182,6 +186,11 @@ export function applyQuickSceneFilters(
   if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
     const idSet = new Set(filters.ids);
     filtered = filtered.filter((s) => idSet.has(s.id));
+    // Populate sceneStreams for detail views (browse queries return empty streams for performance)
+    filtered = filtered.map((s) => ({
+      ...s,
+      sceneStreams: s.sceneStreams?.length ? s.sceneStreams : stashEntityService.generateSceneStreams(s.id),
+    }));
   }
 
   // Filter by performers
@@ -218,10 +227,19 @@ export function applyQuickSceneFilters(
 
     // Expand tag IDs to include descendants if depth is specified
     // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
-    const expandedTagIds = expandTagIds(
+    const expandedTagIds = await expandTagIds(
       tagIds.map((id) => String(id)),
       depth ?? 0
     );
+
+    // Pre-compute expanded sets for each individual tag (needed for INCLUDES_ALL)
+    const expandedTagSets = new Map<string, string[]>();
+    if (modifier === "INCLUDES_ALL") {
+      for (const originalTagId of tagIds) {
+        const expanded = await expandTagIds([String(originalTagId)], depth ?? 0);
+        expandedTagSets.set(String(originalTagId), expanded);
+      }
+    }
 
     filtered = filtered.filter((s) => {
       // Collect all tag IDs from scene, performers, and studio
@@ -247,10 +265,7 @@ export function applyQuickSceneFilters(
         // For INCLUDES_ALL with hierarchy, we check that the scene has at least
         // one tag from each original filter tag's expanded set
         return tagIds.every((originalTagId) => {
-          const expandedForThisTag = expandTagIds(
-            [String(originalTagId)],
-            depth ?? 0
-          );
+          const expandedForThisTag = expandedTagSets.get(String(originalTagId)) || [];
           return expandedForThisTag.some((id) => allTagIds.has(id));
         });
       }
@@ -270,7 +285,7 @@ export function applyQuickSceneFilters(
     // Expand studio IDs to include descendants if depth is specified
     // depth: 0 or undefined = exact match, -1 = all descendants, N = N levels deep
     const expandedStudioIds = new Set(
-      expandStudioIds(
+      await expandStudioIds(
         studioIds.map((id) => String(id)),
         depth ?? 0
       )
@@ -836,8 +851,13 @@ function getFieldValue(
  * Simplified findScenes using cache with pagination-aware filtering
  */
 export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
+  const requestStart = Date.now();
   try {
     const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     const { filter, scene_filter, ids } = req.body;
 
     const sortField = filter?.sort || "created_at";
@@ -846,8 +866,124 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
+    const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
+    const requestingUser = req.user;
+
+    // NEW: Use SQL query builder if enabled
+    if (USE_SQL_QUERY_BUILDER && !searchQuery) {
+      logger.info("findScenes: using SQL query builder path");
+
+      // Get excluded scene IDs
+      const excludedIds = await userRestrictionService.getExcludedSceneIds(
+        userId,
+        requestingUser?.role === 'ADMIN'
+      );
+
+      // Build filters object
+      const filters: PeekSceneFilter = { ...scene_filter };
+      if (ids && ids.length > 0) {
+        filters.ids = { value: ids, modifier: "INCLUDES" };
+      }
+
+      // Execute query
+      const result = await sceneQueryBuilder.execute({
+        userId,
+        filters,
+        excludedSceneIds: excludedIds,
+        sort: sortField,
+        sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
+        page,
+        perPage,
+        randomSeed: userId, // Stable random per user
+      });
+
+      // Add streamability info
+      const scenes = addStreamabilityInfo(result.scenes);
+
+      logger.info("findScenes complete (SQL path)", {
+        totalTimeMs: Date.now() - requestStart,
+        resultCount: scenes.length,
+        total: result.total,
+      });
+
+      return res.json({
+        findScenes: {
+          count: result.total,
+          scenes,
+        },
+      });
+    }
+
+    // Check if we can use the FAST PATH (pure DB pagination)
+    // Fast path requires: no search, no filters, simple sort field
+    // Now works for ALL users (admins and regular users) with pre-computed exclusions
+    const dbSortFields = new Set(['created_at', 'updated_at', 'date', 'title', 'duration', 'filesize', 'bitrate', 'framerate']);
+
+    // Check if scene_filter has any actual filter properties (not just an empty object)
+    const hasSceneFilters = scene_filter && Object.keys(scene_filter).length > 0;
+
+    const canUseDbPagination =
+      !searchQuery &&
+      !ids &&
+      !hasSceneFilters &&
+      dbSortFields.has(sortField);
+
+    // Debug logging to understand why fast path is/isn't used
+    logger.info(`findScenes: fast path check - searchQuery=${!!searchQuery}, ids=${!!ids}, hasSceneFilters=${hasSceneFilters}, sortField=${sortField}, inDbSortFields=${dbSortFields.has(sortField)}, canUse=${canUseDbPagination}`);
+
+    if (canUseDbPagination) {
+      // FAST PATH: Database pagination with pre-computed exclusions (sub-second response)
+      logger.info('findScenes: using FAST PATH (DB pagination with exclusions)');
+
+      // Pre-compute excluded scene IDs at DB level (much faster than loading all scenes)
+      const exclusionStart = Date.now();
+      const excludeIds = await userRestrictionService.getExcludedSceneIds(
+        userId,
+        requestingUser?.role === 'ADMIN' // Skip content restrictions for admins (but still apply hidden entities)
+      );
+      logger.info(`findScenes: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+
+      const dbStart = Date.now();
+      const { scenes: paginatedScenes, total } = await stashEntityService.getScenesPaginated({
+        page,
+        perPage,
+        sortField,
+        sortDirection: sortDirection.toUpperCase() as 'ASC' | 'DESC',
+        excludeIds,
+      });
+      logger.info(`findScenes: DB pagination took ${Date.now() - dbStart}ms`);
+
+      // Merge user data for paginated scenes only
+      const mergeStart = Date.now();
+      const scenesWithUserData = await mergeScenesWithUserData(paginatedScenes, userId);
+      logger.info(`findScenes: merge user data took ${Date.now() - mergeStart}ms (${paginatedScenes.length} scenes)`);
+
+      // Add streamability info
+      const scenesWithStreamability = addStreamabilityInfo(scenesWithUserData);
+
+      logger.info(`findScenes: TOTAL request took ${Date.now() - requestStart}ms (FAST PATH)`);
+
+      return res.json({
+        findScenes: {
+          count: total,
+          scenes: scenesWithStreamability,
+        },
+      });
+    }
+
+    // STANDARD PATH: Load all scenes and filter in memory
+    // Pre-compute excluded scene IDs at DB level (fast Set lookup instead of nested entity checks)
+    const exclusionStart = Date.now();
+    const excludeIds = await userRestrictionService.getExcludedSceneIds(
+      userId,
+      requestingUser?.role === 'ADMIN' // Skip content restrictions for admins
+    );
+    logger.info(`findScenes: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+
     // Step 1: Get all scenes from cache
-    let scenes = stashCacheManager.getAllScenes();
+    const cacheStart = Date.now();
+    let scenes = await stashEntityService.getAllScenes();
+    logger.info(`findScenes: cache fetch took ${Date.now() - cacheStart}ms for ${scenes.length} scenes`);
 
     if (scenes.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -858,6 +994,11 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         },
       });
     }
+
+    // Apply pre-computed exclusions immediately (fast Set lookup)
+    const preFilterStart = Date.now();
+    scenes = scenes.filter(s => !excludeIds.has(s.id));
+    logger.info(`findScenes: applied ${excludeIds.size} exclusions in ${Date.now() - preFilterStart}ms, ${scenes.length} scenes remaining`);
 
     // Determine if we can use optimized pipeline
     // Expensive sort fields require user data, so we must merge all scenes first
@@ -884,15 +1025,14 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       scene_filter?.studio_favorite !== undefined ||
       scene_filter?.tag_favorite !== undefined;
 
-    const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
-    const requestingUser = req.user;
-
     if (requiresUserDataForSort || hasExpensiveFilters) {
       // OLD PIPELINE: Merge all → filter → sort → paginate
       // (Required when sorting/filtering by user-specific data)
 
       // Step 2: Merge with user data (all scenes)
+      const mergeStart = Date.now();
       scenes = await mergeScenesWithUserData(scenes, userId);
+      logger.info(`findScenes: merge user data took ${Date.now() - mergeStart}ms`);
 
       // Step 3: Apply search query
       if (searchQuery) {
@@ -917,21 +1057,18 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       // Step 4: Apply all filters (quick + expensive)
-      scenes = applyQuickSceneFilters(scenes, mergedFilter);
+      const filterStart = Date.now();
+      scenes = await applyQuickSceneFilters(scenes, mergedFilter);
       scenes = applyExpensiveSceneFilters(scenes, mergedFilter);
+      logger.info(`findScenes: filters took ${Date.now() - filterStart}ms`);
 
-      // Step 5: Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      scenes = await userRestrictionService.filterScenesForUser(
-        scenes,
-        userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
-      );
+      // Note: Exclusions already applied via pre-computed excludeIds above
 
       // Step 6: Sort
+      const sortStart = Date.now();
       const groupIdForSort = scene_filter?.groups?.value?.[0];
       scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
+      logger.info(`findScenes: sort took ${Date.now() - sortStart}ms`);
 
       // Step 7: Paginate
       const total = scenes.length;
@@ -941,6 +1078,8 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
       // Step 8: Add streamability information
       const scenesWithStreamability = addStreamabilityInfo(paginatedScenes);
+
+      logger.info(`findScenes: TOTAL request took ${Date.now() - requestStart}ms (expensive pipeline)`);
 
       return res.json({
         findScenes: {
@@ -975,20 +1114,17 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       // Step 3: Apply quick filters (don't need user data)
-      scenes = applyQuickSceneFilters(scenes, mergedFilter);
+      const filterStart = Date.now();
+      scenes = await applyQuickSceneFilters(scenes, mergedFilter);
+      logger.info(`findScenes: quick filters took ${Date.now() - filterStart}ms`);
 
-      // Step 4: Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      scenes = await userRestrictionService.filterScenesForUser(
-        scenes,
-        userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
-      );
+      // Note: Exclusions already applied via pre-computed excludeIds above
 
-      // Step 5: Sort (using quick sort fields only)
+      // Step 4: Sort (using quick sort fields only)
+      const sortStart = Date.now();
       const groupIdForSort = scene_filter?.groups?.value?.[0];
       scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
+      logger.info(`findScenes: sort took ${Date.now() - sortStart}ms`);
 
       // Step 6: Paginate BEFORE merging user data
       const total = scenes.length;
@@ -997,10 +1133,12 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       const paginatedScenes = scenes.slice(startIndex, endIndex);
 
       // Step 7: Merge user data (ONLY for paginated scenes - huge win!)
+      const mergeStart = Date.now();
       const scenesWithUserData = await mergeScenesWithUserData(
         paginatedScenes,
         userId
       );
+      logger.info(`findScenes: merge user data took ${Date.now() - mergeStart}ms (${paginatedScenes.length} scenes)`);
 
       // Step 8: Apply expensive filters (shouldn't match anything since no expensive filters)
       // Included for completeness, will be no-op
@@ -1011,6 +1149,8 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
       // Step 9: Add streamability information
       const scenesWithStreamability = addStreamabilityInfo(finalScenes);
+
+      logger.info(`findScenes: TOTAL request took ${Date.now() - requestStart}ms (optimized pipeline)`);
 
       return res.json({
         findScenes: {
@@ -1083,7 +1223,7 @@ export const findSimilarScenes = async (
 
     // Get all scenes from cache and filter hidden entities
     // All users (including admins) should have their hidden entities filtered
-    let allScenes = stashCacheManager.getAllScenes();
+    let allScenes = await stashEntityService.getAllScenes();
     allScenes = await userRestrictionService.filterScenesForUser(
       allScenes,
       userId,
@@ -1319,7 +1459,7 @@ export const getRecommendedScenes = async (
 
     // Get all scenes and filter hidden entities
     // All users (including admins) should have their hidden entities filtered
-    let allScenes = stashCacheManager.getAllScenes();
+    let allScenes = await stashEntityService.getAllScenes();
     allScenes = await userRestrictionService.filterScenesForUser(
       allScenes,
       userId,

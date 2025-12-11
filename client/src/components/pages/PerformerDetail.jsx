@@ -21,6 +21,7 @@ import {
   EntityGrid,
   FavoriteButton,
   GenderIcon,
+  LazyImage,
   Lightbox,
   LoadingSpinner,
   PageHeader,
@@ -536,7 +537,7 @@ const PerformerDetails = ({ performer }) => {
   );
 };
 
-const PerformerStats = ({ performer, performerId }) => {
+const PerformerStats = ({ performer, performerId: _performerId }) => { // eslint-disable-line no-unused-vars
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'scenes';
 
@@ -866,8 +867,10 @@ const ImagesTab = ({ performerId, performerName }) => {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 mt-6">
         {images.map((image, index) => (
-          <div
+          <LazyImage
             key={image.id}
+            src={image.paths?.thumbnail}
+            alt={image.title || `Image ${index + 1}`}
             className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
             style={{
               backgroundColor: "var(--bg-secondary)",
@@ -877,23 +880,7 @@ const ImagesTab = ({ performerId, performerName }) => {
               setLightboxIndex(index);
               setLightboxOpen(true);
             }}
-          >
-            {image.paths?.thumbnail ? (
-              <img
-                src={image.paths.thumbnail}
-                alt={image.title || `Image ${index + 1}`}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div
-                className="w-full h-full flex items-center justify-center text-sm"
-                style={{ color: "var(--text-muted)" }}
-              >
-                No Preview
-              </div>
-            )}
-          </div>
+          />
         ))}
       </div>
 

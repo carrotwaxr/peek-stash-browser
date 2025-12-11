@@ -424,7 +424,7 @@ export function scenePlayerReducer(state, action) {
           : null,
       };
 
-    case "TOGGLE_SHUFFLE":
+    case "TOGGLE_SHUFFLE": {
       const newShuffle = !state.shuffle;
       return {
         ...state,
@@ -440,8 +440,9 @@ export function scenePlayerReducer(state, action) {
             }
           : null,
       };
+    }
 
-    case "TOGGLE_REPEAT":
+    case "TOGGLE_REPEAT": {
       // Cycle through: none → all → one → none
       const repeatModes = ["none", "all", "one"];
       const currentIdx = repeatModes.indexOf(state.repeat);
@@ -454,6 +455,7 @@ export function scenePlayerReducer(state, action) {
           ? { ...state.playlist, repeat: nextRepeat }
           : null,
       };
+    }
 
     case "SET_SHUFFLE_HISTORY":
       return {

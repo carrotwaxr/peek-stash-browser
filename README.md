@@ -123,7 +123,7 @@ The wizard stores your Stash connection details securely in the database.
 | Variable     | Required | Default        | Description                                         |
 | ------------ | -------- | -------------- | --------------------------------------------------- |
 | `JWT_SECRET` | Yes      | Auto-generated | Secret for JWT tokens (recommended to set manually) |
-| `CONFIG_DIR` | No       | `/app/data`    | Directory for database and cache                    |
+| `CONFIG_DIR` | No       | `/app/data`    | Directory for database and library data             |
 
 > **Note**: Stash connection details (URL and API key) are configured via the Setup Wizard and stored in the database. No environment variables needed!
 

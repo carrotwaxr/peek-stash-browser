@@ -1,16 +1,16 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
+import { hydrateEntityTags, hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Merge user-specific data into studios
@@ -67,7 +67,7 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all studios from cache
-    let studios = stashCacheManager.getAllStudios();
+    let studios = await stashEntityService.getAllStudios();
 
     if (studios.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -82,7 +82,7 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Apply content restrictions & empty entity filtering with caching
     // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered studios from cache
     let filteredStudios = filteredEntityCacheService.get(
@@ -108,15 +108,15 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       // Filter empty studios (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = stashCacheManager.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = stashCacheManager.getAllGalleries();
-        let allGroups = stashCacheManager.getAllGroups();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
 
         // Apply user restrictions to groups/galleries FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(
@@ -191,29 +191,52 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     let paginatedStudios = studios.slice(startIndex, endIndex);
 
-    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
+    // Step 8: For single-entity requests (detail pages), get studio with computed counts
     if (ids && ids.length === 1 && paginatedStudios.length === 1) {
-      const studio = paginatedStudios[0];
-      const actualImageCount = await calculateEntityImageCount(
-        "studio",
-        studio.id
-      );
-      paginatedStudios = [
-        {
-          ...studio,
-          image_count: actualImageCount,
-        },
-      ];
-      logger.info("Calculated accurate image_count for studio detail", {
-        studioId: studio.id,
-        studioName: studio.name,
-        stashImageCount: studio.image_count,
-        actualImageCount,
-      });
+      // Get studio with computed counts from junction tables
+      const studioWithCounts = await stashEntityService.getStudio(ids[0]);
+      if (studioWithCounts) {
+        // Merge with the paginated studio data (which has user ratings/stats)
+        const existingStudio = paginatedStudios[0];
+        paginatedStudios = [
+          {
+            ...existingStudio,
+            scene_count: studioWithCounts.scene_count,
+            image_count: studioWithCounts.image_count,
+            gallery_count: studioWithCounts.gallery_count,
+            performer_count: studioWithCounts.performer_count,
+            group_count: studioWithCounts.group_count,
+          },
+        ];
+
+        // Hydrate tags with names
+        paginatedStudios = await hydrateEntityTags(paginatedStudios);
+
+        logger.info("Computed counts for studio detail", {
+          studioId: existingStudio.id,
+          studioName: existingStudio.name,
+          sceneCount: studioWithCounts.scene_count,
+          imageCount: studioWithCounts.image_count,
+          galleryCount: studioWithCounts.gallery_count,
+          performerCount: studioWithCounts.performer_count,
+          groupCount: studioWithCounts.group_count,
+        });
+      }
     }
 
+    // Step 9: Hydrate parent/child relationships with names
+    // For single-studio requests (detail pages), hydrate relationships using ALL studios for accurate lookup
+    // For multi-studio requests (grid pages), hydrate using paginated studios only (children will be incomplete but that's ok)
+    const hydratedStudios = await hydrateStudioRelationships(
+      ids && ids.length === 1 ? studios : paginatedStudios
+    );
+    // If we hydrated all studios, extract just the paginated ones
+    const finalStudios = ids && ids.length === 1
+      ? hydratedStudios.filter((s) => paginatedStudios.some((p) => p.id === s.id))
+      : hydratedStudios;
+
     // Add stashUrl to each studio
-    const studiosWithStashUrl = paginatedStudios.map(studio => ({
+    const studiosWithStashUrl = finalStudios.map(studio => ({
       ...studio,
       stashUrl: buildStashEntityUrl('studio', studio.id),
     }));
@@ -507,12 +530,12 @@ export const findStudiosMinimal = async (
     const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
-    let studios = stashCacheManager.getAllStudios();
+    let studios = await stashEntityService.getAllStudios();
 
     // Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
     const userId = req.user?.id;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered studios from cache
     let filteredStudios = filteredEntityCacheService.get(
@@ -538,15 +561,15 @@ export const findStudiosMinimal = async (
       // Filter empty studios (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = stashCacheManager.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = stashCacheManager.getAllGalleries();
-        let allGroups = stashCacheManager.getAllGroups();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
 
         // Apply user restrictions to groups/galleries FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(

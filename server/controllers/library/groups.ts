@@ -1,11 +1,12 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
+import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -50,10 +51,10 @@ async function mergeGroupsWithUserData(
 /**
  * Apply group filters
  */
-export function applyGroupFilters(
+export async function applyGroupFilters(
   groups: NormalizedGroup[],
   filters: PeekGroupFilter | null | undefined
-): NormalizedGroup[] {
+): Promise<NormalizedGroup[]> {
   if (!filters) return groups;
 
   let filtered = groups;
@@ -94,30 +95,10 @@ export function applyGroupFilters(
   // Filter by performers
   // Note: Groups/Collections don't have direct performer relationships in Stash
   // We need to check which groups contain scenes with these performers
+  // Uses efficient SQL join query instead of loading all scenes
   if (filters.performers && filters.performers.value) {
-    const performerIds = new Set(filters.performers.value.map(String));
-    const allScenes = stashCacheManager.getAllScenes();
-
-    // Build a set of group IDs that contain scenes with these performers
-    const groupIdsWithPerformers = new Set<string>();
-    allScenes.forEach((scene) => {
-      if (scene.performers && scene.performers.length > 0) {
-        const sceneHasPerformer = scene.performers.some((p) =>
-          performerIds.has(String(p.id))
-        );
-        if (sceneHasPerformer && scene.groups && scene.groups.length > 0) {
-          scene.groups.forEach((group: any) => {
-            // Handle both nested { group: { id } } and flattened { id } structures
-            const groupId = group.group?.id || group.id;
-            if (groupId) {
-              groupIdsWithPerformers.add(String(groupId));
-            }
-          });
-        }
-      }
-    });
-
-    // Filter groups to only those that contain scenes with the specified performers
+    const performerIds = filters.performers.value.map(String);
+    const groupIdsWithPerformers = await stashEntityService.getGroupIdsByPerformers(performerIds);
     filtered = filtered.filter((g) => groupIdsWithPerformers.has(g.id));
   }
 
@@ -226,7 +207,7 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
-    let groups = stashCacheManager.getAllGroups();
+    let groups = await stashEntityService.getAllGroups();
 
     if (groups.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -243,7 +224,7 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 2.5: Apply content restrictions & empty entity filtering with caching
     const requestingUser = req.user;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered groups from cache
     let filteredGroups = filteredEntityCacheService.get(
@@ -304,7 +285,7 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 4: Apply filters (merge root-level ids with group_filter)
     const mergedFilter = { ...group_filter, ids: ids || group_filter?.ids };
-    groups = applyGroupFilters(groups, mergedFilter);
+    groups = await applyGroupFilters(groups, mergedFilter);
 
     // Step 5: Sort
     groups = sortGroups(groups, sortField, sortDirection);
@@ -313,7 +294,55 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     const total = groups.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedGroups = groups.slice(startIndex, endIndex);
+    let paginatedGroups = groups.slice(startIndex, endIndex);
+
+    // Step 7: For single-entity requests (detail pages), get group with computed counts
+    if (ids && ids.length === 1 && paginatedGroups.length === 1) {
+      const groupWithCounts = await stashEntityService.getGroup(ids[0]);
+      if (groupWithCounts) {
+        const existingGroup = paginatedGroups[0];
+        paginatedGroups = [
+          {
+            ...existingGroup,
+            scene_count: groupWithCounts.scene_count,
+            performer_count: groupWithCounts.performer_count,
+          },
+        ];
+
+        // Hydrate tags with names
+        paginatedGroups = await hydrateEntityTags(paginatedGroups);
+
+        logger.info("Computed counts for group detail", {
+          groupId: existingGroup.id,
+          groupName: existingGroup.name,
+          sceneCount: groupWithCounts.scene_count,
+          performerCount: groupWithCounts.performer_count,
+        });
+      }
+    }
+
+    // Step 8: Hydrate studios with full data (name, etc.)
+    const studioIds = [
+      ...new Set(
+        paginatedGroups
+          .map((g) => g.studio?.id)
+          .filter((id): id is string => !!id)
+      ),
+    ];
+
+    if (studioIds.length > 0) {
+      const studios = await stashEntityService.getStudiosByIds(studioIds);
+      const studioMap = new Map(studios.map((s) => [s.id, s]));
+
+      for (const group of paginatedGroups) {
+        if (group.studio?.id) {
+          const fullStudio = studioMap.get(group.studio.id);
+          if (fullStudio) {
+            group.studio = fullStudio;
+          }
+        }
+      }
+    }
 
     // Add stashUrl to each group
     const groupsWithStashUrl = paginatedGroups.map(group => ({
@@ -351,7 +380,7 @@ export const findGroupsMinimal = async (
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
-    let groups = stashCacheManager.getAllGroups();
+    let groups = await stashEntityService.getAllGroups();
 
     if (groups.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -365,7 +394,7 @@ export const findGroupsMinimal = async (
 
     // Step 2.5: Apply empty entity filtering with caching
     const requestingUser = req.user;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // Try to get filtered groups from cache
     let filteredGroups = filteredEntityCacheService.get(

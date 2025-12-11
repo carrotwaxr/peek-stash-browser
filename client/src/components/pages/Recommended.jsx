@@ -6,7 +6,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import SceneGrid from "../scene-search/SceneGrid.jsx";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   PageHeader,
   PageLayout,
   Pagination,
@@ -65,7 +65,7 @@ const Recommended = () => {
           err.response?.status === 503 && err.response?.data?.ready === false;
 
         if (isInitializing && retryCount < MAX_RETRIES) {
-          setInitMessage("Server is loading cache, please wait...");
+          setInitMessage("Server is syncing library, please wait...");
           retryCount++;
           setTimeout(() => {
             fetchRecommended();
@@ -137,7 +137,7 @@ const Recommended = () => {
           subtitle="Personalized recommendations based on your favorites and ratings"
         />
 
-        {initMessage && <CacheLoadingBanner message={initMessage} />}
+        {initMessage && <SyncProgressBanner message={initMessage} />}
 
         {/* Top Pagination */}
         {!loading && !error && !message && !initMessage && totalPages > 1 && (

@@ -10,7 +10,7 @@ import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js"
 
 import { libraryApi } from "../../services/api.js";
 import {
-  CacheLoadingBanner,
+  SyncProgressBanner,
   ErrorMessage,
   GridCard,
   PageHeader,
@@ -58,7 +58,7 @@ const Groups = () => {
       setIsLoading(false);
     } catch (err) {
       if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is loading cache, please wait...");
+        setInitMessage("Server is syncing library, please wait...");
         setTimeout(() => {
           handleQueryChange(newQuery, retryCount + 1);
         }, 5000);
@@ -79,7 +79,7 @@ const Groups = () => {
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
-    tvNavigation,
+    _tvNavigation,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -114,7 +114,7 @@ const Groups = () => {
           subtitle="Browse collections and movies in your library"
         />
 
-        {initMessage && <CacheLoadingBanner message={initMessage} />}
+        {initMessage && <SyncProgressBanner message={initMessage} />}
 
         {/* Controls Section */}
         <SearchControls
@@ -184,6 +184,8 @@ const GroupCard = forwardRef(
         indicators={[
           { type: "SCENES", count: group.scene_count },
           { type: "GROUPS", count: group.sub_group_count },
+          { type: "PERFORMERS", count: group.performer_count },
+          { type: "TAGS", count: group.tags?.length || 0 },
         ]}
         linkTo={`/collection/${group.id}`}
         maxTitleLines={2}

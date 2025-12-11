@@ -1,25 +1,25 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { stashCacheManager } from "../../services/StashCacheManager.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
+import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Enhance tags with scene counts from tagged performers
  * This adds scenes where performers have the tag, even if the scene itself doesn't
  */
-function enhanceTagsWithPerformerScenes(tags: NormalizedTag[]): NormalizedTag[] {
+async function enhanceTagsWithPerformerScenes(tags: NormalizedTag[]): Promise<NormalizedTag[]> {
   // Get all scenes and performers from cache
-  const allScenes = stashCacheManager.getAllScenes();
-  const allPerformers = stashCacheManager.getAllPerformers();
+  const allScenes = await stashEntityService.getAllScenes();
+  const allPerformers = await stashEntityService.getAllPerformers();
 
   // Build a map of performer ID -> set of tag IDs
   const performerTagsMap = new Map<string, Set<string>>();
@@ -129,7 +129,7 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all tags from cache
-    let tags = stashCacheManager.getAllTags();
+    let tags = await stashEntityService.getAllTags();
 
     if (tags.length === 0) {
       logger.warn("Cache not initialized, returning empty result");
@@ -144,7 +144,7 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Apply content restrictions & empty entity filtering with caching
     // NOTE: We apply user stats AFTER this to ensure fresh data
     const requestingUser = req.user;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
 
     // Try to get filtered tags from cache
@@ -176,17 +176,17 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         !isFetchingByIds
       ) {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = stashCacheManager.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenes();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
         );
 
         // Get all entities from cache
-        let allGalleries = stashCacheManager.getAllGalleries();
-        let allGroups = stashCacheManager.getAllGroups();
-        let allStudios = stashCacheManager.getAllStudios();
-        let allPerformers = stashCacheManager.getAllPerformers();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
+        let allStudios = await stashEntityService.getAllStudios();
+        let allPerformers = await stashEntityService.getAllPerformers();
 
         // Apply user restrictions to all entity types FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(
@@ -256,7 +256,7 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 2.7: Enhance tags with performer scene counts
     // This adds scenes where performers have the tag, even if the scene doesn't
-    tags = enhanceTagsWithPerformerScenes(tags);
+    tags = await enhanceTagsWithPerformerScenes(tags);
 
     // Step 3: Merge with FRESH user data (ratings, stats)
     // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
@@ -277,7 +277,7 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
 
     // Step 5: Apply filters (merge root-level ids with tag_filter)
     const mergedFilter = { ...tag_filter, ids: ids || tag_filter?.ids };
-    tags = applyTagFilters(tags, mergedFilter);
+    tags = await applyTagFilters(tags, mergedFilter);
 
     // Step 6: Sort
     tags = sortTags(tags, sortField, sortDirection);
@@ -288,26 +288,49 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     let paginatedTags = tags.slice(startIndex, endIndex);
 
-    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
+    // Step 8: Get tag with computed counts for single-entity requests (detail pages)
     if (ids && ids.length === 1 && paginatedTags.length === 1) {
-      const tag = paginatedTags[0];
-      const actualImageCount = await calculateEntityImageCount("tag", tag.id);
-      paginatedTags = [
-        {
-          ...tag,
-          image_count: actualImageCount,
-        },
-      ];
-      logger.info("Calculated accurate image_count for tag detail", {
-        tagId: tag.id,
-        tagName: tag.name,
-        stashImageCount: tag.image_count,
-        actualImageCount,
-      });
+      const tagWithCounts = await stashEntityService.getTag(ids[0]);
+      if (tagWithCounts) {
+        const existingTag = paginatedTags[0];
+        paginatedTags = [
+          {
+            ...existingTag,
+            scene_count: tagWithCounts.scene_count,
+            image_count: tagWithCounts.image_count,
+            gallery_count: tagWithCounts.gallery_count,
+            performer_count: tagWithCounts.performer_count,
+            studio_count: tagWithCounts.studio_count,
+            group_count: tagWithCounts.group_count,
+            scene_marker_count: tagWithCounts.scene_marker_count,
+          },
+        ];
+        logger.info("Computed counts for tag detail", {
+          tagId: existingTag.id,
+          tagName: existingTag.name,
+          sceneCount: tagWithCounts.scene_count,
+          imageCount: tagWithCounts.image_count,
+          galleryCount: tagWithCounts.gallery_count,
+          performerCount: tagWithCounts.performer_count,
+          studioCount: tagWithCounts.studio_count,
+          groupCount: tagWithCounts.group_count,
+        });
+      }
     }
 
+    // Step 9: Hydrate parent/child relationships with names
+    // For single-tag requests (detail pages), hydrate relationships using ALL tags for accurate lookup
+    // For multi-tag requests (grid pages), hydrate using paginated tags only (children will be incomplete but that's ok)
+    const hydratedTags = await hydrateTagRelationships(
+      ids && ids.length === 1 ? tags : paginatedTags
+    );
+    // If we hydrated all tags, extract just the paginated ones
+    const finalTags = ids && ids.length === 1
+      ? hydratedTags.filter((t) => paginatedTags.some((p) => p.id === t.id))
+      : hydratedTags;
+
     // Add stashUrl to each tag
-    const tagsWithStashUrl = paginatedTags.map(tag => ({
+    const tagsWithStashUrl = finalTags.map(tag => ({
       ...tag,
       stashUrl: buildStashEntityUrl('tag', tag.id),
     }));
@@ -332,10 +355,10 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Apply tag filters
  */
-export function applyTagFilters(
+export async function applyTagFilters(
   tags: NormalizedTag[],
   filters: PeekTagFilter | null | undefined
-): NormalizedTag[] {
+): Promise<NormalizedTag[]> {
   if (!filters) return tags;
 
   let filtered = tags;
@@ -509,8 +532,8 @@ export function applyTagFilters(
       (filters.performers.value || []).map(String)
     );
     if (performerIdSet.size > 0) {
-      const allPerformers = stashCacheManager.getAllPerformers();
-      const matchingPerformers = allPerformers.filter((p) =>
+      const allPerformers = await stashEntityService.getAllPerformers();
+      const matchingPerformers = allPerformers.filter((p: any) =>
         performerIdSet.has(String(p.id))
       );
 
@@ -530,7 +553,7 @@ export function applyTagFilters(
   if (filters.studios) {
     const studioIdSet = new Set((filters.studios.value || []).map(String));
     if (studioIdSet.size > 0) {
-      const allStudios = stashCacheManager.getAllStudios();
+      const allStudios = await stashEntityService.getAllStudios();
 
       // Get all tag IDs directly from matching studios
       const tagIdSet = new Set<string>();
@@ -553,9 +576,9 @@ export function applyTagFilters(
       (filters.scenes_filter.id.value || []).map(String)
     );
     if (sceneIdSet.size > 0) {
-      const allScenes = stashCacheManager.getAllScenes();
-      const allPerformers = stashCacheManager.getAllPerformers();
-      const matchingScenes = allScenes.filter((s) =>
+      const allScenes = await stashEntityService.getAllScenes();
+      const allPerformers = await stashEntityService.getAllPerformers();
+      const matchingScenes = allScenes.filter((s: any) =>
         sceneIdSet.has(String(s.id))
       );
 
@@ -588,9 +611,9 @@ export function applyTagFilters(
       (filters.scenes_filter.groups.value || []).map(String)
     );
     if (groupIdSet.size > 0) {
-      const allScenes = stashCacheManager.getAllScenes();
-      const allPerformers = stashCacheManager.getAllPerformers();
-      const matchingScenes = allScenes.filter((scene) => {
+      const allScenes = await stashEntityService.getAllScenes();
+      const allPerformers = await stashEntityService.getAllPerformers();
+      const matchingScenes = allScenes.filter((scene: any) => {
         if (!scene.groups) return false;
         return scene.groups.some((g: any) => groupIdSet.has(String(g.id)));
       });
@@ -697,11 +720,11 @@ export const findTagsMinimal = async (
     const sortDirection = filter?.direction || "ASC";
     const perPage = filter?.per_page || -1; // -1 means all results
 
-    let tags = stashCacheManager.getAllTags();
+    let tags = await stashEntityService.getAllTags();
 
     const requestingUser = req.user;
     const userId = req.user?.id;
-    const cacheVersion = stashCacheManager.getCacheVersion();
+    const cacheVersion = await stashEntityService.getCacheVersion();
 
     // OPTIMIZATION: Skip expensive filtering only if user has NO content restrictions
     // Check if user has any restrictions configured
@@ -736,10 +759,10 @@ export const findTagsMinimal = async (
         filteredTags = tags;
 
         // Get all entities from cache
-        let allGalleries = stashCacheManager.getAllGalleries();
-        let allGroups = stashCacheManager.getAllGroups();
-        let allStudios = stashCacheManager.getAllStudios();
-        let allPerformers = stashCacheManager.getAllPerformers();
+        let allGalleries = await stashEntityService.getAllGalleries();
+        let allGroups = await stashEntityService.getAllGroups();
+        let allStudios = await stashEntityService.getAllStudios();
+        let allPerformers = await stashEntityService.getAllPerformers();
 
         // Apply user restrictions to all entity types FIRST
         allGalleries = await userRestrictionService.filterGalleriesForUser(

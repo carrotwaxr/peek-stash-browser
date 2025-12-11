@@ -4,6 +4,7 @@
  * Creates realistic test data based on TypeScript models from stashapp-api
  * and Peek's Normalized types.
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import type {
   NormalizedGallery,
   NormalizedGroup,

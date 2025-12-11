@@ -24,6 +24,7 @@ import libraryTagsRoutes from "../routes/library/tags.js";
 import playlistRoutes from "../routes/playlist.js";
 import ratingsRoutes from "../routes/ratings.js";
 import setupRoutes from "../routes/setup.js";
+import syncRoutes from "../routes/sync.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
@@ -105,6 +106,9 @@ export const setupAPI = () => {
 
   // Setup wizard routes (mixed - some public for initial setup, some protected for settings)
   app.use("/api/setup", setupRoutes);
+
+  // Sync routes (protected - admin only for triggering syncs)
+  app.use("/api/sync", syncRoutes);
 
   // User settings routes (protected)
   app.use("/api/user", userRoutes);

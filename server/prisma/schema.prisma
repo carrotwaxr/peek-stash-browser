@@ -1,389 +1,885 @@
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "sqlite"
-    url = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-    id          Int         @id @default(autoincrement())
-    username    String      @unique
-    password    String      // Will be hashed
-    role        UserRole    @default(USER)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String // Will be hashed
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    // User preferences
-    preferredQuality    String?     @default("auto")    // "auto", "1080p", "720p", "480p", "360p"
-    preferredPlaybackMode String?   @default("auto")    // "auto", "direct", "transcode"
-    preferredPreviewQuality String? @default("sprite")  // "sprite", "webp", "mp4" - Card preview quality (sprite=low quality, webp/mp4=high quality with sprite fallback)
-    enableCast         Boolean     @default(true)      // Enable Chromecast/AirPlay plugins
-    theme              String?     @default("dark")    // "dark", "light", "purple", etc.
-    carouselPreferences Json?       // Array of {id, enabled, order} for homepage carousels
-    navPreferences     Json?       // Array of {id, enabled, order} for navigation menu items
-    filterPresets      Json?       // Object with keys: scene, performer, studio, tag, group, gallery - each containing array of saved presets
-    defaultFilterPresets Json?      // Object with keys: scene, performer, studio, tag, group, gallery - values are preset IDs
+  // User preferences
+  preferredQuality        String? @default("auto") // "auto", "1080p", "720p", "480p", "360p"
+  preferredPlaybackMode   String? @default("auto") // "auto", "direct", "transcode"
+  preferredPreviewQuality String? @default("sprite") // "sprite", "webp", "mp4" - Card preview quality (sprite=low quality, webp/mp4=high quality with sprite fallback)
+  enableCast              Boolean @default(true) // Enable Chromecast/AirPlay plugins
+  theme                   String? @default("dark") // "dark", "light", "purple", etc.
+  carouselPreferences     Json? // Array of {id, enabled, order} for homepage carousels
+  navPreferences          Json? // Array of {id, enabled, order} for navigation menu items
+  filterPresets           Json? // Object with keys: scene, performer, studio, tag, group, gallery - each containing array of saved presets
+  defaultFilterPresets    Json? // Object with keys: scene, performer, studio, tag, group, gallery - values are preset IDs
 
-    // Watch history settings
-    minimumPlayPercent Int         @default(20)        // Percent of video to watch before incrementing play_count (0-100)
-    syncToStash        Boolean     @default(false)     // Admin-only: Sync this user's activity to Stash
+  // Watch history settings
+  minimumPlayPercent Int     @default(20) // Percent of video to watch before incrementing play_count (0-100)
+  syncToStash        Boolean @default(false) // Admin-only: Sync this user's activity to Stash
 
-    // Future features
-    watchHistory WatchHistory[]
-    playlists   Playlist[]
-    customThemes CustomTheme[]
+  // Future features
+  watchHistory WatchHistory[]
+  playlists    Playlist[]
+  customThemes CustomTheme[]
 
-    // Per-user ratings and favorites
-    sceneRatings     SceneRating[]
-    performerRatings PerformerRating[]
-    studioRatings    StudioRating[]
-    tagRatings       TagRating[]
-    galleryRatings   GalleryRating[]
-    groupRatings     GroupRating[]
-    imageRatings     ImageRating[]
+  // Per-user ratings and favorites
+  sceneRatings     SceneRating[]
+  performerRatings PerformerRating[]
+  studioRatings    StudioRating[]
+  tagRatings       TagRating[]
+  galleryRatings   GalleryRating[]
+  groupRatings     GroupRating[]
+  imageRatings     ImageRating[]
 
-    // Content restrictions
-    contentRestrictions UserContentRestriction[]
+  // Content restrictions
+  contentRestrictions UserContentRestriction[]
 
-    // Hidden entities (user-level hiding)
-    hiddenEntities UserHiddenEntity[]
-    hideConfirmationDisabled Boolean @default(false) // Don't show hide confirmation dialog
+  // Hidden entities (user-level hiding)
+  hiddenEntities           UserHiddenEntity[]
+  hideConfirmationDisabled Boolean            @default(false) // Don't show hide confirmation dialog
 
-    // Custom carousels
-    customCarousels UserCarousel[]
+  // Custom carousels
+  customCarousels UserCarousel[]
 }
 
 model WatchHistory {
-    id              Int         @id @default(autoincrement())
-    userId          Int
-    sceneId         String      // Stash scene ID
+  id      Int    @id @default(autoincrement())
+  userId  Int
+  sceneId String // Stash scene ID
 
-    // Playback tracking (syncs with Stash)
-    playCount       Int         @default(0)      // Number of 5+ minute sessions
-    playDuration    Float       @default(0)      // Total seconds watched (cumulative across all sessions)
-    resumeTime      Float?                       // Last playback position in seconds
-    lastPlayedAt    DateTime?                    // Last time this scene was played
+  // Playback tracking (syncs with Stash)
+  playCount    Int       @default(0) // Number of 5+ minute sessions
+  playDuration Float     @default(0) // Total seconds watched (cumulative across all sessions)
+  resumeTime   Float? // Last playback position in seconds
+  lastPlayedAt DateTime? // Last time this scene was played
 
-    // O Counter tracking (syncs with Stash)
-    oCount          Int         @default(0)      // Total O counter increments
-    oHistory        Json        @default("[]")   // Array of timestamp strings when O was incremented
+  // O Counter tracking (syncs with Stash)
+  oCount   Int  @default(0) // Total O counter increments
+  oHistory Json @default("[]") // Array of timestamp strings when O was incremented
 
-    // Detailed play session history for analytics
-    playHistory     Json        @default("[]")   // Array of {startTime, endTime, quality, duration, seekEvents: [{time, from, to}]}
+  // Detailed play session history for analytics
+  playHistory Json @default("[]") // Array of {startTime, endTime, quality, duration, seekEvents: [{time, from, to}]}
 
-    // Legacy fields (deprecated, use fields above)
-    watchedAt       DateTime    @default(now())
-    position        Int         @default(0)
-    duration        Int?
-    completed       Boolean     @default(false)
+  // Legacy fields (deprecated, use fields above)
+  watchedAt DateTime @default(now())
+  position  Int      @default(0)
+  duration  Int?
+  completed Boolean  @default(false)
 
-    user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, sceneId])
-    @@index([userId])
-    @@index([sceneId])
-    @@index([lastPlayedAt])
+  @@unique([userId, sceneId])
+  @@index([userId])
+  @@index([sceneId])
+  @@index([lastPlayedAt])
 }
 
 model Playlist {
-    id          Int         @id @default(autoincrement())
-    name        String
-    description String?
-    userId      Int
-    isPublic    Boolean     @default(false)
-    shuffle     Boolean     @default(false)
-    repeat      String      @default("none")  // "none", "all", "one"
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  userId      Int
+  isPublic    Boolean  @default(false)
+  shuffle     Boolean  @default(false)
+  repeat      String   @default("none") // "none", "all", "one"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-    items       PlaylistItem[]
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items PlaylistItem[]
 
-    @@index([userId])
-    @@index([updatedAt])
+  @@index([userId])
+  @@index([updatedAt])
 }
 
 model PlaylistItem {
-    id          Int         @id @default(autoincrement())
-    playlistId  Int
-    sceneId     String      // Stash scene ID
-    position    Int         // Order in playlist
-    addedAt     DateTime    @default(now())
+  id         Int      @id @default(autoincrement())
+  playlistId Int
+  sceneId    String // Stash scene ID
+  position   Int // Order in playlist
+  addedAt    DateTime @default(now())
 
-    playlist    Playlist    @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
-    @@unique([playlistId, sceneId])
-    @@index([playlistId, position])
+  @@unique([playlistId, sceneId])
+  @@index([playlistId, position])
 }
 
 model CustomTheme {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    name        String      // User-defined theme name (e.g., "My Purple Theme")
-    config      Json        // Complete theme config: {mode, fonts, colors, accents, status}
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  name      String // User-defined theme name (e.g., "My Purple Theme")
+  config    Json // Complete theme config: {mode, fonts, colors, accents, status}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, name])
-    @@index([userId])
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 model SceneRating {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    sceneId     String      // Stash scene ID
-    rating      Int?        // 0-100, null if not rated
-    favorite    Boolean     @default(false)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  sceneId   String // Stash scene ID
+  rating    Int? // 0-100, null if not rated
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, sceneId])
-    @@index([userId])
-    @@index([sceneId])
-    @@index([favorite])
-    @@index([rating])
+  @@unique([userId, sceneId])
+  @@index([userId])
+  @@index([sceneId])
+  @@index([favorite])
+  @@index([rating])
 }
 
 model PerformerRating {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    performerId String      // Stash performer ID
-    rating      Int?        // 0-100, null if not rated
-    favorite    Boolean     @default(false)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  performerId String // Stash performer ID
+  rating      Int? // 0-100, null if not rated
+  favorite    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, performerId])
-    @@index([userId])
-    @@index([performerId])
-    @@index([favorite])
-    @@index([rating])
+  @@unique([userId, performerId])
+  @@index([userId])
+  @@index([performerId])
+  @@index([favorite])
+  @@index([rating])
 }
 
 model StudioRating {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    studioId    String      // Stash studio ID
-    rating      Int?        // 0-100, null if not rated
-    favorite    Boolean     @default(false)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  studioId  String // Stash studio ID
+  rating    Int? // 0-100, null if not rated
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, studioId])
-    @@index([userId])
-    @@index([studioId])
-    @@index([favorite])
-    @@index([rating])
+  @@unique([userId, studioId])
+  @@index([userId])
+  @@index([studioId])
+  @@index([favorite])
+  @@index([rating])
 }
 
 model TagRating {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    tagId       String      // Stash tag ID
-    rating      Int?        // 0-100, null if not rated
-    favorite    Boolean     @default(false)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  tagId     String // Stash tag ID
+  rating    Int? // 0-100, null if not rated
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, tagId])
-    @@index([userId])
-    @@index([tagId])
-    @@index([favorite])
-    @@index([rating])
+  @@unique([userId, tagId])
+  @@index([userId])
+  @@index([tagId])
+  @@index([favorite])
+  @@index([rating])
 }
 
 model GalleryRating {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    galleryId   String      // Stash gallery ID
-    rating      Int?        // 0-100, null if not rated
-    favorite    Boolean     @default(false)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  galleryId String // Stash gallery ID
+  rating    Int? // 0-100, null if not rated
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, galleryId])
-    @@index([userId])
-    @@index([galleryId])
-    @@index([favorite])
-    @@index([rating])
+  @@unique([userId, galleryId])
+  @@index([userId])
+  @@index([galleryId])
+  @@index([favorite])
+  @@index([rating])
 }
 
 model GroupRating {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    groupId     String      // Stash group ID
-    rating      Int?        // 0-100, null if not rated
-    favorite    Boolean     @default(false)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  groupId   String // Stash group ID
+  rating    Int? // 0-100, null if not rated
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, groupId])
-    @@index([userId])
-    @@index([groupId])
-    @@index([favorite])
-    @@index([rating])
+  @@unique([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
+  @@index([favorite])
+  @@index([rating])
 }
 
 model ImageRating {
-    id          Int         @id @default(autoincrement())
-    userId      Int
-    imageId     String      // Stash image ID
-    rating      Int?        // 0-100, null if not rated
-    favorite    Boolean     @default(false)
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  imageId   String // Stash image ID
+  rating    Int? // 0-100, null if not rated
+  favorite  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, imageId])
-    @@index([userId])
-    @@index([imageId])
-    @@index([favorite])
-    @@index([rating])
+  @@unique([userId, imageId])
+  @@index([userId])
+  @@index([imageId])
+  @@index([favorite])
+  @@index([rating])
 }
 
 model UserContentRestriction {
-    id            Int      @id @default(autoincrement())
-    userId        Int
-    entityType    String   // 'groups' | 'tags' | 'studios' | 'galleries'
-    mode          String   // 'INCLUDE' | 'EXCLUDE'
-    entityIds     String   // JSON array of entity IDs (stringified)
-    restrictEmpty Boolean  @default(false)  // If true, restrict items with no entities of this type
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  entityType    String // 'groups' | 'tags' | 'studios' | 'galleries'
+  mode          String // 'INCLUDE' | 'EXCLUDE'
+  entityIds     String // JSON array of entity IDs (stringified)
+  restrictEmpty Boolean  @default(false) // If true, restrict items with no entities of this type
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-    user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, entityType])
-    @@index([userId])
+  @@unique([userId, entityType])
+  @@index([userId])
 }
 
 // Performance optimization: Pre-computed per-user statistics
 // These tables cache aggregated stats from watch history to avoid expensive real-time calculations
 
 model UserPerformerStats {
-    id              Int       @id @default(autoincrement())
-    userId          Int
-    performerId     String    // Stash performer ID
+  id          Int    @id @default(autoincrement())
+  userId      Int
+  performerId String // Stash performer ID
 
-    // Aggregated statistics from all scenes featuring this performer
-    oCounter        Int       @default(0)      // Total O counter increments
-    playCount       Int       @default(0)      // Total play count
-    lastPlayedAt    DateTime?                  // Most recent playback timestamp
-    lastOAt         DateTime?                  // Most recent O timestamp
+  // Aggregated statistics from all scenes featuring this performer
+  oCounter     Int       @default(0) // Total O counter increments
+  playCount    Int       @default(0) // Total play count
+  lastPlayedAt DateTime? // Most recent playback timestamp
+  lastOAt      DateTime? // Most recent O timestamp
 
-    updatedAt       DateTime  @updatedAt
+  updatedAt DateTime @updatedAt
 
-    @@unique([userId, performerId])
-    @@index([userId])
-    @@index([performerId])
+  @@unique([userId, performerId])
+  @@index([userId])
+  @@index([performerId])
 }
 
 model UserStudioStats {
-    id              Int       @id @default(autoincrement())
-    userId          Int
-    studioId        String    // Stash studio ID
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  studioId String // Stash studio ID
 
-    // Aggregated statistics from all scenes produced by this studio
-    oCounter        Int       @default(0)      // Total O counter increments
-    playCount       Int       @default(0)      // Total play count
+  // Aggregated statistics from all scenes produced by this studio
+  oCounter  Int @default(0) // Total O counter increments
+  playCount Int @default(0) // Total play count
 
-    updatedAt       DateTime  @updatedAt
+  updatedAt DateTime @updatedAt
 
-    @@unique([userId, studioId])
-    @@index([userId])
-    @@index([studioId])
+  @@unique([userId, studioId])
+  @@index([userId])
+  @@index([studioId])
 }
 
 model UserTagStats {
-    id              Int       @id @default(autoincrement())
-    userId          Int
-    tagId           String    // Stash tag ID
+  id     Int    @id @default(autoincrement())
+  userId Int
+  tagId  String // Stash tag ID
 
-    // Aggregated statistics from all scenes tagged with this tag
-    oCounter        Int       @default(0)      // Total O counter increments
-    playCount       Int       @default(0)      // Total play count
+  // Aggregated statistics from all scenes tagged with this tag
+  oCounter  Int @default(0) // Total O counter increments
+  playCount Int @default(0) // Total play count
 
-    updatedAt       DateTime  @updatedAt
+  updatedAt DateTime @updatedAt
 
-    @@unique([userId, tagId])
-    @@index([userId])
-    @@index([tagId])
+  @@unique([userId, tagId])
+  @@index([userId])
+  @@index([tagId])
 }
 
 enum UserRole {
-    ADMIN
-    USER
+  ADMIN
+  USER
 }
 
 model UserHiddenEntity {
-    id          Int      @id @default(autoincrement())
-    userId      Int
-    entityType  String   // 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery' | 'image'
-    entityId    String   // Stash entity ID
-    hiddenAt    DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  entityType String // 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery' | 'image'
+  entityId   String // Stash entity ID
+  hiddenAt   DateTime @default(now())
 
-    user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, entityType, entityId])
-    @@index([userId])
-    @@index([entityType])
-    @@index([entityId])
+  @@unique([userId, entityType, entityId])
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityId])
 }
 
 // Track which data migrations have been applied
 model DataMigration {
-    id          Int      @id @default(autoincrement())
-    name        String   @unique  // Migration identifier (e.g., "001_rebuild_user_stats")
-    appliedAt   DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  name      String   @unique // Migration identifier (e.g., "001_rebuild_user_stats")
+  appliedAt DateTime @default(now())
 }
 
 // Stash server instance configuration
 // Supports multiple Stash servers (multi-instance support in future commit)
 model StashInstance {
-    id        String   @id @default(uuid()) // Immutable UUID, used in all references
-    name      String   @default("Default")  // Display name only, can be renamed freely
-    url       String                        // GraphQL endpoint (e.g., http://stash:9999/graphql)
-    apiKey    String                        // API key for authentication
-    enabled   Boolean  @default(true)       // Can disable without deleting
-    priority  Int      @default(0)          // For ordering (lower = higher priority)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(uuid()) // Immutable UUID, used in all references
+  name      String   @default("Default") // Display name only, can be renamed freely
+  url       String // GraphQL endpoint (e.g., http://stash:9999/graphql)
+  apiKey    String // API key for authentication
+  enabled   Boolean  @default(true) // Can disable without deleting
+  priority  Int      @default(0) // For ordering (lower = higher priority)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // User-defined custom carousels for homepage
 // Each carousel is a saved scene query with display settings
 model UserCarousel {
-    id        String   @id @default(uuid())
-    userId    Int
-    title     String
-    icon      String   @default("Film")     // Lucide icon name (e.g., "Film", "Heart", "Star")
+  id     String @id @default(uuid())
+  userId Int
+  title  String
+  icon   String @default("Film") // Lucide icon name (e.g., "Film", "Heart", "Star")
 
-    // Query definition (same format as buildSceneFilter output)
-    rules     Json                          // Scene filter object for findScenes API
-    sort      String   @default("random")   // Sort field (random, created_at, rating, etc.)
-    direction String   @default("DESC")     // Sort direction (ASC or DESC)
+  // Query definition (same format as buildSceneFilter output)
+  rules     Json // Scene filter object for findScenes API
+  sort      String @default("random") // Sort field (random, created_at, rating, etc.)
+  direction String @default("DESC") // Sort direction (ASC or DESC)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@index([userId])
+  @@index([userId])
+}
+
+// ============================================================================
+// CACHED STASH ENTITIES
+// These tables store synced data from Stash for scalable querying
+// ============================================================================
+
+model StashScene {
+  id              String  @id // Stash scene ID
+  stashInstanceId String? // Which Stash server
+
+  // === Core fields (indexed) ===
+  title     String?
+  code      String?
+  date      String? // YYYY-MM-DD
+  studioId  String?
+  rating100 Int?
+  duration  Int? // seconds (from primary file)
+  organized Boolean @default(false)
+
+  // === Content fields ===
+  details String? // Scene description
+
+  // === Primary file metadata ===
+  filePath       String? // Primary file path
+  fileBitRate    Int? // bits/second
+  fileFrameRate  Float? // fps
+  fileWidth      Int? // pixels
+  fileHeight     Int? // pixels
+  fileVideoCodec String? // e.g., "h264", "hevc"
+  fileAudioCodec String? // e.g., "aac", "ac3"
+  fileSize       BigInt? // bytes (can be > 4GB)
+
+  // === Stash paths (raw, transformed at read time) ===
+  pathScreenshot  String? // Screenshot URL path
+  pathPreview     String? // Preview video path
+  pathSprite      String? // Sprite sheet path
+  pathVtt         String? // VTT chapter path
+  pathChaptersVtt String? // Chapters VTT path
+  pathStream      String? // Primary stream path
+  pathCaption     String? // Caption path
+
+  // === Stream data (small JSON array) ===
+  streams String? // JSON: [{url, mime_type, label}]
+
+  // === Stash counter data ===
+  oCounter     Int   @default(0) // Stash o_counter
+  playCount    Int   @default(0) // Stash play_count
+  playDuration Float @default(0) // Stash play_duration
+
+  // === Sync metadata ===
+  stashCreatedAt DateTime?
+  stashUpdatedAt DateTime?
+  syncedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+
+  // === Junction table relations ===
+  performers ScenePerformer[]
+  tags       SceneTag[]
+  groups     SceneGroup[]
+  galleries  SceneGallery[]
+
+  @@index([studioId])
+  @@index([date])
+  @@index([stashCreatedAt])
+  @@index([stashUpdatedAt])
+  @@index([rating100])
+  @@index([duration])
+  @@index([deletedAt])
+  @@index([oCounter])
+  @@index([playCount])
+  // Compound indexes for efficient browse queries (deletedAt filter + sort)
+  @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "StashScene_browse_idx")
+  @@index([deletedAt, stashUpdatedAt(sort: Desc)], map: "StashScene_browse_updated_idx")
+  @@index([deletedAt, date(sort: Desc)], map: "StashScene_browse_date_idx")
+  @@index([deletedAt, title], map: "StashScene_browse_title_idx")
+  @@index([deletedAt, duration(sort: Desc)], map: "StashScene_browse_duration_idx")
+}
+
+model StashPerformer {
+  id              String  @id
+  stashInstanceId String?
+
+  // === Core fields ===
+  name           String
+  disambiguation String?
+  gender         String?
+  birthdate      String?
+  favorite       Boolean @default(false)
+  rating100      Int?
+
+  // === Counts (synced from Stash) ===
+  sceneCount   Int @default(0)
+  imageCount   Int @default(0)
+  galleryCount Int @default(0)
+  groupCount   Int @default(0)
+
+  // === Extended fields ===
+  details      String? // Biography
+  aliasList    String? // JSON array of aliases
+  country      String?
+  ethnicity    String?
+  hairColor    String?
+  eyeColor     String?
+  heightCm     Int? // Height in cm
+  weightKg     Int? // Weight in kg
+  measurements String? // e.g., "34D-24-34"
+  tattoos      String?
+  piercings    String?
+  careerLength String?
+  deathDate    String?
+  url          String? // Homepage
+
+  // === Stash paths (raw, transformed at read time) ===
+  imagePath String? // Profile image path
+
+  // === Sync metadata ===
+  stashCreatedAt DateTime?
+  stashUpdatedAt DateTime?
+  syncedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+
+  // === Relations ===
+  scenes    ScenePerformer[]
+  images    ImagePerformer[]
+  galleries GalleryPerformer[]
+  tags      PerformerTag[]
+
+  @@index([name])
+  @@index([gender])
+  @@index([favorite])
+  @@index([rating100])
+  @@index([stashUpdatedAt])
+  @@index([deletedAt])
+}
+
+model StashStudio {
+  id              String  @id
+  stashInstanceId String?
+
+  // === Core fields ===
+  name      String
+  parentId  String?
+  favorite  Boolean @default(false)
+  rating100 Int?
+
+  // === Counts (synced from Stash) ===
+  sceneCount     Int @default(0)
+  imageCount     Int @default(0)
+  galleryCount   Int @default(0)
+  performerCount Int @default(0)
+  groupCount     Int @default(0)
+
+  // === Extended fields ===
+  details String? // Studio description
+  url     String? // Studio website
+
+  // === Stash paths (raw, transformed at read time) ===
+  imagePath String? // Logo image path
+
+  // === Sync metadata ===
+  stashCreatedAt DateTime?
+  stashUpdatedAt DateTime?
+  syncedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+
+  // === Relations ===
+  tags StudioTag[]
+
+  @@index([name])
+  @@index([parentId])
+  @@index([favorite])
+  @@index([rating100])
+  @@index([stashUpdatedAt])
+  @@index([deletedAt])
+}
+
+model StashTag {
+  id              String  @id
+  stashInstanceId String?
+
+  // === Core fields ===
+  name     String
+  favorite Boolean @default(false)
+
+  // === Counts (synced from Stash) ===
+  sceneCount       Int @default(0)
+  imageCount       Int @default(0)
+  galleryCount     Int @default(0)
+  performerCount   Int @default(0)
+  studioCount      Int @default(0)
+  groupCount       Int @default(0)
+  sceneMarkerCount Int @default(0)
+
+  // === Extended fields ===
+  description String? // Tag description
+  aliases     String? // JSON array of alias strings
+  parentIds   String? // JSON array of parent tag IDs
+
+  // === Stash paths (raw, transformed at read time) ===
+  imagePath String? // Tag image path
+
+  // === Sync metadata ===
+  stashCreatedAt DateTime?
+  stashUpdatedAt DateTime?
+  syncedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+
+  // === Relations ===
+  scenes     SceneTag[]
+  images     ImageTag[]
+  performers PerformerTag[]
+  studios    StudioTag[]
+  galleries  GalleryTag[]
+  groups     GroupTag[]
+
+  @@index([name])
+  @@index([favorite])
+  @@index([stashUpdatedAt])
+  @@index([deletedAt])
+}
+
+model StashGroup {
+  id              String  @id
+  stashInstanceId String?
+
+  // === Core fields ===
+  name      String
+  date      String?
+  studioId  String?
+  rating100 Int?
+  duration  Int?
+
+  // === Counts (synced from Stash) ===
+  sceneCount     Int @default(0)
+  performerCount Int @default(0)
+
+  // === Extended fields ===
+  director String?
+  synopsis String?
+  urls     String? // JSON array of URLs
+
+  // === Stash paths (raw, transformed at read time) ===
+  frontImagePath String? // Front cover image
+  backImagePath  String? // Back cover image
+
+  // === Sync metadata ===
+  stashCreatedAt DateTime?
+  stashUpdatedAt DateTime?
+  syncedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+
+  // === Relations ===
+  scenes SceneGroup[]
+  tags   GroupTag[]
+
+  @@index([name])
+  @@index([date])
+  @@index([studioId])
+  @@index([rating100])
+  @@index([stashUpdatedAt])
+  @@index([deletedAt])
+}
+
+model StashGallery {
+  id              String  @id
+  stashInstanceId String?
+
+  // === Core fields ===
+  title     String?
+  date      String?
+  studioId  String?
+  rating100 Int?
+
+  // === Counts (synced from Stash) ===
+  imageCount Int @default(0)
+
+  // === Extended fields ===
+  details String? // Gallery description
+  url     String? // Gallery URL
+  code    String? // Gallery code
+
+  // === File metadata ===
+  folderPath String? // Folder path if folder-based
+
+  // === Stash paths (raw, transformed at read time) ===
+  coverPath String? // Cover image path
+
+  // === Sync metadata ===
+  stashCreatedAt DateTime?
+  stashUpdatedAt DateTime?
+  syncedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+
+  // === Relations ===
+  scenes     SceneGallery[]
+  images     ImageGallery[]
+  performers GalleryPerformer[]
+  tags       GalleryTag[]
+
+  @@index([title])
+  @@index([date])
+  @@index([studioId])
+  @@index([rating100])
+  @@index([stashUpdatedAt])
+  @@index([deletedAt])
+}
+
+model StashImage {
+  id              String  @id
+  stashInstanceId String?
+
+  // === Core fields ===
+  title     String?
+  date      String?
+  studioId  String?
+  rating100 Int?
+  oCounter  Int     @default(0)
+  organized Boolean @default(false)
+
+  // === File metadata ===
+  filePath String? // Image file path
+  width    Int?
+  height   Int?
+  fileSize BigInt? // bytes
+
+  // === Stash paths (raw, transformed at read time) ===
+  pathThumbnail String? // Thumbnail URL path
+  pathPreview   String? // Preview URL path
+  pathImage     String? // Full image URL path
+
+  // === Sync metadata ===
+  stashCreatedAt DateTime?
+  stashUpdatedAt DateTime?
+  syncedAt       DateTime  @default(now())
+  deletedAt      DateTime?
+
+  // === Relations ===
+  performers ImagePerformer[]
+  tags       ImageTag[]
+  galleries  ImageGallery[]
+
+  @@index([studioId])
+  @@index([date])
+  @@index([rating100])
+  @@index([stashUpdatedAt])
+  @@index([deletedAt])
+}
+
+// Junction tables for efficient many-to-many queries
+
+model ScenePerformer {
+  sceneId     String
+  performerId String
+  scene       StashScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+
+  @@id([sceneId, performerId])
+  @@index([performerId])
+}
+
+model SceneTag {
+  sceneId String
+  tagId   String
+  scene   StashScene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  tag     StashTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([sceneId, tagId])
+  @@index([tagId])
+}
+
+model SceneGroup {
+  sceneId    String
+  groupId    String
+  sceneIndex Int?
+  scene      StashScene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  group      StashGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([sceneId, groupId])
+  @@index([groupId])
+}
+
+model SceneGallery {
+  sceneId   String
+  galleryId String
+  scene     StashScene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  gallery   StashGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@id([sceneId, galleryId])
+  @@index([galleryId])
+}
+
+model ImagePerformer {
+  imageId     String
+  performerId String
+  image       StashImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, performerId])
+  @@index([performerId])
+}
+
+model ImageTag {
+  imageId String
+  tagId   String
+  image   StashImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  tag     StashTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, tagId])
+  @@index([tagId])
+}
+
+model ImageGallery {
+  imageId   String
+  galleryId String
+  image     StashImage   @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  gallery   StashGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+
+  @@id([imageId, galleryId])
+  @@index([galleryId])
+}
+
+model GalleryPerformer {
+  galleryId   String
+  performerId String
+  gallery     StashGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+
+  @@id([galleryId, performerId])
+  @@index([performerId])
+}
+
+model PerformerTag {
+  performerId String
+  tagId       String
+  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  tag         StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([performerId, tagId])
+  @@index([tagId])
+}
+
+model StudioTag {
+  studioId String
+  tagId    String
+  studio   StashStudio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  tag      StashTag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([studioId, tagId])
+  @@index([tagId])
+}
+
+model GalleryTag {
+  galleryId String
+  tagId     String
+  gallery   StashGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  tag       StashTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([galleryId, tagId])
+  @@index([tagId])
+}
+
+model GroupTag {
+  groupId String
+  tagId   String
+  group   StashGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  tag     StashTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, tagId])
+  @@index([tagId])
+}
+
+// Sync state tracking per entity type
+model SyncState {
+  id              Int     @id @default(autoincrement())
+  stashInstanceId String?
+  entityType      String // 'scene', 'performer', etc.
+
+  lastFullSync        DateTime?
+  lastIncrementalSync DateTime?
+  lastSyncCount       Int       @default(0)
+  lastSyncDurationMs  Int?
+  lastError           String?
+  totalEntities       Int       @default(0)
+
+  @@unique([stashInstanceId, entityType])
+}
+
+// Sync settings (admin configurable)
+model SyncSettings {
+  id                     Int     @id @default(1) // Singleton
+  syncIntervalMinutes    Int     @default(60) // Default 60 min (current behavior)
+  enableScanSubscription Boolean @default(true) // Subscribe to scanCompleteSubscribe
+  enablePluginWebhook    Boolean @default(false) // Accept webhook from Stash plugin
+
+  updatedAt DateTime @updatedAt
 }

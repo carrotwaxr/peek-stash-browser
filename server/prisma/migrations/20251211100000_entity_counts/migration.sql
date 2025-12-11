@@ -1,0 +1,28 @@
+-- Add count columns to StashPerformer
+ALTER TABLE "StashPerformer" ADD COLUMN "sceneCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashPerformer" ADD COLUMN "imageCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashPerformer" ADD COLUMN "galleryCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashPerformer" ADD COLUMN "groupCount" INTEGER NOT NULL DEFAULT 0;
+
+-- Add count columns to StashStudio
+ALTER TABLE "StashStudio" ADD COLUMN "sceneCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashStudio" ADD COLUMN "imageCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashStudio" ADD COLUMN "galleryCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashStudio" ADD COLUMN "performerCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashStudio" ADD COLUMN "groupCount" INTEGER NOT NULL DEFAULT 0;
+
+-- Add count columns to StashTag
+ALTER TABLE "StashTag" ADD COLUMN "sceneCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashTag" ADD COLUMN "imageCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashTag" ADD COLUMN "galleryCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashTag" ADD COLUMN "performerCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashTag" ADD COLUMN "studioCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashTag" ADD COLUMN "groupCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashTag" ADD COLUMN "sceneMarkerCount" INTEGER NOT NULL DEFAULT 0;
+
+-- Add count columns to StashGroup
+ALTER TABLE "StashGroup" ADD COLUMN "sceneCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StashGroup" ADD COLUMN "performerCount" INTEGER NOT NULL DEFAULT 0;
+
+-- Add count columns to StashGallery
+ALTER TABLE "StashGallery" ADD COLUMN "imageCount" INTEGER NOT NULL DEFAULT 0;

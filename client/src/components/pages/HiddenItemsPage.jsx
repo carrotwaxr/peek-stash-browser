@@ -6,6 +6,7 @@ import { getSceneTitle } from "../../utils/format.js";
 import {
   Button,
   EmptyState,
+  LazyImage,
   LoadingSpinner,
   PageHeader,
   PageLayout,
@@ -187,7 +188,7 @@ const HiddenItemsPage = () => {
                       >
                         {/* Thumbnail */}
                         {hasImage && (
-                          <img
+                          <LazyImage
                             src={`/api/proxy/stash?path=${encodeURIComponent(
                               item.entity.image_path
                             )}`}

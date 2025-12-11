@@ -24,10 +24,10 @@ const SceneGrid = ({
   onHideSuccess,
   emptyMessage = "No scenes found",
   emptyDescription = "Check your media library configuration",
-  enableKeyboard = true,
-  isTVMode = false,
+  enableKeyboard = true, // eslint-disable-line no-unused-vars
+  isTVMode = false, // eslint-disable-line no-unused-vars
   tvGridZoneActive = false,
-  gridNavigation = null,
+  gridNavigation = null, // eslint-disable-line no-unused-vars
   gridItemProps = null,
 }) => {
   const gridRef = useRef();

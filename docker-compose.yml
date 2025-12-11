@@ -18,7 +18,7 @@ services:
       # Media access - multiple volumes for multi-library support
       - ${MEDIA_VOLUME_1:-peek-videos}:/app/media:ro
       - ${MEDIA_VOLUME_2:-peek-images}:/app/images:ro
-      # Peek config/data directory
+      # Peek config/data directory (bind mount for production/Unraid)
       - ${PEEK_DATA_DIR:-./.peek-data}:/app/data
     networks:
       - peek-network

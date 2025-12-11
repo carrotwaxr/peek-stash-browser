@@ -1,4 +1,5 @@
-import { forwardRef, useMemo, useRef, useState } from "react";
+/* eslint-disable react-refresh/only-export-components */
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
 import { libraryApi } from "../../services/api";
@@ -84,19 +85,85 @@ export const CardImage = ({ aspectRatio, children, className = "" }) => {
 };
 
 /**
- * Default card image component
- * Uses object-contain to show full image without cropping
- * Letterboxing uses theme background color for consistency
+ * Hook for true lazy loading via IntersectionObserver
+ * Returns [ref, shouldLoad] - attach ref to container, use shouldLoad to conditionally set src
+ */
+export const useLazyLoad = (rootMargin = "200px") => {
+  const ref = useRef(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    if (!ref.current || shouldLoad) return;
+
+    // Check for IntersectionObserver support (for SSR or old browsers)
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldLoad(true);
+      return;
+    }
+
+    let observer;
+    try {
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setShouldLoad(true);
+            observer.disconnect();
+          }
+        },
+        { rootMargin, threshold: 0 }
+      );
+      observer.observe(ref.current);
+    } catch {
+      // Fallback: load immediately if observer fails
+      setShouldLoad(true);
+      return;
+    }
+
+    return () => observer?.disconnect();
+  }, [shouldLoad, rootMargin]);
+
+  return [ref, shouldLoad];
+};
+
+/**
+ * Lazy-loaded image component
+ * Uses IntersectionObserver to only load images when they enter the viewport
+ * This prevents overwhelming the proxy with 24+ simultaneous requests
+ */
+export const LazyImage = ({ src, alt, className, style, onClick }) => {
+  const [ref, shouldLoad] = useLazyLoad();
+
+  return (
+    <div ref={ref} className={className} style={style} onClick={onClick}>
+      {shouldLoad && src ? (
+        <img src={src} alt={alt} className="w-full h-full object-cover" />
+      ) : (
+        <div
+          className="w-full h-full"
+          style={{ backgroundColor: "var(--bg-secondary)" }}
+        />
+      )}
+    </div>
+  );
+};
+
+/**
+ * Default card image component with true lazy loading
+ * Uses IntersectionObserver to only load images when they enter the viewport
+ * This prevents overwhelming the proxy with 24+ simultaneous requests
  */
 export const CardDefaultImage = ({ src, alt, entityType }) => {
+  const [ref, shouldLoad] = useLazyLoad();
+
   return (
     <div
+      ref={ref}
       className="w-full h-full flex items-center justify-center"
       style={{ backgroundColor: "var(--bg-secondary)" }}
     >
       <img
         className="w-full h-full object-contain"
-        src={src}
+        src={shouldLoad ? src : undefined}
         alt={alt || `${entityType} image`}
       />
     </div>

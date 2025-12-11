@@ -7,10 +7,10 @@
 import { describe, it, expect } from "vitest";
 import {
   buildSceneFilter,
-  buildPerformerFilter,
-  buildStudioFilter,
-  buildTagFilter,
-  buildGroupFilter,
+  _buildPerformerFilter,
+  _buildStudioFilter,
+  _buildTagFilter,
+  _buildGroupFilter,
 } from "../filterConfig.js";
 
 describe("buildSceneFilter", () => {

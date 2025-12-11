@@ -19,7 +19,7 @@ import { TooltipEntityGrid } from "./TooltipEntityGrid.jsx";
  * @param {string} [props.emptyMessage] - Message to display when no results
  */
 const EntityGrid = ({ entityType, filters, emptyMessage }) => {
-  const navigate = useNavigate();
+  const navigate = useNavigate();  // eslint-disable-line no-unused-vars
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState([]);
@@ -271,9 +271,9 @@ const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others },
         },
         {
           type: "TAGS",
-          count: entity.tag_count,
+          count: entity.tags?.length || 0,
           onClick:
-            entity.tag_count > 0
+            entity.tags?.length > 0
               ? () => navigate(`/tags?groupIds=${entity.id}`)
               : undefined,
         },

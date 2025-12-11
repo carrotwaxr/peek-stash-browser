@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem.js";
-import { Button } from "../ui/index.js";
+import { Button, useLazyLoad } from "../ui/index.js";
 
 /**
  * PlaylistSidebar - Vertical playlist controls optimized for sidebar display
@@ -40,7 +40,7 @@ const PlaylistSidebar = ({ maxHeight }) => {
   const totalScenes = playlist.scenes.length;
   const position = currentIndex + 1;
   const isVirtualPlaylist = playlist.id?.startsWith?.("virtual-");
-  const currentScene = playlist.scenes[currentIndex];
+  const _currentScene = playlist.scenes[currentIndex];
 
   // Find next scene for "Up Next" preview
   const nextSceneIndex = currentIndex + 1;
@@ -255,53 +255,17 @@ const PlaylistSidebar = ({ maxHeight }) => {
                 }}
               >
                 <div className="flex gap-2">
-                  {/* Thumbnail */}
-                  <div
-                    className="relative flex-shrink-0"
-                    style={{
-                      width: "120px",
-                      height: "68px",
-                      backgroundColor: "var(--border-color)",
-                    }}
-                  >
-                    {nextScene.scene?.paths?.screenshot ? (
-                      <img
-                        src={nextScene.scene.paths.screenshot}
-                        alt={nextScene.scene.title || "Next scene"}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span style={{ color: "var(--text-muted)" }}>
-                          {nextSceneIndex + 1}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Play icon overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Play
-                          size={24}
-                          style={{ color: "white" }}
-                          fill="white"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Duration */}
-                    {nextScene.scene?.files?.[0]?.duration && (
-                      <div
-                        className="absolute bottom-1 right-1 px-1 py-0.5 text-xs font-medium rounded"
-                        style={{
-                          backgroundColor: "rgba(0, 0, 0, 0.8)",
-                          color: "white",
-                        }}
-                      >
-                        {formatDuration(nextScene.scene.files[0].duration)}
-                      </div>
-                    )}
-                  </div>
+                  {/* Thumbnail with lazy loading and play overlay */}
+                  <PlaylistThumbnail
+                    src={nextScene.scene?.paths?.screenshot}
+                    alt={nextScene.scene?.title || "Next scene"}
+                    duration={nextScene.scene?.files?.[0]?.duration}
+                    formatDuration={formatDuration}
+                    fallbackText={nextSceneIndex + 1}
+                    width="120px"
+                    height="68px"
+                    showPlayOverlay
+                  />
 
                   {/* Info */}
                   <div className="flex-1 py-1 pr-2 min-w-0">
@@ -368,46 +332,17 @@ const PlaylistSidebar = ({ maxHeight }) => {
                       )}
                     </div>
 
-                    {/* Thumbnail */}
-                    <div
-                      className="relative flex-shrink-0 rounded overflow-hidden"
-                      style={{
-                        width: "80px",
-                        height: "45px",
-                        backgroundColor: "var(--border-color)",
-                      }}
-                    >
-                      {scene?.paths?.screenshot ? (
-                        <img
-                          src={scene.paths.screenshot}
-                          alt={scene.title || `Scene ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span
-                            className="text-xs"
-                            style={{ color: "var(--text-muted)" }}
-                          >
-                            {index + 1}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Duration */}
-                      {scene?.files?.[0]?.duration && (
-                        <div
-                          className="absolute bottom-0.5 right-0.5 px-1 py-0.5 text-xs rounded"
-                          style={{
-                            backgroundColor: "rgba(0, 0, 0, 0.8)",
-                            color: "white",
-                            fontSize: "10px",
-                          }}
-                        >
-                          {formatDuration(scene.files[0].duration)}
-                        </div>
-                      )}
-                    </div>
+                    {/* Thumbnail with lazy loading */}
+                    <PlaylistThumbnail
+                      src={scene?.paths?.screenshot}
+                      alt={scene?.title || `Scene ${index + 1}`}
+                      duration={scene?.files?.[0]?.duration}
+                      formatDuration={formatDuration}
+                      fallbackText={index + 1}
+                      width="80px"
+                      height="45px"
+                      small
+                    />
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
@@ -440,6 +375,71 @@ const PlaylistSidebar = ({ maxHeight }) => {
             })}
           </div>
         </>
+      )}
+    </div>
+  );
+};
+
+/**
+ * PlaylistThumbnail - Lazy-loaded thumbnail for playlist items
+ */
+const PlaylistThumbnail = ({
+  src,
+  alt,
+  duration,
+  formatDuration,
+  fallbackText,
+  width,
+  height,
+  showPlayOverlay = false,
+  small = false,
+}) => {
+  const [ref, shouldLoad] = useLazyLoad();
+
+  return (
+    <div
+      ref={ref}
+      className={`relative flex-shrink-0 ${small ? "rounded" : ""} overflow-hidden`}
+      style={{
+        width,
+        height,
+        backgroundColor: "var(--border-color)",
+      }}
+    >
+      {shouldLoad && src ? (
+        <img src={src} alt={alt} className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <span
+            className={small ? "text-xs" : ""}
+            style={{ color: "var(--text-muted)" }}
+          >
+            {fallbackText}
+          </span>
+        </div>
+      )}
+
+      {/* Play icon overlay (for Up Next) */}
+      {showPlayOverlay && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-colors">
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+            <Play size={24} style={{ color: "white" }} fill="white" />
+          </div>
+        </div>
+      )}
+
+      {/* Duration badge */}
+      {duration && (
+        <div
+          className={`absolute ${small ? "bottom-0.5 right-0.5 px-1 py-0.5" : "bottom-1 right-1 px-1 py-0.5"} text-xs ${small ? "" : "font-medium"} rounded`}
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            color: "white",
+            ...(small && { fontSize: "10px" }),
+          }}
+        >
+          {formatDuration(duration)}
+        </div>
       )}
     </div>
   );
