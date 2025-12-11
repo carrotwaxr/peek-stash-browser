@@ -184,13 +184,13 @@ section.video-container {
 
 /* Volume control (Stash pattern - uses popup, configured via JS inline: false) */
 .video-js .vjs-volume-control {
-  z-index: 1 !important;
+  z-index: 1;
 }
 
 /* Hide volume on touch devices */
 @media (hover: none) and (pointer: coarse) {
   .video-js .vjs-volume-panel {
-    display: none !important;
+    display: none;
   }
 }
 
@@ -199,47 +199,41 @@ section.video-container {
    ============================================================================ */
 
 .video-js .vjs-time-control {
-  align-items: center !important;
-  display: flex !important;
-  justify-content: center !important;
-  min-width: 0 !important;
-  padding: 0 4px !important;
-  pointer-events: none !important;
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 4px;
+  pointer-events: none;
 }
 
 .video-js .vjs-time-control .vjs-control-text {
-  display: none !important;
+  display: none;
 }
 
 .video-js .vjs-duration {
-  margin-right: auto !important; /* Push right-side controls to the right (Stash pattern) */
+  margin-right: auto; /* Push right-side controls to the right (Stash pattern) */
 }
 
 .video-js .vjs-remaining-time {
-  display: none !important;
+  display: none;
 }
-
-/* ============================================================================
-   BUTTON ORDER - Remove order overrides, let JS plugins handle it
-   ============================================================================ */
-
-/* Don't use CSS order - Video.js plugins insert buttons in correct order */
 
 /* ============================================================================
    POPUP MENUS - Playback Speed, Captions, etc. (Stash pattern)
    ============================================================================ */
 
 .video-js .vjs-menu-button-popup .vjs-menu {
-  width: 8em !important; /* Stash width for popup menus */
-  z-index: 10 !important; /* Above progress bar */
+  width: 8em; /* Stash width for popup menus */
+  z-index: 10; /* Above progress bar */
 }
 
 .video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
-  max-height: 10em !important; /* Stash max height */
+  max-height: 10em; /* Stash max height */
 }
 
 .video-js .vjs-menu-button-popup .vjs-menu li {
-  font-size: 0.8em !important; /* Stash font size */
+  font-size: 0.8em; /* Stash font size */
 }
 
 
