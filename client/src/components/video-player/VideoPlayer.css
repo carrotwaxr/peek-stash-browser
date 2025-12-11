@@ -276,48 +276,58 @@ section.video-container {
 /* Compact controls on smaller screens (Stash pattern) */
 @media (max-width: 576px) {
   .video-js .vjs-control {
-    width: 2.5em !important;
+    width: 2.5em;
   }
 
   .video-js .vjs-progress-control {
-    height: 2em !important;
-    width: 100% !important;
+    height: 2em;
+    width: 100%;
   }
 
   .video-js .vjs-playback-rate {
-    width: 3em !important;
+    width: 3em;
   }
 
   .video-js .vjs-button > .vjs-icon-placeholder::before,
   .video-js .vjs-skip-button::before {
-    font-size: 1.5em !important;
-    line-height: 2 !important;
+    font-size: 1.5em;
+    line-height: 2;
   }
 
   /* Smaller cast buttons */
   .video-js .vjs-airplay-button .vjs-icon-placeholder,
   .video-js .vjs-chromecast-button .vjs-icon-placeholder {
-    height: 1.4em !important;
-    width: 1.4em !important;
+    height: 1.4em;
+    width: 1.4em;
   }
 
   /* Menu adjustments */
   .video-js .vjs-menu-button-popup .vjs-menu {
-    width: 8em !important;
+    width: 8em;
   }
 
   .video-js .vjs-menu-button-popup .vjs-menu .vjs-menu-content {
-    max-height: 10em !important;
+    max-height: 10em;
   }
 
   .video-js .vjs-menu li {
-    font-size: 10px !important;
+    font-size: 10px;
   }
 
   /* Playback rate value */
   .video-js .vjs-playback-rate .vjs-playback-rate-value {
-    font-size: 1em !important;
-    line-height: 2.97 !important;
+    font-size: 1em;
+    line-height: 2.97;
+  }
+
+  /* Time control font size (Stash pattern) */
+  .video-js .vjs-time-control {
+    font-size: 12px;
+  }
+
+  /* Current time margin (Stash pattern) */
+  .video-js .vjs-current-time {
+    margin-left: 1em;
   }
 }
 
