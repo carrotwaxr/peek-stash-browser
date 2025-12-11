@@ -245,9 +245,9 @@ section.video-container {
 .video-js .vjs-big-play-button:hover,
 .video-js .vjs-big-play-button:focus,
 .video-js:hover .vjs-big-play-button {
-  background: none !important;
-  border: none !important;
-  font-size: 10em !important;
+  background: none;
+  border: none;
+  font-size: 10em;
 }
 
 /* ============================================================================
@@ -255,15 +255,15 @@ section.video-container {
    ============================================================================ */
 
 .video-js .vjs-loading-spinner {
-  border-color: rgba(255, 255, 255, 0.2) !important;
-  border-top-color: white !important;
-  width: 60px !important;
-  height: 60px !important;
-  border-width: 4px !important;
-  left: 50% !important;
-  top: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  margin: 0 !important;
+  border-color: rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+  width: 60px;
+  height: 60px;
+  border-width: 4px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
 }
 
 /* Big play button only shows before video has started (initial load) */
