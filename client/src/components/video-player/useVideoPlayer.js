@@ -217,6 +217,28 @@ export function useVideoPlayer({
   }, [scene?.paths?.vtt, scene?.paths?.sprite, playerRef]);
 
   // ============================================================================
+  // MEDIA SESSION METADATA (OS media controls - title, artist, poster)
+  // ============================================================================
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !scene) return;
+
+    const mediaSessionPlugin = player.mediaSession?.();
+    if (!mediaSessionPlugin) return;
+
+    // Build performer string from scene performers
+    const performers = scene.performers?.map((p) => p.name).join(", ") || "";
+
+    // Set metadata for OS media controls
+    mediaSessionPlugin.setMetadata(
+      scene.title || "Untitled Scene",
+      performers,
+      scene.paths?.screenshot || ""
+    );
+  }, [scene?.id, scene?.title, scene?.performers, scene?.paths?.screenshot, playerRef]);
+
+  // ============================================================================
   // TRACK ACTIVITY PLUGIN (Stash pattern - integrates with watch history)
   // ============================================================================
 
