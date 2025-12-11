@@ -271,9 +271,9 @@ const EntityCard = forwardRef(({ entity, entityType, onHideSuccess, ...others },
         },
         {
           type: "TAGS",
-          count: entity.tag_count,
+          count: entity.tags?.length || 0,
           onClick:
-            entity.tag_count > 0
+            entity.tags?.length > 0
               ? () => navigate(`/tags?groupIds=${entity.id}`)
               : undefined,
         },

@@ -296,9 +296,52 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     let paginatedGroups = groups.slice(startIndex, endIndex);
 
-    // Step 7: For single-entity requests (detail pages), hydrate tags with names
+    // Step 7: For single-entity requests (detail pages), get group with computed counts
     if (ids && ids.length === 1 && paginatedGroups.length === 1) {
-      paginatedGroups = await hydrateEntityTags(paginatedGroups);
+      const groupWithCounts = await stashEntityService.getGroup(ids[0]);
+      if (groupWithCounts) {
+        const existingGroup = paginatedGroups[0];
+        paginatedGroups = [
+          {
+            ...existingGroup,
+            scene_count: groupWithCounts.scene_count,
+            performer_count: groupWithCounts.performer_count,
+          },
+        ];
+
+        // Hydrate tags with names
+        paginatedGroups = await hydrateEntityTags(paginatedGroups);
+
+        logger.info("Computed counts for group detail", {
+          groupId: existingGroup.id,
+          groupName: existingGroup.name,
+          sceneCount: groupWithCounts.scene_count,
+          performerCount: groupWithCounts.performer_count,
+        });
+      }
+    }
+
+    // Step 8: Hydrate studios with full data (name, etc.)
+    const studioIds = [
+      ...new Set(
+        paginatedGroups
+          .map((g) => g.studio?.id)
+          .filter((id): id is string => !!id)
+      ),
+    ];
+
+    if (studioIds.length > 0) {
+      const studios = await stashEntityService.getStudiosByIds(studioIds);
+      const studioMap = new Map(studios.map((s) => [s.id, s]));
+
+      for (const group of paginatedGroups) {
+        if (group.studio?.id) {
+          const fullStudio = studioMap.get(group.studio.id);
+          if (fullStudio) {
+            group.studio = fullStudio;
+          }
+        }
+      }
     }
 
     // Add stashUrl to each group

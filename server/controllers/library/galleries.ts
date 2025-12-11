@@ -349,7 +349,26 @@ export const findGalleries = async (
     const total = galleries.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedGalleries = galleries.slice(startIndex, endIndex);
+    let paginatedGalleries = galleries.slice(startIndex, endIndex);
+
+    // Step 6.5: For single-entity requests (detail pages), get gallery with computed counts
+    if (ids && ids.length === 1 && paginatedGalleries.length === 1) {
+      const galleryWithCounts = await stashEntityService.getGallery(ids[0]);
+      if (galleryWithCounts) {
+        const existingGallery = paginatedGalleries[0];
+        paginatedGalleries = [
+          {
+            ...existingGallery,
+            image_count: galleryWithCounts.image_count,
+          },
+        ];
+        logger.info("Computed counts for gallery detail", {
+          galleryId: existingGallery.id,
+          galleryTitle: existingGallery.title,
+          imageCount: galleryWithCounts.image_count,
+        });
+      }
+    }
 
     // Step 7: Hydrate studios with full data (name, etc.)
     const studioIds = [

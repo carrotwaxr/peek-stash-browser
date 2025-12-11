@@ -334,6 +334,9 @@ class StashEntityService {
     const queryStart = Date.now();
     const cached = await prisma.stashPerformer.findMany({
       where: { deletedAt: null },
+      include: {
+        tags: true, // Include tags from junction table
+      },
     });
     const queryTime = Date.now() - queryStart;
 
@@ -347,7 +350,7 @@ class StashEntityService {
   }
 
   /**
-   * Get performer by ID
+   * Get performer by ID with computed counts
    */
   async getPerformer(id: string): Promise<NormalizedPerformer | null> {
     const cached = await prisma.stashPerformer.findFirst({
@@ -355,7 +358,47 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformPerformer(cached);
+
+    // Compute counts from junction tables
+    const [sceneCount, imageCount, galleryCount] = await Promise.all([
+      prisma.scenePerformer.count({
+        where: {
+          performerId: id,
+          scene: { deletedAt: null },
+        },
+      }),
+      prisma.imagePerformer.count({
+        where: {
+          performerId: id,
+          image: { deletedAt: null },
+        },
+      }),
+      prisma.galleryPerformer.count({
+        where: {
+          performerId: id,
+          gallery: { deletedAt: null },
+        },
+      }),
+    ]);
+
+    // Get group count by counting distinct groups from scenes
+    const groupCountResult = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(DISTINCT sg.groupId) as count
+      FROM ScenePerformer sp
+      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId
+      INNER JOIN StashScene s ON sp.sceneId = s.id
+      WHERE sp.performerId = ${id}
+        AND s.deletedAt IS NULL
+    `;
+    const groupCount = Number(groupCountResult[0]?.count ?? 0);
+
+    return this.transformPerformer({
+      ...cached,
+      sceneCount,
+      imageCount,
+      galleryCount,
+      groupCount,
+    });
   }
 
   /**
@@ -421,6 +464,9 @@ class StashEntityService {
     const queryStart = Date.now();
     const cached = await prisma.stashStudio.findMany({
       where: { deletedAt: null },
+      include: {
+        tags: true, // Include tags from junction table
+      },
     });
     const queryTime = Date.now() - queryStart;
 
@@ -434,7 +480,7 @@ class StashEntityService {
   }
 
   /**
-   * Get studio by ID
+   * Get studio by ID with computed counts
    */
   async getStudio(id: string): Promise<NormalizedStudio | null> {
     const cached = await prisma.stashStudio.findFirst({
@@ -442,7 +488,57 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformStudio(cached);
+
+    // Compute counts from junction tables and scene data
+    const [sceneCount, imageCount, galleryCount] = await Promise.all([
+      prisma.stashScene.count({
+        where: {
+          studioId: id,
+          deletedAt: null,
+        },
+      }),
+      prisma.stashImage.count({
+        where: {
+          studioId: id,
+          deletedAt: null,
+        },
+      }),
+      prisma.stashGallery.count({
+        where: {
+          studioId: id,
+          deletedAt: null,
+        },
+      }),
+    ]);
+
+    // Get performer count by counting distinct performers from scenes
+    const performerCountResult = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(DISTINCT sp.performerId) as count
+      FROM ScenePerformer sp
+      INNER JOIN StashScene s ON sp.sceneId = s.id
+      WHERE s.studioId = ${id}
+        AND s.deletedAt IS NULL
+    `;
+    const performerCount = Number(performerCountResult[0]?.count ?? 0);
+
+    // Get group count by counting distinct groups from scenes
+    const groupCountResult = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(DISTINCT sg.groupId) as count
+      FROM SceneGroup sg
+      INNER JOIN StashScene s ON sg.sceneId = s.id
+      WHERE s.studioId = ${id}
+        AND s.deletedAt IS NULL
+    `;
+    const groupCount = Number(groupCountResult[0]?.count ?? 0);
+
+    return this.transformStudio({
+      ...cached,
+      sceneCount,
+      imageCount,
+      galleryCount,
+      performerCount,
+      groupCount,
+    });
   }
 
   /**
@@ -492,7 +588,7 @@ class StashEntityService {
   }
 
   /**
-   * Get tag by ID
+   * Get tag by ID with computed counts
    */
   async getTag(id: string): Promise<NormalizedTag | null> {
     const cached = await prisma.stashTag.findFirst({
@@ -500,7 +596,57 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformTag(cached);
+
+    // Compute counts from junction tables
+    const [sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount] = await Promise.all([
+      prisma.sceneTag.count({
+        where: {
+          tagId: id,
+          scene: { deletedAt: null },
+        },
+      }),
+      prisma.imageTag.count({
+        where: {
+          tagId: id,
+          image: { deletedAt: null },
+        },
+      }),
+      prisma.galleryTag.count({
+        where: {
+          tagId: id,
+          gallery: { deletedAt: null },
+        },
+      }),
+      prisma.performerTag.count({
+        where: {
+          tagId: id,
+          performer: { deletedAt: null },
+        },
+      }),
+      prisma.studioTag.count({
+        where: {
+          tagId: id,
+          studio: { deletedAt: null },
+        },
+      }),
+      prisma.groupTag.count({
+        where: {
+          tagId: id,
+          group: { deletedAt: null },
+        },
+      }),
+    ]);
+
+    return this.transformTag({
+      ...cached,
+      sceneCount,
+      imageCount,
+      galleryCount,
+      performerCount,
+      studioCount,
+      groupCount,
+      sceneMarkerCount: 0, // Scene markers not currently synced
+    });
   }
 
   /**
@@ -536,6 +682,7 @@ class StashEntityService {
       where: { deletedAt: null },
       include: {
         performers: { include: { performer: true } },
+        tags: true, // Include tags from junction table
       },
     });
 
@@ -543,7 +690,7 @@ class StashEntityService {
   }
 
   /**
-   * Get gallery by ID
+   * Get gallery by ID with computed counts
    */
   async getGallery(id: string): Promise<NormalizedGallery | null> {
     const cached = await prisma.stashGallery.findFirst({
@@ -554,7 +701,19 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformGallery(cached);
+
+    // Compute image count from ImageGallery junction table
+    const imageCount = await prisma.imageGallery.count({
+      where: {
+        galleryId: id,
+        image: { deletedAt: null },
+      },
+    });
+
+    return this.transformGallery({
+      ...cached,
+      imageCount,
+    });
   }
 
   /**
@@ -591,13 +750,16 @@ class StashEntityService {
   async getAllGroups(): Promise<NormalizedGroup[]> {
     const cached = await prisma.stashGroup.findMany({
       where: { deletedAt: null },
+      include: {
+        tags: true, // Include tags from junction table
+      },
     });
 
     return cached.map((c) => this.transformGroup(c));
   }
 
   /**
-   * Get group by ID
+   * Get group by ID with computed counts
    */
   async getGroup(id: string): Promise<NormalizedGroup | null> {
     const cached = await prisma.stashGroup.findFirst({
@@ -605,7 +767,31 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformGroup(cached);
+
+    // Compute counts from junction tables
+    const sceneCount = await prisma.sceneGroup.count({
+      where: {
+        groupId: id,
+        scene: { deletedAt: null },
+      },
+    });
+
+    // Get performer count by counting distinct performers from scenes in this group
+    const performerCountResult = await prisma.$queryRaw<{ count: number }[]>`
+      SELECT COUNT(DISTINCT sp.performerId) as count
+      FROM SceneGroup sg
+      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId
+      INNER JOIN StashScene s ON sg.sceneId = s.id
+      WHERE sg.groupId = ${id}
+        AND s.deletedAt IS NULL
+    `;
+    const performerCount = Number(performerCountResult[0]?.count ?? 0);
+
+    return this.transformGroup({
+      ...cached,
+      sceneCount,
+      performerCount,
+    });
   }
 
   /**
@@ -1002,8 +1188,8 @@ class StashEntityService {
   }
 
   private transformPerformer(performer: any): NormalizedPerformer {
-    // Parse tag IDs and create tag objects (will be hydrated later)
-    const tagIds = performer.tagIds ? JSON.parse(performer.tagIds) : [];
+    // Extract tags from junction table relation (if included) or empty array
+    const tags = performer.tags?.map((pt: any) => ({ id: pt.tagId })) || [];
     return {
       ...DEFAULT_PERFORMER_USER_FIELDS,
       id: performer.id,
@@ -1031,8 +1217,8 @@ class StashEntityService {
       career_length: performer.careerLength,
       death_date: performer.deathDate,
       url: performer.url,
-      // Tags as array of {id} objects - will be hydrated with names in controller
-      tags: tagIds.map((id: string) => ({ id })),
+      // Tags from junction table relation - will be hydrated with names in controller
+      tags,
       image_path: this.transformUrl(performer.imagePath),
       created_at: performer.stashCreatedAt?.toISOString() ?? null,
       updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
@@ -1040,8 +1226,8 @@ class StashEntityService {
   }
 
   private transformStudio(studio: any): NormalizedStudio {
-    // Parse tag IDs and create tag objects (will be hydrated later)
-    const tagIds = studio.tagIds ? JSON.parse(studio.tagIds) : [];
+    // Extract tags from junction table relation (if included) or empty array
+    const tags = studio.tags?.map((st: any) => ({ id: st.tagId })) || [];
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
       id: studio.id,
@@ -1056,8 +1242,8 @@ class StashEntityService {
       group_count: studio.groupCount ?? 0,
       details: studio.details,
       url: studio.url,
-      // Tags as array of {id} objects - will be hydrated with names in controller
-      tags: tagIds.map((id: string) => ({ id })),
+      // Tags from junction table relation - will be hydrated with names in controller
+      tags,
       image_path: this.transformUrl(studio.imagePath),
       created_at: studio.stashCreatedAt?.toISOString() ?? null,
       updated_at: studio.stashUpdatedAt?.toISOString() ?? null,
@@ -1087,8 +1273,8 @@ class StashEntityService {
   }
 
   private transformGroup(group: any): NormalizedGroup {
-    // Parse tag IDs and create tag objects (will be hydrated later)
-    const tagIds = group.tagIds ? JSON.parse(group.tagIds) : [];
+    // Extract tags from junction table relation (if included) or empty array
+    const tags = group.tags?.map((gt: any) => ({ id: gt.tagId })) || [];
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
       id: group.id,
@@ -1102,8 +1288,8 @@ class StashEntityService {
       director: group.director,
       synopsis: group.synopsis,
       urls: group.urls ? JSON.parse(group.urls) : [],
-      // Tags as array of {id} objects - will be hydrated with names in controller
-      tags: tagIds.map((id: string) => ({ id })),
+      // Tags from junction table relation - will be hydrated with names in controller
+      tags,
       front_image_path: this.transformUrl(group.frontImagePath),
       back_image_path: this.transformUrl(group.backImagePath),
       created_at: group.stashCreatedAt?.toISOString() ?? null,
@@ -1113,8 +1299,8 @@ class StashEntityService {
 
   private transformGallery(gallery: any): NormalizedGallery {
     const coverUrl = this.transformUrl(gallery.coverPath);
-    // Parse tag IDs and create tag objects (will be hydrated later)
-    const tagIds = gallery.tagIds ? JSON.parse(gallery.tagIds) : [];
+    // Extract tags from junction table relation (if included) or empty array
+    const tags = gallery.tags?.map((gt: any) => ({ id: gt.tagId })) || [];
 
     // Transform performers from junction table
     const performers = gallery.performers?.map((gp: any) => ({
@@ -1137,8 +1323,8 @@ class StashEntityService {
       cover: coverUrl ? { paths: { thumbnail: coverUrl } } : null,
       // Frontend expects gallery.paths.cover for the cover image
       paths: coverUrl ? { cover: coverUrl } : null,
-      // Tags as array of {id} objects - will be hydrated with names in controller
-      tags: tagIds.map((id: string) => ({ id })),
+      // Tags from junction table relation - will be hydrated with names in controller
+      tags,
       // Performers from junction table
       performers,
       created_at: gallery.stashCreatedAt?.toISOString() ?? null,

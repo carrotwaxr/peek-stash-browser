@@ -11,7 +11,6 @@ import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Enhance tags with scene counts from tagged performers
@@ -289,22 +288,34 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     let paginatedTags = tags.slice(startIndex, endIndex);
 
-    // Step 8: Calculate accurate image_count for single-entity requests (detail pages)
+    // Step 8: Get tag with computed counts for single-entity requests (detail pages)
     if (ids && ids.length === 1 && paginatedTags.length === 1) {
-      const tag = paginatedTags[0];
-      const actualImageCount = await calculateEntityImageCount("tag", tag.id);
-      paginatedTags = [
-        {
-          ...tag,
-          image_count: actualImageCount,
-        },
-      ];
-      logger.info("Calculated accurate image_count for tag detail", {
-        tagId: tag.id,
-        tagName: tag.name,
-        stashImageCount: tag.image_count,
-        actualImageCount,
-      });
+      const tagWithCounts = await stashEntityService.getTag(ids[0]);
+      if (tagWithCounts) {
+        const existingTag = paginatedTags[0];
+        paginatedTags = [
+          {
+            ...existingTag,
+            scene_count: tagWithCounts.scene_count,
+            image_count: tagWithCounts.image_count,
+            gallery_count: tagWithCounts.gallery_count,
+            performer_count: tagWithCounts.performer_count,
+            studio_count: tagWithCounts.studio_count,
+            group_count: tagWithCounts.group_count,
+            scene_marker_count: tagWithCounts.scene_marker_count,
+          },
+        ];
+        logger.info("Computed counts for tag detail", {
+          tagId: existingTag.id,
+          tagName: existingTag.name,
+          sceneCount: tagWithCounts.scene_count,
+          imageCount: tagWithCounts.image_count,
+          galleryCount: tagWithCounts.gallery_count,
+          performerCount: tagWithCounts.performer_count,
+          studioCount: tagWithCounts.studio_count,
+          groupCount: tagWithCounts.group_count,
+        });
+      }
     }
 
     // Step 9: Hydrate parent/child relationships with names

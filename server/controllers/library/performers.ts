@@ -14,7 +14,6 @@ import type {
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
-import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Merge user-specific data into performers
@@ -206,29 +205,35 @@ export const findPerformers = async (
     const endIndex = startIndex + perPage;
     let paginatedPerformers = performers.slice(startIndex, endIndex);
 
-    // Step 8: For single-entity requests (detail pages), hydrate tags and calculate accurate image_count
+    // Step 8: For single-entity requests (detail pages), get performer with computed counts
     if (ids && ids.length === 1 && paginatedPerformers.length === 1) {
-      // Hydrate tags with names
-      paginatedPerformers = await hydrateEntityTags(paginatedPerformers);
+      // Get performer with computed counts from junction tables
+      const performerWithCounts = await stashEntityService.getPerformer(ids[0]);
+      if (performerWithCounts) {
+        // Merge with the paginated performer data (which has user ratings/stats)
+        const existingPerformer = paginatedPerformers[0];
+        paginatedPerformers = [
+          {
+            ...existingPerformer,
+            scene_count: performerWithCounts.scene_count,
+            image_count: performerWithCounts.image_count,
+            gallery_count: performerWithCounts.gallery_count,
+            group_count: performerWithCounts.group_count,
+          },
+        ];
 
-      // Calculate accurate image_count (accounts for Gallery→Image relationships)
-      const performer = paginatedPerformers[0];
-      const actualImageCount = await calculateEntityImageCount(
-        "performer",
-        performer.id
-      );
-      paginatedPerformers = [
-        {
-          ...performer,
-          image_count: actualImageCount,
-        },
-      ];
-      logger.info("Calculated accurate image_count for performer detail", {
-        performerId: performer.id,
-        performerName: performer.name,
-        stashImageCount: performer.image_count,
-        actualImageCount,
-      });
+        // Hydrate tags with names
+        paginatedPerformers = await hydrateEntityTags(paginatedPerformers);
+
+        logger.info("Computed counts for performer detail", {
+          performerId: existingPerformer.id,
+          performerName: existingPerformer.name,
+          sceneCount: performerWithCounts.scene_count,
+          imageCount: performerWithCounts.image_count,
+          galleryCount: performerWithCounts.gallery_count,
+          groupCount: performerWithCounts.group_count,
+        });
+      }
     }
 
     // Add stashUrl to each performer

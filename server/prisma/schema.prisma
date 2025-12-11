@@ -477,6 +477,12 @@ model StashPerformer {
   favorite       Boolean @default(false)
   rating100      Int?
 
+  // === Counts (synced from Stash) ===
+  sceneCount   Int @default(0)
+  imageCount   Int @default(0)
+  galleryCount Int @default(0)
+  groupCount   Int @default(0)
+
   // === Extended fields ===
   details      String? // Biography
   aliasList    String? // JSON array of aliases
@@ -526,6 +532,13 @@ model StashStudio {
   favorite  Boolean @default(false)
   rating100 Int?
 
+  // === Counts (synced from Stash) ===
+  sceneCount     Int @default(0)
+  imageCount     Int @default(0)
+  galleryCount   Int @default(0)
+  performerCount Int @default(0)
+  groupCount     Int @default(0)
+
   // === Extended fields ===
   details String? // Studio description
   url     String? // Studio website
@@ -557,6 +570,15 @@ model StashTag {
   // === Core fields ===
   name     String
   favorite Boolean @default(false)
+
+  // === Counts (synced from Stash) ===
+  sceneCount       Int @default(0)
+  imageCount       Int @default(0)
+  galleryCount     Int @default(0)
+  performerCount   Int @default(0)
+  studioCount      Int @default(0)
+  groupCount       Int @default(0)
+  sceneMarkerCount Int @default(0)
 
   // === Extended fields ===
   description String? // Tag description
@@ -597,6 +619,10 @@ model StashGroup {
   rating100 Int?
   duration  Int?
 
+  // === Counts (synced from Stash) ===
+  sceneCount     Int @default(0)
+  performerCount Int @default(0)
+
   // === Extended fields ===
   director String?
   synopsis String?
@@ -633,6 +659,9 @@ model StashGallery {
   date      String?
   studioId  String?
   rating100 Int?
+
+  // === Counts (synced from Stash) ===
+  imageCount Int @default(0)
 
   // === Extended fields ===
   details String? // Gallery description

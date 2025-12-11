@@ -184,6 +184,8 @@ const GroupCard = forwardRef(
         indicators={[
           { type: "SCENES", count: group.scene_count },
           { type: "GROUPS", count: group.sub_group_count },
+          { type: "PERFORMERS", count: group.performer_count },
+          { type: "TAGS", count: group.tags?.length || 0 },
         ]}
         linkTo={`/collection/${group.id}`}
         maxTitleLines={2}

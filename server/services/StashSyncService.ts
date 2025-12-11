@@ -944,6 +944,10 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(performer.death_date)},
       ${this.escapeNullable(performer.url)},
       ${this.escapeNullable(performer.image_path)},
+      ${performer.scene_count ?? 0},
+      ${performer.image_count ?? 0},
+      ${performer.gallery_count ?? 0},
+      ${(performer as any).group_count ?? 0},
       ${performer.created_at ? `'${performer.created_at}'` : "NULL"},
       ${performer.updated_at ? `'${performer.updated_at}'` : "NULL"},
       datetime('now'),
@@ -958,6 +962,7 @@ class StashSyncService extends EventEmitter {
       rating100, details, aliasList,
       country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements,
       tattoos, piercings, careerLength, deathDate, url, imagePath,
+      sceneCount, imageCount, galleryCount, groupCount,
       stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -982,6 +987,10 @@ class StashSyncService extends EventEmitter {
       deathDate = excluded.deathDate,
       url = excluded.url,
       imagePath = excluded.imagePath,
+      sceneCount = excluded.sceneCount,
+      imageCount = excluded.imageCount,
+      galleryCount = excluded.galleryCount,
+      groupCount = excluded.groupCount,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
       syncedAt = excluded.syncedAt,
@@ -1117,6 +1126,11 @@ class StashSyncService extends EventEmitter {
       ${studio.parent_studio?.id ? `'${this.escape(studio.parent_studio.id)}'` : "NULL"},
       ${studio.favorite ? 1 : 0},
       ${studio.rating100 ?? "NULL"},
+      ${studio.scene_count ?? 0},
+      ${studio.image_count ?? 0},
+      ${studio.gallery_count ?? 0},
+      ${(studio as any).performer_count ?? 0},
+      ${(studio as any).group_count ?? 0},
       ${this.escapeNullable(studio.details)},
       ${this.escapeNullable(studio.url)},
       ${this.escapeNullable(studio.image_path)},
@@ -1131,6 +1145,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashStudio (
       id, stashInstanceId, name, parentId, favorite, rating100,
+      sceneCount, imageCount, galleryCount, performerCount, groupCount,
       details, url, imagePath, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
@@ -1139,6 +1154,11 @@ class StashSyncService extends EventEmitter {
       parentId = excluded.parentId,
       favorite = excluded.favorite,
       rating100 = excluded.rating100,
+      sceneCount = excluded.sceneCount,
+      imageCount = excluded.imageCount,
+      galleryCount = excluded.galleryCount,
+      performerCount = excluded.performerCount,
+      groupCount = excluded.groupCount,
       details = excluded.details,
       url = excluded.url,
       imagePath = excluded.imagePath,
@@ -1274,6 +1294,13 @@ class StashSyncService extends EventEmitter {
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
       ${this.escapeNullable(tag.name)},
       ${tag.favorite ? 1 : 0},
+      ${tag.scene_count ?? 0},
+      ${tag.image_count ?? 0},
+      ${tag.gallery_count ?? 0},
+      ${tag.performer_count ?? 0},
+      ${(tag as any).studio_count ?? 0},
+      ${(tag as any).group_count ?? 0},
+      ${tag.scene_marker_count ?? 0},
       ${this.escapeNullable(tag.description)},
       ${this.escapeNullable(JSON.stringify(aliases))},
       ${this.escapeNullable(JSON.stringify(parentIds))},
@@ -1288,12 +1315,20 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashTag (
-      id, stashInstanceId, name, favorite, description,
-      aliases, parentIds, imagePath, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+      id, stashInstanceId, name, favorite,
+      sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
+      description, aliases, parentIds, imagePath, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
       favorite = excluded.favorite,
+      sceneCount = excluded.sceneCount,
+      imageCount = excluded.imageCount,
+      galleryCount = excluded.galleryCount,
+      performerCount = excluded.performerCount,
+      studioCount = excluded.studioCount,
+      groupCount = excluded.groupCount,
+      sceneMarkerCount = excluded.sceneMarkerCount,
       description = excluded.description,
       aliases = excluded.aliases,
       parentIds = excluded.parentIds,
@@ -1408,6 +1443,8 @@ class StashSyncService extends EventEmitter {
       ${group.studio?.id ? `'${this.escape(group.studio.id)}'` : "NULL"},
       ${group.rating100 ?? "NULL"},
       ${duration ? Math.round(duration) : "NULL"},
+      ${group.scene_count ?? 0},
+      ${(group as any).performer_count ?? 0},
       ${this.escapeNullable(group.director)},
       ${this.escapeNullable(group.synopsis)},
       ${this.escapeNullable(JSON.stringify(urls))},
@@ -1424,6 +1461,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashGroup (
       id, stashInstanceId, name, date, studioId, rating100, duration,
+      sceneCount, performerCount,
       director, synopsis, urls, frontImagePath, backImagePath, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
@@ -1433,6 +1471,8 @@ class StashSyncService extends EventEmitter {
       studioId = excluded.studioId,
       rating100 = excluded.rating100,
       duration = excluded.duration,
+      sceneCount = excluded.sceneCount,
+      performerCount = excluded.performerCount,
       director = excluded.director,
       synopsis = excluded.synopsis,
       urls = excluded.urls,
@@ -1574,6 +1614,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(gallery.date)},
       ${gallery.studio?.id ? `'${this.escape(gallery.studio.id)}'` : "NULL"},
       ${gallery.rating100 ?? "NULL"},
+      ${gallery.image_count ?? 0},
       ${this.escapeNullable(gallery.details)},
       ${this.escapeNullable(gallery.url)},
       ${this.escapeNullable(gallery.code)},
@@ -1589,7 +1630,7 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashGallery (
-      id, stashInstanceId, title, date, studioId, rating100,
+      id, stashInstanceId, title, date, studioId, rating100, imageCount,
       details, url, code, folderPath, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
@@ -1598,6 +1639,7 @@ class StashSyncService extends EventEmitter {
       date = excluded.date,
       studioId = excluded.studioId,
       rating100 = excluded.rating100,
+      imageCount = excluded.imageCount,
       details = excluded.details,
       url = excluded.url,
       code = excluded.code,

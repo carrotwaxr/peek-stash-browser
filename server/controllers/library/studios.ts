@@ -11,7 +11,6 @@ import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { hydrateEntityTags, hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import { calculateEntityImageCount } from "./images.js";
 
 /**
  * Merge user-specific data into studios
@@ -192,29 +191,37 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     const endIndex = startIndex + perPage;
     let paginatedStudios = studios.slice(startIndex, endIndex);
 
-    // Step 8: For single-entity requests (detail pages), hydrate tags and calculate accurate image_count
+    // Step 8: For single-entity requests (detail pages), get studio with computed counts
     if (ids && ids.length === 1 && paginatedStudios.length === 1) {
-      // Hydrate tags with names
-      paginatedStudios = await hydrateEntityTags(paginatedStudios);
+      // Get studio with computed counts from junction tables
+      const studioWithCounts = await stashEntityService.getStudio(ids[0]);
+      if (studioWithCounts) {
+        // Merge with the paginated studio data (which has user ratings/stats)
+        const existingStudio = paginatedStudios[0];
+        paginatedStudios = [
+          {
+            ...existingStudio,
+            scene_count: studioWithCounts.scene_count,
+            image_count: studioWithCounts.image_count,
+            gallery_count: studioWithCounts.gallery_count,
+            performer_count: studioWithCounts.performer_count,
+            group_count: studioWithCounts.group_count,
+          },
+        ];
 
-      // Calculate accurate image_count (accounts for Gallery→Image relationships)
-      const studio = paginatedStudios[0];
-      const actualImageCount = await calculateEntityImageCount(
-        "studio",
-        studio.id
-      );
-      paginatedStudios = [
-        {
-          ...studio,
-          image_count: actualImageCount,
-        },
-      ];
-      logger.info("Calculated accurate image_count for studio detail", {
-        studioId: studio.id,
-        studioName: studio.name,
-        stashImageCount: studio.image_count,
-        actualImageCount,
-      });
+        // Hydrate tags with names
+        paginatedStudios = await hydrateEntityTags(paginatedStudios);
+
+        logger.info("Computed counts for studio detail", {
+          studioId: existingStudio.id,
+          studioName: existingStudio.name,
+          sceneCount: studioWithCounts.scene_count,
+          imageCount: studioWithCounts.image_count,
+          galleryCount: studioWithCounts.gallery_count,
+          performerCount: studioWithCounts.performer_count,
+          groupCount: studioWithCounts.group_count,
+        });
+      }
     }
 
     // Step 9: Hydrate parent/child relationships with names
