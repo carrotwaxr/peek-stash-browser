@@ -485,6 +485,11 @@ section.video-container {
   .video-js.vjs-touch-enabled .vjs-control-bar .vjs-seek-button {
     display: none;
   }
+
+  /* VTT thumbnail position on touch */
+  .video-js.vjs-touch-enabled .vjs-vtt-thumbnail-display {
+    bottom: 2.8em;
+  }
 }
 
 /* Markers - Timeline markers with tooltips */
@@ -511,6 +516,7 @@ section.video-container {
   border-radius: 2px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   height: 8px;
+  min-width: 8px;
   position: absolute;
   transform: translateY(-28px);
   transition: none;
@@ -602,9 +608,5 @@ section.video-container {
 
   .video-js .vjs-source-selector .vjs-menu li {
     font-size: 10px;
-  }
-
-  .video-js.vjs-touch-enabled .vjs-vtt-thumbnail-display {
-    bottom: 2.8em;
   }
 }
