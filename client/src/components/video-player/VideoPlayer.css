@@ -70,86 +70,85 @@ section.video-container {
    ============================================================================ */
 
 .video-js .vjs-progress-control {
-  position: absolute !important;
-  bottom: 2.5em !important; /* Float above controls */
-  left: 0 !important;
-  right: 0 !important;
-  width: 100% !important;
-  height: 3em !important;
-  pointer-events: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  position: absolute;
+  bottom: 2.5em; /* Float above controls */
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 3em;
+  margin: 0;
+  padding: 0;
 }
 
 .video-js .vjs-progress-holder {
-  height: 6px !important;
-  margin: 0 15px !important; /* Side margins like Stash */
-  padding: 0 !important;
-  width: auto !important;
-  font-size: inherit !important;
+  height: 6px;
+  margin: 0 15px; /* Side margins like Stash */
+  padding: 0;
+  width: auto;
+  font-size: inherit;
 }
 
 /* Progress bar rail */
 .video-js .vjs-progress-holder {
-  background: rgba(255, 255, 255, 0.2) !important;
-  border-radius: 0 !important;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 0;
 }
 
 /* Loaded progress (buffered) */
 .video-js .vjs-load-progress {
-  background: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .video-js .vjs-load-progress div {
-  background: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* Play progress (watched portion) */
 .video-js .vjs-play-progress {
-  background-color: var(--accent-primary) !important;
-  border-radius: 0 !important;
+  background-color: var(--accent-primary);
+  border-radius: 0;
 }
 
 /* Progress bar scrubber/handle */
 .video-js .vjs-play-progress:before {
-  display: none !important; /* Hide by default */
+  display: none; /* Hide by default */
 }
 
 /* Show handle on hover */
 .video-js .vjs-progress-control:hover .vjs-play-progress:before,
 .video-js .vjs-progress-control:focus-within .vjs-play-progress:before {
-  display: block !important;
-  content: "" !important;
-  position: absolute !important;
-  right: -6px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  width: 12px !important;
-  height: 12px !important;
-  background-color: var(--accent-primary) !important;
-  border-radius: 50% !important;
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4) !important;
+  display: block;
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  background-color: var(--accent-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
 }
 
 /* Enlarge progress bar on hover */
 .video-js .vjs-progress-control:hover .vjs-progress-holder,
 .video-js .vjs-progress-control:focus-within .vjs-progress-holder {
-  height: 6px !important;
-  transition: height 0.1s ease !important;
+  height: 6px;
+  transition: height 0.1s ease;
 }
 
 /* VTT Thumbnails - matching Stash's styling */
 .video-js .vjs-vtt-thumbnail-display {
-  position: absolute !important;
-  left: 0 !important;
-  bottom: 20px !important;
-  border: 2px solid white !important;
-  border-radius: 2px !important;
-  box-shadow: 0 0 7px rgba(0, 0, 0, 0.6) !important;
+  position: absolute;
+  left: 0;
+  bottom: 6em; /* Stash uses em-based positioning */
+  border: 2px solid white;
+  border-radius: 2px;
+  box-shadow: 0 0 7px rgba(0, 0, 0, 0.6);
   opacity: 0; /* No !important - allow JS to override */
-  transition: opacity 0.1s ease !important;
-  pointer-events: none !important;
-  /* background-size removed - sprite sheets use background-position, not cover */
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 100;
 }
 
 /* Ensure thumbnails show on touch/mobile interaction */
@@ -158,18 +157,18 @@ section.video-container {
 .video-js.vjs-scrubbing .vjs-vtt-thumbnail-display,
 .video-js .vjs-mouse-display:hover .vjs-vtt-thumbnail-display {
   opacity: 1 !important;
-  transition: opacity 0s !important; /* Instant show, no fade delay */
+  transition: opacity 0s; /* Instant show, no fade delay */
 }
 
 /* Time tooltip (appears on hover over progress bar) */
 .video-js .vjs-mouse-display .vjs-time-tooltip {
-  font-size: 13px !important;
-  padding: 6px 10px !important;
-  line-height: 1.4 !important;
-  font-family: var(--font-body) !important;
-  font-weight: 500 !important;
-  background: rgba(28, 28, 28, 0.95) !important;
-  border-radius: 4px !important;
+  font-size: 13px;
+  padding: 6px 10px;
+  line-height: 1.4;
+  font-family: var(--font-body);
+  font-weight: 500;
+  background: rgba(28, 28, 28, 0.95);
+  border-radius: 4px;
 }
 
 /* Hide tooltip on play progress (current position) - only show on hover */
