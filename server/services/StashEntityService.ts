@@ -151,6 +151,40 @@ class StashEntityService {
   }
 
   /**
+   * Get all scenes with tags relation included
+   * Used for empty entity filtering which needs to know which tags appear on visible scenes
+   */
+  async getAllScenesWithTags(): Promise<NormalizedScene[]> {
+    const startTotal = Date.now();
+
+    const queryStart = Date.now();
+    const cached = await prisma.stashScene.findMany({
+      where: { deletedAt: null },
+      select: {
+        ...this.BROWSE_SELECT,
+        // Include tags relation for filtering
+        tags: {
+          select: { tagId: true },
+        },
+      },
+    });
+    const queryTime = Date.now() - queryStart;
+
+    const transformStart = Date.now();
+    const result = cached.map((c) => {
+      const scene = this.transformSceneForBrowse(c);
+      // Override tags with the junction table data (cast to satisfy type checker - only id is needed for filtering)
+      scene.tags = (c.tags?.map((t: { tagId: string }) => ({ id: t.tagId })) || []) as typeof scene.tags;
+      return scene;
+    });
+    const transformTime = Date.now() - transformStart;
+
+    logger.info(`getAllScenesWithTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+
+    return result;
+  }
+
+  /**
    * Get scene by ID (includes related entities)
    */
   async getScene(id: string): Promise<NormalizedScene | null> {
