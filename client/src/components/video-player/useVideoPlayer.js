@@ -17,6 +17,7 @@ import "./plugins/skip-buttons.js";
 import "./plugins/source-selector.js";
 import "./plugins/track-activity.js";
 import "./plugins/vrmode.js";
+import "./plugins/media-session.js";
 
 // Register Video.js plugins
 airplay(videojs);
@@ -172,6 +173,7 @@ export function useVideoPlayer({
         },
         skipButtons: {},
         trackActivity: {},
+        mediaSession: {},
         vrMenu: {},
       },
     });
