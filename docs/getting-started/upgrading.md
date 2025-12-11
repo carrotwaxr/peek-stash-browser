@@ -2,11 +2,13 @@
 
 This guide covers upgrading Peek to new versions, including database migration procedures and backup strategies.
 
-## Version 2.2.0 (Beta) - SQLite Entity Cache
+## Version 3.0.0 (Beta) - SQLite Entity Cache
 
 **Release Type:** Beta - recommended for testing only
 
-Version 2.2.0 introduces a major architectural change: Stash entity data is now stored in SQLite tables instead of being held in memory. This provides:
+**Latest:** `v3.0.0-beta.2`
+
+Version 3.0.0 introduces a major architectural change: Stash entity data is now stored in SQLite tables instead of being held in memory. This provides:
 
 - **Scalability**: Support for 100k+ scenes without memory exhaustion
 - **Performance**: Sub-100ms query times with proper indexing
@@ -14,7 +16,7 @@ Version 2.2.0 introduces a major architectural change: Stash entity data is now 
 
 ### What's Changed
 
-| Before (v2.1.x) | After (v2.2.0) |
+| Before (v2.1.x) | After (v3.0.0) |
 |-----------------|----------------|
 | In-memory cache | SQLite tables |
 | ~3.6 hour sync for 22k scenes | ~3 minute sync |
@@ -94,7 +96,7 @@ docker cp peek-server:/app/data/peek-backup.db ./peek.db.backup
 docker-compose pull
 
 # For manual docker users
-docker pull carrotwaxr/peek:2.2.0-beta
+docker pull carrotwaxr/peek:3.0.0-beta.2
 ```
 
 #### Step 2: Restart the Container
@@ -107,7 +109,7 @@ docker-compose up -d
 # Manual Docker
 docker stop peek-server
 docker rm peek-server
-docker run -d --name peek-server ... carrotwaxr/peek:2.2.0-beta
+docker run -d --name peek-server ... carrotwaxr/peek:3.0.0-beta.2
 ```
 
 #### Step 3: Wait for Migration
@@ -117,14 +119,9 @@ On first startup, Prisma will automatically apply the migration:
 - Look for: `Applied migration: 20251211000000_stash_entities`
 - Migration typically completes in under 5 seconds
 
-#### Step 4: Trigger Initial Sync
+#### Step 4: Wait for Initial Sync
 
-The library will be empty until you sync with Stash:
-
-1. Open Peek in your browser
-2. Navigate to **Settings > Sync**
-3. Click **Full Sync**
-4. Wait for sync to complete (check progress in the header)
+The sync starts **automatically** on first startup after migration. Watch the logs or the sync progress banner in the UI.
 
 Sync times depend on your library size:
 | Library Size | Expected Time |
@@ -161,7 +158,7 @@ docker exec peek-server sqlite3 /app/data/peek.db \
 
 #### "Library is empty after upgrade"
 
-This is expected! The new SQLite tables start empty. Go to Settings > Sync and click "Full Sync".
+The sync should start automatically on first startup. If your library appears empty after waiting several minutes, check the logs for errors. You can also manually trigger a sync from Settings > Sync.
 
 #### "Migration failed"
 
@@ -183,7 +180,7 @@ The initial sync after upgrade fetches all data from Stash. Subsequent syncs are
 
 Verify your Stash configuration in Settings. The upgrade doesn't change your Stash connection settings.
 
-### What's NOT Included in 2.2.0 Beta
+### What's NOT Included in 3.0.0 Beta
 
 This beta focuses on the core architecture change. These features are planned for stable release:
 
