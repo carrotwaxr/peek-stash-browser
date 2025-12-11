@@ -111,6 +111,7 @@ nav:
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
+      - Upgrading: getting-started/upgrading.md
   - User Guide:
       - Custom Carousels: user-guide/custom-carousels.md
       - Watch History: user-guide/watch-history.md
