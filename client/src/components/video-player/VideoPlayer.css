@@ -338,7 +338,7 @@ section.video-container {
 /* Hide live display (we only do VOD) */
 .video-js .vjs-live-control,
 .video-js .vjs-seek-to-live-control {
-  display: none !important;
+  display: none;
 }
 
 /* ============================================================================
@@ -347,45 +347,45 @@ section.video-container {
 
 /* Source selector menu - click only, no hover (matches Stash's approach) */
 .video-js .vjs-source-selector.vjs-hover .vjs-menu {
-  display: none !important;
+  display: none;
 }
 
 /* Captions/subtitles button - inherits from standard menu styling */
 
 /* Hide chapters button (not supported) */
 .video-js .vjs-chapters-button {
-  display: none !important;
+  display: none;
 }
 
 /* Hide audio track button (not needed) */
 .video-js .vjs-audio-button {
-  display: none !important;
+  display: none;
 }
 
 /* Hide descriptions button (accessibility feature we don't use) */
 .video-js .vjs-descriptions-button {
-  display: none !important;
+  display: none;
 }
 
 /* Hide picture-in-picture (already disabled in config but extra safety) */
 .video-js .vjs-picture-in-picture-control {
-  display: none !important;
+  display: none;
 }
 
 /* Hide remaining time display (we only show current time / duration) */
 .video-js .vjs-remaining-time {
-  display: none !important;
+  display: none;
 }
 
 /* Hide spacer element */
 .video-js .vjs-custom-control-spacer {
-  display: none !important;
+  display: none;
 }
 
 /* Hide skip buttons (not used) */
 .video-js .vjs-skip-backward-undefined,
 .video-js .vjs-skip-forward-undefined {
-  display: none !important;
+  display: none;
 }
 
 /* ============================================================================
@@ -395,7 +395,7 @@ section.video-container {
 .video-js .vjs-control,
 .video-js .vjs-progress-control,
 .video-js .vjs-volume-control {
-  transition: all 0.2s ease !important;
+  transition: all 0.2s ease;
 }
 
 /* No transition on menus - should appear instantly on click (Stash pattern) */
@@ -405,11 +405,11 @@ section.video-container {
    ============================================================================ */
 
 .video-js .vjs-button {
-  outline: none !important; /* Stash pattern */
+  outline: none; /* Stash pattern */
 }
 
 .video-js .vjs-progress-control:focus-within {
-  outline: none !important;
+  outline: none;
 }
 
 .video-js .vjs-slider {
@@ -418,7 +418,17 @@ section.video-container {
 }
 
 .video-js .vjs-slider:focus {
-  box-shadow: 0 0 0 2px var(--accent-primary) !important;
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+/* Show controls on error (Stash pattern) */
+.video-js.vjs-error .vjs-control-bar {
+  display: flex !important;
+}
+
+/* Caption settings accessibility (Stash pattern) */
+.video-js .vjs-text-track-settings select {
+  background: #fff;
 }
 
 /* ============================================================================
