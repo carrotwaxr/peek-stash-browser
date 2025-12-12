@@ -2,8 +2,8 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Install system dependencies including OpenSSL, FFmpeg, and SQLite
-RUN apt-get update && apt-get install -y ffmpeg openssl sqlite3 && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (OpenSSL for Prisma, SQLite for CLI tools)
+RUN apt-get update && apt-get install -y openssl sqlite3 && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY package*.json ./
