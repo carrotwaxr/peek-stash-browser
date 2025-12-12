@@ -56,7 +56,6 @@ FROM node:22-slim AS production
 # Install runtime dependencies in one layer
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ffmpeg \
         nginx \
         sqlite3 \
         ca-certificates \

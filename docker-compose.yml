@@ -15,9 +15,8 @@ services:
       # Hot reloading - mount source code
       - ./server:/app
       - /app/node_modules
-      # Media access - multiple volumes for multi-library support
-      - ${MEDIA_VOLUME_1:-peek-videos}:/app/media:ro
-      - ${MEDIA_VOLUME_2:-peek-images}:/app/images:ro
+      # Mount .env file for hot reloading
+      - ./.env:/app/../.env:ro
       # Peek config/data directory (bind mount for production/Unraid)
       - ${PEEK_DATA_DIR:-./.peek-data}:/app/data
     networks:
@@ -42,11 +41,3 @@ services:
 networks:
   peek-network:
     driver: bridge
-
-volumes:
-  # External Docker volumes (created separately, e.g., CIFS/SMB mounts)
-  # Create with: docker volume create peek-videos --driver local --opt type=cifs ...
-  peek-videos:
-    external: true
-  peek-images:
-    external: true
