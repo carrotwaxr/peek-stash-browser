@@ -1,21 +1,25 @@
-/**
- * YouTube-Style Video Player Controls
- *
- * Comprehensive CSS overrides to transform VideoJS controls to match YouTube's design:
- * - Transparent control bar with gradient
- * - Progress bar positioned above controls (full width)
- * - Larger, better-spaced control buttons
- * - Modern, clean appearance
- * - Smooth animations and interactions
- */
+# Video Player Improvements Implementation Plan
 
-/* Video player specific styles */
-section.video-container {
-  background-color: #000000;
-  border-radius: 8px;
-  overflow: hidden;
-}
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+**Goal:** Fix the volume/seek bar interaction bug, clean up CSS, remove workaround plugin, and add media-session plugin for OS media controls.
+
+**Architecture:** Refactor CSS to match Stash's proven approach (minimal `!important` usage), delete the unnecessary volume-progress-fix plugin, and port the media-session plugin from Stash that integrates with the existing skip-buttons plugin for playlist navigation.
+
+**Tech Stack:** Video.js 8, React, CSS, MediaSession API
+
+---
+
+## Task 1: CSS Refactor - Control Bar Section
+
+**Files:**
+- Modify: `client/src/components/video-player/VideoPlayer.css:23-66`
+
+**Step 1: Remove !important from control bar styles**
+
+Replace lines 23-66 with:
+
+```css
 /* ============================================================================
    CONTROL BAR - Transparent background with gradient (Stash pattern)
    ============================================================================ */
@@ -64,7 +68,32 @@ section.video-container {
     opacity 0.3s ease,
     visibility 0s 0s;
 }
+```
 
+**Step 2: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors related to CSS
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/VideoPlayer.css
+git commit -m "refactor(video-player): remove !important from control bar CSS"
+```
+
+---
+
+## Task 2: CSS Refactor - Progress Bar Section
+
+**Files:**
+- Modify: `client/src/components/video-player/VideoPlayer.css:68-178`
+
+**Step 1: Remove !important from progress bar styles**
+
+Replace lines 68-178 with:
+
+```css
 /* ============================================================================
    PROGRESS BAR - Absolute positioned above controls (Stash pattern)
    ============================================================================ */
@@ -175,7 +204,32 @@ section.video-container {
 .video-js .vjs-play-progress .vjs-time-tooltip {
   display: none !important;
 }
+```
 
+**Step 2: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/VideoPlayer.css
+git commit -m "refactor(video-player): remove !important from progress bar CSS"
+```
+
+---
+
+## Task 3: CSS Refactor - Volume and Time Controls
+
+**Files:**
+- Modify: `client/src/components/video-player/VideoPlayer.css:180-244`
+
+**Step 1: Remove !important from volume and time control styles**
+
+Replace lines 180-244 with:
+
+```css
 /* ============================================================================
    CONTROL BUTTONS - Let Video.js and font-size: 15px handle sizing naturally
    ============================================================================ */
@@ -235,8 +289,32 @@ section.video-container {
 .video-js .vjs-menu-button-popup .vjs-menu li {
   font-size: 0.8em; /* Stash font size */
 }
+```
 
+**Step 2: Verify the change**
 
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/VideoPlayer.css
+git commit -m "refactor(video-player): remove !important from volume/time controls CSS"
+```
+
+---
+
+## Task 4: CSS Refactor - Big Play Button and Loading Spinner
+
+**Files:**
+- Modify: `client/src/components/video-player/VideoPlayer.css:246-278`
+
+**Step 1: Remove !important from big play button and spinner styles**
+
+Replace lines 246-278 with:
+
+```css
 /* ============================================================================
    BIG PLAY BUTTON (Stash pattern - no background, no border, large icon)
    ============================================================================ */
@@ -268,7 +346,32 @@ section.video-container {
 
 /* Big play button only shows before video has started (initial load) */
 /* Loading spinner handles all buffering/waiting states after that */
+```
 
+**Step 2: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/VideoPlayer.css
+git commit -m "refactor(video-player): remove !important from big play button/spinner CSS"
+```
+
+---
+
+## Task 5: CSS Refactor - Mobile Optimizations
+
+**Files:**
+- Modify: `client/src/components/video-player/VideoPlayer.css:280-329`
+
+**Step 1: Remove !important from mobile styles**
+
+Replace lines 280-329 with:
+
+```css
 /* ============================================================================
    MOBILE OPTIMIZATIONS
    ============================================================================ */
@@ -330,7 +433,32 @@ section.video-container {
     margin-left: 1em;
   }
 }
+```
 
+**Step 2: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/VideoPlayer.css
+git commit -m "refactor(video-player): remove !important from mobile CSS"
+```
+
+---
+
+## Task 6: CSS Refactor - Hidden Controls and Animations
+
+**Files:**
+- Modify: `client/src/components/video-player/VideoPlayer.css:331-419`
+
+**Step 1: Remove !important and add missing Stash styles**
+
+Replace lines 331-419 with:
+
+```css
 /* ============================================================================
    HIDE UNSUPPORTED/UNWANTED CONTROLS
    ============================================================================ */
@@ -430,7 +558,32 @@ section.video-container {
 .video-js .vjs-text-track-settings select {
   background: #fff;
 }
+```
 
+**Step 2: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/VideoPlayer.css
+git commit -m "refactor(video-player): clean up hidden controls and add Stash patterns"
+```
+
+---
+
+## Task 7: CSS Refactor - Plugin Styles (Big Buttons, Markers, etc.)
+
+**Files:**
+- Modify: `client/src/components/video-player/VideoPlayer.css:421-597`
+
+**Step 1: Remove !important from plugin styles**
+
+Replace lines 421-597 with:
+
+```css
 /* ============================================================================
    STASH PLUGIN STYLES - Markers, Big Buttons, Source Selector, Skip Buttons
    ============================================================================ */
@@ -610,3 +763,405 @@ section.video-container {
     font-size: 10px;
   }
 }
+```
+
+**Step 2: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/VideoPlayer.css
+git commit -m "refactor(video-player): remove !important from plugin styles CSS"
+```
+
+---
+
+## Task 8: Delete volume-progress-fix Plugin
+
+**Files:**
+- Delete: `client/src/components/video-player/plugins/volume-progress-fix.js`
+- Modify: `client/src/components/video-player/useVideoPlayer.js:19,176`
+
+**Step 1: Delete the plugin file**
+
+```bash
+rm client/src/components/video-player/plugins/volume-progress-fix.js
+```
+
+**Step 2: Remove import from useVideoPlayer.js**
+
+In `client/src/components/video-player/useVideoPlayer.js`, delete line 19:
+
+```javascript
+import "./plugins/volume-progress-fix.js";
+```
+
+**Step 3: Remove plugin from configuration**
+
+In `client/src/components/video-player/useVideoPlayer.js`, find the plugins object (around line 158-178) and delete this line:
+
+```javascript
+        volumeProgressFix: {},
+```
+
+**Step 4: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors, no missing import errors
+
+**Step 5: Commit**
+
+```bash
+git add -A
+git commit -m "refactor(video-player): remove volume-progress-fix plugin
+
+No longer needed after CSS refactor removed forced pointer-events."
+```
+
+---
+
+## Task 9: Create media-session Plugin
+
+**Files:**
+- Create: `client/src/components/video-player/plugins/media-session.js`
+
+**Step 1: Create the media-session plugin**
+
+Create `client/src/components/video-player/plugins/media-session.js`:
+
+```javascript
+import videojs from "video.js";
+
+/**
+ * MediaSessionPlugin
+ *
+ * Integrates with the MediaSession API to provide OS-level media controls.
+ * Enables keyboard media keys (play/pause/next/prev) and mobile lock screen controls.
+ *
+ * Ported from Stash's media-session.ts plugin.
+ */
+class MediaSessionPlugin extends videojs.getPlugin("plugin") {
+  constructor(player, options) {
+    super(player, options);
+
+    player.ready(() => {
+      player.addClass("vjs-media-session");
+      this.setActionHandlers();
+    });
+
+    player.on("play", () => {
+      this.updatePlaybackState();
+    });
+
+    player.on("pause", () => {
+      this.updatePlaybackState();
+    });
+
+    this.updatePlaybackState();
+  }
+
+  /**
+   * Set metadata for the current media (title, artist, artwork)
+   * Called when scene changes to update OS media display
+   *
+   * @param {string} title - Scene title
+   * @param {string} artist - Performer name(s)
+   * @param {string} poster - Poster/screenshot URL
+   */
+  setMetadata(title, artist, poster) {
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: title || "Unknown",
+        artist: artist || "",
+        artwork: [
+          {
+            src: poster || this.player.poster() || "",
+            type: "image/jpeg",
+          },
+        ],
+      });
+    }
+  }
+
+  /**
+   * Update the playback state (playing/paused) in the OS
+   * @private
+   */
+  updatePlaybackState() {
+    if ("mediaSession" in navigator) {
+      const playbackState = this.player.paused() ? "paused" : "playing";
+      navigator.mediaSession.playbackState = playbackState;
+    }
+  }
+
+  /**
+   * Set up MediaSession action handlers
+   * Integrates with skipButtons plugin for playlist navigation
+   * @private
+   */
+  setActionHandlers() {
+    if (!("mediaSession" in navigator)) {
+      return;
+    }
+
+    navigator.mediaSession.setActionHandler("play", () => {
+      this.player.play();
+    });
+
+    navigator.mediaSession.setActionHandler("pause", () => {
+      this.player.pause();
+    });
+
+    navigator.mediaSession.setActionHandler("nexttrack", () => {
+      // Use skipButtons plugin's forward handler (playlist integration)
+      const skipButtons = this.player.skipButtons?.();
+      if (skipButtons) {
+        skipButtons.handleForward();
+      }
+    });
+
+    navigator.mediaSession.setActionHandler("previoustrack", () => {
+      // Use skipButtons plugin's backward handler (playlist integration)
+      const skipButtons = this.player.skipButtons?.();
+      if (skipButtons) {
+        skipButtons.handleBackward();
+      }
+    });
+
+    // Optional: seekbackward/seekforward for 10s skip via media keys
+    navigator.mediaSession.setActionHandler("seekbackward", () => {
+      this.player.currentTime(Math.max(0, this.player.currentTime() - 10));
+    });
+
+    navigator.mediaSession.setActionHandler("seekforward", () => {
+      this.player.currentTime(
+        Math.min(this.player.duration(), this.player.currentTime() + 10)
+      );
+    });
+  }
+
+  dispose() {
+    // Clear action handlers on dispose
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.setActionHandler("play", null);
+      navigator.mediaSession.setActionHandler("pause", null);
+      navigator.mediaSession.setActionHandler("nexttrack", null);
+      navigator.mediaSession.setActionHandler("previoustrack", null);
+      navigator.mediaSession.setActionHandler("seekbackward", null);
+      navigator.mediaSession.setActionHandler("seekforward", null);
+    }
+    super.dispose();
+  }
+}
+
+// Register the plugin with video.js
+videojs.registerPlugin("mediaSession", MediaSessionPlugin);
+
+export default MediaSessionPlugin;
+```
+
+**Step 2: Verify the file syntax**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors in the new file
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/plugins/media-session.js
+git commit -m "feat(video-player): add media-session plugin for OS media controls
+
+Ported from Stash. Enables:
+- Keyboard media keys (play/pause/next/prev)
+- Mobile lock screen controls
+- Seek forward/backward via media keys"
+```
+
+---
+
+## Task 10: Register media-session Plugin
+
+**Files:**
+- Modify: `client/src/components/video-player/useVideoPlayer.js:19-20,176`
+
+**Step 1: Add import for media-session plugin**
+
+In `client/src/components/video-player/useVideoPlayer.js`, add after line 20 (after the vrmode import):
+
+```javascript
+import "./plugins/media-session.js";
+```
+
+**Step 2: Add plugin to configuration**
+
+In the plugins object (around line 175-178), add `mediaSession` before `vrMenu`:
+
+```javascript
+        trackActivity: {},
+        mediaSession: {},
+        vrMenu: {},
+```
+
+**Step 3: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 4: Commit**
+
+```bash
+git add client/src/components/video-player/useVideoPlayer.js
+git commit -m "feat(video-player): register media-session plugin"
+```
+
+---
+
+## Task 11: Wire Up Media Session Metadata
+
+**Files:**
+- Modify: `client/src/components/video-player/useVideoPlayer.js` (add new useEffect)
+
+**Step 1: Add useEffect to update media session metadata on scene change**
+
+Add this new useEffect after the VTT thumbnails update effect (around line 218):
+
+```javascript
+  // ============================================================================
+  // MEDIA SESSION METADATA (OS media controls - title, artist, poster)
+  // ============================================================================
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !scene) return;
+
+    const mediaSessionPlugin = player.mediaSession?.();
+    if (!mediaSessionPlugin) return;
+
+    // Build performer string from scene performers
+    const performers = scene.performers?.map((p) => p.name).join(", ") || "";
+
+    // Set metadata for OS media controls
+    mediaSessionPlugin.setMetadata(
+      scene.title || "Untitled Scene",
+      performers,
+      scene.paths?.screenshot || ""
+    );
+  }, [scene?.id, scene?.title, scene?.performers, scene?.paths?.screenshot, playerRef]);
+```
+
+**Step 2: Verify the change**
+
+Run: `cd client && npm run lint`
+Expected: No lint errors
+
+**Step 3: Commit**
+
+```bash
+git add client/src/components/video-player/useVideoPlayer.js
+git commit -m "feat(video-player): wire up media session metadata on scene change"
+```
+
+---
+
+## Task 12: Manual Testing
+
+**Files:** None (manual testing only)
+
+**Step 1: Start the dev environment**
+
+```bash
+docker-compose up --build -d
+```
+
+**Step 2: Test volume/seek bar interaction**
+
+1. Navigate to a scene and start playback
+2. Hover over the volume icon
+3. Move mouse up to the volume slider popup
+4. Verify: No seek event is triggered while moving to volume slider
+5. Adjust volume and verify it works correctly
+
+**Step 3: Test control bar functionality**
+
+1. Verify play/pause button works
+2. Verify seek bar works (click to seek, drag to scrub)
+3. Verify time display updates correctly
+4. Verify fullscreen toggle works
+5. Verify playback rate menu works (direct play only)
+6. Verify source selector menu works
+
+**Step 4: Test media keys**
+
+1. Play a video
+2. Press keyboard media play/pause key (if available)
+3. Verify: Video pauses/resumes
+4. Navigate to a playlist
+5. Press keyboard media next/prev keys
+6. Verify: Navigates to next/prev scene in playlist
+
+**Step 5: Test on touch device (if available)**
+
+1. Open on mobile browser or touch-enabled device
+2. Verify big button overlay appears on tap
+3. Verify volume panel is hidden (touch devices don't have hover)
+4. Verify seek bar works with touch drag
+
+**Step 6: Document results**
+
+If all tests pass, proceed to final commit. If issues found, document and address.
+
+---
+
+## Task 13: Final Verification and Commit
+
+**Files:** None
+
+**Step 1: Run full lint check**
+
+```bash
+cd client && npm run lint
+```
+
+Expected: No errors
+
+**Step 2: Check git status**
+
+```bash
+git status
+```
+
+Expected: Clean working tree (all changes committed)
+
+**Step 3: Review commits**
+
+```bash
+git log --oneline -10
+```
+
+Expected: See all the commits from this implementation
+
+**Step 4: Push to remote**
+
+```bash
+git push -u origin feature/video-player-improvements
+```
+
+---
+
+## Summary
+
+This implementation plan covers:
+
+1. **Tasks 1-7:** CSS refactor removing ~40 unnecessary `!important` declarations
+2. **Task 8:** Delete the volume-progress-fix plugin workaround
+3. **Tasks 9-11:** Port and integrate the media-session plugin from Stash
+4. **Tasks 12-13:** Manual testing and verification
+
+Total estimated changes:
+- ~400 lines of CSS refactored
+- 1 file deleted (volume-progress-fix.js)
+- 1 file created (media-session.js, ~100 lines)
+- ~20 lines added to useVideoPlayer.js

@@ -16,8 +16,8 @@ import "./plugins/persist-volume.js";
 import "./plugins/skip-buttons.js";
 import "./plugins/source-selector.js";
 import "./plugins/track-activity.js";
-import "./plugins/volume-progress-fix.js";
 import "./plugins/vrmode.js";
+import "./plugins/media-session.js";
 
 // Register Video.js plugins
 airplay(videojs);
@@ -173,7 +173,7 @@ export function useVideoPlayer({
         },
         skipButtons: {},
         trackActivity: {},
-        volumeProgressFix: {},
+        mediaSession: {},
         vrMenu: {},
       },
     });
@@ -215,6 +215,28 @@ export function useVideoPlayer({
       vttPlugin.src(scene.paths.vtt, scene.paths.sprite);
     }
   }, [scene?.paths?.vtt, scene?.paths?.sprite, playerRef]);
+
+  // ============================================================================
+  // MEDIA SESSION METADATA (OS media controls - title, artist, poster)
+  // ============================================================================
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player || !scene) return;
+
+    const mediaSessionPlugin = player.mediaSession?.();
+    if (!mediaSessionPlugin) return;
+
+    // Build performer string from scene performers
+    const performers = scene.performers?.map((p) => p.name).join(", ") || "";
+
+    // Set metadata for OS media controls
+    mediaSessionPlugin.setMetadata(
+      scene.title || "Untitled Scene",
+      performers,
+      scene.paths?.screenshot || ""
+    );
+  }, [scene?.id, scene?.title, scene?.performers, scene?.paths?.screenshot, playerRef]);
 
   // ============================================================================
   // TRACK ACTIVITY PLUGIN (Stash pattern - integrates with watch history)
