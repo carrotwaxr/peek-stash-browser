@@ -265,6 +265,7 @@ class EmptyEntityFilterService {
    * - No visible groups
    * - No images
    * - No visible galleries
+   * - No child studios with content
    */
   filterEmptyStudios<T extends FilterableStudio>(
     studios: T[],
@@ -286,49 +287,101 @@ class EmptyEntityFilterService {
     const visibleGroupIds = new Set(visibleGroups.map((g) => g.id));
     const visibleGalleryIds = new Set(visibleGalleries.map((g) => g.id));
 
-    return studios.filter((studio) => {
-      // CRITICAL FIX: Check if studio appears in visible scenes
-      // This replaces the buggy scene_count check
+    // Build set of studios that have visible galleries
+    const studiosWithVisibleGalleries = new Set<string>();
+    for (const gallery of visibleGalleries) {
+      const studioId = (gallery as { studio?: { id: string } }).studio?.id;
+      if (studioId) {
+        studiosWithVisibleGalleries.add(studioId);
+      }
+    }
+
+    // Build parent -> children map for recursive check
+    const studioMap = new Map(studios.map((s) => [s.id, s]));
+    const childrenMap = new Map<string, string[]>();
+    for (const studio of studios) {
+      const parentId = (studio as { parent_studio?: { id: string } }).parent_studio?.id;
+      if (parentId) {
+        if (!childrenMap.has(parentId)) {
+          childrenMap.set(parentId, []);
+        }
+        childrenMap.get(parentId)!.push(studio.id);
+      }
+    }
+
+    // Track which studios have content
+    const hasContent = new Map<string, boolean>();
+
+    const checkHasContent = (studioId: string, visited = new Set<string>()): boolean => {
+      if (visited.has(studioId)) return false;
+      visited.add(studioId);
+
+      if (hasContent.has(studioId)) {
+        return hasContent.get(studioId)!;
+      }
+
+      const studio = studioMap.get(studioId);
+      if (!studio) return false;
+
+      // Check if studio appears in visible scenes
       if (visibleScenes && studiosInVisibleScenes.has(studio.id)) {
+        hasContent.set(studioId, true);
         return true;
       }
 
-      // Fallback to old logic if visibleScenes not provided (backward compatibility)
+      // Fallback to scene_count if visibleScenes not provided
       if (!visibleScenes && studio.scene_count && studio.scene_count > 0) {
+        hasContent.set(studioId, true);
         return true;
       }
 
       // Has images? Keep
       if (studio.image_count && studio.image_count > 0) {
+        hasContent.set(studioId, true);
+        return true;
+      }
+
+      // Has visible galleries? Keep
+      if (studiosWithVisibleGalleries.has(studio.id)) {
+        hasContent.set(studioId, true);
         return true;
       }
 
       // Has visible groups? Keep
       if (studio.groups && Array.isArray(studio.groups)) {
-        const hasVisibleGroup = studio.groups.some((g) =>
-          visibleGroupIds.has(g.id)
-        );
-        if (hasVisibleGroup) {
+        if (studio.groups.some((g) => visibleGroupIds.has(g.id))) {
+          hasContent.set(studioId, true);
           return true;
         }
       }
 
-      // Has visible galleries? Keep
-      // Check studio's galleries array against visible galleries
-      const studioGalleries = (studio as { galleries?: Array<{ id: string }> })
-        .galleries;
-      if (studioGalleries && studioGalleries.length > 0) {
-        const hasVisibleGallery = studioGalleries.some((g) =>
-          visibleGalleryIds.has(g.id)
-        );
-        if (hasVisibleGallery) {
+      // Check if any child studio has content
+      const children = childrenMap.get(studioId) || [];
+      for (const childId of children) {
+        if (checkHasContent(childId, visited)) {
+          hasContent.set(studioId, true);
           return true;
         }
       }
 
-      // No content found
+      hasContent.set(studioId, false);
       return false;
+    };
+
+    // Check all studios
+    for (const studio of studios) {
+      checkHasContent(studio.id);
+    }
+
+    const filtered = studios.filter((studio) => hasContent.get(studio.id) === true);
+
+    logger.debug("Filtered empty studios", {
+      original: studios.length,
+      filtered: filtered.length,
+      removed: studios.length - filtered.length,
     });
+
+    return filtered;
   }
 
   /**
