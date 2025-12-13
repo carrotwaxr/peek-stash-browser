@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CardOverlay } from "../CardComponents";
+import { CardOverlay, CardImage } from "../CardComponents";
 
 describe("CardOverlay", () => {
   it("renders children in positioned overlay", () => {
@@ -64,5 +64,27 @@ describe("CardOverlay", () => {
     });
 
     expect(element.props.className).toContain("custom-class");
+  });
+});
+
+describe("CardImage", () => {
+  it("is a React component function", () => {
+    expect(typeof CardImage).toBe("function");
+  });
+
+  it("has expected parameter signature", () => {
+    // CardImage should accept these props in its signature
+    // We verify it's a function that can be stringified without errors
+    expect(() => {
+      CardImage.toString();
+    }).not.toThrow();
+
+    // Verify function contains expected parameters
+    const funcString = CardImage.toString();
+    expect(funcString).toContain("src");
+    expect(funcString).toContain("alt");
+    expect(funcString).toContain("aspectRatio");
+    expect(funcString).toContain("entityType");
+    expect(funcString).toContain("onClick");
   });
 });
