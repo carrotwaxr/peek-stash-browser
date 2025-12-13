@@ -185,6 +185,38 @@ class StashEntityService {
   }
 
   /**
+   * Get all scenes with performers relation included
+   * Used for empty entity filtering which needs to know which performers appear in visible scenes
+   */
+  async getAllScenesWithPerformers(): Promise<NormalizedScene[]> {
+    const startTotal = Date.now();
+
+    const queryStart = Date.now();
+    const cached = await prisma.stashScene.findMany({
+      where: { deletedAt: null },
+      select: {
+        ...this.BROWSE_SELECT,
+        performers: {
+          select: { performerId: true },
+        },
+      },
+    });
+    const queryTime = Date.now() - queryStart;
+
+    const transformStart = Date.now();
+    const result = cached.map((c) => {
+      const scene = this.transformSceneForBrowse(c);
+      scene.performers = (c.performers?.map((p: { performerId: string }) => ({ id: p.performerId })) || []) as typeof scene.performers;
+      return scene;
+    });
+    const transformTime = Date.now() - transformStart;
+
+    logger.info(`getAllScenesWithPerformers: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+
+    return result;
+  }
+
+  /**
    * Get scene by ID (includes related entities)
    */
   async getScene(id: string): Promise<NormalizedScene | null> {
