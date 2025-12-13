@@ -13,7 +13,6 @@ import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
-  EntityGrid,
   FavoriteButton,
   LazyImage,
   Lightbox,
@@ -23,6 +22,7 @@ import {
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
+import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const StudioDetail = () => {
@@ -263,10 +263,9 @@ const StudioDetail = () => {
           )}
 
           {activeTab === "galleries" && (
-            <EntityGrid
+            <GalleryGrid
               key={`galleries-${includeSubStudios}`}
-              entityType="gallery"
-              filters={{
+              lockedFilters={{
                 gallery_filter: {
                   studios: {
                     value: [parseInt(studioId, 10)],
@@ -275,6 +274,7 @@ const StudioDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No galleries found for ${studio?.name}`}
             />
           )}
@@ -288,9 +288,8 @@ const StudioDetail = () => {
           )}
 
           {activeTab === "performers" && (
-            <EntityGrid
-              entityType="performer"
-              filters={{
+            <PerformerGrid
+              lockedFilters={{
                 performer_filter: {
                   studios: {
                     value: [parseInt(studioId, 10)],
@@ -298,14 +297,14 @@ const StudioDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No performers found for ${studio?.name}`}
             />
           )}
 
           {activeTab === "groups" && (
-            <EntityGrid
-              entityType="group"
-              filters={{
+            <GroupGrid
+              lockedFilters={{
                 group_filter: {
                   studios: {
                     value: [parseInt(studioId, 10)],
@@ -313,6 +312,7 @@ const StudioDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No collections found for ${studio?.name}`}
             />
           )}
