@@ -212,7 +212,11 @@ describe('EmptyEntityFilterService', () => {
 
   describe('filterEmptyStudios', () => {
     const visibleGroups = [{ id: 'group1' }, { id: 'group2' }];
-    const visibleGalleries = [{ id: 'gallery1' }, { id: 'gallery2' }];
+    // Galleries include studio references for the gallery->studio lookup
+    const visibleGalleries = [
+      { id: 'gallery1', studio: { id: 'studio_with_gallery' } },
+      { id: 'gallery2' },
+    ];
 
     it('should keep studios with scenes', () => {
       const studios = [
@@ -261,9 +265,10 @@ describe('EmptyEntityFilterService', () => {
     });
 
     it('should keep studios with visible galleries', () => {
+      // The new implementation looks up gallery.studio.id, not studio.galleries[]
       const studios = [
-        { id: 'studio1', scene_count: 0, image_count: 0, galleries: [{ id: 'gallery1' }] },
-        { id: 'studio2', scene_count: 0, image_count: 0, galleries: [{ id: 'gallery_hidden' }] },
+        { id: 'studio_with_gallery', scene_count: 0, image_count: 0 },
+        { id: 'studio2', scene_count: 0, image_count: 0 },
       ];
 
       const result = emptyEntityFilterService.filterEmptyStudios(
@@ -272,8 +277,27 @@ describe('EmptyEntityFilterService', () => {
         visibleGalleries as any
       );
 
-      // studio1 has visible gallery, studio2 doesn't
-      expect(result.map(s => s.id)).toEqual(['studio1']);
+      // studio_with_gallery has visible gallery (gallery1), studio2 doesn't
+      expect(result.map(s => s.id)).toEqual(['studio_with_gallery']);
+    });
+
+    it('should keep parent studios with visible child studios', () => {
+      const studios = [
+        { id: 'parent_studio', scene_count: 0, image_count: 0 },
+        { id: 'child_studio', scene_count: 5, image_count: 0, parent_studio: { id: 'parent_studio' } },
+        { id: 'orphan_parent', scene_count: 0, image_count: 0 },
+      ];
+
+      const result = emptyEntityFilterService.filterEmptyStudios(
+        studios,
+        visibleGroups as any,
+        visibleGalleries as any
+      );
+
+      // parent_studio should be kept because child_studio has scenes
+      // child_studio has scenes directly
+      // orphan_parent has no content and no children with content
+      expect(result.map(s => s.id)).toEqual(['parent_studio', 'child_studio']);
     });
 
     it('should remove studios with no content', () => {
