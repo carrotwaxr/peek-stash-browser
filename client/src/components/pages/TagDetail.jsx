@@ -7,7 +7,6 @@ import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
-  EntityGrid,
   FavoriteButton,
   LazyImage,
   Lightbox,
@@ -17,6 +16,7 @@ import {
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
+import { GalleryGrid, GroupGrid, PerformerGrid, StudioGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const TagDetail = () => {
@@ -277,10 +277,9 @@ const TagDetail = () => {
           )}
 
           {activeTab === 'galleries' && (
-            <EntityGrid
+            <GalleryGrid
               key={`galleries-${includeSubTags}`}
-              entityType="gallery"
-              filters={{
+              lockedFilters={{
                 gallery_filter: {
                   tags: {
                     value: [parseInt(tagId, 10)],
@@ -289,6 +288,7 @@ const TagDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No galleries found with tag "${tag?.name}"`}
             />
           )}
@@ -298,9 +298,8 @@ const TagDetail = () => {
           )}
 
           {activeTab === 'performers' && (
-            <EntityGrid
-              entityType="performer"
-              filters={{
+            <PerformerGrid
+              lockedFilters={{
                 performer_filter: {
                   tags: {
                     value: [parseInt(tagId, 10)],
@@ -308,14 +307,14 @@ const TagDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No performers found with tag "${tag?.name}"`}
             />
           )}
 
           {activeTab === 'studios' && (
-            <EntityGrid
-              entityType="studio"
-              filters={{
+            <StudioGrid
+              lockedFilters={{
                 studio_filter: {
                   tags: {
                     value: [parseInt(tagId, 10)],
@@ -323,14 +322,14 @@ const TagDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No studios found with tag "${tag?.name}"`}
             />
           )}
 
           {activeTab === 'groups' && (
-            <EntityGrid
-              entityType="group"
-              filters={{
+            <GroupGrid
+              lockedFilters={{
                 group_filter: {
                   tags: {
                     value: [parseInt(tagId, 10)],
@@ -338,6 +337,7 @@ const TagDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No collections found with tag "${tag?.name}"`}
             />
           )}
