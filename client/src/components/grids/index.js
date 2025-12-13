@@ -1,1 +1,1 @@
-// Entity grid components will be exported here
+export { default as PerformerGrid } from "./PerformerGrid.jsx";
