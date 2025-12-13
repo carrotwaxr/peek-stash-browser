@@ -171,6 +171,29 @@ export const CardDefaultImage = ({ src, alt, entityType }) => {
 };
 
 /**
+ * CardOverlay - Positioned overlay container for progress bars, selection checkboxes, etc.
+ * @param {Object} props
+ * @param {'top-left'|'top-right'|'bottom-left'|'bottom-right'|'full'} props.position - Position of overlay
+ * @param {React.ReactNode} props.children - Content to render in overlay
+ * @param {string} [props.className] - Additional CSS classes
+ */
+export const CardOverlay = ({ position = "bottom-left", children, className = "" }) => {
+  const positionClasses = {
+    "top-left": "absolute top-0 left-0",
+    "top-right": "absolute top-0 right-0",
+    "bottom-left": "absolute bottom-0 left-0",
+    "bottom-right": "absolute bottom-0 right-0",
+    "full": "absolute inset-0",
+  };
+
+  return (
+    <div className={`${positionClasses[position]} ${className}`}>
+      {children}
+    </div>
+  );
+};
+
+/**
  * Card title section with configurable line clamping and tooltips
  * @param {string|ReactNode} title - Title content (if ReactNode, tooltip won't be added)
  * @param {string} subtitle - Optional subtitle

@@ -12,6 +12,7 @@ export {
   CardDescription,
   CardImage,
   CardIndicators,
+  CardOverlay,
   CardRatingRow,
   CardTitle,
   LazyImage,
