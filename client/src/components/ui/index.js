@@ -3,6 +3,8 @@
 
 export { default as ActiveFilterChips } from "./ActiveFilterChips.jsx";
 export { default as AddToPlaylistButton } from "./AddToPlaylistButton.jsx";
+export { BaseCard } from "./BaseCard.jsx";
+export { BaseGrid } from "./BaseGrid.jsx";
 export { default as BulkActionBar } from "./BulkActionBar.jsx";
 export { default as Button } from "./Button.jsx";
 export { default as SyncProgressBanner } from "./SyncProgressBanner.jsx";
@@ -12,6 +14,7 @@ export {
   CardDescription,
   CardImage,
   CardIndicators,
+  CardOverlay,
   CardRatingRow,
   CardTitle,
   LazyImage,
@@ -22,7 +25,6 @@ export { default as CardStatusIcons } from "./CardStatusIcons.jsx";
 export { default as ConfirmDialog } from "./ConfirmDialog.jsx";
 export { default as ContinueWatchingCarousel } from "./ContinueWatchingCarousel.jsx";
 export { default as EmptyState } from "./EmptyState.jsx";
-export { default as EntityGrid } from "./EntityGrid.jsx";
 export { default as EntityMenu } from "./EntityMenu.jsx";
 export { default as ErrorMessage } from "./ErrorMessage.jsx";
 export { default as ExternalPlayerButton } from "./ExternalPlayerButton.jsx";
@@ -32,7 +34,6 @@ export { FilterControl, FilterPanel, SortControl } from "./FilterControls.jsx";
 export { default as FilterPresets } from "./FilterPresets.jsx";
 export { default as GenderIcon } from "./GenderIcon.jsx";
 export { default as GlobalLayout } from "./GlobalLayout.jsx";
-export { GridCard } from "./GridCard.jsx";
 export { default as HelpModal } from "./HelpModal.jsx";
 export { default as InfoMessage } from "./InfoMessage.jsx";
 export { default as Lightbox } from "./Lightbox.jsx";
@@ -43,7 +44,7 @@ export { default as PageHeader } from "./PageHeader.jsx";
 export { default as PageLayout } from "./PageLayout.jsx";
 export { default as Pagination } from "./Pagination.jsx";
 export { default as Paper } from "./Paper.jsx";
-export { default as PerformerCard } from "./PerformerCard.jsx";
+export { PerformerCard } from "../cards/index.js";
 export { default as PlayCountIndicator } from "./PlayCountIndicator.jsx";
 export { default as RatingBadge } from "./RatingBadge.jsx";
 export { default as RatingSlider } from "./RatingSlider.jsx";
@@ -55,6 +56,7 @@ export { default as SceneCarousel } from "./SceneCarousel.jsx";
 export { default as SceneListItem } from "./SceneListItem.jsx";
 export { default as ScenesLikeThis } from "./ScenesLikeThis.jsx";
 export { default as SearchableSelect } from "./SearchableSelect.jsx";
+export { SearchableGrid } from "./SearchableGrid.jsx";
 export { default as SearchControls } from "./SearchControls.jsx";
 export { default as SearchInput } from "./SearchInput.jsx";
 export { default as Sidebar } from "./Sidebar.jsx";

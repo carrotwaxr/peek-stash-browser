@@ -1,4 +1,4 @@
-import { forwardRef, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
@@ -8,10 +8,10 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
+import { TagCard } from "../cards/index.js";
 import {
   SyncProgressBanner,
   ErrorMessage,
-  GridCard,
   PageHeader,
   PageLayout,
   SearchControls,
@@ -145,8 +145,8 @@ const Tags = () => {
                     <TagCard
                       key={tag.id}
                       tag={tag}
-                      isTVMode={isTVMode}
                       referrerUrl={`${location.pathname}${location.search}`}
+                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       {...itemProps}
                     />
                   );
@@ -159,47 +159,6 @@ const Tags = () => {
     </PageLayout>
   );
 };
-
-const TagCard = forwardRef(
-  ({ tag, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
-    const subtitle =
-      tag.child_count > 0
-        ? `${tag.child_count} subtag${tag.child_count !== 1 ? "s" : ""}`
-        : null;
-
-    return (
-      <GridCard
-        description={tag.description}
-        entityType="tag"
-        imagePath={tag.image_path}
-        indicators={[
-          { type: "PLAY_COUNT", count: tag.play_count },
-          { type: "SCENES", count: tag.scene_count },
-          { type: "IMAGES", count: tag.image_count },
-          { type: "GALLERIES", count: tag.gallery_count },
-          { type: "GROUPS", count: tag.group_count },
-          { type: "STUDIOS", count: tag.studio_count },
-          { type: "PERFORMERS", count: tag.performer_count },
-        ]}
-        linkTo={`/tag/${tag.id}`}
-        ratingControlsProps={{
-          entityId: tag.id,
-          initialRating: tag.rating,
-          initialFavorite: tag.favorite || false,
-          initialOCounter: tag.o_counter,
-        }}
-        ref={ref}
-        referrerUrl={referrerUrl}
-        subtitle={subtitle}
-        tabIndex={isTVMode ? tabIndex : -1}
-        title={tag.name}
-        {...others}
-      />
-    );
-  }
-);
-
-TagCard.displayName = "TagCard";
 
 const getTags = async (query) => {
   const response = await libraryApi.findTags(query);
