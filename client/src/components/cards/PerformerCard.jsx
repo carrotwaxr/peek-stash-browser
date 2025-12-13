@@ -1,7 +1,7 @@
 import { forwardRef } from "react";
 import { useNavigate } from "react-router-dom";
-import GenderIcon from "./GenderIcon.jsx";
-import { GridCard } from "./GridCard.jsx";
+import GenderIcon from "../ui/GenderIcon.jsx";
+import { GridCard } from "../ui/GridCard.jsx";
 
 const PerformerCard = forwardRef(
   ({ performer, referrerUrl, isTVMode, tabIndex, onHideSuccess, ...others }, ref) => {

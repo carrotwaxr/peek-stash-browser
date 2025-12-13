@@ -7,7 +7,7 @@ import EmptyState from "./EmptyState.jsx";
 import { GridCard } from "./GridCard.jsx";
 import LoadingSpinner from "./LoadingSpinner.jsx";
 import Pagination from "./Pagination.jsx";
-import PerformerCard from "./PerformerCard.jsx";
+import PerformerCard from "../cards/PerformerCard.jsx";
 import { TooltipEntityGrid } from "./TooltipEntityGrid.jsx";
 
 /**
