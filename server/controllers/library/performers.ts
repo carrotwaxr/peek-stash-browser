@@ -119,7 +119,7 @@ export const findPerformers = async (
       // Filter empty performers (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = await stashEntityService.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenesWithPerformers();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
@@ -602,7 +602,7 @@ export const findPerformersMinimal = async (
       // Filter empty performers (non-admins only)
       if (requestingUser && requestingUser.role !== "ADMIN") {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = await stashEntityService.getAllScenes();
+        let visibleScenes = await stashEntityService.getAllScenesWithPerformers();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
