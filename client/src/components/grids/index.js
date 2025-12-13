@@ -1,2 +1,3 @@
 export { default as GalleryGrid } from "./GalleryGrid.jsx";
+export { default as GroupGrid } from "./GroupGrid.jsx";
 export { default as PerformerGrid } from "./PerformerGrid.jsx";
