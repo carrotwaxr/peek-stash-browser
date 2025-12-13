@@ -33,6 +33,7 @@ export const BaseCard = forwardRef(
       hideSubtitle = false,
       maxTitleLines = 2,
       maxDescriptionLines = 3,
+      objectFit = "contain",
 
       // Customization slots
       renderOverlay,
@@ -69,6 +70,7 @@ export const BaseCard = forwardRef(
           alt={typeof title === "string" ? title : ""}
           aspectRatio={aspectRatio}
           entityType={entityType}
+          objectFit={objectFit}
         >
           {/* Custom image content (e.g., sprite preview) */}
           {renderImageContent?.()}
@@ -87,7 +89,7 @@ export const BaseCard = forwardRef(
         {renderAfterTitle?.()}
 
         {/* Description */}
-        {!hideDescription && description && (
+        {!hideDescription && (
           <CardDescription
             description={description}
             maxLines={maxDescriptionLines}

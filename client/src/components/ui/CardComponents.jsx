@@ -77,6 +77,7 @@ CardContainer.displayName = "CardContainer";
  * @param {string} [props.alt] - Alt text for image
  * @param {string} [props.aspectRatio] - CSS aspect ratio (e.g., "16/9", "2/3")
  * @param {string} [props.entityType] - Entity type for placeholder icon
+ * @param {'cover'|'contain'} [props.objectFit] - How image should fit container (default: 'contain')
  * @param {React.ReactNode} [props.children] - Overlay content
  * @param {string} [props.className] - Additional CSS classes
  * @param {Object} [props.style] - Additional inline styles
@@ -87,6 +88,7 @@ export const CardImage = ({
   alt = "",
   aspectRatio = "16/9",
   entityType,
+  objectFit = "contain",
   children,
   className = "",
   style = {},
@@ -156,9 +158,10 @@ export const CardImage = ({
             <img
               src={src}
               alt={alt}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+              className={`absolute inset-0 w-full h-full transition-opacity duration-200 ${
                 isLoaded ? "opacity-100" : "opacity-0"
               }`}
+              style={{ objectFit }}
               onLoad={() => setIsLoaded(true)}
               onError={() => setHasError(true)}
             />

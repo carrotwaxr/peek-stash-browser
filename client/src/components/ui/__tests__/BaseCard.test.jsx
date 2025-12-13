@@ -2,19 +2,6 @@ import { describe, it, expect, vi } from "vitest";
 import { createElement } from "react";
 import { BaseCard } from "../BaseCard";
 
-// Helper to find element by text in tree
-const findInTree = (element, text) => {
-  if (!element) return false;
-  if (typeof element === "string") return element.includes(text);
-  if (element.props?.children) {
-    const children = Array.isArray(element.props.children)
-      ? element.props.children
-      : [element.props.children];
-    return children.some((child) => findInTree(child, text));
-  }
-  return false;
-};
-
 describe("BaseCard", () => {
   const defaultProps = {
     entityType: "scene",

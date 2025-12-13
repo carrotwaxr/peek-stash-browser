@@ -22,7 +22,12 @@ const PerformerCard = forwardRef(
         ref={ref}
         entityType="performer"
         imagePath={performer.image_path}
-        title={performer.name}
+        title={
+          <div className="flex items-center justify-center gap-2">
+            {performer.name}
+            <GenderIcon gender={performer.gender} size={16} />
+          </div>
+        }
         linkTo={`/performer/${performer.id}`}
         referrerUrl={referrerUrl}
         tabIndex={isTVMode ? tabIndex : -1}
@@ -36,11 +41,6 @@ const PerformerCard = forwardRef(
           initialOCounter: performer.o_counter,
           onHideSuccess,
         }}
-        renderAfterTitle={() => (
-          <div className="flex items-center gap-1 mt-1">
-            <GenderIcon gender={performer.gender} size={16} />
-          </div>
-        )}
         {...rest}
       />
     );

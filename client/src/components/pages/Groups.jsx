@@ -1,4 +1,4 @@
-import { forwardRef, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
@@ -9,10 +9,10 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 
 import { libraryApi } from "../../services/api.js";
+import { GroupCard } from "../cards/index.js";
 import {
   SyncProgressBanner,
   ErrorMessage,
-  GridCard,
   PageHeader,
   PageLayout,
   SearchControls,
@@ -147,8 +147,8 @@ const Groups = () => {
                     <GroupCard
                       key={group.id}
                       group={group}
-                      isTVMode={isTVMode}
                       referrerUrl={`${location.pathname}${location.search}`}
+                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       {...itemProps}
                     />
                   );
@@ -161,52 +161,6 @@ const Groups = () => {
     </PageLayout>
   );
 };
-
-const GroupCard = forwardRef(
-  ({ group, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
-    const imagePath = group.front_image_path || group.back_image_path;
-    const subtitle = (() => {
-      if (group.studio && group.date) {
-        return `${group.studio.name} • ${group.date}`;
-      } else if (group.studio) {
-        return group.studio.name;
-      } else if (group.date) {
-        return group.date;
-      }
-      return null;
-    })();
-
-    return (
-      <GridCard
-        description={group.description}
-        entityType="group"
-        imagePath={imagePath}
-        indicators={[
-          { type: "SCENES", count: group.scene_count },
-          { type: "GROUPS", count: group.sub_group_count },
-          { type: "PERFORMERS", count: group.performer_count },
-          { type: "TAGS", count: group.tags?.length || 0 },
-        ]}
-        linkTo={`/collection/${group.id}`}
-        maxTitleLines={2}
-        ratingControlsProps={{
-          entityId: group.id,
-          initialRating: group.rating,
-          initialFavorite: group.favorite || false,
-          initialOCounter: group.o_counter,
-        }}
-        ref={ref}
-        referrerUrl={referrerUrl}
-        subtitle={subtitle}
-        tabIndex={isTVMode ? tabIndex : -1}
-        title={group.name}
-        {...others}
-      />
-    );
-  }
-);
-
-GroupCard.displayName = "GroupCard";
 
 const getGroups = async (query) => {
   const response = await libraryApi.findGroups(query);

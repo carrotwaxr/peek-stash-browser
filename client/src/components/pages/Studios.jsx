@@ -1,4 +1,4 @@
-import { forwardRef, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import deepEqual from "fast-deep-equal";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
@@ -7,10 +7,10 @@ import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { libraryApi } from "../../services/api.js";
+import { StudioCard } from "../cards/index.js";
 import {
   SyncProgressBanner,
   ErrorMessage,
-  GridCard,
   PageHeader,
   PageLayout,
   SearchControls,
@@ -147,8 +147,8 @@ const Studios = () => {
                     <StudioCard
                       key={studio.id}
                       studio={studio}
-                      isTVMode={isTVMode}
                       referrerUrl={`${location.pathname}${location.search}`}
+                      tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       {...itemProps}
                     />
                   );
@@ -161,62 +161,6 @@ const Studios = () => {
     </PageLayout>
   );
 };
-
-const StudioCard = forwardRef(
-  ({ studio, tabIndex, isTVMode = false, referrerUrl, ...others }, ref) => {
-    const navigate = useNavigate();
-
-    return (
-      <GridCard
-        description={studio.description}
-        entityType="studio"
-        imagePath={studio.image_path}
-        indicators={[
-          { type: "PLAY_COUNT", count: studio.play_count },
-          {
-            type: "SCENES",
-            count: studio.scene_count,
-            onClick: studio.scene_count > 0 ? () => navigate(`/scenes?studioId=${studio.id}`) : undefined,
-          },
-          {
-            type: "IMAGES",
-            count: studio.image_count,
-            onClick: studio.image_count > 0 ? () => navigate(`/images?studioId=${studio.id}`) : undefined,
-          },
-          {
-            type: "GALLERIES",
-            count: studio.gallery_count,
-            onClick: studio.gallery_count > 0 ? () => navigate(`/galleries?studioIds=${studio.id}`) : undefined,
-          },
-          {
-            type: "PERFORMERS",
-            count: studio.performer_count,
-            onClick: studio.performer_count > 0 ? () => navigate(`/performers?studioId=${studio.id}`) : undefined,
-          },
-          {
-            type: "TAGS",
-            count: studio.tags?.length || 0,
-            onClick: studio.tags?.length > 0 ? () => navigate(`/tags?studioId=${studio.id}`) : undefined,
-          },
-        ]}
-        linkTo={`/studio/${studio.id}`}
-        ratingControlsProps={{
-          entityId: studio.id,
-          initialRating: studio.rating,
-          initialFavorite: studio.favorite || false,
-          initialOCounter: studio.o_counter,
-        }}
-        ref={ref}
-        referrerUrl={referrerUrl}
-        tabIndex={isTVMode ? tabIndex : -1}
-        title={studio.name}
-        {...others}
-      />
-    );
-  }
-);
-
-StudioCard.displayName = "StudioCard";
 
 const getStudios = async (query) => {
   const response = await libraryApi.findStudios(query);

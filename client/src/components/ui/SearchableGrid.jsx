@@ -1,5 +1,4 @@
-import { useCallback, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
 import deepEqual from "fast-deep-equal";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
@@ -30,7 +29,8 @@ export const SearchableGrid = ({
   gridType = "standard",
   renderItem,
   defaultSort = "name",
-  defaultFilters = {},
+  // eslint-disable-next-line no-unused-vars
+  defaultFilters: _defaultFilters = {},
   onResultsChange,
   emptyMessage,
   emptyDescription,
@@ -38,7 +38,6 @@ export const SearchableGrid = ({
   syncToUrl = true,
 }) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
-  const [searchParams] = useSearchParams();
 
   const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,38 +45,44 @@ export const SearchableGrid = ({
   const [data, setData] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
 
-  // API method mapping
-  const apiMethods = {
-    scene: "findScenes",
-    performer: "findPerformers",
-    gallery: "findGalleries",
-    group: "findGroups",
-    studio: "findStudios",
-    tag: "findTags",
-    image: "findImages",
-  };
+  // API method and key mappings (memoized to avoid recreating on each render)
+  const { apiMethod, responseKey, dataKey } = useMemo(() => {
+    const apiMethods = {
+      scene: "findScenes",
+      performer: "findPerformers",
+      gallery: "findGalleries",
+      group: "findGroups",
+      studio: "findStudios",
+      tag: "findTags",
+      image: "findImages",
+    };
 
-  // Response key mapping
-  const responseKeys = {
-    scene: "findScenes",
-    performer: "findPerformers",
-    gallery: "findGalleries",
-    group: "findGroups",
-    studio: "findStudios",
-    tag: "findTags",
-    image: "findImages",
-  };
+    const responseKeys = {
+      scene: "findScenes",
+      performer: "findPerformers",
+      gallery: "findGalleries",
+      group: "findGroups",
+      studio: "findStudios",
+      tag: "findTags",
+      image: "findImages",
+    };
 
-  // Data array key mapping
-  const dataKeys = {
-    scene: "scenes",
-    performer: "performers",
-    gallery: "galleries",
-    group: "groups",
-    studio: "studios",
-    tag: "tags",
-    image: "images",
-  };
+    const dataKeys = {
+      scene: "scenes",
+      performer: "performers",
+      gallery: "galleries",
+      group: "groups",
+      studio: "studios",
+      tag: "tags",
+      image: "images",
+    };
+
+    return {
+      apiMethod: apiMethods[entityType],
+      responseKey: responseKeys[entityType],
+      dataKey: dataKeys[entityType],
+    };
+  }, [entityType]);
 
   const handleQueryChange = useCallback(
     async (newQuery) => {
@@ -101,10 +106,6 @@ export const SearchableGrid = ({
         setLastQuery(mergedQuery);
         setError(null);
 
-        const apiMethod = apiMethods[entityType];
-        const responseKey = responseKeys[entityType];
-        const dataKey = dataKeys[entityType];
-
         const result = await libraryApi[apiMethod](mergedQuery);
         const items = result[responseKey]?.[dataKey] || [];
         const count = result[responseKey]?.count || 0;
@@ -118,7 +119,7 @@ export const SearchableGrid = ({
         setIsLoading(false);
       }
     },
-    [entityType, lockedFilters, lastQuery, isAuthLoading, isAuthenticated, onResultsChange]
+    [apiMethod, responseKey, dataKey, lockedFilters, lastQuery, isAuthLoading, isAuthenticated, onResultsChange]
   );
 
   // Handle successful hide - remove item from local state

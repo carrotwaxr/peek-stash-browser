@@ -10,12 +10,37 @@ const StudioCard = forwardRef(
     const navigate = useNavigate();
 
     const indicators = [
+      { type: "PLAY_COUNT", count: studio.play_count },
       {
         type: "SCENES",
         count: studio.scene_count,
         onClick:
           studio.scene_count > 0
             ? () => navigate(`/scenes?studioId=${studio.id}`)
+            : undefined,
+      },
+      {
+        type: "IMAGES",
+        count: studio.image_count,
+        onClick:
+          studio.image_count > 0
+            ? () => navigate(`/images?studioId=${studio.id}`)
+            : undefined,
+      },
+      {
+        type: "GALLERIES",
+        count: studio.gallery_count,
+        onClick:
+          studio.gallery_count > 0
+            ? () => navigate(`/galleries?studioIds=${studio.id}`)
+            : undefined,
+      },
+      {
+        type: "PERFORMERS",
+        count: studio.performer_count,
+        onClick:
+          studio.performer_count > 0
+            ? () => navigate(`/performers?studioId=${studio.id}`)
             : undefined,
       },
       {
