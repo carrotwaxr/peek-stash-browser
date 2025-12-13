@@ -4,6 +4,7 @@
 export { default as ActiveFilterChips } from "./ActiveFilterChips.jsx";
 export { default as AddToPlaylistButton } from "./AddToPlaylistButton.jsx";
 export { BaseCard } from "./BaseCard.jsx";
+export { BaseGrid } from "./BaseGrid.jsx";
 export { default as BulkActionBar } from "./BulkActionBar.jsx";
 export { default as Button } from "./Button.jsx";
 export { default as SyncProgressBanner } from "./SyncProgressBanner.jsx";
