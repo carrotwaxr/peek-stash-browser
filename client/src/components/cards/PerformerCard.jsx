@@ -1,47 +1,34 @@
 import { forwardRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { BaseCard } from "../ui/BaseCard.jsx";
 import GenderIcon from "../ui/GenderIcon.jsx";
-import { GridCard } from "../ui/GridCard.jsx";
 
+/**
+ * PerformerCard - Card for displaying performer entities
+ * Uses BaseCard with performer-specific configuration
+ */
 const PerformerCard = forwardRef(
-  ({ performer, referrerUrl, isTVMode, tabIndex, onHideSuccess, ...others }, ref) => {
-    const navigate = useNavigate();
+  ({ performer, referrerUrl, isTVMode, tabIndex, onHideSuccess, ...rest }, ref) => {
+    const indicators = [
+      { type: "PLAY_COUNT", count: performer.play_count },
+      { type: "SCENES", count: performer.scene_count },
+      { type: "GROUPS", count: performer.group_count },
+      { type: "IMAGES", count: performer.image_count },
+      { type: "GALLERIES", count: performer.gallery_count },
+      { type: "TAGS", count: performer.tags?.length || 0 },
+    ];
 
     return (
-      <GridCard
+      <BaseCard
+        ref={ref}
         entityType="performer"
         imagePath={performer.image_path}
+        title={performer.name}
+        linkTo={`/performer/${performer.id}`}
+        referrerUrl={referrerUrl}
+        tabIndex={isTVMode ? tabIndex : -1}
         hideDescription
         hideSubtitle
-        indicators={[
-          { type: "PLAY_COUNT", count: performer.play_count },
-          {
-            type: "SCENES",
-            count: performer.scene_count,
-            onClick: performer.scene_count > 0 ? () => navigate(`/scenes?performerIds=${performer.id}`) : undefined,
-          },
-          {
-            type: "GROUPS",
-            count: performer.group_count,
-            onClick: performer.group_count > 0 ? () => navigate(`/collections?performerIds=${performer.id}`) : undefined,
-          },
-          {
-            type: "IMAGES",
-            count: performer.image_count,
-            onClick: performer.image_count > 0 ? () => navigate(`/images?performerIds=${performer.id}`) : undefined,
-          },
-          {
-            type: "GALLERIES",
-            count: performer.gallery_count,
-            onClick: performer.gallery_count > 0 ? () => navigate(`/galleries?performerIds=${performer.id}`) : undefined,
-          },
-          {
-            type: "TAGS",
-            count: performer.tags?.length || 0,
-            onClick: performer.tags?.length > 0 ? () => navigate(`/tags?performerIds=${performer.id}`) : undefined,
-          },
-        ]}
-        linkTo={`/performer/${performer.id}`}
+        indicators={indicators}
         ratingControlsProps={{
           entityId: performer.id,
           initialRating: performer.rating,
@@ -49,16 +36,12 @@ const PerformerCard = forwardRef(
           initialOCounter: performer.o_counter,
           onHideSuccess,
         }}
-        ref={ref}
-        referrerUrl={referrerUrl}
-        tabIndex={isTVMode ? tabIndex : -1}
-        title={
-          <div className="flex items-center justify-center gap-2">
-            {performer.name}
+        renderAfterTitle={() => (
+          <div className="flex items-center gap-1 mt-1">
             <GenderIcon gender={performer.gender} size={16} />
           </div>
-        }
-        {...others}
+        )}
+        {...rest}
       />
     );
   }
