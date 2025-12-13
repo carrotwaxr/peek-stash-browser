@@ -176,8 +176,8 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         !isFetchingByIds
       ) {
         // CRITICAL FIX: Filter scenes first to get visibility baseline
-        // Use getAllScenesWithTags() to include tag IDs needed for empty entity filtering
-        let visibleScenes = await stashEntityService.getAllScenesWithTags();
+        // Use getAllScenesWithPerformersAndTags() to include tag IDs needed for empty entity filtering
+        let visibleScenes = await stashEntityService.getAllScenesWithPerformersAndTags();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
@@ -234,7 +234,8 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
         filteredTags = emptyEntityFilterService.filterEmptyTags(
           filteredTags,
           visibilitySet,
-          visibleScenes // ← NEW: Pass visible scenes
+          visibleScenes, // ← NEW: Pass visible scenes
+          allPerformers // Pass performers for tag lookup
         );
       }
 
@@ -760,7 +761,7 @@ export const findTagsMinimal = async (
         filteredTags = tags;
 
         // Get visible scenes with tags for filtering
-        let visibleScenes = await stashEntityService.getAllScenesWithTags();
+        let visibleScenes = await stashEntityService.getAllScenesWithPerformersAndTags();
         visibleScenes = await userRestrictionService.filterScenesForUser(
           visibleScenes,
           userId
@@ -815,7 +816,8 @@ export const findTagsMinimal = async (
         filteredTags = emptyEntityFilterService.filterEmptyTags(
           filteredTags,
           visibilitySet,
-          visibleScenes
+          visibleScenes,
+          allPerformers // Pass performers for tag lookup
         );
 
         // Store in cache
