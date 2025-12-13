@@ -58,6 +58,7 @@ export { default as SceneCarousel } from "./SceneCarousel.jsx";
 export { default as SceneListItem } from "./SceneListItem.jsx";
 export { default as ScenesLikeThis } from "./ScenesLikeThis.jsx";
 export { default as SearchableSelect } from "./SearchableSelect.jsx";
+export { SearchableGrid } from "./SearchableGrid.jsx";
 export { default as SearchControls } from "./SearchControls.jsx";
 export { default as SearchInput } from "./SearchInput.jsx";
 export { default as Sidebar } from "./Sidebar.jsx";
