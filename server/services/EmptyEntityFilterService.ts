@@ -283,9 +283,8 @@ class EmptyEntityFilterService {
       }
     }
 
-    // Build sets of visible group and gallery IDs for fast lookup
+    // Build set of visible group IDs for fast lookup
     const visibleGroupIds = new Set(visibleGroups.map((g) => g.id));
-    const visibleGalleryIds = new Set(visibleGalleries.map((g) => g.id));
 
     // Build set of studios that have visible galleries
     const studiosWithVisibleGalleries = new Set<string>();
