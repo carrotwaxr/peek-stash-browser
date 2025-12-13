@@ -8,13 +8,13 @@ import { formatDuration } from "../../utils/format.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
-  EntityGrid,
   FavoriteButton,
   LoadingSpinner,
   PageHeader,
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
+import { PerformerGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const GroupDetail = () => {
@@ -195,9 +195,8 @@ const GroupDetail = () => {
           )}
 
           {activeTab === 'performers' && (
-            <EntityGrid
-              entityType="performer"
-              filters={{
+            <PerformerGrid
+              lockedFilters={{
                 performer_filter: {
                   groups: {
                     value: [parseInt(groupId, 10)],
@@ -205,6 +204,7 @@ const GroupDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No performers found in "${group?.name}"`}
             />
           )}
