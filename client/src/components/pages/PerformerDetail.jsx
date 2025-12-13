@@ -18,7 +18,6 @@ import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
-  EntityGrid,
   FavoriteButton,
   GenderIcon,
   LazyImage,
@@ -29,6 +28,7 @@ import {
   RatingSlider,
   TabNavigation,
 } from "../ui/index.js";
+import { GalleryGrid, GroupGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 // Helper to detect and map URLs to known sites with colors
@@ -261,9 +261,8 @@ const PerformerDetail = () => {
           )}
 
           {activeTab === 'galleries' && (
-            <EntityGrid
-              entityType="gallery"
-              filters={{
+            <GalleryGrid
+              lockedFilters={{
                 gallery_filter: {
                   performers: {
                     value: [parseInt(performerId, 10)],
@@ -271,6 +270,7 @@ const PerformerDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No galleries found for ${performer.name}`}
             />
           )}
@@ -280,9 +280,8 @@ const PerformerDetail = () => {
           )}
 
           {activeTab === 'groups' && (
-            <EntityGrid
-              entityType="group"
-              filters={{
+            <GroupGrid
+              lockedFilters={{
                 group_filter: {
                   performers: {
                     value: [parseInt(performerId, 10)],
@@ -290,6 +289,7 @@ const PerformerDetail = () => {
                   },
                 },
               }}
+              hideLockedFilters
               emptyMessage={`No collections found for ${performer.name}`}
             />
           )}
