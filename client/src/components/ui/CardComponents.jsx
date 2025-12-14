@@ -428,6 +428,19 @@ export const CardRatingRow = ({
   const badgeRef = useRef(null);
   const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
 
+  // Sync state when initial values change (e.g., on data refresh)
+  useEffect(() => {
+    setRating(initialRating);
+  }, [initialRating]);
+
+  useEffect(() => {
+    setIsFavorite(initialFavorite);
+  }, [initialFavorite]);
+
+  useEffect(() => {
+    setOCounter(initialOCounter);
+  }, [initialOCounter]);
+
   const handleRatingSave = async (newRating) => {
     setRating(newRating);
     try {

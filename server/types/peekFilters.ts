@@ -33,6 +33,24 @@ export type PeekSceneFilter = BaseSceneFilterType & {
 export type PeekPerformerFilter = BasePerformerFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  // Additional filters using custom format for compatibility with frontend
+  name?: { value?: string; modifier?: string };
+  details?: { value?: string; modifier?: string };
+  tattoos?: { value?: string; modifier?: string };
+  piercings?: { value?: string; modifier?: string };
+  measurements?: { value?: string; modifier?: string };
+  height?: { value?: number; value2?: number; modifier?: string };
+  eye_color?: { value?: string; modifier?: string };
+  ethnicity?: { value?: string; modifier?: string };
+  hair_color?: { value?: string; modifier?: string };
+  fake_tits?: { value?: string; modifier?: string };
+  birth_year?: { value?: number; value2?: number; modifier?: string };
+  death_year?: { value?: number; value2?: number; modifier?: string };
+  age?: { value?: number; value2?: number; modifier?: string };
+  career_length?: { value?: number; value2?: number; modifier?: string };
+  birthdate?: { value?: string; value2?: string; modifier?: string };
+  death_date?: { value?: string; value2?: string; modifier?: string };
+  penis_length?: { value?: number; value2?: number; modifier?: string };
 };
 
 /**
