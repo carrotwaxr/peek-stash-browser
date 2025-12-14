@@ -1463,7 +1463,7 @@ class SceneQueryBuilder {
       // User data - prefer Peek user data over Stash data
       rating: row.userRating ?? null,
       rating100: row.userRating ?? null,
-      favorite: row.userFavorite === 1,
+      favorite: Boolean(row.userFavorite),
       o_counter: row.userOCount ?? row.stashOCounter ?? 0,
       play_count: row.userPlayCount ?? row.stashPlayCount ?? 0,
       play_duration: row.userPlayDuration ?? row.stashPlayDuration ?? 0,
