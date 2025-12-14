@@ -260,6 +260,21 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     // This adds scenes where performers have the tag, even if the scene doesn't
     tags = await enhanceTagsWithPerformerScenes(tags);
 
+    // Step 2.8: Add performer counts per tag
+    const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`
+      SELECT pt.tagId, COUNT(*) as count
+      FROM PerformerTag pt
+      JOIN StashPerformer p ON p.id = pt.performerId AND p.deletedAt IS NULL
+      GROUP BY pt.tagId
+    `;
+    const performerCountMap = new Map(performerCountsQuery.map(r => [r.tagId, Number(r.count)]));
+    
+    // Merge performer counts into tags
+    tags = tags.map(tag => ({
+      ...tag,
+      performer_count: performerCountMap.get(tag.id) || 0
+    }));
+
     // Step 3: Merge with FRESH user data (ratings, stats)
     // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
     tags = await mergeTagsWithUserData(tags, userId);
@@ -699,6 +714,7 @@ function getTagFieldValue(
   if (field === "play_count") return tag.play_count || 0;
   if (field === "scene_count" || field === "scenes_count")
     return tag.scene_count || 0;
+  if (field === "performer_count") return tag.performer_count || 0;
   if (field === "name") return tag.name || "";
   if (field === "created_at") return tag.created_at || "";
   if (field === "updated_at") return tag.updated_at || "";

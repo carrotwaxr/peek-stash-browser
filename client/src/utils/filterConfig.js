@@ -72,6 +72,7 @@ export const TAG_SORT_OPTIONS = [
   { value: "created_at", label: "Created At" },
   { value: "name", label: "Name" },
   { value: "o_counter", label: "O Count" },
+  { value: "performer_count", label: "Performer Count" },
   { value: "play_count", label: "Play Count" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
