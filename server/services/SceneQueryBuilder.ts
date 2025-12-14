@@ -766,7 +766,7 @@ class SceneQueryBuilder {
       studioId: row.studioId,
 
       // User data - prefer Peek user data over Stash data
-      rating: row.userRating != null ? Math.round(row.userRating / 20) : null,
+      rating: row.userRating ?? null,
       rating100: row.userRating ?? null,
       favorite: row.userFavorite === 1,
       o_counter: row.userOCount ?? row.stashOCounter ?? 0,
