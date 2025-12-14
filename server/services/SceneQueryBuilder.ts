@@ -517,8 +517,8 @@ class SceneQueryBuilder {
       performer_count: `(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id) ${dir}`,
       tag_count: `(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id) ${dir}`,
 
-      // Stash ratings (not user ratings)
-      rating: `s.rating100 ${dir}`,
+      // User ratings (from SceneRating table)
+      rating: `COALESCE(r.rating, 0) ${dir}`,
 
       // User data - prefer user values
       last_played_at: `w.lastPlayedAt ${dir}`,
