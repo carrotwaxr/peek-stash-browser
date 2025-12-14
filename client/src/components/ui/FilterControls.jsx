@@ -133,16 +133,25 @@ export const FilterControl = ({
             </select>
           </div>
         );
-      case "searchable-select":
+      case "searchable-select": {
+        // When hierarchy is enabled, force modifier to INCLUDES
+        const isHierarchyEnabled = hierarchyValue === -1;
+        const effectiveModifierValue = isHierarchyEnabled ? "INCLUDES" : modifierValue;
+
         return (
           <div className="space-y-2">
             {/* Modifier dropdown (if provided) */}
             {modifierOptions && modifierOptions.length > 0 && (
               <select
-                value={modifierValue}
+                value={effectiveModifierValue}
                 onChange={(e) => onModifierChange(e.target.value)}
                 className={inputClasses}
-                style={baseInputStyle}
+                style={{
+                  ...baseInputStyle,
+                  ...(isHierarchyEnabled ? { opacity: 0.6, cursor: "not-allowed" } : {}),
+                }}
+                disabled={isHierarchyEnabled}
+                title={isHierarchyEnabled ? "Locked to 'Has ANY' when hierarchy is enabled" : undefined}
               >
                 {modifierOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -165,7 +174,14 @@ export const FilterControl = ({
                 <input
                   type="checkbox"
                   checked={hierarchyValue === -1}
-                  onChange={(e) => onHierarchyChange(e.target.checked ? -1 : undefined)}
+                  onChange={(e) => {
+                    const newHierarchyValue = e.target.checked ? -1 : undefined;
+                    onHierarchyChange(newHierarchyValue);
+                    // When enabling hierarchy, force modifier to INCLUDES
+                    if (e.target.checked && onModifierChange) {
+                      onModifierChange("INCLUDES");
+                    }
+                  }}
                   className="w-4 h-4 rounded border cursor-pointer"
                   style={{
                     accentColor: "var(--accent-primary)",
@@ -181,6 +197,7 @@ export const FilterControl = ({
             )}
           </div>
         );
+      }
       case "number":
         return (
           <input

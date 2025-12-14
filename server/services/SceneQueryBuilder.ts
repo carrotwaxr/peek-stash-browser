@@ -7,6 +7,7 @@
 import type { PeekSceneFilter, NormalizedScene } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -456,8 +457,9 @@ class SceneQueryBuilder {
       return { sql: "", params: [] };
     }
 
-    // Resolution values: "144p", "240p", "360p", "480p", "720p", "1080p", "4k", "5k", "6k", "8k"
+    // Resolution values map enum names to pixel heights
     const resolutionMap: Record<string, number> = {
+      // Lowercase with 'p' suffix (e.g., "720p")
       "144p": 144,
       "240p": 240,
       "360p": 360,
@@ -470,6 +472,20 @@ class SceneQueryBuilder {
       "5k": 2880,
       "6k": 3240,
       "8k": 4320,
+      // Stash enum values (e.g., "STANDARD_HD")
+      very_low: 144,
+      low: 240,
+      r360p: 360,
+      standard: 480,
+      web_hd: 540,
+      standard_hd: 720,
+      full_hd: 1080,
+      quad_hd: 1440,
+      vr_hd: 1920,
+      four_k: 2160,
+      five_k: 2880,
+      six_k: 3240,
+      eight_k: 4320,
     };
 
     const height = resolutionMap[filter.value.toLowerCase()];
@@ -483,12 +499,557 @@ class SceneQueryBuilder {
     switch (modifier) {
       case "EQUALS":
         return { sql: `${col} = ?`, params: [height] };
+      case "NOT_EQUALS":
+        return { sql: `${col} != ?`, params: [height] };
       case "GREATER_THAN":
         return { sql: `${col} > ?`, params: [height] };
       case "LESS_THAN":
         return { sql: `${col} < ?`, params: [height] };
       default:
         return { sql: `${col} >= ?`, params: [height] };
+    }
+  }
+
+  /**
+   * Build title filter clause (text search)
+   */
+  private buildTitleFilter(
+    filter: { value?: string | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, modifier = "INCLUDES" } = filter;
+
+    switch (modifier) {
+      case "INCLUDES":
+        return { sql: "LOWER(s.title) LIKE LOWER(?)", params: [`%${value}%`] };
+      case "EXCLUDES":
+        return {
+          sql: "(s.title IS NULL OR LOWER(s.title) NOT LIKE LOWER(?))",
+          params: [`%${value}%`],
+        };
+      case "EQUALS":
+        return { sql: "LOWER(s.title) = LOWER(?)", params: [value] };
+      case "NOT_EQUALS":
+        return {
+          sql: "(s.title IS NULL OR LOWER(s.title) != LOWER(?))",
+          params: [value],
+        };
+      case "IS_NULL":
+        return { sql: "(s.title IS NULL OR s.title = '')", params: [] };
+      case "NOT_NULL":
+        return { sql: "(s.title IS NOT NULL AND s.title != '')", params: [] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build details filter clause (text search)
+   */
+  private buildDetailsFilter(
+    filter: { value?: string | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, modifier = "INCLUDES" } = filter;
+
+    switch (modifier) {
+      case "INCLUDES":
+        return { sql: "LOWER(s.details) LIKE LOWER(?)", params: [`%${value}%`] };
+      case "EXCLUDES":
+        return {
+          sql: "(s.details IS NULL OR LOWER(s.details) NOT LIKE LOWER(?))",
+          params: [`%${value}%`],
+        };
+      case "EQUALS":
+        return { sql: "LOWER(s.details) = LOWER(?)", params: [value] };
+      case "NOT_EQUALS":
+        return {
+          sql: "(s.details IS NULL OR LOWER(s.details) != LOWER(?))",
+          params: [value],
+        };
+      case "IS_NULL":
+        return { sql: "(s.details IS NULL OR s.details = '')", params: [] };
+      case "NOT_NULL":
+        return { sql: "(s.details IS NOT NULL AND s.details != '')", params: [] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build date filter clause (for scene date, created_at, updated_at, last_played_at)
+   */
+  private buildDateFilter(
+    filter:
+      | { value?: string | null; value2?: string | null; modifier?: string | null }
+      | undefined
+      | null,
+    column: string
+  ): FilterClause {
+    if (!filter || !filter.value) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "GREATER_THAN" } = filter;
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `date(${column}) = date(?)`, params: [value] };
+      case "NOT_EQUALS":
+        return {
+          sql: `(${column} IS NULL OR date(${column}) != date(?))`,
+          params: [value],
+        };
+      case "GREATER_THAN":
+        return { sql: `${column} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${column} < ?`, params: [value] };
+      case "BETWEEN":
+        if (value2) {
+          return { sql: `${column} BETWEEN ? AND ?`, params: [value, value2] };
+        }
+        return { sql: `${column} >= ?`, params: [value] };
+      case "NOT_BETWEEN":
+        if (value2) {
+          return {
+            sql: `(${column} IS NULL OR ${column} < ? OR ${column} > ?)`,
+            params: [value, value2],
+          };
+        }
+        return { sql: `${column} < ?`, params: [value] };
+      case "IS_NULL":
+        return { sql: `${column} IS NULL`, params: [] };
+      case "NOT_NULL":
+        return { sql: `${column} IS NOT NULL`, params: [] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build numeric filter clause (for bitrate, framerate, counts, etc.)
+   */
+  private buildNumericFilter(
+    filter:
+      | { value?: number | null; value2?: number | null; modifier?: string | null }
+      | undefined
+      | null,
+    column: string,
+    coalesce: number = 0
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "GREATER_THAN" } = filter;
+    const col = `COALESCE(${column}, ${coalesce})`;
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${col} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${col} != ?`, params: [value] };
+      case "GREATER_THAN":
+        return { sql: `${col} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${col} < ?`, params: [value] };
+      case "BETWEEN":
+        if (value2 !== undefined && value2 !== null) {
+          return { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] };
+        }
+        return { sql: `${col} >= ?`, params: [value] };
+      case "NOT_BETWEEN":
+        if (value2 !== undefined && value2 !== null) {
+          return { sql: `(${col} < ? OR ${col} > ?)`, params: [value, value2] };
+        }
+        return { sql: `${col} < ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build orientation filter clause
+   */
+  private buildOrientationFilter(
+    filter: { value?: string[] | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const orientations = filter.value.map((o) => o.toUpperCase());
+    const conditions: string[] = [];
+
+    for (const orientation of orientations) {
+      switch (orientation) {
+        case "LANDSCAPE":
+          conditions.push("(s.fileWidth > s.fileHeight)");
+          break;
+        case "PORTRAIT":
+          conditions.push("(s.fileWidth < s.fileHeight)");
+          break;
+        case "SQUARE":
+          conditions.push("(s.fileWidth = s.fileHeight AND s.fileWidth > 0)");
+          break;
+      }
+    }
+
+    if (conditions.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    return { sql: `(${conditions.join(" OR ")})`, params: [] };
+  }
+
+  /**
+   * Build video codec filter clause
+   */
+  private buildVideoCodecFilter(
+    filter: { value?: string | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, modifier = "INCLUDES" } = filter;
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: "LOWER(s.fileVideoCodec) LIKE LOWER(?)",
+          params: [`%${value}%`],
+        };
+      case "EXCLUDES":
+        return {
+          sql: "(s.fileVideoCodec IS NULL OR LOWER(s.fileVideoCodec) NOT LIKE LOWER(?))",
+          params: [`%${value}%`],
+        };
+      case "EQUALS":
+        return { sql: "LOWER(s.fileVideoCodec) = LOWER(?)", params: [value] };
+      case "NOT_EQUALS":
+        return {
+          sql: "(s.fileVideoCodec IS NULL OR LOWER(s.fileVideoCodec) != LOWER(?))",
+          params: [value],
+        };
+      case "IS_NULL":
+        return {
+          sql: "(s.fileVideoCodec IS NULL OR s.fileVideoCodec = '')",
+          params: [],
+        };
+      case "NOT_NULL":
+        return {
+          sql: "(s.fileVideoCodec IS NOT NULL AND s.fileVideoCodec != '')",
+          params: [],
+        };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build audio codec filter clause
+   */
+  private buildAudioCodecFilter(
+    filter: { value?: string | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, modifier = "INCLUDES" } = filter;
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: "LOWER(s.fileAudioCodec) LIKE LOWER(?)",
+          params: [`%${value}%`],
+        };
+      case "EXCLUDES":
+        return {
+          sql: "(s.fileAudioCodec IS NULL OR LOWER(s.fileAudioCodec) NOT LIKE LOWER(?))",
+          params: [`%${value}%`],
+        };
+      case "EQUALS":
+        return { sql: "LOWER(s.fileAudioCodec) = LOWER(?)", params: [value] };
+      case "NOT_EQUALS":
+        return {
+          sql: "(s.fileAudioCodec IS NULL OR LOWER(s.fileAudioCodec) != LOWER(?))",
+          params: [value],
+        };
+      case "IS_NULL":
+        return {
+          sql: "(s.fileAudioCodec IS NULL OR s.fileAudioCodec = '')",
+          params: [],
+        };
+      case "NOT_NULL":
+        return {
+          sql: "(s.fileAudioCodec IS NOT NULL AND s.fileAudioCodec != '')",
+          params: [],
+        };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build performer count filter clause
+   */
+  private buildPerformerCountFilter(
+    filter:
+      | { value?: number | null; value2?: number | null; modifier?: string | null }
+      | undefined
+      | null
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "EQUALS" } = filter;
+    const subquery =
+      "(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id)";
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${subquery} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${subquery} != ?`, params: [value] };
+      case "GREATER_THAN":
+        return { sql: `${subquery} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${subquery} < ?`, params: [value] };
+      case "BETWEEN":
+        if (value2 !== undefined && value2 !== null) {
+          return { sql: `${subquery} BETWEEN ? AND ?`, params: [value, value2] };
+        }
+        return { sql: `${subquery} >= ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build tag count filter clause
+   */
+  private buildTagCountFilter(
+    filter:
+      | { value?: number | null; value2?: number | null; modifier?: string | null }
+      | undefined
+      | null
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "EQUALS" } = filter;
+    const subquery = "(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id)";
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${subquery} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${subquery} != ?`, params: [value] };
+      case "GREATER_THAN":
+        return { sql: `${subquery} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${subquery} < ?`, params: [value] };
+      case "BETWEEN":
+        if (value2 !== undefined && value2 !== null) {
+          return { sql: `${subquery} BETWEEN ? AND ?`, params: [value, value2] };
+        }
+        return { sql: `${subquery} >= ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build performer favorite filter clause
+   * Returns scenes that have at least one favorite performer
+   */
+  private buildPerformerFavoriteFilter(userId: number): FilterClause {
+    return {
+      sql: `s.id IN (
+        SELECT sp.sceneId FROM ScenePerformer sp
+        JOIN PerformerRating pr ON sp.performerId = pr.performerId AND pr.userId = ?
+        WHERE pr.favorite = 1
+      )`,
+      params: [userId],
+    };
+  }
+
+  /**
+   * Build studio favorite filter clause
+   * Returns scenes that have a favorite studio
+   */
+  private buildStudioFavoriteFilter(userId: number): FilterClause {
+    return {
+      sql: `s.studioId IN (
+        SELECT sr.studioId FROM StudioRating sr
+        WHERE sr.userId = ? AND sr.favorite = 1
+      )`,
+      params: [userId],
+    };
+  }
+
+  /**
+   * Build tag favorite filter clause
+   * Returns scenes that have at least one favorite tag
+   */
+  private buildTagFavoriteFilter(userId: number): FilterClause {
+    return {
+      sql: `s.id IN (
+        SELECT st.sceneId FROM SceneTag st
+        JOIN TagRating tr ON st.tagId = tr.tagId AND tr.userId = ?
+        WHERE tr.favorite = 1
+      )`,
+      params: [userId],
+    };
+  }
+
+  /**
+   * Build performer age filter clause
+   * Filters by performer age at time of scene date
+   */
+  private buildPerformerAgeFilter(
+    filter:
+      | { value?: number | null; value2?: number | null; modifier?: string | null }
+      | undefined
+      | null
+  ): FilterClause {
+    if (!filter || filter.value === undefined || filter.value === null) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "EQUALS" } = filter;
+    // Calculate age: (scene_date - birthdate) in years
+    // SQLite: (julianday(scene_date) - julianday(birthdate)) / 365.25
+    const ageSubquery = `(
+      SELECT MAX(
+        CAST((julianday(COALESCE(s.date, date('now'))) - julianday(p.birthdate)) / 365.25 AS INTEGER)
+      )
+      FROM ScenePerformer sp
+      JOIN StashPerformer p ON sp.performerId = p.id
+      WHERE sp.sceneId = s.id AND p.birthdate IS NOT NULL
+    )`;
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `${ageSubquery} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${ageSubquery} != ?`, params: [value] };
+      case "GREATER_THAN":
+        return { sql: `${ageSubquery} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${ageSubquery} < ?`, params: [value] };
+      case "BETWEEN":
+        if (value2 !== undefined && value2 !== null) {
+          return { sql: `${ageSubquery} BETWEEN ? AND ?`, params: [value, value2] };
+        }
+        return { sql: `${ageSubquery} >= ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build studio filter with hierarchy support
+   */
+  private async buildStudioFilterWithHierarchy(
+    filter:
+      | { value?: string[] | null; modifier?: string | null; depth?: number | null }
+      | undefined
+      | null
+  ): Promise<FilterClause> {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    let ids = filter.value;
+    const { modifier = "INCLUDES", depth } = filter;
+
+    // Expand IDs if depth is specified and not 0
+    if (depth !== undefined && depth !== null && depth !== 0) {
+      ids = await expandStudioIds(ids, depth);
+    }
+
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `s.studioId IN (${placeholders})`,
+          params: ids,
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `(s.studioId IS NULL OR s.studioId NOT IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build tag filter with hierarchy support
+   */
+  private async buildTagFilterWithHierarchy(
+    filter:
+      | { value?: string[] | null; modifier?: string | null; depth?: number | null }
+      | undefined
+      | null
+  ): Promise<FilterClause> {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    let ids = filter.value;
+    const { modifier = "INCLUDES", depth } = filter;
+
+    // Expand IDs if depth is specified and not 0
+    if (depth !== undefined && depth !== null && depth !== 0) {
+      ids = await expandTagIds(ids, depth);
+    }
+
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `s.id IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        // Note: When hierarchy is enabled, the UI forces modifier to INCLUDES.
+        // This case handles non-hierarchy INCLUDES_ALL (match scenes with ALL specified tags)
+        return {
+          sql: `s.id IN (
+            SELECT sceneId FROM SceneTag
+            WHERE tagId IN (${placeholders})
+            GROUP BY sceneId
+            HAVING COUNT(DISTINCT tagId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `s.id NOT IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
     }
   }
 
@@ -588,14 +1149,16 @@ class SceneQueryBuilder {
     }
 
     if (filters?.tags) {
-      const tagFilter = this.buildTagFilter(filters.tags);
+      // Use hierarchy-aware filter that supports depth parameter
+      const tagFilter = await this.buildTagFilterWithHierarchy(filters.tags as any);
       if (tagFilter.sql) {
         whereClauses.push(tagFilter);
       }
     }
 
     if (filters?.studios) {
-      const studioFilter = this.buildStudioFilter(filters.studios);
+      // Use hierarchy-aware filter that supports depth parameter
+      const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios as any);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
       }
@@ -633,6 +1196,133 @@ class SceneQueryBuilder {
       if (oCounterFilter.sql) {
         whereClauses.push(oCounterFilter);
       }
+    }
+
+    // Text filters
+    if (filters?.title) {
+      const titleFilter = this.buildTitleFilter(filters.title);
+      if (titleFilter.sql) {
+        whereClauses.push(titleFilter);
+      }
+    }
+
+    if (filters?.details) {
+      const detailsFilter = this.buildDetailsFilter(filters.details);
+      if (detailsFilter.sql) {
+        whereClauses.push(detailsFilter);
+      }
+    }
+
+    // Date filters
+    if (filters?.date) {
+      const dateFilter = this.buildDateFilter(filters.date, "s.date");
+      if (dateFilter.sql) {
+        whereClauses.push(dateFilter);
+      }
+    }
+
+    if (filters?.created_at) {
+      const createdFilter = this.buildDateFilter(filters.created_at, "s.stashCreatedAt");
+      if (createdFilter.sql) {
+        whereClauses.push(createdFilter);
+      }
+    }
+
+    if (filters?.updated_at) {
+      const updatedFilter = this.buildDateFilter(filters.updated_at, "s.stashUpdatedAt");
+      if (updatedFilter.sql) {
+        whereClauses.push(updatedFilter);
+      }
+    }
+
+    if (filters?.last_played_at) {
+      const lastPlayedFilter = this.buildDateFilter(filters.last_played_at, "w.lastPlayedAt");
+      if (lastPlayedFilter.sql) {
+        whereClauses.push(lastPlayedFilter);
+      }
+    }
+
+    // Numeric filters
+    if (filters?.bitrate) {
+      const bitrateFilter = this.buildNumericFilter(filters.bitrate, "s.fileBitRate", 0);
+      if (bitrateFilter.sql) {
+        whereClauses.push(bitrateFilter);
+      }
+    }
+
+    if (filters?.framerate) {
+      const framerateFilter = this.buildNumericFilter(filters.framerate, "s.fileFrameRate", 0);
+      if (framerateFilter.sql) {
+        whereClauses.push(framerateFilter);
+      }
+    }
+
+    if (filters?.play_duration) {
+      const playDurationFilter = this.buildNumericFilter(
+        filters.play_duration,
+        "COALESCE(w.playDuration, 0)",
+        0
+      );
+      if (playDurationFilter.sql) {
+        whereClauses.push(playDurationFilter);
+      }
+    }
+
+    // Count filters
+    if (filters?.performer_count) {
+      const performerCountFilter = this.buildPerformerCountFilter(filters.performer_count);
+      if (performerCountFilter.sql) {
+        whereClauses.push(performerCountFilter);
+      }
+    }
+
+    if (filters?.tag_count) {
+      const tagCountFilter = this.buildTagCountFilter(filters.tag_count);
+      if (tagCountFilter.sql) {
+        whereClauses.push(tagCountFilter);
+      }
+    }
+
+    if (filters?.performer_age) {
+      const performerAgeFilter = this.buildPerformerAgeFilter(filters.performer_age);
+      if (performerAgeFilter.sql) {
+        whereClauses.push(performerAgeFilter);
+      }
+    }
+
+    // Enum/select filters
+    if (filters?.orientation) {
+      const orientationFilter = this.buildOrientationFilter(filters.orientation);
+      if (orientationFilter.sql) {
+        whereClauses.push(orientationFilter);
+      }
+    }
+
+    if (filters?.video_codec) {
+      const videoCodecFilter = this.buildVideoCodecFilter(filters.video_codec);
+      if (videoCodecFilter.sql) {
+        whereClauses.push(videoCodecFilter);
+      }
+    }
+
+    if (filters?.audio_codec) {
+      const audioCodecFilter = this.buildAudioCodecFilter(filters.audio_codec);
+      if (audioCodecFilter.sql) {
+        whereClauses.push(audioCodecFilter);
+      }
+    }
+
+    // Favorite entity filters
+    if (filters?.performer_favorite === true) {
+      whereClauses.push(this.buildPerformerFavoriteFilter(userId));
+    }
+
+    if (filters?.studio_favorite === true) {
+      whereClauses.push(this.buildStudioFavoriteFilter(userId));
+    }
+
+    if (filters?.tag_favorite === true) {
+      whereClauses.push(this.buildTagFavoriteFilter(userId));
     }
 
     // Combine WHERE clauses
@@ -681,7 +1371,12 @@ class SceneQueryBuilder {
       filters?.favorite !== undefined ||
       filters?.rating100 !== undefined ||
       filters?.play_count !== undefined ||
-      filters?.o_counter !== undefined;
+      filters?.o_counter !== undefined ||
+      filters?.last_played_at !== undefined ||
+      filters?.play_duration !== undefined ||
+      filters?.performer_favorite === true ||
+      filters?.studio_favorite === true ||
+      filters?.tag_favorite === true;
 
     if (hasUserDataFilters) {
       // Need full JOINs for accurate count with user data filters

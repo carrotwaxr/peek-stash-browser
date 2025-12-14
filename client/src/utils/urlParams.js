@@ -12,7 +12,7 @@
 const filtersToUrlParams = (filters, filterOptions) => {
   const params = new URLSearchParams();
 
-  filterOptions.forEach(({ key, type, multi }) => {
+  filterOptions.forEach(({ key, type, multi, modifierKey, hierarchyKey }) => {
     const value = filters[key];
 
     if (value === undefined || value === "" || value === false) {
@@ -45,6 +45,14 @@ const filtersToUrlParams = (filters, filterOptions) => {
             params.set(key, value);
           }
         }
+        // Serialize modifier if present
+        if (modifierKey && filters[modifierKey]) {
+          params.set(modifierKey, filters[modifierKey]);
+        }
+        // Serialize hierarchy depth if present
+        if (hierarchyKey && filters[hierarchyKey] !== undefined) {
+          params.set(hierarchyKey, filters[hierarchyKey].toString());
+        }
         break;
 
       case "range":
@@ -72,7 +80,7 @@ const filtersToUrlParams = (filters, filterOptions) => {
 const urlParamsToFilters = (searchParams, filterOptions) => {
   const filters = {};
 
-  filterOptions.forEach(({ key, type, multi }) => {
+  filterOptions.forEach(({ key, type, multi, modifierKey, hierarchyKey }) => {
     switch (type) {
       case "checkbox":
         if (searchParams.has(key)) {
@@ -98,6 +106,14 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
             // Single select: just set the value
             filters[key] = value;
           }
+        }
+        // Deserialize modifier if present
+        if (modifierKey && searchParams.has(modifierKey)) {
+          filters[modifierKey] = searchParams.get(modifierKey);
+        }
+        // Deserialize hierarchy depth if present
+        if (hierarchyKey && searchParams.has(hierarchyKey)) {
+          filters[hierarchyKey] = parseInt(searchParams.get(hierarchyKey), 10);
         }
         break;
 

@@ -264,7 +264,7 @@ export const findPerformers = async (
  */
 export async function applyPerformerFilters(
   performers: NormalizedPerformer[],
-  filters: PeekPerformerFilter | null | undefined
+  filters: (PeekPerformerFilter & Record<string, any>) | null | undefined
 ): Promise<NormalizedPerformer[]> {
   if (!filters) return performers;
 
@@ -454,6 +454,308 @@ export async function applyPerformerFilters(
     filtered = filtered.filter((p) => {
       if (!p.updated_at) return false;
       const performerDate = new Date(p.updated_at);
+      if (!value) return false;
+      const filterDate = new Date(value);
+      if (modifier === "GREATER_THAN") return performerDate > filterDate;
+      if (modifier === "LESS_THAN") return performerDate < filterDate;
+      if (modifier === "EQUALS") {
+        return performerDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
+        const filterDate2 = new Date(value2);
+        return performerDate >= filterDate && performerDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by name (text search)
+  if (filters.name) {
+    const { modifier, value } = filters.name;
+    if (value) {
+      const searchValue = value.toLowerCase();
+      filtered = filtered.filter((p) => {
+        const name = (p.name || "").toLowerCase();
+        const aliases = (p.alias_list || []).join(" ").toLowerCase();
+        const combinedText = name + " " + aliases;
+        if (modifier === "INCLUDES" || !modifier) return combinedText.includes(searchValue);
+        if (modifier === "EXCLUDES") return !combinedText.includes(searchValue);
+        if (modifier === "EQUALS") return name === searchValue;
+        if (modifier === "NOT_EQUALS") return name !== searchValue;
+        return true;
+      });
+    }
+  }
+
+  // Filter by details (text search)
+  if (filters.details) {
+    const { modifier, value } = filters.details;
+    if (value) {
+      const searchValue = value.toLowerCase();
+      filtered = filtered.filter((p) => {
+        const details = (p.details || "").toLowerCase();
+        if (modifier === "INCLUDES" || !modifier) return details.includes(searchValue);
+        if (modifier === "EXCLUDES") return !details.includes(searchValue);
+        return true;
+      });
+    }
+  }
+
+  // Filter by tattoos (text search)
+  if (filters.tattoos) {
+    const { modifier, value } = filters.tattoos;
+    if (value) {
+      const searchValue = value.toLowerCase();
+      filtered = filtered.filter((p) => {
+        const tattoos = (p.tattoos || "").toLowerCase();
+        if (modifier === "INCLUDES" || !modifier) return tattoos.includes(searchValue);
+        if (modifier === "EXCLUDES") return !tattoos.includes(searchValue);
+        return true;
+      });
+    }
+  }
+
+  // Filter by piercings (text search)
+  if (filters.piercings) {
+    const { modifier, value } = filters.piercings;
+    if (value) {
+      const searchValue = value.toLowerCase();
+      filtered = filtered.filter((p) => {
+        const piercings = (p.piercings || "").toLowerCase();
+        if (modifier === "INCLUDES" || !modifier) return piercings.includes(searchValue);
+        if (modifier === "EXCLUDES") return !piercings.includes(searchValue);
+        return true;
+      });
+    }
+  }
+
+  // Filter by measurements (text search)
+  if (filters.measurements) {
+    const { modifier, value } = filters.measurements;
+    if (value) {
+      const searchValue = value.toLowerCase();
+      filtered = filtered.filter((p) => {
+        const measurements = (p.measurements || "").toLowerCase();
+        if (modifier === "INCLUDES" || !modifier) return measurements.includes(searchValue);
+        if (modifier === "EXCLUDES") return !measurements.includes(searchValue);
+        return true;
+      });
+    }
+  }
+
+  // Filter by height (numeric range in cm)
+  if (filters.height) {
+    const { modifier, value, value2 } = filters.height;
+    if (value !== undefined && value !== null) {
+      filtered = filtered.filter((p) => {
+        const height = p.height_cm || 0;
+        if (modifier === "GREATER_THAN") return height > value;
+        if (modifier === "LESS_THAN") return height < value;
+        if (modifier === "EQUALS") return height === value;
+        if (modifier === "NOT_EQUALS") return height !== value;
+        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
+          return height >= value && height <= value2;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Filter by weight (numeric range in kg)
+  if (filters.weight) {
+    const { modifier, value, value2 } = filters.weight;
+    if (value !== undefined && value !== null) {
+      filtered = filtered.filter((p) => {
+        const weight = p.weight || 0;
+        if (modifier === "GREATER_THAN") return weight > value;
+        if (modifier === "LESS_THAN") return weight < value;
+        if (modifier === "EQUALS") return weight === value;
+        if (modifier === "NOT_EQUALS") return weight !== value;
+        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
+          return weight >= value && weight <= value2;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Filter by penis_length (numeric range in cm)
+  if (filters.penis_length) {
+    const { modifier, value, value2 } = filters.penis_length;
+    if (value !== undefined && value !== null) {
+      filtered = filtered.filter((p) => {
+        const penisLength = p.penis_length || 0;
+        if (modifier === "GREATER_THAN") return penisLength > value;
+        if (modifier === "LESS_THAN") return penisLength < value;
+        if (modifier === "EQUALS") return penisLength === value;
+        if (modifier === "NOT_EQUALS") return penisLength !== value;
+        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
+          return penisLength >= value && penisLength <= value2;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Filter by eye_color (enum/string)
+  if (filters.eye_color) {
+    const { modifier, value } = filters.eye_color;
+    if (value) {
+      filtered = filtered.filter((p) => {
+        if (modifier === "EQUALS" || !modifier) return p.eye_color === value;
+        if (modifier === "NOT_EQUALS") return p.eye_color !== value;
+        return true;
+      });
+    }
+  }
+
+  // Filter by ethnicity (enum/string)
+  if (filters.ethnicity) {
+    const { modifier, value } = filters.ethnicity;
+    if (value) {
+      filtered = filtered.filter((p) => {
+        if (modifier === "EQUALS" || !modifier) return p.ethnicity === value;
+        if (modifier === "NOT_EQUALS") return p.ethnicity !== value;
+        return true;
+      });
+    }
+  }
+
+  // Filter by hair_color (enum/string)
+  if (filters.hair_color) {
+    const { modifier, value } = filters.hair_color;
+    if (value) {
+      filtered = filtered.filter((p) => {
+        if (modifier === "EQUALS" || !modifier) return p.hair_color === value;
+        if (modifier === "NOT_EQUALS") return p.hair_color !== value;
+        return true;
+      });
+    }
+  }
+
+  // Filter by fake_tits/breast_type (enum/string)
+  if (filters.fake_tits) {
+    const { modifier, value } = filters.fake_tits;
+    if (value) {
+      filtered = filtered.filter((p) => {
+        if (modifier === "EQUALS" || !modifier) return p.fake_tits === value;
+        if (modifier === "NOT_EQUALS") return p.fake_tits !== value;
+        return true;
+      });
+    }
+  }
+
+  // Filter by birth_year (numeric range)
+  if (filters.birth_year) {
+    const { modifier, value, value2 } = filters.birth_year;
+    if (value !== undefined && value !== null) {
+      filtered = filtered.filter((p) => {
+        if (!p.birthdate) return false;
+        const birthYear = new Date(p.birthdate).getFullYear();
+        if (modifier === "GREATER_THAN") return birthYear > value;
+        if (modifier === "LESS_THAN") return birthYear < value;
+        if (modifier === "EQUALS") return birthYear === value;
+        if (modifier === "NOT_EQUALS") return birthYear !== value;
+        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
+          return birthYear >= value && birthYear <= value2;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Filter by death_year (numeric range)
+  if (filters.death_year) {
+    const { modifier, value, value2 } = filters.death_year;
+    if (value !== undefined && value !== null) {
+      filtered = filtered.filter((p) => {
+        if (!p.death_date) return false;
+        const deathYear = new Date(p.death_date).getFullYear();
+        if (modifier === "GREATER_THAN") return deathYear > value;
+        if (modifier === "LESS_THAN") return deathYear < value;
+        if (modifier === "EQUALS") return deathYear === value;
+        if (modifier === "NOT_EQUALS") return deathYear !== value;
+        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
+          return deathYear >= value && deathYear <= value2;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Filter by age (numeric range - calculated from birthdate)
+  if (filters.age) {
+    const { modifier, value, value2 } = filters.age;
+    if (value !== undefined && value !== null) {
+      const today = new Date();
+      filtered = filtered.filter((p) => {
+        if (!p.birthdate) return false;
+        const birthDate = new Date(p.birthdate);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        if (modifier === "GREATER_THAN") return age > value;
+        if (modifier === "LESS_THAN") return age < value;
+        if (modifier === "EQUALS") return age === value;
+        if (modifier === "NOT_EQUALS") return age !== value;
+        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
+          return age >= value && age <= value2;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Filter by career_length (numeric range in years)
+  if (filters.career_length) {
+    const careerFilter = filters.career_length as { value?: number; value2?: number; modifier?: string };
+    const { modifier, value, value2 } = careerFilter;
+    if (value !== undefined && value !== null) {
+      filtered = filtered.filter((p) => {
+        const careerLength = parseInt(p.career_length || '0', 10) || 0;
+        if (modifier === "GREATER_THAN") return careerLength > value;
+        if (modifier === "LESS_THAN") return careerLength < value;
+        if (modifier === "EQUALS") return careerLength === value;
+        if (modifier === "NOT_EQUALS") return careerLength !== value;
+        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
+          return careerLength >= value && careerLength <= value2;
+        }
+        return true;
+      });
+    }
+  }
+
+  // Filter by birthdate (date range)
+  if (filters.birthdate) {
+    const { modifier, value, value2 } = filters.birthdate;
+    filtered = filtered.filter((p) => {
+      if (!p.birthdate) return false;
+      const performerDate = new Date(p.birthdate);
+      if (!value) return false;
+      const filterDate = new Date(value);
+      if (modifier === "GREATER_THAN") return performerDate > filterDate;
+      if (modifier === "LESS_THAN") return performerDate < filterDate;
+      if (modifier === "EQUALS") {
+        return performerDate.toDateString() === filterDate.toDateString();
+      }
+      if (modifier === "BETWEEN") {
+        if (!value2) return false;
+        const filterDate2 = new Date(value2);
+        return performerDate >= filterDate && performerDate <= filterDate2;
+      }
+      return true;
+    });
+  }
+
+  // Filter by death_date (date range)
+  if (filters.death_date) {
+    const { modifier, value, value2 } = filters.death_date;
+    filtered = filtered.filter((p) => {
+      if (!p.death_date) return false;
+      const performerDate = new Date(p.death_date);
       if (!value) return false;
       const filterDate = new Date(value);
       if (modifier === "GREATER_THAN") return performerDate > filterDate;

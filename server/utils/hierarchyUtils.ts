@@ -34,17 +34,20 @@ export async function getDescendantTagIds(
 
   const allTags = await stashEntityService.getAllTags();
 
-  // Build a map of tag ID to its children for O(1) lookups
+  // Build a map of tag ID to its children by inverting parent relationships
+  // Tags store parents, not children, so we invert to get children
   const childrenMap = new Map<string, string[]>();
   for (const tag of allTags) {
-    if (tag.children && Array.isArray(tag.children)) {
-      childrenMap.set(
-        String(tag.id),
-        tag.children.map((c) => String(c.id))
-      );
+    if (tag.parents && Array.isArray(tag.parents)) {
+      for (const parent of tag.parents) {
+        const parentId = String(parent.id);
+        if (!childrenMap.has(parentId)) {
+          childrenMap.set(parentId, []);
+        }
+        childrenMap.get(parentId)!.push(String(tag.id));
+      }
     }
   }
-
   // BFS to collect descendants up to depth
   const queue: { id: string; currentDepth: number }[] = [
     { id: tagId, currentDepth: 0 },
@@ -91,14 +94,16 @@ export async function getDescendantStudioIds(
 
   const allStudios = await stashEntityService.getAllStudios();
 
-  // Build a map of studio ID to its children for O(1) lookups
+  // Build a map of studio ID to its children by inverting parent relationships
+  // Studios store parent_studio, not child_studios, so we invert to get children
   const childrenMap = new Map<string, string[]>();
   for (const studio of allStudios) {
-    if (studio.child_studios && Array.isArray(studio.child_studios)) {
-      childrenMap.set(
-        String(studio.id),
-        studio.child_studios.map((c) => String(c.id))
-      );
+    if (studio.parent_studio?.id) {
+      const parentId = String(studio.parent_studio.id);
+      if (!childrenMap.has(parentId)) {
+        childrenMap.set(parentId, []);
+      }
+      childrenMap.get(parentId)!.push(String(studio.id));
     }
   }
 

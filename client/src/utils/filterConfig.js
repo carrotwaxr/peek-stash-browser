@@ -159,11 +159,6 @@ const FAKE_TITS_OPTIONS = [
   { value: "FALSE", label: "Natural" },
 ];
 
-const ORGANIZED_OPTIONS = [
-  { value: "TRUE", label: "Organized" },
-  { value: "FALSE", label: "Not Organized" },
-];
-
 // Resolution options (matching Stash's ResolutionEnum)
 const RESOLUTION_OPTIONS = [
   { value: "VERY_LOW", label: "144p" },
@@ -480,14 +475,7 @@ export const SCENE_FILTER_OPTIONS = [
     min: 0,
     max: 50,
   },
-  {
-    key: "organized",
-    label: "Organized",
-    type: "select",
-    defaultValue: "",
-    options: ORGANIZED_OPTIONS,
-    placeholder: "Any",
-  },
+
 ];
 
 export const PERFORMER_FILTER_OPTIONS = [
@@ -734,33 +722,6 @@ export const PERFORMER_FILTER_OPTIONS = [
     type: "text",
     defaultValue: "",
     placeholder: "Search details...",
-  },
-
-  // Entity Filters
-  {
-    type: "section-header",
-    label: "Entity Filters",
-    key: "section-entities",
-    collapsible: true,
-    defaultOpen: false,
-  },
-  {
-    key: "sceneId",
-    label: "Scene",
-    type: "searchable-select",
-    entityType: "scenes",
-    multi: false,
-    defaultValue: "",
-    placeholder: "Select scene...",
-  },
-  {
-    key: "groupIds",
-    label: "Collections",
-    type: "searchable-select",
-    entityType: "groups",
-    multi: true,
-    defaultValue: [],
-    placeholder: "Select collections...",
   },
 ];
 
@@ -1320,9 +1281,7 @@ export const buildSceneFilter = (filters) => {
   if (filters.tagFavorite === true || filters.tagFavorite === "TRUE") {
     sceneFilter.tag_favorite = true;
   }
-  if (filters.organized) {
-    sceneFilter.organized = filters.organized === "TRUE";
-  }
+
 
   // Rating filter (0-100 scale)
   if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
