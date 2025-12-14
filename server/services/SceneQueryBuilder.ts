@@ -513,7 +513,7 @@ class SceneQueryBuilder {
       filesize: `s.fileSize ${dir}`,
       bitrate: `s.fileBitRate ${dir}`,
       framerate: `s.fileFrameRate ${dir}`,
-      path: `(SELECT sf.path FROM StashSceneFile sf WHERE sf.sceneId = s.id ORDER BY sf.isPrimary DESC LIMIT 1) ${dir}`,
+      path: `s.filePath ${dir}`,
       performer_count: `(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id) ${dir}`,
       tag_count: `(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id) ${dir}`,
 
@@ -525,7 +525,8 @@ class SceneQueryBuilder {
       play_count: `COALESCE(w.playCount, 0) ${dir}`,
       play_duration: `COALESCE(w.playDuration, 0) ${dir}`,
       o_counter: `COALESCE(w.oCount, 0) ${dir}`,
-      last_o_at: `w.lastOAt ${dir}`,
+      // last_o_at: SQL sort not supported - lastOAt column doesn't exist in WatchHistory
+      // The last O timestamp is derived from oHistory JSON and can only be sorted in JS
       user_rating: `COALESCE(r.rating, 0) ${dir}`,
       resume_time: `COALESCE(w.resumeTime, 0) ${dir}`,
 
