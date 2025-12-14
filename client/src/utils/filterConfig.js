@@ -3,7 +3,8 @@
  */
 
 // Scene sorting options (alphabetically organized by label)
-export const SCENE_SORT_OPTIONS = [
+// Note: scene_index is added dynamically when group filter is active
+export const SCENE_SORT_OPTIONS_BASE = [
   { value: "bitrate", label: "Bitrate" },
   { value: "created_at", label: "Created At" },
   { value: "date", label: "Date" },
@@ -19,10 +20,19 @@ export const SCENE_SORT_OPTIONS = [
   { value: "play_duration", label: "Play Duration" },
   { value: "random", label: "Random" },
   { value: "rating", label: "Rating" },
-  { value: "scene_index", label: "Scene Number" },
   { value: "tag_count", label: "Tag Count" },
   { value: "title", label: "Title" },
   { value: "updated_at", label: "Updated At" },
+];
+
+// Scene Number option - only shown when group filter is active
+export const SCENE_INDEX_SORT_OPTION = { value: "scene_index", label: "Scene Number" };
+
+// Full list for backwards compatibility
+export const SCENE_SORT_OPTIONS = [
+  ...SCENE_SORT_OPTIONS_BASE.slice(0, 15), // up to "rating"
+  SCENE_INDEX_SORT_OPTION,
+  ...SCENE_SORT_OPTIONS_BASE.slice(15), // "tag_count" onwards
 ];
 
 // Performer sorting options (alphabetically organized by label)

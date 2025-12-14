@@ -12,7 +12,9 @@ import {
   PERFORMER_FILTER_OPTIONS,
   PERFORMER_SORT_OPTIONS,
   SCENE_FILTER_OPTIONS,
+  SCENE_INDEX_SORT_OPTION,
   SCENE_SORT_OPTIONS,
+  SCENE_SORT_OPTIONS_BASE,
   STUDIO_FILTER_OPTIONS,
   STUDIO_SORT_OPTIONS,
   TAG_FILTER_OPTIONS,
@@ -594,10 +596,20 @@ const SearchControls = ({
     );
   }, [filters]);
 
-  const sortOptions = useMemo(
-    () => getSortOptions(artifactType),
-    [artifactType]
-  );
+  const sortOptions = useMemo(() => {
+    const baseOptions = getSortOptions(artifactType);
+    
+    // For scenes, conditionally include scene_index based on group filter
+    if (artifactType === "scene") {
+      const hasGroupFilter = filters?.groups?.length > 0;
+      if (hasGroupFilter) {
+        return SCENE_SORT_OPTIONS; // Full list with scene_index
+      }
+      return SCENE_SORT_OPTIONS_BASE; // Without scene_index
+    }
+    
+    return baseOptions;
+  }, [artifactType, filters?.groups]);
 
   // Show loading state while fetching default presets
   if (isLoadingDefaults) {
