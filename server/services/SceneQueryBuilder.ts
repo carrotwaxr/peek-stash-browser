@@ -513,15 +513,20 @@ class SceneQueryBuilder {
       filesize: `s.fileSize ${dir}`,
       bitrate: `s.fileBitRate ${dir}`,
       framerate: `s.fileFrameRate ${dir}`,
+      path: `s.filePath ${dir}`,
+      performer_count: `(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id) ${dir}`,
+      tag_count: `(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id) ${dir}`,
 
-      // Stash ratings (not user ratings)
-      rating: `s.rating100 ${dir}`,
+      // User ratings (from SceneRating table)
+      rating: `COALESCE(r.rating, 0) ${dir}`,
 
       // User data - prefer user values
       last_played_at: `w.lastPlayedAt ${dir}`,
       play_count: `COALESCE(w.playCount, 0) ${dir}`,
       play_duration: `COALESCE(w.playDuration, 0) ${dir}`,
       o_counter: `COALESCE(w.oCount, 0) ${dir}`,
+      // last_o_at: SQL sort not supported - lastOAt column doesn't exist in WatchHistory
+      // The last O timestamp is derived from oHistory JSON and can only be sorted in JS
       user_rating: `COALESCE(r.rating, 0) ${dir}`,
       resume_time: `COALESCE(w.resumeTime, 0) ${dir}`,
 
@@ -761,7 +766,7 @@ class SceneQueryBuilder {
       studioId: row.studioId,
 
       // User data - prefer Peek user data over Stash data
-      rating: row.userRating != null ? Math.round(row.userRating / 20) : null,
+      rating: row.userRating ?? null,
       rating100: row.userRating ?? null,
       favorite: row.userFavorite === 1,
       o_counter: row.userOCount ?? row.stashOCounter ?? 0,

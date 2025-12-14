@@ -213,6 +213,7 @@ function sortGalleries(
         aVal = a.date || "";
         bVal = b.date || "";
         break;
+      case "rating":
       case "rating100":
         aVal = a.rating100 || 0;
         bVal = b.rating100 || 0;
@@ -231,6 +232,10 @@ function sortGalleries(
         break;
       case "random":
         return Math.random() - 0.5;
+      case "path":
+        aVal = (a.folder?.path || "").toLowerCase();
+        bVal = (b.folder?.path || "").toLowerCase();
+        break;
       default:
         aVal = (a.title || "").toLowerCase();
         bVal = (b.title || "").toLowerCase();

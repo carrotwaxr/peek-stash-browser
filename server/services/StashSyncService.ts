@@ -18,6 +18,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 // Transform functions no longer needed - URLs transformed at read time
 import { stashInstanceManager } from "./StashInstanceManager.js";
+import { userStatsService } from "./UserStatsService.js";
 
 export interface SyncProgress {
   entityType: string;
@@ -145,6 +146,10 @@ class StashSyncService extends EventEmitter {
       result = await this.syncImages(stashInstanceId, true);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
+      // Rebuild user stats to reflect current entity relationships
+      logger.info("Rebuilding user stats after sync...");
+      await userStatsService.rebuildAllStats();
+      logger.info("User stats rebuild complete");
 
       const duration = Date.now() - startTime;
       logger.info("Full sync completed", {
@@ -446,6 +451,10 @@ class StashSyncService extends EventEmitter {
       result = await this.syncImages(stashInstanceId, false, lastSync);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "incremental", result);
+      // Rebuild user stats to reflect current entity relationships
+      logger.info("Rebuilding user stats after sync...");
+      await userStatsService.rebuildAllStats();
+      logger.info("User stats rebuild complete");
 
       const duration = Date.now() - startTime;
       logger.info("Incremental sync completed", {

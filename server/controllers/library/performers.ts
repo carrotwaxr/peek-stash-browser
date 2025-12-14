@@ -552,6 +552,7 @@ function getPerformerFieldValue(
   if (field === "last_played_at") return performer.last_played_at; // Return null as-is for timestamps
   if (field === "last_o_at") return performer.last_o_at; // Return null as-is for timestamps
   if (field === "random") return Math.random();
+  if (field === "height") return performer.height_cm || 0;
   // Fallback for dynamic field access (safe as function is only called with known fields)
   const value = (performer as Record<string, unknown>)[field];
   return typeof value === "string" || typeof value === "number" ? value : 0;
