@@ -231,6 +231,10 @@ function sortGalleries(
         break;
       case "random":
         return Math.random() - 0.5;
+      case "path":
+        aVal = (a.folder_path || "").toLowerCase();
+        bVal = (b.folder_path || "").toLowerCase();
+        break;
       default:
         aVal = (a.title || "").toLowerCase();
         bVal = (b.title || "").toLowerCase();
