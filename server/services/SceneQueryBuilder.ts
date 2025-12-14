@@ -523,6 +523,7 @@ class SceneQueryBuilder {
       play_count: `COALESCE(w.playCount, 0) ${dir}`,
       play_duration: `COALESCE(w.playDuration, 0) ${dir}`,
       o_counter: `COALESCE(w.oCount, 0) ${dir}`,
+      last_o_at: `w.lastOAt ${dir}`,
       user_rating: `COALESCE(r.rating, 0) ${dir}`,
       resume_time: `COALESCE(w.resumeTime, 0) ${dir}`,
 
