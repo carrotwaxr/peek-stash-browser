@@ -841,6 +841,7 @@ function getFieldValue(
   if (field === "duration") return scene.files?.[0]?.duration || 0;
   if (field === "filesize") return scene.files?.[0]?.size || 0;
   if (field === "framerate") return scene.files?.[0]?.frame_rate || 0;
+  if (field === "path") return scene.files?.[0]?.path || "";
 
   // Fallback for dynamic field access (safe as function is only called with known fields)
   const value = (scene as Record<string, unknown>)[field];

@@ -513,6 +513,7 @@ class SceneQueryBuilder {
       filesize: `s.fileSize ${dir}`,
       bitrate: `s.fileBitRate ${dir}`,
       framerate: `s.fileFrameRate ${dir}`,
+      path: `(SELECT sf.path FROM StashSceneFile sf WHERE sf.sceneId = s.id ORDER BY sf.isPrimary DESC LIMIT 1) ${dir}`,
 
       // Stash ratings (not user ratings)
       rating: `s.rating100 ${dir}`,
