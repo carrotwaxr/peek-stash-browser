@@ -213,6 +213,7 @@ function sortGalleries(
         aVal = a.date || "";
         bVal = b.date || "";
         break;
+      case "rating":
       case "rating100":
         aVal = a.rating100 || 0;
         bVal = b.rating100 || 0;
