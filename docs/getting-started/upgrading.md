@@ -2,11 +2,9 @@
 
 This guide covers upgrading Peek to new versions, including database migration procedures and backup strategies.
 
-## Version 3.0.0 (Beta) - SQLite Entity Cache
+## Version 3.0.0 - SQLite Entity Cache
 
-**Release Type:** Beta - recommended for testing only
-
-**Latest:** `v3.0.0-beta.2`
+**Release Type:** Stable
 
 Version 3.0.0 introduces a major architectural change: Stash entity data is now stored in SQLite tables instead of being held in memory. This provides:
 
@@ -96,7 +94,9 @@ docker cp peek-server:/app/data/peek-backup.db ./peek.db.backup
 docker-compose pull
 
 # For manual docker users
-docker pull carrotwaxr/peek:3.0.0-beta.2
+docker pull carrotwaxr/peek-stash-browser:3.0.0
+# or for latest
+docker pull carrotwaxr/peek-stash-browser:latest
 ```
 
 #### Step 2: Restart the Container
@@ -109,7 +109,7 @@ docker-compose up -d
 # Manual Docker
 docker stop peek-server
 docker rm peek-server
-docker run -d --name peek-server ... carrotwaxr/peek:3.0.0-beta.2
+docker run -d --name peek-server ... carrotwaxr/peek-stash-browser:3.0.0
 ```
 
 #### Step 3: Wait for Migration
@@ -130,6 +130,22 @@ Sync times depend on your library size:
 | 10,000 scenes | ~1-2 minutes |
 | 50,000 scenes | ~5-8 minutes |
 | 100,000 scenes | ~15-20 minutes |
+
+### Upgrading from 3.0.0 Beta Versions
+
+If you're upgrading from any v3.0.0-beta.x version, **we recommend running a full sync** after upgrading to ensure your database has all the latest fields populated correctly.
+
+**Why a full sync is recommended:**
+- beta.6 added `fileBasename` for gallery display
+- beta.9 added `fakeTits` for performer filtering
+
+**How to run a full sync:**
+1. Go to **Settings > Server Settings**
+2. Click **Sync from Stash**
+3. Select **Full Sync** (not incremental)
+4. Wait for completion
+
+This ensures all new fields are populated for existing data.
 
 ### Rollback Procedure
 
@@ -180,13 +196,9 @@ The initial sync after upgrade fetches all data from Stash. Subsequent syncs are
 
 Verify your Stash configuration in Settings. The upgrade doesn't change your Stash connection settings.
 
-### What's NOT Included in 3.0.0 Beta
+#### "Performer filters not working correctly"
 
-This beta focuses on the core architecture change. These features are planned for stable release:
-
-- [ ] Automatic incremental sync on Stash scan complete
-- [ ] Full-text search across all entity types
-- [ ] Multi-Stash instance support
+If performer filters (like career length, ethnicity, eye color) aren't working as expected, run a full sync to ensure all performer fields are populated.
 
 ### Reporting Issues
 
@@ -200,3 +212,24 @@ Include:
 3. Library size (scene count)
 4. Relevant log output
 5. Steps to reproduce
+
+---
+
+## Previous Version Upgrades
+
+### v2.0.0 - Stash Proxy Streaming
+
+Version 2.0 removed local transcoding in favor of proxying streams directly through Stash.
+
+**Key Changes:**
+- Removed FFmpeg transcoding system
+- Removed path mapping configuration
+- Added StashInstance table for connection storage
+
+**Migration:** Automatic. No user action required.
+
+### v1.x to v2.x
+
+Users upgrading from v1.x will have their schema automatically updated via the schemaCatchup system. All user data is preserved.
+
+**Migration:** Automatic. The system detects legacy databases and applies necessary schema updates before running Prisma migrations.
