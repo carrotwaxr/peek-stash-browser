@@ -1,3 +1,4 @@
+import { forwardRef, useEffect } from "react";
 import Button from "./Button.jsx";
 import SearchableSelect from "./SearchableSelect.jsx";
 
@@ -47,7 +48,7 @@ export const SortControl = ({
 /**
  * Reusable Filter Control Component
  */
-export const FilterControl = ({
+export const FilterControl = forwardRef(({
   type = "select",
   label,
   value,
@@ -66,7 +67,8 @@ export const FilterControl = ({
   hierarchyLabel = "Include children",
   hierarchyValue, // current depth value (undefined/0 = off, -1 = all)
   onHierarchyChange, // hierarchy change handler
-}) => {
+  isHighlighted = false, // for highlight animation when chip is clicked
+}, ref) => {
   // Standardized styles for all inputs in the filter panel
   const baseInputStyle = {
     backgroundColor: "var(--bg-card)",
@@ -413,7 +415,10 @@ export const FilterControl = ({
   };
 
   return (
-    <div className="flex flex-col">
+    <div
+      ref={ref}
+      className={`flex flex-col ${isHighlighted ? "filter-highlight" : ""}`}
+    >
       <label
         className="text-sm font-medium mb-2"
         style={{ color: "var(--text-primary)" }}
@@ -423,7 +428,9 @@ export const FilterControl = ({
       {renderInput()}
     </div>
   );
-};
+});
+
+FilterControl.displayName = "FilterControl";
 
 /**
  * Collapsible Filter Panel Component with manual submit
@@ -435,7 +442,21 @@ export const FilterPanel = ({
   isOpen,
   onToggle,
   onSubmit,
+  highlightedFilterKey,
+  filterRefs,
 }) => {
+  // Scroll to highlighted filter when it changes
+  useEffect(() => {
+    if (highlightedFilterKey && filterRefs?.current?.[highlightedFilterKey]) {
+      const element = filterRefs.current[highlightedFilterKey];
+
+      // Small delay to ensure panel is rendered
+      setTimeout(() => {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+    }
+  }, [highlightedFilterKey, filterRefs]);
+
   if (!isOpen) {
     return null; // Don't render when closed
   }
