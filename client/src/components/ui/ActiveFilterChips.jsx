@@ -8,6 +8,7 @@ import Button from "./Button.jsx";
  * @param {Object} props.filters - Current filter values
  * @param {Array} props.filterOptions - Filter configuration from filterConfig.js
  * @param {Function} props.onRemoveFilter - Callback when a filter is removed
+ * @param {Function} props.onChipClick - Callback when a chip body is clicked (receives filter key)
  * @param {Object} props.permanentFilters - Filters that can't be removed
  * @param {Object} props.permanentFiltersMetadata - Display names for permanent filters
  */
@@ -15,6 +16,7 @@ const ActiveFilterChips = ({
   filters,
   filterOptions,
   onRemoveFilter,
+  onChipClick,
   permanentFilters = {},
   permanentFiltersMetadata = {},
 }) => {
@@ -156,7 +158,10 @@ const ActiveFilterChips = ({
       {allChips.map((chip) => (
         <div
           key={chip.key}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-colors"
+          onClick={() => !chip.isPermanent && onChipClick?.(chip.key)}
+          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm border transition-colors ${
+            !chip.isPermanent ? "cursor-pointer hover:opacity-80" : ""
+          }`}
           style={{
             backgroundColor: chip.isPermanent
               ? "var(--bg-tertiary)"
@@ -173,7 +178,10 @@ const ActiveFilterChips = ({
           <span>{chip.label}</span>
           {!chip.isPermanent && (
             <Button
-              onClick={() => onRemoveFilter(chip.key)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemoveFilter(chip.key);
+              }}
               variant="tertiary"
               className="hover:opacity-70 !p-0 !border-0"
               aria-label={`Remove filter: ${chip.label}`}
