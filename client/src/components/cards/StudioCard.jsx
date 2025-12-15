@@ -69,6 +69,7 @@ const StudioCard = forwardRef(
           entityId: studio.id,
           initialRating: studio.rating100,
           initialFavorite: studio.favorite || false,
+          initialOCounter: studio.o_counter,
           onHideSuccess,
         }}
         {...rest}
