@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { migrateCarouselPreferences } from "../../constants/carousels.js";
 import { migrateNavPreferences } from "../../constants/navigation.js";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
@@ -31,6 +32,7 @@ const Settings = () => {
   usePageTitle("My Settings");
   const { changeTheme, availableThemes, currentTheme } = useTheme();
   const { hideConfirmationDisabled, updateHideConfirmation } = useHiddenEntities();
+  const { unitPreference, setUnitPreference } = useUnitPreference();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -43,7 +45,6 @@ const Settings = () => {
   const [carouselPreferences, setCarouselPreferences] = useState([]);
   const [navPreferences, setNavPreferences] = useState([]);
   const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
-  const [unitPreference, setUnitPreference] = useState("metric");
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState("");
@@ -81,7 +82,6 @@ const Settings = () => {
       setNavPreferences(migratedNavPrefs);
 
       setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
-      setUnitPreference(settings.unitPreference || "metric");
     } catch {
       // Error handling could be added here if needed
     } finally {
@@ -133,7 +133,6 @@ const Settings = () => {
         preferredPreviewQuality,
         enableCast,
         minimumPlayPercent,
-        unitPreference,
       });
 
       showSuccess("Settings saved successfully!");

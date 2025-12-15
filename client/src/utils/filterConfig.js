@@ -1806,14 +1806,14 @@ export const buildPerformerFilter = (filters, unitPreference = UNITS.METRIC) => 
 
   // Height, weight, and penisLength use convertedFilters for unit conversion
   if (convertedFilters.height?.min || convertedFilters.height?.max) {
-    performerFilter.height_cm = {};
+    performerFilter.height = {};
     if (convertedFilters.height.min)
-      performerFilter.height_cm.value = parseInt(convertedFilters.height.min);
-    performerFilter.height_cm.modifier = convertedFilters.height.max
+      performerFilter.height.value = parseInt(convertedFilters.height.min);
+    performerFilter.height.modifier = convertedFilters.height.max
       ? "BETWEEN"
       : "GREATER_THAN";
     if (convertedFilters.height.max)
-      performerFilter.height_cm.value2 = parseInt(convertedFilters.height.max);
+      performerFilter.height.value2 = parseInt(convertedFilters.height.max);
   }
 
   if (convertedFilters.weight?.min || convertedFilters.weight?.max) {
