@@ -118,6 +118,7 @@ export const getUserSettings = async (
         minimumPlayPercent: true,
         syncToStash: true,
         hideConfirmationDisabled: true,
+        unitPreference: true,
       },
     });
 
@@ -138,6 +139,7 @@ export const getUserSettings = async (
         minimumPlayPercent: user.minimumPlayPercent,
         syncToStash: user.syncToStash,
         hideConfirmationDisabled: user.hideConfirmationDisabled,
+        unitPreference: user.unitPreference || "metric",
       },
     });
   } catch (error) {
@@ -185,6 +187,7 @@ export const updateUserSettings = async (
       navPreferences,
       minimumPlayPercent,
       syncToStash,
+      unitPreference,
     } = req.body;
 
     // Validate values
@@ -226,6 +229,16 @@ export const updateUserSettings = async (
     // Validate syncToStash if provided (admin only can change this)
     if (syncToStash !== undefined && typeof syncToStash !== "boolean") {
       return res.status(400).json({ error: "Sync to Stash must be a boolean" });
+    }
+
+    // Validate unitPreference if provided
+    if (unitPreference !== undefined) {
+      const validUnits = ["metric", "imperial"];
+      if (!validUnits.includes(unitPreference)) {
+        return res
+          .status(400)
+          .json({ error: "Unit preference must be 'metric' or 'imperial'" });
+      }
     }
 
     // Validate carousel preferences if provided
@@ -286,6 +299,7 @@ export const updateUserSettings = async (
         ...(navPreferences !== undefined && { navPreferences }),
         ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
         ...(syncToStash !== undefined && { syncToStash }),
+        ...(unitPreference !== undefined && { unitPreference }),
       },
       select: {
         id: true,
