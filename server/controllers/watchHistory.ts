@@ -578,3 +578,214 @@ export async function clearAllWatchHistory(
     res.status(500).json({ error: "Failed to clear watch history" });
   }
 }
+
+/**
+ * Save activity (resume time and play duration delta)
+ * Simplified endpoint matching Stash's pattern - called by track-activity plugin
+ */
+export async function saveActivity(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { sceneId, resumeTime, playDuration } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!sceneId) {
+      return res.status(400).json({ error: "Missing required field: sceneId" });
+    }
+
+    logger.info("Save activity", {
+      userId,
+      sceneId,
+      resumeTime: resumeTime?.toFixed(2),
+      playDuration: playDuration?.toFixed(2),
+    });
+
+    // Get user settings for syncToStash
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    const now = new Date();
+
+    // Use upsert to avoid race condition between concurrent saveActivity and incrementPlayCount calls
+    const watchHistory = await prisma.watchHistory.upsert({
+      where: { userId_sceneId: { userId, sceneId } },
+      create: {
+        userId,
+        sceneId,
+        playCount: 0,
+        playDuration: playDuration || 0,
+        resumeTime: resumeTime || 0,
+        lastPlayedAt: now,
+        oCount: 0,
+        oHistory: [],
+        playHistory: [],
+      },
+      update: {
+        resumeTime: resumeTime,
+        playDuration: { increment: playDuration || 0 },
+        lastPlayedAt: now,
+      },
+    });
+
+    // Sync to Stash if user has sync enabled
+    if (user.syncToStash && playDuration) {
+      try {
+        const stash = stashInstanceManager.getDefault();
+        await stash.sceneSaveActivity({
+          id: sceneId,
+          resume_time: resumeTime,
+          playDuration: playDuration,
+        });
+
+        logger.info("Synced activity to Stash", {
+          userId,
+          sceneId,
+          resumeTime,
+          playDuration,
+        });
+      } catch (stashError) {
+        logger.error("Failed to sync activity to Stash", {
+          sceneId,
+          error: stashError,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      watchHistory: {
+        playCount: watchHistory.playCount,
+        playDuration: watchHistory.playDuration,
+        resumeTime: watchHistory.resumeTime,
+        lastPlayedAt: watchHistory.lastPlayedAt,
+      },
+    });
+  } catch (error) {
+    logger.error("Error saving activity", { error });
+    res.status(500).json({ error: "Failed to save activity" });
+  }
+}
+
+/**
+ * Increment play count for a scene
+ * Called by track-activity plugin when minimum play percentage is reached
+ */
+export async function incrementPlayCount(
+  req: AuthenticatedRequest,
+  res: Response
+) {
+  try {
+    const { sceneId } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    if (!sceneId) {
+      return res.status(400).json({ error: "Missing required field: sceneId" });
+    }
+
+    logger.info("Increment play count", { userId, sceneId });
+
+    // Get user settings for syncToStash
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { syncToStash: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    const now = new Date();
+
+    // First, get existing record to build play history (upsert doesn't support array append)
+    const existing = await prisma.watchHistory.findUnique({
+      where: { userId_sceneId: { userId, sceneId } },
+    });
+
+    const existingPlayHistory = existing
+      ? Array.isArray(existing.playHistory)
+        ? existing.playHistory
+        : JSON.parse((existing.playHistory as string) || "[]")
+      : [];
+
+    const newPlayHistory = [...existingPlayHistory, now.toISOString()];
+
+    // Use upsert to avoid race condition between concurrent saveActivity and incrementPlayCount calls
+    const watchHistory = await prisma.watchHistory.upsert({
+      where: { userId_sceneId: { userId, sceneId } },
+      create: {
+        userId,
+        sceneId,
+        playCount: 1,
+        playDuration: 0,
+        resumeTime: 0,
+        lastPlayedAt: now,
+        oCount: 0,
+        oHistory: [],
+        playHistory: [now.toISOString()],
+      },
+      update: {
+        playCount: { increment: 1 },
+        playHistory: JSON.stringify(newPlayHistory),
+        lastPlayedAt: now,
+      },
+    });
+
+    // Update pre-computed stats
+    await userStatsService.updateStatsForScene(
+      userId,
+      sceneId,
+      0, // oCountDelta
+      1, // playCountDelta
+      now, // lastPlayedAt
+      undefined // lastOAt
+    );
+
+    // Sync to Stash if user has sync enabled
+    if (user.syncToStash) {
+      try {
+        const stash = stashInstanceManager.getDefault();
+        const addPlayResult = await stash.sceneAddPlay({
+          id: sceneId,
+          times: [now.toISOString()],
+        });
+
+        logger.info("Synced play count to Stash", {
+          userId,
+          sceneId,
+          stashPlayCount: addPlayResult.sceneAddPlay.count,
+        });
+      } catch (stashError) {
+        logger.error("Failed to sync play count to Stash", {
+          sceneId,
+          error: stashError,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      watchHistory: {
+        playCount: watchHistory.playCount,
+        playDuration: watchHistory.playDuration,
+        resumeTime: watchHistory.resumeTime,
+        lastPlayedAt: watchHistory.lastPlayedAt,
+      },
+    });
+  } catch (error) {
+    logger.error("Error incrementing play count", { error });
+    res.status(500).json({ error: "Failed to increment play count" });
+  }
+}

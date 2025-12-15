@@ -3,25 +3,26 @@ import { apiGet, apiPost } from "../services/api.js";
 import { useAuth } from "./useAuth.js";
 
 /**
- * Hook for tracking watch history with periodic pings
- * Handles playback tracking, O counter, and resume time
+ * Hook for watch history state and O counter
+ *
+ * Note: Playback tracking (play duration, play count) is now handled by the
+ * track-activity Video.js plugin in useVideoPlayer.js. This hook only provides:
+ * - Watch history state (for resume time display)
+ * - O counter increment
+ * - Quality tracking
  *
  * @param {string} sceneId - Stash scene ID
- * @param {Object} playerRef - React ref to Video.js player instance
+ * @param {Object} playerRef - React ref to Video.js player instance (unused, kept for API compat)
  * @returns {Object} Watch history state and methods
  */
-export function useWatchHistory(sceneId, playerRef = { current: null }) {
+export function useWatchHistory(sceneId, _playerRef = { current: null }) { // eslint-disable-line no-unused-vars
   const { isAuthenticated } = useAuth();
   const [watchHistory, setWatchHistory] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Refs for tracking session state
-  const sessionStartRef = useRef(null);
-  const pingIntervalRef = useRef(null);
-  const seekEventsRef = useRef([]);
+  // Track current quality for logging/debugging
   const currentQualityRef = useRef("auto");
-  const hasIncrementedPlayCountRef = useRef(false);
 
   /**
    * Fetch watch history for this scene
@@ -44,105 +45,6 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
       setLoading(false);
     }
   }, [sceneId, isAuthenticated]);
-
-  /**
-   * Send ping to server with current playback state
-   */
-  const sendPing = useCallback(async () => {
-    if (
-      !playerRef.current ||
-      playerRef.current.isDisposed?.() ||
-      !sceneId ||
-      !isAuthenticated
-    ) {
-      return;
-    }
-
-    try {
-      const currentTime = playerRef.current.currentTime();
-
-      const pingData = {
-        sceneId,
-        currentTime,
-        quality: currentQualityRef.current,
-        sessionStart: sessionStartRef.current,
-        seekEvents: seekEventsRef.current,
-      };
-
-      const response = await apiPost("/watch-history/ping", pingData);
-
-      // Update local state with server response
-      if (response.success) {
-        setWatchHistory(response.watchHistory);
-
-        // Mark that play count has been incremented (to prevent multiple increments in same session)
-        if (response.watchHistory.playCount > (watchHistory?.playCount || 0)) {
-          hasIncrementedPlayCountRef.current = true;
-        }
-      }
-    } catch (err) {
-      console.error("Error sending watch history ping:", err);
-      // Don't set error state for ping failures - they're not critical
-    }
-  }, [playerRef, sceneId, isAuthenticated, watchHistory?.playCount]);
-
-  /**
-   * Start tracking watch session
-   */
-  const startTracking = useCallback(() => {
-    if (
-      !playerRef.current ||
-      playerRef.current.isDisposed?.() ||
-      !sceneId ||
-      !isAuthenticated
-    ) {
-      return;
-    }
-
-    // Initialize session start time if not already set
-    if (!sessionStartRef.current) {
-      sessionStartRef.current = new Date().toISOString();
-      hasIncrementedPlayCountRef.current = false;
-    }
-
-    // Clear existing interval if any
-    if (pingIntervalRef.current) {
-      clearInterval(pingIntervalRef.current);
-    }
-
-    // Send immediate ping
-    sendPing();
-
-    // Set up 10-second ping interval (matching Stash's pattern)
-    pingIntervalRef.current = setInterval(() => {
-      sendPing();
-    }, 10000); // 10 seconds
-  }, [playerRef, sceneId, isAuthenticated, sendPing]);
-
-  /**
-   * Stop tracking watch session (send final ping and cleanup)
-   */
-  const stopTracking = useCallback(() => {
-    // Send final ping before stopping
-    sendPing();
-
-    // Clear interval
-    if (pingIntervalRef.current) {
-      clearInterval(pingIntervalRef.current);
-      pingIntervalRef.current = null;
-    }
-  }, [sendPing]);
-
-  /**
-   * Track seek event
-   */
-  const trackSeek = useCallback((from, to) => {
-    seekEventsRef.current.push({
-      time: new Date().toISOString(),
-      from,
-      to,
-    });
-  }, []);
 
   /**
    * Update current quality setting
@@ -177,96 +79,10 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
     }
   }, [sceneId, isAuthenticated]);
 
-  /**
-   * Reset session (for when starting new playback session)
-   */
-  const resetSession = useCallback(() => {
-    sessionStartRef.current = new Date().toISOString();
-    seekEventsRef.current = [];
-    hasIncrementedPlayCountRef.current = false;
-  }, []);
-
   // Fetch watch history on mount
   useEffect(() => {
     fetchWatchHistory();
   }, [fetchWatchHistory]);
-
-  useEffect(() => {
-    const player = playerRef.current;
-    if (!player || player.isDisposed?.()) return;
-
-    const handlePlay = () => startTracking();
-    const handlePause = () => stopTracking();
-    const handleSeeked = () => trackSeek(0, player.currentTime());
-    const handleEnded = () => stopTracking();
-
-    player.on("play", handlePlay);
-    player.on("pause", handlePause);
-    player.on("seeked", handleSeeked);
-    player.on("ended", handleEnded);
-
-    return () => {
-      // Send final ping and cleanup when component unmounts
-      if (pingIntervalRef.current) {
-        stopTracking();
-      }
-
-      if (player && !player.isDisposed()) {
-        player.off("play", handlePlay);
-        player.off("pause", handlePause);
-        player.off("seeked", handleSeeked);
-        player.off("ended", handleEnded);
-      }
-    };
-  }, [playerRef, startTracking, stopTracking, trackSeek]);
-
-  // Listen for page visibility changes (tab switching)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // User switched away from tab - send final ping
-        stopTracking();
-      } else if (playerRef.current && !playerRef.current.paused()) {
-        // User returned to tab and video is playing - restart tracking
-        startTracking();
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [playerRef, startTracking, stopTracking]);
-
-  // Listen for beforeunload (closing tab/navigating away)
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Send final ping before page unloads
-      if (pingIntervalRef.current && navigator.sendBeacon) {
-        // Use sendBeacon for reliable delivery during page unload
-        const currentTime = playerRef.current?.currentTime() || 0;
-        const pingData = {
-          sceneId,
-          currentTime,
-          quality: currentQualityRef.current,
-          sessionStart: sessionStartRef.current,
-          seekEvents: seekEventsRef.current,
-        };
-
-        navigator.sendBeacon(
-          "/api/watch-history/ping",
-          JSON.stringify(pingData)
-        );
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [playerRef, sceneId]);
 
   return {
     // State
@@ -275,12 +91,8 @@ export function useWatchHistory(sceneId, playerRef = { current: null }) {
     error,
 
     // Methods
-    startTracking,
-    stopTracking,
-    trackSeek,
     updateQuality,
     incrementOCounter,
-    resetSession,
     refresh: fetchWatchHistory,
   };
 }

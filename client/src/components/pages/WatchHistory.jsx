@@ -47,8 +47,11 @@ const WatchHistory = () => {
         // Extract scene IDs from watch history
         const sceneIds = watchHistoryList.map((wh) => wh.sceneId);
 
-        // Fetch scenes in bulk
-        const response = await libraryApi.findScenes({ ids: sceneIds });
+        // Fetch scenes in bulk - must set per_page to match number of IDs
+        const response = await libraryApi.findScenes({
+          ids: sceneIds,
+          filter: { per_page: sceneIds.length },
+        });
         const fetchedScenes = response?.findScenes?.scenes || [];
 
         // Match scenes with watch history data

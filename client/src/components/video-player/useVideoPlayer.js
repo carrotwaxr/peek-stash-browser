@@ -7,6 +7,7 @@ import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import axios from "axios";
 import videojs from "video.js";
+import { apiPost } from "../../services/api.js";
 import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
@@ -22,6 +23,30 @@ import "./plugins/media-session.js";
 // Register Video.js plugins
 airplay(videojs);
 chromecast(videojs);
+
+/**
+ * Retry a function with exponential backoff
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxAttempts - Maximum number of attempts (default: 3)
+ * @param {number} baseDelay - Base delay in ms (default: 1000)
+ * @returns {Promise} Result of the function or throws after all retries
+ */
+async function retryWithBackoff(fn, maxAttempts = 3, baseDelay = 1000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.warn(`[RETRY] Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
 
 const _api = axios.create({
   baseURL: "/api",
@@ -94,7 +119,6 @@ export function useVideoPlayer({
   nextScene,
   prevScene,
   updateQuality,
-  stopTracking,
   location,
   hasResumedRef,
   initialResumeTimeRef,
@@ -182,10 +206,10 @@ export function useVideoPlayer({
     player.focus();
 
     // Volume persistence is now handled by persistVolume plugin
+    // Watch history tracking is now handled by the trackActivity plugin
 
     // Cleanup
     return () => {
-      stopTracking();
       playerRef.current = null;
 
       try {
@@ -249,14 +273,38 @@ export function useVideoPlayer({
     const trackActivityPlugin = player.trackActivity();
     if (!trackActivityPlugin) return;
 
+    const sceneId = scene.id;
+
     // Enable tracking
     trackActivityPlugin.setEnabled(true);
     trackActivityPlugin.minimumPlayPercent = 10; // Match Stash's 10% threshold
 
-    // The plugin tracks playback internally and calls these callbacks
-    // It coordinates with the existing useWatchHistory hook's ping system
-    // incrementPlayCount is called once per session when threshold is reached
+    // Connect plugin callbacks to API endpoints
     // saveActivity is called periodically (every 10s) during playback
+    trackActivityPlugin.saveActivity = async (resumeTime, playDuration) => {
+      try {
+        await retryWithBackoff(() =>
+          apiPost("/watch-history/save-activity", {
+            sceneId,
+            resumeTime,
+            playDuration,
+          })
+        );
+      } catch (error) {
+        console.error("Failed to save activity after 3 attempts:", error);
+      }
+    };
+
+    // incrementPlayCount is called once per session when threshold is reached
+    trackActivityPlugin.incrementPlayCount = async () => {
+      try {
+        await retryWithBackoff(() =>
+          apiPost("/watch-history/increment-play-count", { sceneId })
+        );
+      } catch (error) {
+        console.error("Failed to increment play count after 3 attempts:", error);
+      }
+    };
 
     return () => {
       trackActivityPlugin.setEnabled(false);

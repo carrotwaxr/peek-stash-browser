@@ -670,7 +670,8 @@ model StashGallery {
   code    String? // Gallery code
 
   // === File metadata ===
-  folderPath String? // Folder path if folder-based
+  folderPath   String? // Folder path if folder-based
+  fileBasename String? // First file's basename (for zip galleries)
 
   // === Stash paths (raw, transformed at read time) ===
   coverPath String? // Cover image path

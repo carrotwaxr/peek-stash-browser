@@ -1411,6 +1411,9 @@ class StashEntityService {
       name: gp.performer.name,
     })) || [];
 
+    // Build files array for frontend title fallback (zip galleries)
+    const files = gallery.fileBasename ? [{ basename: gallery.fileBasename }] : [];
+
     return {
       ...DEFAULT_GALLERY_USER_FIELDS,
       id: gallery.id,
@@ -1423,6 +1426,8 @@ class StashEntityService {
       url: gallery.url,
       code: gallery.code,
       folder: gallery.folderPath ? { path: gallery.folderPath } : null,
+      // Files array for frontend galleryTitle() fallback
+      files,
       cover: coverUrl ? { paths: { thumbnail: coverUrl } } : null,
       // Frontend expects gallery.paths.cover for the cover image
       paths: coverUrl ? { cover: coverUrl } : null,
