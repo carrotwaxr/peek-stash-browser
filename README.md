@@ -1,7 +1,5 @@
 # Peek Stash Browser
 
-**⚠️ BETA SOFTWARE** - Currently in beta testing. Expect bugs and incomplete features.
-
 A modern web application for browsing and streaming your [Stash](https://github.com/stashapp/stash) adult content library with adaptive video streaming, playlists, and watch history tracking.
 
 ## What is Peek?
@@ -180,7 +178,7 @@ docker run -d `
 
 **unRAID users:** Simply click **Force Update** in the Docker tab to pull the latest image and restart.
 
-**Note:** Your database, user settings, path mappings, and playlists are stored in the `peek-data` volume and will persist across updates.
+**Note:** Your database, user settings, and playlists are stored in the `peek-data` volume and will persist across updates.
 
 ### Use Specific Version
 
@@ -195,15 +193,6 @@ docker run ... carrotwaxr/peek-stash-browser:1.0.0
 ```
 
 Available versions are listed on [GitHub Releases](https://github.com/carrotwaxr/peek-stash-browser/releases).
-
-## Beta Testing
-
-This is **beta software**. Please help improve Peek by:
-
-1. **Testing core functionality** - See [Regression Testing Guide](https://carrotwaxr.github.io/peek-stash-browser/development/regression-testing/) for test scenarios
-2. **Reporting bugs** - [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues) with detailed reproduction steps
-3. **Requesting features** - Open an issue tagged as "enhancement"
-4. **Providing feedback** - What works well? What's confusing?
 
 ## Documentation
 

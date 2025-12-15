@@ -40,12 +40,13 @@ Peek is a web-based browser for your Stash library, offering a sleek modern inte
 
 ### Key Features
 
-- **Adaptive Video Streaming** - Real-time HLS transcoding with multiple quality options (720p/480p/360p)
+- **Video Streaming** - Proxied through Stash with quality selection (Direct, 1080p, 720p, 480p, 360p)
 - **Watch History Tracking** - Automatic progress tracking and resume playback ([Learn more](user-guide/watch-history.md))
 - **Playlist Management** - Create, organize, and play custom playlists ([Learn more](user-guide/playlists.md))
 - **Modern Interface** - Responsive React UI with theme support
 - **Full Keyboard Navigation** - Complete TV remote and keyboard control support ([Learn more](user-guide/keyboard-navigation.md))
 - **Mobile Ready** - Optimized for all devices
+- **Scalable Library** - SQLite-based storage supports 100k+ scenes
 
 ## Quick Start
 
@@ -73,20 +74,18 @@ Peek is a web-based browser for your Stash library, offering a sleek modern inte
 
 ### First Login
 
-**Default Credentials:**
+On first access, you'll be guided through a setup wizard:
 
-- **Username:** `admin`
-- **Password:** `admin`
-
-!!! warning "Important: Change Default Password"
-    **Immediately change your password** after first login via Settings → My Settings
+1. **Welcome** - Introduction to Peek
+2. **Create Admin** - Set your admin username and password
+3. **Connect to Stash** - Enter your Stash URL and API key
+4. **Complete** - Setup finished!
 
 ## Requirements
 
 - Stash server with GraphQL API enabled
 - Docker (or unRAID)
 - Network access between Peek and Stash
-- Shared media storage accessible to both containers
 
 ## Architecture
 
@@ -95,7 +94,7 @@ Peek uses a **single-container architecture**:
 - **Frontend**: React 19 app served by nginx
 - **Backend**: Node.js/Express API server (proxied through nginx)
 - **Database**: SQLite (embedded, no separate container)
-- **Transcoding**: FFmpeg for real-time video conversion
+- **Streaming**: Proxied through Stash (no local transcoding)
 
 ## Community & Support
 
