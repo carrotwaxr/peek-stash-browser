@@ -205,6 +205,7 @@ const GroupDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No performers found in "${group?.name}"`}
             />
           )}

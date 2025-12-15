@@ -275,6 +275,7 @@ const StudioDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No galleries found for ${studio?.name}`}
             />
           )}
@@ -298,6 +299,7 @@ const StudioDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No performers found for ${studio?.name}`}
             />
           )}
@@ -313,6 +315,7 @@ const StudioDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No collections found for ${studio?.name}`}
             />
           )}
