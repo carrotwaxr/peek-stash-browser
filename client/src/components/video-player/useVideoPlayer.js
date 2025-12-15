@@ -94,7 +94,9 @@ export function useVideoPlayer({
   nextScene,
   prevScene,
   updateQuality,
+  startTracking,
   stopTracking,
+  trackSeek,
   location,
   hasResumedRef,
   initialResumeTimeRef,
@@ -182,6 +184,18 @@ export function useVideoPlayer({
     player.focus();
 
     // Volume persistence is now handled by persistVolume plugin
+
+    // Set up watch history tracking event listeners
+    // These must be attached here (after player creation) because the useWatchHistory
+    // hook's useEffect runs before the player exists due to React's render cycle
+    player.on("play", () => startTracking());
+    player.on("pause", () => stopTracking());
+    player.on("ended", () => stopTracking());
+    player.on("seeked", () => {
+      if (player && !player.isDisposed()) {
+        trackSeek(0, player.currentTime());
+      }
+    });
 
     // Cleanup
     return () => {

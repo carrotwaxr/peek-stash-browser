@@ -97,7 +97,9 @@ const VideoPlayer = () => {
   const {
     watchHistory,
     loading: loadingWatchHistory,
+    startTracking,
     stopTracking,
+    trackSeek,
     updateQuality,
   } = useWatchHistory(scene?.id, playerRef);
 
@@ -122,7 +124,9 @@ const VideoPlayer = () => {
     nextScene,
     prevScene,
     updateQuality,
+    startTracking,
     stopTracking,
+    trackSeek,
     location,
     hasResumedRef,
     initialResumeTimeRef,
