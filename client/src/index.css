@@ -124,3 +124,18 @@ a:focus-visible,
     0 0 0 10px rgba(255, 255, 255, 0.1),
     0 4px 12px rgba(0, 0, 0, 0.6);
 }
+
+/* Filter control highlight animation - used when clicking filter chips */
+@keyframes filter-highlight-pulse {
+  0% {
+    box-shadow: 0 0 0 3px var(--accent-primary);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.filter-highlight {
+  animation: filter-highlight-pulse 1.5s ease-out;
+  border-radius: 0.375rem;
+}

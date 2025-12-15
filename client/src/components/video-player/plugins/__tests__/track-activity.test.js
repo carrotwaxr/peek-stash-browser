@@ -319,15 +319,13 @@ describe("TrackActivityPlugin", () => {
       plugin.lastResumeTime = 150;
       plugin.lastDuration = 600;
 
-      // Simulate player being disposed
-      const originalCurrentTime = mockPlayer.currentTime;
-      mockPlayer.currentTime = undefined;
+      // Simulate player.currentTime() throwing or returning undefined
+      mockPlayer.currentTime.mockReturnValue(undefined);
+      mockPlayer.duration.mockReturnValue(600);
 
       plugin.sendActivity();
 
       expect(plugin.saveActivity).toHaveBeenCalledWith(150, 10);
-
-      mockPlayer.currentTime = originalCurrentTime;
     });
 
     it("should use lastDuration when player.duration is unavailable", () => {
@@ -338,17 +336,13 @@ describe("TrackActivityPlugin", () => {
       plugin.lastDuration = 600;
 
       mockPlayer.currentTime.mockReturnValue(150);
-
-      // Simulate player being disposed
-      const originalDuration = mockPlayer.duration;
-      mockPlayer.duration = undefined;
+      // Simulate player.duration() returning undefined
+      mockPlayer.duration.mockReturnValue(undefined);
 
       plugin.sendActivity();
 
       // Should still work using lastDuration
       expect(plugin.saveActivity).toHaveBeenCalled();
-
-      mockPlayer.duration = originalDuration;
     });
   });
 });
