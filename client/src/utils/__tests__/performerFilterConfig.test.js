@@ -772,4 +772,87 @@ describe("buildPerformerFilter", () => {
       });
     });
   });
+
+  describe("Imperial Unit Conversion", () => {
+    it("should convert imperial height (feet/inches) to cm", () => {
+      const uiFilters = {
+        height: { feetMin: "5", inchesMin: "10", feetMax: "6", inchesMax: "2" },
+      };
+      const result = buildPerformerFilter(uiFilters, "imperial");
+      // 5'10" = 178cm, 6'2" = 188cm
+      expect(result.height_cm).toEqual({
+        modifier: "BETWEEN",
+        value: 178,
+        value2: 188,
+      });
+    });
+
+    it("should convert imperial height min only", () => {
+      const uiFilters = {
+        height: { feetMin: "5", inchesMin: "6" },
+      };
+      const result = buildPerformerFilter(uiFilters, "imperial");
+      // 5'6" = 168cm
+      expect(result.height_cm).toEqual({
+        modifier: "GREATER_THAN",
+        value: 168,
+      });
+    });
+
+    it("should convert imperial weight (lbs) to kg", () => {
+      const uiFilters = {
+        weight: { min: "110", max: "180" },
+      };
+      const result = buildPerformerFilter(uiFilters, "imperial");
+      // 110 lbs = 50 kg, 180 lbs = 82 kg
+      expect(result.weight).toEqual({
+        modifier: "BETWEEN",
+        value: 50,
+        value2: 82,
+      });
+    });
+
+    it("should convert imperial penis length (inches) to cm", () => {
+      const uiFilters = {
+        penisLength: { min: "5", max: "8" },
+      };
+      const result = buildPerformerFilter(uiFilters, "imperial");
+      // 5 in = 12.7cm -> 12 (parseInt), 8 in = 20.3cm -> 20 (parseInt)
+      expect(result.penis_length).toEqual({
+        modifier: "BETWEEN",
+        value: 12,
+        value2: 20,
+      });
+    });
+
+    it("should not convert when unit preference is metric", () => {
+      const uiFilters = {
+        height: { min: "170", max: "180" },
+        weight: { min: "60", max: "80" },
+      };
+      const result = buildPerformerFilter(uiFilters, "metric");
+      expect(result.height_cm).toEqual({
+        modifier: "BETWEEN",
+        value: 170,
+        value2: 180,
+      });
+      expect(result.weight).toEqual({
+        modifier: "BETWEEN",
+        value: 60,
+        value2: 80,
+      });
+    });
+
+    it("should default to metric when no unit preference provided", () => {
+      const uiFilters = {
+        height: { min: "170", max: "180" },
+      };
+      const result = buildPerformerFilter(uiFilters);
+      expect(result.height_cm).toEqual({
+        modifier: "BETWEEN",
+        value: 170,
+        value2: 180,
+      });
+    });
+  });
 });

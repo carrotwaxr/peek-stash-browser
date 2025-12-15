@@ -4,6 +4,7 @@ import { LucideArrowDown, LucideArrowUp } from "lucide-react";
 import { apiGet } from "../../services/api.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation.js";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
 import {
   GALLERY_FILTER_OPTIONS,
   GALLERY_SORT_OPTIONS,
@@ -38,10 +39,10 @@ import {
   SortControl,
 } from "./index.js";
 
-const buildFilter = (artifactType, filters) => {
+const buildFilter = (artifactType, filters, unitPreference) => {
   switch (artifactType) {
     case "performer":
-      return { performer_filter: buildPerformerFilter(filters) };
+      return { performer_filter: buildPerformerFilter(filters, unitPreference) };
     case "studio":
       return { studio_filter: buildStudioFilter(filters) };
     case "tag":
@@ -102,6 +103,9 @@ const SearchControls = ({
   // TV Mode
   const { isTVMode } = useTVMode();
 
+  // Unit preference for filter conversions
+  const { unitPreference } = useUnitPreference();
+
   // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets
   const searchZoneItems = useMemo(() => [
     { id: "search-input", name: "Search" },
@@ -152,9 +156,44 @@ const SearchControls = ({
 
   // Get filter options for this artifact type
   const filterOptions = useMemo(() => {
+    // Transform filter options based on unit preference
+    const transformForUnits = (options) => {
+      if (unitPreference !== "imperial") return options;
+      return options.map((opt) => {
+        // Transform height filter for imperial
+        if (opt.key === "height") {
+          return {
+            ...opt,
+            label: "Height (ft/in)",
+            type: "imperial-height-range",
+            // Store in separate keys that buildPerformerFilter will convert
+          };
+        }
+        // Transform weight filter for imperial
+        if (opt.key === "weight") {
+          return {
+            ...opt,
+            label: "Weight (lbs)",
+            min: 50,
+            max: 500,
+          };
+        }
+        // Transform penisLength filter for imperial
+        if (opt.key === "penisLength") {
+          return {
+            ...opt,
+            label: "Penis Length (inches)",
+            min: 1,
+            max: 15,
+          };
+        }
+        return opt;
+      });
+    };
+
     switch (artifactType) {
       case "performer":
-        return [...PERFORMER_FILTER_OPTIONS];
+        return transformForUnits([...PERFORMER_FILTER_OPTIONS]);
       case "studio":
         return [...STUDIO_FILTER_OPTIONS];
       case "tag":
@@ -167,7 +206,7 @@ const SearchControls = ({
       default:
         return [...SCENE_FILTER_OPTIONS];
     }
-  }, [artifactType]);
+  }, [artifactType, unitPreference]);
 
   // Track collapsed state for each filter section
   const [collapsedSections, setCollapsedSections] = useState(() => {
@@ -306,7 +345,7 @@ const SearchControls = ({
           q: initialState.searchText,
           sort: initialState.sortField,
         },
-        ...buildFilter(artifactType, initialState.filters),
+        ...buildFilter(artifactType, initialState.filters, unitPreference),
       };
       onQueryChange(query);
 
@@ -316,7 +355,7 @@ const SearchControls = ({
 
     initializeState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run once on mount
+  }, [unitPreference]); // Re-run when unit preference changes
 
   // Update URL params whenever state changes (one-way: State → URL)
   useEffect(() => {
@@ -372,7 +411,7 @@ const SearchControls = ({
         q: searchText,
         sort: sortField,
       },
-      ...buildFilter(artifactType, { ...permanentFilters }),
+      ...buildFilter(artifactType, { ...permanentFilters }, unitPreference),
     };
 
     onQueryChange(query);
@@ -400,7 +439,7 @@ const SearchControls = ({
         q: searchText,
         sort: sortField,
       },
-      ...buildFilter(artifactType, filters),
+      ...buildFilter(artifactType, filters, unitPreference),
     };
 
     onQueryChange(query);
@@ -428,7 +467,7 @@ const SearchControls = ({
           q: searchText,
           sort: sortField,
         },
-        ...buildFilter(artifactType, updatedFilters),
+        ...buildFilter(artifactType, updatedFilters, unitPreference),
       };
 
       onQueryChange(query);
@@ -442,6 +481,7 @@ const SearchControls = ({
       sortField,
       artifactType,
       onQueryChange,
+      unitPreference,
     ]
   );
 
@@ -464,12 +504,12 @@ const SearchControls = ({
         ...buildFilter(artifactType, {
           ...permanentFilters,
           ...preset.filters,
-        }),
+        }, unitPreference),
       };
 
       onQueryChange(query);
     },
-    [permanentFilters, perPage, searchText, artifactType, onQueryChange]
+    [permanentFilters, perPage, searchText, artifactType, onQueryChange, unitPreference]
   );
 
   const handlePageChange = (page) => {
@@ -484,7 +524,7 @@ const SearchControls = ({
         q: searchText,
         sort: sortField,
       },
-      ...buildFilter(artifactType, filters),
+      ...buildFilter(artifactType, filters, unitPreference),
     };
 
     onQueryChange(query);
@@ -527,7 +567,7 @@ const SearchControls = ({
         q: searchStr,
         sort: sortField,
       },
-      ...buildFilter(artifactType, filters),
+      ...buildFilter(artifactType, filters, unitPreference),
     };
 
     onQueryChange(query);
@@ -556,7 +596,7 @@ const SearchControls = ({
         q: searchText,
         sort: newSortField,
       },
-      ...buildFilter(artifactType, filters),
+      ...buildFilter(artifactType, filters, unitPreference),
     };
 
     onQueryChange(query);
@@ -579,7 +619,7 @@ const SearchControls = ({
         q: searchText,
         sort: sortField,
       },
-      ...buildFilter(artifactType, filters),
+      ...buildFilter(artifactType, filters, unitPreference),
     };
 
     onQueryChange(query);

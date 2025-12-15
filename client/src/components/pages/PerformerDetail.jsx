@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
+import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
+import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions.js";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -409,6 +411,8 @@ const SectionLink = ({ url }) => {
 };
 
 const PerformerDetails = ({ performer }) => {
+  const { unitPreference, isLoading: isLoadingUnits } = useUnitPreference();
+
   // Calculate age from birthdate
   const getAge = (birthdate) => {
     if (!birthdate) return null;
@@ -478,17 +482,29 @@ const PerformerDetails = ({ performer }) => {
           <DetailField label="Hair Color" value={performer?.hair_color} />
           <DetailField
             label="Height"
-            value={performer?.height_cm && `${performer.height_cm} cm`}
+            value={
+              isLoadingUnits
+                ? "..."
+                : performer?.height_cm && formatHeight(performer.height_cm, unitPreference)
+            }
           />
           <DetailField
             label="Weight"
-            value={performer?.weight && `${performer.weight} kg`}
+            value={
+              isLoadingUnits
+                ? "..."
+                : performer?.weight && formatWeight(performer.weight, unitPreference)
+            }
           />
           <DetailField label="Measurements" value={performer?.measurements} />
           <DetailField label="Fake Tits" value={performer?.fake_tits} />
           <DetailField
             label="Penis Length"
-            value={performer?.penis_length && `${performer.penis_length} cm`}
+            value={
+              isLoadingUnits
+                ? "..."
+                : performer?.penis_length && formatLength(performer.penis_length, unitPreference)
+            }
           />
           <DetailField label="Circumcised" value={performer?.circumcised} />
         </div>

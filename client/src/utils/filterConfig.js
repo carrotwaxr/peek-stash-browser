@@ -2,6 +2,13 @@
  * Sorting and filtering configuration for all entity types
  */
 
+import {
+  UNITS,
+  feetInchesToCm,
+  lbsToKg,
+  inchesToCm,
+} from "./unitConversions.js";
+
 // Scene sorting options (alphabetically organized by label)
 // Note: scene_index is added dynamically when group filter is active
 export const SCENE_SORT_OPTIONS_BASE = [
@@ -1611,7 +1618,72 @@ export const buildSceneFilter = (filters) => {
   return sceneFilter;
 };
 
-export const buildPerformerFilter = (filters) => {
+/**
+ * Converts filter values from imperial to metric if needed.
+ * Height uses feet/inches fields, weight uses lbs, penisLength uses inches.
+ */
+const convertFilterUnits = (filters, unitPreference) => {
+  if (unitPreference !== UNITS.IMPERIAL) return filters;
+
+  const converted = { ...filters };
+
+  // Height: convert feet/inches to cm (from imperial-height-range filter type)
+  // The filter stores: { feetMin, inchesMin, feetMax, inchesMax }
+  if (filters.height?.feetMin !== undefined || filters.height?.inchesMin !== undefined) {
+    const feet = parseInt(filters.height.feetMin || 0);
+    const inches = parseInt(filters.height.inchesMin || 0);
+    if (feet || inches) {
+      converted.height = {
+        ...converted.height,
+        min: feetInchesToCm(feet, inches),
+      };
+    }
+  }
+  if (filters.height?.feetMax !== undefined || filters.height?.inchesMax !== undefined) {
+    const feet = parseInt(filters.height.feetMax || 0);
+    const inches = parseInt(filters.height.inchesMax || 0);
+    if (feet || inches) {
+      converted.height = {
+        ...converted.height,
+        max: feetInchesToCm(feet, inches),
+      };
+    }
+  }
+
+  // Weight: convert lbs to kg
+  if (filters.weight?.min) {
+    converted.weight = {
+      ...converted.weight,
+      min: lbsToKg(parseInt(filters.weight.min)),
+    };
+  }
+  if (filters.weight?.max) {
+    converted.weight = {
+      ...converted.weight,
+      max: lbsToKg(parseInt(filters.weight.max)),
+    };
+  }
+
+  // Penis length: convert inches to cm
+  if (filters.penisLength?.min) {
+    converted.penisLength = {
+      ...converted.penisLength,
+      min: inchesToCm(parseFloat(filters.penisLength.min)),
+    };
+  }
+  if (filters.penisLength?.max) {
+    converted.penisLength = {
+      ...converted.penisLength,
+      max: inchesToCm(parseFloat(filters.penisLength.max)),
+    };
+  }
+
+  return converted;
+};
+
+export const buildPerformerFilter = (filters, unitPreference = UNITS.METRIC) => {
+  // Convert imperial values to metric before building filter
+  const convertedFilters = convertFilterUnits(filters, unitPreference);
   const performerFilter = {};
 
   // Boolean filter
@@ -1732,37 +1804,38 @@ export const buildPerformerFilter = (filters) => {
       performerFilter.career_length.value2 = parseInt(filters.careerLength.max);
   }
 
-  if (filters.height?.min || filters.height?.max) {
+  // Height, weight, and penisLength use convertedFilters for unit conversion
+  if (convertedFilters.height?.min || convertedFilters.height?.max) {
     performerFilter.height_cm = {};
-    if (filters.height.min)
-      performerFilter.height_cm.value = parseInt(filters.height.min);
-    performerFilter.height_cm.modifier = filters.height.max
+    if (convertedFilters.height.min)
+      performerFilter.height_cm.value = parseInt(convertedFilters.height.min);
+    performerFilter.height_cm.modifier = convertedFilters.height.max
       ? "BETWEEN"
       : "GREATER_THAN";
-    if (filters.height.max)
-      performerFilter.height_cm.value2 = parseInt(filters.height.max);
+    if (convertedFilters.height.max)
+      performerFilter.height_cm.value2 = parseInt(convertedFilters.height.max);
   }
 
-  if (filters.weight?.min || filters.weight?.max) {
+  if (convertedFilters.weight?.min || convertedFilters.weight?.max) {
     performerFilter.weight = {};
-    if (filters.weight.min)
-      performerFilter.weight.value = parseInt(filters.weight.min);
-    performerFilter.weight.modifier = filters.weight.max
+    if (convertedFilters.weight.min)
+      performerFilter.weight.value = parseInt(convertedFilters.weight.min);
+    performerFilter.weight.modifier = convertedFilters.weight.max
       ? "BETWEEN"
       : "GREATER_THAN";
-    if (filters.weight.max)
-      performerFilter.weight.value2 = parseInt(filters.weight.max);
+    if (convertedFilters.weight.max)
+      performerFilter.weight.value2 = parseInt(convertedFilters.weight.max);
   }
 
-  if (filters.penisLength?.min || filters.penisLength?.max) {
+  if (convertedFilters.penisLength?.min || convertedFilters.penisLength?.max) {
     performerFilter.penis_length = {};
-    if (filters.penisLength.min)
-      performerFilter.penis_length.value = parseInt(filters.penisLength.min);
-    performerFilter.penis_length.modifier = filters.penisLength.max
+    if (convertedFilters.penisLength.min)
+      performerFilter.penis_length.value = parseInt(convertedFilters.penisLength.min);
+    performerFilter.penis_length.modifier = convertedFilters.penisLength.max
       ? "BETWEEN"
       : "GREATER_THAN";
-    if (filters.penisLength.max)
-      performerFilter.penis_length.value2 = parseInt(filters.penisLength.max);
+    if (convertedFilters.penisLength.max)
+      performerFilter.penis_length.value2 = parseInt(convertedFilters.penisLength.max);
   }
 
   // Check for non-empty values before creating filter object

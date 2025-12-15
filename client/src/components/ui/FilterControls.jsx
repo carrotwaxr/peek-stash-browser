@@ -257,6 +257,100 @@ export const FilterControl = ({
             />
           </div>
         );
+      case "imperial-height-range":
+        // Imperial height input with feet and inches fields
+        return (
+          <div className="space-y-2">
+            <fieldset>
+              <legend
+                className="text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Min Height:
+              </legend>
+              <div className="flex space-x-2 mt-1">
+                <div className="flex-1">
+                  <label htmlFor="height-feet-min" className="sr-only">
+                    Minimum height feet
+                  </label>
+                  <input
+                    id="height-feet-min"
+                    type="number"
+                    value={value?.feetMin || ""}
+                    onChange={(e) => onChange({ ...value, feetMin: e.target.value })}
+                    placeholder="Feet"
+                    min={0}
+                    max={8}
+                    aria-label="Minimum height in feet"
+                    className={inputClasses}
+                    style={baseInputStyle}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label htmlFor="height-inches-min" className="sr-only">
+                    Minimum height inches
+                  </label>
+                  <input
+                    id="height-inches-min"
+                    type="number"
+                    value={value?.inchesMin || ""}
+                    onChange={(e) => onChange({ ...value, inchesMin: e.target.value })}
+                    placeholder="Inches"
+                    min={0}
+                    max={11}
+                    aria-label="Minimum height in inches"
+                    className={inputClasses}
+                    style={baseInputStyle}
+                  />
+                </div>
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend
+                className="text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                Max Height:
+              </legend>
+              <div className="flex space-x-2 mt-1">
+                <div className="flex-1">
+                  <label htmlFor="height-feet-max" className="sr-only">
+                    Maximum height feet
+                  </label>
+                  <input
+                    id="height-feet-max"
+                    type="number"
+                    value={value?.feetMax || ""}
+                    onChange={(e) => onChange({ ...value, feetMax: e.target.value })}
+                    placeholder="Feet"
+                    min={0}
+                    max={8}
+                    aria-label="Maximum height in feet"
+                    className={inputClasses}
+                    style={baseInputStyle}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label htmlFor="height-inches-max" className="sr-only">
+                    Maximum height inches
+                  </label>
+                  <input
+                    id="height-inches-max"
+                    type="number"
+                    value={value?.inchesMax || ""}
+                    onChange={(e) => onChange({ ...value, inchesMax: e.target.value })}
+                    placeholder="Inches"
+                    min={0}
+                    max={11}
+                    aria-label="Maximum height in inches"
+                    className={inputClasses}
+                    style={baseInputStyle}
+                  />
+                </div>
+              </div>
+            </fieldset>
+          </div>
+        );
       case "date-range":
         return (
           <div className="flex flex-col space-y-2">

@@ -6,6 +6,7 @@ import SetupWizard from "./components/pages/SetupWizard.jsx";
 import { GlobalLayout } from "./components/ui/index.js";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
+import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider.jsx";
 import { SetupGuard, LoginGuard, ProtectedRoute } from "./components/guards/RouteGuards.jsx";
 import { setupApi } from "./services/api.js";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
@@ -351,18 +352,20 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <TVModeProvider>
-          <AppContent />
-          <Toaster
-            position="bottom-center"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                padding: "0",
-              },
-            }}
-          />
-        </TVModeProvider>
+        <UnitPreferenceProvider>
+          <TVModeProvider>
+            <AppContent />
+            <Toaster
+              position="bottom-center"
+              toastOptions={{
+                duration: 3000,
+                style: {
+                  padding: "0",
+                },
+              }}
+            />
+          </TVModeProvider>
+        </UnitPreferenceProvider>
       </AuthProvider>
     </ThemeProvider>
   );

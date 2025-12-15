@@ -1,5 +1,14 @@
 /**
  * Unit conversion utilities for Metric/Imperial measurements
+ *
+ * IMPORTANT: Round-trip conversions may not be exact due to rounding.
+ * For example:
+ *   - 100 kg → 221 lbs → 100 kg (works due to symmetric rounding)
+ *   - 65 kg → 143 lbs → 65 kg (works)
+ *   - Some edge cases may lose 1 unit precision
+ *
+ * This is acceptable for display purposes and filter ranges where
+ * exact precision is not critical. The API always stores metric values.
  */
 
 export const UNITS = {
