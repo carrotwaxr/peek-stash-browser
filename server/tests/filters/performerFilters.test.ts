@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import type { NormalizedPerformer, PeekPerformerFilter } from "../../types/index.js";
-import { applyPerformerFilters } from "../../controllers/library/performers.js";
+import { applyPerformerFilters, parseCareerLength } from "../../controllers/library/performers.js";
 import {
   createMockPerformer,
   createMockPerformers,
@@ -671,5 +671,243 @@ describe("Performer Filters", () => {
       expect(result).toHaveLength(1);
       expect(result[0].scene_count).toBe(0);
     });
+  });
+});
+
+describe("parseCareerLength", () => {
+  const currentYear = new Date().getFullYear();
+
+  describe("Active careers (year-present format)", () => {
+    it("should parse '2015-present' as years from 2015 to now", () => {
+      const result = parseCareerLength("2015-present");
+      expect(result).toBe(currentYear - 2015);
+    });
+
+    it("should parse '2020-Present' (case insensitive)", () => {
+      const result = parseCareerLength("2020-Present");
+      expect(result).toBe(currentYear - 2020);
+    });
+
+    it("should parse '2018-' (trailing dash, no end)", () => {
+      const result = parseCareerLength("2018-");
+      expect(result).toBe(currentYear - 2018);
+    });
+
+    it("should parse '2015 - present' (with spaces)", () => {
+      const result = parseCareerLength("2015 - present");
+      expect(result).toBe(currentYear - 2015);
+    });
+
+    it("should parse '2019-current' as active career", () => {
+      const result = parseCareerLength("2019-current");
+      expect(result).toBe(currentYear - 2019);
+    });
+
+    it("should parse '2017-now' as active career", () => {
+      const result = parseCareerLength("2017-now");
+      expect(result).toBe(currentYear - 2017);
+    });
+  });
+
+  describe("Ended careers (year-year format)", () => {
+    it("should parse '2010-2018' as 8 years", () => {
+      const result = parseCareerLength("2010-2018");
+      expect(result).toBe(8);
+    });
+
+    it("should parse '2015 - 2020' (with spaces) as 5 years", () => {
+      const result = parseCareerLength("2015 - 2020");
+      expect(result).toBe(5);
+    });
+
+    it("should parse '2000-2000' as 0 years", () => {
+      const result = parseCareerLength("2000-2000");
+      expect(result).toBe(0);
+    });
+  });
+
+  describe("Numeric duration format", () => {
+    it("should parse '5' as 5 years", () => {
+      const result = parseCareerLength("5");
+      expect(result).toBe(5);
+    });
+
+    it("should parse '10 years' as 10 years", () => {
+      const result = parseCareerLength("10 years");
+      expect(result).toBe(10);
+    });
+
+    it("should parse '3 yrs' as 3 years", () => {
+      const result = parseCareerLength("3 yrs");
+      expect(result).toBe(3);
+    });
+
+    it("should parse '1 year' as 1 year", () => {
+      const result = parseCareerLength("1 year");
+      expect(result).toBe(1);
+    });
+  });
+
+  describe("Standalone year format", () => {
+    it("should parse '2020' as years from 2020 to now", () => {
+      const result = parseCareerLength("2020");
+      expect(result).toBe(currentYear - 2020);
+    });
+  });
+
+  describe("Invalid/empty inputs", () => {
+    it("should return null for null input", () => {
+      const result = parseCareerLength(null);
+      expect(result).toBeNull();
+    });
+
+    it("should return null for undefined input", () => {
+      const result = parseCareerLength(undefined);
+      expect(result).toBeNull();
+    });
+
+    it("should return null for empty string", () => {
+      const result = parseCareerLength("");
+      expect(result).toBeNull();
+    });
+
+    it("should return null for whitespace-only string", () => {
+      const result = parseCareerLength("   ");
+      expect(result).toBeNull();
+    });
+
+    it("should return null for unparseable string", () => {
+      const result = parseCareerLength("unknown");
+      expect(result).toBeNull();
+    });
+
+    it("should return null for invalid year range (end before start)", () => {
+      const result = parseCareerLength("2020-2010");
+      expect(result).toBeNull();
+    });
+
+    it("should return null for unreasonably old year", () => {
+      const result = parseCareerLength("1800-present");
+      expect(result).toBeNull();
+    });
+  });
+});
+
+describe("Career Length Filter", () => {
+  it("should filter performers by career_length with GREATER_THAN modifier", async () => {
+    const performers = [
+      createMockPerformer({ id: "p1", career_length: "2015-present" }), // ~9-10 years
+      createMockPerformer({ id: "p2", career_length: "2022-present" }), // ~2-3 years
+      createMockPerformer({ id: "p3", career_length: "5 years" }),      // 5 years
+      createMockPerformer({ id: "p4", career_length: null }),           // null - excluded
+    ];
+
+    const filter: PeekPerformerFilter = {
+      career_length: { value: 4, modifier: "GREATER_THAN" },
+    };
+
+    const result = await applyPerformerFilters(performers, filter);
+
+    // Should include p1 (9-10 years > 4) and p3 (5 years > 4)
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result.find(p => p.id === "p1")).toBeDefined();
+    expect(result.find(p => p.id === "p3")).toBeDefined();
+    // Should exclude p4 (null career_length)
+    expect(result.find(p => p.id === "p4")).toBeUndefined();
+  });
+
+  it("should filter performers by career_length with LESS_THAN modifier", async () => {
+    const performers = [
+      createMockPerformer({ id: "p1", career_length: "2015-present" }), // ~9-10 years
+      createMockPerformer({ id: "p2", career_length: "2022-present" }), // ~2-3 years
+      createMockPerformer({ id: "p3", career_length: "1 year" }),       // 1 year
+    ];
+
+    const filter: PeekPerformerFilter = {
+      career_length: { value: 5, modifier: "LESS_THAN" },
+    };
+
+    const result = await applyPerformerFilters(performers, filter);
+
+    // Should include p2 and p3 (both < 5 years)
+    expect(result.find(p => p.id === "p2")).toBeDefined();
+    expect(result.find(p => p.id === "p3")).toBeDefined();
+    // Should exclude p1 (9-10 years)
+    expect(result.find(p => p.id === "p1")).toBeUndefined();
+  });
+
+  it("should filter performers by career_length with BETWEEN modifier (both bounds)", async () => {
+    const performers = [
+      createMockPerformer({ id: "p1", career_length: "10 years" }),
+      createMockPerformer({ id: "p2", career_length: "5 years" }),
+      createMockPerformer({ id: "p3", career_length: "2 years" }),
+      createMockPerformer({ id: "p4", career_length: "15 years" }),
+    ];
+
+    const filter: PeekPerformerFilter = {
+      career_length: { value: 3, value2: 12, modifier: "BETWEEN" },
+    };
+
+    const result = await applyPerformerFilters(performers, filter);
+
+    // Should include p1 (10 years) and p2 (5 years) - both between 3-12
+    expect(result).toHaveLength(2);
+    expect(result.find(p => p.id === "p1")).toBeDefined();
+    expect(result.find(p => p.id === "p2")).toBeDefined();
+  });
+
+  it("should filter performers by career_length with BETWEEN modifier (max only)", async () => {
+    const performers = [
+      createMockPerformer({ id: "p1", career_length: "10 years" }),
+      createMockPerformer({ id: "p2", career_length: "2 years" }),
+      createMockPerformer({ id: "p3", career_length: "1 year" }),
+    ];
+
+    const filter: PeekPerformerFilter = {
+      career_length: { value2: 3, modifier: "BETWEEN" },
+    };
+
+    const result = await applyPerformerFilters(performers, filter);
+
+    // Should include p2 (2 years) and p3 (1 year) - both <= 3
+    expect(result).toHaveLength(2);
+    expect(result.find(p => p.id === "p2")).toBeDefined();
+    expect(result.find(p => p.id === "p3")).toBeDefined();
+  });
+
+  it("should exclude performers with unparseable career_length", async () => {
+    const performers = [
+      createMockPerformer({ id: "p1", career_length: "5 years" }),
+      createMockPerformer({ id: "p2", career_length: "unknown" }),
+      createMockPerformer({ id: "p3", career_length: "" }),
+      createMockPerformer({ id: "p4", career_length: null }),
+    ];
+
+    const filter: PeekPerformerFilter = {
+      career_length: { value: 0, modifier: "GREATER_THAN" },
+    };
+
+    const result = await applyPerformerFilters(performers, filter);
+
+    // Should only include p1 (parseable and > 0)
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("p1");
+  });
+
+  it("should parse year-range format correctly in filter", async () => {
+    const performers = [
+      createMockPerformer({ id: "p1", career_length: "2010-2018" }), // 8 years
+      createMockPerformer({ id: "p2", career_length: "2015-2020" }), // 5 years
+    ];
+
+    const filter: PeekPerformerFilter = {
+      career_length: { value: 6, modifier: "GREATER_THAN" },
+    };
+
+    const result = await applyPerformerFilters(performers, filter);
+
+    // Should only include p1 (8 years > 6)
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("p1");
   });
 });

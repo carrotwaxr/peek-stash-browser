@@ -16,6 +16,73 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 
 /**
+ * Parse a career_length string into years of career duration.
+ *
+ * Stash stores career_length as a free-text string with various formats:
+ * - "2015-present" or "2015-" → calculate years from start to current year
+ * - "2010-2018" → calculate years between start and end
+ * - "5" or "5 years" → extract numeric duration directly
+ *
+ * @param careerLengthStr The career_length string from Stash
+ * @returns Number of years, or null if unparseable/empty
+ */
+export function parseCareerLength(careerLengthStr: string | null | undefined): number | null {
+  if (!careerLengthStr || careerLengthStr.trim() === "") {
+    return null;
+  }
+
+  const str = careerLengthStr.trim().toLowerCase();
+  const currentYear = new Date().getFullYear();
+
+  // Pattern: "2015-present", "2015-", "2015 - present", "2015 -"
+  // Matches: start year with optional end that's "present", empty, or missing
+  const activePattern = /^(\d{4})\s*[-–—]\s*(present|current|now|\s*)$/i;
+  const activeMatch = str.match(activePattern);
+  if (activeMatch) {
+    const startYear = parseInt(activeMatch[1], 10);
+    if (startYear > 1900 && startYear <= currentYear) {
+      return currentYear - startYear;
+    }
+  }
+
+  // Pattern: "2010-2018", "2010 - 2018"
+  // Matches: start year to end year
+  const rangePattern = /^(\d{4})\s*[-–—]\s*(\d{4})$/;
+  const rangeMatch = str.match(rangePattern);
+  if (rangeMatch) {
+    const startYear = parseInt(rangeMatch[1], 10);
+    const endYear = parseInt(rangeMatch[2], 10);
+    if (startYear > 1900 && endYear >= startYear && endYear <= currentYear + 1) {
+      return endYear - startYear;
+    }
+  }
+
+  // Pattern: "5", "5 years", "10 yrs"
+  // Matches: just a number optionally followed by "years" or "yrs"
+  const numericPattern = /^(\d+)\s*(years?|yrs?)?$/i;
+  const numericMatch = str.match(numericPattern);
+  if (numericMatch) {
+    const years = parseInt(numericMatch[1], 10);
+    if (years >= 0 && years <= 100) {
+      return years;
+    }
+  }
+
+  // Pattern: standalone 4-digit year like "2015" (assume active from that year)
+  const yearOnlyPattern = /^(\d{4})$/;
+  const yearOnlyMatch = str.match(yearOnlyPattern);
+  if (yearOnlyMatch) {
+    const startYear = parseInt(yearOnlyMatch[1], 10);
+    if (startYear > 1900 && startYear <= currentYear) {
+      return currentYear - startYear;
+    }
+  }
+
+  // Unable to parse
+  return null;
+}
+
+/**
  * Merge user-specific data into performers
  * OPTIMIZED: Now uses pre-computed stats from database instead of calculating on-the-fly
  */
@@ -713,15 +780,23 @@ export async function applyPerformerFilters(
   if (filters.career_length) {
     const careerFilter = filters.career_length as { value?: number; value2?: number; modifier?: string };
     const { modifier, value, value2 } = careerFilter;
-    if (value !== undefined && value !== null) {
+    // For BETWEEN, we need at least one bound; for other modifiers we need value
+    const hasValidFilter = (modifier === "BETWEEN" && (value !== undefined || value2 !== undefined)) ||
+                           (modifier !== "BETWEEN" && value !== undefined && value !== null);
+    if (hasValidFilter) {
       filtered = filtered.filter((p) => {
-        const careerLength = parseInt(p.career_length || '0', 10) || 0;
-        if (modifier === "GREATER_THAN") return careerLength > value;
-        if (modifier === "LESS_THAN") return careerLength < value;
+        const careerLength = parseCareerLength(p.career_length);
+        // Exclude performers with unparseable career_length
+        if (careerLength === null) return false;
+        if (modifier === "GREATER_THAN" && value !== undefined) return careerLength > value;
+        if (modifier === "LESS_THAN" && value !== undefined) return careerLength < value;
         if (modifier === "EQUALS") return careerLength === value;
         if (modifier === "NOT_EQUALS") return careerLength !== value;
-        if (modifier === "BETWEEN" && value2 !== undefined && value2 !== null) {
-          return careerLength >= value && careerLength <= value2;
+        if (modifier === "BETWEEN") {
+          // Support partial ranges (min only, max only, or both)
+          const minOk = value === undefined || value === null || careerLength >= value;
+          const maxOk = value2 === undefined || value2 === null || careerLength <= value2;
+          return minOk && maxOk;
         }
         return true;
       });
