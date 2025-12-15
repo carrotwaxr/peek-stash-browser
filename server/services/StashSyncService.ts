@@ -1616,6 +1616,8 @@ class StashSyncService extends EventEmitter {
     const values = validGalleries
       .map((gallery) => {
         const folder = gallery.folder;
+        // Get first file's basename for zip gallery title fallback
+        const fileBasename = gallery.files?.[0]?.basename || null;
         return `(
       '${this.escape(gallery.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -1628,6 +1630,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(gallery.url)},
       ${this.escapeNullable(gallery.code)},
       ${this.escapeNullable(folder?.path)},
+      ${this.escapeNullable(fileBasename)},
       ${this.escapeNullable(gallery.paths?.cover)},
       ${gallery.created_at ? `'${gallery.created_at}'` : "NULL"},
       ${gallery.updated_at ? `'${gallery.updated_at}'` : "NULL"},
@@ -1640,7 +1643,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashGallery (
       id, stashInstanceId, title, date, studioId, rating100, imageCount,
-      details, url, code, folderPath, coverPath, stashCreatedAt, stashUpdatedAt,
+      details, url, code, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1653,6 +1656,7 @@ class StashSyncService extends EventEmitter {
       url = excluded.url,
       code = excluded.code,
       folderPath = excluded.folderPath,
+      fileBasename = excluded.fileBasename,
       coverPath = excluded.coverPath,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
