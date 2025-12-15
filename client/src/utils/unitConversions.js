@@ -49,3 +49,31 @@ export const formatHeight = (cm, unit) => {
   }
   return `${cm} cm`;
 };
+
+/**
+ * Convert kilograms to pounds
+ * @param {number} kg - Weight in kilograms
+ * @returns {number} Weight in pounds (rounded)
+ */
+export const kgToLbs = (kg) => Math.round(kg * 2.205);
+
+/**
+ * Convert pounds to kilograms
+ * @param {number} lbs - Weight in pounds
+ * @returns {number} Weight in kilograms (rounded)
+ */
+export const lbsToKg = (lbs) => Math.round(lbs / 2.205);
+
+/**
+ * Format weight for display based on unit preference
+ * @param {number} kg - Weight in kilograms
+ * @param {string} unit - UNITS.METRIC or UNITS.IMPERIAL
+ * @returns {string|null}
+ */
+export const formatWeight = (kg, unit) => {
+  if (!kg) return null;
+  if (unit === UNITS.IMPERIAL) {
+    return `${kgToLbs(kg)} lbs`;
+  }
+  return `${kg} kg`;
+};

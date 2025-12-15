@@ -4,6 +4,9 @@ import {
   cmToFeetInches,
   feetInchesToCm,
   formatHeight,
+  kgToLbs,
+  lbsToKg,
+  formatWeight,
 } from "../unitConversions.js";
 
 describe("unitConversions", () => {
@@ -55,6 +58,37 @@ describe("unitConversions", () => {
     it("returns null for null/undefined input", () => {
       expect(formatHeight(null, UNITS.METRIC)).toBeNull();
       expect(formatHeight(undefined, UNITS.IMPERIAL)).toBeNull();
+    });
+  });
+
+  describe("weight conversions", () => {
+    it("converts 70 kg to 154 lbs", () => {
+      expect(kgToLbs(70)).toBe(154);
+    });
+
+    it("converts 100 kg to 221 lbs", () => {
+      expect(kgToLbs(100)).toBe(221);
+    });
+
+    it("converts 154 lbs to 70 kg", () => {
+      expect(lbsToKg(154)).toBe(70);
+    });
+
+    it("converts 221 lbs to 100 kg", () => {
+      expect(lbsToKg(221)).toBe(100);
+    });
+
+    it("formats weight in metric as 'X kg'", () => {
+      expect(formatWeight(70, UNITS.METRIC)).toBe("70 kg");
+    });
+
+    it("formats weight in imperial as 'X lbs'", () => {
+      expect(formatWeight(70, UNITS.IMPERIAL)).toBe("154 lbs");
+    });
+
+    it("returns null for null/undefined input", () => {
+      expect(formatWeight(null, UNITS.METRIC)).toBeNull();
+      expect(formatWeight(undefined, UNITS.IMPERIAL)).toBeNull();
     });
   });
 });
