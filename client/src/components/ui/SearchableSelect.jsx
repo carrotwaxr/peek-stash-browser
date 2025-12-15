@@ -271,6 +271,11 @@ const SearchableSelect = ({
     }
   };
 
+  const handleClearAll = (e) => {
+    e.stopPropagation(); // Don't toggle dropdown
+    onChange(multi ? [] : "");
+  };
+
   const isSelected = (optionId) => {
     if (multi) {
       return (value || []).includes(optionId);
@@ -326,13 +331,26 @@ const SearchableSelect = ({
             </div>
           )}
         </div>
-        <LucideChevronDown
-          size={14}
-          style={{
-            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-            transition: "transform 0.2s",
-          }}
-        />
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {selectedItems.length > 0 && (
+            <Button
+              onClick={handleClearAll}
+              variant="tertiary"
+              className="hover:opacity-70 !p-1 !border-0"
+              aria-label="Clear all selections"
+              title="Clear all"
+              icon={<LucideX size={16} style={{ color: "var(--text-muted)" }} />}
+            />
+          )}
+          <LucideChevronDown
+            size={14}
+            style={{
+              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 0.2s",
+              color: "var(--text-muted)",
+            }}
+          />
+        </div>
       </div>
 
       {/* Dropdown */}
