@@ -97,8 +97,10 @@ const SearchControls = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [highlightedFilterKey, setHighlightedFilterKey] = useState(null);
   const hasInitialized = useRef(false); // Prevent double initialization
   const topPaginationRef = useRef(null); // Ref for top pagination element
+  const filterRefs = useRef({}); // Refs for filter controls (for scroll-to-highlight)
 
   // TV Mode
   const { isTVMode } = useTVMode();
@@ -485,6 +487,46 @@ const SearchControls = ({
     ]
   );
 
+  // Handle clicking on a filter chip to highlight that filter
+  const handleFilterChipClick = useCallback(
+    (filterKey) => {
+      // Open filter panel if not already open
+      setIsFilterPanelOpen(true);
+
+      // Find which section this filter belongs to
+      let sectionKey = null;
+      for (let i = 0; i < filterOptions.length; i++) {
+        if (filterOptions[i].type === "section-header") {
+          sectionKey = filterOptions[i].key;
+        } else if (filterOptions[i].key === filterKey) {
+          break;
+        }
+      }
+
+      // Expand the section if it's collapsed
+      if (sectionKey && collapsedSections[sectionKey]) {
+        setCollapsedSections((prev) => ({
+          ...prev,
+          [sectionKey]: false,
+        }));
+      }
+
+      // Set the highlighted filter key (triggers scroll and animation)
+      setHighlightedFilterKey(filterKey);
+    },
+    [filterOptions, collapsedSections]
+  );
+
+  // Clear highlight after animation completes
+  useEffect(() => {
+    if (highlightedFilterKey) {
+      const timer = setTimeout(() => {
+        setHighlightedFilterKey(null);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedFilterKey]);
+
   // Handle loading a saved preset
   const handleLoadPreset = useCallback(
     (preset) => {
@@ -797,6 +839,7 @@ const SearchControls = ({
         filters={filters}
         filterOptions={filterOptions}
         onRemoveFilter={handleRemoveFilter}
+        onChipClick={handleFilterChipClick}
         permanentFilters={permanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
       />
@@ -834,6 +877,8 @@ const SearchControls = ({
         onClear={clearFilters}
         onSubmit={handleFilterSubmit}
         hasActiveFilters={hasActiveFilters}
+        highlightedFilterKey={highlightedFilterKey}
+        filterRefs={filterRefs}
       >
         {filterOptions.map((opt, index) => {
           const { defaultValue, key, type, ...rest } = opt;
@@ -923,6 +968,10 @@ const SearchControls = ({
           return (
             <FilterControl
               key={`FilterControl-${key}`}
+              ref={(el) => {
+                if (el) filterRefs.current[key] = el;
+              }}
+              isHighlighted={highlightedFilterKey === key}
               onChange={(value) => handleFilterChange(key, value)}
               value={filters[key] || defaultValue}
               type={type}
