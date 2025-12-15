@@ -273,6 +273,7 @@ const PerformerDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No galleries found for ${performer.name}`}
             />
           )}
@@ -292,6 +293,7 @@ const PerformerDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No collections found for ${performer.name}`}
             />
           )}

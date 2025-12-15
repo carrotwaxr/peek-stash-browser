@@ -254,6 +254,8 @@ export function scenePlayerReducer(state, action) {
         ready: false,
         // Reset quality to "direct" for new scene - will be auto-selected based on codec
         quality: "direct",
+        // Reset O counter immediately - will be set correctly when new scene loads
+        oCounter: 0,
       };
     }
 
@@ -286,6 +288,8 @@ export function scenePlayerReducer(state, action) {
             ready: false,
             // Reset quality to "direct" for new scene - will be auto-selected based on codec
             quality: "direct",
+            // Reset O counter immediately - will be set correctly when new scene loads
+            oCounter: 0,
           };
         } else {
           // No history - pick a random scene (excluding current)
@@ -319,6 +323,8 @@ export function scenePlayerReducer(state, action) {
         ready: false,
         // Reset quality to "direct" for new scene - will be auto-selected based on codec
         quality: "direct",
+        // Reset O counter immediately - will be set correctly when new scene loads
+        oCounter: 0,
       };
     }
 

@@ -289,6 +289,7 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No galleries found with tag "${tag?.name}"`}
             />
           )}
@@ -308,6 +309,7 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No performers found with tag "${tag?.name}"`}
             />
           )}
@@ -323,6 +325,7 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No studios found with tag "${tag?.name}"`}
             />
           )}
@@ -338,6 +341,7 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
+              syncToUrl={false}
               emptyMessage={`No collections found with tag "${tag?.name}"`}
             />
           )}
