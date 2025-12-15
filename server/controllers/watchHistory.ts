@@ -615,37 +615,26 @@ export async function saveActivity(req: AuthenticatedRequest, res: Response) {
 
     const now = new Date();
 
-    // Get or create watch history record
-    let watchHistory = await prisma.watchHistory.findUnique({
+    // Use upsert to avoid race condition between concurrent saveActivity and incrementPlayCount calls
+    const watchHistory = await prisma.watchHistory.upsert({
       where: { userId_sceneId: { userId, sceneId } },
+      create: {
+        userId,
+        sceneId,
+        playCount: 0,
+        playDuration: playDuration || 0,
+        resumeTime: resumeTime || 0,
+        lastPlayedAt: now,
+        oCount: 0,
+        oHistory: [],
+        playHistory: [],
+      },
+      update: {
+        resumeTime: resumeTime,
+        playDuration: { increment: playDuration || 0 },
+        lastPlayedAt: now,
+      },
     });
-
-    if (!watchHistory) {
-      // Create new watch history record
-      watchHistory = await prisma.watchHistory.create({
-        data: {
-          userId,
-          sceneId,
-          playCount: 0,
-          playDuration: playDuration || 0,
-          resumeTime: resumeTime || 0,
-          lastPlayedAt: now,
-          oCount: 0,
-          oHistory: [],
-          playHistory: [],
-        },
-      });
-    } else {
-      // Update existing record - add playDuration delta
-      watchHistory = await prisma.watchHistory.update({
-        where: { id: watchHistory.id },
-        data: {
-          resumeTime: resumeTime ?? watchHistory.resumeTime,
-          playDuration: watchHistory.playDuration + (playDuration || 0),
-          lastPlayedAt: now,
-        },
-      });
-    }
 
     // Sync to Stash if user has sync enabled
     if (user.syncToStash && playDuration) {
@@ -720,42 +709,39 @@ export async function incrementPlayCount(
 
     const now = new Date();
 
-    // Get or create watch history record
-    let watchHistory = await prisma.watchHistory.findUnique({
+    // First, get existing record to build play history (upsert doesn't support array append)
+    const existing = await prisma.watchHistory.findUnique({
       where: { userId_sceneId: { userId, sceneId } },
     });
 
-    if (!watchHistory) {
-      // Create new watch history record with play count = 1
-      watchHistory = await prisma.watchHistory.create({
-        data: {
-          userId,
-          sceneId,
-          playCount: 1,
-          playDuration: 0,
-          resumeTime: 0,
-          lastPlayedAt: now,
-          oCount: 0,
-          oHistory: [],
-          playHistory: [now.toISOString()],
-        },
-      });
-    } else {
-      // Parse existing play history
-      const playHistory = Array.isArray(watchHistory.playHistory)
-        ? watchHistory.playHistory
-        : JSON.parse((watchHistory.playHistory as string) || "[]");
+    const existingPlayHistory = existing
+      ? Array.isArray(existing.playHistory)
+        ? existing.playHistory
+        : JSON.parse((existing.playHistory as string) || "[]")
+      : [];
 
-      // Update with incremented play count
-      watchHistory = await prisma.watchHistory.update({
-        where: { id: watchHistory.id },
-        data: {
-          playCount: watchHistory.playCount + 1,
-          playHistory: JSON.stringify([...playHistory, now.toISOString()]),
-          lastPlayedAt: now,
-        },
-      });
-    }
+    const newPlayHistory = [...existingPlayHistory, now.toISOString()];
+
+    // Use upsert to avoid race condition between concurrent saveActivity and incrementPlayCount calls
+    const watchHistory = await prisma.watchHistory.upsert({
+      where: { userId_sceneId: { userId, sceneId } },
+      create: {
+        userId,
+        sceneId,
+        playCount: 1,
+        playDuration: 0,
+        resumeTime: 0,
+        lastPlayedAt: now,
+        oCount: 0,
+        oHistory: [],
+        playHistory: [now.toISOString()],
+      },
+      update: {
+        playCount: { increment: 1 },
+        playHistory: JSON.stringify(newPlayHistory),
+        lastPlayedAt: now,
+      },
+    });
 
     // Update pre-computed stats
     await userStatsService.updateStatsForScene(

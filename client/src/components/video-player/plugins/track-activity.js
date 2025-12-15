@@ -94,6 +94,16 @@ class TrackActivityPlugin extends videojs.getPlugin("plugin") {
     if (this.totalPlayDuration > 0) {
       let resumeTime = this.player?.currentTime() ?? this.lastResumeTime;
       const videoDuration = this.player?.duration() ?? this.lastDuration;
+
+      // Guard against NaN/invalid values (can happen if player not ready)
+      if (!Number.isFinite(videoDuration) || videoDuration <= 0) {
+        console.warn("[track-activity] Invalid video duration, skipping activity save");
+        return;
+      }
+      if (!Number.isFinite(resumeTime)) {
+        resumeTime = this.lastResumeTime || 0;
+      }
+
       const percentCompleted = (100 / videoDuration) * resumeTime;
       const percentPlayed = (100 / videoDuration) * this.totalPlayDuration;
 

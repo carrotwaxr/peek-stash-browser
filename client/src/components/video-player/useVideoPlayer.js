@@ -24,6 +24,30 @@ import "./plugins/media-session.js";
 airplay(videojs);
 chromecast(videojs);
 
+/**
+ * Retry a function with exponential backoff
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxAttempts - Maximum number of attempts (default: 3)
+ * @param {number} baseDelay - Base delay in ms (default: 1000)
+ * @returns {Promise} Result of the function or throws after all retries
+ */
+async function retryWithBackoff(fn, maxAttempts = 3, baseDelay = 1000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        console.warn(`[RETRY] Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 const _api = axios.create({
   baseURL: "/api",
   withCredentials: true,
@@ -259,22 +283,26 @@ export function useVideoPlayer({
     // saveActivity is called periodically (every 10s) during playback
     trackActivityPlugin.saveActivity = async (resumeTime, playDuration) => {
       try {
-        await apiPost("/watch-history/save-activity", {
-          sceneId,
-          resumeTime,
-          playDuration,
-        });
+        await retryWithBackoff(() =>
+          apiPost("/watch-history/save-activity", {
+            sceneId,
+            resumeTime,
+            playDuration,
+          })
+        );
       } catch (error) {
-        console.error("Failed to save activity:", error);
+        console.error("Failed to save activity after 3 attempts:", error);
       }
     };
 
     // incrementPlayCount is called once per session when threshold is reached
     trackActivityPlugin.incrementPlayCount = async () => {
       try {
-        await apiPost("/watch-history/increment-play-count", { sceneId });
+        await retryWithBackoff(() =>
+          apiPost("/watch-history/increment-play-count", { sceneId })
+        );
       } catch (error) {
-        console.error("Failed to increment play count:", error);
+        console.error("Failed to increment play count after 3 attempts:", error);
       }
     };
 
