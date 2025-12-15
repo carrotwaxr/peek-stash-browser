@@ -162,8 +162,8 @@ const EYE_COLOR_OPTIONS = [
 ];
 
 const FAKE_TITS_OPTIONS = [
-  { value: "TRUE", label: "Fake" },
-  { value: "FALSE", label: "Natural" },
+  { value: "Fake", label: "Fake/Augmented" },
+  { value: "Natural", label: "Natural" },
 ];
 
 // Resolution options (matching Stash's ResolutionEnum)

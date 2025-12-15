@@ -947,6 +947,7 @@ class StashSyncService extends EventEmitter {
       ${performer.height_cm ?? "NULL"},
       ${performer.weight ?? "NULL"},
       ${this.escapeNullable(performer.measurements)},
+      ${this.escapeNullable(performer.fake_tits)},
       ${this.escapeNullable(performer.tattoos)},
       ${this.escapeNullable(performer.piercings)},
       ${this.escapeNullable(performer.career_length)},
@@ -969,7 +970,7 @@ class StashSyncService extends EventEmitter {
     INSERT INTO StashPerformer (
       id, stashInstanceId, name, disambiguation, gender, birthdate, favorite,
       rating100, details, aliasList,
-      country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements,
+      country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements, fakeTits,
       tattoos, piercings, careerLength, deathDate, url, imagePath,
       sceneCount, imageCount, galleryCount, groupCount,
       stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
@@ -990,6 +991,7 @@ class StashSyncService extends EventEmitter {
       heightCm = excluded.heightCm,
       weightKg = excluded.weightKg,
       measurements = excluded.measurements,
+      fakeTits = excluded.fakeTits,
       tattoos = excluded.tattoos,
       piercings = excluded.piercings,
       careerLength = excluded.careerLength,
