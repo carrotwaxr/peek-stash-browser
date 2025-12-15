@@ -1738,28 +1738,28 @@ export const buildPerformerFilter = (filters, unitPreference = UNITS.METRIC) => 
   if (filters.ethnicity) {
     performerFilter.ethnicity = {
       value: filters.ethnicity,
-      modifier: "INCLUDES",
+      modifier: "EQUALS",
     };
   }
 
   if (filters.hairColor) {
     performerFilter.hair_color = {
       value: filters.hairColor,
-      modifier: "INCLUDES",
+      modifier: "EQUALS",
     };
   }
 
   if (filters.eyeColor) {
     performerFilter.eye_color = {
       value: filters.eyeColor,
-      modifier: "INCLUDES",
+      modifier: "EQUALS",
     };
   }
 
   if (filters.fakeTits) {
     performerFilter.fake_tits = {
       value: filters.fakeTits,
-      modifier: "INCLUDES",
+      modifier: "EQUALS",
     };
   }
 

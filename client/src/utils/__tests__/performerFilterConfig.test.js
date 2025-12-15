@@ -184,39 +184,39 @@ describe("buildPerformerFilter", () => {
   });
 
   describe("Select Filters (Ethnicity, Hair Color, Eye Color, Fake Tits)", () => {
-    it("should build ethnicity filter with INCLUDES modifier", () => {
+    it("should build ethnicity filter with EQUALS modifier", () => {
       const uiFilters = { ethnicity: "asian" };
       const result = buildPerformerFilter(uiFilters);
       expect(result.ethnicity).toEqual({
         value: "asian",
-        modifier: "INCLUDES",
+        modifier: "EQUALS",
       });
     });
 
-    it("should build hair_color filter with INCLUDES modifier", () => {
+    it("should build hair_color filter with EQUALS modifier", () => {
       const uiFilters = { hairColor: "blonde" };
       const result = buildPerformerFilter(uiFilters);
       expect(result.hair_color).toEqual({
         value: "blonde",
-        modifier: "INCLUDES",
+        modifier: "EQUALS",
       });
     });
 
-    it("should build eye_color filter with INCLUDES modifier", () => {
+    it("should build eye_color filter with EQUALS modifier", () => {
       const uiFilters = { eyeColor: "blue" };
       const result = buildPerformerFilter(uiFilters);
       expect(result.eye_color).toEqual({
         value: "blue",
-        modifier: "INCLUDES",
+        modifier: "EQUALS",
       });
     });
 
-    it("should build fake_tits filter with INCLUDES modifier", () => {
+    it("should build fake_tits filter with EQUALS modifier", () => {
       const uiFilters = { fakeTits: "Yes" };
       const result = buildPerformerFilter(uiFilters);
       expect(result.fake_tits).toEqual({
         value: "Yes",
-        modifier: "INCLUDES",
+        modifier: "EQUALS",
       });
     });
   });
@@ -714,8 +714,8 @@ describe("buildPerformerFilter", () => {
         modifier: "LESS_THAN",
         value: 101,
       });
-      expect(result.ethnicity).toEqual({ value: "caucasian", modifier: "INCLUDES" });
-      expect(result.hair_color).toEqual({ value: "brown", modifier: "INCLUDES" });
+      expect(result.ethnicity).toEqual({ value: "caucasian", modifier: "EQUALS" });
+      expect(result.hair_color).toEqual({ value: "brown", modifier: "EQUALS" });
       expect(result.name).toEqual({ value: "Jane", modifier: "INCLUDES" });
       expect(result.created_at).toEqual({
         value: "2023-01-01",
