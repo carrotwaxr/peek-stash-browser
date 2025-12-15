@@ -328,23 +328,23 @@ describe("buildPerformerFilter", () => {
   });
 
   describe("Physical Attribute Range Filters (Height, Weight, Penis Length)", () => {
-    it("should build height_cm filter with GREATER_THAN modifier (min only)", () => {
+    it("should build height filter with GREATER_THAN modifier (min only)", () => {
       const uiFilters = {
         height: { min: 160 },
       };
       const result = buildPerformerFilter(uiFilters);
-      expect(result.height_cm).toEqual({
+      expect(result.height).toEqual({
         value: 160,
         modifier: "GREATER_THAN",
       });
     });
 
-    it("should build height_cm filter with BETWEEN modifier (both min and max)", () => {
+    it("should build height filter with BETWEEN modifier (both min and max)", () => {
       const uiFilters = {
         height: { min: 160, max: 180 },
       };
       const result = buildPerformerFilter(uiFilters);
-      expect(result.height_cm).toEqual({
+      expect(result.height).toEqual({
         value: 160,
         modifier: "BETWEEN",
         value2: 180,
@@ -700,7 +700,7 @@ describe("buildPerformerFilter", () => {
         value: 79,
       });
       expect(result.age).toEqual({ value: 25, modifier: "BETWEEN", value2: 40 });
-      expect(result.height_cm).toEqual({ value: 165, modifier: "GREATER_THAN" });
+      expect(result.height).toEqual({ value: 165, modifier: "GREATER_THAN" });
       expect(result.o_counter).toEqual({
         modifier: "BETWEEN",
         value: 5,
@@ -780,7 +780,7 @@ describe("buildPerformerFilter", () => {
       };
       const result = buildPerformerFilter(uiFilters, "imperial");
       // 5'10" = 178cm, 6'2" = 188cm
-      expect(result.height_cm).toEqual({
+      expect(result.height).toEqual({
         modifier: "BETWEEN",
         value: 178,
         value2: 188,
@@ -793,7 +793,7 @@ describe("buildPerformerFilter", () => {
       };
       const result = buildPerformerFilter(uiFilters, "imperial");
       // 5'6" = 168cm
-      expect(result.height_cm).toEqual({
+      expect(result.height).toEqual({
         modifier: "GREATER_THAN",
         value: 168,
       });
@@ -831,7 +831,7 @@ describe("buildPerformerFilter", () => {
         weight: { min: "60", max: "80" },
       };
       const result = buildPerformerFilter(uiFilters, "metric");
-      expect(result.height_cm).toEqual({
+      expect(result.height).toEqual({
         modifier: "BETWEEN",
         value: 170,
         value2: 180,
@@ -848,7 +848,7 @@ describe("buildPerformerFilter", () => {
         height: { min: "170", max: "180" },
       };
       const result = buildPerformerFilter(uiFilters);
-      expect(result.height_cm).toEqual({
+      expect(result.height).toEqual({
         modifier: "BETWEEN",
         value: 170,
         value2: 180,
