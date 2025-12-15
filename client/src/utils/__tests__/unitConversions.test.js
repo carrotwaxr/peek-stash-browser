@@ -7,6 +7,9 @@ import {
   kgToLbs,
   lbsToKg,
   formatWeight,
+  cmToInches,
+  inchesToCm,
+  formatLength,
 } from "../unitConversions.js";
 
 describe("unitConversions", () => {
@@ -89,6 +92,38 @@ describe("unitConversions", () => {
     it("returns null for null/undefined input", () => {
       expect(formatWeight(null, UNITS.METRIC)).toBeNull();
       expect(formatWeight(undefined, UNITS.IMPERIAL)).toBeNull();
+    });
+  });
+
+  describe("length conversions (penis length)", () => {
+    it("converts 15 cm to 5.9 inches", () => {
+      expect(cmToInches(15)).toBe(5.9);
+    });
+
+    it("converts 20 cm to 7.9 inches", () => {
+      expect(cmToInches(20)).toBe(7.9);
+    });
+
+    it("converts 6 inches to 15.2 cm", () => {
+      expect(inchesToCm(6)).toBe(15.2);
+    });
+
+    it("formats length in metric as 'X cm'", () => {
+      expect(formatLength(15, UNITS.METRIC)).toBe("15 cm");
+    });
+
+    it("formats length in imperial as 'X in'", () => {
+      expect(formatLength(15, UNITS.IMPERIAL)).toBe("5.9 in");
+    });
+
+    it("handles zero value", () => {
+      expect(formatLength(0, UNITS.METRIC)).toBe("0 cm");
+      expect(formatLength(0, UNITS.IMPERIAL)).toBe("0 in");
+    });
+
+    it("returns null for null/undefined input", () => {
+      expect(formatLength(null, UNITS.METRIC)).toBeNull();
+      expect(formatLength(undefined, UNITS.IMPERIAL)).toBeNull();
     });
   });
 });

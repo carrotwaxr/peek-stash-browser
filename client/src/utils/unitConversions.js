@@ -77,3 +77,31 @@ export const formatWeight = (kg, unit) => {
   }
   return `${kg} kg`;
 };
+
+/**
+ * Convert centimeters to inches (1 decimal place)
+ * @param {number} cm - Length in centimeters
+ * @returns {number} Length in inches
+ */
+export const cmToInches = (cm) => Math.round((cm / 2.54) * 10) / 10;
+
+/**
+ * Convert inches to centimeters (1 decimal place)
+ * @param {number} inches - Length in inches
+ * @returns {number} Length in centimeters
+ */
+export const inchesToCm = (inches) => Math.round(inches * 2.54 * 10) / 10;
+
+/**
+ * Format length for display based on unit preference
+ * @param {number} cm - Length in centimeters
+ * @param {string} unit - UNITS.METRIC or UNITS.IMPERIAL
+ * @returns {string|null}
+ */
+export const formatLength = (cm, unit) => {
+  if (cm === null || cm === undefined) return null;
+  if (unit === UNITS.IMPERIAL) {
+    return `${cmToInches(cm)} in`;
+  }
+  return `${cm} cm`;
+};
