@@ -212,10 +212,10 @@ describe("buildPerformerFilter", () => {
     });
 
     it("should build fake_tits filter with EQUALS modifier", () => {
-      const uiFilters = { fakeTits: "Yes" };
+      const uiFilters = { fakeTits: "Natural" };
       const result = buildPerformerFilter(uiFilters);
       expect(result.fake_tits).toEqual({
-        value: "Yes",
+        value: "Natural",
         modifier: "EQUALS",
       });
     });

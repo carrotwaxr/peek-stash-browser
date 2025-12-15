@@ -1339,6 +1339,7 @@ class StashEntityService {
       height_cm: performer.heightCm,
       weight: performer.weightKg,
       measurements: performer.measurements,
+      fake_tits: performer.fakeTits,
       tattoos: performer.tattoos,
       piercings: performer.piercings,
       career_length: performer.careerLength,

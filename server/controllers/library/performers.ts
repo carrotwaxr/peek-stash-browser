@@ -665,49 +665,57 @@ export async function applyPerformerFilters(
     }
   }
 
-  // Filter by eye_color (enum/string)
+  // Filter by eye_color (enum/string) - case-insensitive comparison
   if (filters.eye_color) {
     const { modifier, value } = filters.eye_color;
     if (value) {
+      const searchValue = value.toUpperCase();
       filtered = filtered.filter((p) => {
-        if (modifier === "EQUALS" || !modifier) return p.eye_color === value;
-        if (modifier === "NOT_EQUALS") return p.eye_color !== value;
+        const eyeColor = (p.eye_color || "").toUpperCase();
+        if (modifier === "EQUALS" || !modifier) return eyeColor === searchValue;
+        if (modifier === "NOT_EQUALS") return eyeColor !== searchValue;
         return true;
       });
     }
   }
 
-  // Filter by ethnicity (enum/string)
+  // Filter by ethnicity (enum/string) - case-insensitive comparison
   if (filters.ethnicity) {
     const { modifier, value } = filters.ethnicity;
     if (value) {
+      const searchValue = value.toUpperCase();
       filtered = filtered.filter((p) => {
-        if (modifier === "EQUALS" || !modifier) return p.ethnicity === value;
-        if (modifier === "NOT_EQUALS") return p.ethnicity !== value;
+        const ethnicity = (p.ethnicity || "").toUpperCase();
+        if (modifier === "EQUALS" || !modifier) return ethnicity === searchValue;
+        if (modifier === "NOT_EQUALS") return ethnicity !== searchValue;
         return true;
       });
     }
   }
 
-  // Filter by hair_color (enum/string)
+  // Filter by hair_color (enum/string) - case-insensitive comparison
   if (filters.hair_color) {
     const { modifier, value } = filters.hair_color;
     if (value) {
+      const searchValue = value.toUpperCase();
       filtered = filtered.filter((p) => {
-        if (modifier === "EQUALS" || !modifier) return p.hair_color === value;
-        if (modifier === "NOT_EQUALS") return p.hair_color !== value;
+        const hairColor = (p.hair_color || "").toUpperCase();
+        if (modifier === "EQUALS" || !modifier) return hairColor === searchValue;
+        if (modifier === "NOT_EQUALS") return hairColor !== searchValue;
         return true;
       });
     }
   }
 
-  // Filter by fake_tits/breast_type (enum/string)
+  // Filter by fake_tits/breast_type (enum/string) - case-insensitive comparison
   if (filters.fake_tits) {
     const { modifier, value } = filters.fake_tits;
     if (value) {
+      const searchValue = value.toUpperCase();
       filtered = filtered.filter((p) => {
-        if (modifier === "EQUALS" || !modifier) return p.fake_tits === value;
-        if (modifier === "NOT_EQUALS") return p.fake_tits !== value;
+        const fakeTits = (p.fake_tits || "").toUpperCase();
+        if (modifier === "EQUALS" || !modifier) return fakeTits === searchValue;
+        if (modifier === "NOT_EQUALS") return fakeTits !== searchValue;
         return true;
       });
     }
