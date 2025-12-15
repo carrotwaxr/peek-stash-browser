@@ -86,6 +86,7 @@ const TagCard = forwardRef(
                 entityId: tag.id,
                 initialRating: tag.rating100,
                 initialFavorite: tag.favorite || false,
+                initialOCounter: tag.o_counter,
                 onHideSuccess,
               }
             : undefined

@@ -286,6 +286,30 @@ class StashEntityService {
   }
 
   /**
+   * Get scenes by IDs with full relations (performers, tags, studio, groups, galleries)
+   * Use this when you need the related entities, not just scene data.
+   * This is more expensive than getScenesByIds due to the joins.
+   */
+  async getScenesByIdsWithRelations(ids: string[]): Promise<NormalizedScene[]> {
+    if (ids.length === 0) return [];
+
+    const cached = await prisma.stashScene.findMany({
+      where: {
+        id: { in: ids },
+        deletedAt: null,
+      },
+      include: {
+        performers: { include: { performer: true } },
+        tags: { include: { tag: true } },
+        groups: { include: { group: true } },
+        galleries: { include: { gallery: true } },
+      },
+    });
+
+    return cached.map((c) => this.transformSceneWithRelations(c));
+  }
+
+  /**
    * Get total scene count
    */
   async getSceneCount(): Promise<number> {
