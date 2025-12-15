@@ -4,7 +4,9 @@ import {
   getAllWatchHistory,
   getWatchHistory,
   incrementOCounter,
+  incrementPlayCount,
   pingWatchHistory,
+  saveActivity,
 } from "../controllers/watchHistory.js";
 import { authenticateToken } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
@@ -14,8 +16,14 @@ const router = express.Router();
 // All watch history routes require authentication
 router.use(authenticateToken);
 
-// Ping watch history (called every 30 seconds during playback)
+// Ping watch history (legacy - called every 30 seconds during playback)
 router.post("/ping", authenticated(pingWatchHistory));
+
+// Save activity (called by track-activity plugin every 10 seconds)
+router.post("/save-activity", authenticated(saveActivity));
+
+// Increment play count (called when minimum play percentage reached)
+router.post("/increment-play-count", authenticated(incrementPlayCount));
 
 // Increment O counter
 router.post("/increment-o", authenticated(incrementOCounter));

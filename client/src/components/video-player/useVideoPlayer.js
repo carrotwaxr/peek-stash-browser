@@ -7,6 +7,7 @@ import "videojs-seek-buttons";
 import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import axios from "axios";
 import videojs from "video.js";
+import { apiPost } from "../../services/api.js";
 import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
@@ -94,9 +95,6 @@ export function useVideoPlayer({
   nextScene,
   prevScene,
   updateQuality,
-  startTracking,
-  stopTracking,
-  trackSeek,
   location,
   hasResumedRef,
   initialResumeTimeRef,
@@ -184,22 +182,10 @@ export function useVideoPlayer({
     player.focus();
 
     // Volume persistence is now handled by persistVolume plugin
-
-    // Set up watch history tracking event listeners
-    // These must be attached here (after player creation) because the useWatchHistory
-    // hook's useEffect runs before the player exists due to React's render cycle
-    player.on("play", () => startTracking());
-    player.on("pause", () => stopTracking());
-    player.on("ended", () => stopTracking());
-    player.on("seeked", () => {
-      if (player && !player.isDisposed()) {
-        trackSeek(0, player.currentTime());
-      }
-    });
+    // Watch history tracking is now handled by the trackActivity plugin
 
     // Cleanup
     return () => {
-      stopTracking();
       playerRef.current = null;
 
       try {
@@ -263,14 +249,34 @@ export function useVideoPlayer({
     const trackActivityPlugin = player.trackActivity();
     if (!trackActivityPlugin) return;
 
+    const sceneId = scene.id;
+
     // Enable tracking
     trackActivityPlugin.setEnabled(true);
     trackActivityPlugin.minimumPlayPercent = 10; // Match Stash's 10% threshold
 
-    // The plugin tracks playback internally and calls these callbacks
-    // It coordinates with the existing useWatchHistory hook's ping system
-    // incrementPlayCount is called once per session when threshold is reached
+    // Connect plugin callbacks to API endpoints
     // saveActivity is called periodically (every 10s) during playback
+    trackActivityPlugin.saveActivity = async (resumeTime, playDuration) => {
+      try {
+        await apiPost("/watch-history/save-activity", {
+          sceneId,
+          resumeTime,
+          playDuration,
+        });
+      } catch (error) {
+        console.error("Failed to save activity:", error);
+      }
+    };
+
+    // incrementPlayCount is called once per session when threshold is reached
+    trackActivityPlugin.incrementPlayCount = async () => {
+      try {
+        await apiPost("/watch-history/increment-play-count", { sceneId });
+      } catch (error) {
+        console.error("Failed to increment play count:", error);
+      }
+    };
 
     return () => {
       trackActivityPlugin.setEnabled(false);
