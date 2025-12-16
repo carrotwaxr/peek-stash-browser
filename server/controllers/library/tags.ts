@@ -237,9 +237,28 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
           visibleScenes, // ← NEW: Pass visible scenes
           allPerformers // Pass performers for tag lookup
         );
+
+        // Enhance tags with performer scene counts (inside cache block for performance)
+        // This adds scenes where performers have the tag, even if the scene doesn't
+        filteredTags = await enhanceTagsWithPerformerScenes(filteredTags);
+
+        // Add performer counts per tag (inside cache block for performance)
+        const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`
+          SELECT pt.tagId, COUNT(*) as count
+          FROM PerformerTag pt
+          JOIN StashPerformer p ON p.id = pt.performerId AND p.deletedAt IS NULL
+          GROUP BY pt.tagId
+        `;
+        const performerCountMap = new Map(performerCountsQuery.map(r => [r.tagId, Number(r.count)]));
+
+        // Merge performer counts into tags
+        filteredTags = filteredTags.map(tag => ({
+          ...tag,
+          performer_count: performerCountMap.get(tag.id) || 0
+        }));
       }
 
-      // Store in cache
+      // Store in cache (includes enhancement data and performer counts)
       filteredEntityCacheService.set(
         userId,
         "tags",
@@ -255,25 +274,6 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
 
     // Use cached/filtered tags for remaining operations
     tags = filteredTags;
-
-    // Step 2.7: Enhance tags with performer scene counts
-    // This adds scenes where performers have the tag, even if the scene doesn't
-    tags = await enhanceTagsWithPerformerScenes(tags);
-
-    // Step 2.8: Add performer counts per tag
-    const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`
-      SELECT pt.tagId, COUNT(*) as count
-      FROM PerformerTag pt
-      JOIN StashPerformer p ON p.id = pt.performerId AND p.deletedAt IS NULL
-      GROUP BY pt.tagId
-    `;
-    const performerCountMap = new Map(performerCountsQuery.map(r => [r.tagId, Number(r.count)]));
-    
-    // Merge performer counts into tags
-    tags = tags.map(tag => ({
-      ...tag,
-      performer_count: performerCountMap.get(tag.id) || 0
-    }));
 
     // Step 3: Merge with FRESH user data (ratings, stats)
     // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
@@ -836,7 +836,26 @@ export const findTagsMinimal = async (
           allPerformers // Pass performers for tag lookup
         );
 
-        // Store in cache
+        // Enhance tags with performer scene counts (inside cache block for performance)
+        // This ensures cache consistency with findTags endpoint
+        filteredTags = await enhanceTagsWithPerformerScenes(filteredTags);
+
+        // Add performer counts per tag (inside cache block for performance)
+        const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`
+          SELECT pt.tagId, COUNT(*) as count
+          FROM PerformerTag pt
+          JOIN StashPerformer p ON p.id = pt.performerId AND p.deletedAt IS NULL
+          GROUP BY pt.tagId
+        `;
+        const performerCountMap = new Map(performerCountsQuery.map(r => [r.tagId, Number(r.count)]));
+
+        // Merge performer counts into tags
+        filteredTags = filteredTags.map(tag => ({
+          ...tag,
+          performer_count: performerCountMap.get(tag.id) || 0
+        }));
+
+        // Store in cache (includes enhancement data and performer counts)
         filteredEntityCacheService.set(
           userId,
           "tags",
