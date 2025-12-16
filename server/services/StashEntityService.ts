@@ -18,6 +18,7 @@ import type {
   NormalizedScene,
   NormalizedStudio,
   NormalizedTag,
+  SceneScoringData,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
 
@@ -156,6 +157,53 @@ class StashEntityService {
     const hydrateTime = Date.now() - hydrateStart;
 
     logger.info(`getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+
+    return result;
+  }
+
+  /**
+   * Get lightweight scene data for scoring operations
+   * Returns only IDs needed for similarity/recommendation calculations
+   * Much more efficient than loading full scene objects
+   */
+  async getScenesForScoring(): Promise<SceneScoringData[]> {
+    const startTime = Date.now();
+
+    // Single query that aggregates performer and tag IDs
+    const sql = `
+      SELECT
+        s.id,
+        s.studioId,
+        s.oCounter,
+        s.date,
+        COALESCE(GROUP_CONCAT(DISTINCT sp.performerId), '') as performerIds,
+        COALESCE(GROUP_CONCAT(DISTINCT st.tagId), '') as tagIds
+      FROM StashScene s
+      LEFT JOIN ScenePerformer sp ON s.id = sp.sceneId
+      LEFT JOIN SceneTag st ON s.id = st.sceneId
+      WHERE s.deletedAt IS NULL
+      GROUP BY s.id
+    `;
+
+    const rows = await prisma.$queryRawUnsafe<Array<{
+      id: string;
+      studioId: string | null;
+      oCounter: number;
+      date: string | null;
+      performerIds: string;
+      tagIds: string;
+    }>>(sql);
+
+    const result: SceneScoringData[] = rows.map(row => ({
+      id: row.id,
+      studioId: row.studioId,
+      performerIds: row.performerIds ? row.performerIds.split(',').filter(Boolean) : [],
+      tagIds: row.tagIds ? row.tagIds.split(',').filter(Boolean) : [],
+      oCounter: row.oCounter || 0,
+      date: row.date,
+    }));
+
+    logger.info(`getScenesForScoring: ${Date.now() - startTime}ms, count=${result.length}`);
 
     return result;
   }
