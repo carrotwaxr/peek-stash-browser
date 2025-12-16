@@ -33,6 +33,12 @@ export interface SceneQueryResult {
   total: number;
 }
 
+// Query by IDs options
+export interface SceneByIdsOptions {
+  userId: number;
+  ids: string[];
+}
+
 /**
  * Builds and executes SQL queries for scene filtering
  */
@@ -1758,6 +1764,30 @@ class SceneQueryBuilder {
 
     // Otherwise treat as path and encode it
     return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+  }
+
+  /**
+   * Get scenes by IDs with full relations
+   * Used after scoring to fetch the final paginated results
+   */
+  async getByIds(options: SceneByIdsOptions): Promise<SceneQueryResult> {
+    const { userId, ids } = options;
+
+    if (ids.length === 0) {
+      return { scenes: [], total: 0 };
+    }
+
+    // Use execute with ID filter
+    return this.execute({
+      userId,
+      filters: {
+        ids: { value: ids, modifier: "INCLUDES" },
+      },
+      sort: "created_at", // Default sort, results will be reordered by caller if needed
+      sortDirection: "DESC",
+      page: 1,
+      perPage: ids.length, // Get all requested IDs
+    });
   }
 }
 
