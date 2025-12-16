@@ -1595,6 +1595,18 @@ export const getRecommendedScenes = async (
     // Cap at top 500 recommendations
     const cappedScenes = diversifiedScenes.slice(0, 500);
 
+    // If no recommendations after scoring, include criteria for feedback
+    if (cappedScenes.length === 0) {
+      return res.json({
+        scenes: [],
+        count: 0,
+        page,
+        perPage,
+        message: "No matching recommendations found",
+        criteria: criteriaCounts,
+      });
+    }
+
     // Paginate
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
