@@ -2,11 +2,16 @@
 import { describe, it, expect } from "vitest";
 import {
   calculateSceneWeightMultiplier,
+  buildDerivedWeightsFromScenes,
+  countUserCriteria,
+  hasAnyCriteria,
   SCENE_WEIGHT_BASE,
   SCENE_WEIGHT_FAVORITE_BONUS,
   SCENE_RATING_FLOOR,
   SCENE_FAVORITED_IMPLICIT_RATING,
+  type SceneRatingInput,
 } from "../../services/RecommendationScoringService.js";
+import type { NormalizedScene } from "../../types/index.js";
 
 describe("RecommendationScoringService", () => {
   describe("calculateSceneWeightMultiplier", () => {
@@ -66,6 +71,201 @@ describe("RecommendationScoringService", () => {
       expect(calculateSceneWeightMultiplier(60, false)).toBeCloseTo(expected, 5);
       // Should be 0.24
       expect(calculateSceneWeightMultiplier(60, false)).toBeCloseTo(0.24, 2);
+    });
+  });
+
+  describe("buildDerivedWeightsFromScenes", () => {
+    const mockScene1: NormalizedScene = {
+      id: "scene1",
+      title: "Test Scene 1",
+      performers: [
+        { id: "perf1", name: "Performer 1" },
+        { id: "perf2", name: "Performer 2" },
+      ],
+      studio: { id: "studio1", name: "Studio 1" },
+      tags: [
+        { id: "tag1", name: "Tag 1" },
+        { id: "tag2", name: "Tag 2" },
+      ],
+    } as NormalizedScene;
+
+    const mockScene2: NormalizedScene = {
+      id: "scene2",
+      title: "Test Scene 2",
+      performers: [
+        { id: "perf1", name: "Performer 1" }, // Same performer
+        { id: "perf3", name: "Performer 3" },
+      ],
+      studio: { id: "studio2", name: "Studio 2" },
+      tags: [{ id: "tag1", name: "Tag 1" }], // Same tag
+    } as NormalizedScene;
+
+    const sceneMap = new Map<string, NormalizedScene>([
+      ["scene1", mockScene1],
+      ["scene2", mockScene2],
+    ]);
+
+    const getSceneById = (id: string) => sceneMap.get(id);
+
+    it("extracts performer weights from rated scene", () => {
+      const sceneRatings: SceneRatingInput[] = [
+        { sceneId: "scene1", rating: 100, favorite: false },
+      ];
+
+      const result = buildDerivedWeightsFromScenes(sceneRatings, getSceneById);
+
+      expect(result.derivedPerformerWeights.get("perf1")).toBeCloseTo(0.4, 2);
+      expect(result.derivedPerformerWeights.get("perf2")).toBeCloseTo(0.4, 2);
+    });
+
+    it("extracts studio weights from rated scene", () => {
+      const sceneRatings: SceneRatingInput[] = [
+        { sceneId: "scene1", rating: 100, favorite: false },
+      ];
+
+      const result = buildDerivedWeightsFromScenes(sceneRatings, getSceneById);
+
+      expect(result.derivedStudioWeights.get("studio1")).toBeCloseTo(0.4, 2);
+    });
+
+    it("extracts tag weights from rated scene", () => {
+      const sceneRatings: SceneRatingInput[] = [
+        { sceneId: "scene1", rating: 100, favorite: false },
+      ];
+
+      const result = buildDerivedWeightsFromScenes(sceneRatings, getSceneById);
+
+      expect(result.derivedTagWeights.get("tag1")).toBeCloseTo(0.4, 2);
+      expect(result.derivedTagWeights.get("tag2")).toBeCloseTo(0.4, 2);
+    });
+
+    it("accumulates weights for same entity across multiple scenes", () => {
+      const sceneRatings: SceneRatingInput[] = [
+        { sceneId: "scene1", rating: 100, favorite: false }, // perf1: 0.4
+        { sceneId: "scene2", rating: 100, favorite: false }, // perf1: +0.4 = 0.8
+      ];
+
+      const result = buildDerivedWeightsFromScenes(sceneRatings, getSceneById);
+
+      expect(result.derivedPerformerWeights.get("perf1")).toBeCloseTo(0.8, 2);
+      expect(result.derivedPerformerWeights.get("perf2")).toBeCloseTo(0.4, 2);
+      expect(result.derivedPerformerWeights.get("perf3")).toBeCloseTo(0.4, 2);
+    });
+
+    it("skips scenes rated below floor", () => {
+      const sceneRatings: SceneRatingInput[] = [
+        { sceneId: "scene1", rating: 39, favorite: false },
+      ];
+
+      const result = buildDerivedWeightsFromScenes(sceneRatings, getSceneById);
+
+      expect(result.derivedPerformerWeights.size).toBe(0);
+      expect(result.derivedStudioWeights.size).toBe(0);
+      expect(result.derivedTagWeights.size).toBe(0);
+    });
+
+    it("handles favorited-only scenes with implicit rating", () => {
+      const sceneRatings: SceneRatingInput[] = [
+        { sceneId: "scene1", rating: null, favorite: true },
+      ];
+
+      const result = buildDerivedWeightsFromScenes(sceneRatings, getSceneById);
+
+      // Implicit 85 + favorite bonus = 0.49
+      expect(result.derivedPerformerWeights.get("perf1")).toBeCloseTo(0.49, 2);
+    });
+
+    it("handles scene not found in cache", () => {
+      const sceneRatings: SceneRatingInput[] = [
+        { sceneId: "nonexistent", rating: 100, favorite: false },
+      ];
+
+      const result = buildDerivedWeightsFromScenes(sceneRatings, getSceneById);
+
+      expect(result.derivedPerformerWeights.size).toBe(0);
+    });
+  });
+
+  describe("countUserCriteria", () => {
+    it("counts favorited and rated entities correctly", () => {
+      const performerRatings = [
+        { favorite: true, rating: null },
+        { favorite: false, rating: 85 },
+        { favorite: false, rating: 70 }, // Below 80, not counted as rated
+      ];
+      const studioRatings = [{ favorite: true, rating: 90 }];
+      const tagRatings = [
+        { favorite: false, rating: 80 },
+        { favorite: false, rating: 80 },
+      ];
+      const sceneRatings = [
+        { favorite: true, rating: null },
+        { favorite: false, rating: 50 },
+        { favorite: false, rating: 30 }, // Below 40, not counted
+      ];
+
+      const counts = countUserCriteria(
+        performerRatings,
+        studioRatings,
+        tagRatings,
+        sceneRatings
+      );
+
+      expect(counts.favoritedPerformers).toBe(1);
+      expect(counts.ratedPerformers).toBe(1);
+      expect(counts.favoritedStudios).toBe(1);
+      expect(counts.ratedStudios).toBe(1);
+      expect(counts.favoritedTags).toBe(0);
+      expect(counts.ratedTags).toBe(2);
+      expect(counts.favoritedScenes).toBe(1);
+      expect(counts.ratedScenes).toBe(1); // Only rating >= 40 counts
+    });
+  });
+
+  describe("hasAnyCriteria", () => {
+    it("returns false when all counts are zero", () => {
+      const counts = {
+        favoritedPerformers: 0,
+        ratedPerformers: 0,
+        favoritedStudios: 0,
+        ratedStudios: 0,
+        favoritedTags: 0,
+        ratedTags: 0,
+        favoritedScenes: 0,
+        ratedScenes: 0,
+      };
+
+      expect(hasAnyCriteria(counts)).toBe(false);
+    });
+
+    it("returns true when only scene favorites exist", () => {
+      const counts = {
+        favoritedPerformers: 0,
+        ratedPerformers: 0,
+        favoritedStudios: 0,
+        ratedStudios: 0,
+        favoritedTags: 0,
+        ratedTags: 0,
+        favoritedScenes: 1,
+        ratedScenes: 0,
+      };
+
+      expect(hasAnyCriteria(counts)).toBe(true);
+    });
+
+    it("returns true when only scene ratings exist", () => {
+      const counts = {
+        favoritedPerformers: 0,
+        ratedPerformers: 0,
+        favoritedStudios: 0,
+        ratedStudios: 0,
+        favoritedTags: 0,
+        ratedTags: 0,
+        favoritedScenes: 0,
+        ratedScenes: 3,
+      };
+
+      expect(hasAnyCriteria(counts)).toBe(true);
     });
   });
 });
