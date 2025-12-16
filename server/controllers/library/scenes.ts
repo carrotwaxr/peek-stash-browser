@@ -6,14 +6,14 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import {
-  buildDerivedWeightsFromScenes,
-  scoreSceneByPreferences,
+  buildDerivedWeightsFromScoringData,
+  scoreScoringDataByPreferences,
   countUserCriteria,
   hasAnyCriteria,
-  type EntityPreferences,
+  type LightweightEntityPreferences,
   type SceneRatingInput,
 } from "../../services/RecommendationScoringService.js";
-import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
+import type { NormalizedScene, PeekSceneFilter, SceneScoringData } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
@@ -1213,8 +1213,12 @@ export const updateScene = async (req: AuthenticatedRequest, res: Response) => {
 /**
  * Find similar scenes based on weighted scoring
  * Performers: 3 points each
- * Tags: 1 point each (squashed from scene, performers, studio)
+ * Tags: 1 point each
  * Studio: 1 point
+ *
+ * Uses two-phase query:
+ * 1. Lightweight scoring query to score all scenes
+ * 2. SceneQueryBuilder to fetch final results with relations
  */
 export const findSimilarScenes = async (
   req: AuthenticatedRequest,
@@ -1223,58 +1227,37 @@ export const findSimilarScenes = async (
   try {
     const { id } = req.params;
     const page = parseInt(req.query.page as string) || 1;
-    const perPage = 12; // Fixed at 12 scenes per page
+    const perPage = 12;
     const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    // Get all scenes from cache and filter hidden entities
-    // All users (including admins) should have their hidden entities filtered
-    let allScenes = await stashEntityService.getAllScenes();
-    allScenes = await userRestrictionService.filterScenesForUser(
-      allScenes,
-      userId,
-      true // Skip content restrictions - just filter hidden entities
+    // Get excluded scene IDs for this user
+    const excludedIds = await userRestrictionService.getExcludedSceneIds(userId, true);
+
+    // Phase 1: Get lightweight scoring data
+    const allScoringData = await stashEntityService.getScenesForScoring();
+
+    // Filter out excluded scenes and current scene
+    const scoringData = allScoringData.filter(
+      s => s.id !== id && !excludedIds.has(s.id)
     );
 
-    // Find the current scene
-    const currentScene = allScenes.find((s: NormalizedScene) => s.id === id);
+    // Find the current scene's data
+    const currentScene = allScoringData.find(s => s.id === id);
     if (!currentScene) {
       return res.status(404).json({ error: "Scene not found" });
     }
 
-    // Helper to get squashed tags (scene + performers + studio)
-    const getSquashedTagIds = (scene: NormalizedScene): Set<string> => {
-      const tagIds = new Set<string>();
+    // Check if current scene has any metadata
+    const hasMetadata =
+      currentScene.performerIds.length > 0 ||
+      currentScene.studioId ||
+      currentScene.tagIds.length > 0;
 
-      // Scene tags
-      (scene.tags || []).forEach((t) => tagIds.add(String(t.id)));
-
-      // Performer tags
-      (scene.performers || []).forEach((p) => {
-        (p.tags || []).forEach((t) => tagIds.add(String(t.id)));
-      });
-
-      // Studio tags
-      if (scene.studio?.tags) {
-        scene.studio.tags.forEach((t) => tagIds.add(String(t.id)));
-      }
-
-      return tagIds;
-    };
-
-    // Check if scene has any metadata
-    const hasMetadata = (scene: NormalizedScene): boolean => {
-      const hasPerformers = scene.performers && scene.performers.length > 0;
-      const hasStudio = !!scene.studio;
-      const hasTags = getSquashedTagIds(scene).size > 0;
-      return hasPerformers || hasStudio || hasTags;
-    };
-
-    // If current scene has no metadata, return empty results
-    if (!hasMetadata(currentScene)) {
+    if (!hasMetadata) {
       return res.json({
         scenes: [],
         count: 0,
@@ -1283,86 +1266,86 @@ export const findSimilarScenes = async (
       });
     }
 
-    // Get current scene's metadata
-    const currentPerformerIds = new Set(
-      (currentScene.performers || []).map((p) => String(p.id))
-    );
-    const currentStudioId = currentScene.studio?.id
-      ? String(currentScene.studio.id)
-      : null;
-    const currentTagIds = getSquashedTagIds(currentScene);
+    // Build sets for fast lookup
+    const currentPerformerIds = new Set(currentScene.performerIds);
+    const currentTagIds = new Set(currentScene.tagIds);
+    const currentStudioId = currentScene.studioId;
 
-    // Calculate similarity scores for all other scenes
+    // Score all scenes
     interface ScoredScene {
-      scene: NormalizedScene;
+      id: string;
       score: number;
+      date: string | null;
     }
 
     const scoredScenes: ScoredScene[] = [];
 
-    for (const scene of allScenes) {
-      // Skip current scene
-      if (scene.id === id) continue;
-
-      // Skip scenes with no metadata
-      if (!hasMetadata(scene)) continue;
-
+    for (const scene of scoringData) {
       let score = 0;
 
       // Score for matching performers (3 points each)
-      if (scene.performers) {
-        for (const performer of scene.performers) {
-          if (currentPerformerIds.has(String(performer.id))) {
-            score += 3;
-          }
+      for (const performerId of scene.performerIds) {
+        if (currentPerformerIds.has(performerId)) {
+          score += 3;
         }
       }
 
       // Score for matching studio (1 point)
-      if (currentStudioId && scene.studio?.id === currentStudioId) {
+      if (currentStudioId && scene.studioId === currentStudioId) {
         score += 1;
       }
 
       // Score for matching tags (1 point each)
-      const sceneTagIds = getSquashedTagIds(scene);
-      for (const tagId of currentTagIds) {
-        if (sceneTagIds.has(tagId)) {
+      for (const tagId of scene.tagIds) {
+        if (currentTagIds.has(tagId)) {
           score += 1;
         }
       }
 
-      // Only include scenes with at least some similarity
       if (score > 0) {
-        scoredScenes.push({ scene, score });
+        scoredScenes.push({ id: scene.id, score, date: scene.date });
       }
     }
 
-    // Sort by score descending, then by date descending as tiebreaker
+    // Sort by score descending, then by date descending
     scoredScenes.sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;
       }
-      // Tiebreaker: newer scenes first
-      const dateA = a.scene.date ? new Date(a.scene.date).getTime() : 0;
-      const dateB = b.scene.date ? new Date(b.scene.date).getTime() : 0;
+      const dateA = a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b.date ? new Date(b.date).getTime() : 0;
       return dateB - dateA;
     });
 
-    // Paginate results
+    // Paginate
     const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    const paginatedScenes = scoredScenes
-      .slice(startIndex, endIndex)
-      .map((s) => s.scene);
+    const paginatedIds = scoredScenes
+      .slice(startIndex, startIndex + perPage)
+      .map(s => s.id);
 
-    // Merge with user data
-    const scenesWithUserData = await mergeScenesWithUserData(
-      paginatedScenes,
-      userId
-    );
+    if (paginatedIds.length === 0) {
+      return res.json({
+        scenes: [],
+        count: scoredScenes.length,
+        page,
+        perPage,
+      });
+    }
+
+    // Phase 2: Fetch full scene data via SceneQueryBuilder
+    const { scenes } = await sceneQueryBuilder.getByIds({
+      userId,
+      ids: paginatedIds,
+    });
+
+    // Preserve score order (getByIds may return in different order)
+    const sceneMap = new Map(scenes.map(s => [s.id, s]));
+    const orderedScenes = paginatedIds
+      .map(id => sceneMap.get(id))
+      .filter((s): s is NormalizedScene => s !== undefined);
 
     res.json({
-      scenes: scenesWithUserData,
+      scenes: orderedScenes,
       count: scoredScenes.length,
       page,
       perPage,
@@ -1376,6 +1359,10 @@ export const findSimilarScenes = async (
 /**
  * Get recommended scenes based on user preferences and watch history
  * Uses favorites, ratings (80+), watch status, and engagement quality
+ *
+ * Two-phase query architecture:
+ * 1. Lightweight scoring: Score all scenes using IDs only (SceneScoringData)
+ * 2. Full fetch: Get complete scene data for paginated results via SceneQueryBuilder
  */
 export const getRecommendedScenes = async (
   req: AuthenticatedRequest,
@@ -1390,15 +1377,24 @@ export const getRecommendedScenes = async (
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    // Fetch user ratings and watch history
-    const [performerRatings, studioRatings, tagRatings, sceneRatings, watchHistory] =
-      await Promise.all([
-        prisma.performerRating.findMany({ where: { userId } }),
-        prisma.studioRating.findMany({ where: { userId } }),
-        prisma.tagRating.findMany({ where: { userId } }),
-        prisma.sceneRating.findMany({ where: { userId } }),
-        prisma.watchHistory.findMany({ where: { userId } }),
-      ]);
+    // Fetch user ratings, watch history, and lightweight scoring data in parallel
+    const [
+      performerRatings,
+      studioRatings,
+      tagRatings,
+      sceneRatings,
+      watchHistory,
+      allScoringData,
+      excludedIds,
+    ] = await Promise.all([
+      prisma.performerRating.findMany({ where: { userId } }),
+      prisma.studioRating.findMany({ where: { userId } }),
+      prisma.tagRating.findMany({ where: { userId } }),
+      prisma.sceneRating.findMany({ where: { userId } }),
+      prisma.watchHistory.findMany({ where: { userId } }),
+      stashEntityService.getScenesForScoring(),
+      userRestrictionService.getExcludedSceneIds(userId, true),
+    ]);
 
     // Build sets of favorite and highly-rated entities
     const favoritePerformers = new Set(
@@ -1467,33 +1463,27 @@ export const getRecommendedScenes = async (
       })
     );
 
-    // Get all scenes and filter hidden entities
-    // All users (including admins) should have their hidden entities filtered
-    let allScenes = await stashEntityService.getAllScenes();
-    allScenes = await userRestrictionService.filterScenesForUser(
-      allScenes,
-      userId,
-      true // Skip content restrictions - just filter hidden entities
-    );
+    // Filter excluded scenes from scoring data
+    const scoringData = allScoringData.filter((s) => !excludedIds.has(s.id));
 
-    // Build derived weights from rated/favorited scenes
+    // Build derived weights from rated/favorited scenes using lightweight data
     const sceneRatingsForDerived: SceneRatingInput[] = sceneRatings.map((r) => ({
       sceneId: r.sceneId,
       rating: r.rating,
       favorite: r.favorite,
     }));
 
-    const sceneMap = new Map(allScenes.map((s) => [s.id, s]));
-    const getSceneById = (id: string) => sceneMap.get(id);
+    const scoringDataMap = new Map(scoringData.map((s) => [s.id, s]));
+    const getScoringDataById = (id: string) => scoringDataMap.get(id);
 
     const {
       derivedPerformerWeights,
       derivedStudioWeights,
       derivedTagWeights,
-    } = buildDerivedWeightsFromScenes(sceneRatingsForDerived, getSceneById);
+    } = buildDerivedWeightsFromScoringData(sceneRatingsForDerived, getScoringDataById);
 
     // Build entity preferences object
-    const prefs: EntityPreferences = {
+    const prefs: LightweightEntityPreferences = {
       favoritePerformers,
       highlyRatedPerformers,
       favoriteStudios,
@@ -1505,24 +1495,25 @@ export const getRecommendedScenes = async (
       derivedTagWeights,
     };
 
-    // Score all scenes
-    interface ScoredScene {
-      scene: NormalizedScene;
+    // Phase 1: Score all scenes using lightweight data
+    interface ScoredSceneId {
+      id: string;
       score: number;
+      oCounter: number;
     }
 
-    const scoredScenes: ScoredScene[] = [];
+    const scoredScenes: ScoredSceneId[] = [];
     const now = new Date();
 
-    for (const scene of allScenes) {
-      const baseScore = scoreSceneByPreferences(scene, prefs);
+    for (const data of scoringData) {
+      const baseScore = scoreScoringDataByPreferences(data, prefs);
 
       // Skip if no base score (doesn't match any criteria)
       if (baseScore === 0) continue;
 
       // Watch status modifier (reduced dominance: was +100/-100, now +30/-30)
       let adjustedScore = baseScore;
-      const watchData = watchMap.get(scene.id);
+      const watchData = watchMap.get(data.id);
       if (!watchData || watchData.playCount === 0) {
         // Never watched
         adjustedScore += 30;
@@ -1544,13 +1535,12 @@ export const getRecommendedScenes = async (
       }
 
       // Engagement quality multiplier
-      const oCounter = scene.o_counter || 0;
-      const engagementMultiplier = 1.0 + Math.min(oCounter, 10) * 0.03;
+      const engagementMultiplier = 1.0 + Math.min(data.oCounter, 10) * 0.03;
       const finalScore = adjustedScore * engagementMultiplier;
 
       // Only include scenes with positive final scores
       if (finalScore > 0) {
-        scoredScenes.push({ scene, score: finalScore });
+        scoredScenes.push({ id: data.id, score: finalScore, oCounter: data.oCounter });
       }
     }
 
@@ -1560,7 +1550,7 @@ export const getRecommendedScenes = async (
     // Add diversity through score tier randomization
     // Group scenes into score tiers (10% bands) and randomize within each tier
     // This creates variety while maintaining general quality order
-    const diversifiedScenes: ScoredScene[] = [];
+    const diversifiedScenes: ScoredSceneId[] = [];
     if (scoredScenes.length > 0) {
       const maxScore = scoredScenes[0].score;
       const minScore = scoredScenes[scoredScenes.length - 1].score;
@@ -1568,7 +1558,7 @@ export const getRecommendedScenes = async (
       const tierSize = scoreRange / 10; // 10 tiers
 
       // Group scenes by tier
-      const tiers: ScoredScene[][] = Array.from({ length: 10 }, () => []);
+      const tiers: ScoredSceneId[][] = Array.from({ length: 10 }, () => []);
       for (const scoredScene of scoredScenes) {
         const tierIndex = Math.min(
           9,
@@ -1607,21 +1597,25 @@ export const getRecommendedScenes = async (
       });
     }
 
-    // Paginate
+    // Paginate scene IDs
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
-    const paginatedScenes = cappedScenes
-      .slice(startIndex, endIndex)
-      .map((s) => s.scene);
+    const paginatedIds = cappedScenes.slice(startIndex, endIndex).map((s) => s.id);
 
-    // Merge with user data
-    const scenesWithUserData = await mergeScenesWithUserData(
-      paginatedScenes,
-      userId
-    );
+    // Phase 2: Fetch full scene data via SceneQueryBuilder
+    const { scenes } = await sceneQueryBuilder.getByIds({
+      userId,
+      ids: paginatedIds,
+    });
+
+    // Preserve score order (getByIds returns in arbitrary order)
+    const sceneMap = new Map(scenes.map((s) => [s.id, s]));
+    const orderedScenes = paginatedIds
+      .map((id) => sceneMap.get(id))
+      .filter((s): s is NormalizedScene => s !== undefined);
 
     res.json({
-      scenes: scenesWithUserData,
+      scenes: orderedScenes,
       count: cappedScenes.length,
       page,
       perPage,

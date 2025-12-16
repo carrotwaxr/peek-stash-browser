@@ -106,4 +106,40 @@ describeWithDb("SceneQueryBuilder Integration", () => {
       result2.scenes.map((s) => s.id)
     );
   });
+
+  it("should fetch scenes by IDs with full relations", async () => {
+    // First get some scene IDs
+    const initial = await sceneQueryBuilder.execute({
+      userId: 1,
+      sort: "created_at",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: 3,
+    });
+
+    if (initial.scenes.length < 2) {
+      console.log("Skipping getByIds test - not enough scenes");
+      return;
+    }
+
+    const idsToFetch = initial.scenes.slice(0, 2).map(s => s.id);
+
+    const result = await sceneQueryBuilder.getByIds({
+      userId: 1,
+      ids: idsToFetch,
+    });
+
+    expect(result.scenes).toHaveLength(2);
+    expect(result.scenes.map(s => s.id).sort()).toEqual(idsToFetch.sort());
+
+    // Verify relations are populated
+    for (const scene of result.scenes) {
+      expect(scene).toHaveProperty("performers");
+      expect(scene).toHaveProperty("tags");
+      expect(scene).toHaveProperty("groups");
+      expect(scene).toHaveProperty("galleries");
+      expect(Array.isArray(scene.performers)).toBe(true);
+      expect(Array.isArray(scene.tags)).toBe(true);
+    }
+  });
 });
