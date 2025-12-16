@@ -352,6 +352,8 @@ export function scenePlayerReducer(state, action) {
         shouldAutoplay: shouldAutoplay,
         // Reset quality to "direct" for new scene - will be auto-selected based on codec
         quality: "direct",
+        // Reset O counter immediately - will be set correctly when new scene loads
+        oCounter: 0,
       };
     }
 
