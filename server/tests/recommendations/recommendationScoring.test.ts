@@ -3,13 +3,16 @@ import { describe, it, expect } from "vitest";
 import {
   calculateSceneWeightMultiplier,
   buildDerivedWeightsFromScenes,
+  scoreSceneByPreferences,
   countUserCriteria,
   hasAnyCriteria,
   SCENE_WEIGHT_BASE,
   SCENE_WEIGHT_FAVORITE_BONUS,
   SCENE_RATING_FLOOR,
   SCENE_FAVORITED_IMPLICIT_RATING,
+  PERFORMER_FAVORITE_WEIGHT,
   type SceneRatingInput,
+  type EntityPreferences,
 } from "../../services/RecommendationScoringService.js";
 import type { NormalizedScene } from "../../types/index.js";
 
@@ -266,6 +269,93 @@ describe("RecommendationScoringService", () => {
       };
 
       expect(hasAnyCriteria(counts)).toBe(true);
+    });
+  });
+
+  describe("scoreSceneByPreferences", () => {
+    const createEmptyPrefs = (): EntityPreferences => ({
+      favoritePerformers: new Set(),
+      highlyRatedPerformers: new Set(),
+      favoriteStudios: new Set(),
+      highlyRatedStudios: new Set(),
+      favoriteTags: new Set(),
+      highlyRatedTags: new Set(),
+      derivedPerformerWeights: new Map(),
+      derivedStudioWeights: new Map(),
+      derivedTagWeights: new Map(),
+    });
+
+    const mockScene: NormalizedScene = {
+      id: "scene1",
+      title: "Test Scene",
+      performers: [
+        { id: "perf1", name: "Performer 1", tags: [] },
+        { id: "perf2", name: "Performer 2", tags: [] },
+      ],
+      studio: { id: "studio1", name: "Studio 1", tags: [] },
+      tags: [{ id: "tag1", name: "Tag 1" }],
+    } as NormalizedScene;
+
+    it("returns 0 for scene with no matching preferences", () => {
+      const prefs = createEmptyPrefs();
+      const score = scoreSceneByPreferences(mockScene, prefs);
+      expect(score).toBe(0);
+    });
+
+    it("scores favorite performer correctly (5 points)", () => {
+      const prefs = createEmptyPrefs();
+      prefs.favoritePerformers.add("perf1");
+
+      const score = scoreSceneByPreferences(mockScene, prefs);
+
+      expect(score).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2); // 5 * sqrt(1) = 5
+    });
+
+    it("applies sqrt diminishing returns for multiple favorite performers", () => {
+      const prefs = createEmptyPrefs();
+      prefs.favoritePerformers.add("perf1");
+      prefs.favoritePerformers.add("perf2");
+
+      const score = scoreSceneByPreferences(mockScene, prefs);
+
+      // 5 * sqrt(2) ≈ 7.07
+      expect(score).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT * Math.sqrt(2), 2);
+    });
+
+    it("scores favorite studio correctly (3 points)", () => {
+      const prefs = createEmptyPrefs();
+      prefs.favoriteStudios.add("studio1");
+
+      const score = scoreSceneByPreferences(mockScene, prefs);
+
+      expect(score).toBe(3);
+    });
+
+    it("scores derived performer weights with sqrt scaling", () => {
+      const prefs = createEmptyPrefs();
+      // Accumulated weight of 0.8 from two scenes
+      prefs.derivedPerformerWeights.set("perf1", 0.8);
+
+      const score = scoreSceneByPreferences(mockScene, prefs);
+
+      // 5 * sqrt(0.8) ≈ 4.47
+      expect(score).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT * Math.sqrt(0.8), 2);
+    });
+
+    it("combines explicit and derived preferences", () => {
+      const prefs = createEmptyPrefs();
+      prefs.favoritePerformers.add("perf1"); // 5 points
+      prefs.favoriteStudios.add("studio1"); // 3 points
+      prefs.derivedPerformerWeights.set("perf2", 0.4); // 5 * sqrt(0.4) ≈ 3.16
+
+      const score = scoreSceneByPreferences(mockScene, prefs);
+
+      const expected =
+        PERFORMER_FAVORITE_WEIGHT * Math.sqrt(1) + // perf1 explicit
+        3 + // studio
+        PERFORMER_FAVORITE_WEIGHT * Math.sqrt(0.4); // perf2 derived
+
+      expect(score).toBeCloseTo(expected, 1);
     });
   });
 });
