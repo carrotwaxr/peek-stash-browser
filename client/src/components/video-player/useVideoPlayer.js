@@ -511,7 +511,12 @@ export function useVideoPlayer({
           // e.g., "stream.m3u8" from "http://stash:9999/scene/123/stream.m3u8?resolution=STANDARD_HD"
           const pathParts = url.pathname.split(`/scene/${scene.id}/`);
           const streamPath = pathParts[1] || 'stream'; // "stream.m3u8" or "stream"
-          const queryString = url.search; // "?resolution=STANDARD_HD" or ""
+
+          // Strip apikey from query params (security: don't expose Stash API key to client)
+          url.searchParams.delete('apikey');
+          url.searchParams.delete('ApiKey');
+          url.searchParams.delete('APIKEY');
+          const queryString = url.search; // "?resolution=STANDARD_HD" or "" (without apikey)
 
           // Rewrite to Peek's proxy endpoint
           const proxiedUrl = `/api/scene/${scene.id}/proxy-stream/${streamPath}${queryString}`;
