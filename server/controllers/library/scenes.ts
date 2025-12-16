@@ -1627,9 +1627,18 @@ export const getRecommendedScenes = async (
       perPage,
     });
   } catch (error) {
+    const err = error as Error;
     logger.error("Error getting recommended scenes:", {
-      error: error as Error,
+      message: err.message,
+      name: err.name,
+      stack: err.stack,
+      userId: req.user?.id,
     });
-    res.status(500).json({ error: "Failed to get recommended scenes" });
+
+    const errorType = err.name || "Unknown error";
+    res.status(500).json({
+      error: "Failed to get recommended scenes",
+      errorType,
+    });
   }
 };
