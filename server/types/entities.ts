@@ -149,3 +149,16 @@ export type NormalizedGroup = Group & {
   rating: number | null;
   favorite: boolean;
 };
+
+/**
+ * Lightweight scene data for scoring operations
+ * Contains only IDs needed for similarity/recommendation scoring
+ */
+export interface SceneScoringData {
+  id: string;
+  studioId: string | null;
+  performerIds: string[];
+  tagIds: string[];
+  oCounter: number;
+  date: string | null;
+}

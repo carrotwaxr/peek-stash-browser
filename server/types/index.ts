@@ -19,6 +19,7 @@ export type {
   NormalizedTag,
   NormalizedGallery,
   NormalizedGroup,
+  SceneScoringData,
 } from "./entities.js";
 
 // Base filter types from stashapp-api
