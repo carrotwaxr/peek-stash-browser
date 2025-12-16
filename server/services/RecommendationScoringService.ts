@@ -1,5 +1,5 @@
 // server/services/RecommendationScoringService.ts
-import type { NormalizedScene } from "../types/index.js";
+import type { NormalizedScene, SceneScoringData } from "../types/index.js";
 
 // Configuration constants
 export const SCENE_WEIGHT_BASE = 0.4;
@@ -304,4 +304,157 @@ export function hasAnyCriteria(counts: UserCriteriaCounts): boolean {
     counts.favoritedScenes > 0 ||
     counts.ratedScenes > 0
   );
+}
+
+/**
+ * Lightweight entity preferences for scoring (excludes performer/studio tag data)
+ * Used with SceneScoringData for efficient two-phase query architecture
+ */
+export interface LightweightEntityPreferences {
+  favoritePerformers: Set<string>;
+  highlyRatedPerformers: Set<string>;
+  favoriteStudios: Set<string>;
+  highlyRatedStudios: Set<string>;
+  favoriteTags: Set<string>;
+  highlyRatedTags: Set<string>;
+  derivedPerformerWeights: Map<string, number>;
+  derivedStudioWeights: Map<string, number>;
+  derivedTagWeights: Map<string, number>;
+}
+
+/**
+ * Build derived entity weights from rated/favorited scenes using lightweight scoring data
+ * Works with SceneScoringData (IDs only) instead of full NormalizedScene objects
+ */
+export function buildDerivedWeightsFromScoringData(
+  sceneRatings: SceneRatingInput[],
+  getScoringDataById: (sceneId: string) => SceneScoringData | undefined
+): {
+  derivedPerformerWeights: Map<string, number>;
+  derivedStudioWeights: Map<string, number>;
+  derivedTagWeights: Map<string, number>;
+} {
+  const derivedPerformerWeights = new Map<string, number>();
+  const derivedStudioWeights = new Map<string, number>();
+  const derivedTagWeights = new Map<string, number>();
+
+  for (const sceneRating of sceneRatings) {
+    const multiplier = calculateSceneWeightMultiplier(
+      sceneRating.rating,
+      sceneRating.favorite
+    );
+
+    if (multiplier === 0) continue;
+
+    const scoringData = getScoringDataById(sceneRating.sceneId);
+    if (!scoringData) continue;
+
+    // Accumulate performer weights
+    for (const performerId of scoringData.performerIds) {
+      const current = derivedPerformerWeights.get(performerId) || 0;
+      derivedPerformerWeights.set(performerId, current + multiplier);
+    }
+
+    // Accumulate studio weight
+    if (scoringData.studioId) {
+      const current = derivedStudioWeights.get(scoringData.studioId) || 0;
+      derivedStudioWeights.set(scoringData.studioId, current + multiplier);
+    }
+
+    // Accumulate tag weights (scene tags only - no performer/studio tags in lightweight data)
+    for (const tagId of scoringData.tagIds) {
+      const current = derivedTagWeights.get(tagId) || 0;
+      derivedTagWeights.set(tagId, current + multiplier);
+    }
+  }
+
+  return {
+    derivedPerformerWeights,
+    derivedStudioWeights,
+    derivedTagWeights,
+  };
+}
+
+/**
+ * Score a scene using lightweight scoring data (IDs only)
+ * Simplified version that doesn't include performer/studio tag scoring
+ * (those require full entity hydration which defeats the purpose of lightweight scoring)
+ */
+export function scoreScoringDataByPreferences(
+  scoringData: SceneScoringData,
+  prefs: LightweightEntityPreferences
+): number {
+  let baseScore = 0;
+
+  // Score performers with diminishing returns (sqrt scaling)
+  let favoritePerformerCount = 0;
+  let highlyRatedPerformerCount = 0;
+  let derivedPerformerWeight = 0;
+
+  for (const performerId of scoringData.performerIds) {
+    if (prefs.favoritePerformers.has(performerId)) {
+      favoritePerformerCount++;
+    } else if (prefs.highlyRatedPerformers.has(performerId)) {
+      highlyRatedPerformerCount++;
+    }
+
+    const derived = prefs.derivedPerformerWeights.get(performerId);
+    if (derived) {
+      derivedPerformerWeight += derived;
+    }
+  }
+
+  if (favoritePerformerCount > 0) {
+    baseScore += PERFORMER_FAVORITE_WEIGHT * Math.sqrt(favoritePerformerCount);
+  }
+  if (highlyRatedPerformerCount > 0) {
+    baseScore += PERFORMER_RATED_WEIGHT * Math.sqrt(highlyRatedPerformerCount);
+  }
+  if (derivedPerformerWeight > 0) {
+    baseScore += PERFORMER_FAVORITE_WEIGHT * Math.sqrt(derivedPerformerWeight);
+  }
+
+  // Score studio
+  if (scoringData.studioId) {
+    if (prefs.favoriteStudios.has(scoringData.studioId)) {
+      baseScore += STUDIO_FAVORITE_WEIGHT;
+    } else if (prefs.highlyRatedStudios.has(scoringData.studioId)) {
+      baseScore += STUDIO_RATED_WEIGHT;
+    }
+
+    const derivedStudio = prefs.derivedStudioWeights.get(scoringData.studioId);
+    if (derivedStudio) {
+      baseScore += STUDIO_FAVORITE_WEIGHT * Math.sqrt(derivedStudio);
+    }
+  }
+
+  // Score scene tags only (no performer/studio tag data in lightweight scoring)
+  let favoriteTagCount = 0;
+  let ratedTagCount = 0;
+  let derivedTagWeight = 0;
+
+  for (const tagId of scoringData.tagIds) {
+    if (prefs.favoriteTags.has(tagId)) {
+      favoriteTagCount++;
+    } else if (prefs.highlyRatedTags.has(tagId)) {
+      ratedTagCount++;
+    }
+
+    const derived = prefs.derivedTagWeights.get(tagId);
+    if (derived) {
+      derivedTagWeight += derived;
+    }
+  }
+
+  if (favoriteTagCount > 0) {
+    baseScore += TAG_SCENE_FAVORITE_WEIGHT * Math.sqrt(favoriteTagCount);
+  }
+  if (ratedTagCount > 0) {
+    baseScore += TAG_SCENE_RATED_WEIGHT * Math.sqrt(ratedTagCount);
+  }
+  if (derivedTagWeight > 0) {
+    baseScore += TAG_SCENE_FAVORITE_WEIGHT * Math.sqrt(derivedTagWeight);
+  }
+
+  return baseScore;
 }

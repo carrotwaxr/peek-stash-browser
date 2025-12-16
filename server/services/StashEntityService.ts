@@ -135,6 +135,10 @@ class StashEntityService {
   /**
    * Get all scenes from cache
    * Returns scenes with default user fields (not merged with user-specific data)
+   *
+   * @deprecated Use SceneQueryBuilder.execute() instead for consistent scene data with relations.
+   * This method returns scenes with empty relation arrays (performers, tags, etc.).
+   * Only kept for legacy fallback paths when USE_SQL_QUERY_BUILDER=false.
    */
   async getAllScenes(): Promise<NormalizedScene[]> {
     const startTotal = Date.now();
@@ -209,8 +213,41 @@ class StashEntityService {
   }
 
   /**
+   * Get lightweight scene data for entity visibility filtering
+   * Returns only IDs needed to determine which entities appear in scenes
+   * Much more efficient than loading full scene objects
+   *
+   * Returns scenes with:
+   * - id: Scene ID
+   * - performers: Array<{ id: string }> - performer IDs
+   * - tags: Array<{ id: string }> - tag IDs
+   * - studio: { id: string } | null - studio ID
+   */
+  async getScenesForVisibility(): Promise<Array<{
+    id: string;
+    performers: Array<{ id: string }>;
+    tags: Array<{ id: string }>;
+    studio: { id: string } | null;
+  }>> {
+    const scoringData = await this.getScenesForScoring();
+
+    // Transform to the shape expected by empty entity filters
+    return scoringData.map(s => ({
+      id: s.id,
+      // Transform to array of objects with id property (matches existing interface)
+      performers: s.performerIds.map(id => ({ id })),
+      tags: s.tagIds.map(id => ({ id })),
+      // studio property needs to match { id: string } | null shape
+      studio: s.studioId ? { id: s.studioId } : null,
+    }));
+  }
+
+  /**
    * Get all scenes with tags relation included
    * Used for empty entity filtering which needs to know which tags appear on visible scenes
+   *
+   * @deprecated Use getScenesForVisibility() for entity visibility filtering instead.
+   * This method loads full scene objects when only IDs are needed.
    */
   async getAllScenesWithTags(): Promise<NormalizedScene[]> {
     const startTotal = Date.now();
@@ -251,6 +288,9 @@ class StashEntityService {
   /**
    * Get all scenes with performers relation included
    * Used for empty entity filtering which needs to know which performers appear in visible scenes
+   *
+   * @deprecated Use getScenesForVisibility() for entity visibility filtering instead.
+   * This method loads full scene objects when only IDs are needed.
    */
   async getAllScenesWithPerformers(): Promise<NormalizedScene[]> {
     const startTotal = Date.now();
@@ -289,6 +329,9 @@ class StashEntityService {
   /**
    * Get all scenes with both performers and tags relations included
    * Used for tags filtering which needs both performer IDs and tag IDs
+   *
+   * @deprecated Use getScenesForVisibility() for entity visibility filtering instead.
+   * This method loads full scene objects when only IDs are needed.
    */
   async getAllScenesWithPerformersAndTags(): Promise<NormalizedScene[]> {
     const startTotal = Date.now();
@@ -398,6 +441,10 @@ class StashEntityService {
    * Get scenes with database-level pagination and sorting
    * This is the optimized path for browse queries
    * Supports efficient exclusion filtering using NOT IN at the database level
+   *
+   * @deprecated Use SceneQueryBuilder.execute() instead for consistent scene data with relations.
+   * This method returns scenes with empty relation arrays (performers, tags, etc.).
+   * Only kept for legacy fallback paths when USE_SQL_QUERY_BUILDER=false.
    */
   async getScenesPaginated(options: {
     page: number;
