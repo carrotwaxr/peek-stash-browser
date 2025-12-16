@@ -5,6 +5,14 @@ import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import {
+  buildDerivedWeightsFromScenes,
+  scoreSceneByPreferences,
+  countUserCriteria,
+  hasAnyCriteria,
+  type EntityPreferences,
+  type SceneRatingInput,
+} from "../../services/RecommendationScoringService.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
@@ -1383,11 +1391,12 @@ export const getRecommendedScenes = async (
     }
 
     // Fetch user ratings and watch history
-    const [performerRatings, studioRatings, tagRatings, watchHistory] =
+    const [performerRatings, studioRatings, tagRatings, sceneRatings, watchHistory] =
       await Promise.all([
         prisma.performerRating.findMany({ where: { userId } }),
         prisma.studioRating.findMany({ where: { userId } }),
         prisma.tagRating.findMany({ where: { userId } }),
+        prisma.sceneRating.findMany({ where: { userId } }),
         prisma.watchHistory.findMany({ where: { userId } }),
       ]);
 
@@ -1417,23 +1426,23 @@ export const getRecommendedScenes = async (
         .map((r) => r.tagId)
     );
 
-    // Check if user has any favorites or highly-rated entities
-    const hasCriteria =
-      favoritePerformers.size > 0 ||
-      highlyRatedPerformers.size > 0 ||
-      favoriteStudios.size > 0 ||
-      highlyRatedStudios.size > 0 ||
-      favoriteTags.size > 0 ||
-      highlyRatedTags.size > 0;
+    // Count user criteria for feedback
+    const criteriaCounts = countUserCriteria(
+      performerRatings,
+      studioRatings,
+      tagRatings,
+      sceneRatings
+    );
 
-    if (!hasCriteria) {
+    // Check if user has any criteria (now includes scenes)
+    if (!hasAnyCriteria(criteriaCounts)) {
       return res.json({
         scenes: [],
         count: 0,
         page,
         perPage,
-        message:
-          "Rate or favorite some performers, studios, or tags to get recommendations",
+        message: "No recommendations yet",
+        criteria: criteriaCounts,
       });
     }
 
@@ -1467,21 +1476,33 @@ export const getRecommendedScenes = async (
       true // Skip content restrictions - just filter hidden entities
     );
 
-    // Helper to get tags by source (weighted to reduce squashing inflation)
-    const getTagsBySource = (scene: NormalizedScene) => {
-      const sceneTags = new Set<string>();
-      const performerTags = new Set<string>();
-      const studioTags = new Set<string>();
+    // Build derived weights from rated/favorited scenes
+    const sceneRatingsForDerived: SceneRatingInput[] = sceneRatings.map((r) => ({
+      sceneId: r.sceneId,
+      rating: r.rating,
+      favorite: r.favorite,
+    }));
 
-      (scene.tags || []).forEach((t) => sceneTags.add(String(t.id)));
-      (scene.performers || []).forEach((p) => {
-        (p.tags || []).forEach((t) => performerTags.add(String(t.id)));
-      });
-      if (scene.studio?.tags) {
-        scene.studio.tags.forEach((t) => studioTags.add(String(t.id)));
-      }
+    const sceneMap = new Map(allScenes.map((s) => [s.id, s]));
+    const getSceneById = (id: string) => sceneMap.get(id);
 
-      return { sceneTags, performerTags, studioTags };
+    const {
+      derivedPerformerWeights,
+      derivedStudioWeights,
+      derivedTagWeights,
+    } = buildDerivedWeightsFromScenes(sceneRatingsForDerived, getSceneById);
+
+    // Build entity preferences object
+    const prefs: EntityPreferences = {
+      favoritePerformers,
+      highlyRatedPerformers,
+      favoriteStudios,
+      highlyRatedStudios,
+      favoriteTags,
+      highlyRatedTags,
+      derivedPerformerWeights,
+      derivedStudioWeights,
+      derivedTagWeights,
     };
 
     // Score all scenes
@@ -1494,102 +1515,17 @@ export const getRecommendedScenes = async (
     const now = new Date();
 
     for (const scene of allScenes) {
-      let baseScore = 0;
-
-      // Score performers with diminishing returns (sqrt scaling)
-      if (scene.performers) {
-        let favoritePerformerCount = 0;
-        let highlyRatedPerformerCount = 0;
-
-        for (const performer of scene.performers) {
-          const performerId = String(performer.id);
-          if (favoritePerformers.has(performerId)) {
-            favoritePerformerCount++;
-          } else if (highlyRatedPerformers.has(performerId)) {
-            highlyRatedPerformerCount++;
-          }
-        }
-
-        // Diminishing returns: sqrt scaling
-        // 1 performer = 5 pts, 4 = 10 pts, 9 = 15 pts (not linear)
-        if (favoritePerformerCount > 0) {
-          baseScore += 5 * Math.sqrt(favoritePerformerCount);
-        }
-        if (highlyRatedPerformerCount > 0) {
-          baseScore += 3 * Math.sqrt(highlyRatedPerformerCount);
-        }
-      }
-
-      // Score studio (already capped at 1 per scene)
-      if (scene.studio) {
-        const studioId = String(scene.studio.id);
-        if (favoriteStudios.has(studioId)) {
-          baseScore += 3;
-        } else if (highlyRatedStudios.has(studioId)) {
-          baseScore += 2;
-        }
-      }
-
-      // Score tags with source weighting and diminishing returns
-      const { sceneTags, performerTags, studioTags } = getTagsBySource(scene);
-
-      let favoriteSceneTagCount = 0;
-      let favoritePerformerTagCount = 0;
-      let favoriteStudioTagCount = 0;
-      let ratedSceneTagCount = 0;
-      let ratedPerformerTagCount = 0;
-      let ratedStudioTagCount = 0;
-
-      for (const tagId of sceneTags) {
-        if (favoriteTags.has(tagId)) favoriteSceneTagCount++;
-        else if (highlyRatedTags.has(tagId)) ratedSceneTagCount++;
-      }
-      for (const tagId of performerTags) {
-        if (!sceneTags.has(tagId)) {
-          // Don't double-count
-          if (favoriteTags.has(tagId)) favoritePerformerTagCount++;
-          else if (highlyRatedTags.has(tagId)) ratedPerformerTagCount++;
-        }
-      }
-      for (const tagId of studioTags) {
-        if (!sceneTags.has(tagId) && !performerTags.has(tagId)) {
-          // Don't double-count
-          if (favoriteTags.has(tagId)) favoriteStudioTagCount++;
-          else if (highlyRatedTags.has(tagId)) ratedStudioTagCount++;
-        }
-      }
-
-      // Weighted tag scores with diminishing returns
-      // Scene tags: Full value (1.0x weight)
-      // Performer tags: Reduced value (0.3x weight)
-      // Studio tags: Medium value (0.5x weight)
-      if (favoriteSceneTagCount > 0) {
-        baseScore += 1.0 * Math.sqrt(favoriteSceneTagCount);
-      }
-      if (favoritePerformerTagCount > 0) {
-        baseScore += 0.3 * Math.sqrt(favoritePerformerTagCount);
-      }
-      if (favoriteStudioTagCount > 0) {
-        baseScore += 0.5 * Math.sqrt(favoriteStudioTagCount);
-      }
-      if (ratedSceneTagCount > 0) {
-        baseScore += 0.5 * Math.sqrt(ratedSceneTagCount);
-      }
-      if (ratedPerformerTagCount > 0) {
-        baseScore += 0.15 * Math.sqrt(ratedPerformerTagCount);
-      }
-      if (ratedStudioTagCount > 0) {
-        baseScore += 0.25 * Math.sqrt(ratedStudioTagCount);
-      }
+      const baseScore = scoreSceneByPreferences(scene, prefs);
 
       // Skip if no base score (doesn't match any criteria)
       if (baseScore === 0) continue;
 
       // Watch status modifier (reduced dominance: was +100/-100, now +30/-30)
+      let adjustedScore = baseScore;
       const watchData = watchMap.get(scene.id);
       if (!watchData || watchData.playCount === 0) {
         // Never watched
-        baseScore += 30;
+        adjustedScore += 30;
       } else if (watchData.lastPlayedAt) {
         const daysSinceWatched =
           (now.getTime() - watchData.lastPlayedAt.getTime()) /
@@ -1597,20 +1533,20 @@ export const getRecommendedScenes = async (
 
         if (daysSinceWatched > 14) {
           // Not recently watched
-          baseScore += 20;
+          adjustedScore += 20;
         } else if (daysSinceWatched >= 1) {
           // Recently watched (1-14 days)
-          baseScore -= 10;
+          adjustedScore -= 10;
         } else {
           // Very recently watched (<24 hours)
-          baseScore -= 30;
+          adjustedScore -= 30;
         }
       }
 
       // Engagement quality multiplier
       const oCounter = scene.o_counter || 0;
       const engagementMultiplier = 1.0 + Math.min(oCounter, 10) * 0.03;
-      const finalScore = baseScore * engagementMultiplier;
+      const finalScore = adjustedScore * engagementMultiplier;
 
       // Only include scenes with positive final scores
       if (finalScore > 0) {
@@ -1659,6 +1595,18 @@ export const getRecommendedScenes = async (
     // Cap at top 500 recommendations
     const cappedScenes = diversifiedScenes.slice(0, 500);
 
+    // If no recommendations after scoring, include criteria for feedback
+    if (cappedScenes.length === 0) {
+      return res.json({
+        scenes: [],
+        count: 0,
+        page,
+        perPage,
+        message: "No matching recommendations found",
+        criteria: criteriaCounts,
+      });
+    }
+
     // Paginate
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
@@ -1679,9 +1627,18 @@ export const getRecommendedScenes = async (
       perPage,
     });
   } catch (error) {
+    const err = error as Error;
     logger.error("Error getting recommended scenes:", {
-      error: error as Error,
+      message: err.message,
+      name: err.name,
+      stack: err.stack,
+      userId: req.user?.id,
     });
-    res.status(500).json({ error: "Failed to get recommended scenes" });
+
+    const errorType = err.name || "Unknown error";
+    res.status(500).json({
+      error: "Failed to get recommended scenes",
+      errorType,
+    });
   }
 };

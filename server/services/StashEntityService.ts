@@ -88,6 +88,10 @@ const DEFAULT_GROUP_USER_FIELDS = {
 };
 
 class StashEntityService {
+  // In-memory cache for studio name lookups (cleared on cache invalidation)
+  private studioNameCache: Map<string, string> | null = null;
+  private studioNameCachePromise: Promise<Map<string, string>> | null = null;
+
   // Columns to select for browse queries (excludes heavy streams/data columns)
   private readonly BROWSE_SELECT = {
     id: true,
@@ -145,7 +149,13 @@ class StashEntityService {
     const result = cached.map((c) => this.transformSceneForBrowse(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    // Hydrate studio names (workaround until StashScene has studio relation)
+    const hydrateStart = Date.now();
+    const studioNames = await this.getStudioNameMap();
+    this.hydrateStudioNames(result, studioNames);
+    const hydrateTime = Date.now() - hydrateStart;
+
+    logger.info(`getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
 
     return result;
   }
@@ -179,7 +189,13 @@ class StashEntityService {
     });
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getAllScenesWithTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    // Hydrate studio names (workaround until StashScene has studio relation)
+    const hydrateStart = Date.now();
+    const studioNames = await this.getStudioNameMap();
+    this.hydrateStudioNames(result, studioNames);
+    const hydrateTime = Date.now() - hydrateStart;
+
+    logger.info(`getAllScenesWithTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
 
     return result;
   }
@@ -211,7 +227,13 @@ class StashEntityService {
     });
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getAllScenesWithPerformers: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    // Hydrate studio names (workaround until StashScene has studio relation)
+    const hydrateStart = Date.now();
+    const studioNames = await this.getStudioNameMap();
+    this.hydrateStudioNames(result, studioNames);
+    const hydrateTime = Date.now() - hydrateStart;
+
+    logger.info(`getAllScenesWithPerformers: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
 
     return result;
   }
@@ -247,7 +269,13 @@ class StashEntityService {
     });
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getAllScenesWithPerformersAndTags: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
+    // Hydrate studio names (workaround until StashScene has studio relation)
+    const hydrateStart = Date.now();
+    const studioNames = await this.getStudioNameMap();
+    this.hydrateStudioNames(result, studioNames);
+    const hydrateTime = Date.now() - hydrateStart;
+
+    logger.info(`getAllScenesWithPerformersAndTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
 
     return result;
   }
@@ -386,7 +414,13 @@ class StashEntityService {
     const scenes = cached.map((c) => this.transformSceneForBrowse(c));
     const transformTime = Date.now() - transformStart;
 
-    logger.info(`getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}, excluded=${excludeIds?.size || 0}`);
+    // Hydrate studio names (workaround until StashScene has studio relation)
+    const hydrateStart = Date.now();
+    const studioNames = await this.getStudioNameMap();
+    this.hydrateStudioNames(scenes, studioNames);
+    const hydrateTime = Date.now() - hydrateStart;
+
+    logger.info(`getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}, excluded=${excludeIds?.size || 0}`);
 
     return { scenes, total };
   }
@@ -581,6 +615,48 @@ class StashEntityService {
   }
 
   // ==================== Studio Queries ====================
+
+  /**
+   * Get a lightweight Map of studio ID -> name for hydrating browse scenes.
+   * Uses in-memory caching to avoid repeated DB queries.
+   * This is a workaround until StashScene has a proper studio relation.
+   */
+  async getStudioNameMap(): Promise<Map<string, string>> {
+    // Return cached result if available
+    if (this.studioNameCache) {
+      return this.studioNameCache;
+    }
+
+    // If already loading, wait for that promise
+    if (this.studioNameCachePromise) {
+      return this.studioNameCachePromise;
+    }
+
+    // Build the cache
+    this.studioNameCachePromise = (async () => {
+      const studios = await prisma.stashStudio.findMany({
+        where: { deletedAt: null },
+        select: { id: true, name: true },
+      });
+      const map = new Map<string, string>();
+      for (const s of studios) {
+        if (s.name) map.set(s.id, s.name);
+      }
+      this.studioNameCache = map;
+      this.studioNameCachePromise = null;
+      return map;
+    })();
+
+    return this.studioNameCachePromise;
+  }
+
+  /**
+   * Invalidate the studio name cache (call after sync or studio updates)
+   */
+  invalidateStudioNameCache(): void {
+    this.studioNameCache = null;
+    this.studioNameCachePromise = null;
+  }
 
   /**
    * Get all studios from cache
@@ -1276,13 +1352,29 @@ class StashEntityService {
       created_at: scene.stashCreatedAt?.toISOString() ?? null,
       updated_at: scene.stashUpdatedAt?.toISOString() ?? null,
 
-      // Nested entities - studio from studioId, others empty (loaded separately or via include)
+      // Nested entities - studioId only (name added by caller if needed), others empty (loaded separately or via include)
       studio: scene.studioId ? { id: scene.studioId } : null,
       performers: [],
       tags: [],
       groups: [],
       galleries: [],
     } as unknown as NormalizedScene;
+  }
+
+  /**
+   * Hydrate studio names on an array of scenes using a pre-fetched name map.
+   * Mutates scenes in-place for performance.
+   * This is a workaround until StashScene has a proper studio relation in Prisma.
+   */
+  private hydrateStudioNames(scenes: NormalizedScene[], studioNames: Map<string, string>): void {
+    for (const scene of scenes) {
+      if (scene.studio?.id) {
+        const name = studioNames.get(scene.studio.id);
+        if (name) {
+          (scene.studio as { id: string; name?: string }).name = name;
+        }
+      }
+    }
   }
 
   private transformSceneWithRelations(scene: any): NormalizedScene {
