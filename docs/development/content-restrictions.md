@@ -19,7 +19,7 @@ The Content Restrictions system allows administrators to control what content ea
 6. [Caching Strategy](#caching-strategy)
 7. [API Endpoints](#api-endpoints)
 8. [Code Flow](#code-flow)
-9. [Known Issues & Edge Cases](#known-issues--edge-cases)
+9. [Known Issues & Edge Cases](#known-issues-edge-cases)
 10. [Testing Strategy](#testing-strategy)
 
 ---
