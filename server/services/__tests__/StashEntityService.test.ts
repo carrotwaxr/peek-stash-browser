@@ -251,6 +251,8 @@ const mockCachedGroup = {
 describe("StashEntityService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock for studio name lookup (used by getAllScenes* methods)
+    getMock(prisma.stashStudio.findMany).mockResolvedValue([]);
   });
 
   afterEach(() => {
