@@ -13,7 +13,7 @@ import {
   type LightweightEntityPreferences,
   type SceneRatingInput,
 } from "../../services/RecommendationScoringService.js";
-import type { NormalizedScene, PeekSceneFilter, SceneScoringData } from "../../types/index.js";
+import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";

@@ -5,7 +5,14 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["dist/**", "node_modules/**", "prisma/migrations/**"],
+    ignores: [
+      "dist/**",
+      "node_modules/**",
+      "prisma/migrations/**",
+      "tests/**",
+      "**/*.test.ts",
+      "**/__tests__/**",
+    ],
   },
   {
     files: ["**/*.ts"],
