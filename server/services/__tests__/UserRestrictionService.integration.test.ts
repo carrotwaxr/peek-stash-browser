@@ -16,6 +16,9 @@ vi.mock('../../prisma/singleton.js', () => ({
     userContentRestriction: {
       findMany: vi.fn(),
     },
+    userHiddenEntity: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }));
 

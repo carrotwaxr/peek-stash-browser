@@ -13,7 +13,7 @@ import {
   type LightweightEntityPreferences,
   type SceneRatingInput,
 } from "../../services/RecommendationScoringService.js";
-import type { NormalizedScene, PeekSceneFilter, SceneScoringData } from "../../types/index.js";
+import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
@@ -1049,6 +1049,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         scenes = scenes.filter((s) => {
           const title = s.title || "";
           const details = s.details || "";
+          const filePath = s.files?.[0]?.path || "";
           const performers = (s.performers || [])
             .map((p) => p.name || "")
             .join(" ");
@@ -1058,6 +1059,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
           return (
             title.toLowerCase().includes(lowerQuery) ||
             details.toLowerCase().includes(lowerQuery) ||
+            filePath.toLowerCase().includes(lowerQuery) ||
             performers.toLowerCase().includes(lowerQuery) ||
             studio.toLowerCase().includes(lowerQuery) ||
             tags.toLowerCase().includes(lowerQuery)
@@ -1106,6 +1108,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         scenes = scenes.filter((s) => {
           const title = s.title || "";
           const details = s.details || "";
+          const filePath = s.files?.[0]?.path || "";
           const performers = (s.performers || [])
             .map((p) => p.name || "")
             .join(" ");
@@ -1115,6 +1118,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
           return (
             title.toLowerCase().includes(lowerQuery) ||
             details.toLowerCase().includes(lowerQuery) ||
+            filePath.toLowerCase().includes(lowerQuery) ||
             performers.toLowerCase().includes(lowerQuery) ||
             studio.toLowerCase().includes(lowerQuery) ||
             tags.toLowerCase().includes(lowerQuery)

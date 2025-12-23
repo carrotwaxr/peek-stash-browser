@@ -1,8 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
 
-const prisma = new PrismaClient();
 
 export type EntityType =
   | "scene"
