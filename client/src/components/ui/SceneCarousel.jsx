@@ -159,7 +159,7 @@ const SceneCarousel = ({
           />
           {seeMoreUrl && (
             <Link to={seeMoreUrl}>
-              <Button variant="secondary" size="sm" className="ml-2">
+              <Button variant="secondary" size="sm" className="ml-2 h-10">
                 More
               </Button>
             </Link>

@@ -43,10 +43,10 @@ const isCustomCarousel = (id) => id && id.startsWith("custom-");
 const getSeeMoreUrl = (fetchKey) => {
   const urlMap = {
     recentlyAddedScenes: "/scenes?sort=created_at&dir=DESC",
-    highRatedScenes: "/scenes?rating_min=80",
-    favoritePerformerScenes: "/scenes?performerFavorite=true",
-    favoriteTagScenes: "/scenes?tagFavorite=true",
-    favoriteStudioScenes: "/scenes?studioFavorite=true",
+    highRatedScenes: "/scenes?sort=random&rating_min=80",
+    favoritePerformerScenes: "/scenes?sort=random&performerFavorite=true",
+    favoriteTagScenes: "/scenes?sort=random&tagFavorite=true",
+    favoriteStudioScenes: "/scenes?sort=random&studioFavorite=true",
     continueWatching: "/watch-history",
   };
   return urlMap[fetchKey] || null;
