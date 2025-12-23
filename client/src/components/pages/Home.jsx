@@ -32,6 +32,21 @@ const SCENES_PER_CAROUSEL = 12;
  */
 const isCustomCarousel = (id) => id && id.startsWith("custom-");
 
+/**
+ * Get the "See More" URL for a hardcoded carousel based on its fetchKey
+ */
+const getSeeMoreUrl = (fetchKey) => {
+  const urlMap = {
+    recentlyAddedScenes: "/scenes?sort=created_at&dir=DESC",
+    highRatedScenes: "/scenes?rating_min=80",
+    favoritePerformerScenes: "/scenes?performerFavorite=true",
+    favoriteTagScenes: "/scenes?tagFavorite=true",
+    favoriteStudioScenes: "/scenes?studioFavorite=true",
+    continueWatching: "/watch-history",
+  };
+  return urlMap[fetchKey] || null;
+};
+
 const Home = () => {
   usePageTitle(); // Sets "Peek"
   const navigate = useNavigate();
@@ -331,6 +346,7 @@ const HomeCarousel = ({
       onSceneClick={createSceneClickHandler(scenes || [], title)}
       selectedScenes={selectedScenes}
       onToggleSelect={onToggleSelect}
+      seeMoreUrl={getSeeMoreUrl(fetchKey)}
     />
   );
 };
