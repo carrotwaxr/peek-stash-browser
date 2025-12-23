@@ -285,9 +285,11 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
       tags = tags.filter((t) => {
         const name = t.name || "";
         const description = t.description || "";
+        const aliases = (t.aliases || []).join(" ");
         return (
           name.toLowerCase().includes(lowerQuery) ||
-          description.toLowerCase().includes(lowerQuery)
+          description.toLowerCase().includes(lowerQuery) ||
+          aliases.toLowerCase().includes(lowerQuery)
         );
       });
     }
@@ -878,9 +880,11 @@ export const findTagsMinimal = async (
       tags = tags.filter((t) => {
         const name = t.name || "";
         const description = t.description || "";
+        const aliases = (t.aliases || []).join(" ");
         return (
           name.toLowerCase().includes(lowerQuery) ||
-          description.toLowerCase().includes(lowerQuery)
+          description.toLowerCase().includes(lowerQuery) ||
+          aliases.toLowerCase().includes(lowerQuery)
         );
       });
     }
