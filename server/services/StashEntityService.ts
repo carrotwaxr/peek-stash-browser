@@ -1357,6 +1357,9 @@ class StashEntityService {
       rating100: scene.rating100,
       organized: scene.organized,
 
+      // URLs
+      urls: scene.urls ? JSON.parse(scene.urls) : [],
+
       // File metadata
       files: scene.filePath ? [{
         path: scene.filePath,
@@ -1417,6 +1420,9 @@ class StashEntityService {
       details: scene.details,
       rating100: scene.rating100,
       organized: scene.organized,
+
+      // URLs
+      urls: scene.urls ? JSON.parse(scene.urls) : [],
 
       // File metadata
       files: scene.filePath ? [{
