@@ -690,6 +690,8 @@ class StashSyncService extends EventEmitter {
       ${file?.duration ? Math.round(file.duration) : "NULL"},
       ${scene.organized ? 1 : 0},
       ${this.escapeNullable(scene.details)},
+      ${this.escapeNullable(scene.director)},
+      ${this.escapeNullable(JSON.stringify(scene.urls || []))},
       ${this.escapeNullable(file?.path)},
       ${file?.bit_rate ?? "NULL"},
       ${file?.frame_rate ?? "NULL"},
@@ -720,7 +722,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashScene (
       id, stashInstanceId, title, code, date, studioId, rating100, duration,
-      organized, details, filePath, fileBitRate, fileFrameRate, fileWidth,
+      organized, details, director, urls, filePath, fileBitRate, fileFrameRate, fileWidth,
       fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
       pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption,
       streams, oCounter, playCount, playDuration, stashCreatedAt, stashUpdatedAt,
@@ -735,6 +737,8 @@ class StashSyncService extends EventEmitter {
       duration = excluded.duration,
       organized = excluded.organized,
       details = excluded.details,
+      director = excluded.director,
+      urls = excluded.urls,
       filePath = excluded.filePath,
       fileBitRate = excluded.fileBitRate,
       fileFrameRate = excluded.fileFrameRate,

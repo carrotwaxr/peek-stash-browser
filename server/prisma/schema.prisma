@@ -408,7 +408,9 @@ model StashScene {
   organized Boolean @default(false)
 
   // === Content fields ===
-  details String? // Scene description
+  details  String? // Scene description
+  director String? // Director name
+  urls     String? // JSON array of URLs
 
   // === Primary file metadata ===
   filePath       String? // Primary file path
