@@ -105,6 +105,8 @@ class StashEntityService {
     duration: true,
     organized: true,
     details: true,
+    director: true,
+    urls: true,
     filePath: true,
     fileBitRate: true,
     fileFrameRate: true,

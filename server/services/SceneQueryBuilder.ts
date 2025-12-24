@@ -46,7 +46,7 @@ class SceneQueryBuilder {
   // Column list for SELECT - all StashScene fields plus user data
   private readonly SELECT_COLUMNS = `
     s.id, s.title, s.code, s.date, s.studioId, s.rating100 AS stashRating100,
-    s.duration, s.organized, s.details, s.filePath, s.fileBitRate,
+    s.duration, s.organized, s.details, s.director, s.urls, s.filePath, s.fileBitRate,
     s.fileFrameRate, s.fileWidth, s.fileHeight, s.fileVideoCodec,
     s.fileAudioCodec, s.fileSize, s.pathScreenshot, s.pathPreview,
     s.pathSprite, s.pathVtt, s.pathChaptersVtt, s.pathStream, s.pathCaption,
@@ -1459,9 +1459,13 @@ class SceneQueryBuilder {
       code: row.code || null,
       date: row.date || null,
       details: row.details || null,
+      director: row.director || null,
       organized: row.organized === 1,
       created_at: row.stashCreatedAt || null,
       updated_at: row.stashUpdatedAt || null,
+
+      // URLs
+      urls: this.parseJsonArray(row.urls),
 
       // Store studioId for later population
       studioId: row.studioId,
