@@ -59,6 +59,7 @@ export { default as SearchableSelect } from "./SearchableSelect.jsx";
 export { SearchableGrid } from "./SearchableGrid.jsx";
 export { default as SearchControls } from "./SearchControls.jsx";
 export { default as SearchInput } from "./SearchInput.jsx";
+export { default as SectionLink } from "./SectionLink.jsx";
 export { default as Sidebar } from "./Sidebar.jsx";
 export { default as SkeletonSceneCard } from "./SkeletonSceneCard.jsx";
 export { default as SuccessMessage } from "./SuccessMessage.jsx";
