@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { Paper, useLazyLoad } from "../ui/index.js";
+import { Paper, SectionLink, useLazyLoad } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
 
 /**
@@ -367,6 +367,23 @@ const SceneDetails = ({
                     )
                   );
                 })()}
+
+                {/* URLs/Links */}
+                {scene.urls && scene.urls.length > 0 && (
+                  <div className="mt-6">
+                    <h3
+                      className="text-sm font-medium mb-3"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Links
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {scene.urls.map((url, index) => (
+                        <SectionLink key={index} url={url} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </Paper.Body>
             )}
           </Paper>

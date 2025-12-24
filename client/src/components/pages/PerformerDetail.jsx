@@ -1,17 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  LucideDatabase,
-  LucideFacebook,
-  LucideFilm,
-  LucideGlobe,
-  LucideInstagram,
-  LucideLink,
-  LucideStar,
-  LucideTwitter,
-  LucideVideo,
-} from "lucide-react";
+import { ArrowLeft, LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
@@ -28,68 +17,11 @@ import {
   PageHeader,
   Pagination,
   RatingSlider,
+  SectionLink,
   TabNavigation,
 } from "../ui/index.js";
 import { GalleryGrid, GroupGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
-
-// Helper to detect and map URLs to known sites with colors
-const getSiteInfo = (url) => {
-  const urlLower = url.toLowerCase();
-
-  // Social Media
-  if (urlLower.includes("twitter.com") || urlLower.includes("x.com")) {
-    return { name: "Twitter", icon: LucideTwitter, color: "#1DA1F2" }; // Twitter blue
-  }
-  if (urlLower.includes("instagram.com")) {
-    return { name: "Instagram", icon: LucideInstagram, color: "#E4405F" }; // Instagram pink
-  }
-  if (urlLower.includes("facebook.com")) {
-    return { name: "Facebook", icon: LucideFacebook, color: "#1877F2" }; // Facebook blue
-  }
-  if (urlLower.includes("onlyfans.com")) {
-    return { name: "OnlyFans", icon: LucideVideo, color: "#00AFF0" }; // OnlyFans cyan
-  }
-
-  // Entertainment Databases
-  if (urlLower.includes("imdb.com")) {
-    return { name: "IMDb", icon: LucideFilm, color: "#F5C518" }; // IMDb yellow
-  }
-
-  // Adult Industry Databases
-  if (urlLower.includes("iafd.com")) {
-    return { name: "IAFD", icon: LucideDatabase, color: "#9B59B6" }; // Purple
-  }
-  if (urlLower.includes("adultfilmdatabase.com")) {
-    return { name: "AFDB", icon: LucideDatabase, color: "#16A085" }; // Teal
-  }
-  if (urlLower.includes("freeones.com")) {
-    return { name: "FreeOnes", icon: LucideDatabase, color: "#E67E22" }; // Orange
-  }
-  if (urlLower.includes("babepedia.com")) {
-    return { name: "Babepedia", icon: LucideDatabase, color: "#E91E63" }; // Pink
-  }
-  if (urlLower.includes("data18.com")) {
-    return { name: "Data18", icon: LucideDatabase, color: "#27AE60" }; // Green
-  }
-  if (urlLower.includes("indexxx.com")) {
-    return { name: "Indexxx", icon: LucideDatabase, color: "#8E44AD" }; // Violet
-  }
-  if (urlLower.includes("thenude.com")) {
-    return { name: "The Nude", icon: LucideDatabase, color: "#1ABC9C" }; // Aqua
-  }
-  if (urlLower.includes("pornteengirl.com")) {
-    return { name: "PornTeenGirl", icon: LucideGlobe, color: "#2ECC71" }; // Lime
-  }
-
-  // Unknown site - extract domain with neutral color
-  try {
-    const domain = new URL(url).hostname.replace("www.", "");
-    return { name: domain, icon: LucideLink, color: "#95A5A6" }; // Gray
-  } catch {
-    return { name: "Link", icon: LucideLink, color: "#95A5A6" };
-  }
-};
 
 const PerformerDetail = () => {
   const { performerId } = useParams();
@@ -385,30 +317,6 @@ const Card = ({ children, title }) => {
 
       {children}
     </div>
-  );
-};
-
-// Reusable component for external link with icon
-const SectionLink = ({ url }) => {
-  if (!url) return null;
-
-  const { name, icon: Icon, color } = getSiteInfo(url);
-
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:opacity-80"
-      style={{
-        backgroundColor: "var(--bg-secondary)",
-        color: "var(--text-primary)",
-        border: "1px solid var(--border-color)",
-      }}
-    >
-      <Icon size={16} style={{ color }} />
-      <span>{name}</span>
-    </a>
   );
 };
 
