@@ -12,6 +12,11 @@ import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { libraryApi } from "../../services/api.js";
 import {
+  carouselRulesToFilterState,
+  SCENE_FILTER_OPTIONS,
+} from "../../utils/filterConfig.js";
+import { buildSearchParams } from "../../utils/urlParams.js";
+import {
   BulkActionBar,
   ContinueWatchingCarousel,
   LoadingSpinner,
@@ -31,6 +36,47 @@ const SCENES_PER_CAROUSEL = 12;
  * Check if an ID is a custom carousel (prefixed with "custom-")
  */
 const isCustomCarousel = (id) => id && id.startsWith("custom-");
+
+/**
+ * Get the "See More" URL for a hardcoded carousel based on its fetchKey
+ */
+const getSeeMoreUrl = (fetchKey) => {
+  const urlMap = {
+    recentlyAddedScenes: "/scenes?sort=created_at&dir=DESC",
+    highRatedScenes: "/scenes?sort=random&rating_min=80",
+    favoritePerformerScenes: "/scenes?sort=random&performerFavorite=true",
+    favoriteTagScenes: "/scenes?sort=random&tagFavorite=true",
+    favoriteStudioScenes: "/scenes?sort=random&studioFavorite=true",
+    continueWatching: "/watch-history",
+  };
+  return urlMap[fetchKey] || null;
+};
+
+/**
+ * Build a "See More" URL for a custom carousel from its rules
+ */
+const buildCustomCarouselUrl = (rules, sort, direction) => {
+  if (!rules || typeof rules !== "object") {
+    return "/scenes";
+  }
+
+  // Convert API rules format to UI filter state
+  const filterState = carouselRulesToFilterState(rules);
+
+  // Build URL params using existing utility
+  const params = buildSearchParams({
+    searchText: "",
+    sortField: sort || "random",
+    sortDirection: direction || "DESC",
+    currentPage: 1,
+    perPage: 24,
+    filters: filterState,
+    filterOptions: SCENE_FILTER_OPTIONS,
+  });
+
+  const queryString = params.toString();
+  return queryString ? `/scenes?${queryString}` : "/scenes";
+};
 
 const Home = () => {
   usePageTitle(); // Sets "Peek"
@@ -207,6 +253,7 @@ const Home = () => {
             <CustomCarousel
               key={carousel.prefId}
               carouselId={id}
+              carousel={customCarousels.find((c) => c.id === id)}
               title={title}
               icon={icon}
               createSceneClickHandler={createSceneClickHandler}
@@ -331,6 +378,7 @@ const HomeCarousel = ({
       onSceneClick={createSceneClickHandler(scenes || [], title)}
       selectedScenes={selectedScenes}
       onToggleSelect={onToggleSelect}
+      seeMoreUrl={getSeeMoreUrl(fetchKey)}
     />
   );
 };
@@ -341,6 +389,7 @@ const HomeCarousel = ({
  */
 const CustomCarousel = ({
   carouselId,
+  carousel,
   title,
   icon,
   createSceneClickHandler,
@@ -421,6 +470,11 @@ const CustomCarousel = ({
       onSceneClick={createSceneClickHandler(scenes, title)}
       selectedScenes={selectedScenes}
       onToggleSelect={onToggleSelect}
+      seeMoreUrl={
+        carousel
+          ? buildCustomCarouselUrl(carousel.rules, carousel.sort, carousel.direction)
+          : null
+      }
     />
   );
 };

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import Button from "./Button.jsx";
 import SceneCard from "./SceneCard.jsx";
 import SkeletonSceneCard from "./SkeletonSceneCard.jsx";
@@ -11,6 +12,7 @@ const SceneCarousel = ({
   onSceneClick,
   selectedScenes = [],
   onToggleSelect,
+  seeMoreUrl,
 }) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -155,6 +157,13 @@ const SceneCarousel = ({
               </svg>
             }
           />
+          {seeMoreUrl && (
+            <Link to={seeMoreUrl}>
+              <Button variant="secondary" size="sm" className="ml-2 h-10">
+                More
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
