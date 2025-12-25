@@ -1635,6 +1635,8 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(gallery.details)},
       ${this.escapeNullable(gallery.url)},
       ${this.escapeNullable(gallery.code)},
+      ${this.escapeNullable((gallery as any).photographer)},
+      ${this.escapeNullable((gallery as any).urls ? JSON.stringify((gallery as any).urls) : null)},
       ${this.escapeNullable(folder?.path)},
       ${this.escapeNullable(fileBasename)},
       ${this.escapeNullable(gallery.paths?.cover)},
@@ -1649,7 +1651,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashGallery (
       id, stashInstanceId, title, date, studioId, rating100, imageCount,
-      details, url, code, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
+      details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1661,6 +1663,8 @@ class StashSyncService extends EventEmitter {
       details = excluded.details,
       url = excluded.url,
       code = excluded.code,
+      photographer = excluded.photographer,
+      urls = excluded.urls,
       folderPath = excluded.folderPath,
       fileBasename = excluded.fileBasename,
       coverPath = excluded.coverPath,
