@@ -4,10 +4,8 @@ import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
 import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import {
-  CriterionModifier,
   NormalizedGallery,
   NormalizedPerformer,
   NormalizedTag,
@@ -16,7 +14,6 @@ import {
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import { convertToProxyUrl } from "../../utils/stashUrlProxy.js";
 import { mergePerformersWithUserData } from "./performers.js";
 import { mergeStudiosWithUserData } from "./studios.js";
 import { mergeTagsWithUserData } from "./tags.js";
@@ -598,7 +595,7 @@ export const findGalleriesMinimal = async (
 
 /**
  * GET /api/library/galleries/:galleryId/images
- * Get images for a specific gallery
+ * Get images for a specific gallery from local database
  */
 export const getGalleryImages = async (
   req: AuthenticatedRequest,
@@ -612,38 +609,50 @@ export const getGalleryImages = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Query images filtered by gallery
-    const stash = stashInstanceManager.getDefault();
-    const result = await stash.findImages({
-      filter: {
-        per_page: -1, // Get all images
-        sort: "path", // Sort by path for consistent ordering
-        // Type assertion: SortDirectionEnum not exported from stashapp-api, but "ASC" is valid enum value
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        direction: "ASC" as any,
-      },
-      image_filter: {
+    // Query images from local database filtered by gallery
+    const dbImages = await prisma.stashImage.findMany({
+      where: {
+        deletedAt: null,
         galleries: {
-          value: [galleryId],
-          modifier: CriterionModifier.Includes,
+          some: { galleryId },
         },
       },
+      include: {
+        performers: { include: { performer: true } },
+        tags: { include: { tag: true } },
+      },
+      orderBy: { filePath: "asc" },
     });
 
-    const images = result?.findImages?.images || [];
-
-    // Transform image URLs to use proxy
-    const transformedImages = images.map((image) => ({
-      ...image,
+    // Transform to API format with proxy URLs
+    const transformedImages = dbImages.map((image) => ({
+      id: image.id,
+      title: image.title,
+      code: image.code,
+      details: image.details,
+      photographer: image.photographer,
+      date: image.date,
       paths: {
-        thumbnail: image.paths?.thumbnail
-          ? convertToProxyUrl(image.paths.thumbnail)
-          : null,
-        preview: image.paths?.preview
-          ? convertToProxyUrl(image.paths.preview)
-          : null,
-        image: image.paths?.image ? convertToProxyUrl(image.paths.image) : null,
+        thumbnail: `/api/proxy/image/${image.id}/thumbnail`,
+        preview: `/api/proxy/image/${image.id}/preview`,
+        image: `/api/proxy/image/${image.id}/image`,
       },
+      width: image.width,
+      height: image.height,
+      rating100: image.rating100,
+      o_counter: image.oCounter,
+      filePath: image.filePath,
+      fileSize: image.fileSize ? Number(image.fileSize) : null,
+      performers: image.performers.map((ip) => ({
+        id: ip.performer.id,
+        name: ip.performer.name,
+      })),
+      tags: image.tags.map((it) => ({
+        id: it.tag.id,
+        name: it.tag.name,
+      })),
+      stashCreatedAt: image.stashCreatedAt?.toISOString() ?? null,
+      stashUpdatedAt: image.stashUpdatedAt?.toISOString() ?? null,
     }));
 
     // Merge images with user data (ratings/favorites)
@@ -654,7 +663,7 @@ export const getGalleryImages = async (
 
     res.json({
       images: mergedImages,
-      count: result?.findImages?.count || 0,
+      count: mergedImages.length,
     });
   } catch (error) {
     logger.error("Error fetching gallery images", {
