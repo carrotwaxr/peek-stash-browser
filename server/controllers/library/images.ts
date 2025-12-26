@@ -1,72 +1,286 @@
 import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
+import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { CriterionModifier } from "../../types/index.js";
+import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
-import { transformImage } from "../../utils/stashUrlProxy.js";
+import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
- * Calculate actual image count for an entity by querying galleries→images
- * This provides the real count that includes Gallery→Image relationships
+ * Merge images with user rating/favorite data
+ */
+async function mergeImagesWithUserData(
+  images: any[],
+  userId: number
+): Promise<any[]> {
+  const ratings = await prisma.imageRating.findMany({ where: { userId } });
+
+  const ratingMap = new Map(
+    ratings.map((r) => [
+      r.imageId,
+      {
+        rating: r.rating,
+        rating100: r.rating,
+        favorite: r.favorite,
+      },
+    ])
+  );
+
+  return images.map((image) => ({
+    ...image,
+    rating: null,
+    rating100: image.rating100 ?? null,
+    favorite: false,
+    ...ratingMap.get(image.id),
+  }));
+}
+
+/**
+ * Apply image filters with gallery-umbrella inheritance
+ * Uses union approach: image matches if ANY of its galleries match the filter
+ */
+async function applyImageFiltersWithInheritance(
+  images: any[],
+  filters: any,
+  ids?: string[]
+): Promise<any[]> {
+  if (!filters && !ids) return images;
+
+  let filtered = images;
+
+  // Filter by IDs
+  if (ids && Array.isArray(ids) && ids.length > 0) {
+    const idSet = new Set(ids);
+    filtered = filtered.filter((img) => idSet.has(img.id));
+  }
+
+  // Filter by favorite
+  if (filters?.favorite !== undefined) {
+    filtered = filtered.filter((img) => img.favorite === filters.favorite);
+  }
+
+  // Filter by rating100
+  if (filters?.rating100) {
+    const { modifier, value, value2 } = filters.rating100;
+    filtered = filtered.filter((img) => {
+      const rating = img.rating100 || 0;
+      if (modifier === "GREATER_THAN") return rating > value;
+      if (modifier === "LESS_THAN") return rating < value;
+      if (modifier === "EQUALS") return rating === value;
+      if (modifier === "NOT_EQUALS") return rating !== value;
+      if (modifier === "BETWEEN") return rating >= value && rating <= value2;
+      return true;
+    });
+  }
+
+  // Filter by performers (with gallery-umbrella inheritance)
+  if (filters?.performers?.value) {
+    const performerIds = new Set(filters.performers.value.map(String));
+    filtered = filtered.filter((img) => {
+      // Check direct performers on image
+      if (img.performers?.some((p: any) => performerIds.has(String(p.id)))) {
+        return true;
+      }
+      // Check gallery performers (inheritance via union)
+      if (
+        img.galleries?.some((g: any) =>
+          g.performers?.some((p: any) => performerIds.has(String(p.id)))
+        )
+      ) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // Filter by tags (with gallery-umbrella inheritance and hierarchy expansion)
+  if (filters?.tags?.value) {
+    const expandedTagIds = new Set(
+      await expandTagIds(
+        filters.tags.value.map(String),
+        filters.tags.depth ?? 0
+      )
+    );
+    filtered = filtered.filter((img) => {
+      // Check direct tags on image
+      if (img.tags?.some((t: any) => expandedTagIds.has(String(t.id)))) {
+        return true;
+      }
+      // Check gallery tags (inheritance via union)
+      if (
+        img.galleries?.some((g: any) =>
+          g.tags?.some((t: any) => expandedTagIds.has(String(t.id)))
+        )
+      ) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // Filter by studios (with gallery-umbrella inheritance and hierarchy expansion)
+  if (filters?.studios?.value) {
+    const expandedStudioIds = new Set(
+      await expandStudioIds(
+        filters.studios.value.map(String),
+        filters.studios.depth ?? 0
+      )
+    );
+    filtered = filtered.filter((img) => {
+      // Check direct studio on image
+      if (img.studioId && expandedStudioIds.has(String(img.studioId))) {
+        return true;
+      }
+      // Check gallery studio (inheritance via union)
+      if (
+        img.galleries?.some(
+          (g: any) => g.studioId && expandedStudioIds.has(String(g.studioId))
+        )
+      ) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  // Filter by specific galleries
+  if (filters?.galleries?.value) {
+    const galleryIds = new Set(filters.galleries.value.map(String));
+    filtered = filtered.filter((img) =>
+      img.galleries?.some((g: any) => galleryIds.has(String(g.id)))
+    );
+  }
+
+  return filtered;
+}
+
+/**
+ * Sort images by field and direction
+ */
+function sortImages(
+  images: any[],
+  sortField: string,
+  sortDirection: string
+): any[] {
+  const direction = sortDirection === "DESC" ? -1 : 1;
+
+  return images.sort((a, b) => {
+    let aVal, bVal;
+
+    switch (sortField) {
+      case "title":
+        aVal = (a.title || a.filePath || "").toLowerCase();
+        bVal = (b.title || b.filePath || "").toLowerCase();
+        break;
+      case "date":
+        aVal = a.date || "";
+        bVal = b.date || "";
+        break;
+      case "rating":
+      case "rating100":
+        aVal = a.rating100 || 0;
+        bVal = b.rating100 || 0;
+        break;
+      case "o_counter":
+        aVal = a.o_counter || 0;
+        bVal = b.o_counter || 0;
+        break;
+      case "filesize":
+        aVal = Number(a.fileSize) || 0;
+        bVal = Number(b.fileSize) || 0;
+        break;
+      case "path":
+        aVal = (a.filePath || "").toLowerCase();
+        bVal = (b.filePath || "").toLowerCase();
+        break;
+      case "created_at":
+        aVal = a.stashCreatedAt || a.created_at || "";
+        bVal = b.stashCreatedAt || b.created_at || "";
+        break;
+      case "updated_at":
+        aVal = a.stashUpdatedAt || a.updated_at || "";
+        bVal = b.stashUpdatedAt || b.updated_at || "";
+        break;
+      case "random":
+        return Math.random() - 0.5;
+      default:
+        aVal = (a.title || "").toLowerCase();
+        bVal = (b.title || "").toLowerCase();
+    }
+
+    if (aVal < bVal) return -1 * direction;
+    if (aVal > bVal) return 1 * direction;
+    return 0;
+  });
+}
+
+/**
+ * Calculate actual image count for an entity using local database
+ * Considers gallery-umbrella inheritance
  */
 export async function calculateEntityImageCount(
   entityType: "performer" | "studio" | "tag",
   entityId: string
 ): Promise<number> {
   try {
-    // Step 1: Find galleries matching the entity
-    const allGalleries = await stashEntityService.getAllGalleries();
-    let matchingGalleries = allGalleries;
+    // Get all images from local database
+    const allImages = await stashEntityService.getAllImages();
 
-    if (entityType === "performer") {
-      const performerIds = new Set([String(entityId)]);
-      matchingGalleries = matchingGalleries.filter((g) =>
-        g.performers?.some((p) => performerIds.has(String(p.id)))
-      );
-    } else if (entityType === "tag") {
-      const tagIds = new Set([String(entityId)]);
-      matchingGalleries = matchingGalleries.filter((g) =>
-        g.tags?.some((t) => tagIds.has(String(t.id)))
-      );
-    } else if (entityType === "studio") {
-      const studioIds = new Set([String(entityId)]);
-      matchingGalleries = matchingGalleries.filter(
-        (g) => g.studio && studioIds.has(String(g.studio.id))
-      );
-    }
+    // Filter based on entity type with gallery inheritance
+    const matchingImages = allImages.filter((img) => {
+      if (entityType === "performer") {
+        // Check direct performers
+        if (img.performers?.some((p: any) => String(p.id) === String(entityId))) {
+          return true;
+        }
+        // Check gallery performers
+        if (
+          img.galleries?.some((g: any) =>
+            g.performers?.some((p: any) => String(p.id) === String(entityId))
+          )
+        ) {
+          return true;
+        }
+        return false;
+      }
 
-    // Step 2: Get all images from matching galleries in a single query
-    const stash = stashInstanceManager.getDefault();
-    const galleryIds = matchingGalleries.map((g) => g.id);
+      if (entityType === "tag") {
+        // Check direct tags
+        if (img.tags?.some((t: any) => String(t.id) === String(entityId))) {
+          return true;
+        }
+        // Check gallery tags
+        if (
+          img.galleries?.some((g: any) =>
+            g.tags?.some((t: any) => String(t.id) === String(entityId))
+          )
+        ) {
+          return true;
+        }
+        return false;
+      }
 
-    if (galleryIds.length === 0) {
-      return 0;
-    }
+      if (entityType === "studio") {
+        // Check direct studio
+        if (String(img.studioId) === String(entityId)) {
+          return true;
+        }
+        // Check gallery studio
+        if (
+          img.galleries?.some(
+            (g: any) => String(g.studioId) === String(entityId)
+          )
+        ) {
+          return true;
+        }
+        return false;
+      }
 
-    try {
-      const result = await stash.findImages({
-        filter: { per_page: -1 },
-        image_filter: {
-          galleries: {
-            value: galleryIds,
-            modifier: CriterionModifier.Includes,
-          },
-        },
-      });
+      return false;
+    });
 
-      const images = result?.findImages?.images || [];
-
-      // De-duplicate by image ID
-      const uniqueImageIds = new Set(images.map((img: any) => img.id));
-      return uniqueImageIds.size;
-    } catch (error) {
-      logger.error(`Failed to fetch images for ${entityType} ${entityId}`, {
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-      return 0;
-    }
+    return matchingImages.length;
   } catch (error) {
     logger.error(`Error calculating image count for ${entityType} ${entityId}`, {
       error: error instanceof Error ? error.message : "Unknown error",
@@ -76,230 +290,84 @@ export async function calculateEntityImageCount(
 }
 
 /**
- * Find images endpoint
- * Handles both:
- * 1. Direct Entity→Image relationships (rare - most users don't tag individual images)
- * 2. Entity→Gallery→Image relationships (common - users tag galleries, images inherit)
- *
- * Strategy:
- * - Get galleries matching the entity filter
- * - Extract all images from those galleries
- * - Enhance images with gallery metadata when image-level data is missing
- * - De-duplicate images
+ * Find images endpoint - queries local database with gallery-umbrella inheritance
  */
 export const findImages = async (req: AuthenticatedRequest, res: Response) => {
   const startTime = Date.now();
   try {
-    const { filter, image_filter } = req.body;
+    const userId = req.user?.id;
+    const { filter, image_filter, ids } = req.body;
 
     const sortField = filter?.sort || "title";
     const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
+    const searchQuery = filter?.q || "";
 
-    // Step 1: Find galleries matching the entity filter
-    const step1Start = Date.now();
-    const allGalleries = await stashEntityService.getAllGalleries();
-    let matchingGalleries = allGalleries;
+    // Step 1: Get all images from cache/database
+    let images = await stashEntityService.getAllImages();
 
-    if (image_filter?.performers) {
-      const performerIds = new Set(image_filter.performers.value.map(String));
-      matchingGalleries = matchingGalleries.filter((g) =>
-        g.performers?.some((p) => performerIds.has(String(p.id)))
-      );
-    }
-
-    if (image_filter?.tags) {
-      // Expand tag IDs to include descendants if depth is specified
-      const expandedTagIds = new Set(
-        await expandTagIds(
-          image_filter.tags.value.map(String),
-          image_filter.tags.depth ?? 0
-        )
-      );
-      matchingGalleries = matchingGalleries.filter((g) =>
-        g.tags?.some((t) => expandedTagIds.has(String(t.id)))
-      );
-    }
-
-    if (image_filter?.studios) {
-      // Expand studio IDs to include descendants if depth is specified
-      const expandedStudioIds = new Set(
-        await expandStudioIds(
-          image_filter.studios.value.map(String),
-          image_filter.studios.depth ?? 0
-        )
-      );
-      matchingGalleries = matchingGalleries.filter(
-        (g) => g.studio && expandedStudioIds.has(String(g.studio.id))
-      );
-    }
-
-    const step1Time = Date.now() - step1Start;
-    logger.info("Finding images for entity", {
-      galleryCount: matchingGalleries.length,
-      performerFilter: image_filter?.performers?.value,
-      tagFilter: image_filter?.tags?.value,
-      studioFilter: image_filter?.studios?.value,
-      step1FilterTime: `${step1Time}ms`,
-    });
-
-    // Step 2: Get all images from matching galleries (single query with all gallery IDs)
-    const step2Start = Date.now();
-    const stash = stashInstanceManager.getDefault();
-    const allImagesMap = new Map(); // Use map for de-duplication
-
-    try {
-      // Query all images at once using all gallery IDs
-      const galleryIds = matchingGalleries.map((g) => g.id);
-
-      const result = await stash.findImages({
-        filter: {
-          per_page: -1, // Get all images from all matching galleries
-        },
-        image_filter: {
-          galleries: {
-            value: galleryIds,
-            modifier: CriterionModifier.Includes,
-          },
+    if (images.length === 0) {
+      logger.warn("Image cache not initialized, returning empty result");
+      return res.json({
+        findImages: {
+          count: 0,
+          images: [],
         },
       });
+    }
 
-      const images = result?.findImages?.images || [];
+    // Step 2: Merge with user data (ratings/favorites)
+    images = await mergeImagesWithUserData(images, userId);
 
-      // Build gallery map for quick lookup
-      const galleryMap = new Map(matchingGalleries.map((g) => [g.id, g]));
+    // Step 3: Apply content restrictions
+    const requestingUser = req.user;
+    images = await userRestrictionService.filterImagesForUser(
+      images,
+      userId,
+      requestingUser?.role === "ADMIN"
+    );
 
-      // Enhance each image with gallery metadata
-      images.forEach((image: any) => {
-        if (!allImagesMap.has(image.id)) {
-          // Find the gallery this image belongs to (use first match)
-          const imageGallery = image.galleries?.[0];
-          const gallery = imageGallery ? galleryMap.get(imageGallery.id) : null;
-
-          // Inherit gallery metadata for missing fields
-          const enhancedImage = {
-            ...image,
-            // Only inherit if image doesn't have the field
-            performers: image.performers?.length
-              ? image.performers
-              : gallery?.performers || [],
-            tags: image.tags?.length ? image.tags : gallery?.tags || [],
-            studio: image.studio || gallery?.studio || null,
-          };
-          allImagesMap.set(image.id, enhancedImage);
-        }
-      });
-    } catch (error) {
-      logger.error("Failed to fetch images from galleries", {
-        galleryCount: matchingGalleries.length,
-        error: error instanceof Error ? error.message : "Unknown error",
+    // Step 4: Apply search query
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      images = images.filter((img) => {
+        const title = img.title || "";
+        const details = img.details || "";
+        const photographer = img.photographer || "";
+        const filePath = img.filePath || "";
+        return (
+          title.toLowerCase().includes(lowerQuery) ||
+          details.toLowerCase().includes(lowerQuery) ||
+          photographer.toLowerCase().includes(lowerQuery) ||
+          filePath.toLowerCase().includes(lowerQuery)
+        );
       });
     }
 
-    let images = Array.from(allImagesMap.values());
+    // Step 5: Apply filters with gallery-umbrella inheritance
+    images = await applyImageFiltersWithInheritance(images, image_filter, ids);
 
-    const step2Time = Date.now() - step2Start;
-    logger.info("Total unique images found (single query optimization)", {
-      count: images.length,
-      galleriesInFilter: matchingGalleries.length,
-      step2QueryTime: `${step2Time}ms`,
-    });
+    // Step 6: Sort
+    images = sortImages(images, sortField, sortDirection);
 
-    // Step 3: Apply additional filters (favorite, rating, etc.)
-    const step3Start = Date.now();
-    if (image_filter?.favorite !== undefined) {
-      images = images.filter((img: any) => img.favorite === image_filter.favorite);
-    }
-
-    if (image_filter?.rating100) {
-      const { modifier, value, value2 } = image_filter.rating100;
-      images = images.filter((img: any) => {
-        const rating = img.rating100 || 0;
-        if (modifier === "GREATER_THAN") return rating > value;
-        if (modifier === "LESS_THAN") return rating < value;
-        if (modifier === "EQUALS") return rating === value;
-        if (modifier === "NOT_EQUALS") return rating !== value;
-        if (modifier === "BETWEEN")
-          return (
-            value !== undefined &&
-            value2 !== null &&
-            value2 !== undefined &&
-            rating >= value &&
-            rating <= value2
-          );
-        return true;
-      });
-    }
-
-    const step3Time = Date.now() - step3Start;
-
-    // Step 4: Sort
-    const step4Start = Date.now();
-    images.sort((a: any, b: any) => {
-      let aVal: number | string | null;
-      let bVal: number | string | null;
-
-      switch (sortField) {
-        case "title":
-          aVal = (a.title || "").toLowerCase();
-          bVal = (b.title || "").toLowerCase();
-          break;
-        case "rating100":
-          aVal = a.rating100 || 0;
-          bVal = b.rating100 || 0;
-          break;
-        case "o_counter":
-          aVal = a.o_counter || 0;
-          bVal = b.o_counter || 0;
-          break;
-        case "created_at":
-          aVal = a.created_at || "";
-          bVal = b.created_at || "";
-          break;
-        case "updated_at":
-          aVal = a.updated_at || "";
-          bVal = b.updated_at || "";
-          break;
-        default:
-          aVal = (a.title || "").toLowerCase();
-          bVal = (b.title || "").toLowerCase();
-      }
-
-      let comparison = 0;
-      if ((aVal as string | number) < (bVal as string | number)) comparison = -1;
-      if ((aVal as string | number) > (bVal as string | number)) comparison = 1;
-
-      return sortDirection === "DESC" ? -comparison : comparison;
-    });
-
-    const step4Time = Date.now() - step4Start;
-
-    // Step 5: Paginate
-    const step5Start = Date.now();
+    // Step 7: Paginate
     const total = images.length;
     const startIndex = (page - 1) * perPage;
     const endIndex = startIndex + perPage;
     const paginatedImages = images.slice(startIndex, endIndex);
-    const step5Time = Date.now() - step5Start;
 
-    // Step 6: Transform images to proxy URLs
-    const step6Start = Date.now();
-    const transformedImages = paginatedImages.map(transformImage);
-    const step6Time = Date.now() - step6Start;
+    // Step 8: Add stashUrl to each image
+    const imagesWithStashUrl = paginatedImages.map((image) => ({
+      ...image,
+      stashUrl: buildStashEntityUrl("image", image.id),
+    }));
 
     const totalTime = Date.now() - startTime;
-
-    logger.info("findImages performance breakdown", {
+    logger.debug("findImages completed", {
       totalTime: `${totalTime}ms`,
-      step1_filterGalleries: `${step1Time}ms`,
-      step2_queryImages: `${step2Time}ms`,
-      step3_applyFilters: `${step3Time}ms`,
-      step4_sort: `${step4Time}ms`,
-      step5_paginate: `${step5Time}ms`,
-      step6_transform: `${step6Time}ms`,
       totalImages: total,
-      returnedImages: transformedImages.length,
+      returnedImages: imagesWithStashUrl.length,
       page,
       perPage,
     });
@@ -307,7 +375,7 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     res.json({
       findImages: {
         count: total,
-        images: transformedImages,
+        images: imagesWithStashUrl,
       },
     });
   } catch (error) {
@@ -316,6 +384,45 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     });
     res.status(500).json({
       error: "Failed to find images",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
+/**
+ * Find single image by ID
+ */
+export const findImageById = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+
+    const image = await stashEntityService.getImage(id);
+
+    if (!image) {
+      return res.status(404).json({ error: "Image not found" });
+    }
+
+    // Merge with user data
+    const images = await mergeImagesWithUserData([image], userId);
+    const mergedImage = images[0];
+
+    // Add stashUrl
+    const imageWithStashUrl = {
+      ...mergedImage,
+      stashUrl: buildStashEntityUrl("image", mergedImage.id),
+    };
+
+    res.json(imageWithStashUrl);
+  } catch (error) {
+    logger.error("Error in findImageById", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    res.status(500).json({
+      error: "Failed to find image",
       details: error instanceof Error ? error.message : "Unknown error",
     });
   }

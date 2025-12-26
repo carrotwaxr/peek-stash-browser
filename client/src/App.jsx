@@ -21,6 +21,7 @@ const Studios = lazy(() => import("./components/pages/Studios.jsx"));
 const Tags = lazy(() => import("./components/pages/Tags.jsx"));
 const Groups = lazy(() => import("./components/pages/Groups.jsx"));
 const Galleries = lazy(() => import("./components/pages/Galleries.jsx"));
+const Images = lazy(() => import("./components/pages/Images.jsx"));
 const GalleryDetail = lazy(
   () => import("./components/pages/GalleryDetail.jsx")
 );
@@ -195,6 +196,16 @@ const AppContent = () => {
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
                   <Galleries />
+                </GlobalLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/images"
+            element={
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Images />
                 </GlobalLayout>
               </ProtectedRoute>
             }
