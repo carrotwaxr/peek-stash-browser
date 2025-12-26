@@ -2142,17 +2142,6 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async getLastSyncTime(stashInstanceId?: string): Promise<Date | null> {
-    const syncState = await prisma.syncState.findFirst({
-      where: {
-        stashInstanceId: stashInstanceId || null,
-        entityType: "scene", // Use scene as the reference entity type
-      },
-    });
-
-    return syncState?.lastFullSync || syncState?.lastIncrementalSync || null;
-  }
-
   /**
    * Save sync state for a single entity type immediately after sync completes
    */
