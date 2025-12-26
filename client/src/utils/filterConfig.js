@@ -111,6 +111,19 @@ export const GALLERY_SORT_OPTIONS = [
   { value: "updated_at", label: "Updated At" },
 ];
 
+// Image sorting options
+export const IMAGE_SORT_OPTIONS = [
+  { value: "created_at", label: "Created At" },
+  { value: "date", label: "Date" },
+  { value: "filesize", label: "File Size" },
+  { value: "o_counter", label: "O Count" },
+  { value: "path", label: "Path" },
+  { value: "random", label: "Random" },
+  { value: "rating", label: "Rating" },
+  { value: "title", label: "Title" },
+  { value: "updated_at", label: "Updated At" },
+];
+
 // Filter type options for different data types
 const RATING_OPTIONS = [
   { value: "1", label: "1 Star" },
@@ -1177,6 +1190,87 @@ export const GALLERY_FILTER_OPTIONS = [
   {
     key: "favorite",
     label: "Favorite Galleries",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Favorites Only",
+  },
+];
+
+// Image filter options (with gallery-umbrella inheritance)
+export const IMAGE_FILTER_OPTIONS = [
+  // Common Filters
+  {
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
+  },
+  {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select performers...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "performerIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "studioIds",
+    label: "Studios",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select studios...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "studioIdsModifier",
+    defaultModifier: "INCLUDES",
+    supportsHierarchy: true,
+    hierarchyKey: "studioIdsDepth",
+    hierarchyLabel: "Include sub-studios",
+  },
+  {
+    key: "tagIds",
+    label: "Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES_ALL",
+    supportsHierarchy: true,
+    hierarchyKey: "tagIdsDepth",
+    hierarchyLabel: "Include sub-tags",
+  },
+  {
+    key: "galleryIds",
+    label: "Galleries",
+    type: "searchable-select",
+    entityType: "galleries",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Select galleries...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "galleryIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "rating",
+    label: "Rating (0-100)",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 100,
+  },
+  {
+    key: "favorite",
+    label: "Favorite Images",
     type: "checkbox",
     defaultValue: false,
     placeholder: "Favorites Only",
@@ -2587,6 +2681,80 @@ export const buildGalleryFilter = (filters) => {
   }
 
   return galleryFilter;
+};
+
+export const buildImageFilter = (filters) => {
+  const imageFilter = {};
+
+  // Boolean filter
+  if (filters.favorite === true || filters.favorite === "TRUE") {
+    imageFilter.favorite = true;
+  }
+
+  // Rating filter (0-100 scale)
+  if (filters.rating?.min !== undefined || filters.rating?.max !== undefined) {
+    imageFilter.rating100 = {};
+    const hasMin =
+      filters.rating.min !== undefined && filters.rating.min !== "";
+    const hasMax =
+      filters.rating.max !== undefined && filters.rating.max !== "";
+
+    if (hasMin && hasMax) {
+      imageFilter.rating100.modifier = "BETWEEN";
+      imageFilter.rating100.value = parseInt(filters.rating.min);
+      imageFilter.rating100.value2 = parseInt(filters.rating.max);
+    } else if (hasMin) {
+      imageFilter.rating100.modifier = "GREATER_THAN";
+      imageFilter.rating100.value = parseInt(filters.rating.min) - 1;
+    } else if (hasMax) {
+      imageFilter.rating100.modifier = "LESS_THAN";
+      imageFilter.rating100.value = parseInt(filters.rating.max) + 1;
+    }
+  }
+
+  // Performers filter (with gallery-umbrella inheritance on backend)
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    imageFilter.performers = {
+      value: filters.performerIds.map(String),
+      modifier: filters.performerIdsModifier || "INCLUDES",
+    };
+  }
+
+  // Studios filter (with gallery-umbrella inheritance on backend)
+  // Supports hierarchical filtering via depth parameter
+  if (filters.studioIds && filters.studioIds.length > 0) {
+    imageFilter.studios = {
+      value: filters.studioIds.map(String),
+      modifier: filters.studioIdsModifier || "INCLUDES",
+    };
+    // Pass through depth for hierarchical filtering
+    if (filters.studioIdsDepth !== undefined) {
+      imageFilter.studios.depth = filters.studioIdsDepth;
+    }
+  }
+
+  // Tags filter (with gallery-umbrella inheritance on backend)
+  // Supports hierarchical filtering via depth parameter
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    imageFilter.tags = {
+      value: filters.tagIds.map(String),
+      modifier: filters.tagIdsModifier || "INCLUDES",
+    };
+    // Pass through depth for hierarchical filtering
+    if (filters.tagIdsDepth !== undefined) {
+      imageFilter.tags.depth = filters.tagIdsDepth;
+    }
+  }
+
+  // Galleries filter
+  if (filters.galleryIds && filters.galleryIds.length > 0) {
+    imageFilter.galleries = {
+      value: filters.galleryIds.map(String),
+      modifier: filters.galleryIdsModifier || "INCLUDES",
+    };
+  }
+
+  return imageFilter;
 };
 
 // ============================================================================

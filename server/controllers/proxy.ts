@@ -402,7 +402,16 @@ export const proxyImage = async (req: Request, res: Response) => {
 
   try {
     // Construct full Stash URL with API key
-    const fullUrl = `${stashUrl}${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
+    // Note: stashPath may already be a full URL (stored from Stash API response)
+    // or it could be a relative path - handle both cases
+    let fullUrl: string;
+    if (stashPath.startsWith("http://") || stashPath.startsWith("https://")) {
+      // Already a full URL, just append API key
+      fullUrl = `${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
+    } else {
+      // Relative path, prepend base URL
+      fullUrl = `${stashUrl}${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
+    }
 
     logger.debug("Proxying image request", {
       imageId,
