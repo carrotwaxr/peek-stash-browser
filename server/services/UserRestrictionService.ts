@@ -784,6 +784,57 @@ class UserRestrictionService {
   }
 
   /**
+   * Filter images for a user based on their restrictions and hidden entities
+   */
+  async filterImagesForUser(
+    images: any[],
+    userId: number,
+    skipContentRestrictions: boolean = false
+  ): Promise<any[]> {
+    let filtered = [...images];
+
+    // Apply content restrictions if they exist AND not skipped (admins skip these)
+    if (!skipContentRestrictions) {
+      const restrictions = await this.getRestrictionsForUser(userId);
+
+      const imageRestriction = restrictions.find(
+        (r) => r.entityType === "images"
+      );
+
+      if (imageRestriction) {
+        const restrictedIds = JSON.parse(imageRestriction.entityIds) as string[];
+
+        if (imageRestriction.mode === "EXCLUDE") {
+          // Hide excluded images
+          filtered = filtered.filter((image) => !restrictedIds.includes(image.id));
+        } else if (imageRestriction.mode === "INCLUDE") {
+          // Show only included images
+          filtered = filtered.filter((image) => restrictedIds.includes(image.id));
+        }
+      }
+    }
+
+    // Apply hidden entity filtering (ALWAYS applied, even for admins)
+    const hiddenIds = await userHiddenEntityService.getHiddenEntityIds(userId);
+
+    filtered = filtered.filter((image) => {
+      // Hide directly hidden images
+      if (hiddenIds.images?.has(image.id)) return false;
+
+      // Hide images in hidden galleries
+      if (
+        image.galleries?.some((g: any) => hiddenIds.galleries?.has(g.id))
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return filtered;
+  }
+
+  /**
    * Get entity IDs from a scene based on entity type
    *
    * FOR TAGS: Implements cascading logic - checks:
