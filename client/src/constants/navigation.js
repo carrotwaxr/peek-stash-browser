@@ -53,6 +53,13 @@ export const NAV_DEFINITIONS = [
     description: "Browse image galleries in your library",
   },
   {
+    key: "images",
+    name: "Images",
+    path: "/images",
+    icon: "image",
+    description: "Browse all images in your library",
+  },
+  {
     key: "playlists",
     name: "Playlists",
     path: "/playlists",
