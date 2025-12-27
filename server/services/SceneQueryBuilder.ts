@@ -83,18 +83,18 @@ class SceneQueryBuilder {
   /**
    * Build exclusion filter clause
    * Excludes scenes by ID (from user restrictions)
+   * Handles large sets by chunking into multiple NOT IN clauses
    */
   private buildExclusionFilter(excludedIds: Set<string>): FilterClause {
     if (!excludedIds || excludedIds.size === 0) {
       return { sql: "", params: [] };
     }
 
-    // For large exclusion sets, use a subquery approach
-    // SQLite handles IN clauses well up to ~1000 items
     const ids = Array.from(excludedIds);
+    const CHUNK_SIZE = 500;
 
-    if (ids.length <= 500) {
-      // Direct IN clause for smaller sets
+    if (ids.length <= CHUNK_SIZE) {
+      // Single NOT IN clause for small sets
       const placeholders = ids.map(() => "?").join(", ");
       return {
         sql: `s.id NOT IN (${placeholders})`,
@@ -102,16 +102,25 @@ class SceneQueryBuilder {
       };
     }
 
-    // For larger sets, we'll need to use a different approach
-    // This is a pragmatic limit - if you have >500 exclusions,
-    // consider pre-computing a materialized view
-    const placeholders = ids.slice(0, 500).map(() => "?").join(", ");
-    logger.warn("Exclusion set truncated to 500 items", {
-      originalSize: ids.length,
+    // Chunk large sets into multiple NOT IN clauses combined with AND
+    const clauses: string[] = [];
+    const allParams: string[] = [];
+
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "?").join(", ");
+      clauses.push(`s.id NOT IN (${placeholders})`);
+      allParams.push(...chunk);
+    }
+
+    logger.debug("Large exclusion set chunked", {
+      totalSize: ids.length,
+      chunks: clauses.length,
     });
+
     return {
-      sql: `s.id NOT IN (${placeholders})`,
-      params: ids.slice(0, 500),
+      sql: `(${clauses.join(" AND ")})`,
+      params: allParams,
     };
   }
 
