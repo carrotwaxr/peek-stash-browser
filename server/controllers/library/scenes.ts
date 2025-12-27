@@ -869,11 +869,27 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
     const { filter, scene_filter, ids } = req.body;
 
-    const sortField = filter?.sort || "created_at";
+    const sortFieldRaw = filter?.sort || "created_at";
     const sortDirection = filter?.direction || "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
+
+    // Parse random_<seed> format (e.g., "random_12345678")
+    let randomSeed: number | undefined;
+    let sortField = sortFieldRaw;
+
+    if (sortFieldRaw.startsWith('random_')) {
+      const seedStr = sortFieldRaw.slice(7); // Remove "random_" prefix
+      const parsedSeed = parseInt(seedStr, 10);
+      if (!isNaN(parsedSeed)) {
+        randomSeed = parsedSeed % 1e8; // Cap at 10^8 like Stash does
+        sortField = 'random';
+      }
+    } else if (sortFieldRaw === 'random') {
+      // Plain "random" without seed - generate time-based seed
+      randomSeed = (userId + Date.now()) % 1e8;
+    }
 
     const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
     const requestingUser = req.user;
@@ -903,7 +919,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
         page,
         perPage,
-        randomSeed: userId, // Stable random per user
+        randomSeed: sortField === 'random' ? randomSeed : userId,
       });
 
       // Add streamability info
