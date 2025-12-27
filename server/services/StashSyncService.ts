@@ -389,6 +389,7 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Incremental sync - fetches only changed entities
+   * Uses per-entity-type timestamps so each entity type syncs from its own last sync time
    */
   async incrementalSync(stashInstanceId?: string): Promise<SyncResult[]> {
     if (this.syncInProgress) {
@@ -402,55 +403,41 @@ class StashSyncService extends EventEmitter {
     const results: SyncResult[] = [];
 
     try {
-      const lastSync = await this.getLastSyncTime(stashInstanceId);
+      logger.info("Starting incremental sync with per-entity timestamps...");
 
-      if (!lastSync) {
-        logger.info("No previous sync found, performing full sync");
-        this.syncInProgress = false;
-        this.abortController = null;
-        return this.fullSync(stashInstanceId);
+      // Entity types in dependency order (tags first since others reference them)
+      const entityTypes: EntityType[] = [
+        "tag",
+        "studio",
+        "performer",
+        "group",
+        "gallery",
+        "scene",
+        "image",
+      ];
+
+      for (const entityType of entityTypes) {
+        this.checkAbort();
+
+        // Get THIS entity type's last sync timestamp
+        const syncState = await this.getEntitySyncState(stashInstanceId, entityType);
+        const lastSync = syncState?.lastFullSync || syncState?.lastIncrementalSync;
+
+        if (!lastSync) {
+          // Never synced - do full sync for this entity type only
+          logger.info(`${entityType}: No previous sync, syncing all`);
+          const result = await this.syncEntityType(entityType, stashInstanceId, true);
+          results.push(result);
+          await this.saveSyncState(stashInstanceId, "full", result);
+        } else {
+          // Incremental sync using this entity's own timestamp
+          logger.info(`${entityType}: syncing changes since ${lastSync.toISOString()}`);
+          const result = await this.syncEntityType(entityType, stashInstanceId, false, lastSync);
+          results.push(result);
+          await this.saveSyncState(stashInstanceId, "incremental", result);
+        }
       }
 
-      logger.info("Starting incremental sync", { since: lastSync.toISOString() });
-
-      // Sync each entity type (only changed)
-      // Tags must be synced first since other entities reference them via junction tables
-      // Save state after each entity so restarts are efficient
-      let result: SyncResult;
-
-      result = await this.syncTags(stashInstanceId, false, lastSync);
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "incremental", result);
-      this.checkAbort();
-
-      result = await this.syncStudios(stashInstanceId, false, lastSync);
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "incremental", result);
-      this.checkAbort();
-
-      result = await this.syncPerformers(stashInstanceId, false, lastSync);
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "incremental", result);
-      this.checkAbort();
-
-      result = await this.syncGroups(stashInstanceId, false, lastSync);
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "incremental", result);
-      this.checkAbort();
-
-      result = await this.syncGalleries(stashInstanceId, false, lastSync);
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "incremental", result);
-      this.checkAbort();
-
-      result = await this.syncScenes(stashInstanceId, false, lastSync);
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "incremental", result);
-      this.checkAbort();
-
-      result = await this.syncImages(stashInstanceId, false, lastSync);
-      results.push(result);
-      await this.saveSyncState(stashInstanceId, "incremental", result);
       // Rebuild user stats to reflect current entity relationships
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
@@ -2153,17 +2140,6 @@ class StashSyncService extends EventEmitter {
         });
         break;
     }
-  }
-
-  private async getLastSyncTime(stashInstanceId?: string): Promise<Date | null> {
-    const syncState = await prisma.syncState.findFirst({
-      where: {
-        stashInstanceId: stashInstanceId || null,
-        entityType: "scene", // Use scene as the reference entity type
-      },
-    });
-
-    return syncState?.lastFullSync || syncState?.lastIncrementalSync || null;
   }
 
   /**
