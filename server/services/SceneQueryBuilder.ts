@@ -1098,8 +1098,9 @@ class SceneQueryBuilder {
       resume_time: `COALESCE(w.resumeTime, 0) ${dir}`,
 
       // Random with deterministic seed for stable pagination
-      // Uses Stash's formula: ((id+seed)*(id+seed)*52959209 + (id+seed)*1047483763) % 2147483647
-      random: `(((CAST(substr(s.id, 1, 8) AS INTEGER) + ${randomSeed || 12345}) * (CAST(substr(s.id, 1, 8) AS INTEGER) + ${randomSeed || 12345}) * 52959209 + (CAST(substr(s.id, 1, 8) AS INTEGER) + ${randomSeed || 12345}) * 1047483763) % 2147483647) ${dir}`,
+      // Uses improved formula with multiple prime multiplications for better distribution
+      // This breaks the clustering that occurs with sequential IDs
+      random: `(((CAST(s.id AS INTEGER) * 2654435761 + ${randomSeed || 12345}) * 2246822519 + CAST(s.id AS INTEGER)) % 2147483647) ${dir}`,
     };
 
     const sortExpr = sortMap[sort] || sortMap["created_at"];

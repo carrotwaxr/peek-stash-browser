@@ -244,9 +244,13 @@ const SearchControls = ({
   // Get sort value with embedded random seed when needed
   // Uses ref so seed persists across renders without causing re-renders
   const getSortWithSeed = useCallback((sort) => {
-    if (sort === 'random') {
+    // Normalize: treat both "random" and "random_*" as random sort
+    // (latter can happen if saved in preset, though we try to avoid it)
+    const isRandomSort = sort === 'random' || sort.startsWith('random_');
+
+    if (isRandomSort) {
       if (randomSeedRef.current === -1) {
-        // Generate new 8-digit seed
+        // Generate new 8-digit seed on first call
         randomSeedRef.current = Math.floor(Math.random() * 1e8);
       }
       return `random_${randomSeedRef.current}`;
