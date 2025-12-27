@@ -107,6 +107,65 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     );
   });
 
+  it("should return different results with different random seeds", async () => {
+    const seed1 = 11111111;
+    const seed2 = 99999999;
+
+    const result1 = await sceneQueryBuilder.execute({
+      userId: 1,
+      sort: "random",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: 10,
+      randomSeed: seed1,
+    });
+
+    const result2 = await sceneQueryBuilder.execute({
+      userId: 1,
+      sort: "random",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: 10,
+      randomSeed: seed2,
+    });
+
+    // Different seeds should give different orders (with enough scenes)
+    if (result1.scenes.length >= 3 && result2.scenes.length >= 3) {
+      const order1 = result1.scenes.map((s) => s.id).join(",");
+      const order2 = result2.scenes.map((s) => s.id).join(",");
+      expect(order1).not.toEqual(order2);
+    }
+  });
+
+  it("should reverse order when direction changes with same seed", async () => {
+    const seed = 12345678;
+
+    const ascResult = await sceneQueryBuilder.execute({
+      userId: 1,
+      sort: "random",
+      sortDirection: "ASC",
+      page: 1,
+      perPage: 10,
+      randomSeed: seed,
+    });
+
+    const descResult = await sceneQueryBuilder.execute({
+      userId: 1,
+      sort: "random",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: 10,
+      randomSeed: seed,
+    });
+
+    // Same seed with opposite directions should give reversed order
+    if (ascResult.scenes.length >= 2 && descResult.scenes.length >= 2) {
+      const ascIds = ascResult.scenes.map((s) => s.id);
+      const descIds = descResult.scenes.map((s) => s.id);
+      expect(ascIds).toEqual(descIds.reverse());
+    }
+  });
+
   it("should fetch scenes by IDs with full relations", async () => {
     // First get some scene IDs
     const initial = await sceneQueryBuilder.execute({

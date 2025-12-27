@@ -503,6 +503,7 @@ const SearchControls = ({
       artifactType,
       onQueryChange,
       unitPreference,
+      getSortWithSeed,
     ]
   );
 
