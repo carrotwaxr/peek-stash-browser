@@ -1098,7 +1098,9 @@ class SceneQueryBuilder {
       resume_time: `COALESCE(w.resumeTime, 0) ${dir}`,
 
       // Random with deterministic seed for stable pagination
-      random: `((CAST(substr(s.id, 1, 8) AS INTEGER) * 1103515245 + ${randomSeed || 12345}) % 2147483647) ${dir}`,
+      // Uses Stash's formula with modulo at each step to prevent SQLite integer overflow
+      // Without intermediate modulo, large seeds cause overflow to float which breaks ordering
+      random: `(((((s.id + ${randomSeed || 12345}) % 2147483647) * ((s.id + ${randomSeed || 12345}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((s.id + ${randomSeed || 12345}) * 1047483763 % 2147483647)) % 2147483647) ${dir}`,
     };
 
     const sortExpr = sortMap[sort] || sortMap["created_at"];
