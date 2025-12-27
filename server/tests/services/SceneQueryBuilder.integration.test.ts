@@ -137,6 +137,39 @@ describeWithDb("SceneQueryBuilder Integration", () => {
     }
   });
 
+  it("should produce shuffled non-sequential IDs with random sort", async () => {
+    // This test catches the SQLite integer overflow bug where random sort
+    // produces sequential IDs due to floating-point conversion
+    const result = await sceneQueryBuilder.execute({
+      userId: 1,
+      sort: "random",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: 20,
+      randomSeed: 12345,
+    });
+
+    if (result.scenes.length < 10) {
+      console.log("Skipping shuffle test - not enough scenes");
+      return;
+    }
+
+    const ids = result.scenes.map((s) => parseInt(s.id, 10));
+
+    // Count how many consecutive pairs have sequential IDs
+    // In a truly random order, very few should be sequential
+    let sequentialPairs = 0;
+    for (let i = 0; i < ids.length - 1; i++) {
+      if (Math.abs(ids[i] - ids[i + 1]) === 1) {
+        sequentialPairs++;
+      }
+    }
+
+    // If more than half the pairs are sequential, the random sort is broken
+    const maxAllowedSequential = Math.floor((ids.length - 1) / 2);
+    expect(sequentialPairs).toBeLessThan(maxAllowedSequential);
+  });
+
   it("should reverse order when direction changes with same seed", async () => {
     const seed = 12345678;
 
