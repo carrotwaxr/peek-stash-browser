@@ -210,7 +210,7 @@ class StashSyncService extends EventEmitter {
 
         // Get sync state for this specific entity type
         const syncState = await this.getEntitySyncState(stashInstanceId, entityType);
-        const lastSync = syncState?.lastFullSync || syncState?.lastIncrementalSync;
+        const lastSync = this.getMostRecentSyncTime(syncState);
 
         if (!lastSync) {
           // Never synced - do full sync for this entity type only
@@ -279,6 +279,24 @@ class StashSyncService extends EventEmitter {
     });
 
     return syncState;
+  }
+
+  /**
+   * Get the most recent sync timestamp from a sync state record.
+   * Returns whichever is more recent: lastFullSync or lastIncrementalSync.
+   * This ensures incremental syncs after a full sync use the correct "since" time.
+   */
+  private getMostRecentSyncTime(
+    syncState: { lastFullSync: Date | null; lastIncrementalSync: Date | null } | null
+  ): Date | null {
+    if (!syncState) return null;
+
+    const { lastFullSync, lastIncrementalSync } = syncState;
+
+    if (!lastFullSync) return lastIncrementalSync;
+    if (!lastIncrementalSync) return lastFullSync;
+
+    return lastFullSync > lastIncrementalSync ? lastFullSync : lastIncrementalSync;
   }
 
   /**
@@ -421,7 +439,7 @@ class StashSyncService extends EventEmitter {
 
         // Get THIS entity type's last sync timestamp
         const syncState = await this.getEntitySyncState(stashInstanceId, entityType);
-        const lastSync = syncState?.lastFullSync || syncState?.lastIncrementalSync;
+        const lastSync = this.getMostRecentSyncTime(syncState);
 
         if (!lastSync) {
           // Never synced - do full sync for this entity type only

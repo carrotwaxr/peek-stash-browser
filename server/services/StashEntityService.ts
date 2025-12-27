@@ -1228,12 +1228,7 @@ class StashEntityService {
    * Uses the last sync timestamp as a version number
    */
   async getCacheVersion(): Promise<number> {
-    const syncState = await prisma.syncState.findFirst({
-      where: { entityType: "scene" },
-    });
-
-    // Use the last sync time as a cache version (convert to integer timestamp)
-    const lastSync = syncState?.lastIncrementalSync || syncState?.lastFullSync;
+    const lastSync = await this.getLastRefreshed();
     return lastSync ? lastSync.getTime() : 0;
   }
 
