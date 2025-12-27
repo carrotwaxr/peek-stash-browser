@@ -101,6 +101,7 @@ const SearchControls = ({
   const hasInitialized = useRef(false); // Prevent double initialization
   const topPaginationRef = useRef(null); // Ref for top pagination element
   const filterRefs = useRef({}); // Refs for filter controls (for scroll-to-highlight)
+  const randomSeedRef = useRef(-1); // Random seed for stable pagination (-1 = uninitialized)
 
   // TV Mode
   const { isTVMode } = useTVMode();
@@ -240,6 +241,24 @@ const SearchControls = ({
     urlState.sortDirection,
   ]);
 
+  // Get sort value with embedded random seed when needed
+  // Uses ref so seed persists across renders without causing re-renders
+  const getSortWithSeed = useCallback((sort) => {
+    if (sort === 'random') {
+      if (randomSeedRef.current === -1) {
+        // Generate new 8-digit seed
+        randomSeedRef.current = Math.floor(Math.random() * 1e8);
+      }
+      return `random_${randomSeedRef.current}`;
+    }
+    return sort;
+  }, []);
+
+  // Reset random seed (call when changing sort type or loading presets)
+  const resetRandomSeed = useCallback(() => {
+    randomSeedRef.current = -1;
+  }, []);
+
   // Initialize component: Determine initial state from URL or default preset
   useEffect(() => {
     // Prevent double initialization in dev mode (React StrictMode)
@@ -345,7 +364,7 @@ const SearchControls = ({
           page: initialState.currentPage,
           per_page: initialState.perPage,
           q: initialState.searchText,
-          sort: initialState.sortField,
+          sort: getSortWithSeed(initialState.sortField),
         },
         ...buildFilter(artifactType, initialState.filters, unitPreference),
       };
@@ -411,7 +430,7 @@ const SearchControls = ({
         page: 1,
         per_page: perPage,
         q: searchText,
-        sort: sortField,
+        sort: getSortWithSeed(sortField),
       },
       ...buildFilter(artifactType, { ...permanentFilters }, unitPreference),
     };
@@ -439,7 +458,7 @@ const SearchControls = ({
         page: 1,
         per_page: perPage,
         q: searchText,
-        sort: sortField,
+        sort: getSortWithSeed(sortField),
       },
       ...buildFilter(artifactType, filters, unitPreference),
     };
@@ -467,7 +486,7 @@ const SearchControls = ({
           page: 1,
           per_page: perPage,
           q: searchText,
-          sort: sortField,
+          sort: getSortWithSeed(sortField),
         },
         ...buildFilter(artifactType, updatedFilters, unitPreference),
       };
@@ -534,6 +553,10 @@ const SearchControls = ({
       setFilters({ ...permanentFilters, ...preset.filters });
       setSort([preset.sort, preset.direction]);
 
+      // Reset random seed when loading preset (like Stash does)
+      // This ensures fresh randomization each time a preset is loaded
+      resetRandomSeed();
+
       // Trigger search with preset values
       const query = {
         filter: {
@@ -541,7 +564,7 @@ const SearchControls = ({
           page: 1,
           per_page: perPage,
           q: searchText,
-          sort: preset.sort,
+          sort: getSortWithSeed(preset.sort),
         },
         ...buildFilter(artifactType, {
           ...permanentFilters,
@@ -551,7 +574,7 @@ const SearchControls = ({
 
       onQueryChange(query);
     },
-    [permanentFilters, perPage, searchText, artifactType, onQueryChange, unitPreference]
+    [permanentFilters, perPage, searchText, artifactType, onQueryChange, unitPreference, getSortWithSeed, resetRandomSeed]
   );
 
   const handlePageChange = (page) => {
@@ -564,7 +587,7 @@ const SearchControls = ({
         page,
         per_page: perPage,
         q: searchText,
-        sort: sortField,
+        sort: getSortWithSeed(sortField),
       },
       ...buildFilter(artifactType, filters, unitPreference),
     };
@@ -607,7 +630,7 @@ const SearchControls = ({
         page: 1,
         per_page: perPage,
         q: searchStr,
-        sort: sortField,
+        sort: getSortWithSeed(sortField),
       },
       ...buildFilter(artifactType, filters, unitPreference),
     };
@@ -620,12 +643,18 @@ const SearchControls = ({
     let newSortDirection = "DESC";
     let newSortField = sortField;
 
-    // If same field, toggle direction
+    // If same field, toggle direction (keep same seed for random)
     if (field === sortField) {
       newSortDirection = sortDirection === "ASC" ? "DESC" : "ASC";
     } else {
       // New field, default to DESC
       newSortField = field;
+
+      // Reset random seed when changing TO or FROM random sort
+      // This ensures fresh randomization when switching sort types
+      if (field === 'random' || sortField === 'random') {
+        resetRandomSeed();
+      }
     }
     setSort([newSortField, newSortDirection]);
 
@@ -636,7 +665,7 @@ const SearchControls = ({
         page: currentPage,
         per_page: perPage,
         q: searchText,
-        sort: newSortField,
+        sort: getSortWithSeed(newSortField),
       },
       ...buildFilter(artifactType, filters, unitPreference),
     };
@@ -659,7 +688,7 @@ const SearchControls = ({
         page: 1,
         per_page: newPerPage,
         q: searchText,
-        sort: sortField,
+        sort: getSortWithSeed(sortField),
       },
       ...buildFilter(artifactType, filters, unitPreference),
     };
