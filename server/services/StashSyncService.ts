@@ -2303,6 +2303,12 @@ class StashSyncService extends EventEmitter {
    * to a "fake UTC" Date. This preserves the local time values so that when we
    * later retrieve this timestamp and format it for Stash, we get the correct
    * local time that Stash expects. See stashTimestampToFakeUtcDate() for details.
+   *
+   * IMPORTANT: When no entities are synced (result.synced === 0), we do NOT update
+   * the sync timestamp. This is because we can't reliably generate a timestamp that
+   * matches Stash's timezone. If we used the server's current time, it could be in
+   * a different timezone than Stash (e.g., Docker container in UTC, Stash in PST),
+   * which would cause Stash to interpret the timestamp incorrectly and miss entities.
    */
   private async saveSyncState(
     stashInstanceId: string | undefined,
@@ -2311,33 +2317,37 @@ class StashSyncService extends EventEmitter {
   ): Promise<void> {
     const instanceId = stashInstanceId ?? null;
 
-    // Use the max updated_at from synced entities if available.
-    // This is the timestamp of the most recently updated entity we actually synced.
-    // IMPORTANT: Use stashTimestampToFakeUtcDate to preserve local time values for Stash queries.
-    let syncTimestamp: Date;
-    if (result.maxUpdatedAt) {
-      syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
-    } else {
-      // No entities synced - use current time as "fake UTC"
-      // We need to store the current LOCAL time as if it were UTC
-      const now = new Date();
-      // Get local ISO string without timezone, then parse as UTC
-      const localIso = now.toLocaleString("sv-SE").replace(" ", "T");
-      syncTimestamp = new Date(localIso + "Z");
-    }
-
     // Actual time (real UTC) for display purposes
     const actualTime = new Date();
 
-    const updateData = {
-      ...(syncType === "full"
-        ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
-        : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }),
+    // Only update sync timestamp if we actually synced entities.
+    // Without maxUpdatedAt from synced entities, we can't reliably generate a timestamp
+    // that matches Stash's timezone (server might be UTC while Stash is in local time).
+    let syncTimestamp: Date | undefined;
+    if (result.maxUpdatedAt) {
+      // Use stashTimestampToFakeUtcDate to preserve local time values for Stash queries
+      syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
+    }
+
+    // Build update data - only include sync timestamp if we have one
+    const updateData: Record<string, unknown> = {
       lastSyncCount: result.synced,
       lastSyncDurationMs: result.durationMs,
       lastError: result.error ?? null,
-      totalEntities: result.synced,
     };
+
+    // Only update timestamp fields if we have a valid timestamp from synced entities
+    if (syncTimestamp) {
+      if (syncType === "full") {
+        updateData.lastFullSync = syncTimestamp;
+        updateData.lastFullSyncActual = actualTime;
+      } else {
+        updateData.lastIncrementalSync = syncTimestamp;
+        updateData.lastIncrementalSyncActual = actualTime;
+      }
+      // Only update totalEntities when we actually sync something
+      updateData.totalEntities = result.synced;
+    }
 
     // Find existing record
     const existing = await prisma.syncState.findFirst({
@@ -2353,11 +2363,20 @@ class StashSyncService extends EventEmitter {
         data: updateData,
       });
     } else {
+      // For new records, we need to include entityType and stashInstanceId
       await prisma.syncState.create({
         data: {
           stashInstanceId: instanceId,
           entityType: result.entityType,
-          ...updateData,
+          ...(syncTimestamp
+            ? syncType === "full"
+              ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
+              : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }
+            : {}),
+          lastSyncCount: result.synced,
+          lastSyncDurationMs: result.durationMs,
+          lastError: result.error ?? null,
+          totalEntities: result.synced,
         },
       });
     }
@@ -2372,20 +2391,17 @@ class StashSyncService extends EventEmitter {
     const instanceId = stashInstanceId ?? null;
 
     for (const result of results) {
-      // Use the max updated_at from synced entities if available
-      // IMPORTANT: Use stashTimestampToFakeUtcDate to preserve local time values
-      let syncTimestamp: Date;
-      if (result.maxUpdatedAt) {
-        syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
-      } else {
-        // No entities synced - use current time as "fake UTC"
-        const now = new Date();
-        const localIso = now.toLocaleString("sv-SE").replace(" ", "T");
-        syncTimestamp = new Date(localIso + "Z");
-      }
-
       // Actual time (real UTC) for display purposes
       const actualTime = new Date();
+
+      // Only update sync timestamp if we actually synced entities.
+      // Without maxUpdatedAt from synced entities, we can't reliably generate a timestamp
+      // that matches Stash's timezone (server might be UTC while Stash is in local time).
+      let syncTimestamp: Date | undefined;
+      if (result.maxUpdatedAt) {
+        // Use stashTimestampToFakeUtcDate to preserve local time values for Stash queries
+        syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
+      }
 
       // Find existing sync state
       const existing = await prisma.syncState.findFirst({
@@ -2395,15 +2411,25 @@ class StashSyncService extends EventEmitter {
         },
       });
 
-      const updateData = {
-        ...(syncType === "full"
-          ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
-          : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }),
+      // Build update data - only include sync timestamp if we have one
+      const updateData: Record<string, unknown> = {
         lastSyncCount: result.synced,
         lastSyncDurationMs: result.durationMs,
         lastError: result.error ?? null,
-        totalEntities: result.synced,
       };
+
+      // Only update timestamp fields if we have a valid timestamp from synced entities
+      if (syncTimestamp) {
+        if (syncType === "full") {
+          updateData.lastFullSync = syncTimestamp;
+          updateData.lastFullSyncActual = actualTime;
+        } else {
+          updateData.lastIncrementalSync = syncTimestamp;
+          updateData.lastIncrementalSyncActual = actualTime;
+        }
+        // Only update totalEntities when we actually sync something
+        updateData.totalEntities = result.synced;
+      }
 
       if (existing) {
         await prisma.syncState.update({
@@ -2415,7 +2441,15 @@ class StashSyncService extends EventEmitter {
           data: {
             stashInstanceId: instanceId,
             entityType: result.entityType,
-            ...updateData,
+            ...(syncTimestamp
+              ? syncType === "full"
+                ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
+                : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }
+              : {}),
+            lastSyncCount: result.synced,
+            lastSyncDurationMs: result.durationMs,
+            lastError: result.error ?? null,
+            totalEntities: result.synced,
           },
         });
       }
