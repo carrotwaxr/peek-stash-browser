@@ -594,11 +594,11 @@ describe("StashEntityService", () => {
       expect(stats.images).toBe(2000);
     });
 
-    it("should return true for isReady when sync state exists with lastFullSync", async () => {
+    it("should return true for isReady when sync state exists with lastFullSyncTimestamp", async () => {
       getMock(prisma.syncState.findFirst).mockResolvedValue({
         entityType: "scene",
-        lastFullSync: new Date("2024-01-01T00:00:00Z"),
-        lastIncrementalSync: null,
+        lastFullSyncTimestamp: "2024-01-01T00:00:00-08:00",
+        lastIncrementalSyncTimestamp: null,
       });
 
       const ready = await stashEntityService.isReady();
@@ -606,11 +606,11 @@ describe("StashEntityService", () => {
       expect(ready).toBe(true);
     });
 
-    it("should return true for isReady when sync state exists with lastIncrementalSync", async () => {
+    it("should return true for isReady when sync state exists with lastIncrementalSyncTimestamp", async () => {
       getMock(prisma.syncState.findFirst).mockResolvedValue({
         entityType: "scene",
-        lastFullSync: null,
-        lastIncrementalSync: new Date("2024-01-02T00:00:00Z"),
+        lastFullSyncTimestamp: null,
+        lastIncrementalSyncTimestamp: "2024-01-02T00:00:00-08:00",
       });
 
       const ready = await stashEntityService.isReady();
@@ -629,8 +629,8 @@ describe("StashEntityService", () => {
     it("should return false for isReady when sync state has no timestamps", async () => {
       getMock(prisma.syncState.findFirst).mockResolvedValue({
         entityType: "scene",
-        lastFullSync: null,
-        lastIncrementalSync: null,
+        lastFullSyncTimestamp: null,
+        lastIncrementalSyncTimestamp: null,
       });
 
       const ready = await stashEntityService.isReady();
@@ -642,8 +642,8 @@ describe("StashEntityService", () => {
       const lastSyncDate = new Date("2024-01-15T12:00:00Z");
       getMock(prisma.syncState.findFirst).mockResolvedValue({
         entityType: "scene",
-        lastFullSync: lastSyncDate,
-        lastIncrementalSync: null,
+        lastFullSyncActual: lastSyncDate,
+        lastIncrementalSyncActual: null,
       });
 
       const lastRefreshed = await stashEntityService.getLastRefreshed();
@@ -663,8 +663,8 @@ describe("StashEntityService", () => {
       const syncDate = new Date("2024-01-15T12:00:00Z");
       getMock(prisma.syncState.findFirst).mockResolvedValue({
         entityType: "scene",
-        lastFullSync: syncDate,
-        lastIncrementalSync: null,
+        lastFullSyncActual: syncDate,
+        lastIncrementalSyncActual: null,
       });
 
       const version = await stashEntityService.getCacheVersion();

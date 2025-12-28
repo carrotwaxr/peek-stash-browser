@@ -875,13 +875,7 @@ model SyncState {
   lastFullSyncTimestamp        String?
   lastIncrementalSyncTimestamp String?
 
-  // DEPRECATED: Old DateTime fields kept for backwards compatibility during migration
-  // These used "fake UTC" which was unreliable across timezone differences
-  lastFullSync        DateTime?
-  lastIncrementalSync DateTime?
-
   // Timestamps for UI display (actual UTC time when sync occurred)
-  // These are the real times for user-facing display
   lastFullSyncActual        DateTime?
   lastIncrementalSyncActual DateTime?
 

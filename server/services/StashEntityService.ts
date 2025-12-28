@@ -1201,14 +1201,11 @@ class StashEntityService {
       where: { entityType: "scene" },
     });
 
-    return !!(syncState?.lastFullSync || syncState?.lastIncrementalSync);
+    return !!(syncState?.lastFullSyncTimestamp || syncState?.lastIncrementalSyncTimestamp);
   }
 
   /**
    * Get last refresh time for display (returns most recent actual sync time)
-   *
-   * Uses the "Actual" timestamp fields which store real UTC time (for display),
-   * as opposed to the "fake UTC" timestamps used for Stash sync queries.
    */
   async getLastRefreshed(): Promise<Date | null> {
     const syncState = await prisma.syncState.findFirst({
@@ -1217,15 +1214,13 @@ class StashEntityService {
 
     if (!syncState) return null;
 
-    // Use actual timestamps for display (fall back to sync timestamps for backwards compatibility)
-    const lastFullSync = syncState.lastFullSyncActual ?? syncState.lastFullSync;
-    const lastIncrementalSync = syncState.lastIncrementalSyncActual ?? syncState.lastIncrementalSync;
+    const { lastFullSyncActual, lastIncrementalSyncActual } = syncState;
 
     // Return whichever sync happened more recently
-    if (!lastFullSync) return lastIncrementalSync;
-    if (!lastIncrementalSync) return lastFullSync;
+    if (!lastFullSyncActual) return lastIncrementalSyncActual;
+    if (!lastIncrementalSyncActual) return lastFullSyncActual;
 
-    return lastFullSync > lastIncrementalSync ? lastFullSync : lastIncrementalSync;
+    return lastFullSyncActual > lastIncrementalSyncActual ? lastFullSyncActual : lastIncrementalSyncActual;
   }
 
   /**

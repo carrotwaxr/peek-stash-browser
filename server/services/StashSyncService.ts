@@ -325,8 +325,6 @@ class StashSyncService extends EventEmitter {
   ): Promise<{
     lastFullSyncTimestamp: string | null;
     lastIncrementalSyncTimestamp: string | null;
-    lastFullSync: Date | null;
-    lastIncrementalSync: Date | null;
   } | null> {
     const syncState = await prisma.syncState.findFirst({
       where: {
@@ -350,30 +348,11 @@ class StashSyncService extends EventEmitter {
     syncState: {
       lastFullSyncTimestamp: string | null;
       lastIncrementalSyncTimestamp: string | null;
-      // Deprecated fields for backwards compatibility
-      lastFullSync: Date | null;
-      lastIncrementalSync: Date | null;
     } | null
   ): string | null {
     if (!syncState) return null;
 
-    const { lastFullSyncTimestamp, lastIncrementalSyncTimestamp, lastFullSync, lastIncrementalSync } =
-      syncState;
-
-    // Prefer new string fields if available
-    if (lastFullSyncTimestamp || lastIncrementalSyncTimestamp) {
-      return getMostRecentTimestamp(lastFullSyncTimestamp, lastIncrementalSyncTimestamp);
-    }
-
-    // Fall back to deprecated Date fields for backwards compatibility
-    // Convert to ISO string for consistent handling
-    if (lastFullSync || lastIncrementalSync) {
-      const fullSyncStr = lastFullSync?.toISOString() ?? null;
-      const incrSyncStr = lastIncrementalSync?.toISOString() ?? null;
-      return getMostRecentTimestamp(fullSyncStr, incrSyncStr);
-    }
-
-    return null;
+    return getMostRecentTimestamp(syncState.lastFullSyncTimestamp, syncState.lastIncrementalSyncTimestamp);
   }
 
   /**
