@@ -869,8 +869,14 @@ model SyncState {
   stashInstanceId String?
   entityType      String // 'scene', 'performer', etc.
 
-  // Timestamps for Stash sync queries (stored as "fake UTC" - local time values in UTC format)
-  // These preserve Stash's local time so queries use correct timestamps
+  // Raw timestamp strings from Stash's maxUpdatedAt - stored exactly as received
+  // These are the source of truth for "since" queries to Stash
+  // Format: RFC3339 with timezone offset, e.g., "2025-12-28T10:47:03-08:00"
+  lastFullSyncTimestamp        String?
+  lastIncrementalSyncTimestamp String?
+
+  // DEPRECATED: Old DateTime fields kept for backwards compatibility during migration
+  // These used "fake UTC" which was unreliable across timezone differences
   lastFullSync        DateTime?
   lastIncrementalSync DateTime?
 
