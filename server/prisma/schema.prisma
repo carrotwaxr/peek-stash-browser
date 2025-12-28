@@ -869,8 +869,16 @@ model SyncState {
   stashInstanceId String?
   entityType      String // 'scene', 'performer', etc.
 
+  // Timestamps for Stash sync queries (stored as "fake UTC" - local time values in UTC format)
+  // These preserve Stash's local time so queries use correct timestamps
   lastFullSync        DateTime?
   lastIncrementalSync DateTime?
+
+  // Timestamps for UI display (actual UTC time when sync occurred)
+  // These are the real times for user-facing display
+  lastFullSyncActual        DateTime?
+  lastIncrementalSyncActual DateTime?
+
   lastSyncCount       Int       @default(0)
   lastSyncDurationMs  Int?
   lastError           String?
