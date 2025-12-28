@@ -45,27 +45,58 @@ const BATCH_SIZE = 500; // Number of entities to fetch per page
 
 /**
  * Format a Date or ISO string for Stash GraphQL queries.
- * Stash doesn't properly handle the 'Z' suffix - it interprets all timestamps
+ * Stash doesn't properly handle timezone suffixes - it interprets all timestamps
  * as local time regardless of timezone indicator. So we strip the timezone
  * and pass the timestamp as-is, which Stash will interpret as local time.
  *
- * When the timestamp comes FROM Stash (e.g., updated_at), it already has the
- * correct local time value, so stripping the timezone suffix is safe.
+ * IMPORTANT: When we store sync timestamps, we use stashTimestampToFakeUtcDate()
+ * to convert Stash's local timestamps to a "fake UTC" Date that preserves the
+ * local time values. When that Date is retrieved from the database and passed
+ * here, calling toISOString() gives us back the original local time values.
  */
 function formatTimestampForStash(timestamp: Date | string): string {
-  // If it's a string (from Stash), parse and use as-is after stripping TZ
   if (typeof timestamp === "string") {
-    // Stash returns timestamps like "2025-12-28T09:47:03-08:00"
-    // We want to keep the date/time part and strip the timezone
-    // This regex matches the timezone suffix (+HH:MM, -HH:MM, or Z)
+    // If it's a string from Stash (e.g., "2025-12-28T09:47:03-08:00"),
+    // strip the timezone to get the local time portion
     return timestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
   }
 
-  // If it's a Date object, we have a problem: the Date is in UTC internally
-  // but we want to send it to Stash as if it were local time.
-  // This should only happen on first sync or when we don't have entity timestamps.
-  // For safety, convert to ISO and strip the Z.
+  // If it's a Date object (from database), use toISOString() and strip Z.
+  // Since we stored it as "fake UTC" (local time values in UTC),
+  // toISOString() gives us back the original local time values.
   return timestamp.toISOString().replace(/Z$/, "");
+}
+
+/**
+ * Convert a Stash timestamp string to a "fake UTC" Date for database storage.
+ *
+ * Problem: Stash returns timestamps like "2025-12-28T09:47:03-08:00" (local time with offset).
+ * When we query Stash, we must send local time values without timezone (e.g., "2025-12-28T09:47:03").
+ *
+ * If we naively use `new Date("2025-12-28T09:47:03-08:00")`, JavaScript converts to UTC internally
+ * (17:47:03 UTC). Later, when we call toISOString(), we get "2025-12-28T17:47:03.000Z", and
+ * after stripping Z, we send "2025-12-28T17:47:03.000" to Stash - but Stash interprets this as
+ * 5:47 PM local time, not 9:47 AM! This is the bug.
+ *
+ * Solution: Strip the timezone from Stash's timestamp and parse it as if it were UTC.
+ * This creates a "fake UTC" Date where the internal UTC values match the original local time.
+ * When retrieved from DB and formatted via toISOString().replace(/Z$/, ""), we get the
+ * correct local time string that Stash expects.
+ *
+ * Example:
+ *   Stash returns: "2025-12-28T09:47:03-08:00" (9:47 AM Pacific)
+ *   We strip TZ:   "2025-12-28T09:47:03"
+ *   Parse as UTC:  new Date("2025-12-28T09:47:03Z") -> internally 09:47:03 UTC
+ *   Store in DB:   2025-12-28 09:47:03 (SQLite stores as-is)
+ *   Retrieve:      Date object with 09:47:03 UTC
+ *   Format:        toISOString() -> "2025-12-28T09:47:03.000Z" -> strip Z -> "2025-12-28T09:47:03.000"
+ *   Send to Stash: "2025-12-28T09:47:03.000" -> interpreted as 9:47 AM local -> CORRECT!
+ */
+function stashTimestampToFakeUtcDate(stashTimestamp: string): Date {
+  // Strip the timezone suffix to get local time values
+  const localTime = stashTimestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
+  // Parse as if it were UTC (append Z to force UTC interpretation)
+  return new Date(localTime + "Z");
 }
 
 /**
@@ -2266,8 +2297,12 @@ class StashSyncService extends EventEmitter {
    * Save sync state for a single entity type immediately after sync completes.
    *
    * Uses the maxUpdatedAt from synced entities (if available) instead of the current time.
-   * This prevents race conditions where entities added during sync would be missed,
-   * and avoids timezone issues since we use Stash's own timestamps.
+   * This prevents race conditions where entities added during sync would be missed.
+   *
+   * CRITICAL: We use stashTimestampToFakeUtcDate() to convert the Stash timestamp
+   * to a "fake UTC" Date. This preserves the local time values so that when we
+   * later retrieve this timestamp and format it for Stash, we get the correct
+   * local time that Stash expects. See stashTimestampToFakeUtcDate() for details.
    */
   private async saveSyncState(
     stashInstanceId: string | undefined,
@@ -2278,17 +2313,26 @@ class StashSyncService extends EventEmitter {
 
     // Use the max updated_at from synced entities if available.
     // This is the timestamp of the most recently updated entity we actually synced.
-    // Fall back to current time only if we synced 0 entities (no timestamp available).
+    // IMPORTANT: Use stashTimestampToFakeUtcDate to preserve local time values for Stash queries.
     let syncTimestamp: Date;
     if (result.maxUpdatedAt) {
-      syncTimestamp = new Date(result.maxUpdatedAt);
+      syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
     } else {
-      // No entities synced, use current time as fallback
-      syncTimestamp = new Date();
+      // No entities synced - use current time as "fake UTC"
+      // We need to store the current LOCAL time as if it were UTC
+      const now = new Date();
+      // Get local ISO string without timezone, then parse as UTC
+      const localIso = now.toLocaleString("sv-SE").replace(" ", "T");
+      syncTimestamp = new Date(localIso + "Z");
     }
 
+    // Actual time (real UTC) for display purposes
+    const actualTime = new Date();
+
     const updateData = {
-      ...(syncType === "full" ? { lastFullSync: syncTimestamp } : { lastIncrementalSync: syncTimestamp }),
+      ...(syncType === "full"
+        ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
+        : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }),
       lastSyncCount: result.synced,
       lastSyncDurationMs: result.durationMs,
       lastError: result.error ?? null,
@@ -2329,12 +2373,19 @@ class StashSyncService extends EventEmitter {
 
     for (const result of results) {
       // Use the max updated_at from synced entities if available
+      // IMPORTANT: Use stashTimestampToFakeUtcDate to preserve local time values
       let syncTimestamp: Date;
       if (result.maxUpdatedAt) {
-        syncTimestamp = new Date(result.maxUpdatedAt);
+        syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
       } else {
-        syncTimestamp = new Date();
+        // No entities synced - use current time as "fake UTC"
+        const now = new Date();
+        const localIso = now.toLocaleString("sv-SE").replace(" ", "T");
+        syncTimestamp = new Date(localIso + "Z");
       }
+
+      // Actual time (real UTC) for display purposes
+      const actualTime = new Date();
 
       // Find existing sync state
       const existing = await prisma.syncState.findFirst({
@@ -2345,7 +2396,9 @@ class StashSyncService extends EventEmitter {
       });
 
       const updateData = {
-        ...(syncType === "full" ? { lastFullSync: syncTimestamp } : { lastIncrementalSync: syncTimestamp }),
+        ...(syncType === "full"
+          ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
+          : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }),
         lastSyncCount: result.synced,
         lastSyncDurationMs: result.durationMs,
         lastError: result.error ?? null,
