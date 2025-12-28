@@ -34,12 +34,57 @@ export interface SyncResult {
   deleted: number;
   durationMs: number;
   error?: string;
+  /** The max updated_at timestamp from synced entities (used for next incremental sync) */
+  maxUpdatedAt?: string;
 }
 
 type EntityType = "scene" | "performer" | "studio" | "tag" | "group" | "gallery" | "image";
 
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
+
+/**
+ * Format a Date or ISO string for Stash GraphQL queries.
+ * Stash doesn't properly handle the 'Z' suffix - it interprets all timestamps
+ * as local time regardless of timezone indicator. So we strip the timezone
+ * and pass the timestamp as-is, which Stash will interpret as local time.
+ *
+ * When the timestamp comes FROM Stash (e.g., updated_at), it already has the
+ * correct local time value, so stripping the timezone suffix is safe.
+ */
+function formatTimestampForStash(timestamp: Date | string): string {
+  // If it's a string (from Stash), parse and use as-is after stripping TZ
+  if (typeof timestamp === "string") {
+    // Stash returns timestamps like "2025-12-28T09:47:03-08:00"
+    // We want to keep the date/time part and strip the timezone
+    // This regex matches the timezone suffix (+HH:MM, -HH:MM, or Z)
+    return timestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
+  }
+
+  // If it's a Date object, we have a problem: the Date is in UTC internally
+  // but we want to send it to Stash as if it were local time.
+  // This should only happen on first sync or when we don't have entity timestamps.
+  // For safety, convert to ISO and strip the Z.
+  return timestamp.toISOString().replace(/Z$/, "");
+}
+
+/**
+ * Get the max updated_at timestamp from a list of entities.
+ * Returns the raw string from Stash (with timezone) to preserve accuracy.
+ */
+function getMaxUpdatedAt(entities: Array<{ updated_at?: string | null }>): string | undefined {
+  let max: string | undefined;
+
+  for (const entity of entities) {
+    if (entity.updated_at) {
+      if (!max || entity.updated_at > max) {
+        max = entity.updated_at;
+      }
+    }
+  }
+
+  return max;
+}
 
 /**
  * Validate that an entity ID is safe for SQL insertion.
@@ -305,12 +350,12 @@ class StashSyncService extends EventEmitter {
    */
   private async getChangeCount(
     entityType: EntityType,
-    since: Date,
+    since: Date | string,
     _stashInstanceId?: string
   ): Promise<number> {
     const stash = stashInstanceManager.getDefault();
     const filter = {
-      updated_at: { modifier: "GREATER_THAN", value: since.toISOString() },
+      updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(since) },
     };
 
     try {
@@ -383,7 +428,7 @@ class StashSyncService extends EventEmitter {
     entityType: EntityType,
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     switch (entityType) {
       case "studio":
@@ -567,7 +612,7 @@ class StashSyncService extends EventEmitter {
   private async syncScenes(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     logger.info("Syncing scenes...");
     const startTime = Date.now();
@@ -575,6 +620,7 @@ class StashSyncService extends EventEmitter {
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
 
     this.emit("progress", {
       entityType: "scene",
@@ -588,8 +634,9 @@ class StashSyncService extends EventEmitter {
         this.checkAbort();
 
         // Build filter for incremental sync
+        // Use formatTimestampForStash to handle Stash's timezone quirks
         const sceneFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
+          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         logger.debug(`Fetching scenes page ${page}...`);
@@ -604,6 +651,12 @@ class StashSyncService extends EventEmitter {
         totalCount = result.findScenes.count;
 
         if (scenes.length === 0) break;
+
+        // Track max updated_at for sync state
+        const batchMax = getMaxUpdatedAt(scenes as Array<{ updated_at?: string | null }>);
+        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
+          maxUpdatedAt = batchMax;
+        }
 
         // Process batch with progress logging every 500 items
         await this.processScenesBatch(scenes as Scene[], stashInstanceId, totalSynced, totalCount);
@@ -638,6 +691,7 @@ class StashSyncService extends EventEmitter {
         synced: totalSynced,
         deleted: 0,
         durationMs,
+        maxUpdatedAt,
       };
     } catch (error) {
       this.emit("progress", {
@@ -847,7 +901,7 @@ class StashSyncService extends EventEmitter {
   private async syncPerformers(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     logger.info("Syncing performers...");
     const startTime = Date.now();
@@ -855,6 +909,7 @@ class StashSyncService extends EventEmitter {
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
 
     this.emit("progress", {
       entityType: "performer",
@@ -868,7 +923,7 @@ class StashSyncService extends EventEmitter {
         this.checkAbort();
 
         const performerFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
+          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findPerformers({
@@ -880,6 +935,12 @@ class StashSyncService extends EventEmitter {
         totalCount = result.findPerformers.count;
 
         if (performers.length === 0) break;
+
+        // Track max updated_at for sync state
+        const batchMax = getMaxUpdatedAt(performers as Array<{ updated_at?: string | null }>);
+        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
+          maxUpdatedAt = batchMax;
+        }
 
         await this.processPerformersBatch(performers as Performer[], stashInstanceId);
 
@@ -912,6 +973,7 @@ class StashSyncService extends EventEmitter {
         synced: totalSynced,
         deleted: 0,
         durationMs,
+        maxUpdatedAt,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1048,7 +1110,7 @@ class StashSyncService extends EventEmitter {
   private async syncStudios(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     logger.info("Syncing studios...");
     const startTime = Date.now();
@@ -1056,6 +1118,7 @@ class StashSyncService extends EventEmitter {
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
 
     this.emit("progress", {
       entityType: "studio",
@@ -1069,7 +1132,7 @@ class StashSyncService extends EventEmitter {
         this.checkAbort();
 
         const studioFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
+          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findStudios({
@@ -1081,6 +1144,12 @@ class StashSyncService extends EventEmitter {
         totalCount = result.findStudios.count;
 
         if (studios.length === 0) break;
+
+        // Track max updated_at for sync state
+        const batchMax = getMaxUpdatedAt(studios as Array<{ updated_at?: string | null }>);
+        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
+          maxUpdatedAt = batchMax;
+        }
 
         await this.processStudiosBatch(studios as Studio[], stashInstanceId);
 
@@ -1113,6 +1182,7 @@ class StashSyncService extends EventEmitter {
         synced: totalSynced,
         deleted: 0,
         durationMs,
+        maxUpdatedAt,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1219,7 +1289,7 @@ class StashSyncService extends EventEmitter {
   private async syncTags(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     logger.info("Syncing tags...");
     const startTime = Date.now();
@@ -1227,6 +1297,7 @@ class StashSyncService extends EventEmitter {
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
 
     this.emit("progress", {
       entityType: "tag",
@@ -1240,7 +1311,7 @@ class StashSyncService extends EventEmitter {
         this.checkAbort();
 
         const tagFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
+          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findTags({
@@ -1252,6 +1323,12 @@ class StashSyncService extends EventEmitter {
         totalCount = result.findTags.count;
 
         if (tags.length === 0) break;
+
+        // Track max updated_at for sync state
+        const batchMax = getMaxUpdatedAt(tags as Array<{ updated_at?: string | null }>);
+        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
+          maxUpdatedAt = batchMax;
+        }
 
         await this.processTagsBatch(tags as Tag[], stashInstanceId);
 
@@ -1284,6 +1361,7 @@ class StashSyncService extends EventEmitter {
         synced: totalSynced,
         deleted: 0,
         durationMs,
+        maxUpdatedAt,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1365,7 +1443,7 @@ class StashSyncService extends EventEmitter {
   private async syncGroups(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     logger.info("Syncing groups...");
     const startTime = Date.now();
@@ -1373,6 +1451,7 @@ class StashSyncService extends EventEmitter {
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
 
     this.emit("progress", {
       entityType: "group",
@@ -1386,7 +1465,7 @@ class StashSyncService extends EventEmitter {
         this.checkAbort();
 
         const groupFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
+          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findGroups({
@@ -1398,6 +1477,12 @@ class StashSyncService extends EventEmitter {
         totalCount = result.findGroups.count;
 
         if (groups.length === 0) break;
+
+        // Track max updated_at for sync state
+        const batchMax = getMaxUpdatedAt(groups as Array<{ updated_at?: string | null }>);
+        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
+          maxUpdatedAt = batchMax;
+        }
 
         await this.processGroupsBatch(groups as Group[], stashInstanceId);
 
@@ -1430,6 +1515,7 @@ class StashSyncService extends EventEmitter {
         synced: totalSynced,
         deleted: 0,
         durationMs,
+        maxUpdatedAt,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1535,7 +1621,7 @@ class StashSyncService extends EventEmitter {
   private async syncGalleries(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     logger.info("Syncing galleries...");
     const startTime = Date.now();
@@ -1543,6 +1629,7 @@ class StashSyncService extends EventEmitter {
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
 
     this.emit("progress", {
       entityType: "gallery",
@@ -1556,7 +1643,7 @@ class StashSyncService extends EventEmitter {
         this.checkAbort();
 
         const galleryFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
+          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findGalleries({
@@ -1568,6 +1655,12 @@ class StashSyncService extends EventEmitter {
         totalCount = result.findGalleries.count;
 
         if (galleries.length === 0) break;
+
+        // Track max updated_at for sync state
+        const batchMax = getMaxUpdatedAt(galleries as Array<{ updated_at?: string | null }>);
+        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
+          maxUpdatedAt = batchMax;
+        }
 
         await this.processGalleriesBatch(galleries as Gallery[], stashInstanceId);
 
@@ -1600,6 +1693,7 @@ class StashSyncService extends EventEmitter {
         synced: totalSynced,
         deleted: 0,
         durationMs,
+        maxUpdatedAt,
       };
     } catch (error) {
       this.emit("progress", {
@@ -1747,7 +1841,7 @@ class StashSyncService extends EventEmitter {
   private async syncImages(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date
+    lastSyncTime?: Date | string
   ): Promise<SyncResult> {
     logger.info("Syncing images...");
     const startTime = Date.now();
@@ -1755,6 +1849,7 @@ class StashSyncService extends EventEmitter {
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
 
     this.emit("progress", {
       entityType: "image",
@@ -1768,7 +1863,7 @@ class StashSyncService extends EventEmitter {
         this.checkAbort();
 
         const imageFilter = lastSyncTime
-          ? { updated_at: { modifier: "GREATER_THAN", value: lastSyncTime.toISOString() } }
+          ? { updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(lastSyncTime) } }
           : undefined;
 
         const result = await stash.findImages({
@@ -1780,6 +1875,12 @@ class StashSyncService extends EventEmitter {
         totalCount = result.findImages.count;
 
         if (images.length === 0) break;
+
+        // Track max updated_at for sync state
+        const batchMax = getMaxUpdatedAt(images as Array<{ updated_at?: string | null }>);
+        if (batchMax && (!maxUpdatedAt || batchMax > maxUpdatedAt)) {
+          maxUpdatedAt = batchMax;
+        }
 
         await this.processImagesBatch(images, stashInstanceId);
 
@@ -1812,6 +1913,7 @@ class StashSyncService extends EventEmitter {
         synced: totalSynced,
         deleted: 0,
         durationMs,
+        maxUpdatedAt,
       };
     } catch (error) {
       this.emit("progress", {
@@ -2161,18 +2263,32 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Save sync state for a single entity type immediately after sync completes
+   * Save sync state for a single entity type immediately after sync completes.
+   *
+   * Uses the maxUpdatedAt from synced entities (if available) instead of the current time.
+   * This prevents race conditions where entities added during sync would be missed,
+   * and avoids timezone issues since we use Stash's own timestamps.
    */
   private async saveSyncState(
     stashInstanceId: string | undefined,
     syncType: "full" | "incremental",
     result: SyncResult
   ): Promise<void> {
-    const now = new Date();
     const instanceId = stashInstanceId ?? null;
 
+    // Use the max updated_at from synced entities if available.
+    // This is the timestamp of the most recently updated entity we actually synced.
+    // Fall back to current time only if we synced 0 entities (no timestamp available).
+    let syncTimestamp: Date;
+    if (result.maxUpdatedAt) {
+      syncTimestamp = new Date(result.maxUpdatedAt);
+    } else {
+      // No entities synced, use current time as fallback
+      syncTimestamp = new Date();
+    }
+
     const updateData = {
-      ...(syncType === "full" ? { lastFullSync: now } : { lastIncrementalSync: now }),
+      ...(syncType === "full" ? { lastFullSync: syncTimestamp } : { lastIncrementalSync: syncTimestamp }),
       lastSyncCount: result.synced,
       lastSyncDurationMs: result.durationMs,
       lastError: result.error ?? null,
@@ -2209,10 +2325,17 @@ class StashSyncService extends EventEmitter {
     results: SyncResult[],
     _totalDurationMs: number
   ): Promise<void> {
-    const now = new Date();
     const instanceId = stashInstanceId ?? null;
 
     for (const result of results) {
+      // Use the max updated_at from synced entities if available
+      let syncTimestamp: Date;
+      if (result.maxUpdatedAt) {
+        syncTimestamp = new Date(result.maxUpdatedAt);
+      } else {
+        syncTimestamp = new Date();
+      }
+
       // Find existing sync state
       const existing = await prisma.syncState.findFirst({
         where: {
@@ -2222,7 +2345,7 @@ class StashSyncService extends EventEmitter {
       });
 
       const updateData = {
-        ...(syncType === "full" ? { lastFullSync: now } : { lastIncrementalSync: now }),
+        ...(syncType === "full" ? { lastFullSync: syncTimestamp } : { lastIncrementalSync: syncTimestamp }),
         lastSyncCount: result.synced,
         lastSyncDurationMs: result.durationMs,
         lastError: result.error ?? null,
