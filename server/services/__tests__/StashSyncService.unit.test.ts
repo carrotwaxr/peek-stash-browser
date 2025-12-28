@@ -56,23 +56,23 @@ describe("StashSyncService", () => {
       // Import after mocks are set up
       const { stashSyncService } = await import("../StashSyncService.js");
 
-      // Set up different timestamps for different entity types
-      const tagTimestamp = new Date("2025-12-20T10:00:00Z");
-      const performerTimestamp = new Date("2025-12-22T15:00:00Z");
-      const sceneTimestamp = new Date("2025-12-25T08:00:00Z");
+      // Set up different timestamps for different entity types (now stored as RFC3339 strings)
+      const tagTimestamp = "2025-12-20T10:00:00-08:00";
+      const performerTimestamp = "2025-12-22T15:00:00-08:00";
+      const sceneTimestamp = "2025-12-25T08:00:00-08:00";
 
       mockPrisma.syncState.findFirst.mockImplementation(({ where }) => {
         if (where.entityType === "tag") {
-          return Promise.resolve({ lastIncrementalSync: tagTimestamp, lastFullSync: null });
+          return Promise.resolve({ lastIncrementalSyncTimestamp: tagTimestamp, lastFullSyncTimestamp: null });
         }
         if (where.entityType === "performer") {
-          return Promise.resolve({ lastIncrementalSync: performerTimestamp, lastFullSync: null });
+          return Promise.resolve({ lastIncrementalSyncTimestamp: performerTimestamp, lastFullSyncTimestamp: null });
         }
         if (where.entityType === "scene") {
-          return Promise.resolve({ lastIncrementalSync: sceneTimestamp, lastFullSync: null });
+          return Promise.resolve({ lastIncrementalSyncTimestamp: sceneTimestamp, lastFullSyncTimestamp: null });
         }
         // Return timestamps for other entity types
-        return Promise.resolve({ lastIncrementalSync: new Date("2025-12-24T12:00:00Z"), lastFullSync: null });
+        return Promise.resolve({ lastIncrementalSyncTimestamp: "2025-12-24T12:00:00-08:00", lastFullSyncTimestamp: null });
       });
 
       // Run incremental sync
@@ -100,8 +100,8 @@ describe("StashSyncService", () => {
       mockPrisma.syncState.findFirst.mockImplementation(({ where }) => {
         if (where.entityType === "tag") {
           return Promise.resolve({
-            lastIncrementalSync: new Date("2025-12-20T10:00:00Z"),
-            lastFullSync: null,
+            lastIncrementalSyncTimestamp: "2025-12-20T10:00:00-08:00",
+            lastFullSyncTimestamp: null,
           });
         }
         // No sync state for other entities
@@ -114,16 +114,16 @@ describe("StashSyncService", () => {
       expect(mockPrisma.syncState.findFirst).toHaveBeenCalled();
     });
 
-    it("should use lastIncrementalSync when it is more recent than lastFullSync", async () => {
+    it("should use lastIncrementalSyncTimestamp when it is more recent than lastFullSyncTimestamp", async () => {
       const { stashSyncService } = await import("../StashSyncService.js");
 
       // Full sync happened on Dec 17, incremental sync happened on Dec 27
-      const fullSyncDate = new Date("2025-12-17T08:00:00Z");
-      const incrementalSyncDate = new Date("2025-12-27T16:00:00Z");
+      const fullSyncTimestamp = "2025-12-17T08:00:00-08:00";
+      const incrementalSyncTimestamp = "2025-12-27T16:00:00-08:00";
 
       mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSync: fullSyncDate,
-        lastIncrementalSync: incrementalSyncDate,
+        lastFullSyncTimestamp: fullSyncTimestamp,
+        lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
       });
 
       await stashSyncService.incrementalSync();
@@ -133,16 +133,16 @@ describe("StashSyncService", () => {
       expect(mockPrisma.syncState.findFirst).toHaveBeenCalled();
     });
 
-    it("should use lastFullSync when it is more recent than lastIncrementalSync", async () => {
+    it("should use lastFullSyncTimestamp when it is more recent than lastIncrementalSyncTimestamp", async () => {
       const { stashSyncService } = await import("../StashSyncService.js");
 
       // Edge case: Full sync happened AFTER an incremental sync (user triggered manual full sync)
-      const incrementalSyncDate = new Date("2025-12-20T10:00:00Z");
-      const fullSyncDate = new Date("2025-12-27T16:00:00Z");
+      const incrementalSyncTimestamp = "2025-12-20T10:00:00-08:00";
+      const fullSyncTimestamp = "2025-12-27T16:00:00-08:00";
 
       mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSync: fullSyncDate,
-        lastIncrementalSync: incrementalSyncDate,
+        lastFullSyncTimestamp: fullSyncTimestamp,
+        lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
       });
 
       await stashSyncService.incrementalSync();
@@ -151,14 +151,14 @@ describe("StashSyncService", () => {
       expect(mockPrisma.syncState.findFirst).toHaveBeenCalled();
     });
 
-    it("should use lastFullSync when lastIncrementalSync is null", async () => {
+    it("should use lastFullSyncTimestamp when lastIncrementalSyncTimestamp is null", async () => {
       const { stashSyncService } = await import("../StashSyncService.js");
 
-      const fullSyncDate = new Date("2025-12-17T08:00:00Z");
+      const fullSyncTimestamp = "2025-12-17T08:00:00-08:00";
 
       mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSync: fullSyncDate,
-        lastIncrementalSync: null,
+        lastFullSyncTimestamp: fullSyncTimestamp,
+        lastIncrementalSyncTimestamp: null,
       });
 
       await stashSyncService.incrementalSync();
@@ -166,14 +166,14 @@ describe("StashSyncService", () => {
       expect(mockPrisma.syncState.findFirst).toHaveBeenCalled();
     });
 
-    it("should use lastIncrementalSync when lastFullSync is null", async () => {
+    it("should use lastIncrementalSyncTimestamp when lastFullSyncTimestamp is null", async () => {
       const { stashSyncService } = await import("../StashSyncService.js");
 
-      const incrementalSyncDate = new Date("2025-12-27T16:00:00Z");
+      const incrementalSyncTimestamp = "2025-12-27T16:00:00-08:00";
 
       mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSync: null,
-        lastIncrementalSync: incrementalSyncDate,
+        lastFullSyncTimestamp: null,
+        lastIncrementalSyncTimestamp: incrementalSyncTimestamp,
       });
 
       await stashSyncService.incrementalSync();
@@ -188,17 +188,17 @@ describe("StashSyncService", () => {
 
       // This is the bug scenario: full sync on Dec 17, incremental on Dec 27
       // The system should use Dec 27, not Dec 17
-      const olderFullSync = new Date("2025-12-17T08:00:00Z");
-      const newerIncrementalSync = new Date("2025-12-27T16:00:00Z");
+      const olderFullSync = "2025-12-17T08:00:00-08:00";
+      const newerIncrementalSync = "2025-12-27T16:00:00-08:00";
 
       mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSync: olderFullSync,
-        lastIncrementalSync: newerIncrementalSync,
+        lastFullSyncTimestamp: olderFullSync,
+        lastIncrementalSyncTimestamp: newerIncrementalSync,
       });
 
       // Run the sync - we verify via the log output which shows the timestamp used
       // The logs above in the test output show:
-      // "tag: syncing changes since 2025-12-27T16:00:00.000Z"
+      // "tag: syncing changes since 2025-12-27T16:00:00"
       // which proves it's using the NEWER incremental timestamp, not the older full sync
       await stashSyncService.incrementalSync();
 
@@ -211,17 +211,17 @@ describe("StashSyncService", () => {
       const { stashSyncService } = await import("../StashSyncService.js");
 
       // User ran incremental sync, then later ran a full sync
-      const olderIncrementalSync = new Date("2025-12-17T08:00:00Z");
-      const newerFullSync = new Date("2025-12-27T16:00:00Z");
+      const olderIncrementalSync = "2025-12-17T08:00:00-08:00";
+      const newerFullSync = "2025-12-27T16:00:00-08:00";
 
       mockPrisma.syncState.findFirst.mockResolvedValue({
-        lastFullSync: newerFullSync,
-        lastIncrementalSync: olderIncrementalSync,
+        lastFullSyncTimestamp: newerFullSync,
+        lastIncrementalSyncTimestamp: olderIncrementalSync,
       });
 
       await stashSyncService.incrementalSync();
 
-      // The logs will show "syncing changes since 2025-12-27T16:00:00.000Z"
+      // The logs will show "syncing changes since 2025-12-27T16:00:00"
       // proving it uses the newer fullSync timestamp
       expect(mockPrisma.syncState.findFirst).toHaveBeenCalled();
     });

@@ -44,59 +44,36 @@ type EntityType = "scene" | "performer" | "studio" | "tag" | "group" | "gallery"
 const BATCH_SIZE = 500; // Number of entities to fetch per page
 
 /**
- * Format a Date or ISO string for Stash GraphQL queries.
- * Stash doesn't properly handle timezone suffixes - it interprets all timestamps
- * as local time regardless of timezone indicator. So we strip the timezone
- * and pass the timestamp as-is, which Stash will interpret as local time.
+ * Format a timestamp for Stash GraphQL queries.
  *
- * IMPORTANT: When we store sync timestamps, we use stashTimestampToFakeUtcDate()
- * to convert Stash's local timestamps to a "fake UTC" Date that preserves the
- * local time values. When that Date is retrieved from the database and passed
- * here, calling toISOString() gives us back the original local time values.
+ * Stash expects timestamps without timezone suffix. It interprets all timestamps as local time.
+ * We store raw timestamp strings from Stash and strip the timezone when querying.
  */
-function formatTimestampForStash(timestamp: Date | string): string {
-  if (typeof timestamp === "string") {
-    // If it's a string from Stash (e.g., "2025-12-28T09:47:03-08:00"),
-    // strip the timezone to get the local time portion
-    return timestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
-  }
-
-  // If it's a Date object (from database), use toISOString() and strip Z.
-  // Since we stored it as "fake UTC" (local time values in UTC),
-  // toISOString() gives us back the original local time values.
-  return timestamp.toISOString().replace(/Z$/, "");
+function formatTimestampForStash(timestamp: string): string {
+  // Strip the timezone suffix to get the local time portion
+  // "2025-12-28T09:47:03-08:00" -> "2025-12-28T09:47:03"
+  // "2025-12-28T09:47:03Z" -> "2025-12-28T09:47:03"
+  return timestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
 }
 
 /**
- * Convert a Stash timestamp string to a "fake UTC" Date for database storage.
- *
- * Problem: Stash returns timestamps like "2025-12-28T09:47:03-08:00" (local time with offset).
- * When we query Stash, we must send local time values without timezone (e.g., "2025-12-28T09:47:03").
- *
- * If we naively use `new Date("2025-12-28T09:47:03-08:00")`, JavaScript converts to UTC internally
- * (17:47:03 UTC). Later, when we call toISOString(), we get "2025-12-28T17:47:03.000Z", and
- * after stripping Z, we send "2025-12-28T17:47:03.000" to Stash - but Stash interprets this as
- * 5:47 PM local time, not 9:47 AM! This is the bug.
- *
- * Solution: Strip the timezone from Stash's timestamp and parse it as if it were UTC.
- * This creates a "fake UTC" Date where the internal UTC values match the original local time.
- * When retrieved from DB and formatted via toISOString().replace(/Z$/, ""), we get the
- * correct local time string that Stash expects.
- *
- * Example:
- *   Stash returns: "2025-12-28T09:47:03-08:00" (9:47 AM Pacific)
- *   We strip TZ:   "2025-12-28T09:47:03"
- *   Parse as UTC:  new Date("2025-12-28T09:47:03Z") -> internally 09:47:03 UTC
- *   Store in DB:   2025-12-28 09:47:03 (SQLite stores as-is)
- *   Retrieve:      Date object with 09:47:03 UTC
- *   Format:        toISOString() -> "2025-12-28T09:47:03.000Z" -> strip Z -> "2025-12-28T09:47:03.000"
- *   Send to Stash: "2025-12-28T09:47:03.000" -> interpreted as 9:47 AM local -> CORRECT!
+ * Compare two RFC3339 timestamp strings to determine which is more recent.
+ * Handles timestamps with different timezone offsets by parsing to Date objects.
+ * Returns positive if a > b, negative if a < b, 0 if equal.
  */
-function stashTimestampToFakeUtcDate(stashTimestamp: string): Date {
-  // Strip the timezone suffix to get local time values
-  const localTime = stashTimestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
-  // Parse as if it were UTC (append Z to force UTC interpretation)
-  return new Date(localTime + "Z");
+function compareTimestamps(a: string, b: string): number {
+  const dateA = new Date(a);
+  const dateB = new Date(b);
+  return dateA.getTime() - dateB.getTime();
+}
+
+/**
+ * Get the more recent of two RFC3339 timestamp strings.
+ */
+function getMostRecentTimestamp(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return compareTimestamps(a, b) >= 0 ? a : b;
 }
 
 /**
@@ -299,7 +276,8 @@ class StashSyncService extends EventEmitter {
           const changeCount = await this.getChangeCount(entityType, lastSync, stashInstanceId);
 
           if (changeCount === 0) {
-            logger.info(`${entityType}: No changes since ${lastSync.toISOString()}, skipping`);
+            // lastSync is now a raw RFC3339 string
+            logger.info(`${entityType}: No changes since ${lastSync}, skipping`);
             results.push({
               entityType,
               synced: 0,
@@ -307,9 +285,7 @@ class StashSyncService extends EventEmitter {
               durationMs: 0,
             });
           } else {
-            logger.info(
-              `${entityType}: ${changeCount} changes since ${lastSync.toISOString()}, syncing`
-            );
+            logger.info(`${entityType}: ${changeCount} changes since ${lastSync}, syncing`);
             const result = await this.syncEntityType(entityType, stashInstanceId, false, lastSync);
             results.push(result);
             await this.saveSyncState(stashInstanceId, "incremental", result);
@@ -346,7 +322,10 @@ class StashSyncService extends EventEmitter {
   private async getEntitySyncState(
     stashInstanceId: string | undefined,
     entityType: EntityType
-  ): Promise<{ lastFullSync: Date | null; lastIncrementalSync: Date | null } | null> {
+  ): Promise<{
+    lastFullSyncTimestamp: string | null;
+    lastIncrementalSyncTimestamp: string | null;
+  } | null> {
     const syncState = await prisma.syncState.findFirst({
       where: {
         stashInstanceId: stashInstanceId || null,
@@ -359,29 +338,30 @@ class StashSyncService extends EventEmitter {
 
   /**
    * Get the most recent sync timestamp from a sync state record.
-   * Returns whichever is more recent: lastFullSync or lastIncrementalSync.
+   * Returns whichever is more recent: lastFullSyncTimestamp or lastIncrementalSyncTimestamp.
    * This ensures incremental syncs after a full sync use the correct "since" time.
+   *
+   * Returns the raw RFC3339 timestamp string from Stash, which we strip the timezone
+   * from when querying.
    */
   private getMostRecentSyncTime(
-    syncState: { lastFullSync: Date | null; lastIncrementalSync: Date | null } | null
-  ): Date | null {
+    syncState: {
+      lastFullSyncTimestamp: string | null;
+      lastIncrementalSyncTimestamp: string | null;
+    } | null
+  ): string | null {
     if (!syncState) return null;
 
-    const { lastFullSync, lastIncrementalSync } = syncState;
-
-    if (!lastFullSync) return lastIncrementalSync;
-    if (!lastIncrementalSync) return lastFullSync;
-
-    return lastFullSync > lastIncrementalSync ? lastFullSync : lastIncrementalSync;
+    return getMostRecentTimestamp(syncState.lastFullSyncTimestamp, syncState.lastIncrementalSyncTimestamp);
   }
 
   /**
-   * Get count of entities updated since a given date
+   * Get count of entities updated since a given timestamp
    * Used to determine if we need to sync at all
    */
   private async getChangeCount(
     entityType: EntityType,
-    since: Date | string,
+    since: string,
     _stashInstanceId?: string
   ): Promise<number> {
     const stash = stashInstanceManager.getDefault();
@@ -459,7 +439,7 @@ class StashSyncService extends EventEmitter {
     entityType: EntityType,
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     switch (entityType) {
       case "studio":
@@ -525,7 +505,8 @@ class StashSyncService extends EventEmitter {
           await this.saveSyncState(stashInstanceId, "full", result);
         } else {
           // Incremental sync using this entity's own timestamp
-          logger.info(`${entityType}: syncing changes since ${lastSync.toISOString()}`);
+          // lastSync is now a raw RFC3339 string from Stash
+          logger.info(`${entityType}: syncing changes since ${lastSync}`);
           const result = await this.syncEntityType(entityType, stashInstanceId, false, lastSync);
           results.push(result);
           await this.saveSyncState(stashInstanceId, "incremental", result);
@@ -643,7 +624,7 @@ class StashSyncService extends EventEmitter {
   private async syncScenes(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     logger.info("Syncing scenes...");
     const startTime = Date.now();
@@ -932,7 +913,7 @@ class StashSyncService extends EventEmitter {
   private async syncPerformers(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     logger.info("Syncing performers...");
     const startTime = Date.now();
@@ -1141,7 +1122,7 @@ class StashSyncService extends EventEmitter {
   private async syncStudios(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     logger.info("Syncing studios...");
     const startTime = Date.now();
@@ -1320,7 +1301,7 @@ class StashSyncService extends EventEmitter {
   private async syncTags(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     logger.info("Syncing tags...");
     const startTime = Date.now();
@@ -1474,7 +1455,7 @@ class StashSyncService extends EventEmitter {
   private async syncGroups(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     logger.info("Syncing groups...");
     const startTime = Date.now();
@@ -1652,7 +1633,7 @@ class StashSyncService extends EventEmitter {
   private async syncGalleries(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     logger.info("Syncing galleries...");
     const startTime = Date.now();
@@ -1872,7 +1853,7 @@ class StashSyncService extends EventEmitter {
   private async syncImages(
     stashInstanceId: string | undefined,
     isFullSync: boolean,
-    lastSyncTime?: Date | string
+    lastSyncTime?: string
   ): Promise<SyncResult> {
     logger.info("Syncing images...");
     const startTime = Date.now();
@@ -2299,10 +2280,11 @@ class StashSyncService extends EventEmitter {
    * Uses the maxUpdatedAt from synced entities (if available) instead of the current time.
    * This prevents race conditions where entities added during sync would be missed.
    *
-   * CRITICAL: We use stashTimestampToFakeUtcDate() to convert the Stash timestamp
-   * to a "fake UTC" Date. This preserves the local time values so that when we
-   * later retrieve this timestamp and format it for Stash, we get the correct
-   * local time that Stash expects. See stashTimestampToFakeUtcDate() for details.
+   * We store the raw RFC3339 timestamp string from Stash (with timezone info) as the source
+   * of truth for sync queries. This avoids all timezone conversion bugs.
+   *
+   * When no entities are synced (result.synced === 0), we do NOT update the sync timestamp.
+   * Without maxUpdatedAt from synced entities, we have no reliable timestamp to store.
    */
   private async saveSyncState(
     stashInstanceId: string | undefined,
@@ -2311,33 +2293,30 @@ class StashSyncService extends EventEmitter {
   ): Promise<void> {
     const instanceId = stashInstanceId ?? null;
 
-    // Use the max updated_at from synced entities if available.
-    // This is the timestamp of the most recently updated entity we actually synced.
-    // IMPORTANT: Use stashTimestampToFakeUtcDate to preserve local time values for Stash queries.
-    let syncTimestamp: Date;
-    if (result.maxUpdatedAt) {
-      syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
-    } else {
-      // No entities synced - use current time as "fake UTC"
-      // We need to store the current LOCAL time as if it were UTC
-      const now = new Date();
-      // Get local ISO string without timezone, then parse as UTC
-      const localIso = now.toLocaleString("sv-SE").replace(" ", "T");
-      syncTimestamp = new Date(localIso + "Z");
-    }
-
     // Actual time (real UTC) for display purposes
     const actualTime = new Date();
 
-    const updateData = {
-      ...(syncType === "full"
-        ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
-        : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }),
+    // Build update data - only include sync timestamp if we have one
+    const updateData: Record<string, unknown> = {
       lastSyncCount: result.synced,
       lastSyncDurationMs: result.durationMs,
       lastError: result.error ?? null,
-      totalEntities: result.synced,
     };
+
+    // Only update timestamp fields if we have a valid timestamp from synced entities
+    if (result.maxUpdatedAt) {
+      if (syncType === "full") {
+        // Store raw timestamp string (new field)
+        updateData.lastFullSyncTimestamp = result.maxUpdatedAt;
+        updateData.lastFullSyncActual = actualTime;
+      } else {
+        // Store raw timestamp string (new field)
+        updateData.lastIncrementalSyncTimestamp = result.maxUpdatedAt;
+        updateData.lastIncrementalSyncActual = actualTime;
+      }
+      // Only update totalEntities when we actually sync something
+      updateData.totalEntities = result.synced;
+    }
 
     // Find existing record
     const existing = await prisma.syncState.findFirst({
@@ -2353,11 +2332,20 @@ class StashSyncService extends EventEmitter {
         data: updateData,
       });
     } else {
+      // For new records, we need to include entityType and stashInstanceId
       await prisma.syncState.create({
         data: {
           stashInstanceId: instanceId,
           entityType: result.entityType,
-          ...updateData,
+          ...(result.maxUpdatedAt
+            ? syncType === "full"
+              ? { lastFullSyncTimestamp: result.maxUpdatedAt, lastFullSyncActual: actualTime }
+              : { lastIncrementalSyncTimestamp: result.maxUpdatedAt, lastIncrementalSyncActual: actualTime }
+            : {}),
+          lastSyncCount: result.synced,
+          lastSyncDurationMs: result.durationMs,
+          lastError: result.error ?? null,
+          totalEntities: result.synced,
         },
       });
     }
@@ -2372,18 +2360,6 @@ class StashSyncService extends EventEmitter {
     const instanceId = stashInstanceId ?? null;
 
     for (const result of results) {
-      // Use the max updated_at from synced entities if available
-      // IMPORTANT: Use stashTimestampToFakeUtcDate to preserve local time values
-      let syncTimestamp: Date;
-      if (result.maxUpdatedAt) {
-        syncTimestamp = stashTimestampToFakeUtcDate(result.maxUpdatedAt);
-      } else {
-        // No entities synced - use current time as "fake UTC"
-        const now = new Date();
-        const localIso = now.toLocaleString("sv-SE").replace(" ", "T");
-        syncTimestamp = new Date(localIso + "Z");
-      }
-
       // Actual time (real UTC) for display purposes
       const actualTime = new Date();
 
@@ -2395,15 +2371,25 @@ class StashSyncService extends EventEmitter {
         },
       });
 
-      const updateData = {
-        ...(syncType === "full"
-          ? { lastFullSync: syncTimestamp, lastFullSyncActual: actualTime }
-          : { lastIncrementalSync: syncTimestamp, lastIncrementalSyncActual: actualTime }),
+      // Build update data - only include sync timestamp if we have one
+      const updateData: Record<string, unknown> = {
         lastSyncCount: result.synced,
         lastSyncDurationMs: result.durationMs,
         lastError: result.error ?? null,
-        totalEntities: result.synced,
       };
+
+      // Only update timestamp fields if we have a valid timestamp from synced entities
+      if (result.maxUpdatedAt) {
+        if (syncType === "full") {
+          updateData.lastFullSyncTimestamp = result.maxUpdatedAt;
+          updateData.lastFullSyncActual = actualTime;
+        } else {
+          updateData.lastIncrementalSyncTimestamp = result.maxUpdatedAt;
+          updateData.lastIncrementalSyncActual = actualTime;
+        }
+        // Only update totalEntities when we actually sync something
+        updateData.totalEntities = result.synced;
+      }
 
       if (existing) {
         await prisma.syncState.update({
@@ -2415,7 +2401,15 @@ class StashSyncService extends EventEmitter {
           data: {
             stashInstanceId: instanceId,
             entityType: result.entityType,
-            ...updateData,
+            ...(result.maxUpdatedAt
+              ? syncType === "full"
+                ? { lastFullSyncTimestamp: result.maxUpdatedAt, lastFullSyncActual: actualTime }
+                : { lastIncrementalSyncTimestamp: result.maxUpdatedAt, lastIncrementalSyncActual: actualTime }
+              : {}),
+            lastSyncCount: result.synced,
+            lastSyncDurationMs: result.durationMs,
+            lastError: result.error ?? null,
+            totalEntities: result.synced,
           },
         });
       }

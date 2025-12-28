@@ -221,7 +221,7 @@ class SyncScheduler {
 
     // Log what we found
     const completedTypes = syncStates
-      .filter((s) => s.lastFullSync || s.lastIncrementalSync)
+      .filter((s) => s.lastFullSyncTimestamp || s.lastIncrementalSyncTimestamp)
       .map((s) => s.entityType);
 
     const missingTypes = [
