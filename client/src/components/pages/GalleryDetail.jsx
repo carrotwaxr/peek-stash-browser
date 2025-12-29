@@ -13,6 +13,7 @@ import {
   LoadingSpinner,
   PageHeader,
   RatingSlider,
+  TagChips,
 } from "../ui/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
@@ -95,8 +96,7 @@ const GalleryDetail = () => {
   useRatingHotkeys({
     enabled: !isLoading && !!gallery,
     setRating: handleRatingChange,
-    toggleFavorite,
-  });
+    toggleFavorite });
 
   // Check if there's any sidebar content to display
   const hasSidebarContent =
@@ -235,8 +235,7 @@ const GalleryDetail = () => {
                     <div
                       className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
                       style={{
-                        backgroundColor: "var(--border-color)",
-                      }}
+                        backgroundColor: "var(--border-color)" }}
                     >
                       {performer.image_path ? (
                         <img
@@ -285,8 +284,7 @@ const GalleryDetail = () => {
                     key={index}
                     className="aspect-square rounded-lg animate-pulse"
                     style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                    }}
+                      backgroundColor: "var(--bg-tertiary)" }}
                   />
                 ))}
               </div>
@@ -300,8 +298,7 @@ const GalleryDetail = () => {
                     className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
                     style={{
                       backgroundColor: "var(--bg-secondary)",
-                      borderColor: "var(--border-color)",
-                    }}
+                      borderColor: "var(--border-color)" }}
                     onClick={() => {
                       setLightboxIndex(index);
                       setLightboxAutoPlay(false);
@@ -326,24 +323,7 @@ const GalleryDetail = () => {
               {/* Tags */}
               {gallery.tags && gallery.tags.length > 0 && (
                 <Card title="Tags">
-                  <div className="flex flex-wrap gap-2">
-                    {gallery.tags.map((tag) => {
-                      const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-                      return (
-                        <button
-                          key={tag.id}
-                          onClick={() => navigate(`/tag/${tag.id}`)}
-                          className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                          style={{
-                            backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                            color: "white",
-                          }}
-                        >
-                          {tag.name}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <TagChips tags={gallery.tags} />
                 </Card>
               )}
 
@@ -402,8 +382,7 @@ const Card = ({ title, children }) => {
       className="p-6 rounded-lg border"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-      }}
+        borderColor: "var(--border-color)" }}
     >
       {title && (
         <h3

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { Paper, SectionLink, useLazyLoad } from "../ui/index.js";
+import { Paper, SectionLink, TagChips, useLazyLoad } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
 
 /**
@@ -332,7 +332,7 @@ const SceneDetails = ({
                   </div>
                 )}
 
-                {/* Tags - Styled to match PerformerDetail */}
+                {/* Tags */}
                 {(() => {
                   const allTags = mergeAllTags(scene);
                   return (
@@ -344,25 +344,7 @@ const SceneDetails = ({
                         >
                           Tags
                         </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {allTags.map((tag) => {
-                            // Generate a color based on tag ID for consistency
-                            const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-                            return (
-                              <Link
-                                key={tag.id}
-                                to={`/tag/${tag.id}`}
-                                className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium"
-                                style={{
-                                  backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                                  color: "white",
-                                }}
-                              >
-                                {tag.name}
-                              </Link>
-                            );
-                          })}
-                        </div>
+                        <TagChips tags={allTags} />
                       </div>
                     )
                   );
