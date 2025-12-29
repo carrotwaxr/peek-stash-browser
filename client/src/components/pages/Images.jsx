@@ -137,7 +137,7 @@ const Images = () => {
           {...searchControlsProps}
         >
           {isLoading ? (
-            <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+            <div className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
               {[...Array(24)].map((_, i) => (
                 <div
                   key={i}
@@ -151,7 +151,7 @@ const Images = () => {
             </div>
           ) : (
             <>
-              <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+              <div ref={gridRef} className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
                 {currentImages.map((image, index) => {
                   const itemProps = gridItemProps(index);
                   return (
