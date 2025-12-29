@@ -997,6 +997,7 @@ class StashEntityService {
       where: { id, deletedAt: null },
       include: {
         performers: { include: { performer: true } },
+        tags: { include: { tag: true } },
       },
     });
 
@@ -1027,6 +1028,7 @@ class StashEntityService {
       },
       include: {
         performers: { include: { performer: true } },
+        tags: { include: { tag: true } },
       },
     });
 
