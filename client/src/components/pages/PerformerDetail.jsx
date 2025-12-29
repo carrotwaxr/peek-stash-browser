@@ -19,6 +19,7 @@ import {
   RatingSlider,
   SectionLink,
   TabNavigation,
+  TagChips,
 } from "../ui/index.js";
 import { GalleryGrid, GroupGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
@@ -85,8 +86,7 @@ const PerformerDetail = () => {
   useRatingHotkeys({
     enabled: !isLoading && !!performer,
     setRating: handleRatingChange,
-    toggleFavorite,
-  });
+    toggleFavorite });
 
   if (isLoading) {
     return (
@@ -183,12 +183,9 @@ const PerformerDetail = () => {
               permanentFilters={{
                 performers: {
                   value: [parseInt(performerId, 10)],
-                  modifier: "INCLUDES",
-                },
-              }}
+                  modifier: "INCLUDES" } }}
               permanentFiltersMetadata={{
-                performers: [{ id: performerId, name: performer.name }],
-              }}
+                performers: [{ id: performerId, name: performer.name }] }}
               title={`Scenes featuring ${performer.name}`}
               captureReferrer={false}
             />
@@ -200,10 +197,7 @@ const PerformerDetail = () => {
                 gallery_filter: {
                   performers: {
                     value: [parseInt(performerId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
+                    modifier: "INCLUDES" } } }}
               hideLockedFilters
               syncToUrl={false}
               emptyMessage={`No galleries found for ${performer.name}`}
@@ -220,10 +214,7 @@ const PerformerDetail = () => {
                 group_filter: {
                   performers: {
                     value: [parseInt(performerId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
+                    modifier: "INCLUDES" } } }}
               hideLockedFilters
               syncToUrl={false}
               emptyMessage={`No collections found for ${performer.name}`}
@@ -271,8 +262,7 @@ const StatField = ({ label, value, valueColor = "var(--text-primary)", onClick, 
           style={{
             color: valueColor,
             cursor: isActive ? 'default' : 'pointer',
-            textDecoration: isActive ? 'underline' : 'none',
-          }}
+            textDecoration: isActive ? 'underline' : 'none' }}
         >
           {value}
         </button>
@@ -303,8 +293,7 @@ const Card = ({ children, title }) => {
     <div
       className="p-4 rounded-lg p-6 mb-6"
       style={{
-        backgroundColor: "var(--bg-card)",
-      }}
+        backgroundColor: "var(--bg-card)" }}
     >
       {title && (
         <h2
@@ -349,8 +338,7 @@ const PerformerDetails = ({ performer }) => {
           className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "2px solid var(--accent-primary)",
-          }}
+            borderBottom: "2px solid var(--accent-primary)" }}
         >
           Personal Information
         </h3>
@@ -382,8 +370,7 @@ const PerformerDetails = ({ performer }) => {
           className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
           style={{
             color: "var(--text-primary)",
-            borderBottom: "2px solid var(--accent-primary)",
-          }}
+            borderBottom: "2px solid var(--accent-primary)" }}
         >
           Physical Attributes
         </h3>
@@ -427,8 +414,7 @@ const PerformerDetails = ({ performer }) => {
             className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
             style={{
               color: "var(--text-primary)",
-              borderBottom: "2px solid var(--accent-primary)",
-            }}
+              borderBottom: "2px solid var(--accent-primary)" }}
           >
             Body Modifications
           </h3>
@@ -446,8 +432,7 @@ const PerformerDetails = ({ performer }) => {
             className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
             style={{
               color: "var(--text-primary)",
-              borderBottom: "2px solid var(--accent-primary)",
-            }}
+              borderBottom: "2px solid var(--accent-primary)" }}
           >
             Other
           </h3>
@@ -554,8 +539,7 @@ const PerformerStats = ({ performer, performerId: _performerId }) => { // eslint
               className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${performer.rating100}%`,
-                backgroundColor: "var(--accent-primary)",
-              }}
+                backgroundColor: "var(--accent-primary)" }}
             />
           </div>
         </div>
@@ -586,8 +570,7 @@ const PerformerStats = ({ performer, performerId: _performerId }) => { // eslint
               className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${oCountBarWidth}%`,
-                backgroundColor: "var(--accent-primary)",
-              }}
+                backgroundColor: "var(--accent-primary)" }}
             />
           </div>
           <div className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
@@ -607,8 +590,7 @@ const PerformerImage = ({ performer }) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "7/10",
         width: "100%",
-        maxHeight: "80vh",
-      }}
+        maxHeight: "80vh" }}
     >
       {performer?.image_path ? (
         <img
@@ -617,8 +599,7 @@ const PerformerImage = ({ performer }) => {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "contain",
-          }}
+            objectFit: "contain" }}
         />
       ) : (
         <svg
@@ -673,25 +654,7 @@ const PerformerLinks = ({ performer }) => {
       {/* Tags Section */}
       {hasTags && (
         <Card title="Tags">
-          <div className="flex flex-wrap gap-2">
-            {performer.tags.map((tag) => {
-              // Generate a color based on tag ID for consistency
-              const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-              return (
-                <Link
-                  key={tag.id}
-                  to={`/tags/${tag.id}`}
-                  className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium"
-                  style={{
-                    backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                    color: "white",
-                  }}
-                >
-                  {tag.name}
-                </Link>
-              );
-            })}
-          </div>
+          <TagChips tags={performer.tags} />
         </Card>
       )}
 
@@ -728,15 +691,11 @@ const ImagesTab = ({ performerId, performerName }) => {
         const data = await libraryApi.findImages({
           filter: {
             page: currentPage,
-            per_page: perPage,
-          },
+            per_page: perPage },
           image_filter: {
             performers: {
               value: [parseInt(performerId, 10)],
-              modifier: "INCLUDES",
-            },
-          },
-        });
+              modifier: "INCLUDES" } } });
         setImages(data.findImages?.images || []);
         setTotalCount(data.findImages?.count || 0);
       } catch (error) {
@@ -757,8 +716,7 @@ const ImagesTab = ({ performerId, performerName }) => {
             key={index}
             className="aspect-square rounded-lg animate-pulse"
             style={{
-              backgroundColor: "var(--bg-tertiary)",
-            }}
+              backgroundColor: "var(--bg-tertiary)" }}
           />
         ))}
       </div>
@@ -800,8 +758,7 @@ const ImagesTab = ({ performerId, performerName }) => {
             className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
             style={{
               backgroundColor: "var(--bg-secondary)",
-              borderColor: "var(--border-color)",
-            }}
+              borderColor: "var(--border-color)" }}
             onClick={() => {
               setLightboxIndex(index);
               setLightboxOpen(true);

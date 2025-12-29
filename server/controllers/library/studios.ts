@@ -224,7 +224,10 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    // Step 9: Hydrate parent/child relationships with names
+    // Step 9: Hydrate tags with names (for all requests)
+    paginatedStudios = await hydrateEntityTags(paginatedStudios);
+
+    // Step 10: Hydrate parent/child relationships with names
     // For single-studio requests (detail pages), hydrate relationships using ALL studios for accurate lookup
     // For multi-studio requests (grid pages), hydrate using paginated studios only (children will be incomplete but that's ok)
     const hydratedStudios = await hydrateStudioRelationships(

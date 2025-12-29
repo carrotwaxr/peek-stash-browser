@@ -13,6 +13,7 @@ import {
   PageHeader,
   RatingSlider,
   TabNavigation,
+  TagChips,
 } from "../ui/index.js";
 import { PerformerGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
@@ -79,8 +80,7 @@ const GroupDetail = () => {
   useRatingHotkeys({
     enabled: !isLoading && !!group,
     setRating: handleRatingChange,
-    toggleFavorite,
-  });
+    toggleFavorite });
 
   if (isLoading) {
     return (
@@ -182,13 +182,11 @@ const GroupDetail = () => {
               context="scene_group"
               initialSort="scene_index"
               permanentFilters={{
-                groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" },
-              }}
+                groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" } }}
               permanentFiltersMetadata={{
                 groups: [
                   { id: groupId, name: group?.name || "Unknown Collection" },
-                ],
-              }}
+                ] }}
               title={`Scenes in ${group?.name || "this collection"}`}
               captureReferrer={false}
             />
@@ -200,10 +198,7 @@ const GroupDetail = () => {
                 performer_filter: {
                   groups: {
                     value: [parseInt(groupId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
+                    modifier: "INCLUDES" } } }}
               hideLockedFilters
               syncToUrl={false}
               emptyMessage={`No performers found in "${group?.name}"`}
@@ -222,8 +217,7 @@ const Card = ({ title, children }) => {
       className="p-6 rounded-lg border"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-      }}
+        borderColor: "var(--border-color)" }}
     >
       {title && (
         <h3
@@ -262,8 +256,7 @@ const GroupImageFlipper = ({ group }) => {
           backgroundColor: "var(--bg-card)",
           aspectRatio: "1/1",
           width: "100%",
-          maxHeight: "80vh",
-        }}
+          maxHeight: "80vh" }}
       >
         {displayImage ? (
           <img
@@ -272,8 +265,7 @@ const GroupImageFlipper = ({ group }) => {
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "contain",
-            }}
+              objectFit: "contain" }}
           />
         ) : (
           <svg
@@ -310,8 +302,7 @@ const GroupImageFlipper = ({ group }) => {
               color: showFront ? "white" : "var(--text-primary)",
               border: `1px solid ${
                 showFront ? "var(--accent-primary)" : "var(--border-color)"
-              }`,
-            }}
+              }` }}
             title="Show front cover"
           >
             Front
@@ -328,8 +319,7 @@ const GroupImageFlipper = ({ group }) => {
               color: !showFront ? "white" : "var(--text-primary)",
               border: `1px solid ${
                 !showFront ? "var(--accent-primary)" : "var(--border-color)"
-              }`,
-            }}
+              }` }}
             title="Show back cover"
           >
             Back
@@ -372,8 +362,7 @@ const GroupStats = ({ group }) => {
             style={{
               color: valueColor,
               cursor: isActive ? 'default' : 'pointer',
-              textDecoration: isActive ? 'underline' : 'none',
-            }}
+              textDecoration: isActive ? 'underline' : 'none' }}
           >
             {value}
           </button>
@@ -515,25 +504,7 @@ const GroupDetails = ({ group }) => {
 
       {group?.tags && group.tags.length > 0 && (
         <Card title="Tags">
-          <div className="flex flex-wrap gap-2">
-            {group.tags.map((tag) => {
-              // Generate a color based on tag ID for consistency
-              const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-              return (
-                <Link
-                  key={tag.id}
-                  to={`/tag/${tag.id}`}
-                  className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                  style={{
-                    backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                    color: "white",
-                  }}
-                >
-                  {tag.name}
-                </Link>
-              );
-            })}
-          </div>
+          <TagChips tags={group.tags} />
         </Card>
       )}
 

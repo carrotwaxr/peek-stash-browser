@@ -64,6 +64,7 @@ export { default as Sidebar } from "./Sidebar.jsx";
 export { default as SkeletonSceneCard } from "./SkeletonSceneCard.jsx";
 export { default as SuccessMessage } from "./SuccessMessage.jsx";
 export { default as TabNavigation } from "./TabNavigation.jsx";
+export { default as TagChips } from "./TagChips.jsx";
 export { default as Tooltip } from "./Tooltip.jsx";
 export { TooltipEntityGrid } from "./TooltipEntityGrid.jsx";
 export { default as TopBar } from "./TopBar.jsx";

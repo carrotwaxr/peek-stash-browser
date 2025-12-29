@@ -4,8 +4,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
-  useSearchParams,
-} from "react-router-dom";
+  useSearchParams } from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
@@ -21,6 +20,7 @@ import {
   Pagination,
   RatingSlider,
   TabNavigation,
+  TagChips,
 } from "../ui/index.js";
 import { GalleryGrid, GroupGrid, PerformerGrid } from "../grids/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
@@ -104,8 +104,7 @@ const StudioDetail = () => {
   useRatingHotkeys({
     enabled: !isLoading && !!studio,
     setRating: handleRatingChange,
-    toggleFavorite,
-  });
+    toggleFavorite });
 
   if (isLoading) {
     return (
@@ -204,8 +203,7 @@ const StudioDetail = () => {
                   className="w-4 h-4 rounded border-2 cursor-pointer"
                   style={{
                     borderColor: "var(--border-color)",
-                    accentColor: "var(--accent-primary)",
-                  }}
+                    accentColor: "var(--accent-primary)" }}
                 />
                 <span
                   className="text-sm font-medium"
@@ -223,19 +221,16 @@ const StudioDetail = () => {
               {
                 id: "galleries",
                 label: "Galleries",
-                count: studio.gallery_count || 0,
-              },
+                count: studio.gallery_count || 0 },
               { id: "images", label: "Images", count: studio.image_count || 0 },
               {
                 id: "performers",
                 label: "Performers",
-                count: studio.performer_count || 0,
-              },
+                count: studio.performer_count || 0 },
               {
                 id: "groups",
                 label: "Collections",
-                count: studio.group_count || 0,
-              },
+                count: studio.group_count || 0 },
             ]}
             defaultTab="scenes"
           />
@@ -249,14 +244,11 @@ const StudioDetail = () => {
                 studios: {
                   value: [parseInt(studioId, 10)],
                   modifier: "INCLUDES",
-                  ...(includeSubStudios && { depth: -1 }),
-                },
-              }}
+                  ...(includeSubStudios && { depth: -1 }) } }}
               permanentFiltersMetadata={{
                 studios: [
                   { id: studioId, name: studio?.name || "Unknown Studio" },
-                ],
-              }}
+                ] }}
               title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
               captureReferrer={false}
             />
@@ -270,10 +262,7 @@ const StudioDetail = () => {
                   studios: {
                     value: [parseInt(studioId, 10)],
                     modifier: "INCLUDES",
-                    ...(includeSubStudios && { depth: -1 }),
-                  },
-                },
-              }}
+                    ...(includeSubStudios && { depth: -1 }) } } }}
               hideLockedFilters
               syncToUrl={false}
               emptyMessage={`No galleries found for ${studio?.name}`}
@@ -294,10 +283,7 @@ const StudioDetail = () => {
                 performer_filter: {
                   studios: {
                     value: [parseInt(studioId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
+                    modifier: "INCLUDES" } } }}
               hideLockedFilters
               syncToUrl={false}
               emptyMessage={`No performers found for ${studio?.name}`}
@@ -310,10 +296,7 @@ const StudioDetail = () => {
                 group_filter: {
                   studios: {
                     value: [parseInt(studioId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
+                    modifier: "INCLUDES" } } }}
               hideLockedFilters
               syncToUrl={false}
               emptyMessage={`No collections found for ${studio?.name}`}
@@ -332,8 +315,7 @@ const Card = ({ title, children }) => {
       className="p-6 rounded-lg border"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-      }}
+        borderColor: "var(--border-color)" }}
     >
       {title && (
         <h3
@@ -357,8 +339,7 @@ const StudioImage = ({ studio }) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "1/1",
         width: "100%",
-        maxHeight: "80vh",
-      }}
+        maxHeight: "80vh" }}
     >
       {studio?.image_path ? (
         <img
@@ -367,8 +348,7 @@ const StudioImage = ({ studio }) => {
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "contain",
-          }}
+            objectFit: "contain" }}
         />
       ) : (
         <svg
@@ -405,8 +385,7 @@ const StudioStats = ({ studio, studioId: _studioId }) => { // eslint-disable-lin
     value,
     valueColor = "var(--text-primary)",
     onClick,
-    isActive,
-  }) => {
+    isActive }) => {
     if (!value && value !== 0) return null;
 
     const clickable = onClick && value > 0;
@@ -422,8 +401,7 @@ const StudioStats = ({ studio, studioId: _studioId }) => { // eslint-disable-lin
             style={{
               color: valueColor,
               cursor: isActive ? "default" : "pointer",
-              textDecoration: isActive ? "underline" : "none",
-            }}
+              textDecoration: isActive ? "underline" : "none" }}
           >
             {value}
           </button>
@@ -463,8 +441,7 @@ const StudioStats = ({ studio, studioId: _studioId }) => { // eslint-disable-lin
               className="h-full rounded-full transition-all duration-300"
               style={{
                 width: `${studio.rating100}%`,
-                backgroundColor: "var(--accent-primary)",
-              }}
+                backgroundColor: "var(--accent-primary)" }}
             />
           </div>
         </div>
@@ -561,8 +538,7 @@ const StudioDetails = ({ studio }) => {
             className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
             style={{
               backgroundColor: "var(--accent-primary)",
-              color: "white",
-            }}
+              color: "white" }}
           >
             {studio.parent_studio.name}
           </Link>
@@ -578,8 +554,7 @@ const StudioDetails = ({ studio }) => {
                 to={`/studio/${child.id}`}
                 className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
                 style={{
-                  color: "var(--text-primary)",
-                }}
+                  color: "var(--text-primary)" }}
               >
                 {child.name}
               </Link>
@@ -590,25 +565,7 @@ const StudioDetails = ({ studio }) => {
 
       {studio?.tags && studio.tags.length > 0 && (
         <Card title="Tags">
-          <div className="flex flex-wrap gap-2">
-            {studio.tags.map((tag) => {
-              // Generate a color based on tag ID for consistency
-              const hue = (parseInt(tag.id, 10) * 137.5) % 360;
-              return (
-                <Link
-                  key={tag.id}
-                  to={`/tags/${tag.id}`}
-                  className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
-                  style={{
-                    backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                    color: "white",
-                  }}
-                >
-                  {tag.name}
-                </Link>
-              );
-            })}
-          </div>
+          <TagChips tags={studio.tags} />
         </Card>
       )}
 
@@ -702,16 +659,12 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
         const data = await libraryApi.findImages({
           filter: {
             page: currentPage,
-            per_page: perPage,
-          },
+            per_page: perPage },
           image_filter: {
             studios: {
               value: [parseInt(studioId, 10)],
               modifier: "INCLUDES",
-              ...(includeSubStudios && { depth: -1 }),
-            },
-          },
-        });
+              ...(includeSubStudios && { depth: -1 }) } } });
         setImages(data.findImages?.images || []);
         setTotalCount(data.findImages?.count || 0);
       } catch (error) {
@@ -732,8 +685,7 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
             key={index}
             className="aspect-square rounded-lg animate-pulse"
             style={{
-              backgroundColor: "var(--bg-tertiary)",
-            }}
+              backgroundColor: "var(--bg-tertiary)" }}
           />
         ))}
       </div>
@@ -775,8 +727,7 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
             className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
             style={{
               backgroundColor: "var(--bg-secondary)",
-              borderColor: "var(--border-color)",
-            }}
+              borderColor: "var(--border-color)" }}
             onClick={() => {
               setLightboxIndex(index);
               setLightboxOpen(true);
