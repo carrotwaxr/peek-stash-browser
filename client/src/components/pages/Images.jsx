@@ -80,6 +80,16 @@ const Images = () => {
     setLightboxOpen(true);
   };
 
+  // Handle O counter change from card - update local state
+  const handleOCounterChange = (imageId, newCount) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, oCounter: newCount } : img
+      ),
+    }));
+  };
+
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
@@ -151,6 +161,7 @@ const Images = () => {
                       onClick={() => handleImageClick(image)}
                       referrerUrl={`${location.pathname}${location.search}`}
                       tabIndex={isTVMode ? itemProps.tabIndex : -1}
+                      onOCounterChange={handleOCounterChange}
                       {...itemProps}
                     />
                   );
@@ -166,16 +177,30 @@ const Images = () => {
             isOpen={lightboxOpen}
             images={currentImages.map((img) => ({
               id: img.id,
-              src: img.paths?.image || `/api/proxy/image/${img.id}/image`,
-              thumbnail: img.paths?.thumbnail || `/api/proxy/image/${img.id}/thumbnail`,
+              paths: {
+                image: img.paths?.image || `/api/proxy/image/${img.id}/image`,
+                preview: img.paths?.preview || img.paths?.thumbnail,
+                thumbnail: img.paths?.thumbnail || `/api/proxy/image/${img.id}/thumbnail`,
+              },
               title: img.title,
               width: img.width,
               height: img.height,
               rating100: img.rating100,
               favorite: img.favorite,
+              oCounter: img.oCounter ?? 0,
             }))}
             initialIndex={lightboxIndex}
             onClose={() => setLightboxOpen(false)}
+            onImagesUpdate={(updatedImages) => {
+              // Sync updated images back to page state
+              setData((prev) => ({
+                ...prev,
+                images: prev.images.map((img) => {
+                  const updated = updatedImages.find((u) => u.id === img.id);
+                  return updated ? { ...img, ...updated } : img;
+                }),
+              }));
+            }}
           />
         )}
       </div>

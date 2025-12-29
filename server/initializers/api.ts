@@ -29,6 +29,7 @@ import syncRoutes from "../routes/sync.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
+import imageViewHistoryRoutes from "../routes/imageViewHistory.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -125,6 +126,9 @@ export const setupAPI = () => {
 
   // Watch history routes (protected)
   app.use("/api/watch-history", watchHistoryRoutes);
+
+  // Image view history routes (protected)
+  app.use("/api/image-view-history", imageViewHistoryRoutes);
 
   // Rating and favorite routes (protected)
   app.use("/api/ratings", ratingsRoutes);

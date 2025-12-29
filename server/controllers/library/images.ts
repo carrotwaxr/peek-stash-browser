@@ -8,13 +8,17 @@ import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
- * Merge images with user rating/favorite data
+ * Merge images with user rating/favorite data and O counter
  */
 async function mergeImagesWithUserData(
   images: any[],
   userId: number
 ): Promise<any[]> {
-  const ratings = await prisma.imageRating.findMany({ where: { userId } });
+  // Fetch ratings and view history in parallel
+  const [ratings, viewHistories] = await Promise.all([
+    prisma.imageRating.findMany({ where: { userId } }),
+    prisma.imageViewHistory.findMany({ where: { userId } }),
+  ]);
 
   const ratingMap = new Map(
     ratings.map((r) => [
@@ -27,12 +31,25 @@ async function mergeImagesWithUserData(
     ])
   );
 
+  const viewHistoryMap = new Map(
+    viewHistories.map((vh) => [
+      vh.imageId,
+      {
+        oCounter: vh.oCount,
+        viewCount: vh.viewCount,
+      },
+    ])
+  );
+
   return images.map((image) => ({
     ...image,
     rating: null,
     rating100: image.rating100 ?? null,
     favorite: false,
+    oCounter: 0,
+    viewCount: 0,
     ...ratingMap.get(image.id),
+    ...viewHistoryMap.get(image.id),
   }));
 }
 

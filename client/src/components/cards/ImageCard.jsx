@@ -33,7 +33,7 @@ const getImageTitle = (image) => {
  * Supports onClick for lightbox integration
  */
 const ImageCard = forwardRef(
-  ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, ...rest }, ref) => {
+  ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, ...rest }, ref) => {
     // Build subtitle from gallery and date
     const imageDate = image.date
       ? new Date(image.date).toLocaleDateString()
@@ -138,12 +138,14 @@ const ImageCard = forwardRef(
         indicators={indicators}
         maxTitleLines={2}
         ratingControlsProps={
-          image.rating100 !== undefined || image.favorite !== undefined
+          image.rating100 !== undefined || image.favorite !== undefined || image.oCounter !== undefined
             ? {
                 entityId: image.id,
                 initialRating: image.rating100,
                 initialFavorite: image.favorite || false,
+                initialOCounter: image.oCounter ?? 0,
                 onHideSuccess,
+                onOCounterChange,
               }
             : undefined
         }

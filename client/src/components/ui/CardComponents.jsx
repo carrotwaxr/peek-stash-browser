@@ -408,8 +408,9 @@ export const CardIndicators = ({ indicators }) => {
 /**
  * Card rating and favorite row (always fixed height for consistency)
  * Shows rating badge (left), O counter (center-right), and favorite button (right)
- * O Counter is interactive for scenes, display-only for other entities
+ * O Counter is interactive for scenes and images, display-only for other entities
  * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
+ * @param {Function} onOCounterChange - Callback when O counter changes (for parent to update state)
  */
 export const CardRatingRow = ({
   entityType,
@@ -419,6 +420,7 @@ export const CardRatingRow = ({
   initialOCounter,
   entityTitle,
   onHideSuccess,
+  onOCounterChange,
 }) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
@@ -464,6 +466,8 @@ export const CardRatingRow = ({
 
   const handleOCounterChange = (newCount) => {
     setOCounter(newCount);
+    // Notify parent of the change
+    onOCounterChange?.(entityId, newCount);
   };
 
   const handleHideClick = async (hideInfo) => {
@@ -507,8 +511,8 @@ export const CardRatingRow = ({
     setPendingHide(null);
   };
 
-  // Check if this is a scene (only scenes allow interactive O counter)
-  const isScene = entityType === "scene";
+  // Check if this is a scene or image (both allow interactive O counter)
+  const isSceneOrImage = entityType === "scene" || entityType === "image";
 
   return (
     <>
@@ -528,12 +532,13 @@ export const CardRatingRow = ({
         {/* Right side: O Counter + Favorite + EntityMenu */}
         <div className="flex items-center gap-2">
           <OCounterButton
-            sceneId={isScene ? entityId : null}
+            sceneId={entityType === "scene" ? entityId : null}
+            imageId={entityType === "image" ? entityId : null}
             initialCount={oCounter ?? 0}
             onChange={handleOCounterChange}
             size="small"
             variant="card"
-            interactive={isScene}
+            interactive={isSceneOrImage}
           />
           <FavoriteButton
             isFavorite={isFavorite}
