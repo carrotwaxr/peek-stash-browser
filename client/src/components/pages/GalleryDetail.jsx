@@ -98,11 +98,10 @@ const GalleryDetail = () => {
     setRating: handleRatingChange,
     toggleFavorite });
 
-  // Check if there's any sidebar content to display
+  // Check if there's any sidebar content to display (tags moved to main content)
   const hasSidebarContent =
     gallery &&
-    ((gallery.tags && gallery.tags.length > 0) ||
-      (gallery.scenes && gallery.scenes.length > 0) ||
+    ((gallery.scenes && gallery.scenes.length > 0) ||
       gallery.details);
 
   if (isLoading) {
@@ -265,6 +264,19 @@ const GalleryDetail = () => {
               </div>
             </div>
           )}
+
+          {/* Tags Row */}
+          {gallery.tags && gallery.tags.length > 0 && (
+            <div className="mt-6">
+              <h3
+                className="text-sm font-medium mb-3"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Tags
+              </h3>
+              <TagChips tags={gallery.tags} />
+            </div>
+          )}
         </div>
 
         {/* Images Grid - Conditional sidebar layout */}
@@ -320,13 +332,6 @@ const GalleryDetail = () => {
           {/* Sidebar - Metadata (only render if there's content) */}
           {hasSidebarContent && (
             <aside className="space-y-4">
-              {/* Tags */}
-              {gallery.tags && gallery.tags.length > 0 && (
-                <Card title="Tags">
-                  <TagChips tags={gallery.tags} />
-                </Card>
-              )}
-
               {/* Linked Scenes */}
               {gallery.scenes && gallery.scenes.length > 0 && (
                 <Card title="Related Scenes">
