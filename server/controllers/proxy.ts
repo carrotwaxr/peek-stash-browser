@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import http from "http";
 import https from "https";
 import { URL } from "url";
+import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
 
@@ -341,6 +342,120 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
   } catch (error) {
     releaseConcurrencySlot();
     logger.error("Error proxying Stash media", { error });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  }
+};
+
+/**
+ * Proxy image requests by image ID and type
+ * GET /api/proxy/image/:imageId/:type
+ * :type = "thumbnail" | "preview" | "image"
+ */
+export const proxyImage = async (req: Request, res: Response) => {
+  const { imageId, type } = req.params;
+
+  if (!imageId) {
+    return res.status(400).json({ error: "Missing image ID" });
+  }
+
+  const validTypes = ["thumbnail", "preview", "image"];
+  if (!type || !validTypes.includes(type)) {
+    return res.status(400).json({ error: "Invalid image type. Must be: thumbnail, preview, or image" });
+  }
+
+  // Get image from database
+  const image = await prisma.stashImage.findFirst({
+    where: { id: imageId, deletedAt: null },
+  });
+
+  if (!image) {
+    return res.status(404).json({ error: "Image not found" });
+  }
+
+  // Get the appropriate path
+  const pathMap: Record<string, string | null> = {
+    thumbnail: image.pathThumbnail,
+    preview: image.pathPreview,
+    image: image.pathImage,
+  };
+  const stashPath = pathMap[type];
+
+  if (!stashPath) {
+    return res.status(404).json({ error: `Image ${type} path not available` });
+  }
+
+  let stashUrl: string;
+  let apiKey: string;
+
+  try {
+    stashUrl = stashInstanceManager.getBaseUrl();
+    apiKey = stashInstanceManager.getApiKey();
+  } catch {
+    logger.error("No Stash instance configured");
+    return res.status(500).json({ error: "Stash configuration missing" });
+  }
+
+  // Acquire concurrency slot before making request
+  await acquireConcurrencySlot();
+
+  try {
+    // Construct full Stash URL with API key
+    // Note: stashPath may already be a full URL (stored from Stash API response)
+    // or it could be a relative path - handle both cases
+    let fullUrl: string;
+    if (stashPath.startsWith("http://") || stashPath.startsWith("https://")) {
+      // Already a full URL, just append API key
+      fullUrl = `${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
+    } else {
+      // Relative path, prepend base URL
+      fullUrl = `${stashUrl}${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
+    }
+
+    logger.debug("Proxying image request", {
+      imageId,
+      type,
+      url: fullUrl.replace(apiKey, "***"),
+    });
+
+    const urlObj = new URL(fullUrl);
+    const httpModule = urlObj.protocol === "https:" ? https : http;
+    const agent = getAgentForUrl(urlObj);
+
+    const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
+      if (proxyRes.headers["content-type"]) {
+        res.setHeader("Content-Type", proxyRes.headers["content-type"]);
+      }
+      if (proxyRes.headers["content-length"]) {
+        res.setHeader("Content-Length", proxyRes.headers["content-length"]);
+      }
+      // Cache images for 24 hours
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.status(proxyRes.statusCode || 200);
+      proxyRes.pipe(res);
+      proxyRes.on("end", releaseConcurrencySlot);
+      proxyRes.on("error", releaseConcurrencySlot);
+    });
+
+    proxyReq.on("error", (error: Error) => {
+      releaseConcurrencySlot();
+      logger.error("Error proxying image", { imageId, type, error: error.message });
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Proxy request failed" });
+      }
+    });
+
+    proxyReq.setTimeout(30000, () => {
+      releaseConcurrencySlot();
+      proxyReq.destroy();
+      if (!res.headersSent) {
+        res.status(504).json({ error: "Proxy request timeout" });
+      }
+    });
+  } catch (error) {
+    releaseConcurrencySlot();
+    logger.error("Error proxying image", { error });
     if (!res.headersSent) {
       res.status(500).json({ error: "Internal server error" });
     }

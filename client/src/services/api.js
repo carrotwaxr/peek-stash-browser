@@ -626,3 +626,29 @@ const ratingsApi = {
   updateImageRating: (imageId, data) =>
     apiPut(`/ratings/image/${imageId}`, data),
 };
+
+/**
+ * Image View History API
+ */
+export const imageViewHistoryApi = {
+  /**
+   * Increment O counter for an image
+   * @param {string} imageId - Image ID
+   * @returns {Promise<{success: boolean, oCount: number, timestamp: string}>}
+   */
+  incrementO: (imageId) => apiPost("/image-view-history/increment-o", { imageId }),
+
+  /**
+   * Record image view
+   * @param {string} imageId - Image ID
+   * @returns {Promise<{success: boolean, viewCount: number, lastViewedAt: string}>}
+   */
+  recordView: (imageId) => apiPost("/image-view-history/view", { imageId }),
+
+  /**
+   * Get view history for specific image
+   * @param {string} imageId - Image ID
+   * @returns {Promise<Object>} View history object
+   */
+  getViewHistory: (imageId) => apiGet(`/image-view-history/${imageId}`),
+};

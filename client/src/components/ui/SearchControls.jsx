@@ -10,6 +10,8 @@ import {
   GALLERY_SORT_OPTIONS,
   GROUP_FILTER_OPTIONS,
   GROUP_SORT_OPTIONS,
+  IMAGE_FILTER_OPTIONS,
+  IMAGE_SORT_OPTIONS,
   PERFORMER_FILTER_OPTIONS,
   PERFORMER_SORT_OPTIONS,
   SCENE_FILTER_OPTIONS,
@@ -22,6 +24,7 @@ import {
   TAG_SORT_OPTIONS,
   buildGalleryFilter,
   buildGroupFilter,
+  buildImageFilter,
   buildPerformerFilter,
   buildSceneFilter,
   buildStudioFilter,
@@ -51,6 +54,8 @@ const buildFilter = (artifactType, filters, unitPreference) => {
       return { group_filter: buildGroupFilter(filters) };
     case "gallery":
       return { gallery_filter: buildGalleryFilter(filters) };
+    case "image":
+      return { image_filter: buildImageFilter(filters) };
     case "scene":
     default:
       return { scene_filter: buildSceneFilter(filters) };
@@ -69,6 +74,8 @@ const getSortOptions = (artifactType) => {
       return GROUP_SORT_OPTIONS;
     case "gallery":
       return GALLERY_SORT_OPTIONS;
+    case "image":
+      return IMAGE_SORT_OPTIONS;
     case "scene":
     default:
       return SCENE_SORT_OPTIONS;
@@ -205,6 +212,8 @@ const SearchControls = ({
         return [...GROUP_FILTER_OPTIONS];
       case "gallery":
         return [...GALLERY_FILTER_OPTIONS];
+      case "image":
+        return [...IMAGE_FILTER_OPTIONS];
       case "scene":
       default:
         return [...SCENE_FILTER_OPTIONS];

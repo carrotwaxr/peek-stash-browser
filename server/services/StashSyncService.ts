@@ -1746,6 +1746,8 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(gallery.details)},
       ${this.escapeNullable(gallery.url)},
       ${this.escapeNullable(gallery.code)},
+      ${this.escapeNullable((gallery as any).photographer)},
+      ${this.escapeNullable((gallery as any).urls ? JSON.stringify((gallery as any).urls) : null)},
       ${this.escapeNullable(folder?.path)},
       ${this.escapeNullable(fileBasename)},
       ${this.escapeNullable(gallery.paths?.cover)},
@@ -1760,7 +1762,7 @@ class StashSyncService extends EventEmitter {
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashGallery (
       id, stashInstanceId, title, date, studioId, rating100, imageCount,
-      details, url, code, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
+      details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
@@ -1772,6 +1774,8 @@ class StashSyncService extends EventEmitter {
       details = excluded.details,
       url = excluded.url,
       code = excluded.code,
+      photographer = excluded.photographer,
+      urls = excluded.urls,
       folderPath = excluded.folderPath,
       fileBasename = excluded.fileBasename,
       coverPath = excluded.coverPath,
@@ -1958,12 +1962,16 @@ class StashSyncService extends EventEmitter {
 
     // Build bulk image upsert
     const values = validImages.map((image: any) => {
-      const visualFile = image.visual_files?.[0];
+      const visualFile = image.visual_files?.[0] || image.files?.[0];
       const paths = image.paths;
       return `(
         '${this.escape(image.id)}',
         ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : 'NULL'},
         ${this.escapeNullable(image.title)},
+        ${this.escapeNullable(image.code)},
+        ${this.escapeNullable(image.details)},
+        ${this.escapeNullable(image.photographer)},
+        ${this.escapeNullable(image.urls ? JSON.stringify(image.urls) : null)},
         ${this.escapeNullable(image.date)},
         ${image.studio?.id ? `'${this.escape(image.studio.id)}'` : 'NULL'},
         ${image.rating100 ?? 'NULL'},
@@ -1985,12 +1993,16 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
       INSERT INTO StashImage (
-        id, stashInstanceId, title, date, studioId, rating100, oCounter, organized,
+        id, stashInstanceId, title, code, details, photographer, urls, date, studioId, rating100, oCounter, organized,
         filePath, width, height, fileSize, pathThumbnail, pathPreview, pathImage,
         stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
       ) VALUES ${values}
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
+        code = excluded.code,
+        details = excluded.details,
+        photographer = excluded.photographer,
+        urls = excluded.urls,
         date = excluded.date,
         studioId = excluded.studioId,
         rating100 = excluded.rating100,

@@ -19,12 +19,12 @@ export function getStashBaseUrl(): string | null {
 
 /**
  * Builds a Stash entity URL
- * @param entityType - Type of entity (scene, performer, studio, tag, group, gallery)
+ * @param entityType - Type of entity (scene, performer, studio, tag, group, gallery, image)
  * @param entityId - ID of the entity
  * @returns Full URL to the entity in Stash, or null if stashBaseUrl is not available
  */
 export function buildStashEntityUrl(
-  entityType: 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery',
+  entityType: 'scene' | 'performer' | 'studio' | 'tag' | 'group' | 'gallery' | 'image',
   entityId: string | number
 ): string | null {
   const baseUrl = getStashBaseUrl();
@@ -41,6 +41,7 @@ export function buildStashEntityUrl(
     tag: 'tags',
     group: 'groups',
     gallery: 'galleries',
+    image: 'images',
   };
 
   const path = pathMap[entityType];

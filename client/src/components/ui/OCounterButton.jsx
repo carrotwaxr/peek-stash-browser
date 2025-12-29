@@ -4,18 +4,20 @@ import { apiPost } from "../../services/api.js";
 
 /**
  * Interactive O Counter button component
- * Displays current O counter value and increments on click (scenes only)
- * For non-scene entities, displays as read-only indicator
+ * Displays current O counter value and increments on click (scenes and images)
+ * For other entities, displays as read-only indicator
  *
- * @param {string} sceneId - Stash scene ID (required for interactive mode)
+ * @param {string} sceneId - Stash scene ID (for scene interactive mode)
+ * @param {string} imageId - Stash image ID (for image interactive mode)
  * @param {number} initialCount - Initial O counter value
  * @param {Function} onChange - Optional callback after successful increment (receives new count)
  * @param {string} size - Size variant: small, medium, large
- * @param {string} variant - Style variant: card (transparent), page (with background)
- * @param {boolean} interactive - Enable click-to-increment (default: true if sceneId provided)
+ * @param {string} variant - Style variant: card (transparent), page (with background), lightbox
+ * @param {boolean} interactive - Enable click-to-increment (default: true if sceneId or imageId provided)
  */
 const OCounterButton = ({
   sceneId,
+  imageId,
   initialCount = 0,
   onChange,
   size = "small",
@@ -40,13 +42,17 @@ const OCounterButton = ({
 
   const config = sizes[size] || sizes.small;
 
+  // Determine which entity ID to use
+  const entityId = sceneId || imageId;
+  const entityType = sceneId ? "scene" : imageId ? "image" : null;
+
   const handleClick = async (e) => {
     // Stop propagation to prevent triggering parent click handlers
     e.preventDefault();
     e.stopPropagation();
 
-    // Only allow incrementing for scenes with interactive mode
-    if (!interactive || isUpdating || !sceneId) {
+    // Only allow incrementing for scenes/images with interactive mode
+    if (!interactive || isUpdating || !entityId) {
       return;
     }
 
@@ -56,14 +62,19 @@ const OCounterButton = ({
     setIsUpdating(true);
 
     try {
-      const response = await apiPost("/watch-history/increment-o", { sceneId });
+      let response;
+      if (sceneId) {
+        response = await apiPost("/watch-history/increment-o", { sceneId });
+      } else if (imageId) {
+        response = await apiPost("/image-view-history/increment-o", { imageId });
+      }
 
-      if (response.success) {
+      if (response?.success) {
         setCount(response.oCount); // Update with server value
         onChange?.(response.oCount);
       }
     } catch (err) {
-      console.error("Error incrementing O counter:", err);
+      console.error(`Error incrementing O counter for ${entityType}:`, err);
       setCount(count); // Revert on error
     } finally {
       setTimeout(() => {
@@ -82,10 +93,10 @@ const OCounterButton = ({
       }`}
       style={{
         backgroundColor:
-          variant === "card" ? "transparent" : "var(--bg-tertiary)",
-        border: variant === "card" ? "none" : "1px solid var(--border-color)",
+          variant === "card" || variant === "lightbox" ? "transparent" : "var(--bg-tertiary)",
+        border: variant === "card" || variant === "lightbox" ? "none" : "1px solid var(--border-color)",
         cursor:
-          interactive && sceneId
+          interactive && entityId
             ? isUpdating
               ? "not-allowed"
               : "pointer"
@@ -93,12 +104,12 @@ const OCounterButton = ({
         opacity: isUpdating ? 0.7 : 1,
       }}
       aria-label={
-        interactive && sceneId
+        interactive && entityId
           ? `Increment O counter (current: ${count})`
           : `O Counter: ${count}`
       }
       title={
-        interactive && sceneId
+        interactive && entityId
           ? `O Counter: ${count} (click to increment)`
           : `O Counter: ${count}`
       }

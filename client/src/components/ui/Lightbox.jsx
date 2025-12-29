@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Clock, Pause, Play, X } from "lucide-react";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { libraryApi } from "../../services/api.js";
+import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
 import FavoriteButton from "./FavoriteButton.jsx";
+import OCounterButton from "./OCounterButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
 import RatingSliderDialog from "./RatingSliderDialog.jsx";
 
@@ -20,9 +21,10 @@ const Lightbox = ({
   const [intervalDuration, setIntervalDuration] = useState(5000); // Default 5 seconds
   const intervalRef = useRef(null);
 
-  // Rating and favorite state for current image
+  // Rating, favorite, and O counter state for current image
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [oCounter, setOCounter] = useState(0);
 
   // Rating popover state
   const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
@@ -130,7 +132,28 @@ const Lightbox = ({
     [images, currentIndex, isFavorite, onImagesUpdate]
   );
 
-  // Update rating/favorite when image changes
+  // Handle O counter change
+  const handleOCounterChange = useCallback(
+    (newCount) => {
+      const currentImage = images[currentIndex];
+      if (!currentImage?.id) return;
+
+      setOCounter(newCount);
+
+      // Update the images array so navigation preserves the change
+      const updatedImages = [...images];
+      updatedImages[currentIndex] = {
+        ...currentImage,
+        oCounter: newCount,
+      };
+      if (onImagesUpdate) {
+        onImagesUpdate(updatedImages);
+      }
+    },
+    [images, currentIndex, onImagesUpdate]
+  );
+
+  // Update rating/favorite/oCounter when image changes
   useEffect(() => {
     const currentImage = images[currentIndex];
     // Note: Images from Stash don't have rating/favorite fields by default
@@ -138,7 +161,19 @@ const Lightbox = ({
     // For now, set to defaults (will be updated when user interacts)
     setRating(currentImage?.rating100 ?? null);
     setIsFavorite(currentImage?.favorite ?? false);
+    setOCounter(currentImage?.oCounter ?? 0);
   }, [currentIndex, images]);
+
+  // Track image view when image changes in lightbox
+  useEffect(() => {
+    const currentImage = images[currentIndex];
+    if (!currentImage?.id || !isOpen) return;
+
+    // Record the view (fire and forget - don't block UI)
+    imageViewHistoryApi.recordView(currentImage.id).catch((err) => {
+      console.error("Failed to record image view:", err);
+    });
+  }, [currentIndex, images, isOpen]);
 
   // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
   useRatingHotkeys({
@@ -351,6 +386,18 @@ const Lightbox = ({
             onChange={handleFavoriteChange}
             size="medium"
             variant="lightbox"
+          />
+        </div>
+
+        {/* O Counter Button */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <OCounterButton
+            imageId={images[currentIndex]?.id}
+            initialCount={oCounter}
+            onChange={handleOCounterChange}
+            size="medium"
+            variant="lightbox"
+            interactive={true}
           />
         </div>
       </div>

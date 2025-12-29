@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
+  proxyImage,
   proxyScenePreview,
   proxySceneWebp,
   proxyStashMedia,
@@ -28,6 +29,7 @@ import syncRoutes from "../routes/sync.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
+import imageViewHistoryRoutes from "../routes/imageViewHistory.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -101,6 +103,9 @@ export const setupAPI = () => {
   app.get("/api/proxy/scene/:id/preview", proxyScenePreview);
   app.get("/api/proxy/scene/:id/webp", proxySceneWebp);
 
+  // Image proxy route (public - no auth for performance)
+  app.get("/api/proxy/image/:imageId/:type", proxyImage);
+
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
 
@@ -121,6 +126,9 @@ export const setupAPI = () => {
 
   // Watch history routes (protected)
   app.use("/api/watch-history", watchHistoryRoutes);
+
+  // Image view history routes (protected)
+  app.use("/api/image-view-history", imageViewHistoryRoutes);
 
   // Rating and favorite routes (protected)
   app.use("/api/ratings", ratingsRoutes);

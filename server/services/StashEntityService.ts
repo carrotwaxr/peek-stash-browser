@@ -1122,22 +1122,42 @@ class StashEntityService {
   // ==================== Image Queries ====================
 
   /**
-   * Get all images from cache
+   * Image includes for relations
+   */
+  private readonly imageIncludes = {
+    performers: { include: { performer: true } },
+    tags: { include: { tag: true } },
+    galleries: {
+      include: {
+        gallery: {
+          include: {
+            performers: { include: { performer: true } },
+            tags: { include: { tag: true } },
+          },
+        },
+      },
+    },
+  };
+
+  /**
+   * Get all images from cache with relations
    */
   async getAllImages(): Promise<any[]> {
     const cached = await prisma.stashImage.findMany({
       where: { deletedAt: null },
+      include: this.imageIncludes,
     });
 
     return cached.map((c) => this.transformImage(c));
   }
 
   /**
-   * Get image by ID
+   * Get image by ID with relations
    */
   async getImage(id: string): Promise<any | null> {
     const cached = await prisma.stashImage.findFirst({
       where: { id, deletedAt: null },
+      include: this.imageIncludes,
     });
 
     if (!cached) return null;
@@ -1145,7 +1165,7 @@ class StashEntityService {
   }
 
   /**
-   * Get images by IDs
+   * Get images by IDs with relations
    */
   async getImagesByIds(ids: string[]): Promise<any[]> {
     const cached = await prisma.stashImage.findMany({
@@ -1153,6 +1173,7 @@ class StashEntityService {
         id: { in: ids },
         deletedAt: null,
       },
+      include: this.imageIncludes,
     });
 
     return cached.map((c) => this.transformImage(c));
@@ -1665,14 +1686,50 @@ class StashEntityService {
   }
 
   private transformImage(image: any): any {
+    // Transform performers from junction table
+    const performers = (image.performers ?? []).map((ip: any) => ({
+      id: ip.performer.id,
+      name: ip.performer.name,
+    }));
+
+    // Transform tags from junction table
+    const tags = (image.tags ?? []).map((it: any) => ({
+      id: it.tag.id,
+      name: it.tag.name,
+    }));
+
+    // Transform galleries from junction table (with their performers/tags for inheritance)
+    const galleries = (image.galleries ?? []).map((ig: any) => ({
+      id: ig.gallery.id,
+      title: ig.gallery.title,
+      studioId: ig.gallery.studioId,
+      performers: (ig.gallery.performers ?? []).map((gp: any) => ({
+        id: gp.performer.id,
+        name: gp.performer.name,
+      })),
+      tags: (ig.gallery.tags ?? []).map((gt: any) => ({
+        id: gt.tag.id,
+        name: gt.tag.name,
+      })),
+    }));
+
     return {
       id: image.id,
       title: image.title,
+      code: image.code,
+      details: image.details,
+      photographer: image.photographer,
+      urls: image.urls ? JSON.parse(image.urls) : [],
       date: image.date,
       studio: image.studioId ? { id: image.studioId } : null,
+      studioId: image.studioId,
       rating100: image.rating100,
       o_counter: image.oCounter ?? 0,
       organized: image.organized ?? false,
+      filePath: image.filePath,
+      width: image.width,
+      height: image.height,
+      fileSize: image.fileSize ? Number(image.fileSize) : null,
       files: image.filePath ? [{
         path: image.filePath,
         width: image.width,
@@ -1680,12 +1737,17 @@ class StashEntityService {
         size: image.fileSize ? Number(image.fileSize) : null,
       }] : [],
       paths: {
-        thumbnail: this.transformUrl(image.pathThumbnail),
-        preview: this.transformUrl(image.pathPreview),
-        image: this.transformUrl(image.pathImage),
+        thumbnail: `/api/proxy/image/${image.id}/thumbnail`,
+        preview: `/api/proxy/image/${image.id}/preview`,
+        image: `/api/proxy/image/${image.id}/image`,
       },
+      performers,
+      tags,
+      galleries,
       created_at: image.stashCreatedAt?.toISOString() ?? null,
       updated_at: image.stashUpdatedAt?.toISOString() ?? null,
+      stashCreatedAt: image.stashCreatedAt?.toISOString() ?? null,
+      stashUpdatedAt: image.stashUpdatedAt?.toISOString() ?? null,
     };
   }
 

@@ -44,6 +44,7 @@ model User {
   galleryRatings   GalleryRating[]
   groupRatings     GroupRating[]
   imageRatings     ImageRating[]
+  imageViewHistory ImageViewHistory[]
 
   // Content restrictions
   contentRestrictions UserContentRestriction[]
@@ -257,6 +258,31 @@ model ImageRating {
   @@index([imageId])
   @@index([favorite])
   @@index([rating])
+}
+
+model ImageViewHistory {
+  id      Int    @id @default(autoincrement())
+  userId  Int
+  imageId String // Stash image ID
+
+  // View tracking (incremented when image is viewed in Lightbox)
+  viewCount   Int      @default(0)
+  viewHistory Json     @default("[]") // Array of timestamp strings
+
+  // O Counter tracking (syncs with Stash)
+  oCount   Int  @default(0)
+  oHistory Json @default("[]") // Array of timestamp strings
+
+  lastViewedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, imageId])
+  @@index([userId])
+  @@index([imageId])
+  @@index([lastViewedAt])
 }
 
 model UserContentRestriction {
@@ -668,9 +694,11 @@ model StashGallery {
   imageCount Int @default(0)
 
   // === Extended fields ===
-  details String? // Gallery description
-  url     String? // Gallery URL
-  code    String? // Gallery code
+  details      String? // Gallery description
+  url          String? // Gallery URL (deprecated)
+  code         String? // Gallery code
+  photographer String?
+  urls         String? // JSON array of URLs
 
   // === File metadata ===
   folderPath   String? // Folder path if folder-based
@@ -704,12 +732,16 @@ model StashImage {
   stashInstanceId String?
 
   // === Core fields ===
-  title     String?
-  date      String?
-  studioId  String?
-  rating100 Int?
-  oCounter  Int     @default(0)
-  organized Boolean @default(false)
+  title        String?
+  code         String?
+  details      String?
+  photographer String?
+  urls         String? // JSON array of URLs
+  date         String?
+  studioId     String?
+  rating100    Int?
+  oCounter     Int     @default(0)
+  organized    Boolean @default(false)
 
   // === File metadata ===
   filePath String? // Image file path
@@ -738,6 +770,8 @@ model StashImage {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@index([title])
+  @@index([deletedAt, stashCreatedAt(sort: Desc)])
 }
 
 // Junction tables for efficient many-to-many queries
