@@ -1275,6 +1275,14 @@ export const IMAGE_FILTER_OPTIONS = [
     defaultValue: false,
     placeholder: "Favorites Only",
   },
+  {
+    key: "oCounter",
+    label: "O Count",
+    type: "range",
+    defaultValue: {},
+    min: 0,
+    max: 1000,
+  },
 ];
 
 /**
@@ -2752,6 +2760,27 @@ export const buildImageFilter = (filters) => {
       value: filters.galleryIds.map(String),
       modifier: filters.galleryIdsModifier || "INCLUDES",
     };
+  }
+
+  // O Counter filter
+  if (filters.oCounter?.min !== undefined || filters.oCounter?.max !== undefined) {
+    imageFilter.o_counter = {};
+    const hasMin =
+      filters.oCounter.min !== undefined && filters.oCounter.min !== "";
+    const hasMax =
+      filters.oCounter.max !== undefined && filters.oCounter.max !== "";
+
+    if (hasMin && hasMax) {
+      imageFilter.o_counter.modifier = "BETWEEN";
+      imageFilter.o_counter.value = parseInt(filters.oCounter.min);
+      imageFilter.o_counter.value2 = parseInt(filters.oCounter.max);
+    } else if (hasMin) {
+      imageFilter.o_counter.modifier = "GREATER_THAN";
+      imageFilter.o_counter.value = parseInt(filters.oCounter.min) - 1;
+    } else if (hasMax) {
+      imageFilter.o_counter.modifier = "LESS_THAN";
+      imageFilter.o_counter.value = parseInt(filters.oCounter.max) + 1;
+    }
   }
 
   return imageFilter;

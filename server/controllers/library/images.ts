@@ -91,6 +91,20 @@ async function applyImageFiltersWithInheritance(
     });
   }
 
+  // Filter by o_counter
+  if (filters?.o_counter) {
+    const { modifier, value, value2 } = filters.o_counter;
+    filtered = filtered.filter((img) => {
+      const oCounter = img.oCounter ?? img.o_counter ?? 0;
+      if (modifier === "GREATER_THAN") return oCounter > value;
+      if (modifier === "LESS_THAN") return oCounter < value;
+      if (modifier === "EQUALS") return oCounter === value;
+      if (modifier === "NOT_EQUALS") return oCounter !== value;
+      if (modifier === "BETWEEN") return oCounter >= value && oCounter <= value2;
+      return true;
+    });
+  }
+
   // Filter by performers (with gallery-umbrella inheritance)
   if (filters?.performers?.value) {
     const performerIds = new Set(filters.performers.value.map(String));
@@ -213,8 +227,8 @@ function sortImages(
         bVal = b.rating100 || 0;
         break;
       case "o_counter":
-        aVal = a.o_counter || 0;
-        bVal = b.o_counter || 0;
+        aVal = a.oCounter ?? a.o_counter ?? 0;
+        bVal = b.oCounter ?? b.o_counter ?? 0;
         break;
       case "filesize":
         aVal = Number(a.fileSize) || 0;
