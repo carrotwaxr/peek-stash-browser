@@ -110,11 +110,15 @@ const PlaylistDetail = () => {
       await api.delete(
         `/playlists/${playlistId}/items/${sceneToRemove.sceneId}`
       );
+      // Optimistically update local state instead of refetching
+      setScenes((prev) =>
+        prev.filter((item) => item.sceneId !== sceneToRemove.sceneId)
+      );
       showSuccess("Scene removed from playlist");
-      loadPlaylist();
     } catch {
       showError("Failed to remove scene from playlist");
     } finally {
+      setRemoveConfirmOpen(false);
       setSceneToRemove(null);
     }
   };
