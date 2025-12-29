@@ -157,13 +157,26 @@ async function applyImageFiltersWithInheritance(
 
 /**
  * Sort images by field and direction
+ * Supports random_<seed> format for stable pagination
  */
 function sortImages(
   images: any[],
   sortField: string,
-  sortDirection: string
+  sortDirection: string,
+  randomSeed?: number
 ): any[] {
   const direction = sortDirection === "DESC" ? -1 : 1;
+
+  // For random sort with seed, use Stash's formula for consistent ordering
+  if (sortField === "random" && randomSeed !== undefined) {
+    return images.sort((a, b) => {
+      // Use Stash's random sort formula: (id * seed) % large_prime
+      // This gives stable, reproducible random ordering
+      const aHash = (parseInt(a.id, 10) * randomSeed) % 2147483647;
+      const bHash = (parseInt(b.id, 10) * randomSeed) % 2147483647;
+      return (aHash - bHash) * direction;
+    });
+  }
 
   return images.sort((a, b) => {
     let aVal, bVal;
@@ -203,6 +216,7 @@ function sortImages(
         bVal = b.stashUpdatedAt || b.updated_at || "";
         break;
       case "random":
+        // Fallback random without seed (unstable)
         return Math.random() - 0.5;
       default:
         aVal = (a.title || "").toLowerCase();
@@ -298,11 +312,27 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     const userId = req.user?.id;
     const { filter, image_filter, ids } = req.body;
 
-    const sortField = filter?.sort || "title";
+    const sortFieldRaw = filter?.sort || "title";
     const sortDirection = filter?.direction || "ASC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
+
+    // Parse random_<seed> format (e.g., "random_12345678")
+    let randomSeed: number | undefined;
+    let sortField = sortFieldRaw;
+
+    if (sortFieldRaw.startsWith("random_")) {
+      const seedStr = sortFieldRaw.slice(7); // Remove "random_" prefix
+      const parsedSeed = parseInt(seedStr, 10);
+      if (!isNaN(parsedSeed)) {
+        randomSeed = parsedSeed % 1e8; // Cap at 10^8 like Stash does
+        sortField = "random";
+      }
+    } else if (sortFieldRaw === "random") {
+      // Plain "random" without seed - generate time-based seed
+      randomSeed = (userId + Date.now()) % 1e8;
+    }
 
     // Step 1: Get all images from cache/database
     let images = await stashEntityService.getAllImages();
@@ -348,8 +378,8 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     // Step 5: Apply filters with gallery-umbrella inheritance
     images = await applyImageFiltersWithInheritance(images, image_filter, ids);
 
-    // Step 6: Sort
-    images = sortImages(images, sortField, sortDirection);
+    // Step 6: Sort (with random seed for stable pagination)
+    images = sortImages(images, sortField, sortDirection, randomSeed);
 
     // Step 7: Paginate
     const total = images.length;
