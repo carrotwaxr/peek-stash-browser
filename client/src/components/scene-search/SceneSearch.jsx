@@ -32,7 +32,7 @@ const SceneSearch = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();  // eslint-disable-line no-unused-vars
+  const [searchParams] = useSearchParams();
 
   const columns = useGridColumns("scenes");
 
