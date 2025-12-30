@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, Pause, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Info, Maximize, Minimize, Pause, Play, X } from "lucide-react";
+import { useSwipeable } from "react-swipeable";
+import { useFullscreen } from "../../hooks/useFullscreen.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
 import FavoriteButton from "./FavoriteButton.jsx";
+import MetadataDrawer from "./MetadataDrawer.jsx";
 import OCounterButton from "./OCounterButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
 import RatingSliderDialog from "./RatingSliderDialog.jsx";
@@ -29,6 +32,12 @@ const Lightbox = ({
   // Rating popover state
   const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
   const ratingBadgeRef = useRef(null);
+
+  // New state for enhanced features
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { isFullscreen, toggleFullscreen, supportsFullscreen } = useFullscreen();
+  const controlsTimeoutRef = useRef(null);
 
   // Reset index when initialIndex changes
   useEffect(() => {
@@ -153,6 +162,47 @@ const Lightbox = ({
     [images, currentIndex, onImagesUpdate]
   );
 
+  // Auto-hide controls after inactivity
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = setTimeout(() => {
+      if (!drawerOpen && !isRatingPopoverOpen) {
+        setControlsVisible(false);
+      }
+    }, 3000);
+  }, [drawerOpen, isRatingPopoverOpen]);
+
+  // Reset auto-hide on mouse movement (desktop)
+  const handleMouseMove = useCallback(() => {
+    showControls();
+  }, [showControls]);
+
+  // Toggle controls on tap (mobile)
+  const handleTap = useCallback(() => {
+    setControlsVisible((prev) => !prev);
+  }, []);
+
+  // Swipe gesture handlers
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => goToNext(),
+    onSwipedRight: () => goToPrevious(),
+    onSwipedUp: () => setDrawerOpen(true),
+    onSwipedDown: () => {
+      if (drawerOpen) {
+        setDrawerOpen(false);
+      } else {
+        onClose();
+      }
+    },
+    onTap: handleTap,
+    delta: 50,
+    preventScrollOnSwipe: true,
+    trackMouse: false,
+  });
+
   // Update rating/favorite/oCounter when image changes
   useEffect(() => {
     const currentImage = images[currentIndex];
@@ -207,9 +257,18 @@ const Lightbox = ({
     if (!isOpen) return;
 
     const handleKeyDown = (e) => {
+      // Ignore if typing in an input
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
       switch (e.key) {
         case "Escape":
-          onClose();
+          if (drawerOpen) {
+            setDrawerOpen(false);
+          } else if (isFullscreen) {
+            // Browser handles fullscreen exit, but we track state
+          } else {
+            onClose();
+          }
           break;
         case "ArrowLeft":
           goToPrevious();
@@ -221,14 +280,32 @@ const Lightbox = ({
           e.preventDefault();
           toggleSlideshow();
           break;
+        case "i":
+        case "I":
+          setDrawerOpen((prev) => !prev);
+          break;
+        case "f":
+        case "F":
+          toggleFullscreen();
+          break;
         default:
           break;
       }
+      showControls();
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, goToPrevious, goToNext, toggleSlideshow]);
+  }, [isOpen, onClose, goToPrevious, goToNext, toggleSlideshow, drawerOpen, isFullscreen, toggleFullscreen, showControls]);
+
+  // Cleanup controls timeout
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Prevent body scroll when lightbox is open
   useEffect(() => {
@@ -251,28 +328,79 @@ const Lightbox = ({
 
   return (
     <div
+      {...swipeHandlers}
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{
         backgroundColor: "rgba(0, 0, 0, 0.95)",
       }}
+      onMouseMove={handleMouseMove}
       onClick={onClose}
     >
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 z-50 p-2 rounded-full transition-colors"
-        style={{
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          color: "var(--text-primary)",
-        }}
-        aria-label="Close lightbox"
+      {/* Top controls bar */}
+      <div
+        className={`absolute top-4 left-4 right-4 z-50 flex justify-between items-center transition-opacity duration-300 ${
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
       >
-        <X size={24} />
-      </button>
+        {/* Left side - empty for balance */}
+        <div />
+
+        {/* Right side controls */}
+        <div className="flex items-center gap-2">
+          {/* Info button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDrawerOpen(true);
+            }}
+            className="p-2 rounded-full transition-colors"
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              color: "var(--text-primary)",
+            }}
+            aria-label="Show image info"
+          >
+            <Info size={24} />
+          </button>
+
+          {/* Fullscreen button */}
+          {supportsFullscreen && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFullscreen();
+              }}
+              className="p-2 rounded-full transition-colors"
+              style={{
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                color: "var(--text-primary)",
+              }}
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
+            </button>
+          )}
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full transition-colors"
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              color: "var(--text-primary)",
+            }}
+            aria-label="Close lightbox"
+          >
+            <X size={24} />
+          </button>
+        </div>
+      </div>
 
       {/* Image counter - bottom left */}
       <div
-        className="absolute bottom-4 left-4 z-50 px-4 py-2 rounded-lg text-lg font-medium"
+        className={`absolute bottom-4 left-4 z-50 px-4 py-2 rounded-lg text-lg font-medium transition-opacity duration-300 ${
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
         style={{
           backgroundColor: "rgba(0, 0, 0, 0.5)",
           color: "var(--text-primary)",
@@ -282,7 +410,11 @@ const Lightbox = ({
       </div>
 
       {/* Compact controls - positioned to the right */}
-      <div className="absolute top-4 right-20 z-50 flex items-center gap-3">
+      <div
+        className={`absolute top-16 right-4 z-50 flex items-center gap-3 transition-opacity duration-300 ${
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
         {/* Play/Pause slideshow - icon only */}
         <button
           onClick={(e) => {
@@ -420,7 +552,9 @@ const Lightbox = ({
             e.stopPropagation();
             goToPrevious();
           }}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-50 p-3 rounded-full transition-colors"
+          className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 p-3 rounded-full transition-all duration-300 ${
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             color: "var(--text-primary)",
@@ -438,7 +572,9 @@ const Lightbox = ({
             e.stopPropagation();
             goToNext();
           }}
-          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-50 p-3 rounded-full transition-colors"
+          className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 p-3 rounded-full transition-all duration-300 ${
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             color: "var(--text-primary)",
@@ -481,7 +617,9 @@ const Lightbox = ({
       {/* Image title */}
       {imageTitle && (
         <div
-          className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-center max-w-[80vw]"
+          className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-center max-w-[80vw] transition-opacity duration-300 ${
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             color: "var(--text-primary)",
@@ -493,7 +631,9 @@ const Lightbox = ({
 
       {/* Keyboard hints */}
       <div
-        className="absolute bottom-4 right-4 z-50 px-3 py-2 rounded-lg text-xs"
+        className={`absolute bottom-4 right-4 z-50 px-3 py-2 rounded-lg text-xs transition-opacity duration-300 ${
+          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
         style={{
           backgroundColor: "rgba(0, 0, 0, 0.5)",
           color: "var(--text-muted)",
@@ -501,8 +641,22 @@ const Lightbox = ({
       >
         <div>← → Navigate</div>
         <div>Space Slideshow</div>
+        <div>i Info • f Fullscreen</div>
         <div>Esc Close</div>
       </div>
+
+      {/* Metadata Drawer */}
+      <MetadataDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        image={currentImage}
+        rating={rating}
+        isFavorite={isFavorite}
+        oCounter={oCounter}
+        onRatingClick={() => setIsRatingPopoverOpen(true)}
+        onFavoriteChange={handleFavoriteChange}
+        onOCounterChange={handleOCounterChange}
+      />
     </div>
   );
 };
