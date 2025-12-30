@@ -48,12 +48,26 @@ const BATCH_SIZE = 500; // Number of entities to fetch per page
  *
  * Stash expects timestamps without timezone suffix. It interprets all timestamps as local time.
  * We store raw timestamp strings from Stash and strip the timezone when querying.
+ *
+ * Additionally, we add .999 milliseconds to handle Stash's sub-second precision.
+ * Stash stores timestamps with sub-second precision internally but returns them truncated
+ * to seconds in API responses. Without this adjustment, querying `> 19:41:58` would still
+ * match an entity with actual timestamp `19:41:58.500`, causing infinite re-syncs.
+ * Adding .999 ensures we skip all entities within that second.
  */
 function formatTimestampForStash(timestamp: string): string {
   // Strip the timezone suffix to get the local time portion
   // "2025-12-28T09:47:03-08:00" -> "2025-12-28T09:47:03"
   // "2025-12-28T09:47:03Z" -> "2025-12-28T09:47:03"
-  return timestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
+  const withoutTz = timestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
+
+  // Add .999 milliseconds to handle sub-second precision
+  // "2025-12-28T09:47:03" -> "2025-12-28T09:47:03.999"
+  // If already has milliseconds, replace them with .999
+  if (/\.\d+$/.test(withoutTz)) {
+    return withoutTz.replace(/\.\d+$/, ".999");
+  }
+  return `${withoutTz}.999`;
 }
 
 /**

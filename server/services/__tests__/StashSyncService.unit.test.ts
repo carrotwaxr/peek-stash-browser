@@ -5,6 +5,35 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// Test the formatTimestampForStash logic directly (re-implemented here for testing)
+// This mirrors the function in StashSyncService.ts
+function formatTimestampForStash(timestamp: string): string {
+  const withoutTz = timestamp.replace(/([+-]\d{2}:\d{2}|Z)$/, "");
+  if (/\.\d+$/.test(withoutTz)) {
+    return withoutTz.replace(/\.\d+$/, ".999");
+  }
+  return `${withoutTz}.999`;
+}
+
+describe("formatTimestampForStash", () => {
+  it("should strip timezone and add .999 milliseconds", () => {
+    expect(formatTimestampForStash("2025-12-18T19:41:58-08:00")).toBe("2025-12-18T19:41:58.999");
+    expect(formatTimestampForStash("2025-12-28T09:47:03+05:30")).toBe("2025-12-28T09:47:03.999");
+    expect(formatTimestampForStash("2025-12-28T09:47:03Z")).toBe("2025-12-28T09:47:03.999");
+  });
+
+  it("should replace existing milliseconds with .999", () => {
+    expect(formatTimestampForStash("2025-12-18T19:41:58.123-08:00")).toBe("2025-12-18T19:41:58.999");
+    expect(formatTimestampForStash("2025-12-18T19:41:58.5-08:00")).toBe("2025-12-18T19:41:58.999");
+    expect(formatTimestampForStash("2025-12-18T19:41:58.000Z")).toBe("2025-12-18T19:41:58.999");
+  });
+
+  it("should handle timestamps without timezone", () => {
+    expect(formatTimestampForStash("2025-12-18T19:41:58")).toBe("2025-12-18T19:41:58.999");
+    expect(formatTimestampForStash("2025-12-18T19:41:58.500")).toBe("2025-12-18T19:41:58.999");
+  });
+});
+
 // Mock prisma before importing the service
 const mockPrisma = {
   syncState: {
