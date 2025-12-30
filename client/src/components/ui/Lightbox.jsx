@@ -336,16 +336,95 @@ const Lightbox = ({
       onMouseMove={handleMouseMove}
       onClick={onClose}
     >
-      {/* Top controls bar */}
+      {/* Top controls bar - single row on desktop, wraps on mobile */}
       <div
-        className={`absolute top-4 left-4 right-4 z-50 flex justify-between items-center transition-opacity duration-300 ${
+        className={`absolute top-4 left-4 right-4 z-50 flex flex-wrap justify-between items-center gap-2 transition-opacity duration-300 ${
           controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
-        {/* Left side - empty for balance */}
-        <div />
+        {/* Left side - Slideshow controls */}
+        <div className="flex items-center gap-2">
+          {/* Play/Pause slideshow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSlideshow();
+            }}
+            className="p-2 rounded-full transition-colors"
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              color: "var(--text-primary)",
+            }}
+            aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
+          >
+            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+          </button>
 
-        {/* Right side controls */}
+          {/* Interval selector */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              color: "var(--text-primary)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Clock size={16} />
+            <select
+              value={intervalDuration}
+              onChange={(e) => {
+                setIntervalDuration(Number(e.target.value));
+                // Restart slideshow if playing
+                if (isPlaying) {
+                  setIsPlaying(false);
+                  setTimeout(() => setIsPlaying(true), 0);
+                }
+              }}
+              className="bg-transparent border-0 outline-none cursor-pointer text-sm"
+              style={{ color: "var(--text-primary)" }}
+            >
+              <option value={2000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>2s</option>
+              <option value={3000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>3s</option>
+              <option value={5000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>5s</option>
+              <option value={10000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>10s</option>
+              <option value={15000} style={{ backgroundColor: "var(--bg-primary)", color: "var(--text-primary)" }}>15s</option>
+            </select>
+          </div>
+
+          {/* Divider - hidden on small screens */}
+          <div className="hidden sm:block w-px h-6 bg-white/30" />
+
+          {/* Rating controls */}
+          <div ref={ratingBadgeRef} onClick={(e) => e.stopPropagation()}>
+            <RatingBadge
+              rating={rating}
+              onClick={() => setIsRatingPopoverOpen(true)}
+              size="medium"
+            />
+          </div>
+
+          <div onClick={(e) => e.stopPropagation()}>
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onChange={handleFavoriteChange}
+              size="medium"
+              variant="lightbox"
+            />
+          </div>
+
+          <div onClick={(e) => e.stopPropagation()}>
+            <OCounterButton
+              imageId={images[currentIndex]?.id}
+              initialCount={oCounter}
+              onChange={handleOCounterChange}
+              size="medium"
+              variant="lightbox"
+              interactive={true}
+            />
+          </div>
+        </div>
+
+        {/* Right side - Lightbox controls */}
         <div className="flex items-center gap-2">
           {/* Info button */}
           <button
@@ -407,131 +486,6 @@ const Lightbox = ({
         }}
       >
         {currentIndex + 1} / {images.length}
-      </div>
-
-      {/* Compact controls - positioned to the right */}
-      <div
-        className={`absolute top-16 right-4 z-50 flex items-center gap-3 transition-opacity duration-300 ${
-          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-      >
-        {/* Play/Pause slideshow - icon only */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleSlideshow();
-          }}
-          className="p-2 rounded-full transition-colors"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            color: "var(--text-primary)",
-          }}
-          aria-label={isPlaying ? "Pause slideshow" : "Play slideshow"}
-        >
-          {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-        </button>
-
-        {/* Interval selector */}
-        <div
-          className="flex items-center gap-2 px-3 py-2 rounded-lg"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            color: "var(--text-primary)",
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Clock size={16} />
-          <select
-            value={intervalDuration}
-            onChange={(e) => {
-              setIntervalDuration(Number(e.target.value));
-              // Restart slideshow if playing
-              if (isPlaying) {
-                setIsPlaying(false);
-                setTimeout(() => setIsPlaying(true), 0);
-              }
-            }}
-            className="bg-transparent border-0 outline-none cursor-pointer text-sm"
-            style={{ color: "var(--text-primary)" }}
-          >
-            <option
-              value={2000}
-              style={{
-                backgroundColor: "var(--bg-primary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              2s
-            </option>
-            <option
-              value={3000}
-              style={{
-                backgroundColor: "var(--bg-primary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              3s
-            </option>
-            <option
-              value={5000}
-              style={{
-                backgroundColor: "var(--bg-primary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              5s
-            </option>
-            <option
-              value={10000}
-              style={{
-                backgroundColor: "var(--bg-primary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              10s
-            </option>
-            <option
-              value={15000}
-              style={{
-                backgroundColor: "var(--bg-primary)",
-                color: "var(--text-primary)",
-              }}
-            >
-              15s
-            </option>
-          </select>
-        </div>
-
-        {/* Rating Badge with Popover */}
-        <div ref={ratingBadgeRef} onClick={(e) => e.stopPropagation()}>
-          <RatingBadge
-            rating={rating}
-            onClick={() => setIsRatingPopoverOpen(true)}
-            size="medium"
-          />
-        </div>
-
-        {/* Favorite Button */}
-        <div onClick={(e) => e.stopPropagation()}>
-          <FavoriteButton
-            isFavorite={isFavorite}
-            onChange={handleFavoriteChange}
-            size="medium"
-            variant="lightbox"
-          />
-        </div>
-
-        {/* O Counter Button */}
-        <div onClick={(e) => e.stopPropagation()}>
-          <OCounterButton
-            imageId={images[currentIndex]?.id}
-            initialCount={oCounter}
-            onChange={handleOCounterChange}
-            size="medium"
-            variant="lightbox"
-            interactive={true}
-          />
-        </div>
       </div>
 
       {/* Rating Popover */}

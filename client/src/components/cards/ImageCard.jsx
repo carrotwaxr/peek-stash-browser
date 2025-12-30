@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import { getEffectiveImageMetadata } from "../../utils/imageGalleryInheritance.js";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 
@@ -34,6 +35,9 @@ const getImageTitle = (image) => {
  */
 const ImageCard = forwardRef(
   ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, ...rest }, ref) => {
+    // Get effective metadata (inherits from galleries if image doesn't have its own)
+    const { effectivePerformers, effectiveTags } = getEffectiveImageMetadata(image);
+
     // Build subtitle from gallery and date
     const imageDate = image.date
       ? new Date(image.date).toLocaleDateString()
@@ -53,23 +57,21 @@ const ImageCard = forwardRef(
     // Resolution badge
     const resolution = formatResolution(image.width, image.height);
 
-    // Build rich tooltip content for performers and tags
+    // Build rich tooltip content for performers and tags (using effective metadata)
     const performersTooltip =
-      image.performers &&
-      image.performers.length > 0 && (
+      effectivePerformers.length > 0 && (
         <TooltipEntityGrid
           entityType="performer"
-          entities={image.performers}
+          entities={effectivePerformers}
           title="Performers"
         />
       );
 
     const tagsTooltip =
-      image.tags &&
-      image.tags.length > 0 && (
+      effectiveTags.length > 0 && (
         <TooltipEntityGrid
           entityType="tag"
-          entities={image.tags}
+          entities={effectiveTags}
           title="Tags"
         />
       );
@@ -96,20 +98,20 @@ const ImageCard = forwardRef(
             },
           ]
         : []),
-      ...(image.performers?.length > 0
+      ...(effectivePerformers.length > 0
         ? [
             {
               type: "PERFORMERS",
-              count: image.performers.length,
+              count: effectivePerformers.length,
               tooltipContent: performersTooltip,
             },
           ]
         : []),
-      ...(image.tags?.length > 0
+      ...(effectiveTags.length > 0
         ? [
             {
               type: "TAGS",
-              count: image.tags.length,
+              count: effectiveTags.length,
               tooltipContent: tagsTooltip,
             },
           ]

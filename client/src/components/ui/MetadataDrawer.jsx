@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import TagChips from "./TagChips.jsx";
-import RatingBadge from "./RatingBadge.jsx";
-import OCounterButton from "./OCounterButton.jsx";
+import { getEffectiveImageMetadata } from "../../utils/imageGalleryInheritance.js";
 import FavoriteButton from "./FavoriteButton.jsx";
+import OCounterButton from "./OCounterButton.jsx";
+import RatingBadge from "./RatingBadge.jsx";
+import TagChips from "./TagChips.jsx";
 
 /**
  * Bottom sheet drawer displaying image metadata
@@ -20,9 +21,10 @@ const MetadataDrawer = ({
 }) => {
   if (!open || !image) return null;
 
-  const studio = image.studio;
-  const performers = image.performers || [];
-  const tags = image.tags || [];
+  // Get effective metadata (inherits from galleries if image doesn't have its own)
+  const { effectivePerformers, effectiveTags, effectiveStudio } =
+    getEffectiveImageMetadata(image);
+
   const date = image.date
     ? new Date(image.date).toLocaleDateString()
     : null;
@@ -30,7 +32,7 @@ const MetadataDrawer = ({
     image.width && image.height ? `${image.width}×${image.height}` : null;
 
   // Build subtitle parts
-  const subtitleParts = [studio?.name, date, resolution].filter(Boolean);
+  const subtitleParts = [effectiveStudio?.name, date, resolution].filter(Boolean);
   const subtitle = subtitleParts.join(" • ");
 
   return (
@@ -101,16 +103,16 @@ const MetadataDrawer = ({
               className="text-sm mb-4"
               style={{ color: "var(--text-secondary)" }}
             >
-              {studio ? (
+              {effectiveStudio ? (
                 <Link
-                  to={`/studio/${studio.id}`}
+                  to={`/studio/${effectiveStudio.id}`}
                   className="hover:underline hover:text-blue-400"
                   onClick={onClose}
                 >
-                  {studio.name}
+                  {effectiveStudio.name}
                 </Link>
               ) : null}
-              {studio && (date || resolution) ? " • " : null}
+              {effectiveStudio && (date || resolution) ? " • " : null}
               {date}
               {date && resolution ? " • " : null}
               {resolution}
@@ -118,7 +120,7 @@ const MetadataDrawer = ({
           )}
 
           {/* Performers section */}
-          {performers.length > 0 && (
+          {effectivePerformers.length > 0 && (
             <div className="mb-4">
               <h3
                 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -133,7 +135,7 @@ const MetadataDrawer = ({
                 className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
                 style={{ scrollbarWidth: "thin" }}
               >
-                {performers.map((performer) => (
+                {effectivePerformers.map((performer) => (
                   <Link
                     key={performer.id}
                     to={`/performer/${performer.id}`}
@@ -174,7 +176,7 @@ const MetadataDrawer = ({
           )}
 
           {/* Tags section */}
-          {tags.length > 0 && (
+          {effectiveTags.length > 0 && (
             <div className="mb-4">
               <h3
                 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
@@ -185,7 +187,7 @@ const MetadataDrawer = ({
               >
                 Tags
               </h3>
-              <TagChips tags={tags} />
+              <TagChips tags={effectiveTags} />
             </div>
           )}
 
