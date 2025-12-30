@@ -90,6 +90,26 @@ const Images = () => {
     }));
   };
 
+  // Handle rating change from card - update local state
+  const handleRatingChange = (imageId, newRating) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, rating100: newRating } : img
+      ),
+    }));
+  };
+
+  // Handle favorite change from card - update local state
+  const handleFavoriteChange = (imageId, newFavorite) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, favorite: newFavorite } : img
+      ),
+    }));
+  };
+
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
@@ -162,6 +182,8 @@ const Images = () => {
                       referrerUrl={`${location.pathname}${location.search}`}
                       tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       onOCounterChange={handleOCounterChange}
+                      onRatingChange={handleRatingChange}
+                      onFavoriteChange={handleFavoriteChange}
                       {...itemProps}
                     />
                   );
@@ -176,17 +198,12 @@ const Images = () => {
           <Lightbox
             isOpen={lightboxOpen}
             images={currentImages.map((img) => ({
-              id: img.id,
+              ...img,
               paths: {
                 image: img.paths?.image || `/api/proxy/image/${img.id}/image`,
                 preview: img.paths?.preview || img.paths?.thumbnail,
                 thumbnail: img.paths?.thumbnail || `/api/proxy/image/${img.id}/thumbnail`,
               },
-              title: img.title,
-              width: img.width,
-              height: img.height,
-              rating100: img.rating100,
-              favorite: img.favorite,
               oCounter: img.oCounter ?? 0,
             }))}
             initialIndex={lightboxIndex}

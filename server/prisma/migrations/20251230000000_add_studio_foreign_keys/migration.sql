@@ -1,0 +1,24 @@
+-- Add studio relations for StashImage and StashGallery
+--
+-- The studioId columns already exist in both tables from the initial migration.
+-- The schema.prisma file now defines @relation directives that tell Prisma
+-- how to join these tables with StashStudio.
+--
+-- SQLite doesn't support ALTER TABLE ADD CONSTRAINT for foreign keys after
+-- table creation, but Prisma doesn't require database-level FK constraints
+-- to perform relation queries - it uses the @relation directive from the schema.
+--
+-- This migration is a no-op for the database but is required for Prisma's
+-- migration history to recognize that the schema has changed. Without this
+-- migration file, `prisma migrate deploy` won't update the migration history
+-- and the Docker container's prisma generate may use cached/stale metadata.
+--
+-- Tables affected:
+--   StashImage.studioId -> StashStudio.id (optional relation)
+--   StashGallery.studioId -> StashStudio.id (optional relation)
+--
+-- Reverse relations added to StashStudio:
+--   images StashImage[]
+--   galleries StashGallery[]
+
+-- Empty migration - schema changes are handled by Prisma's relation directives

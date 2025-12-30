@@ -1127,12 +1127,14 @@ class StashEntityService {
   private readonly imageIncludes = {
     performers: { include: { performer: true } },
     tags: { include: { tag: true } },
+    studio: true,
     galleries: {
       include: {
         gallery: {
           include: {
             performers: { include: { performer: true } },
             tags: { include: { tag: true } },
+            studio: true,
           },
         },
       },
@@ -1686,10 +1688,12 @@ class StashEntityService {
   }
 
   private transformImage(image: any): any {
-    // Transform performers from junction table
+    // Transform performers from junction table (include image_path and gender for display)
     const performers = (image.performers ?? []).map((ip: any) => ({
       id: ip.performer.id,
       name: ip.performer.name,
+      gender: ip.performer.gender,
+      image_path: this.transformUrl(ip.performer.imagePath),
     }));
 
     // Transform tags from junction table
@@ -1698,20 +1702,38 @@ class StashEntityService {
       name: it.tag.name,
     }));
 
-    // Transform galleries from junction table (with their performers/tags for inheritance)
+    // Transform galleries from junction table (with their performers/tags/studio for inheritance)
     const galleries = (image.galleries ?? []).map((ig: any) => ({
       id: ig.gallery.id,
       title: ig.gallery.title,
+      date: ig.gallery.date,
+      details: ig.gallery.details,
+      photographer: ig.gallery.photographer,
+      urls: ig.gallery.urls ? JSON.parse(ig.gallery.urls) : [],
+      cover_path: this.transformUrl(ig.gallery.coverPath),
       studioId: ig.gallery.studioId,
+      // Include studio object for inheritance
+      studio: ig.gallery.studio ? {
+        id: ig.gallery.studio.id,
+        name: ig.gallery.studio.name,
+      } : null,
       performers: (ig.gallery.performers ?? []).map((gp: any) => ({
         id: gp.performer.id,
         name: gp.performer.name,
+        gender: gp.performer.gender,
+        image_path: this.transformUrl(gp.performer.imagePath),
       })),
       tags: (ig.gallery.tags ?? []).map((gt: any) => ({
         id: gt.tag.id,
         name: gt.tag.name,
       })),
     }));
+
+    // Build studio object with name if available
+    const studio = image.studio ? {
+      id: image.studio.id,
+      name: image.studio.name,
+    } : (image.studioId ? { id: image.studioId } : null);
 
     return {
       id: image.id,
@@ -1721,7 +1743,7 @@ class StashEntityService {
       photographer: image.photographer,
       urls: image.urls ? JSON.parse(image.urls) : [],
       date: image.date,
-      studio: image.studioId ? { id: image.studioId } : null,
+      studio,
       studioId: image.studioId,
       rating100: image.rating100,
       o_counter: image.oCounter ?? 0,

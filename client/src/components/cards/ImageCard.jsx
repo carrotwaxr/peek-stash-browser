@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import { getEffectiveImageMetadata } from "../../utils/imageGalleryInheritance.js";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 
@@ -33,48 +34,50 @@ const getImageTitle = (image) => {
  * Supports onClick for lightbox integration
  */
 const ImageCard = forwardRef(
-  ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, ...rest }, ref) => {
-    // Build subtitle from gallery and date
-    const imageDate = image.date
-      ? new Date(image.date).toLocaleDateString()
+  ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, ...rest }, ref) => {
+    // Get effective metadata (inherits from galleries if image doesn't have its own)
+    const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
+
+    // Build subtitle from studio and date (gallery shown in indicators)
+    const imageDate = effectiveDate
+      ? new Date(effectiveDate).toLocaleDateString()
       : null;
-    const galleryName = image.galleries?.[0]?.title;
-    const subtitle = (() => {
-      if (galleryName && imageDate) {
-        return `${galleryName} • ${imageDate}`;
-      } else if (galleryName) {
-        return galleryName;
-      } else if (imageDate) {
-        return imageDate;
-      }
-      return null;
-    })();
+    const studioName = effectiveStudio?.name;
+    const subtitle = [studioName, imageDate].filter(Boolean).join(" • ") || null;
 
     // Resolution badge
     const resolution = formatResolution(image.width, image.height);
 
-    // Build rich tooltip content for performers and tags
+    const galleries = image.galleries || [];
+
+    // Build rich tooltip content for performers, tags, and galleries
     const performersTooltip =
-      image.performers &&
-      image.performers.length > 0 && (
+      effectivePerformers.length > 0 && (
         <TooltipEntityGrid
           entityType="performer"
-          entities={image.performers}
+          entities={effectivePerformers}
           title="Performers"
         />
       );
 
     const tagsTooltip =
-      image.tags &&
-      image.tags.length > 0 && (
+      effectiveTags.length > 0 && (
         <TooltipEntityGrid
           entityType="tag"
-          entities={image.tags}
+          entities={effectiveTags}
           title="Tags"
         />
       );
 
-    const galleriesCount = image.galleries?.length || 0;
+    const galleriesCount = galleries.length;
+    const galleriesContent =
+      galleriesCount > 0 && (
+        <TooltipEntityGrid
+          entityType="gallery"
+          entities={galleries}
+          title="Galleries"
+        />
+      );
 
     const indicators = [
       ...(resolution
@@ -91,25 +94,24 @@ const ImageCard = forwardRef(
             {
               type: "GALLERIES",
               count: galleriesCount,
-              tooltipContent:
-                galleriesCount === 1 ? "1 Gallery" : `${galleriesCount} Galleries`,
+              tooltipContent: galleriesContent,
             },
           ]
         : []),
-      ...(image.performers?.length > 0
+      ...(effectivePerformers.length > 0
         ? [
             {
               type: "PERFORMERS",
-              count: image.performers.length,
+              count: effectivePerformers.length,
               tooltipContent: performersTooltip,
             },
           ]
         : []),
-      ...(image.tags?.length > 0
+      ...(effectiveTags.length > 0
         ? [
             {
               type: "TAGS",
-              count: image.tags.length,
+              count: effectiveTags.length,
               tooltipContent: tagsTooltip,
             },
           ]
@@ -146,6 +148,8 @@ const ImageCard = forwardRef(
                 initialOCounter: image.oCounter ?? 0,
                 onHideSuccess,
                 onOCounterChange,
+                onRatingChange,
+                onFavoriteChange,
               }
             : undefined
         }
