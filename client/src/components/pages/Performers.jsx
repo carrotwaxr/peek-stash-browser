@@ -1,12 +1,11 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import deepEqual from "fast-deep-equal";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
-import { useAuth } from "../../hooks/useAuth.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { libraryApi } from "../../services/api.js";
 import {
   SyncProgressBanner,
@@ -24,51 +23,16 @@ const Performers = () => {
   const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const columns = useGridColumns("performers");
 
-  const [lastQuery, setLastQuery] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState(null);
-  const [initMessage, setInitMessage] = useState(null);
+  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
-  // Note: We don't fetch initial data here anymore.
-  // SearchControls will trigger the initial query via onQueryChange based on URL params.
-
-  const handleQueryChange = async (newQuery, retryCount = 0) => {
-    // Don't make API calls if not authenticated or still checking auth
-    if (isAuthLoading || !isAuthenticated) {
-      return;
-    }
-
-    // Avoid duplicate queries
-    if (lastQuery && deepEqual(newQuery, lastQuery)) {
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setLastQuery(newQuery);
-      setError(null);
-      setInitMessage(null);
-      const result = await getPerformers(newQuery);
-      setData(result);
-      setIsLoading(false);
-    } catch (err) {
-      // If server is initializing, show a message and retry after delay
-      if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is syncing library, please wait...");
-        setTimeout(() => {
-          handleQueryChange(newQuery, retryCount + 1);
-        }, 5000); // Retry every 5 seconds
-        return; // Don't set loading to false, keep the loading state
-      }
-
-      setError(err.message || "An error occurred");
-      setIsLoading(false);
-    }
-  };
+  const handleQueryChange = useCallback(
+    (newQuery) => {
+      execute((signal) => getPerformers(newQuery, signal));
+    },
+    [execute]
+  );
 
   const currentPerformers = data?.performers || [];
   const totalCount = data?.count || 0;
@@ -187,8 +151,8 @@ const Performers = () => {
   );
 };
 
-const getPerformers = async (query) => {
-  const response = await libraryApi.findPerformers(query);
+const getPerformers = async (query, signal) => {
+  const response = await libraryApi.findPerformers(query, signal);
 
   // Extract performers and count from server response structure
   const findPerformers = response?.findPerformers;

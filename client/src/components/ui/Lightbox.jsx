@@ -19,6 +19,7 @@ const Lightbox = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [intervalDuration, setIntervalDuration] = useState(5000); // Default 5 seconds
   const intervalRef = useRef(null);
+  const viewTimerRef = useRef(null);
 
   // Rating, favorite, and O counter state for current image
   const [rating, setRating] = useState(null);
@@ -206,16 +207,37 @@ const Lightbox = ({
     setOCounter(currentImage?.oCounter ?? 0);
   }, [currentIndex, images]);
 
-  // Track image view when image changes in lightbox
+  // Track image view with 3-second dwell time
+  // Only records if user views image for 3+ seconds (filters rapid navigation)
+  // Timer starts after image finishes loading, not when loading begins
   useEffect(() => {
     const currentImage = images[currentIndex];
-    if (!currentImage?.id || !isOpen) return;
 
-    // Record the view (fire and forget - don't block UI)
-    imageViewHistoryApi.recordView(currentImage.id).catch((err) => {
-      console.error("Failed to record image view:", err);
-    });
-  }, [currentIndex, images, isOpen]);
+    // Clear any existing timer
+    if (viewTimerRef.current) {
+      clearTimeout(viewTimerRef.current);
+      viewTimerRef.current = null;
+    }
+
+    // Only start timer when image is loaded and lightbox is open
+    if (!currentImage?.id || !isOpen || !imageLoaded) return;
+
+    // Start 3-second dwell timer
+    viewTimerRef.current = setTimeout(() => {
+      imageViewHistoryApi.recordView(currentImage.id).catch((err) => {
+        console.error("Failed to record image view:", err);
+      });
+      viewTimerRef.current = null;
+    }, 3000);
+
+    // Cleanup on navigation/close
+    return () => {
+      if (viewTimerRef.current) {
+        clearTimeout(viewTimerRef.current);
+        viewTimerRef.current = null;
+      }
+    };
+  }, [currentIndex, images, isOpen, imageLoaded]);
 
   // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
   useRatingHotkeys({

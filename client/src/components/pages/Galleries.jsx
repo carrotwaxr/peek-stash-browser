@@ -1,12 +1,11 @@
-import { useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import deepEqual from "fast-deep-equal";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
-import { useAuth } from "../../hooks/useAuth.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { libraryApi } from "../../services/api.js";
 import { GalleryCard } from "../cards/index.js";
 import {
@@ -24,44 +23,16 @@ const Galleries = () => {
   const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const columns = useGridColumns("galleries");
 
-  const [lastQuery, setLastQuery] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState(null);
-  const [initMessage, setInitMessage] = useState(null);
+  const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
-  const handleQueryChange = async (newQuery, retryCount = 0) => {
-    if (isAuthLoading || !isAuthenticated) {
-      return;
-    }
-
-    if (lastQuery && deepEqual(newQuery, lastQuery)) {
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setLastQuery(newQuery);
-      setError(null);
-      setInitMessage(null);
-      const result = await getGalleries(newQuery);
-      setData(result);
-      setIsLoading(false);
-    } catch (err) {
-      if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is syncing library, please wait...");
-        setTimeout(() => {
-          handleQueryChange(newQuery, retryCount + 1);
-        }, 5000);
-        return;
-      }
-      setError(err.message || "An error occurred");
-      setIsLoading(false);
-    }
-  };
+  const handleQueryChange = useCallback(
+    (newQuery) => {
+      execute((signal) => getGalleries(newQuery, signal));
+    },
+    [execute]
+  );
 
   const currentGalleries = data?.galleries || [];
   const totalCount = data?.count || 0;
@@ -152,8 +123,8 @@ const Galleries = () => {
   );
 };
 
-const getGalleries = async (query) => {
-  const response = await libraryApi.findGalleries(query);
+const getGalleries = async (query, signal) => {
+  const response = await libraryApi.findGalleries(query, signal);
 
   const findGalleries = response?.findGalleries;
   const result = {

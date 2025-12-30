@@ -1,9 +1,8 @@
-import { useState } from "react";
+import { useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import deepEqual from "fast-deep-equal";
-import { useAuth } from "../../hooks/useAuth.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
+import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { libraryApi } from "../../services/api.js";
 import {
   SyncProgressBanner,
@@ -33,19 +32,11 @@ const SceneSearch = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();  // eslint-disable-line no-unused-vars
+  const [searchParams] = useSearchParams();
 
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const columns = useGridColumns("scenes");
 
-  const [lastQuery, setLastQuery] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [data, setData] = useState(null);
-  const [initMessage, setInitMessage] = useState(null);
-
-  // Note: We don't fetch initial data here anymore.
-  // SearchControls will trigger the initial query via onQueryChange based on URL params.
+  const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery();
 
   // Handle successful hide - remove scene from state
   const handleHideSuccess = (sceneId) => {
@@ -90,47 +81,19 @@ const SceneSearch = ({
     return true; // Prevent fallback navigation in SceneCard
   };
 
-  const handleQueryChange = async (newQuery, retryCount = 0) => {
-    // Don't make API calls if not authenticated or still checking auth
-    if (isAuthLoading || !isAuthenticated) {
-      return;
-    }
-
-    // Avoid duplicate queries
-    if (lastQuery && deepEqual(newQuery, lastQuery)) {
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setLastQuery(newQuery);
-      setError(null);
-      setInitMessage(null);
-      const result = await getScenes(newQuery);
-      setData(result);
-      setIsLoading(false);
-    } catch (err) {
-      // If server is initializing, show a message and retry after delay
-      // Increased retry limit to 60 (5 minutes at 5s intervals) to match server retry logic
-      if (err.isInitializing && retryCount < 60) {
-        setInitMessage("Server is syncing library, please wait...");
-        setTimeout(() => {
-          handleQueryChange(newQuery, retryCount + 1);
-        }, 5000); // Retry every 5 seconds
-        return; // Don't set loading to false, keep the loading state
-      }
-
-      setError(err.message || "An error occurred");
-      setIsLoading(false);
-    }
-  };
+  const handleQueryChange = useCallback(
+    (newQuery) => {
+      execute((signal) => getScenes(newQuery, signal));
+    },
+    [execute]
+  );
 
   const currentScenes = data?.scenes || [];
 
   const totalCount = data?.count || 0;
 
-  // Read pagination state from lastQuery (SearchControls manages URL params)
-  const currentPerPage = lastQuery?.filter?.per_page || 24;
+  // Read pagination state from URL params
+  const currentPerPage = parseInt(searchParams.get("per_page")) || 24;
 
   // Calculate totalPages based on currentPerPage from query
   const totalPages = Math.ceil(totalCount / currentPerPage);
@@ -195,8 +158,8 @@ const SceneSearch = ({
   );
 };
 
-const getScenes = async (query) => {
-  const response = await libraryApi.findScenes(query);
+const getScenes = async (query, signal) => {
+  const response = await libraryApi.findScenes(query, signal);
 
   // Extract scenes and count from server response structure
   const findScenes = response?.findScenes;

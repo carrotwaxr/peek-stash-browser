@@ -19,7 +19,16 @@ async function apiFetch(endpoint, options = {}) {
     ...options,
   };
 
-  const response = await fetch(url, config);
+  let response;
+  try {
+    response = await fetch(url, config);
+  } catch (err) {
+    // Re-throw AbortError so it can be caught by useCancellableQuery
+    if (err.name === "AbortError") {
+      throw err;
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     // Try to parse error response body
@@ -50,9 +59,6 @@ async function apiFetch(endpoint, options = {}) {
   return await response.json();
 }
 
-/**
- * GET request wrapper
- */
 async function apiGet(endpoint) {
   return apiFetch(endpoint, { method: "GET" });
 }
@@ -98,8 +104,8 @@ export const libraryApi = {
    * @param {Object} params.scene_filter - Scene-specific filters
    * @param {Array<string>} params.ids - Specific scene IDs to fetch
    */
-  findScenes: (params = {}) => {
-    return apiPost("/library/scenes", params);
+  findScenes: (params = {}, signal) => {
+    return apiFetch("/library/scenes", { method: "POST", body: JSON.stringify(params), signal });
   },
 
   /**
@@ -108,8 +114,8 @@ export const libraryApi = {
    * @param {Object} params.filter - General filters (pagination, search, sort)
    * @param {Object} params.performer_filter - Performer-specific filters
    */
-  findPerformers: (params = {}) => {
-    return apiPost("/library/performers", params);
+  findPerformers: (params = {}, signal) => {
+    return apiFetch("/library/performers", { method: "POST", body: JSON.stringify(params), signal });
   },
 
   /**
@@ -118,8 +124,8 @@ export const libraryApi = {
    * @param {Object} params.filter - General filters (pagination, search, sort)
    * @param {Object} params.studio_filter - Studio-specific filters
    */
-  findStudios: (params = {}) => {
-    return apiPost("/library/studios", params);
+  findStudios: (params = {}, signal) => {
+    return apiFetch("/library/studios", { method: "POST", body: JSON.stringify(params), signal });
   },
 
   /**
@@ -128,8 +134,8 @@ export const libraryApi = {
    * @param {Object} params.filter - General filters (pagination, search, sort)
    * @param {Object} params.tag_filter - Tag-specific filters
    */
-  findTags: (params = {}) => {
-    return apiPost("/library/tags", params);
+  findTags: (params = {}, signal) => {
+    return apiFetch("/library/tags", { method: "POST", body: JSON.stringify(params), signal });
   },
 
   /**
@@ -211,8 +217,8 @@ export const libraryApi = {
    * @param {Object} params.filter - General filters (pagination, search, sort)
    * @param {Object} params.gallery_filter - Gallery-specific filters
    */
-  findGalleries: (params = {}) => {
-    return apiPost("/library/galleries", params);
+  findGalleries: (params = {}, signal) => {
+    return apiFetch("/library/galleries", { method: "POST", body: JSON.stringify(params), signal });
   },
 
   /**
@@ -239,8 +245,8 @@ export const libraryApi = {
    * @param {Object} params.filter - General filters (pagination, search, sort)
    * @param {Object} params.group_filter - Group-specific filters
    */
-  findGroups: (params = {}) => {
-    return apiPost("/library/groups", params);
+  findGroups: (params = {}, signal) => {
+    return apiFetch("/library/groups", { method: "POST", body: JSON.stringify(params), signal });
   },
 
   /**
@@ -281,8 +287,8 @@ export const libraryApi = {
    * @param {Object} params.filter - General filters (pagination, search, sort)
    * @param {Object} params.image_filter - Image-specific filters
    */
-  findImages: (params = {}) => {
-    return apiPost("/library/images", params);
+  findImages: (params = {}, signal) => {
+    return apiFetch("/library/images", { method: "POST", body: JSON.stringify(params), signal });
   },
 
   /**
