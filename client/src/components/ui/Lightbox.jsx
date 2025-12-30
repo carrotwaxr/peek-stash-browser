@@ -4,11 +4,7 @@ import { useSwipeable } from "react-swipeable";
 import { useFullscreen } from "../../hooks/useFullscreen.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
-import FavoriteButton from "./FavoriteButton.jsx";
 import MetadataDrawer from "./MetadataDrawer.jsx";
-import OCounterButton from "./OCounterButton.jsx";
-import RatingBadge from "./RatingBadge.jsx";
-import RatingSliderDialog from "./RatingSliderDialog.jsx";
 
 const Lightbox = ({
   images,
@@ -28,10 +24,6 @@ const Lightbox = ({
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [oCounter, setOCounter] = useState(0);
-
-  // Rating popover state
-  const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
-  const ratingBadgeRef = useRef(null);
 
   // New state for enhanced features
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -169,11 +161,11 @@ const Lightbox = ({
       clearTimeout(controlsTimeoutRef.current);
     }
     controlsTimeoutRef.current = setTimeout(() => {
-      if (!drawerOpen && !isRatingPopoverOpen) {
+      if (!drawerOpen) {
         setControlsVisible(false);
       }
     }, 3000);
-  }, [drawerOpen, isRatingPopoverOpen]);
+  }, [drawerOpen]);
 
   // Reset auto-hide on mouse movement (desktop)
   const handleMouseMove = useCallback(() => {
@@ -391,37 +383,6 @@ const Lightbox = ({
             </select>
           </div>
 
-          {/* Divider - hidden on small screens */}
-          <div className="hidden sm:block w-px h-6 bg-white/30" />
-
-          {/* Rating controls */}
-          <div ref={ratingBadgeRef} onClick={(e) => e.stopPropagation()}>
-            <RatingBadge
-              rating={rating}
-              onClick={() => setIsRatingPopoverOpen(true)}
-              size="medium"
-            />
-          </div>
-
-          <div onClick={(e) => e.stopPropagation()}>
-            <FavoriteButton
-              isFavorite={isFavorite}
-              onChange={handleFavoriteChange}
-              size="medium"
-              variant="lightbox"
-            />
-          </div>
-
-          <div onClick={(e) => e.stopPropagation()}>
-            <OCounterButton
-              imageId={images[currentIndex]?.id}
-              initialCount={oCounter}
-              onChange={handleOCounterChange}
-              size="medium"
-              variant="lightbox"
-              interactive={true}
-            />
-          </div>
         </div>
 
         {/* Right side - Lightbox controls */}
@@ -487,17 +448,6 @@ const Lightbox = ({
       >
         {currentIndex + 1} / {images.length}
       </div>
-
-      {/* Rating Popover */}
-      <RatingSliderDialog
-        isOpen={isRatingPopoverOpen}
-        onClose={() => setIsRatingPopoverOpen(false)}
-        initialRating={rating}
-        onSave={handleRatingChange}
-        entityType="image"
-        entityTitle={images[currentIndex]?.title || `Image ${currentIndex + 1}`}
-        anchorEl={ratingBadgeRef.current}
-      />
 
       {/* Previous button */}
       {images.length > 1 && (
@@ -607,7 +557,7 @@ const Lightbox = ({
         rating={rating}
         isFavorite={isFavorite}
         oCounter={oCounter}
-        onRatingClick={() => setIsRatingPopoverOpen(true)}
+        onRatingChange={handleRatingChange}
         onFavoriteChange={handleFavoriteChange}
         onOCounterChange={handleOCounterChange}
       />

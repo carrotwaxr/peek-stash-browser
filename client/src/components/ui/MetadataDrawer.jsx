@@ -1,9 +1,23 @@
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getEffectiveImageMetadata } from "../../utils/imageGalleryInheritance.js";
 import FavoriteButton from "./FavoriteButton.jsx";
 import OCounterButton from "./OCounterButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
+import RatingSliderDialog from "./RatingSliderDialog.jsx";
 import TagChips from "./TagChips.jsx";
+
+/**
+ * Get image title with fallback to filename or ID
+ */
+const getImageTitle = (image) => {
+  if (image.title) return image.title;
+  if (image.filePath) {
+    const parts = image.filePath.split(/[\\/]/);
+    return parts[parts.length - 1];
+  }
+  return `Image ${image.id}`;
+};
 
 /**
  * Bottom sheet drawer displaying image metadata
@@ -15,10 +29,13 @@ const MetadataDrawer = ({
   rating,
   isFavorite,
   oCounter,
-  onRatingClick,
+  onRatingChange,
   onFavoriteChange,
   onOCounterChange,
 }) => {
+  const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
+  const ratingBadgeRef = useRef(null);
+
   if (!open || !image) return null;
 
   // Get effective metadata (inherits from galleries if image doesn't have its own)
@@ -72,14 +89,16 @@ const MetadataDrawer = ({
               className="text-lg font-semibold line-clamp-2 flex-1"
               style={{ color: "var(--text-primary)" }}
             >
-              {image.title || "Untitled"}
+              {getImageTitle(image)}
             </h2>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <RatingBadge
-                rating={rating}
-                onClick={onRatingClick}
-                size="medium"
-              />
+              <div ref={ratingBadgeRef}>
+                <RatingBadge
+                  rating={rating}
+                  onClick={() => setIsRatingPopoverOpen(true)}
+                  size="medium"
+                />
+              </div>
               <OCounterButton
                 imageId={image.id}
                 initialCount={oCounter}
@@ -213,6 +232,17 @@ const MetadataDrawer = ({
           )}
         </div>
       </div>
+
+      {/* Rating Popover */}
+      <RatingSliderDialog
+        isOpen={isRatingPopoverOpen}
+        onClose={() => setIsRatingPopoverOpen(false)}
+        initialRating={rating}
+        onSave={onRatingChange}
+        entityType="image"
+        entityTitle={getImageTitle(image)}
+        anchorEl={ratingBadgeRef.current}
+      />
     </>
   );
 };
