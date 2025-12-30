@@ -318,6 +318,15 @@ const Lightbox = ({
   const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
   const imageTitle = currentImage?.title || `Image ${currentIndex + 1}`;
 
+  // Handle backdrop click - close drawer if open, otherwise close lightbox
+  const handleBackdropClick = () => {
+    if (drawerOpen) {
+      setDrawerOpen(false);
+    } else {
+      onClose();
+    }
+  };
+
   return (
     <div
       {...swipeHandlers}
@@ -326,7 +335,7 @@ const Lightbox = ({
         backgroundColor: "rgba(0, 0, 0, 0.95)",
       }}
       onMouseMove={handleMouseMove}
-      onClick={onClose}
+      onClick={handleBackdropClick}
     >
       {/* Top controls bar - single row on desktop, wraps on mobile */}
       <div
