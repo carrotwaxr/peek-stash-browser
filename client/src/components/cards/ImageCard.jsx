@@ -38,18 +38,19 @@ const ImageCard = forwardRef(
     // Get effective metadata (inherits from galleries if image doesn't have its own)
     const { effectivePerformers, effectiveTags, effectiveStudio } = getEffectiveImageMetadata(image);
 
-    // Build subtitle from studio, gallery, and date
+    // Build subtitle from studio and date (gallery shown in indicators)
     const imageDate = image.date
       ? new Date(image.date).toLocaleDateString()
       : null;
-    const galleryName = image.galleries?.[0]?.title;
     const studioName = effectiveStudio?.name;
-    const subtitle = [studioName, galleryName, imageDate].filter(Boolean).join(" • ") || null;
+    const subtitle = [studioName, imageDate].filter(Boolean).join(" • ") || null;
 
     // Resolution badge
     const resolution = formatResolution(image.width, image.height);
 
-    // Build rich tooltip content for performers and tags (using effective metadata)
+    const galleries = image.galleries || [];
+
+    // Build rich tooltip content for performers, tags, and galleries
     const performersTooltip =
       effectivePerformers.length > 0 && (
         <TooltipEntityGrid
@@ -68,7 +69,15 @@ const ImageCard = forwardRef(
         />
       );
 
-    const galleriesCount = image.galleries?.length || 0;
+    const galleriesCount = galleries.length;
+    const galleriesContent =
+      galleriesCount > 0 && (
+        <TooltipEntityGrid
+          entityType="gallery"
+          entities={galleries}
+          title="Galleries"
+        />
+      );
 
     const indicators = [
       ...(resolution
@@ -85,8 +94,7 @@ const ImageCard = forwardRef(
             {
               type: "GALLERIES",
               count: galleriesCount,
-              tooltipContent:
-                galleriesCount === 1 ? "1 Gallery" : `${galleriesCount} Galleries`,
+              tooltipContent: galleriesContent,
             },
           ]
         : []),

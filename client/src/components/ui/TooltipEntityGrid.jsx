@@ -49,7 +49,15 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
     if (entityType === "group") {
       return entity.front_image_path || entity.back_image_path;
     }
+    if (entityType === "gallery") {
+      return entity.cover_path;
+    }
     return entity.image_path;
+  };
+
+  // Get display name for entity (galleries use title, others use name)
+  const getDisplayName = (entity) => {
+    return entity.name || entity.title || `${entityType} ${entity.id}`;
   };
 
   // Get fallback emoji for entity type
@@ -119,7 +127,7 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
               {getImagePath(entity) ? (
                 <img
                   src={getImagePath(entity)}
-                  alt={entity.name}
+                  alt={getDisplayName(entity)}
                   className={`w-full h-full object-contain ${imageRadius}`}
                   style={{ backgroundColor: "var(--bg-secondary)" }}
                 />
@@ -134,9 +142,9 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
             <span
               className="text-xs text-center line-clamp-2 w-full px-0.5"
               style={{ color: "var(--text-primary)" }}
-              title={entity.name}
+              title={getDisplayName(entity)}
             >
-              {entity.name}
+              {getDisplayName(entity)}
             </span>
           </Link>
         ))}
