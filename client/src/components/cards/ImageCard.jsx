@@ -34,7 +34,7 @@ const getImageTitle = (image) => {
  * Supports onClick for lightbox integration
  */
 const ImageCard = forwardRef(
-  ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, ...rest }, ref) => {
+  ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, ...rest }, ref) => {
     // Get effective metadata (inherits from galleries if image doesn't have its own)
     const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
 
@@ -148,6 +148,8 @@ const ImageCard = forwardRef(
                 initialOCounter: image.oCounter ?? 0,
                 onHideSuccess,
                 onOCounterChange,
+                onRatingChange,
+                onFavoriteChange,
               }
             : undefined
         }

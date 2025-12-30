@@ -90,6 +90,26 @@ const Images = () => {
     }));
   };
 
+  // Handle rating change from card - update local state
+  const handleRatingChange = (imageId, newRating) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, rating100: newRating } : img
+      ),
+    }));
+  };
+
+  // Handle favorite change from card - update local state
+  const handleFavoriteChange = (imageId, newFavorite) => {
+    setData((prev) => ({
+      ...prev,
+      images: prev.images.map((img) =>
+        img.id === imageId ? { ...img, favorite: newFavorite } : img
+      ),
+    }));
+  };
+
   // TV Navigation - use shared hook for all grid pages
   const {
     isTVMode,
@@ -162,6 +182,8 @@ const Images = () => {
                       referrerUrl={`${location.pathname}${location.search}`}
                       tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       onOCounterChange={handleOCounterChange}
+                      onRatingChange={handleRatingChange}
+                      onFavoriteChange={handleFavoriteChange}
                       {...itemProps}
                     />
                   );

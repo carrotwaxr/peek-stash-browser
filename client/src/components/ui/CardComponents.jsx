@@ -411,6 +411,8 @@ export const CardIndicators = ({ indicators }) => {
  * O Counter is interactive for scenes and images, display-only for other entities
  * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
  * @param {Function} onOCounterChange - Callback when O counter changes (for parent to update state)
+ * @param {Function} onRatingChange - Callback when rating changes (for parent to update state)
+ * @param {Function} onFavoriteChange - Callback when favorite changes (for parent to update state)
  */
 export const CardRatingRow = ({
   entityType,
@@ -421,6 +423,8 @@ export const CardRatingRow = ({
   entityTitle,
   onHideSuccess,
   onOCounterChange,
+  onRatingChange,
+  onFavoriteChange,
 }) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
@@ -448,6 +452,8 @@ export const CardRatingRow = ({
     setRating(newRating);
     try {
       await libraryApi.updateRating(entityType, entityId, newRating);
+      // Notify parent of the change
+      onRatingChange?.(entityId, newRating);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating(initialRating); // Revert on error
@@ -458,6 +464,8 @@ export const CardRatingRow = ({
     setIsFavorite(newValue);
     try {
       await libraryApi.updateFavorite(entityType, entityId, newValue);
+      // Notify parent of the change
+      onFavoriteChange?.(entityId, newValue);
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite(initialFavorite); // Revert on error
