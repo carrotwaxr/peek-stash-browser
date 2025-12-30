@@ -1127,14 +1127,14 @@ class StashEntityService {
   private readonly imageIncludes = {
     performers: { include: { performer: true } },
     tags: { include: { tag: true } },
-    studio: true, // Include studio for name display
+    studio: true,
     galleries: {
       include: {
         gallery: {
           include: {
             performers: { include: { performer: true } },
             tags: { include: { tag: true } },
-            studio: true, // Include gallery studio for inheritance
+            studio: true,
           },
         },
       },

@@ -583,7 +583,9 @@ model StashStudio {
   deletedAt      DateTime?
 
   // === Relations ===
-  tags StudioTag[]
+  tags      StudioTag[]
+  images    StashImage[]
+  galleries StashGallery[]
 
   @@index([name])
   @@index([parentId])
@@ -714,6 +716,7 @@ model StashGallery {
   deletedAt      DateTime?
 
   // === Relations ===
+  studio     StashStudio?     @relation(fields: [studioId], references: [id])
   scenes     SceneGallery[]
   images     ImageGallery[]
   performers GalleryPerformer[]
@@ -761,6 +764,7 @@ model StashImage {
   deletedAt      DateTime?
 
   // === Relations ===
+  studio     StashStudio?     @relation(fields: [studioId], references: [id])
   performers ImagePerformer[]
   tags       ImageTag[]
   galleries  ImageGallery[]
