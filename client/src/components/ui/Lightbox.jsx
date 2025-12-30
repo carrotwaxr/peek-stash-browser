@@ -209,6 +209,7 @@ const Lightbox = ({
 
   // Track image view with 3-second dwell time
   // Only records if user views image for 3+ seconds (filters rapid navigation)
+  // Timer starts after image finishes loading, not when loading begins
   useEffect(() => {
     const currentImage = images[currentIndex];
 
@@ -218,7 +219,8 @@ const Lightbox = ({
       viewTimerRef.current = null;
     }
 
-    if (!currentImage?.id || !isOpen) return;
+    // Only start timer when image is loaded and lightbox is open
+    if (!currentImage?.id || !isOpen || !imageLoaded) return;
 
     // Start 3-second dwell timer
     viewTimerRef.current = setTimeout(() => {
@@ -235,7 +237,7 @@ const Lightbox = ({
         viewTimerRef.current = null;
       }
     };
-  }, [currentIndex, images, isOpen]);
+  }, [currentIndex, images, isOpen, imageLoaded]);
 
   // Rating hotkeys (r + 1-5 for ratings, r + 0 to clear)
   useRatingHotkeys({
