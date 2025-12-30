@@ -5,6 +5,7 @@ import FavoriteButton from "./FavoriteButton.jsx";
 import OCounterButton from "./OCounterButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
 import RatingSliderDialog from "./RatingSliderDialog.jsx";
+import SectionLink from "./SectionLink.jsx";
 import TagChips from "./TagChips.jsx";
 
 /**
@@ -39,17 +40,25 @@ const MetadataDrawer = ({
   if (!open || !image) return null;
 
   // Get effective metadata (inherits from galleries if image doesn't have its own)
-  const { effectivePerformers, effectiveTags, effectiveStudio } =
-    getEffectiveImageMetadata(image);
+  const {
+    effectivePerformers,
+    effectiveTags,
+    effectiveStudio,
+    effectiveDate,
+    effectiveDetails,
+    effectivePhotographer,
+    effectiveUrls,
+  } = getEffectiveImageMetadata(image);
 
-  const date = image.date
-    ? new Date(image.date).toLocaleDateString()
+  const date = effectiveDate
+    ? new Date(effectiveDate).toLocaleDateString()
     : null;
   const resolution =
     image.width && image.height ? `${image.width}×${image.height}` : null;
 
   // Build subtitle parts
-  const subtitleParts = [effectiveStudio?.name, date, resolution].filter(Boolean);
+  const photographerText = effectivePhotographer ? `by ${effectivePhotographer}` : null;
+  const subtitleParts = [effectiveStudio?.name, date, photographerText, resolution].filter(Boolean);
   const subtitle = subtitleParts.join(" • ");
 
   return (
@@ -211,8 +220,8 @@ const MetadataDrawer = ({
           )}
 
           {/* Details section (if description exists) */}
-          {image.details && (
-            <div>
+          {effectiveDetails && (
+            <div className="mb-4">
               <h3
                 className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
                 style={{
@@ -226,8 +235,28 @@ const MetadataDrawer = ({
                 className="text-sm leading-relaxed"
                 style={{ color: "var(--text-primary)" }}
               >
-                {image.details}
+                {effectiveDetails}
               </p>
+            </div>
+          )}
+
+          {/* URLs section */}
+          {effectiveUrls.length > 0 && (
+            <div>
+              <h3
+                className="text-sm font-semibold uppercase tracking-wide mb-3 pb-2"
+                style={{
+                  color: "var(--text-primary)",
+                  borderBottom: "2px solid var(--accent-primary)",
+                }}
+              >
+                Links
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {effectiveUrls.map((url, index) => (
+                  <SectionLink key={index} url={url} />
+                ))}
+              </div>
             </div>
           )}
         </div>

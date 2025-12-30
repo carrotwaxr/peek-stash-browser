@@ -82,15 +82,92 @@ function getInheritedStudio(galleries = []) {
 }
 
 /**
+ * Get inherited date from galleries (first gallery's date wins)
+ * @param {Array} galleries - Array of gallery objects
+ * @returns {string|null} Date string or null
+ */
+function getInheritedDate(galleries = []) {
+  for (const gallery of galleries) {
+    if (gallery?.date) {
+      return gallery.date;
+    }
+  }
+  return null;
+}
+
+/**
+ * Get inherited details from galleries (first gallery's details wins)
+ * @param {Array} galleries - Array of gallery objects
+ * @returns {string|null} Details string or null
+ */
+function getInheritedDetails(galleries = []) {
+  for (const gallery of galleries) {
+    if (gallery?.details) {
+      return gallery.details;
+    }
+  }
+  return null;
+}
+
+/**
+ * Get inherited photographer from galleries (first gallery's photographer wins)
+ * @param {Array} galleries - Array of gallery objects
+ * @returns {string|null} Photographer string or null
+ */
+function getInheritedPhotographer(galleries = []) {
+  for (const gallery of galleries) {
+    if (gallery?.photographer) {
+      return gallery.photographer;
+    }
+  }
+  return null;
+}
+
+/**
+ * Merge URLs from image and galleries (deduplicated)
+ * @param {Array} imageUrls - URLs from image itself
+ * @param {Array} galleries - Array of gallery objects
+ * @returns {Array} Merged array of unique URLs
+ */
+function mergeUrls(imageUrls = [], galleries = []) {
+  const seen = new Set();
+  const result = [];
+
+  // Add image URLs first
+  for (const url of imageUrls) {
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      result.push(url);
+    }
+  }
+
+  // Add gallery URLs
+  for (const gallery of galleries) {
+    for (const url of gallery?.urls || []) {
+      if (url && !seen.has(url)) {
+        seen.add(url);
+        result.push(url);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * Get effective metadata for an image, inheriting from galleries where needed.
  *
  * Inheritance rules:
  * - Performers: Merge image performers with gallery performers (deduplicated)
  * - Tags: Merge image tags with gallery tags (deduplicated)
  * - Studio: Use image studio if set, otherwise inherit from first gallery with a studio
+ * - Date: Use image date if set, otherwise inherit from first gallery with a date
+ * - Details: Use image details if set, otherwise inherit from first gallery with details
+ * - Photographer: Use image photographer if set, otherwise inherit from first gallery with photographer
+ * - URLs: Merge image URLs with gallery URLs (deduplicated)
  *
  * @param {Object} image - Image object with optional galleries array
- * @returns {Object} Object containing effectivePerformers, effectiveTags, effectiveStudio
+ * @returns {Object} Object containing effective metadata fields
  */
 export function getEffectiveImageMetadata(image) {
   if (!image) {
@@ -98,6 +175,10 @@ export function getEffectiveImageMetadata(image) {
       effectivePerformers: [],
       effectiveTags: [],
       effectiveStudio: null,
+      effectiveDate: null,
+      effectiveDetails: null,
+      effectivePhotographer: null,
+      effectiveUrls: [],
     };
   }
 
@@ -118,16 +199,32 @@ export function getEffectiveImageMetadata(image) {
   // Studio: prefer image's own, fallback to gallery's
   const effectiveStudio = image.studio || getInheritedStudio(galleries);
 
+  // Date: prefer image's own, fallback to gallery's
+  const effectiveDate = image.date || getInheritedDate(galleries);
+
+  // Details: prefer image's own, fallback to gallery's
+  const effectiveDetails = image.details || getInheritedDetails(galleries);
+
+  // Photographer: prefer image's own, fallback to gallery's
+  const effectivePhotographer = image.photographer || getInheritedPhotographer(galleries);
+
+  // URLs: merge image URLs with gallery URLs
+  const effectiveUrls = mergeUrls(image.urls || [], galleries);
+
   return {
     effectivePerformers,
     effectiveTags,
     effectiveStudio,
+    effectiveDate,
+    effectiveDetails,
+    effectivePhotographer,
+    effectiveUrls,
   };
 }
 
 /**
  * Enrich an image object with effective metadata fields.
- * Adds effectivePerformers, effectiveTags, effectiveStudio to the image.
+ * Adds all effective* fields to the image.
  *
  * @param {Object} image - Image object
  * @returns {Object} Image with added effective* fields
@@ -135,13 +232,24 @@ export function getEffectiveImageMetadata(image) {
 export function enrichImageWithInheritedMetadata(image) {
   if (!image) return image;
 
-  const { effectivePerformers, effectiveTags, effectiveStudio } =
-    getEffectiveImageMetadata(image);
+  const {
+    effectivePerformers,
+    effectiveTags,
+    effectiveStudio,
+    effectiveDate,
+    effectiveDetails,
+    effectivePhotographer,
+    effectiveUrls,
+  } = getEffectiveImageMetadata(image);
 
   return {
     ...image,
     effectivePerformers,
     effectiveTags,
     effectiveStudio,
+    effectiveDate,
+    effectiveDetails,
+    effectivePhotographer,
+    effectiveUrls,
   };
 }

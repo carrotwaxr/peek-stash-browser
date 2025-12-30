@@ -1706,6 +1706,10 @@ class StashEntityService {
     const galleries = (image.galleries ?? []).map((ig: any) => ({
       id: ig.gallery.id,
       title: ig.gallery.title,
+      date: ig.gallery.date,
+      details: ig.gallery.details,
+      photographer: ig.gallery.photographer,
+      urls: ig.gallery.urls ? JSON.parse(ig.gallery.urls) : [],
       cover_path: this.transformUrl(ig.gallery.coverPath),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
