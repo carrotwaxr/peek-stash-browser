@@ -36,23 +36,15 @@ const getImageTitle = (image) => {
 const ImageCard = forwardRef(
   ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, ...rest }, ref) => {
     // Get effective metadata (inherits from galleries if image doesn't have its own)
-    const { effectivePerformers, effectiveTags } = getEffectiveImageMetadata(image);
+    const { effectivePerformers, effectiveTags, effectiveStudio } = getEffectiveImageMetadata(image);
 
-    // Build subtitle from gallery and date
+    // Build subtitle from studio, gallery, and date
     const imageDate = image.date
       ? new Date(image.date).toLocaleDateString()
       : null;
     const galleryName = image.galleries?.[0]?.title;
-    const subtitle = (() => {
-      if (galleryName && imageDate) {
-        return `${galleryName} • ${imageDate}`;
-      } else if (galleryName) {
-        return galleryName;
-      } else if (imageDate) {
-        return imageDate;
-      }
-      return null;
-    })();
+    const studioName = effectiveStudio?.name;
+    const subtitle = [studioName, galleryName, imageDate].filter(Boolean).join(" • ") || null;
 
     // Resolution badge
     const resolution = formatResolution(image.width, image.height);

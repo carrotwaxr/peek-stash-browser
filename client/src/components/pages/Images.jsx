@@ -176,17 +176,12 @@ const Images = () => {
           <Lightbox
             isOpen={lightboxOpen}
             images={currentImages.map((img) => ({
-              id: img.id,
+              ...img,
               paths: {
                 image: img.paths?.image || `/api/proxy/image/${img.id}/image`,
                 preview: img.paths?.preview || img.paths?.thumbnail,
                 thumbnail: img.paths?.thumbnail || `/api/proxy/image/${img.id}/thumbnail`,
               },
-              title: img.title,
-              width: img.width,
-              height: img.height,
-              rating100: img.rating100,
-              favorite: img.favorite,
               oCounter: img.oCounter ?? 0,
             }))}
             initialIndex={lightboxIndex}
