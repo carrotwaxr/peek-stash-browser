@@ -33,6 +33,7 @@
     "react-dom": "^19.1.1",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.4",
+    "react-swipeable": "^7.0.2",
     "video.js": "^7.21.3",
     "videojs-seek-buttons": "^3.0.1",
     "videojs-vr": "^2.0.0",
