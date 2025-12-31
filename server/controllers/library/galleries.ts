@@ -609,6 +609,9 @@ export const getGalleryImages = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    // Fetch the gallery data for inheritance context
+    const gallery = await stashEntityService.getGallery(galleryId);
+
     // Query images from local database filtered by gallery
     const dbImages = await prisma.stashImage.findMany({
       where: {
@@ -620,9 +623,60 @@ export const getGalleryImages = async (
       include: {
         performers: { include: { performer: true } },
         tags: { include: { tag: true } },
+        studio: true,
       },
       orderBy: { filePath: "asc" },
     });
+
+    // Build gallery context for inheritance (used by client-side getEffectiveImageMetadata)
+    // Include full performer data from cache for proper display (image_path, gender, etc.)
+    let galleryContext = null;
+    if (gallery) {
+      // Hydrate gallery performers with full cached data
+      let hydratedPerformers: NormalizedPerformer[] = [];
+      if (gallery.performers && gallery.performers.length > 0) {
+        const performerIds = gallery.performers.map((p) => p.id);
+        const cachedPerformers =
+          await stashEntityService.getPerformersByIds(performerIds);
+        const performerMap = new Map(cachedPerformers.map((p) => [p.id, p]));
+        hydratedPerformers = gallery.performers.map((performer) => {
+          const cachedPerformer = performerMap.get(performer.id);
+          return cachedPerformer || (performer as NormalizedPerformer);
+        });
+      }
+
+      // Hydrate gallery tags with full cached data
+      let hydratedTags: NormalizedTag[] = [];
+      if (gallery.tags && gallery.tags.length > 0) {
+        const tagIds = gallery.tags.map((t) => t.id);
+        const cachedTags = await stashEntityService.getTagsByIds(tagIds);
+        const tagMap = new Map(cachedTags.map((t) => [t.id, t]));
+        hydratedTags = gallery.tags.map((tag) => {
+          const cachedTag = tagMap.get(tag.id);
+          return cachedTag || (tag as NormalizedTag);
+        });
+      }
+
+      // Hydrate gallery studio with full cached data (gallery.studio only has id)
+      let hydratedStudio = null;
+      if (gallery.studio?.id) {
+        const cachedStudio = await stashEntityService.getStudio(gallery.studio.id);
+        hydratedStudio = cachedStudio || gallery.studio;
+      }
+
+      galleryContext = {
+        id: gallery.id,
+        title: gallery.title,
+        date: gallery.date,
+        details: gallery.details,
+        photographer: gallery.photographer,
+        studio: hydratedStudio,
+        studioId: hydratedStudio?.id,
+        performers: hydratedPerformers,
+        tags: hydratedTags,
+        urls: gallery.urls,
+      };
+    }
 
     // Transform to API format with proxy URLs
     const transformedImages = dbImages.map((image) => ({
@@ -651,8 +705,14 @@ export const getGalleryImages = async (
         id: it.tag.id,
         name: it.tag.name,
       })),
+      studio: image.studio
+        ? { id: image.studio.id, name: image.studio.name }
+        : null,
       stashCreatedAt: image.stashCreatedAt?.toISOString() ?? null,
       stashUpdatedAt: image.stashUpdatedAt?.toISOString() ?? null,
+      // Include galleries array for inheritance support
+      // This allows getEffectiveImageMetadata to work properly on the client
+      galleries: galleryContext ? [galleryContext] : [],
     }));
 
     // Merge images with user data (ratings/favorites)
