@@ -74,6 +74,12 @@ vi.mock("../UserStatsService.js", () => ({
     rebuildAllStats: vi.fn().mockResolvedValue(undefined),
   },
 }));
+// Mock entity image count service
+vi.mock("../EntityImageCountService.js", () => ({
+  entityImageCountService: {
+    rebuildAllImageCounts: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 
 describe("StashSyncService", () => {
   beforeEach(() => {
