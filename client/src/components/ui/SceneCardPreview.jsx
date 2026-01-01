@@ -35,6 +35,7 @@ import {
  * @param {number} spriteCount - Number of sprites to cycle through for VTT previews (default: 5)
  * @param {string} duration - Formatted duration string for bottom-left overlay (e.g., "2h03m")
  * @param {string} resolution - Formatted resolution string for top-right overlay (e.g., "1080p")
+ * @param {string} objectFit - CSS object-fit value: "contain" (default) or "cover" for cropping
  */
 const SceneCardPreview = ({
   scene,
@@ -43,6 +44,7 @@ const SceneCardPreview = ({
   spriteCount = 5,
   duration = null,
   resolution = null,
+  objectFit = "contain",
 }) => {
   const { user } = useAuth();
   const [sprites, setSprites] = useState([]);
@@ -336,6 +338,9 @@ const SceneCardPreview = ({
     return null;
   };
 
+  // Use explicit class names for Tailwind JIT detection (dynamic interpolation doesn't work)
+  const objectFitClass = objectFit === "cover" ? "object-cover" : "object-contain";
+
   return (
     <div
       ref={setContainerElement}
@@ -348,7 +353,7 @@ const SceneCardPreview = ({
       <img
         src={shouldLoadScreenshot ? scene?.paths?.screenshot : undefined}
         alt={scene?.title || "Scene"}
-        className="w-full h-full object-contain pointer-events-none"
+        className={`w-full h-full pointer-events-none ${objectFitClass}`}
         style={{ backgroundColor: "var(--bg-secondary)" }}
       />
 
@@ -358,7 +363,7 @@ const SceneCardPreview = ({
         previewDataLoaded && (
           <video
             src={getPreviewUrl()}
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
             style={{ backgroundColor: "var(--bg-secondary)" }}
             autoPlay
             loop
@@ -374,7 +379,7 @@ const SceneCardPreview = ({
           <img
             src={getPreviewUrl()}
             alt={scene?.title || "Scene preview"}
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            className={`absolute inset-0 w-full h-full pointer-events-none ${objectFitClass}`}
             style={{ backgroundColor: "var(--bg-secondary)" }}
           />
         )}
