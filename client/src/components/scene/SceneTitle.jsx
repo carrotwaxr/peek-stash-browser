@@ -3,17 +3,40 @@ import { formatRelativeTime } from "../../utils/date.js";
 import { getSceneTitle } from "../../utils/format.js";
 
 /**
- * Scene title with link and date
+ * Scene title with link and subtitle (studio • code • date)
+ * Matches SceneCard subtitle format for consistency
  */
 const SceneTitle = ({
   scene,
   linkState,
   showDate = true,
+  showSubtitle = false, // New: show subtitle with studio • code • date (like SceneCard)
   titleClassName = "",
   dateClassName = "",
   maxLines = null, // Optional: limit title to specific number of lines
 }) => {
   const title = getSceneTitle(scene);
+  const date = scene.date ? formatRelativeTime(scene.date) : null;
+
+  // Build subtitle with studio, code, and date (like SceneCard)
+  const subtitle = (() => {
+    if (!showSubtitle) return null;
+    const parts = [];
+
+    if (scene.studio) {
+      parts.push(scene.studio.name);
+    }
+
+    if (scene.code) {
+      parts.push(scene.code);
+    }
+
+    if (date) {
+      parts.push(date);
+    }
+
+    return parts.length > 0 ? parts.join(" • ") : null;
+  })();
 
   // Handle click to set autoplay flag if video is playing
   const handleClick = () => {
@@ -70,13 +93,23 @@ const SceneTitle = ({
         {title}
       </Link>
 
-      {showDate && (
+      {/* Show subtitle (studio • code • date) if enabled, otherwise just date */}
+      {showSubtitle && subtitle ? (
         <div
           className={`text-xs ${dateClassName}`}
           style={{ color: "var(--text-muted)" }}
         >
-          {scene.date ? formatRelativeTime(scene.date) : "No date"}
+          {subtitle}
         </div>
+      ) : (
+        showDate && (
+          <div
+            className={`text-xs ${dateClassName}`}
+            style={{ color: "var(--text-muted)" }}
+          >
+            {date || "No date"}
+          </div>
+        )
       )}
     </div>
   );

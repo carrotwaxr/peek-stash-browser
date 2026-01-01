@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRelativeTime } from "../../utils/date.js";
 import {
@@ -35,6 +36,20 @@ const SceneListItem = ({
   showSessionOIndicator = false, // Show if O was clicked in the last session
 }) => {
   const navigate = useNavigate();
+
+  // Track if viewport is mobile-width for scroll-based preview autoplay
+  // Uses md breakpoint (768px) since list items stack vertically below this
+  const [isMobileWidth, setIsMobileWidth] = useState(false);
+
+  useEffect(() => {
+    const checkWidth = () => {
+      setIsMobileWidth(window.innerWidth < 768);
+    };
+
+    checkWidth();
+    window.addEventListener("resize", checkWidth);
+    return () => window.removeEventListener("resize", checkWidth);
+  }, []);
 
   // Check if an O was clicked during the last viewing session
   const hadOInLastSession = () => {
@@ -137,17 +152,18 @@ const SceneListItem = ({
           {/* Optional Drag Handle */}
           {dragHandle}
 
-          {/* Thumbnail */}
-          <div className="flex-shrink-0 relative">
+          {/* Thumbnail - fixed width on desktop, 16:9 aspect ratio */}
+          <div className="flex-shrink-0 w-full md:w-96">
             {exists ? (
               <SceneThumbnail
                 scene={scene}
                 watchHistory={watchHistory}
-                className="w-full md:w-64 aspect-video md:aspect-auto md:h-36"
+                className="w-full aspect-video"
+                autoplayOnScroll={isMobileWidth}
               />
             ) : (
               <div
-                className="w-full md:w-64 aspect-video md:aspect-auto md:h-36 rounded flex items-center justify-center"
+                className="w-full aspect-video rounded flex items-center justify-center"
                 style={{
                   backgroundColor: "var(--status-error-bg)",
                   border: "2px dashed var(--status-error-border)",
@@ -170,13 +186,14 @@ const SceneListItem = ({
                 <div className="flex-1 min-w-0 md:pr-4">
                   {exists && scene ? (
                     <>
-                      {/* Title and Date */}
+                      {/* Title and Subtitle (Studio • Code • Date) */}
                       <div className="mb-2">
                         <SceneTitle
                           scene={scene}
                           linkState={linkState}
                           titleClassName="text-lg"
                           dateClassName="mt-1"
+                          showSubtitle={true}
                         />
                       </div>
 

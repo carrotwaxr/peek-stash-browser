@@ -1,15 +1,42 @@
-import { Link } from "react-router-dom";
+import {
+  formatDurationCompact,
+  formatResolution,
+} from "../../utils/format.js";
+import { SceneCardPreview } from "../ui/index.js";
 
 /**
- * Scene thumbnail with progress bar, duration, and studio overlays
+ * Scene thumbnail with animated preview and progress bar overlay
+ * Uses SceneCardPreview for animation (hover on desktop, scroll on mobile)
+ * Adds watch progress bar on top of the preview
+ *
+ * @param {Object} scene - Scene object with paths, files, etc.
+ * @param {Object} watchHistory - Optional watch history with resumeTime
+ * @param {string} className - Additional CSS classes
+ * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay (for mobile layouts)
+ * @param {string} objectFit - CSS object-fit: "contain" (default) or "cover" for cropping
  */
-const SceneThumbnail = ({ scene, watchHistory, className = "" }) => {
+const SceneThumbnail = ({
+  scene,
+  watchHistory,
+  className = "",
+  autoplayOnScroll = false,
+  objectFit = "cover",
+}) => {
   const formatResumeTime = (seconds) => {
     if (!seconds) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${String(secs).padStart(2, "0")}`;
   };
+
+  const duration = scene?.files?.[0]?.duration
+    ? formatDurationCompact(scene.files[0].duration)
+    : null;
+
+  const resolution =
+    scene?.files?.[0]?.width && scene?.files?.[0]?.height
+      ? formatResolution(scene.files[0].width, scene.files[0].height)
+      : null;
 
   if (!scene?.paths?.screenshot) {
     return (
@@ -28,39 +55,20 @@ const SceneThumbnail = ({ scene, watchHistory, className = "" }) => {
 
   return (
     <div className={`relative rounded overflow-hidden ${className}`}>
-      <img
-        src={scene.paths.screenshot}
-        alt={scene.title || "Scene"}
-        className="w-full h-full object-cover"
+      {/* Animated preview (handles screenshot, sprite, webp, mp4) */}
+      <SceneCardPreview
+        scene={scene}
+        autoplayOnScroll={autoplayOnScroll}
+        cycleInterval={600}
+        spriteCount={10}
+        duration={duration}
+        resolution={resolution}
+        objectFit={objectFit}
       />
 
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none">
-        {/* Studio badge - clickable */}
-        {scene.studio && (
-          <div className="absolute top-2 right-2 pointer-events-auto">
-            <Link
-              to={`/studio/${scene.studio.id}`}
-              className="px-2 py-1 bg-black/70 text-white text-xs rounded inline-block hover:bg-black/90 transition-colors"
-            >
-              {scene.studio.name}
-            </Link>
-          </div>
-        )}
-
-        {/* Duration */}
-        {scene.files?.[0]?.duration && (
-          <div className="absolute bottom-2 right-2">
-            <span className="px-2 py-1 bg-black/70 text-white text-xs rounded">
-              {Math.floor(scene.files[0].duration / 60)}m
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Watch progress bar */}
+      {/* Watch progress bar - overlaid on top of preview */}
       {watchHistory?.resumeTime && scene.files?.[0]?.duration && (
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50">
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 z-20">
           <div
             className="h-full bg-green-500 transition-all"
             style={{
