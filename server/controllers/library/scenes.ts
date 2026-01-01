@@ -52,12 +52,21 @@ class SeededRandom {
 
 /**
  * Merge user-specific data into scenes
+ *
+ * PERFORMANCE: When fetching data for a small number of scenes (< 100),
+ * we filter by sceneId to avoid loading entire watch history tables.
+ * For larger sets, we load all data and use Map lookups for efficiency.
  */
 export async function mergeScenesWithUserData(
   scenes: NormalizedScene[],
   userId: number
 ): Promise<NormalizedScene[]> {
+  // Extract scene IDs for targeted queries when dealing with small sets
+  const sceneIds = scenes.map((s) => s.id);
+  const useTargetedQuery = sceneIds.length < 100;
+
   // Fetch user data in parallel
+  // For small scene sets, filter by sceneId to avoid loading full tables
   const [
     watchHistory,
     sceneRatings,
@@ -65,8 +74,18 @@ export async function mergeScenesWithUserData(
     studioRatings,
     tagRatings,
   ] = await Promise.all([
-    prisma.watchHistory.findMany({ where: { userId } }),
-    prisma.sceneRating.findMany({ where: { userId } }),
+    prisma.watchHistory.findMany({
+      where: useTargetedQuery
+        ? { userId, sceneId: { in: sceneIds } }
+        : { userId },
+    }),
+    prisma.sceneRating.findMany({
+      where: useTargetedQuery
+        ? { userId, sceneId: { in: sceneIds } }
+        : { userId },
+    }),
+    // Performer/studio/tag ratings are kept as full loads since they're
+    // used for nested entity favorites across all scenes
     prisma.performerRating.findMany({ where: { userId } }),
     prisma.studioRating.findMany({ where: { userId } }),
     prisma.tagRating.findMany({ where: { userId } }),
