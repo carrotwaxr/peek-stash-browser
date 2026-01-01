@@ -6,6 +6,24 @@ import type { NormalizedScene } from "../types/index.js";
 import { transformScene } from "../utils/stashUrlProxy.js";
 
 /**
+ * Default user fields for scenes (when no user data is merged yet).
+ * These override any values from Stash to ensure Peek user data takes precedence.
+ */
+const DEFAULT_SCENE_USER_FIELDS = {
+  rating: null,
+  rating100: null,
+  favorite: false,
+  o_counter: 0,
+  play_count: 0,
+  play_duration: 0,
+  resume_time: 0,
+  play_history: [] as string[],
+  o_history: [] as string[],
+  last_played_at: null,
+  last_o_at: null,
+};
+
+/**
  * Get all playlists for current user
  * Includes first 4 items with scene preview data for thumbnail display
  */
@@ -156,11 +174,18 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
           transformScene(s as Scene)
         );
 
+        // Reset user-specific fields to defaults before merging Peek user data
+        // This ensures Stash's user values (o_counter, play_count, etc.) don't leak through
+        const scenesWithDefaults = transformedScenes.map((s) => ({
+          ...s,
+          ...DEFAULT_SCENE_USER_FIELDS,
+        }));
+
         // Override with per-user watch history
         const { mergeScenesWithUserData } = await import("./library/scenes.js");
         // Type assertion safe: scenes from API are compatible with Normalized type structure
         const scenesWithUserHistory = await mergeScenesWithUserData(
-          transformedScenes as unknown as NormalizedScene[],
+          scenesWithDefaults as unknown as NormalizedScene[],
           userId
         );
 
