@@ -17,6 +17,7 @@ import type { Gallery, Group, Performer, Scene, Studio, Tag } from "stashapp-api
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 // Transform functions no longer needed - URLs transformed at read time
+import { entityImageCountService } from "./EntityImageCountService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { userStatsService } from "./UserStatsService.js";
 
@@ -214,6 +215,11 @@ class StashSyncService extends EventEmitter {
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       // Rebuild user stats to reflect current entity relationships
+      // Rebuild inherited image counts (must happen after images and galleries are synced)
+      logger.info("Rebuilding inherited image counts...");
+      await entityImageCountService.rebuildAllImageCounts();
+      logger.info("Inherited image counts rebuild complete");
+
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
@@ -528,6 +534,11 @@ class StashSyncService extends EventEmitter {
       }
 
       // Rebuild user stats to reflect current entity relationships
+      // Rebuild inherited image counts (must happen after images and galleries are synced)
+      logger.info("Rebuilding inherited image counts...");
+      await entityImageCountService.rebuildAllImageCounts();
+      logger.info("Inherited image counts rebuild complete");
+
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");

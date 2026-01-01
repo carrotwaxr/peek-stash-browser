@@ -617,18 +617,12 @@ class StashEntityService {
 
     if (!cached) return null;
 
-    // Compute counts from junction tables
-    const [sceneCount, imageCount, galleryCount] = await Promise.all([
+    // Compute counts from junction tables (except imageCount which uses stored inherited value)
+    const [sceneCount, galleryCount] = await Promise.all([
       prisma.scenePerformer.count({
         where: {
           performerId: id,
           scene: { deletedAt: null },
-        },
-      }),
-      prisma.imagePerformer.count({
-        where: {
-          performerId: id,
-          image: { deletedAt: null },
         },
       }),
       prisma.galleryPerformer.count({
@@ -650,10 +644,10 @@ class StashEntityService {
     `;
     const groupCount = Number(groupCountResult[0]?.count ?? 0);
 
+    // imageCount comes from cached (stored value with gallery inheritance, calculated at sync time)
     return this.transformPerformer({
       ...cached,
       sceneCount,
-      imageCount,
       galleryCount,
       groupCount,
     });
@@ -789,15 +783,9 @@ class StashEntityService {
 
     if (!cached) return null;
 
-    // Compute counts from junction tables and scene data
-    const [sceneCount, imageCount, galleryCount] = await Promise.all([
+    // Compute counts from junction tables and scene data (except imageCount which uses stored inherited value)
+    const [sceneCount, galleryCount] = await Promise.all([
       prisma.stashScene.count({
-        where: {
-          studioId: id,
-          deletedAt: null,
-        },
-      }),
-      prisma.stashImage.count({
         where: {
           studioId: id,
           deletedAt: null,
@@ -830,11 +818,11 @@ class StashEntityService {
         AND s.deletedAt IS NULL
     `;
     const groupCount = Number(groupCountResult[0]?.count ?? 0);
+    // imageCount comes from cached (stored value with gallery inheritance, calculated at sync time)
 
     return this.transformStudio({
       ...cached,
       sceneCount,
-      imageCount,
       galleryCount,
       performerCount,
       groupCount,
@@ -897,18 +885,12 @@ class StashEntityService {
 
     if (!cached) return null;
 
-    // Compute counts from junction tables
-    const [sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount] = await Promise.all([
+    // Compute counts from junction tables (except imageCount which uses stored inherited value)
+    const [sceneCount, galleryCount, performerCount, studioCount, groupCount] = await Promise.all([
       prisma.sceneTag.count({
         where: {
           tagId: id,
           scene: { deletedAt: null },
-        },
-      }),
-      prisma.imageTag.count({
-        where: {
-          tagId: id,
-          image: { deletedAt: null },
         },
       }),
       prisma.galleryTag.count({
@@ -936,11 +918,11 @@ class StashEntityService {
         },
       }),
     ]);
+    // imageCount comes from cached (stored value with gallery inheritance, calculated at sync time)
 
     return this.transformTag({
       ...cached,
       sceneCount,
-      imageCount,
       galleryCount,
       performerCount,
       studioCount,
