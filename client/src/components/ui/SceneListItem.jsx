@@ -153,7 +153,7 @@ const SceneListItem = ({
           {dragHandle}
 
           {/* Thumbnail - fixed width on desktop, 16:9 aspect ratio */}
-          <div className="flex-shrink-0 w-full md:w-64">
+          <div className="flex-shrink-0 w-full md:w-96">
             {exists ? (
               <SceneThumbnail
                 scene={scene}
