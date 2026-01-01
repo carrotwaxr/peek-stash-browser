@@ -605,6 +605,11 @@ export const getGalleryImages = async (
     const { galleryId } = req.params;
     const userId = req.user?.id;
 
+    // Pagination parameters (optional - defaults to loading all for backwards compat)
+    const page = parseInt(req.query.page as string) || 1;
+    const perPage = parseInt(req.query.per_page as string) || 0; // 0 = no limit (all)
+    const skip = perPage > 0 ? (page - 1) * perPage : 0;
+
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -612,20 +617,30 @@ export const getGalleryImages = async (
     // Fetch the gallery data for inheritance context
     const gallery = await stashEntityService.getGallery(galleryId);
 
-    // Query images from local database filtered by gallery
-    const dbImages = await prisma.stashImage.findMany({
-      where: {
-        deletedAt: null,
-        galleries: {
-          some: { galleryId },
-        },
+    // Build query options
+    const whereClause = {
+      deletedAt: null,
+      galleries: {
+        some: { galleryId },
       },
+    };
+
+    // Get total count for pagination metadata
+    const totalCount = perPage > 0
+      ? await prisma.stashImage.count({ where: whereClause })
+      : 0;
+
+    // Query images from local database filtered by gallery
+    // PERFORMANCE: Uses pagination when per_page is specified to avoid loading huge galleries
+    const dbImages = await prisma.stashImage.findMany({
+      where: whereClause,
       include: {
         performers: { include: { performer: true } },
         tags: { include: { tag: true } },
         studio: true,
       },
       orderBy: { filePath: "asc" },
+      ...(perPage > 0 && { skip, take: perPage }),
     });
 
     // Build gallery context for inheritance (used by client-side getEffectiveImageMetadata)
@@ -721,10 +736,32 @@ export const getGalleryImages = async (
       userId
     );
 
-    res.json({
+    // Build response with optional pagination metadata
+    const response: {
+      images: typeof mergedImages;
+      count: number;
+      pagination?: {
+        page: number;
+        per_page: number;
+        total: number;
+        total_pages: number;
+      };
+    } = {
       images: mergedImages,
       count: mergedImages.length,
-    });
+    };
+
+    // Include pagination metadata when per_page is specified
+    if (perPage > 0) {
+      response.pagination = {
+        page,
+        per_page: perPage,
+        total: totalCount,
+        total_pages: Math.ceil(totalCount / perPage),
+      };
+    }
+
+    res.json(response);
   } catch (error) {
     logger.error("Error fetching gallery images", {
       galleryId: req.params.galleryId,

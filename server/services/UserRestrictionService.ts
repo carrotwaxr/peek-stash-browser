@@ -56,6 +56,9 @@ class UserRestrictionService {
    * 5. Scenes with hidden groups (CASCADE)
    * 6. Scenes with hidden galleries (CASCADE)
    * 7. Content restrictions (INCLUDE/EXCLUDE rules) - unless skipContentRestrictions
+   *
+   * PERFORMANCE: Caches allSceneIds query to avoid redundant full table scans.
+   * For INCLUDE restrictions, we only load the full scene list once.
    */
   async getExcludedSceneIds(
     userId: number,
@@ -139,12 +142,27 @@ class UserRestrictionService {
     if (!skipContentRestrictions) {
       const restrictions = await this.getRestrictionsForUser(userId);
 
+      // PERFORMANCE: Check if we need allSceneIds (only for INCLUDE mode or restrictEmpty)
+      // Cache it once instead of querying multiple times
+      let allSceneIdsCache: Set<string> | null = null;
+      const needsAllSceneIds = restrictions.some(
+        (r) => r.mode === "INCLUDE" || r.restrictEmpty
+      );
+
+      if (needsAllSceneIds) {
+        const allScenes = await prisma.stashScene.findMany({
+          where: { deletedAt: null },
+          select: { id: true },
+        });
+        allSceneIdsCache = new Set(allScenes.map((s) => s.id));
+      }
+
       for (const restriction of restrictions) {
         const entityIds = JSON.parse(restriction.entityIds) as string[];
-        if (entityIds.length === 0) continue;
+        if (entityIds.length === 0 && !restriction.restrictEmpty) continue;
 
         if (restriction.entityType === "groups") {
-          if (restriction.mode === "EXCLUDE") {
+          if (restriction.mode === "EXCLUDE" && entityIds.length > 0) {
             // Exclude scenes in these groups
             const scenesInExcludedGroups = await prisma.sceneGroup.findMany({
               where: { groupId: { in: entityIds } },
@@ -153,28 +171,38 @@ class UserRestrictionService {
             for (const sg of scenesInExcludedGroups) {
               excludedIds.add(sg.sceneId);
             }
-          } else if (restriction.mode === "INCLUDE") {
+          } else if (restriction.mode === "INCLUDE" && entityIds.length > 0) {
             // Only include scenes in these groups - exclude all others
-            // Get all scene IDs that ARE in the included groups
             const scenesInIncludedGroups = await prisma.sceneGroup.findMany({
               where: { groupId: { in: entityIds } },
               select: { sceneId: true },
             });
             const includedSceneIds = new Set(scenesInIncludedGroups.map(sg => sg.sceneId));
 
-            // Get all scene IDs and exclude those NOT in the included groups
-            const allSceneIds = await prisma.stashScene.findMany({
-              where: { deletedAt: null },
-              select: { id: true },
+            // Use cached allSceneIds
+            for (const sceneId of allSceneIdsCache!) {
+              if (!includedSceneIds.has(sceneId)) {
+                excludedIds.add(sceneId);
+              }
+            }
+          }
+
+          // Handle restrictEmpty for groups
+          if (restriction.restrictEmpty) {
+            const scenesWithGroups = await prisma.sceneGroup.findMany({
+              select: { sceneId: true },
+              distinct: ['sceneId'],
             });
-            for (const s of allSceneIds) {
-              if (!includedSceneIds.has(s.id)) {
-                excludedIds.add(s.id);
+            const scenesWithGroupsSet = new Set(scenesWithGroups.map(sg => sg.sceneId));
+
+            for (const sceneId of allSceneIdsCache!) {
+              if (!scenesWithGroupsSet.has(sceneId)) {
+                excludedIds.add(sceneId);
               }
             }
           }
         } else if (restriction.entityType === "tags") {
-          if (restriction.mode === "EXCLUDE") {
+          if (restriction.mode === "EXCLUDE" && entityIds.length > 0) {
             // Exclude scenes with these tags
             const scenesWithExcludedTags = await prisma.sceneTag.findMany({
               where: { tagId: { in: entityIds } },
@@ -183,7 +211,7 @@ class UserRestrictionService {
             for (const st of scenesWithExcludedTags) {
               excludedIds.add(st.sceneId);
             }
-          } else if (restriction.mode === "INCLUDE") {
+          } else if (restriction.mode === "INCLUDE" && entityIds.length > 0) {
             // Only include scenes with these tags - exclude all others
             const scenesWithIncludedTags = await prisma.sceneTag.findMany({
               where: { tagId: { in: entityIds } },
@@ -191,18 +219,29 @@ class UserRestrictionService {
             });
             const includedSceneIds = new Set(scenesWithIncludedTags.map(st => st.sceneId));
 
-            const allSceneIds = await prisma.stashScene.findMany({
-              where: { deletedAt: null },
-              select: { id: true },
+            for (const sceneId of allSceneIdsCache!) {
+              if (!includedSceneIds.has(sceneId)) {
+                excludedIds.add(sceneId);
+              }
+            }
+          }
+
+          // Handle restrictEmpty for tags
+          if (restriction.restrictEmpty) {
+            const scenesWithTags = await prisma.sceneTag.findMany({
+              select: { sceneId: true },
+              distinct: ['sceneId'],
             });
-            for (const s of allSceneIds) {
-              if (!includedSceneIds.has(s.id)) {
-                excludedIds.add(s.id);
+            const scenesWithTagsSet = new Set(scenesWithTags.map(st => st.sceneId));
+
+            for (const sceneId of allSceneIdsCache!) {
+              if (!scenesWithTagsSet.has(sceneId)) {
+                excludedIds.add(sceneId);
               }
             }
           }
         } else if (restriction.entityType === "studios") {
-          if (restriction.mode === "EXCLUDE") {
+          if (restriction.mode === "EXCLUDE" && entityIds.length > 0) {
             // Exclude scenes from these studios
             const scenesFromExcludedStudios = await prisma.stashScene.findMany({
               where: {
@@ -214,7 +253,7 @@ class UserRestrictionService {
             for (const s of scenesFromExcludedStudios) {
               excludedIds.add(s.id);
             }
-          } else if (restriction.mode === "INCLUDE") {
+          } else if (restriction.mode === "INCLUDE" && entityIds.length > 0) {
             // Only include scenes from these studios - exclude all others
             const scenesFromIncludedStudios = await prisma.stashScene.findMany({
               where: {
@@ -225,84 +264,15 @@ class UserRestrictionService {
             });
             const includedSceneIds = new Set(scenesFromIncludedStudios.map(s => s.id));
 
-            const allSceneIds = await prisma.stashScene.findMany({
-              where: { deletedAt: null },
-              select: { id: true },
-            });
-            for (const s of allSceneIds) {
-              if (!includedSceneIds.has(s.id)) {
-                excludedIds.add(s.id);
+            for (const sceneId of allSceneIdsCache!) {
+              if (!includedSceneIds.has(sceneId)) {
+                excludedIds.add(sceneId);
               }
             }
           }
-        } else if (restriction.entityType === "galleries") {
-          if (restriction.mode === "EXCLUDE") {
-            // Exclude scenes linked to these galleries
-            const scenesWithExcludedGalleries = await prisma.sceneGallery.findMany({
-              where: { galleryId: { in: entityIds } },
-              select: { sceneId: true },
-            });
-            for (const sg of scenesWithExcludedGalleries) {
-              excludedIds.add(sg.sceneId);
-            }
-          } else if (restriction.mode === "INCLUDE") {
-            // Only include scenes linked to these galleries - exclude all others
-            const scenesWithIncludedGalleries = await prisma.sceneGallery.findMany({
-              where: { galleryId: { in: entityIds } },
-              select: { sceneId: true },
-            });
-            const includedSceneIds = new Set(scenesWithIncludedGalleries.map(sg => sg.sceneId));
 
-            const allSceneIds = await prisma.stashScene.findMany({
-              where: { deletedAt: null },
-              select: { id: true },
-            });
-            for (const s of allSceneIds) {
-              if (!includedSceneIds.has(s.id)) {
-                excludedIds.add(s.id);
-              }
-            }
-          }
-        }
-
-        // Handle restrictEmpty (exclude scenes with no entities of this type)
-        if (restriction.restrictEmpty) {
-          if (restriction.entityType === "groups") {
-            // Find scenes with no groups
-            const scenesWithGroups = await prisma.sceneGroup.findMany({
-              select: { sceneId: true },
-              distinct: ['sceneId'],
-            });
-            const scenesWithGroupsSet = new Set(scenesWithGroups.map(sg => sg.sceneId));
-
-            const allSceneIds = await prisma.stashScene.findMany({
-              where: { deletedAt: null },
-              select: { id: true },
-            });
-            for (const s of allSceneIds) {
-              if (!scenesWithGroupsSet.has(s.id)) {
-                excludedIds.add(s.id);
-              }
-            }
-          } else if (restriction.entityType === "tags") {
-            // Find scenes with no tags
-            const scenesWithTags = await prisma.sceneTag.findMany({
-              select: { sceneId: true },
-              distinct: ['sceneId'],
-            });
-            const scenesWithTagsSet = new Set(scenesWithTags.map(st => st.sceneId));
-
-            const allSceneIds = await prisma.stashScene.findMany({
-              where: { deletedAt: null },
-              select: { id: true },
-            });
-            for (const s of allSceneIds) {
-              if (!scenesWithTagsSet.has(s.id)) {
-                excludedIds.add(s.id);
-              }
-            }
-          } else if (restriction.entityType === "studios") {
-            // Find scenes with no studio
+          // Handle restrictEmpty for studios
+          if (restriction.restrictEmpty) {
             const scenesWithoutStudio = await prisma.stashScene.findMany({
               where: {
                 OR: [
@@ -316,21 +286,43 @@ class UserRestrictionService {
             for (const s of scenesWithoutStudio) {
               excludedIds.add(s.id);
             }
-          } else if (restriction.entityType === "galleries") {
-            // Find scenes with no galleries
+          }
+        } else if (restriction.entityType === "galleries") {
+          if (restriction.mode === "EXCLUDE" && entityIds.length > 0) {
+            // Exclude scenes linked to these galleries
+            const scenesWithExcludedGalleries = await prisma.sceneGallery.findMany({
+              where: { galleryId: { in: entityIds } },
+              select: { sceneId: true },
+            });
+            for (const sg of scenesWithExcludedGalleries) {
+              excludedIds.add(sg.sceneId);
+            }
+          } else if (restriction.mode === "INCLUDE" && entityIds.length > 0) {
+            // Only include scenes linked to these galleries - exclude all others
+            const scenesWithIncludedGalleries = await prisma.sceneGallery.findMany({
+              where: { galleryId: { in: entityIds } },
+              select: { sceneId: true },
+            });
+            const includedSceneIds = new Set(scenesWithIncludedGalleries.map(sg => sg.sceneId));
+
+            for (const sceneId of allSceneIdsCache!) {
+              if (!includedSceneIds.has(sceneId)) {
+                excludedIds.add(sceneId);
+              }
+            }
+          }
+
+          // Handle restrictEmpty for galleries
+          if (restriction.restrictEmpty) {
             const scenesWithGalleries = await prisma.sceneGallery.findMany({
               select: { sceneId: true },
               distinct: ['sceneId'],
             });
             const scenesWithGalleriesSet = new Set(scenesWithGalleries.map(sg => sg.sceneId));
 
-            const allSceneIds = await prisma.stashScene.findMany({
-              where: { deletedAt: null },
-              select: { id: true },
-            });
-            for (const s of allSceneIds) {
-              if (!scenesWithGalleriesSet.has(s.id)) {
-                excludedIds.add(s.id);
+            for (const sceneId of allSceneIdsCache!) {
+              if (!scenesWithGalleriesSet.has(sceneId)) {
+                excludedIds.add(sceneId);
               }
             }
           }
