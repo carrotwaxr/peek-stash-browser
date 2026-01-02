@@ -20,7 +20,6 @@ import { logger } from "../utils/logger.js";
 class SceneTagInheritanceService {
   async computeInheritedTags(): Promise<void> {
     const startTime = Date.now();
-    logger.info("Computing inherited tags for scenes...");
 
     try {
       const scenes = await prisma.stashScene.findMany({
