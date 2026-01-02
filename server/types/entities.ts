@@ -61,6 +61,9 @@ export type NormalizedScene = Scene & {
 
   // Inherited tag IDs (from performers/studios, pre-computed at sync time)
   inheritedTagIds?: string[];
+
+  // Hydrated inherited tags with full tag objects (populated at API response time)
+  inheritedTags?: { id: string; name: string }[];
 };
 
 /**

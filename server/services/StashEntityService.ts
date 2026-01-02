@@ -1584,6 +1584,19 @@ class StashEntityService {
       );
     }
 
+    // Hydrate inherited tags with full tag objects
+    if (scene.inheritedTagIds) {
+      const inheritedTagIds = JSON.parse(scene.inheritedTagIds);
+      if (inheritedTagIds.length > 0) {
+        // Look up tags in the tags array we already have, or create minimal stub
+        base.inheritedTags = inheritedTagIds.map((tagId: string) => {
+          // Find in existing tags or create minimal stub
+          const existingTag = base.tags?.find((t: any) => t.id === tagId);
+          return existingTag || { id: tagId, name: "Unknown" };
+        });
+      }
+    }
+
     return base;
   }
 
