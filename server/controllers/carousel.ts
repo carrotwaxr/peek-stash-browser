@@ -308,17 +308,10 @@ export async function executeCarouselQuery(
   if (USE_SQL_QUERY_BUILDER) {
     logger.info("executeCarouselQuery: using SQL query builder path");
 
-    // Get exclusions
-    const excludedIds = await userRestrictionService.getExcludedSceneIds(
-      userId,
-      false
-    );
-
-    // Execute query
+    // Execute query (applyExclusions defaults to true)
     const result = await sceneQueryBuilder.execute({
       userId,
       filters: rules,
-      excludedSceneIds: excludedIds,
       sort,
       sortDirection: direction.toUpperCase() as "ASC" | "DESC",
       page: 1,

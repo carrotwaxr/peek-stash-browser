@@ -12,7 +12,7 @@
  * - Empty organizational entities -> reason='empty'
  */
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { stashCacheManager } from "./StashCacheManager.js";
@@ -742,7 +742,7 @@ class ExclusionComputationService {
     entityType: string,
     entityId: string
   ): Promise<void> {
-    const cascadeExclusions: ExclusionRecord[] = [];
+    const cascadeExclusions: Prisma.UserExcludedEntityCreateManyInput[] = [];
 
     switch (entityType) {
       case "performer": {
@@ -908,7 +908,7 @@ class ExclusionComputationService {
     // Insert cascade exclusions if any, using skipDuplicates to handle
     // cases where the scene/entity is already excluded
     if (cascadeExclusions.length > 0) {
-      await tx.userExcludedEntity.createMany({
+      await (tx.userExcludedEntity.createMany as any)({
         data: cascadeExclusions,
         skipDuplicates: true,
       });

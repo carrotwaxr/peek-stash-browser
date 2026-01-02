@@ -917,23 +917,16 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     if (USE_SQL_QUERY_BUILDER && !searchQuery) {
       logger.info("findScenes: using SQL query builder path");
 
-      // Get excluded scene IDs
-      const excludedIds = await userRestrictionService.getExcludedSceneIds(
-        userId,
-        requestingUser?.role === 'ADMIN'
-      );
-
       // Build filters object
       const filters: PeekSceneFilter = { ...scene_filter };
       if (ids && ids.length > 0) {
         filters.ids = { value: ids, modifier: "INCLUDES" };
       }
 
-      // Execute query
+      // Execute query (applyExclusions defaults to true)
       const result = await sceneQueryBuilder.execute({
         userId,
         filters,
-        excludedSceneIds: excludedIds,
         sort: sortField,
         sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
         page,
