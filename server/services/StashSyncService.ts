@@ -18,6 +18,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 // Transform functions no longer needed - URLs transformed at read time
 import { entityImageCountService } from "./EntityImageCountService.js";
+import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { userStatsService } from "./UserStatsService.js";
 
@@ -214,8 +215,13 @@ class StashSyncService extends EventEmitter {
       result = await this.syncImages(stashInstanceId, true);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
-      // Rebuild user stats to reflect current entity relationships
-      // Rebuild inherited image counts (must happen after images and galleries are synced)
+
+      // Apply gallery inheritance to images (must happen after images and galleries are synced)
+      logger.info("Applying gallery inheritance to images...");
+      await imageGalleryInheritanceService.applyGalleryInheritance();
+      logger.info("Gallery inheritance complete");
+
+      // Rebuild inherited image counts (must happen after gallery inheritance)
       logger.info("Rebuilding inherited image counts...");
       await entityImageCountService.rebuildAllImageCounts();
       logger.info("Inherited image counts rebuild complete");
@@ -533,8 +539,15 @@ class StashSyncService extends EventEmitter {
         }
       }
 
-      // Rebuild user stats to reflect current entity relationships
-      // Rebuild inherited image counts (must happen after images and galleries are synced)
+      // Apply gallery inheritance if images were synced
+      const imageResult = results.find((r) => r.entityType === "image");
+      if (imageResult && imageResult.synced > 0) {
+        logger.info("Applying gallery inheritance after incremental sync...");
+        await imageGalleryInheritanceService.applyGalleryInheritance();
+        logger.info("Gallery inheritance complete");
+      }
+
+      // Rebuild inherited image counts (must happen after gallery inheritance)
       logger.info("Rebuilding inherited image counts...");
       await entityImageCountService.rebuildAllImageCounts();
       logger.info("Inherited image counts rebuild complete");
