@@ -50,7 +50,7 @@ class SceneQueryBuilder {
     s.fileFrameRate, s.fileWidth, s.fileHeight, s.fileVideoCodec,
     s.fileAudioCodec, s.fileSize, s.pathScreenshot, s.pathPreview,
     s.pathSprite, s.pathVtt, s.pathChaptersVtt, s.pathStream, s.pathCaption,
-    s.streams,
+    s.streams, s.inheritedTagIds,
     s.oCounter AS stashOCounter, s.playCount AS stashPlayCount,
     s.playDuration AS stashPlayDuration, s.stashCreatedAt, s.stashUpdatedAt,
     r.rating AS userRating, r.favorite AS userFavorite,
@@ -1016,6 +1016,7 @@ class SceneQueryBuilder {
 
   /**
    * Build tag filter with hierarchy support
+   * Searches both direct scene tags (SceneTag) and inherited tags (inheritedTagIds JSON)
    */
   private async buildTagFilterWithHierarchy(
     filter:
@@ -1037,30 +1038,38 @@ class SceneQueryBuilder {
 
     const placeholders = ids.map(() => "?").join(", ");
 
+    // Build inherited tag check using json_each to search the JSON array
+    // inheritedTagIds is stored as JSON string like '["284","313"]'
+    const inheritedTagCheck = ids.map(() =>
+      `EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) WHERE json_each.value = ?)`
+    ).join(" OR ");
+
     switch (modifier) {
       case "INCLUDES":
+        // Match if tag is in direct tags OR in inherited tags
         return {
-          sql: `s.id IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
-          params: ids,
+          sql: `(s.id IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders})) OR (${inheritedTagCheck}))`,
+          params: [...ids, ...ids],
         };
 
       case "INCLUDES_ALL":
-        // Note: When hierarchy is enabled, the UI forces modifier to INCLUDES.
-        // This case handles non-hierarchy INCLUDES_ALL (match scenes with ALL specified tags)
+        // Match if ALL tags are present (in direct tags OR inherited tags)
+        // For each tag, check if it's in SceneTag OR in inheritedTagIds
+        const allTagChecks = ids.map(() =>
+          `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) WHERE json_each.value = ?))`
+        ).join(" AND ");
+        // Flatten params: for each id, we need it twice (once for SceneTag, once for json_each)
+        const allTagParams = ids.flatMap(id => [id, id]);
         return {
-          sql: `s.id IN (
-            SELECT sceneId FROM SceneTag
-            WHERE tagId IN (${placeholders})
-            GROUP BY sceneId
-            HAVING COUNT(DISTINCT tagId) = ?
-          )`,
-          params: [...ids, ids.length],
+          sql: `(${allTagChecks})`,
+          params: allTagParams,
         };
 
       case "EXCLUDES":
+        // Exclude if tag is in direct tags OR in inherited tags
         return {
-          sql: `s.id NOT IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
-          params: ids,
+          sql: `(s.id NOT IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders})) AND NOT (${inheritedTagCheck}))`,
+          params: [...ids, ...ids],
         };
 
       default:
@@ -1528,6 +1537,10 @@ class SceneQueryBuilder {
       tags: [],
       groups: [],
       galleries: [],
+
+      // Inherited tags - IDs parsed here, hydrated with names in populateRelations
+      inheritedTagIds: this.parseJsonArray(row.inheritedTagIds),
+      inheritedTags: [], // Will be populated in populateRelations
     };
 
     return scene as NormalizedScene;
@@ -1572,6 +1585,19 @@ class SceneQueryBuilder {
     const groupIds = [...new Set(groupJunctions.map((j) => j.groupId))];
     const galleryIds = [...new Set(galleryJunctions.map((j) => j.galleryId))];
 
+    // Collect inherited tag IDs (these may not be in tagJunctions since they come from performers/studios/groups)
+    const inheritedTagIdSet = new Set<string>();
+    for (const scene of scenes) {
+      const sceneAny = scene as any;
+      if (sceneAny.inheritedTagIds && Array.isArray(sceneAny.inheritedTagIds)) {
+        for (const tagId of sceneAny.inheritedTagIds) {
+          inheritedTagIdSet.add(tagId);
+        }
+      }
+    }
+    // Merge inherited tag IDs with direct tag IDs for a single query
+    const allTagIds = [...new Set([...tagIds, ...inheritedTagIdSet])];
+
     // Load actual entities (only those that exist)
     const [performers, tags, groups, galleries, studios] = await Promise.all([
       performerIds.length > 0
@@ -1579,9 +1605,9 @@ class SceneQueryBuilder {
             where: { id: { in: performerIds } },
           })
         : Promise.resolve([]),
-      tagIds.length > 0
+      allTagIds.length > 0
         ? prisma.stashTag.findMany({
-            where: { id: { in: tagIds } },
+            where: { id: { in: allTagIds } },
           })
         : Promise.resolve([]),
       groupIds.length > 0
@@ -1674,6 +1700,13 @@ class SceneQueryBuilder {
       const sceneAny = scene as any;
       if (sceneAny.studioId) {
         scene.studio = studiosById.get(sceneAny.studioId) || null;
+      }
+
+      // Hydrate inherited tags with full tag objects
+      if (sceneAny.inheritedTagIds && Array.isArray(sceneAny.inheritedTagIds) && sceneAny.inheritedTagIds.length > 0) {
+        sceneAny.inheritedTags = sceneAny.inheritedTagIds
+          .map((tagId: string) => tagsById.get(tagId))
+          .filter((tag: any) => tag !== undefined);
       }
     }
   }

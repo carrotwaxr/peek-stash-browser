@@ -808,7 +808,7 @@ class StashEntityService {
         select: { id: true, name: true },
       });
       const map = new Map<string, string>();
-      for (const t of tags) {
+      for (const t of tags || []) {
         if (t.name) map.set(t.id, t.name);
       }
       this.tagNameCache = map;
