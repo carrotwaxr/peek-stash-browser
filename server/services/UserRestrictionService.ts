@@ -829,10 +829,8 @@ class UserRestrictionService {
   /**
    * Get entity IDs from a scene based on entity type
    *
-   * FOR TAGS: Implements cascading logic - checks:
-   * - Direct scene tags
-   * - Tags on the scene's studio
-   * - Tags on the scene's performers
+   * FOR TAGS: Uses pre-computed inheritedTagIds (from performers, studio, groups)
+   * combined with direct scene tags for efficient restriction checking.
    */
   private getSceneEntityIds(
     scene: NormalizedScene,
@@ -846,33 +844,14 @@ class UserRestrictionService {
           ) || []
         );
       case "tags": {
-        // CASCADE: Collect tags from scene, studio, and performers
-        const tagIds = new Set<string>();
-
         // Direct scene tags
-        (scene.tags || []).forEach((t: EntityWithId) => {
-          tagIds.add(String(t.id));
-        });
+        const directTagIds = (scene.tags || []).map((t: EntityWithId) => String(t.id));
 
-        // Studio tags (cascading)
-        if (scene.studio?.tags) {
-          (scene.studio.tags as EntityWithId[]).forEach((t: EntityWithId) => {
-            tagIds.add(String(t.id));
-          });
-        }
+        // Inherited tags (pre-computed at sync time)
+        const inheritedTagIds = (scene as any).inheritedTagIds || [];
 
-        // Performer tags (cascading)
-        if (scene.performers) {
-          scene.performers.forEach((performer) => {
-            if ((performer as any).tags) {
-              ((performer as any).tags as EntityWithId[]).forEach((t: EntityWithId) => {
-                tagIds.add(String(t.id));
-              });
-            }
-          });
-        }
-
-        return Array.from(tagIds);
+        // Combine and deduplicate
+        return [...new Set([...directTagIds, ...inheritedTagIds])];
       }
       case "studios":
         return scene.studio ? [String(scene.studio.id)] : [];

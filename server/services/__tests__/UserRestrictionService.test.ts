@@ -32,6 +32,7 @@ describe('UserRestrictionService', () => {
         studio: { id: 'studio1', name: 'Studio 1', tags: [] },
         groups: [{ id: 'group1', name: 'Group 1' }],
         galleries: [],
+        inheritedTagIds: [], // No inherited tags
       } as unknown as NormalizedScene,
       {
         id: '2',
@@ -41,6 +42,7 @@ describe('UserRestrictionService', () => {
         studio: { id: 'studio2', name: 'Studio 2', tags: [{ id: 'tag4', name: 'Tag 4' }] },
         groups: [],
         galleries: [],
+        inheritedTagIds: ['tag3', 'tag4'], // Inherited from performer and studio
       } as unknown as NormalizedScene,
       {
         id: '3',
@@ -50,6 +52,7 @@ describe('UserRestrictionService', () => {
         studio: { id: 'studio1', name: 'Studio 1', tags: [] },
         groups: [{ id: 'group2', name: 'Group 2' }],
         galleries: [{ id: 'gallery1' }],
+        inheritedTagIds: [], // No inherited tags
       } as unknown as NormalizedScene,
       {
         id: '4',
@@ -59,6 +62,7 @@ describe('UserRestrictionService', () => {
         studio: null,
         groups: [],
         galleries: [],
+        inheritedTagIds: [], // No inherited tags
       } as unknown as NormalizedScene,
     ];
 
