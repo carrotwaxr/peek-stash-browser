@@ -231,12 +231,20 @@ export const libraryApi = {
   },
 
   /**
-   * Get images for a gallery
+   * Get images for a gallery with optional pagination
    * @param {string} galleryId - Gallery ID
-   * @returns {Promise<Object>} Object with images array and count
+   * @param {Object} options - Pagination options
+   * @param {number} options.page - Page number (1-indexed)
+   * @param {number} options.per_page - Items per page (0 = all)
+   * @returns {Promise<Object>} Object with images array, count, and pagination metadata
    */
-  getGalleryImages: async (galleryId) => {
-    return apiGet(`/library/galleries/${galleryId}/images`);
+  getGalleryImages: async (galleryId, { page = 1, per_page = 0 } = {}) => {
+    const params = new URLSearchParams();
+    if (page > 1) params.set("page", page.toString());
+    if (per_page > 0) params.set("per_page", per_page.toString());
+    const queryString = params.toString();
+    const url = `/library/galleries/${galleryId}/images${queryString ? `?${queryString}` : ""}`;
+    return apiGet(url);
   },
 
   /**

@@ -1125,14 +1125,54 @@ class StashEntityService {
 
   /**
    * Get all images from cache with relations
+   * Uses chunked queries to avoid Prisma's string conversion limit with large datasets.
+   * The "Failed to convert rust String into napi string" error occurs when Prisma
+   * tries to serialize very large result sets (500k+ rows with relations).
    */
   async getAllImages(): Promise<any[]> {
-    const cached = await prisma.stashImage.findMany({
+    const startTime = Date.now();
+
+    // Get total count first
+    const totalCount = await prisma.stashImage.count({
       where: { deletedAt: null },
-      include: this.imageIncludes,
     });
 
-    return cached.map((c) => this.transformImage(c));
+    // For smaller datasets, use single query (faster)
+    if (totalCount < 10000) {
+      const cached = await prisma.stashImage.findMany({
+        where: { deletedAt: null },
+        include: this.imageIncludes,
+      });
+      const result = cached.map((c) => this.transformImage(c));
+      logger.info(`getAllImages: single query for ${totalCount} images in ${Date.now() - startTime}ms`);
+      return result;
+    }
+
+    // For large datasets, fetch in chunks to avoid Prisma string limit
+    // Chunk size of 5000 keeps each query well under the limit
+    const CHUNK_SIZE = 5000;
+    const allImages: any[] = [];
+    let offset = 0;
+
+    while (offset < totalCount) {
+      const chunkStart = Date.now();
+      const chunk = await prisma.stashImage.findMany({
+        where: { deletedAt: null },
+        include: this.imageIncludes,
+        skip: offset,
+        take: CHUNK_SIZE,
+        orderBy: { id: 'asc' }, // Consistent ordering for pagination
+      });
+
+      const transformed = chunk.map((c) => this.transformImage(c));
+      allImages.push(...transformed);
+
+      logger.debug(`getAllImages chunk: offset=${offset}, fetched=${chunk.length} in ${Date.now() - chunkStart}ms`);
+      offset += CHUNK_SIZE;
+    }
+
+    logger.info(`getAllImages: chunked query for ${totalCount} images in ${Date.now() - startTime}ms`);
+    return allImages;
   }
 
   /**
@@ -1150,17 +1190,40 @@ class StashEntityService {
 
   /**
    * Get images by IDs with relations
+   * Uses chunked queries for large ID sets to avoid Prisma's string conversion limit.
    */
   async getImagesByIds(ids: string[]): Promise<any[]> {
-    const cached = await prisma.stashImage.findMany({
-      where: {
-        id: { in: ids },
-        deletedAt: null,
-      },
-      include: this.imageIncludes,
-    });
+    if (ids.length === 0) return [];
 
-    return cached.map((c) => this.transformImage(c));
+    // For smaller sets, use single query
+    if (ids.length < 5000) {
+      const cached = await prisma.stashImage.findMany({
+        where: {
+          id: { in: ids },
+          deletedAt: null,
+        },
+        include: this.imageIncludes,
+      });
+      return cached.map((c) => this.transformImage(c));
+    }
+
+    // For large sets, fetch in chunks
+    const CHUNK_SIZE = 5000;
+    const allImages: any[] = [];
+
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunkIds = ids.slice(i, i + CHUNK_SIZE);
+      const chunk = await prisma.stashImage.findMany({
+        where: {
+          id: { in: chunkIds },
+          deletedAt: null,
+        },
+        include: this.imageIncludes,
+      });
+      allImages.push(...chunk.map((c) => this.transformImage(c)));
+    }
+
+    return allImages;
   }
 
   /**

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
@@ -12,10 +13,13 @@ import {
   Lightbox,
   LoadingSpinner,
   PageHeader,
+  Pagination,
   RatingSlider,
   TagChips,
 } from "../ui/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
+
+const PER_PAGE = 100;
 
 const GalleryDetail = () => {
   const { galleryId } = useParams();
@@ -24,12 +28,16 @@ const GalleryDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [gallery, setGallery] = useState(null);
   const [images, setImages] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [imagesLoading, setImagesLoading] = useState(true);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [lightboxAutoPlay, setLightboxAutoPlay] = useState(false);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Paginated lightbox state and handlers
+  const lightbox = usePaginatedLightbox({
+    perPage: PER_PAGE,
+    totalCount,
+  });
 
   // Set page title to gallery name
   usePageTitle(gallery ? galleryTitle(gallery) : "Gallery");
@@ -56,8 +64,15 @@ const GalleryDetail = () => {
     const fetchImages = async () => {
       try {
         setImagesLoading(true);
-        const data = await libraryApi.getGalleryImages(galleryId);
+        const data = await libraryApi.getGalleryImages(galleryId, {
+          page: lightbox.currentPage,
+          per_page: PER_PAGE,
+        });
         setImages(data.images || []);
+        setTotalCount(data.pagination?.total || data.images?.length || 0);
+
+        // Handle pending lightbox navigation after page loads
+        lightbox.consumePendingLightboxIndex();
       } catch (error) {
         console.error("Error loading images:", error);
       } finally {
@@ -66,7 +81,8 @@ const GalleryDetail = () => {
     };
 
     fetchImages();
-  }, [galleryId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [galleryId, lightbox.currentPage]);
 
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
@@ -96,13 +112,13 @@ const GalleryDetail = () => {
   useRatingHotkeys({
     enabled: !isLoading && !!gallery,
     setRating: handleRatingChange,
-    toggleFavorite });
+    toggleFavorite,
+  });
 
   // Check if there's any sidebar content to display (tags moved to main content)
   const hasSidebarContent =
     gallery &&
-    ((gallery.scenes && gallery.scenes.length > 0) ||
-      gallery.details);
+    ((gallery.scenes && gallery.scenes.length > 0) || gallery.details);
 
   if (isLoading) {
     return (
@@ -141,11 +157,7 @@ const GalleryDetail = () => {
           <Button
             variant="primary"
             icon={<Play size={20} />}
-            onClick={() => {
-              setLightboxIndex(0);
-              setLightboxAutoPlay(true);
-              setLightboxOpen(true);
-            }}
+            onClick={() => lightbox.openLightbox(0, true)}
             disabled={images.length === 0}
             title="Play Slideshow"
           >
@@ -181,10 +193,9 @@ const GalleryDetail = () => {
                     <span>•</span>
                   </>
                 )}
-                {gallery.image_count && (
+                {totalCount > 0 && (
                   <span>
-                    {gallery.image_count} image
-                    {gallery.image_count !== 1 ? "s" : ""}
+                    {totalCount} image{totalCount !== 1 ? "s" : ""}
                   </span>
                 )}
                 {gallery.date && (
@@ -234,7 +245,8 @@ const GalleryDetail = () => {
                     <div
                       className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
                       style={{
-                        backgroundColor: "var(--border-color)" }}
+                        backgroundColor: "var(--border-color)",
+                      }}
                     >
                       {performer.image_path ? (
                         <img
@@ -289,16 +301,30 @@ const GalleryDetail = () => {
         >
           {/* Main Content - Images Grid (full width) */}
           <div>
+            {/* Pagination - Top */}
+            {lightbox.totalPages > 1 && (
+              <div className="mb-4">
+                <Pagination
+                  currentPage={lightbox.currentPage}
+                  totalPages={lightbox.totalPages}
+                  onPageChange={lightbox.setCurrentPage}
+                />
+              </div>
+            )}
+
             {imagesLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                {[...Array(gallery.image_count || 12)].map((_, index) => (
-                  <div
-                    key={index}
-                    className="aspect-square rounded-lg animate-pulse"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)" }}
-                  />
-                ))}
+                {[...Array(Math.min(PER_PAGE, gallery.image_count || 12))].map(
+                  (_, index) => (
+                    <div
+                      key={index}
+                      className="aspect-square rounded-lg animate-pulse"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                      }}
+                    />
+                  )
+                )}
               </div>
             ) : images.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
@@ -310,12 +336,9 @@ const GalleryDetail = () => {
                     className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
                     style={{
                       backgroundColor: "var(--bg-secondary)",
-                      borderColor: "var(--border-color)" }}
-                    onClick={() => {
-                      setLightboxIndex(index);
-                      setLightboxAutoPlay(false);
-                      setLightboxOpen(true);
+                      borderColor: "var(--border-color)",
                     }}
+                    onClick={() => lightbox.openLightbox(index)}
                   />
                 ))}
               </div>
@@ -325,6 +348,17 @@ const GalleryDetail = () => {
                 style={{ color: "var(--text-muted)" }}
               >
                 No images found in this gallery
+              </div>
+            )}
+
+            {/* Pagination - Bottom */}
+            {lightbox.totalPages > 1 && (
+              <div className="mt-4">
+                <Pagination
+                  currentPage={lightbox.currentPage}
+                  totalPages={lightbox.totalPages}
+                  onPageChange={lightbox.setCurrentPage}
+                />
               </div>
             )}
           </div>
@@ -370,11 +404,15 @@ const GalleryDetail = () => {
       {/* Lightbox */}
       <Lightbox
         images={images}
-        initialIndex={lightboxIndex}
-        isOpen={lightboxOpen}
-        autoPlay={lightboxAutoPlay}
-        onClose={() => setLightboxOpen(false)}
+        initialIndex={lightbox.lightboxIndex}
+        isOpen={lightbox.lightboxOpen}
+        autoPlay={lightbox.lightboxAutoPlay}
+        onClose={lightbox.closeLightbox}
         onImagesUpdate={setImages}
+        onPageBoundary={lightbox.onPageBoundary}
+        totalCount={totalCount}
+        pageOffset={lightbox.pageOffset}
+        onIndexChange={lightbox.onIndexChange}
       />
     </div>
   );
@@ -387,7 +425,8 @@ const Card = ({ title, children }) => {
       className="p-6 rounded-lg border"
       style={{
         backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)" }}
+        borderColor: "var(--border-color)",
+      }}
     >
       {title && (
         <h3
