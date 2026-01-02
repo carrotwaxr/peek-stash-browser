@@ -3,13 +3,13 @@ import {
   findGroups,
   findGroupsMinimal,
 } from "../../controllers/library/groups.js";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
+import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All group routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Find groups with filters
 router.post("/groups", requireCacheReady, authenticated(findGroups));

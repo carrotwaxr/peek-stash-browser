@@ -44,6 +44,7 @@ These settings have sensible defaults but can be customized:
 | `CONFIG_DIR`         | App data directory         | `/app/data`                            | Database + HLS cache         |
 | `TMP_DIR`            | Transcoding temp directory | `/app/tmp`                             | Needs fast I/O               |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
+| `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
 
 ## Video Streaming (v2.0+)
 
@@ -65,9 +66,118 @@ This is a significant simplification from v1.x which required mounting media dir
 !!! warning "Security Best Practices"
     - Set a strong `JWT_SECRET` during installation (required)
     - Set `SECURE_COOKIES=true` when using HTTPS
-    - Don't expose Peek directly to the internet without a reverse proxy
+    - **Never expose Peek directly to the internet** - always use a reverse proxy
     - Admin credentials are created during setup wizard (no default passwords)
     - Stash API key is stored securely in the database (not in environment variables)
+
+## Proxy Authentication
+
+Peek supports delegating authentication to your reverse proxy (e.g., Nginx, Traefik, Caddy, Authelia, Authentik). This is useful when you already have an authentication system in place and want Peek to trust the authenticated user from the proxy.
+
+### How It Works
+
+1. Your reverse proxy handles authentication (SSO, OAuth, basic auth, etc.)
+2. The proxy adds a header with the authenticated username to all requests
+3. Peek reads this header and looks up the corresponding user in its database
+4. If no header is present, Peek falls back to standard JWT token authentication
+
+### Configuration
+
+Set the `PROXY_AUTH_HEADER` environment variable to the name of the header your proxy uses:
+
+```bash
+PROXY_AUTH_HEADER=X-Peek-Username
+```
+
+Common header names:
+- `X-Peek-Username` (recommended)
+- `X-Forwarded-User` (common with Authelia/Traefik)
+- `Remote-User` (common with Nginx auth_request)
+- `X-Auth-Request-User` (oauth2-proxy)
+
+### Security Requirements
+
+!!! danger "Critical Security Requirements"
+    When using proxy authentication, you **MUST** ensure:
+    
+    1. **Peek is NOT accessible directly** - Only allow access through the reverse proxy
+    2. **The proxy sanitizes the authentication header** - The proxy must strip any user-supplied headers with the same name to prevent header injection attacks
+    3. **Network isolation** - Peek should only listen on localhost or a private network, not on public interfaces
+    
+    **Failure to follow these requirements will allow anyone to impersonate any user by setting the header in their request.**
+
+### Example: Nginx with auth_request
+
+```nginx
+location / {
+    # Authentication endpoint
+    auth_request /auth;
+    
+    # Pass authenticated username to Peek
+    auth_request_set $user $upstream_http_x_auth_user;
+    proxy_set_header Remote-User $user;
+    
+    # CRITICAL: Strip any user-provided Remote-User headers
+    proxy_set_header Remote-User "";  # Clear first
+    proxy_set_header Remote-User $user;  # Then set from auth
+    
+    # Proxy to Peek
+    proxy_pass http://localhost:6969;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+```
+
+```bash
+# Peek configuration
+PROXY_AUTH_HEADER=Remote-User
+```
+
+### Example: Traefik with ForwardAuth (Authelia)
+
+```yaml
+# docker-compose.yml
+services:
+  traefik:
+    labels:
+      - "traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://auth.example.com"
+      - "traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User"
+      
+  peek:
+    environment:
+      - PROXY_AUTH_HEADER=Remote-User
+    labels:
+      - "traefik.http.routers.peek.middlewares=authelia@docker"
+```
+
+### User Management
+
+Users **must exist** in Peek's database for proxy authentication to work:
+
+1. Create users through Peek's admin panel (Settings → User Management)
+2. The **username** in Peek must **exactly match** the username passed by the proxy
+3. User roles and permissions are still managed within Peek
+4. Passwords are not used when proxy auth is enabled (but must still be set in the database)
+
+### Fallback Behavior
+
+When `PROXY_AUTH_HEADER` is set but the header is not present in a request, Peek falls back to standard JWT cookie authentication. This allows:
+
+- Mixed authentication (some users via proxy, others via direct login)
+- API access using JWT tokens
+- Testing and development without the proxy
+
+### Troubleshooting
+
+**401 Unauthorized - User not found**
+- Verify the user exists in Peek's database
+- Check that usernames match exactly (case-sensitive)
+- Verify the proxy is passing the correct header name
+
+**Users being logged in as wrong user**
+- **CRITICAL**: Your proxy is not sanitizing the header properly
+- Verify the proxy strips user-supplied headers before setting the authenticated value
+- Check that Peek is not accessible directly (bypass proxy)
 
 ## Example Configurations
 

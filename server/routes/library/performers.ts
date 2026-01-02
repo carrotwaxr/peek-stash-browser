@@ -4,13 +4,13 @@ import {
   findPerformersMinimal,
   updatePerformer,
 } from "../../controllers/library/performers.js";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
+import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All performer routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Find performers with filters
 router.post("/performers", requireCacheReady, authenticated(findPerformers));

@@ -1,6 +1,6 @@
 import express from "express";
-import { findImages, findImageById } from "../../controllers/library/images.js";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
+import { findImageById, findImages } from "../../controllers/library/images.js";
+import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 // Find images (with filters, pagination, sorting)
 router.post(
   "/images",
-  authenticateToken,
+  authenticate,
   requireCacheReady,
   authenticated(findImages)
 );
@@ -16,7 +16,7 @@ router.post(
 // Get single image by ID
 router.get(
   "/images/:id",
-  authenticateToken,
+  authenticate,
   requireCacheReady,
   authenticated(findImageById)
 );

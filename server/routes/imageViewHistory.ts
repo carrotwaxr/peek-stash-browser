@@ -4,13 +4,13 @@ import {
   incrementImageOCounter,
   recordImageView,
 } from "../controllers/imageViewHistory.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All image view history routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Increment O counter for image
 router.post("/increment-o", authenticated(incrementImageOCounter));

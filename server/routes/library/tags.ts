@@ -4,13 +4,13 @@ import {
   findTagsMinimal,
   updateTag,
 } from "../../controllers/library/tags.js";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
+import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All tag routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Find tags with filters
 router.post("/tags", requireCacheReady, authenticated(findTags));

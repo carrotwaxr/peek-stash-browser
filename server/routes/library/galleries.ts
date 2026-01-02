@@ -5,39 +5,39 @@ import {
   findGalleryById,
   getGalleryImages,
 } from "../../controllers/library/galleries.js";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
+import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All rating routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Update ratings and favorites
 router.post(
   "/galleries",
-  authenticateToken,
+  authenticate,
   requireCacheReady,
   authenticated(findGalleries)
 );
 
 router.post(
   "/galleries/minimal",
-  authenticateToken,
+  authenticate,
   requireCacheReady,
   authenticated(findGalleriesMinimal)
 );
 
 router.get(
   "/galleries/:id",
-  authenticateToken,
+  authenticate,
   requireCacheReady,
   authenticated(findGalleryById)
 );
 
 router.get(
   "/galleries/:galleryId/images",
-  authenticateToken,
+  authenticate,
   requireCacheReady,
   authenticated(getGalleryImages)
 );

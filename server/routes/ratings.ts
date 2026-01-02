@@ -8,12 +8,12 @@ import {
   updateStudioRating,
   updateTagRating,
 } from "../controllers/ratings.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
 
 // All rating routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Update ratings and favorites
 router.put("/scene/:sceneId", updateSceneRating);

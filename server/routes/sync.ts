@@ -7,9 +7,8 @@
  * - POST /api/sync/notify - Webhook for Stash plugin (admin only)
  * - PUT /api/sync/settings - Update sync settings (admin only)
  */
-
 import express from "express";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import { syncScheduler } from "../services/SyncScheduler.js";
 import { authenticated } from "../utils/routeHelpers.js";
@@ -17,7 +16,7 @@ import { authenticated } from "../utils/routeHelpers.js";
 const router = express.Router();
 
 // All sync routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 /**
  * GET /api/sync/status
@@ -198,8 +197,11 @@ router.put(
   requireAdmin,
   authenticated(async (req, res) => {
     try {
-      const { syncIntervalMinutes, enableScanSubscription, enablePluginWebhook } =
-        req.body;
+      const {
+        syncIntervalMinutes,
+        enableScanSubscription,
+        enablePluginWebhook,
+      } = req.body;
 
       // Validate syncIntervalMinutes
       if (syncIntervalMinutes !== undefined) {
@@ -210,7 +212,8 @@ router.put(
         ) {
           return res.status(400).json({
             error: "Invalid sync interval",
-            message: "Sync interval must be between 5 and 1440 minutes (24 hours)",
+            message:
+              "Sync interval must be between 5 and 1440 minutes (24 hours)",
           });
         }
       }

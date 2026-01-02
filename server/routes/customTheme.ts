@@ -7,13 +7,13 @@ import {
   getUserCustomThemes,
   updateCustomTheme,
 } from "../controllers/customTheme.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All custom theme routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Get all user custom themes
 router.get("/", authenticated(getUserCustomThemes));

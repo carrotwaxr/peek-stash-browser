@@ -1,5 +1,4 @@
 import express from "express";
-import { authenticateToken } from "../middleware/auth.js";
 import {
   createFirstAdmin,
   createFirstStashInstance,
@@ -8,6 +7,7 @@ import {
   resetSetup,
   testStashConnection,
 } from "../controllers/setup.js";
+import { authenticate } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -19,6 +19,6 @@ router.post("/create-stash-instance", createFirstStashInstance);
 router.post("/reset", resetSetup);
 
 // Protected routes (require authentication)
-router.get("/stash-instance", authenticateToken, getStashInstance);
+router.get("/stash-instance", authenticate, getStashInstance);
 
 export default router;
