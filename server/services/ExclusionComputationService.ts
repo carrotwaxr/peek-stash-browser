@@ -84,6 +84,9 @@ class ExclusionComputationService {
         });
       }
 
+      // Phase 4: Update entity stats
+      await this.updateEntityStats(userId, tx);
+
       logger.info("ExclusionComputationService.recomputeForUser completed", {
         userId,
         totalExclusions: allExclusions.length,
@@ -616,6 +619,59 @@ class ExclusionComputationService {
     }
 
     return emptyExclusions;
+  }
+
+  /**
+   * Update visible entity counts for the user.
+   * Called at the end of recomputeForUser after all exclusions are computed.
+   */
+  private async updateEntityStats(
+    userId: number,
+    tx: TransactionClient
+  ): Promise<void> {
+    const entityTypes = ["scene", "performer", "studio", "tag", "group", "gallery", "image"];
+
+    for (const entityType of entityTypes) {
+      const total = await this.getEntityCount(entityType, tx);
+      const excluded = await tx.userExcludedEntity.count({
+        where: { userId, entityType },
+      });
+
+      await tx.userEntityStats.upsert({
+        where: { userId_entityType: { userId, entityType } },
+        create: { userId, entityType, visibleCount: total - excluded },
+        update: { visibleCount: total - excluded },
+      });
+    }
+
+    logger.debug("updateEntityStats complete", { userId });
+  }
+
+  /**
+   * Get total count of entities of a given type.
+   */
+  private async getEntityCount(
+    entityType: string,
+    tx: TransactionClient
+  ): Promise<number> {
+    switch (entityType) {
+      case "scene":
+        return tx.stashScene.count({ where: { deletedAt: null } });
+      case "performer":
+        return tx.stashPerformer.count({ where: { deletedAt: null } });
+      case "studio":
+        return tx.stashStudio.count({ where: { deletedAt: null } });
+      case "tag":
+        return tx.stashTag.count({ where: { deletedAt: null } });
+      case "group":
+        return tx.stashGroup.count({ where: { deletedAt: null } });
+      case "gallery":
+        return tx.stashGallery.count({ where: { deletedAt: null } });
+      case "image":
+        return tx.stashImage.count({ where: { deletedAt: null } });
+      default:
+        return 0;
+    }
   }
 
   /**
