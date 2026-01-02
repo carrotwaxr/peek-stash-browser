@@ -60,7 +60,7 @@ export const getUserPlaylists = async (
       },
     });
 
-    // Fetch scene details for preview items from Stash
+    // Fetch scene details for preview items from cache
     const playlistsWithScenes = await Promise.all(
       playlists.map(async (playlist) => {
         if (playlist.items.length === 0) {
@@ -70,25 +70,23 @@ export const getUserPlaylists = async (
         const sceneIds = playlist.items.map((item) => item.sceneId);
 
         try {
-          const { stashInstanceManager } = await import(
-            "../services/StashInstanceManager.js"
-          );
-          const stash = stashInstanceManager.getDefault();
+          // 1. Fetch scenes from cache with relations
+          const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
 
-          const scenesResponse = await stash.findScenes({
-            scene_ids: sceneIds.map((id) => parseInt(id)),
-          });
+          // 2. Apply user restrictions (filter out hidden/restricted scenes)
+          const isAdmin = req.user?.role === "ADMIN";
+          const visibleScenes = isAdmin
+            ? scenes
+            : await userRestrictionService.filterScenesForUser(scenes, userId);
 
-          const scenes = scenesResponse.findScenes.scenes;
-
-          // Transform scenes to add API key to image paths
-          const transformedScenes = scenes.map((s: unknown) =>
-            transformScene(s as Scene)
+          // 3. Transform scenes to add proxy URLs
+          const transformedScenes = visibleScenes.map((s) =>
+            transformScene(s as unknown as Scene)
           );
 
           // Create a map of scene ID to scene data
           const sceneMap = new Map(
-            transformedScenes.map((s: Scene) => [s.id, s])
+            transformedScenes.map((s) => [s.id, s])
           );
 
           // Attach scene data to each playlist item (only paths.screenshot needed for preview)
@@ -101,12 +99,12 @@ export const getUserPlaylists = async (
             ...playlist,
             items: itemsWithScenes,
           };
-        } catch (stashError) {
+        } catch (cacheError) {
           console.error(
             `Error fetching scenes for playlist ${playlist.id}:`,
-            stashError
+            cacheError
           );
-          // Return playlist without scene details if Stash fails
+          // Return playlist without scene details if cache fails
           return playlist;
         }
       })
