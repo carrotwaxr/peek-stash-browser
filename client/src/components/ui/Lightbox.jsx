@@ -13,6 +13,11 @@ const Lightbox = ({
   onClose,
   autoPlay = false,
   onImagesUpdate,
+  // Cross-page navigation support
+  onPageBoundary, // (direction: 'next' | 'prev') => boolean - returns true if page change handled
+  totalCount, // Total images across all pages (for counter display)
+  pageOffset = 0, // Offset of current page (e.g., page 2 with 100/page = 100)
+  onIndexChange, // (index: number) => void - called when current index changes (for syncing with parent)
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -38,6 +43,13 @@ const Lightbox = ({
     setImageLoaded(false);
   }, [initialIndex]);
 
+  // Notify parent of index changes (for syncing page on close)
+  useEffect(() => {
+    if (onIndexChange && isOpen) {
+      onIndexChange(currentIndex);
+    }
+  }, [currentIndex, onIndexChange, isOpen]);
+
   // Auto-start slideshow if autoPlay is enabled
   useEffect(() => {
     if (isOpen && autoPlay) {
@@ -47,16 +59,38 @@ const Lightbox = ({
     }
   }, [isOpen, autoPlay]);
 
-  // Navigation functions
+  // Navigation functions with cross-page support
   const goToPrevious = useCallback(() => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+    if (currentIndex === 0) {
+      // At first image - check for previous page
+      if (onPageBoundary && onPageBoundary("prev")) {
+        // Page change handled by parent, index will be set via initialIndex prop
+        setImageLoaded(false);
+        return;
+      }
+      // No previous page or no handler - wrap to end
+      setCurrentIndex(images.length - 1);
+    } else {
+      setCurrentIndex((prev) => prev - 1);
+    }
     setImageLoaded(false);
-  }, [images.length]);
+  }, [currentIndex, images.length, onPageBoundary]);
 
   const goToNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+    if (currentIndex === images.length - 1) {
+      // At last image - check for next page
+      if (onPageBoundary && onPageBoundary("next")) {
+        // Page change handled by parent, index will be set via initialIndex prop
+        setImageLoaded(false);
+        return;
+      }
+      // No next page or no handler - wrap to start
+      setCurrentIndex(0);
+    } else {
+      setCurrentIndex((prev) => prev + 1);
+    }
     setImageLoaded(false);
-  }, [images.length]);
+  }, [currentIndex, images.length, onPageBoundary]);
 
   // Slideshow control
   const toggleSlideshow = useCallback(() => {
@@ -477,11 +511,14 @@ const Lightbox = ({
           color: "var(--text-primary)",
         }}
       >
-        {currentIndex + 1} / {images.length}
+        {/* Show global position if totalCount provided, otherwise local position */}
+        {totalCount
+          ? `${pageOffset + currentIndex + 1} / ${totalCount}`
+          : `${currentIndex + 1} / ${images.length}`}
       </div>
 
-      {/* Previous button */}
-      {images.length > 1 && (
+      {/* Previous button - show if multiple images OR if cross-page navigation available */}
+      {(images.length > 1 || (totalCount && totalCount > images.length)) && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -500,8 +537,8 @@ const Lightbox = ({
         </button>
       )}
 
-      {/* Next button */}
-      {images.length > 1 && (
+      {/* Next button - show if multiple images OR if cross-page navigation available */}
+      {(images.length > 1 || (totalCount && totalCount > images.length)) && (
         <button
           onClick={(e) => {
             e.stopPropagation();

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -566,12 +567,15 @@ const TagDetails = ({ tag }) => {
 const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
   const [images, setImages] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const perPage = 100;
+
+  // Paginated lightbox state and handlers
+  const lightbox = usePaginatedLightbox({
+    perPage,
+    totalCount,
+  });
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -579,7 +583,7 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
         setIsLoading(true);
         const data = await libraryApi.findImages({
           filter: {
-            page: currentPage,
+            page: lightbox.currentPage,
             per_page: perPage,
           },
           image_filter: {
@@ -592,6 +596,9 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
         });
         setImages(data.findImages?.images || []);
         setTotalCount(data.findImages?.count || 0);
+
+        // Handle pending lightbox navigation after page loads
+        lightbox.consumePendingLightboxIndex();
       } catch (error) {
         console.error("Error loading images:", error);
       } finally {
@@ -600,7 +607,8 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
     };
 
     fetchImages();
-  }, [tagId, currentPage, includeSubTags]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tagId, lightbox.currentPage, includeSubTags]);
 
   if (isLoading) {
     return (
@@ -629,17 +637,15 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
     );
   }
 
-  const totalPages = Math.ceil(totalCount / perPage);
-
   return (
     <>
       {/* Pagination - Top */}
-      {totalPages > 1 && (
+      {lightbox.totalPages > 1 && (
         <div className="mt-6">
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
+            currentPage={lightbox.currentPage}
+            totalPages={lightbox.totalPages}
+            onPageChange={lightbox.setCurrentPage}
           />
         </div>
       )}
@@ -655,21 +661,18 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
               backgroundColor: "var(--bg-secondary)",
               borderColor: "var(--border-color)",
             }}
-            onClick={() => {
-              setLightboxIndex(index);
-              setLightboxOpen(true);
-            }}
+            onClick={() => lightbox.openLightbox(index)}
           />
         ))}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
+      {/* Pagination - Bottom */}
+      {lightbox.totalPages > 1 && (
         <div className="mt-6">
           <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
+            currentPage={lightbox.currentPage}
+            totalPages={lightbox.totalPages}
+            onPageChange={lightbox.setCurrentPage}
           />
         </div>
       )}
@@ -677,11 +680,15 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
       {/* Lightbox */}
       <Lightbox
         images={images}
-        initialIndex={lightboxIndex}
-        isOpen={lightboxOpen}
+        initialIndex={lightbox.lightboxIndex}
+        isOpen={lightbox.lightboxOpen}
         autoPlay={false}
-        onClose={() => setLightboxOpen(false)}
+        onClose={lightbox.closeLightbox}
         onImagesUpdate={setImages}
+        onPageBoundary={lightbox.onPageBoundary}
+        totalCount={totalCount}
+        pageOffset={lightbox.pageOffset}
+        onIndexChange={lightbox.onIndexChange}
       />
     </>
   );
