@@ -61,11 +61,16 @@ class ExclusionComputationService {
       // Phase 2: Compute cascade exclusions
       const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, tx);
 
-      // Phase 3: Compute empty exclusions (later task)
-      // const emptyExclusions = await this.computeEmptyExclusions(userId, tx);
+      // Phase 3: Compute empty exclusions
+      // Empty exclusions need to consider direct + cascade exclusions already computed
+      const emptyExclusions = await this.computeEmptyExclusions(
+        userId,
+        [...directExclusions, ...cascadeExclusions],
+        tx
+      );
 
       // Combine all exclusions
-      const allExclusions = [...directExclusions, ...cascadeExclusions];
+      const allExclusions = [...directExclusions, ...cascadeExclusions, ...emptyExclusions];
 
       // Delete existing exclusions for this user
       await tx.userExcludedEntity.deleteMany({
@@ -76,7 +81,6 @@ class ExclusionComputationService {
       if (allExclusions.length > 0) {
         await tx.userExcludedEntity.createMany({
           data: allExclusions,
-          skipDuplicates: true,
         });
       }
 
@@ -357,6 +361,261 @@ class ExclusionComputationService {
     }
 
     return cascadeExclusions;
+  }
+
+  /**
+   * Compute empty exclusions for organizational entities.
+   * An entity is "empty" if it has no visible content after direct and cascade exclusions.
+   *
+   * Empty rules:
+   * - Galleries: 0 visible images
+   * - Performers: 0 visible scenes AND 0 visible images
+   * - Studios: 0 visible scenes AND 0 visible images
+   * - Groups: 0 visible scenes
+   * - Tags: not attached to any visible scene, performer, studio, or group
+   *
+   * Note: Since we delete and recreate all exclusions in the same transaction,
+   * we need to check against the priorExclusions in-memory rather than querying
+   * UserExcludedEntity (which will be empty during the transaction).
+   *
+   * @param userId - User ID
+   * @param priorExclusions - Direct + cascade exclusions already computed
+   * @param tx - Transaction client
+   * @returns Array of empty exclusion records
+   */
+  private async computeEmptyExclusions(
+    userId: number,
+    priorExclusions: ExclusionRecord[],
+    tx: TransactionClient
+  ): Promise<ExclusionRecord[]> {
+    const emptyExclusions: ExclusionRecord[] = [];
+
+    // Build sets of already-excluded entity IDs by type for efficient lookup
+    const excludedSceneIds = new Set<string>();
+    const excludedImageIds = new Set<string>();
+    const excludedPerformerIds = new Set<string>();
+    const excludedStudioIds = new Set<string>();
+    const excludedGroupIds = new Set<string>();
+
+    for (const excl of priorExclusions) {
+      switch (excl.entityType) {
+        case "scene":
+          excludedSceneIds.add(excl.entityId);
+          break;
+        case "image":
+          excludedImageIds.add(excl.entityId);
+          break;
+        case "performer":
+          excludedPerformerIds.add(excl.entityId);
+          break;
+        case "studio":
+          excludedStudioIds.add(excl.entityId);
+          break;
+        case "group":
+          excludedGroupIds.add(excl.entityId);
+          break;
+      }
+    }
+
+    // Helper to check if entity is visible (not in exclusion set)
+    const isSceneVisible = (id: string) => !excludedSceneIds.has(id);
+    const isImageVisible = (id: string) => !excludedImageIds.has(id);
+    const isPerformerVisible = (id: string) => !excludedPerformerIds.has(id);
+    const isStudioVisible = (id: string) => !excludedStudioIds.has(id);
+    const isGroupVisible = (id: string) => !excludedGroupIds.has(id);
+
+    // 1. Empty galleries - galleries with 0 visible images
+    // Get all galleries with their images
+    const galleriesWithImages = await (tx as any).$queryRaw`
+      SELECT g.id as galleryId, i.id as imageId
+      FROM StashGallery g
+      LEFT JOIN ImageGallery ig ON ig.galleryId = g.id
+      LEFT JOIN StashImage i ON ig.imageId = i.id AND i.deletedAt IS NULL
+      WHERE g.deletedAt IS NULL
+    ` as Array<{ galleryId: string; imageId: string | null }>;
+
+    // Group by gallery and check if any image is visible
+    const galleryVisibleImages = new Map<string, boolean>();
+    for (const row of galleriesWithImages) {
+      if (!galleryVisibleImages.has(row.galleryId)) {
+        galleryVisibleImages.set(row.galleryId, false);
+      }
+      if (row.imageId && isImageVisible(row.imageId)) {
+        galleryVisibleImages.set(row.galleryId, true);
+      }
+    }
+
+    for (const [galleryId, hasVisibleImages] of galleryVisibleImages) {
+      if (!hasVisibleImages) {
+        emptyExclusions.push({
+          userId,
+          entityType: "gallery",
+          entityId: galleryId,
+          reason: "empty",
+        });
+      }
+    }
+
+    // 2. Empty performers - performers with 0 visible scenes AND 0 visible images
+    const performersWithContent = await (tx as any).$queryRaw`
+      SELECT p.id as performerId,
+             sp.sceneId,
+             ip.imageId
+      FROM StashPerformer p
+      LEFT JOIN ScenePerformer sp ON sp.performerId = p.id
+      LEFT JOIN StashScene s ON sp.sceneId = s.id AND s.deletedAt IS NULL
+      LEFT JOIN ImagePerformer ip ON ip.performerId = p.id
+      LEFT JOIN StashImage i ON ip.imageId = i.id AND i.deletedAt IS NULL
+      WHERE p.deletedAt IS NULL
+    ` as Array<{ performerId: string; sceneId: string | null; imageId: string | null }>;
+
+    // Group by performer and check visibility
+    const performerHasVisibleContent = new Map<string, boolean>();
+    for (const row of performersWithContent) {
+      if (!performerHasVisibleContent.has(row.performerId)) {
+        performerHasVisibleContent.set(row.performerId, false);
+      }
+      // Skip if performer is already excluded via direct/cascade
+      if (excludedPerformerIds.has(row.performerId)) {
+        continue;
+      }
+      if ((row.sceneId && isSceneVisible(row.sceneId)) ||
+          (row.imageId && isImageVisible(row.imageId))) {
+        performerHasVisibleContent.set(row.performerId, true);
+      }
+    }
+
+    for (const [performerId, hasVisibleContent] of performerHasVisibleContent) {
+      if (!hasVisibleContent && !excludedPerformerIds.has(performerId)) {
+        emptyExclusions.push({
+          userId,
+          entityType: "performer",
+          entityId: performerId,
+          reason: "empty",
+        });
+      }
+    }
+
+    // 3. Empty studios - studios with 0 visible scenes AND 0 visible images
+    const studiosWithContent = await (tx as any).$queryRaw`
+      SELECT st.id as studioId,
+             s.id as sceneId,
+             i.id as imageId
+      FROM StashStudio st
+      LEFT JOIN StashScene s ON s.studioId = st.id AND s.deletedAt IS NULL
+      LEFT JOIN StashImage i ON i.studioId = st.id AND i.deletedAt IS NULL
+      WHERE st.deletedAt IS NULL
+    ` as Array<{ studioId: string; sceneId: string | null; imageId: string | null }>;
+
+    const studioHasVisibleContent = new Map<string, boolean>();
+    for (const row of studiosWithContent) {
+      if (!studioHasVisibleContent.has(row.studioId)) {
+        studioHasVisibleContent.set(row.studioId, false);
+      }
+      if (excludedStudioIds.has(row.studioId)) {
+        continue;
+      }
+      if ((row.sceneId && isSceneVisible(row.sceneId)) ||
+          (row.imageId && isImageVisible(row.imageId))) {
+        studioHasVisibleContent.set(row.studioId, true);
+      }
+    }
+
+    for (const [studioId, hasVisibleContent] of studioHasVisibleContent) {
+      if (!hasVisibleContent && !excludedStudioIds.has(studioId)) {
+        emptyExclusions.push({
+          userId,
+          entityType: "studio",
+          entityId: studioId,
+          reason: "empty",
+        });
+      }
+    }
+
+    // 4. Empty groups - groups with 0 visible scenes
+    const groupsWithScenes = await (tx as any).$queryRaw`
+      SELECT g.id as groupId, s.id as sceneId
+      FROM StashGroup g
+      LEFT JOIN SceneGroup sg ON sg.groupId = g.id
+      LEFT JOIN StashScene s ON sg.sceneId = s.id AND s.deletedAt IS NULL
+      WHERE g.deletedAt IS NULL
+    ` as Array<{ groupId: string; sceneId: string | null }>;
+
+    const groupHasVisibleScenes = new Map<string, boolean>();
+    for (const row of groupsWithScenes) {
+      if (!groupHasVisibleScenes.has(row.groupId)) {
+        groupHasVisibleScenes.set(row.groupId, false);
+      }
+      if (excludedGroupIds.has(row.groupId)) {
+        continue;
+      }
+      if (row.sceneId && isSceneVisible(row.sceneId)) {
+        groupHasVisibleScenes.set(row.groupId, true);
+      }
+    }
+
+    for (const [groupId, hasVisibleScenes] of groupHasVisibleScenes) {
+      if (!hasVisibleScenes && !excludedGroupIds.has(groupId)) {
+        emptyExclusions.push({
+          userId,
+          entityType: "group",
+          entityId: groupId,
+          reason: "empty",
+        });
+      }
+    }
+
+    // 5. Empty tags - tags not attached to any visible scene, performer, studio, or group
+    const tagsWithEntities = await (tx as any).$queryRaw`
+      SELECT t.id as tagId,
+             st.sceneId,
+             pt.performerId,
+             stt.studioId,
+             gt.groupId
+      FROM StashTag t
+      LEFT JOIN SceneTag st ON st.tagId = t.id
+      LEFT JOIN StashScene s ON st.sceneId = s.id AND s.deletedAt IS NULL
+      LEFT JOIN PerformerTag pt ON pt.tagId = t.id
+      LEFT JOIN StashPerformer p ON pt.performerId = p.id AND p.deletedAt IS NULL
+      LEFT JOIN StudioTag stt ON stt.tagId = t.id
+      LEFT JOIN StashStudio stu ON stt.studioId = stu.id AND stu.deletedAt IS NULL
+      LEFT JOIN GroupTag gt ON gt.tagId = t.id
+      LEFT JOIN StashGroup g ON gt.groupId = g.id AND g.deletedAt IS NULL
+      WHERE t.deletedAt IS NULL
+    ` as Array<{
+      tagId: string;
+      sceneId: string | null;
+      performerId: string | null;
+      studioId: string | null;
+      groupId: string | null;
+    }>;
+
+    const tagHasVisibleEntities = new Map<string, boolean>();
+    for (const row of tagsWithEntities) {
+      if (!tagHasVisibleEntities.has(row.tagId)) {
+        tagHasVisibleEntities.set(row.tagId, false);
+      }
+      // Check if any attached entity is visible
+      if ((row.sceneId && isSceneVisible(row.sceneId)) ||
+          (row.performerId && isPerformerVisible(row.performerId)) ||
+          (row.studioId && isStudioVisible(row.studioId)) ||
+          (row.groupId && isGroupVisible(row.groupId))) {
+        tagHasVisibleEntities.set(row.tagId, true);
+      }
+    }
+
+    for (const [tagId, hasVisibleEntities] of tagHasVisibleEntities) {
+      if (!hasVisibleEntities) {
+        emptyExclusions.push({
+          userId,
+          entityType: "tag",
+          entityId: tagId,
+          reason: "empty",
+        });
+      }
+    }
+
+    return emptyExclusions;
   }
 
   /**

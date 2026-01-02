@@ -635,3 +635,414 @@ describe("computeCascadeExclusions", () => {
     );
   });
 });
+
+describe("computeEmptyExclusions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default empty responses for cascade-related queries
+    mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+    mockPrisma.stashScene.findMany.mockResolvedValue([]);
+    mockPrisma.sceneTag.findMany.mockResolvedValue([]);
+    mockPrisma.performerTag.findMany.mockResolvedValue([]);
+    mockPrisma.studioTag.findMany.mockResolvedValue([]);
+    mockPrisma.groupTag.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
+    mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
+    mockPrisma.imageGallery.findMany.mockResolvedValue([]);
+  });
+
+  it("should exclude galleries with no visible images", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+
+    // Mock raw queries for empty exclusions
+    // Returns data with correct column aliases for each query
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1: galleries - return empty galleries
+        case 1: return Promise.resolve([
+          { galleryId: "gallery1", imageId: null },
+          { galleryId: "gallery2", imageId: null },
+        ]);
+        // Query 2-5: other entities have visible content
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data || []);
+
+    expect(allData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityType: "gallery",
+          entityId: "gallery1",
+          reason: "empty",
+        }),
+        expect.objectContaining({
+          entityType: "gallery",
+          entityId: "gallery2",
+          reason: "empty",
+        }),
+      ])
+    );
+  });
+
+  it("should exclude performers with no visible scenes AND no visible images", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+
+    // Mock raw queries
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1: galleries - none empty
+        case 1: return Promise.resolve([]);
+        // Query 2: performers - return empty performer
+        case 2: return Promise.resolve([
+          { performerId: "performer1", sceneId: null, imageId: null },
+        ]);
+        // Query 3-5: other entities have visible content
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data || []);
+
+    expect(allData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityType: "performer",
+          entityId: "performer1",
+          reason: "empty",
+        }),
+      ])
+    );
+  });
+
+  it("should exclude studios with no visible scenes AND no visible images", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+
+    // Mock raw queries
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1-2: galleries and performers - none empty
+        case 1: return Promise.resolve([]);
+        case 2: return Promise.resolve([]);
+        // Query 3: studios - return empty studio
+        case 3: return Promise.resolve([
+          { studioId: "studio1", sceneId: null, imageId: null },
+        ]);
+        // Query 4-5: other entities have visible content
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data || []);
+
+    expect(allData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityType: "studio",
+          entityId: "studio1",
+          reason: "empty",
+        }),
+      ])
+    );
+  });
+
+  it("should exclude groups with no visible scenes", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+
+    // Mock raw queries
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1-3: galleries, performers, studios - none empty
+        case 1: return Promise.resolve([]);
+        case 2: return Promise.resolve([]);
+        case 3: return Promise.resolve([]);
+        // Query 4: groups - return empty group
+        case 4: return Promise.resolve([
+          { groupId: "group1", sceneId: null },
+        ]);
+        // Query 5: tags have visible content
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data || []);
+
+    expect(allData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityType: "group",
+          entityId: "group1",
+          reason: "empty",
+        }),
+      ])
+    );
+  });
+
+  it("should exclude tags not attached to any visible entity", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+
+    // Mock raw queries
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1-4: galleries, performers, studios, groups - none empty
+        case 1: return Promise.resolve([]);
+        case 2: return Promise.resolve([]);
+        case 3: return Promise.resolve([]);
+        case 4: return Promise.resolve([]);
+        // Query 5: tags - return empty tag
+        case 5: return Promise.resolve([
+          { tagId: "tag1", sceneId: null, performerId: null, studioId: null, groupId: null },
+        ]);
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 1 });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data || []);
+
+    expect(allData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityType: "tag",
+          entityId: "tag1",
+          reason: "empty",
+        }),
+      ])
+    );
+  });
+
+  it("should not exclude entities that have visible content", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+
+    // Mock raw queries - all entities have visible content (return populated content)
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1: galleries - gallery1 has visible image
+        case 1: return Promise.resolve([
+          { galleryId: "gallery1", imageId: "image1" },
+        ]);
+        // Query 2: performers - performer1 has visible scene
+        case 2: return Promise.resolve([
+          { performerId: "performer1", sceneId: "scene1", imageId: null },
+        ]);
+        // Query 3: studios - studio1 has visible scene
+        case 3: return Promise.resolve([
+          { studioId: "studio1", sceneId: "scene1", imageId: null },
+        ]);
+        // Query 4: groups - group1 has visible scene
+        case 4: return Promise.resolve([
+          { groupId: "group1", sceneId: "scene1" },
+        ]);
+        // Query 5: tags - tag1 has visible scene
+        case 5: return Promise.resolve([
+          { tagId: "tag1", sceneId: "scene1", performerId: null, studioId: null, groupId: null },
+        ]);
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    // createMany should not be called when no exclusions
+    expect(mockPrisma.userExcludedEntity.createMany).not.toHaveBeenCalled();
+  });
+
+  it("should consider already excluded content when determining if entity is empty", async () => {
+    // Scenario: gallery has images but they're all excluded
+    // Hidden image -> gallery becomes empty
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([
+      { userId: 1, entityType: "image", entityId: "image1" },
+    ]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 2 });
+
+    // No cascades from image hiding in our model
+
+    // Mock $queryRaw to return proper results for each query type
+    // Each query returns data with correct column aliases
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1: galleries with images - gallery1 has image1 (which is excluded)
+        case 1: return Promise.resolve([
+          { galleryId: "gallery1", imageId: "image1" },
+        ]);
+        // Query 2: performers with content - performer has visible scene
+        case 2: return Promise.resolve([
+          { performerId: "performer1", sceneId: "scene1", imageId: null },
+        ]);
+        // Query 3: studios with content - studio has visible scene
+        case 3: return Promise.resolve([
+          { studioId: "studio1", sceneId: "scene1", imageId: null },
+        ]);
+        // Query 4: groups with scenes - group has visible scene
+        case 4: return Promise.resolve([
+          { groupId: "group1", sceneId: "scene1" },
+        ]);
+        // Query 5: tags with entities - tag has visible content
+        case 5: return Promise.resolve([
+          { tagId: "tag1", sceneId: "scene1", performerId: null, studioId: null, groupId: null },
+        ]);
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data || []);
+
+    // Should have: image (hidden), gallery (empty - its only image is excluded)
+    expect(allData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entityType: "image",
+          entityId: "image1",
+          reason: "hidden",
+        }),
+        expect.objectContaining({
+          entityType: "gallery",
+          entityId: "gallery1",
+          reason: "empty",
+        }),
+      ])
+    );
+  });
+
+  it("should handle multiple empty entity types in one pass", async () => {
+    mockPrisma.userContentRestriction.findMany.mockResolvedValue([]);
+    mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
+    mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
+
+    // Mock different results for each entity type query
+    // Each query uses different column aliases matching the actual SQL
+    let queryCallCount = 0;
+    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
+      queryCallCount++;
+      switch (queryCallCount) {
+        // Query 1: galleries - return gallery with no images
+        case 1: return Promise.resolve([
+          { galleryId: "gallery1", imageId: null },
+        ]);
+        // Query 2: performers - return performer with no content
+        case 2: return Promise.resolve([
+          { performerId: "performer1", sceneId: null, imageId: null },
+        ]);
+        // Query 3: studios - return studio with no content
+        case 3: return Promise.resolve([
+          { studioId: "studio1", sceneId: null, imageId: null },
+        ]);
+        // Query 4: groups - return group with no scenes
+        case 4: return Promise.resolve([
+          { groupId: "group1", sceneId: null },
+        ]);
+        // Query 5: tags - return tag with no visible entities
+        case 5: return Promise.resolve([
+          { tagId: "tag1", sceneId: null, performerId: null, studioId: null, groupId: null },
+        ]);
+        default: return Promise.resolve([]);
+      }
+    });
+
+    mockPrisma.userExcludedEntity.createMany.mockResolvedValue({ count: 5 });
+
+    mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+      return callback(mockPrisma);
+    });
+
+    await exclusionComputationService.recomputeForUser(1);
+
+    const calls = mockPrisma.userExcludedEntity.createMany.mock.calls;
+    const allData = calls.flatMap((c: any) => c[0].data || []);
+
+    expect(allData).toHaveLength(5);
+    expect(allData).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ entityType: "gallery", entityId: "gallery1", reason: "empty" }),
+        expect.objectContaining({ entityType: "performer", entityId: "performer1", reason: "empty" }),
+        expect.objectContaining({ entityType: "studio", entityId: "studio1", reason: "empty" }),
+        expect.objectContaining({ entityType: "group", entityId: "group1", reason: "empty" }),
+        expect.objectContaining({ entityType: "tag", entityId: "tag1", reason: "empty" }),
+      ])
+    );
+  });
+});
