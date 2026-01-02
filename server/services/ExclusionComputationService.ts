@@ -18,6 +18,14 @@ import { logger } from "../utils/logger.js";
 import { stashCacheManager } from "./StashCacheManager.js";
 
 /**
+ * Transaction client type for Prisma operations within transactions
+ */
+type TransactionClient = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
+
+/**
  * Maps plural entity types from UserContentRestriction to singular types
  * used in UserExcludedEntity
  */
@@ -50,14 +58,14 @@ class ExclusionComputationService {
       // Phase 1: Compute direct exclusions (restrictions + hidden)
       const directExclusions = await this.computeDirectExclusions(userId, tx);
 
-      // Phase 2: Compute cascade exclusions (later task)
-      // const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, tx);
+      // Phase 2: Compute cascade exclusions
+      const cascadeExclusions = await this.computeCascadeExclusions(userId, directExclusions, tx);
 
       // Phase 3: Compute empty exclusions (later task)
       // const emptyExclusions = await this.computeEmptyExclusions(userId, tx);
 
       // Combine all exclusions
-      const allExclusions = [...directExclusions];
+      const allExclusions = [...directExclusions, ...cascadeExclusions];
 
       // Delete existing exclusions for this user
       await tx.userExcludedEntity.deleteMany({
@@ -113,7 +121,7 @@ class ExclusionComputationService {
    */
   private async computeDirectExclusions(
     userId: number,
-    tx: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">
+    tx: TransactionClient
   ): Promise<ExclusionRecord[]> {
     const exclusions: ExclusionRecord[] = [];
 
@@ -171,6 +179,184 @@ class ExclusionComputationService {
     }
 
     return exclusions;
+  }
+
+  /**
+   * Compute cascade exclusions based on direct exclusions.
+   * When an entity is excluded, related entities should also be cascade-excluded.
+   *
+   * Cascade rules:
+   * - Performer -> Scenes: All scenes with the performer
+   * - Studio -> Scenes: All scenes from the studio
+   * - Tag -> Scenes/Performers/Studios/Groups: Entities tagged with the tag (direct + inherited)
+   * - Group -> Scenes: All scenes in the group
+   * - Gallery -> Scenes/Images: Linked scenes and images in the gallery
+   *
+   * @returns Array of cascade exclusion records to insert
+   */
+  private async computeCascadeExclusions(
+    userId: number,
+    directExclusions: ExclusionRecord[],
+    tx: TransactionClient
+  ): Promise<ExclusionRecord[]> {
+    const cascadeExclusions: ExclusionRecord[] = [];
+    const seen = new Set<string>(); // Track "entityType:entityId" to avoid duplicates
+
+    // Helper to add exclusion if not already seen
+    const addCascade = (entityType: string, entityId: string) => {
+      const key = `${entityType}:${entityId}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        cascadeExclusions.push({
+          userId,
+          entityType,
+          entityId,
+          reason: "cascade",
+        });
+      }
+    };
+
+    // Group direct exclusions by entity type
+    const excludedPerformers: string[] = [];
+    const excludedStudios: string[] = [];
+    const excludedTags: string[] = [];
+    const excludedGroups: string[] = [];
+    const excludedGalleries: string[] = [];
+
+    for (const excl of directExclusions) {
+      switch (excl.entityType) {
+        case "performer":
+          excludedPerformers.push(excl.entityId);
+          break;
+        case "studio":
+          excludedStudios.push(excl.entityId);
+          break;
+        case "tag":
+          excludedTags.push(excl.entityId);
+          break;
+        case "group":
+          excludedGroups.push(excl.entityId);
+          break;
+        case "gallery":
+          excludedGalleries.push(excl.entityId);
+          break;
+      }
+    }
+
+    // 1. Performer -> Scenes
+    if (excludedPerformers.length > 0) {
+      const scenePerformers = await tx.scenePerformer.findMany({
+        where: { performerId: { in: excludedPerformers } },
+        select: { sceneId: true },
+      });
+      for (const sp of scenePerformers) {
+        addCascade("scene", sp.sceneId);
+      }
+    }
+
+    // 2. Studio -> Scenes
+    if (excludedStudios.length > 0) {
+      const studioScenes = await tx.stashScene.findMany({
+        where: {
+          studioId: { in: excludedStudios },
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      for (const scene of studioScenes) {
+        addCascade("scene", scene.id);
+      }
+    }
+
+    // 3. Tag -> Scenes/Performers/Studios/Groups
+    if (excludedTags.length > 0) {
+      // 3a. Scenes with direct tag
+      const sceneTagsResult = await tx.sceneTag.findMany({
+        where: { tagId: { in: excludedTags } },
+        select: { sceneId: true },
+      });
+      for (const st of sceneTagsResult) {
+        addCascade("scene", st.sceneId);
+      }
+
+      // 3b. Scenes with inherited tag (via inheritedTagIds JSON column)
+      // Use raw SQL for JSON array querying
+      for (const tagId of excludedTags) {
+        const inheritedScenes = await (tx as any).$queryRaw`
+          SELECT id FROM StashScene
+          WHERE deletedAt IS NULL
+          AND EXISTS (
+            SELECT 1 FROM json_each(inheritedTagIds)
+            WHERE json_each.value = ${tagId}
+          )
+        ` as Array<{ id: string }>;
+
+        for (const scene of inheritedScenes) {
+          addCascade("scene", scene.id);
+        }
+      }
+
+      // 3c. Performers with tag
+      const performerTagsResult = await tx.performerTag.findMany({
+        where: { tagId: { in: excludedTags } },
+        select: { performerId: true },
+      });
+      for (const pt of performerTagsResult) {
+        addCascade("performer", pt.performerId);
+      }
+
+      // 3d. Studios with tag
+      const studioTagsResult = await tx.studioTag.findMany({
+        where: { tagId: { in: excludedTags } },
+        select: { studioId: true },
+      });
+      for (const st of studioTagsResult) {
+        addCascade("studio", st.studioId);
+      }
+
+      // 3e. Groups with tag
+      const groupTagsResult = await tx.groupTag.findMany({
+        where: { tagId: { in: excludedTags } },
+        select: { groupId: true },
+      });
+      for (const gt of groupTagsResult) {
+        addCascade("group", gt.groupId);
+      }
+    }
+
+    // 4. Group -> Scenes
+    if (excludedGroups.length > 0) {
+      const sceneGroups = await tx.sceneGroup.findMany({
+        where: { groupId: { in: excludedGroups } },
+        select: { sceneId: true },
+      });
+      for (const sg of sceneGroups) {
+        addCascade("scene", sg.sceneId);
+      }
+    }
+
+    // 5. Gallery -> Scenes/Images
+    if (excludedGalleries.length > 0) {
+      // 5a. Linked scenes
+      const sceneGalleries = await tx.sceneGallery.findMany({
+        where: { galleryId: { in: excludedGalleries } },
+        select: { sceneId: true },
+      });
+      for (const sg of sceneGalleries) {
+        addCascade("scene", sg.sceneId);
+      }
+
+      // 5b. Images in gallery
+      const imageGalleries = await tx.imageGallery.findMany({
+        where: { galleryId: { in: excludedGalleries } },
+        select: { imageId: true },
+      });
+      for (const ig of imageGalleries) {
+        addCascade("image", ig.imageId);
+      }
+    }
+
+    return cascadeExclusions;
   }
 
   /**
