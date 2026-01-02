@@ -58,6 +58,9 @@ export type NormalizedScene = Scene & {
   // Computed timestamps
   last_played_at: string | null;
   last_o_at: string | null;
+
+  // Inherited tag IDs (from performers/studios, pre-computed at sync time)
+  inheritedTagIds?: string[];
 };
 
 /**

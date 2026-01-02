@@ -1469,6 +1469,9 @@ class StashEntityService {
       tags: [],
       groups: [],
       galleries: [],
+
+      // Inherited tag IDs (pre-computed at sync time)
+      inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
     } as unknown as NormalizedScene;
   }
 
@@ -1533,6 +1536,9 @@ class StashEntityService {
       tags: [],
       groups: [],
       galleries: [],
+
+      // Inherited tag IDs (pre-computed at sync time)
+      inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
     } as unknown as NormalizedScene;
   }
 
