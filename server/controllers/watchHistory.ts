@@ -54,14 +54,16 @@ export async function pingWatchHistory(
       return res.status(401).json({ error: "User not found" });
     }
 
-    // Get scene duration from Stash
-    const stash = stashInstanceManager.getDefault();
+    // Get scene duration from cache
     let sceneDuration = 0;
     try {
-      const sceneData = await stash.findScenes({ ids: [sceneId] });
-      sceneDuration = sceneData.findScenes.scenes[0]?.files?.[0]?.duration || 0;
+      const scene = await prisma.stashScene.findUnique({
+        where: { id: sceneId },
+        select: { duration: true },
+      });
+      sceneDuration = scene?.duration || 0;
     } catch (error) {
-      logger.error("Failed to fetch scene duration from Stash", {
+      logger.error("Failed to fetch scene duration from cache", {
         sceneId,
         error,
       });
@@ -234,6 +236,7 @@ export async function pingWatchHistory(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
+        const stash = stashInstanceManager.getDefault();
         // Save activity (resume time and play duration) on every ping
         await stash.sceneSaveActivity({
           id: sceneId,
