@@ -471,6 +471,9 @@ model StashScene {
   syncedAt       DateTime  @default(now())
   deletedAt      DateTime?
 
+  // === Inherited tags (denormalized for filtering) ===
+  inheritedTagIds String? // JSON array of tag IDs from performers, studio, groups
+
   // === Junction table relations ===
   performers ScenePerformer[]
   tags       SceneTag[]

@@ -43,28 +43,20 @@ const formatDuration = (seconds) => {
 };
 
 /**
- * Merge and deduplicate tags from scene, performers, and studio
+ * Merge and deduplicate tags from scene direct tags and inherited tags
+ * (inherited tags are pre-computed on server from performers, studio, groups)
  */
 const mergeAllTags = (scene) => {
   const tagMap = new Map();
 
-  // Add scene tags
+  // Add direct scene tags
   if (scene.tags) {
     scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
   }
 
-  // Add performer tags
-  if (scene.performers) {
-    scene.performers.forEach((performer) => {
-      if (performer.tags) {
-        performer.tags.forEach((tag) => tagMap.set(tag.id, tag));
-      }
-    });
-  }
-
-  // Add studio tags
-  if (scene.studio?.tags) {
-    scene.studio.tags.forEach((tag) => tagMap.set(tag.id, tag));
+  // Add inherited tags (pre-computed from performers, studio, groups)
+  if (scene.inheritedTags) {
+    scene.inheritedTags.forEach((tag) => tagMap.set(tag.id, tag));
   }
 
   return Array.from(tagMap.values());

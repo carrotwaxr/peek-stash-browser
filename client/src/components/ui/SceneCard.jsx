@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
@@ -78,26 +78,19 @@ const SceneCard = forwardRef(
       return parts.length > 0 ? parts.join(' • ') : null;
     })();
 
-    // Merge and deduplicate tags
-    const getAllTags = () => {
+    // Combine direct tags with server-computed inherited tags
+    const allTags = useMemo(() => {
       const tagMap = new Map();
+      // Direct scene tags
       if (scene.tags) {
         scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
       }
-      if (scene.performers) {
-        scene.performers.forEach((performer) => {
-          if (performer.tags) {
-            performer.tags.forEach((tag) => tagMap.set(tag.id, tag));
-          }
-        });
-      }
-      if (scene.studio?.tags) {
-        scene.studio.tags.forEach((tag) => tagMap.set(tag.id, tag));
+      // Inherited tags (pre-computed on server)
+      if (scene.inheritedTags) {
+        scene.inheritedTags.forEach((tag) => tagMap.set(tag.id, tag));
       }
       return Array.from(tagMap.values());
-    };
-
-    const allTags = getAllTags();
+    }, [scene.tags, scene.inheritedTags]);
 
     // Build rich tooltip content using TooltipEntityGrid component
     const performersTooltip = scene.performers &&

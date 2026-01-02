@@ -93,6 +93,10 @@ class StashEntityService {
   private studioNameCache: Map<string, string> | null = null;
   private studioNameCachePromise: Promise<Map<string, string>> | null = null;
 
+  // In-memory cache for tag name lookups (for inherited tag hydration)
+  private tagNameCache: Map<string, string> | null = null;
+  private tagNameCachePromise: Promise<Map<string, string>> | null = null;
+
   // Columns to select for browse queries (excludes heavy streams/data columns)
   private readonly BROWSE_SELECT = {
     id: true,
@@ -130,6 +134,7 @@ class StashEntityService {
     stashUpdatedAt: true,
     syncedAt: true,
     deletedAt: true,
+    inheritedTagIds: true,
   } as const;
 
   // ==================== Scene Queries ====================
@@ -156,10 +161,14 @@ class StashEntityService {
     const result = cached.map((c) => this.transformSceneForBrowse(c));
     const transformTime = Date.now() - transformStart;
 
-    // Hydrate studio names (workaround until StashScene has studio relation)
+    // Hydrate studio names and inherited tags
     const hydrateStart = Date.now();
-    const studioNames = await this.getStudioNameMap();
+    const [studioNames, tagNames] = await Promise.all([
+      this.getStudioNameMap(),
+      this.getTagNameMap(),
+    ]);
     this.hydrateStudioNames(result, studioNames);
+    this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
     logger.info(`getAllScenes: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
@@ -276,10 +285,14 @@ class StashEntityService {
     });
     const transformTime = Date.now() - transformStart;
 
-    // Hydrate studio names (workaround until StashScene has studio relation)
+    // Hydrate studio names and inherited tags
     const hydrateStart = Date.now();
-    const studioNames = await this.getStudioNameMap();
+    const [studioNames, tagNames] = await Promise.all([
+      this.getStudioNameMap(),
+      this.getTagNameMap(),
+    ]);
     this.hydrateStudioNames(result, studioNames);
+    this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
     logger.info(`getAllScenesWithTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
@@ -317,10 +330,14 @@ class StashEntityService {
     });
     const transformTime = Date.now() - transformStart;
 
-    // Hydrate studio names (workaround until StashScene has studio relation)
+    // Hydrate studio names and inherited tags
     const hydrateStart = Date.now();
-    const studioNames = await this.getStudioNameMap();
+    const [studioNames, tagNames] = await Promise.all([
+      this.getStudioNameMap(),
+      this.getTagNameMap(),
+    ]);
     this.hydrateStudioNames(result, studioNames);
+    this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
     logger.info(`getAllScenesWithPerformers: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
@@ -362,10 +379,14 @@ class StashEntityService {
     });
     const transformTime = Date.now() - transformStart;
 
-    // Hydrate studio names (workaround until StashScene has studio relation)
+    // Hydrate studio names and inherited tags
     const hydrateStart = Date.now();
-    const studioNames = await this.getStudioNameMap();
+    const [studioNames, tagNames] = await Promise.all([
+      this.getStudioNameMap(),
+      this.getTagNameMap(),
+    ]);
     this.hydrateStudioNames(result, studioNames);
+    this.hydrateInheritedTags(result, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
     logger.info(`getAllScenesWithPerformersAndTags: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${cached.length}`);
@@ -389,7 +410,13 @@ class StashEntityService {
     });
 
     if (!cached) return null;
-    return this.transformSceneWithRelations(cached);
+    const scene = this.transformSceneWithRelations(cached);
+
+    // Hydrate inherited tags
+    const tagNames = await this.getTagNameMap();
+    this.hydrateInheritedTags([scene], tagNames);
+
+    return scene;
   }
 
   /**
@@ -427,7 +454,13 @@ class StashEntityService {
       },
     });
 
-    return cached.map((c) => this.transformSceneWithRelations(c));
+    const scenes = cached.map((c) => this.transformSceneWithRelations(c));
+
+    // Hydrate inherited tags
+    const tagNames = await this.getTagNameMap();
+    this.hydrateInheritedTags(scenes, tagNames);
+
+    return scenes;
   }
 
   /**
@@ -511,10 +544,14 @@ class StashEntityService {
     const scenes = cached.map((c) => this.transformSceneForBrowse(c));
     const transformTime = Date.now() - transformStart;
 
-    // Hydrate studio names (workaround until StashScene has studio relation)
+    // Hydrate studio names and inherited tags
     const hydrateStart = Date.now();
-    const studioNames = await this.getStudioNameMap();
+    const [studioNames, tagNames] = await Promise.all([
+      this.getStudioNameMap(),
+      this.getTagNameMap(),
+    ]);
     this.hydrateStudioNames(scenes, studioNames);
+    this.hydrateInheritedTags(scenes, tagNames);
     const hydrateTime = Date.now() - hydrateStart;
 
     logger.info(`getScenesPaginated: query=${queryTime}ms, transform=${transformTime}ms, hydrate=${hydrateTime}ms, total=${Date.now() - startTotal}ms, count=${scenes.length}/${total}, excluded=${excludeIds?.size || 0}`);
@@ -747,6 +784,47 @@ class StashEntityService {
   invalidateStudioNameCache(): void {
     this.studioNameCache = null;
     this.studioNameCachePromise = null;
+  }
+
+  /**
+   * Get a lightweight Map of tag ID -> name for hydrating inherited tags.
+   * Uses in-memory caching to avoid repeated DB queries.
+   */
+  async getTagNameMap(): Promise<Map<string, string>> {
+    // Return cached result if available
+    if (this.tagNameCache) {
+      return this.tagNameCache;
+    }
+
+    // If already loading, wait for that promise
+    if (this.tagNameCachePromise) {
+      return this.tagNameCachePromise;
+    }
+
+    // Build the cache
+    this.tagNameCachePromise = (async () => {
+      const tags = await prisma.stashTag.findMany({
+        where: { deletedAt: null },
+        select: { id: true, name: true },
+      });
+      const map = new Map<string, string>();
+      for (const t of tags || []) {
+        if (t.name) map.set(t.id, t.name);
+      }
+      this.tagNameCache = map;
+      this.tagNameCachePromise = null;
+      return map;
+    })();
+
+    return this.tagNameCachePromise;
+  }
+
+  /**
+   * Invalidate the tag name cache (call after sync or tag updates)
+   */
+  invalidateTagNameCache(): void {
+    this.tagNameCache = null;
+    this.tagNameCachePromise = null;
   }
 
   /**
@@ -1469,6 +1547,9 @@ class StashEntityService {
       tags: [],
       groups: [],
       galleries: [],
+
+      // Inherited tag IDs (pre-computed at sync time)
+      inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
     } as unknown as NormalizedScene;
   }
 
@@ -1533,6 +1614,9 @@ class StashEntityService {
       tags: [],
       groups: [],
       galleries: [],
+
+      // Inherited tag IDs (pre-computed at sync time)
+      inheritedTagIds: scene.inheritedTagIds ? JSON.parse(scene.inheritedTagIds) : [],
     } as unknown as NormalizedScene;
   }
 
@@ -1548,6 +1632,22 @@ class StashEntityService {
         if (name) {
           (scene.studio as { id: string; name?: string }).name = name;
         }
+      }
+    }
+  }
+
+  /**
+   * Hydrate inherited tag names on an array of scenes using a pre-fetched name map.
+   * Mutates scenes in-place for performance.
+   */
+  private hydrateInheritedTags(scenes: NormalizedScene[], tagNames: Map<string, string>): void {
+    for (const scene of scenes) {
+      const inheritedTagIds = (scene as any).inheritedTagIds;
+      if (inheritedTagIds && Array.isArray(inheritedTagIds) && inheritedTagIds.length > 0) {
+        (scene as any).inheritedTags = inheritedTagIds.map((tagId: string) => ({
+          id: tagId,
+          name: tagNames.get(tagId) || "Unknown",
+        }));
       }
     }
   }
@@ -1576,6 +1676,19 @@ class StashEntityService {
       base.galleries = scene.galleries.map((sg: any) =>
         this.transformGallery(sg.gallery)
       );
+    }
+
+    // Hydrate inherited tags with full tag objects
+    if (scene.inheritedTagIds) {
+      const inheritedTagIds = JSON.parse(scene.inheritedTagIds);
+      if (inheritedTagIds.length > 0) {
+        // Look up tags in the tags array we already have, or create minimal stub
+        base.inheritedTags = inheritedTagIds.map((tagId: string) => {
+          // Find in existing tags or create minimal stub
+          const existingTag = base.tags?.find((t: any) => t.id === tagId);
+          return existingTag || { id: tagId, name: "Unknown" };
+        });
+      }
     }
 
     return base;
