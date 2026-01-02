@@ -180,20 +180,17 @@ class SceneTagInheritanceService {
       });
     }
 
-    // Batch update
+    // Bulk update using raw SQL for scalability
+    // SQLite doesn't support UPDATE FROM, so we use CASE expressions
     if (updates.length > 0) {
-      const SQL_BATCH_SIZE = 100;
-      for (let i = 0; i < updates.length; i += SQL_BATCH_SIZE) {
-        const sqlBatch = updates.slice(i, i + SQL_BATCH_SIZE);
-        await Promise.all(
-          sqlBatch.map((u) =>
-            prisma.stashScene.update({
-              where: { id: u.id },
-              data: { inheritedTagIds: u.inheritedTagIds },
-            })
-          )
-        );
-      }
+      const cases = updates.map((u) => `WHEN '${u.id}' THEN '${u.inheritedTagIds.replace(/'/g, "''")}'`).join(" ");
+      const ids = updates.map((u) => `'${u.id}'`).join(",");
+
+      await prisma.$executeRawUnsafe(`
+        UPDATE StashScene
+        SET inheritedTagIds = CASE id ${cases} END
+        WHERE id IN (${ids})
+      `);
     }
   }
 }
