@@ -2,6 +2,8 @@ import { Response } from "express";
 import { Scene } from "stashapp-api";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import { stashEntityService } from "../services/StashEntityService.js";
+import { userRestrictionService } from "../services/UserRestrictionService.js";
 import type { NormalizedScene } from "../types/index.js";
 import { transformScene } from "../utils/stashUrlProxy.js";
 
@@ -58,7 +60,7 @@ export const getUserPlaylists = async (
       },
     });
 
-    // Fetch scene details for preview items from Stash
+    // Fetch scene details for preview items from cache
     const playlistsWithScenes = await Promise.all(
       playlists.map(async (playlist) => {
         if (playlist.items.length === 0) {
@@ -68,25 +70,23 @@ export const getUserPlaylists = async (
         const sceneIds = playlist.items.map((item) => item.sceneId);
 
         try {
-          const { stashInstanceManager } = await import(
-            "../services/StashInstanceManager.js"
-          );
-          const stash = stashInstanceManager.getDefault();
+          // 1. Fetch scenes from cache with relations
+          const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
 
-          const scenesResponse = await stash.findScenes({
-            scene_ids: sceneIds.map((id) => parseInt(id)),
-          });
+          // 2. Apply user restrictions (filter out hidden/restricted scenes)
+          const isAdmin = req.user?.role === "ADMIN";
+          const visibleScenes = isAdmin
+            ? scenes
+            : await userRestrictionService.filterScenesForUser(scenes, userId);
 
-          const scenes = scenesResponse.findScenes.scenes;
-
-          // Transform scenes to add API key to image paths
-          const transformedScenes = scenes.map((s: unknown) =>
-            transformScene(s as Scene)
+          // 3. Transform scenes to add proxy URLs
+          const transformedScenes = visibleScenes.map((s) =>
+            transformScene(s as unknown as Scene)
           );
 
           // Create a map of scene ID to scene data
           const sceneMap = new Map(
-            transformedScenes.map((s: Scene) => [s.id, s])
+            transformedScenes.map((s) => [s.id, s])
           );
 
           // Attach scene data to each playlist item (only paths.screenshot needed for preview)
@@ -99,12 +99,12 @@ export const getUserPlaylists = async (
             ...playlist,
             items: itemsWithScenes,
           };
-        } catch (stashError) {
+        } catch (cacheError) {
           console.error(
             `Error fetching scenes for playlist ${playlist.id}:`,
-            stashError
+            cacheError
           );
-          // Return playlist without scene details if Stash fails
+          // Return playlist without scene details if cache fails
           return playlist;
         }
       })
@@ -118,7 +118,7 @@ export const getUserPlaylists = async (
 };
 
 /**
- * Get single playlist with items and scene details from Stash
+ * Get single playlist with items and scene details from cache
  */
 export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -151,50 +151,46 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(404).json({ error: "Playlist not found" });
     }
 
-    // Fetch scene details from Stash for all items
+    // Fetch scene details from cache for all items
     if (playlist.items.length > 0) {
       const sceneIds = playlist.items.map((item) => item.sceneId);
 
-      // Get Stash instance and fetch scenes
-      const { stashInstanceManager } = await import(
-        "../services/StashInstanceManager.js"
-      );
-      const stash = stashInstanceManager.getDefault();
-
       try {
-        const scenesResponse = await stash.findScenes({
-          scene_ids: sceneIds.map((id) => parseInt(id)),
-        });
+        // 1. Fetch scenes from cache with relations
+        const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
 
-        const scenes = scenesResponse.findScenes.scenes;
+        // 2. Apply user restrictions (filter out hidden/restricted scenes)
+        const isAdmin = req.user?.role === "ADMIN";
+        const visibleScenes = isAdmin
+          ? scenes
+          : await userRestrictionService.filterScenesForUser(scenes, userId);
 
-        // Transform scenes to add API key to image paths
-        // GraphQL response types don't exactly match Scene type, use unknown for type safety
-        const transformedScenes = scenes.map((s: unknown) =>
-          transformScene(s as Scene)
-        );
-
-        // Reset user-specific fields to defaults before merging Peek user data
-        // This ensures Stash's user values (o_counter, play_count, etc.) don't leak through
-        const scenesWithDefaults = transformedScenes.map((s) => ({
+        // 3. Reset user-specific fields to defaults before merging Peek user data
+        const scenesWithDefaults = visibleScenes.map((s) => ({
           ...s,
           ...DEFAULT_SCENE_USER_FIELDS,
         }));
 
-        // Override with per-user watch history
+        // 4. Merge with user's personal data (WatchHistory + SceneRating)
         const { mergeScenesWithUserData } = await import("./library/scenes.js");
-        // Type assertion safe: scenes from API are compatible with Normalized type structure
+        // Type assertion safe: scenes from cache are compatible with Normalized type structure
         const scenesWithUserHistory = await mergeScenesWithUserData(
           scenesWithDefaults as unknown as NormalizedScene[],
           userId
         );
 
+        // 5. Transform paths for proxy URLs
+        const transformedScenes = scenesWithUserHistory.map((s) =>
+          transformScene(s as unknown as Scene)
+        );
+
         // Create a map of scene ID to scene data
         const sceneMap = new Map(
-          scenesWithUserHistory.map((s: NormalizedScene) => [s.id, s])
+          transformedScenes.map((s) => [s.id, s])
         );
 
         // Attach scene data to each playlist item
+        // Note: Items with restricted/hidden scenes will have scene: null
         const itemsWithScenes = playlist.items.map((item) => ({
           ...item,
           scene: sceneMap.get(item.sceneId) || null,
@@ -206,9 +202,9 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
             items: itemsWithScenes,
           },
         });
-      } catch (stashError) {
-        console.error("Error fetching scenes from Stash:", stashError);
-        // Return playlist without scene details if Stash fails
+      } catch (cacheError) {
+        console.error("Error fetching scenes from cache:", cacheError);
+        // Return playlist without scene details if cache fails
         res.json({ playlist });
       }
     } else {
