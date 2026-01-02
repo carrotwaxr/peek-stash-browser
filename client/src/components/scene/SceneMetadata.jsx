@@ -2,30 +2,18 @@ import { Link } from "react-router-dom";
 import { CardCountIndicators } from "../ui/index.js";
 
 /**
- * Merge and deduplicate tags from scene, performers, and studio
+ * Combine direct tags with inherited tags from server
  */
-const mergeAllTags = (scene) => {
+const getAllTags = (scene) => {
   const tagMap = new Map();
-
-  // Add scene tags
+  // Direct scene tags
   if (scene.tags) {
     scene.tags.forEach((tag) => tagMap.set(tag.id, tag));
   }
-
-  // Add performer tags
-  if (scene.performers) {
-    scene.performers.forEach((performer) => {
-      if (performer.tags) {
-        performer.tags.forEach((tag) => tagMap.set(tag.id, tag));
-      }
-    });
+  // Inherited tags (pre-computed on server)
+  if (scene.inheritedTags) {
+    scene.inheritedTags.forEach((tag) => tagMap.set(tag.id, tag));
   }
-
-  // Add studio tags
-  if (scene.studio?.tags) {
-    scene.studio.tags.forEach((tag) => tagMap.set(tag.id, tag));
-  }
-
   return Array.from(tagMap.values());
 };
 
@@ -34,7 +22,7 @@ const mergeAllTags = (scene) => {
  */
 const SceneMetadata = ({ scene }) => {
   // Get merged and deduped tags
-  const allTags = mergeAllTags(scene);
+  const allTags = getAllTags(scene);
   // Performer tooltip content with images in a grid
   const performersContent = scene.performers && scene.performers.length > 0 && (
     <div>
