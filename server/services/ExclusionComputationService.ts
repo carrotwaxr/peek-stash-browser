@@ -703,12 +703,216 @@ class ExclusionComputationService {
     entityType: string,
     entityId: string
   ): Promise<void> {
+    const startTime = Date.now();
     logger.info("ExclusionComputationService.addHiddenEntity", {
       userId,
       entityType,
       entityId,
     });
-    // Implementation in later task
+
+    await prisma.$transaction(async (tx) => {
+      // Add the direct exclusion
+      await tx.userExcludedEntity.upsert({
+        where: {
+          userId_entityType_entityId: { userId, entityType, entityId },
+        },
+        create: { userId, entityType, entityId, reason: "hidden" },
+        update: { reason: "hidden" },
+      });
+
+      // Compute cascades for this specific entity
+      await this.addCascadesForEntity(tx, userId, entityType, entityId);
+    });
+
+    logger.info("ExclusionComputationService.addHiddenEntity complete", {
+      userId,
+      entityType,
+      entityId,
+      durationMs: Date.now() - startTime,
+    });
+  }
+
+  /**
+   * Compute and add cascade exclusions for a single entity.
+   * Similar logic to computeCascadeExclusions but for a single entity.
+   */
+  private async addCascadesForEntity(
+    tx: TransactionClient,
+    userId: number,
+    entityType: string,
+    entityId: string
+  ): Promise<void> {
+    const cascadeExclusions: ExclusionRecord[] = [];
+
+    switch (entityType) {
+      case "performer": {
+        // Performer -> Scenes
+        const scenePerformers = await tx.scenePerformer.findMany({
+          where: { performerId: entityId },
+          select: { sceneId: true },
+        });
+        for (const sp of scenePerformers) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "scene",
+            entityId: sp.sceneId,
+            reason: "cascade",
+          });
+        }
+        break;
+      }
+
+      case "studio": {
+        // Studio -> Scenes
+        const studioScenes = await tx.stashScene.findMany({
+          where: { studioId: entityId, deletedAt: null },
+          select: { id: true },
+        });
+        for (const scene of studioScenes) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "scene",
+            entityId: scene.id,
+            reason: "cascade",
+          });
+        }
+        break;
+      }
+
+      case "tag": {
+        // Tag -> Scenes (direct)
+        const sceneTags = await tx.sceneTag.findMany({
+          where: { tagId: entityId },
+          select: { sceneId: true },
+        });
+        for (const st of sceneTags) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "scene",
+            entityId: st.sceneId,
+            reason: "cascade",
+          });
+        }
+
+        // Tag -> Scenes (inherited via inheritedTagIds JSON column)
+        const inheritedScenes = await (tx as any).$queryRaw`
+          SELECT id FROM StashScene
+          WHERE deletedAt IS NULL
+          AND EXISTS (
+            SELECT 1 FROM json_each(inheritedTagIds)
+            WHERE json_each.value = ${entityId}
+          )
+        ` as Array<{ id: string }>;
+        for (const scene of inheritedScenes) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "scene",
+            entityId: scene.id,
+            reason: "cascade",
+          });
+        }
+
+        // Tag -> Performers
+        const performerTags = await tx.performerTag.findMany({
+          where: { tagId: entityId },
+          select: { performerId: true },
+        });
+        for (const pt of performerTags) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "performer",
+            entityId: pt.performerId,
+            reason: "cascade",
+          });
+        }
+
+        // Tag -> Studios
+        const studioTags = await tx.studioTag.findMany({
+          where: { tagId: entityId },
+          select: { studioId: true },
+        });
+        for (const st of studioTags) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "studio",
+            entityId: st.studioId,
+            reason: "cascade",
+          });
+        }
+
+        // Tag -> Groups
+        const groupTags = await tx.groupTag.findMany({
+          where: { tagId: entityId },
+          select: { groupId: true },
+        });
+        for (const gt of groupTags) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "group",
+            entityId: gt.groupId,
+            reason: "cascade",
+          });
+        }
+        break;
+      }
+
+      case "group": {
+        // Group -> Scenes
+        const sceneGroups = await tx.sceneGroup.findMany({
+          where: { groupId: entityId },
+          select: { sceneId: true },
+        });
+        for (const sg of sceneGroups) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "scene",
+            entityId: sg.sceneId,
+            reason: "cascade",
+          });
+        }
+        break;
+      }
+
+      case "gallery": {
+        // Gallery -> Scenes
+        const sceneGalleries = await tx.sceneGallery.findMany({
+          where: { galleryId: entityId },
+          select: { sceneId: true },
+        });
+        for (const sg of sceneGalleries) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "scene",
+            entityId: sg.sceneId,
+            reason: "cascade",
+          });
+        }
+
+        // Gallery -> Images
+        const imageGalleries = await tx.imageGallery.findMany({
+          where: { galleryId: entityId },
+          select: { imageId: true },
+        });
+        for (const ig of imageGalleries) {
+          cascadeExclusions.push({
+            userId,
+            entityType: "image",
+            entityId: ig.imageId,
+            reason: "cascade",
+          });
+        }
+        break;
+      }
+    }
+
+    // Insert cascade exclusions if any, using skipDuplicates to handle
+    // cases where the scene/entity is already excluded
+    if (cascadeExclusions.length > 0) {
+      await tx.userExcludedEntity.createMany({
+        data: cascadeExclusions,
+        skipDuplicates: true,
+      });
+    }
   }
 
   /**
@@ -725,7 +929,19 @@ class ExclusionComputationService {
       entityType,
       entityId,
     });
-    // Implementation in later task
+
+    // Queue async recompute - the unhide might affect cascade exclusions
+    // that need to be recalculated based on remaining hidden entities
+    setImmediate(() => {
+      this.recomputeForUser(userId).catch((err) => {
+        logger.error("Failed to recompute exclusions after unhide", {
+          userId,
+          entityType,
+          entityId,
+          error: err,
+        });
+      });
+    });
   }
 }
 
