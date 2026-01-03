@@ -12,6 +12,7 @@ Peek is a web-based browser for your Stash library, offering:
 - **Subtitle Support** - VTT captions just like Stash
 - **Modern UI** - Responsive interface with theme support
 - **Full Keyboard Navigation** - TV remote and keyboard control support
+- **Proxy Authentication** - Integrate with SSO/auth proxies (Authelia, Authentik, oauth2-proxy, etc.)
 
 Think of it as a sleek, modern interface for browsing your "documentary" collection.
 
@@ -118,12 +119,15 @@ The wizard stores your Stash connection details securely in the database.
 
 ### Environment Variables
 
-| Variable     | Required | Default        | Description                                         |
-| ------------ | -------- | -------------- | --------------------------------------------------- |
-| `JWT_SECRET` | Yes      | Auto-generated | Secret for JWT tokens (recommended to set manually) |
-| `CONFIG_DIR` | No       | `/app/data`    | Directory for database and library data             |
+| Variable            | Required | Default        | Description                                            |
+| ------------------- | -------- | -------------- | ------------------------------------------------------ |
+| `JWT_SECRET`        | Yes      | Auto-generated | Secret for JWT tokens (recommended to set manually)    |
+| `CONFIG_DIR`        | No       | `/app/data`    | Directory for database and library data                |
+| `PROXY_AUTH_HEADER` | No       | (disabled)     | Enable proxy authentication (e.g., `X-Forwarded-User`) |
 
 > **Note**: Stash connection details (URL and API key) are configured via the Setup Wizard and stored in the database. No environment variables needed!
+
+> **Proxy Authentication**: For SSO/auth proxy integration (Authelia, Authentik, etc.), see the [Proxy Authentication](https://carrotwaxr.github.io/peek-stash-browser/getting-started/configuration/#proxy-authentication) documentation. **Important**: Peek must not be publicly accessible when using proxy auth.
 
 ## Updating Peek
 

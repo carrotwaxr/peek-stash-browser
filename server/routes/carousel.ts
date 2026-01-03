@@ -1,20 +1,20 @@
 import express from "express";
 import {
-  getUserCarousels,
-  getCarousel,
   createCarousel,
-  updateCarousel,
   deleteCarousel,
-  previewCarousel,
   executeCarouselById,
+  getCarousel,
+  getUserCarousels,
+  previewCarousel,
+  updateCarousel,
 } from "../controllers/carousel.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All carousel routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Get all user's custom carousels
 router.get("/", authenticated(getUserCarousels));

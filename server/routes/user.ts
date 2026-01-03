@@ -23,13 +23,13 @@ import {
   updateUserRole,
   updateUserSettings,
 } from "../controllers/user.js";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All user routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // User settings routes
 router.get("/settings", authenticated(getUserSettings));
@@ -92,9 +92,6 @@ router.get("/hidden-entities", authenticated(getHiddenEntities)); // Get all hid
 router.get("/hidden-entities/ids", authenticated(getHiddenEntityIds)); // Get hidden entity IDs organized by type
 
 // Hide confirmation preference
-router.put(
-  "/hide-confirmation",
-  authenticated(updateHideConfirmation)
-); // Update hide confirmation preference
+router.put("/hide-confirmation", authenticated(updateHideConfirmation)); // Update hide confirmation preference
 
 export default router;

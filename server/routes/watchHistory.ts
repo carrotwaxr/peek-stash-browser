@@ -8,13 +8,13 @@ import {
   pingWatchHistory,
   saveActivity,
 } from "../controllers/watchHistory.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All watch history routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Ping watch history (legacy - called every 30 seconds during playback)
 router.post("/ping", authenticated(pingWatchHistory));

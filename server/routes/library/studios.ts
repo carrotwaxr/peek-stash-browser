@@ -4,13 +4,13 @@ import {
   findStudiosMinimal,
   updateStudio,
 } from "../../controllers/library/studios.js";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
+import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All studio routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Find studios with filters
 router.post("/studios", requireCacheReady, authenticated(findStudios));

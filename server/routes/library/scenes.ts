@@ -5,13 +5,13 @@ import {
   getRecommendedScenes,
   updateScene,
 } from "../../controllers/library/scenes.js";
-import { authenticateToken, requireCacheReady } from "../../middleware/auth.js";
+import { authenticate, requireCacheReady } from "../../middleware/auth.js";
 import { authenticated } from "../../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All scene routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Find scenes with filters
 router.post("/scenes", requireCacheReady, authenticated(findScenes));

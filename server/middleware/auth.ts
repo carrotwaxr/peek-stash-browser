@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
@@ -45,6 +46,58 @@ export const verifyToken = (token: string) => {
   };
 };
 
+export const authenticate = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const proxyAuthHeader = process.env.PROXY_AUTH_HEADER;
+  const username = req.header(proxyAuthHeader || "");
+  if (proxyAuthHeader && username) {
+    return await authenticateUser(username, req, res, next);
+  }
+
+  return await authenticateToken(req, res, next);
+};
+
+const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
+  prisma.user.findUnique({
+    where,
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      preferredQuality: true,
+      preferredPlaybackMode: true,
+      preferredPreviewQuality: true,
+      enableCast: true,
+      theme: true,
+      hideConfirmationDisabled: true,
+    },
+  });
+
+const authenticateUser = async (
+  username: string,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const user = await lookupUser({ username });
+    if (!user) {
+      throw new Error(
+        "Unable to locate user. Falling back to authenticateToken"
+      );
+    }
+
+    // Cast to AuthenticatedRequest to set user property
+    (req as AuthenticatedRequest).user = user;
+    next();
+  } catch {
+    return await authenticateToken(req, res, next);
+  }
+};
+
 export const authenticateToken = async (
   req: Request,
   res: Response,
@@ -59,21 +112,7 @@ export const authenticateToken = async (
 
   try {
     const decoded = verifyToken(token);
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: {
-        id: true,
-        username: true,
-        role: true,
-        preferredQuality: true,
-        preferredPlaybackMode: true,
-        preferredPreviewQuality: true,
-        enableCast: true,
-        theme: true,
-        hideConfirmationDisabled: true,
-      },
-    });
-
+    const user = await lookupUser({ id: decoded.id });
     if (!user) {
       return res.status(401).json({ error: "Invalid token. User not found." });
     }

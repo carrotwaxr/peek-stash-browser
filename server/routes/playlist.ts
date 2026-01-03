@@ -9,13 +9,13 @@ import {
   reorderPlaylist,
   updatePlaylist,
 } from "../controllers/playlist.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticate } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // All playlist routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Get all user playlists
 router.get("/", authenticated(getUserPlaylists));

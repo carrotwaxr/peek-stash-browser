@@ -11,10 +11,11 @@ import {
   proxyStashMedia,
 } from "../controllers/proxy.js";
 import * as statsController from "../controllers/stats.js";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import authRoutes from "../routes/auth.js";
 import carouselRoutes from "../routes/carousel.js";
 import customThemeRoutes from "../routes/customTheme.js";
+import imageViewHistoryRoutes from "../routes/imageViewHistory.js";
 import libraryGalleriesRoutes from "../routes/library/galleries.js";
 import libraryGroupsRoutes from "../routes/library/groups.js";
 import libraryImagesRoutes from "../routes/library/images.js";
@@ -30,7 +31,6 @@ import exclusionsRoutes from "../routes/exclusions.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
-import imageViewHistoryRoutes from "../routes/imageViewHistory.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -82,17 +82,12 @@ export const setupAPI = () => {
   });
 
   // Server stats endpoint (admin only - authenticated)
-  app.get(
-    "/api/stats",
-    authenticateToken,
-    requireAdmin,
-    statsController.getStats
-  );
+  app.get("/api/stats", authenticate, requireAdmin, statsController.getStats);
 
   // Refresh cache endpoint (admin only)
   app.post(
     "/api/stats/refresh-cache",
-    authenticateToken,
+    authenticate,
     requireAdmin,
     statsController.refreshCache
   );

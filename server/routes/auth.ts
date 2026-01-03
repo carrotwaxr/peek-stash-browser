@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import express, { Response } from "express";
 import {
   AuthenticatedRequest,
-  authenticateToken,
+  authenticate,
   generateToken,
 } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
@@ -70,7 +70,7 @@ router.post("/logout", (req, res) => {
 // Get current user
 router.get(
   "/me",
-  authenticateToken,
+  authenticate,
   authenticated((req: AuthenticatedRequest, res: Response) => {
     res.json({
       user: req.user,
@@ -81,7 +81,7 @@ router.get(
 // Check if authenticated
 router.get(
   "/check",
-  authenticateToken,
+  authenticate,
   authenticated((req: AuthenticatedRequest, res: Response) => {
     res.json({ authenticated: true, user: req.user });
   })
