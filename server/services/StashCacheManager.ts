@@ -23,7 +23,6 @@ import {
   transformStudio,
   transformTag,
 } from "../utils/stashUrlProxy.js";
-import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
@@ -346,12 +345,18 @@ class StashCacheManager {
 
       // Recompute exclusions for all users (empty entities may have changed)
       // Run asynchronously to not block the cache refresh response
-      setImmediate(() => {
-        exclusionComputationService.recomputeAllUsers().catch((err) => {
+      // Lazy import to avoid circular dependency with ExclusionComputationService
+      setImmediate(async () => {
+        try {
+          const { exclusionComputationService } = await import(
+            "./ExclusionComputationService.js"
+          );
+          await exclusionComputationService.recomputeAllUsers();
+        } catch (err) {
           logger.error("Failed to recompute exclusions after cache refresh", {
             error: err instanceof Error ? err.message : String(err),
           });
-        });
+        }
       });
       logger.info("Triggered exclusion recomputation due to cache refresh");
 
