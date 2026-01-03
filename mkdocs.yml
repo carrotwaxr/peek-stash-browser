@@ -120,7 +120,7 @@ nav:
       - Hidden Items: user-guide/hidden-items.md
       - External Player: user-guide/external-player.md
   - Development:
-      - Content Restrictions System: development/content-restrictions.md
+      - Technical Overview: development/technical-overview.md
       - Regression Testing Guide: development/regression-testing.md
   - Reference:
       - Troubleshooting: reference/troubleshooting.md

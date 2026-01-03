@@ -19,9 +19,29 @@ This doesn't scale. Problems include:
 - **Pagination:** To get page 5 of 25 items, we load and filter ALL items first
 - **Counts:** Total visible count requires processing entire dataset
 
+**Current flow (slow):**
+```
+Controller (e.g., scenes.ts)
+    ↓
+1. userRestrictionService.getExcludedSceneIds(userId)  ← 6-10 DB queries per request
+    ↓
+2. sceneQueryBuilder.execute({ excludedSceneIds, ... })  ← passes exclusions as Set
+    ↓
+3. SceneQueryBuilder uses NOT IN (excludedIds) in SQL  ← parameter limits, chunking needed
+```
+
 **Target scale:** Users with 100TB+ collections containing millions of scenes and images.
 
 **Goal:** Pre-compute excluded entity IDs per user, stored in a database table. Queries become simple JOINs with proper pagination and counts at the database level.
+
+**New flow (fast):**
+```
+Controller (e.g., scenes.ts)
+    ↓
+1. sceneQueryBuilder.execute({ userId, ... })  ← no pre-computation needed
+    ↓
+2. SceneQueryBuilder adds LEFT JOIN UserExcludedEntity + WHERE e.id IS NULL
+```
 
 ---
 
@@ -42,7 +62,7 @@ LIMIT 25 OFFSET 100
 
 | Table | Purpose |
 |-------|---------|
-| `UserExcludedEntity` | Stores (userId, entityType, entityId) for every excluded item |
+| `UserExcludedEntity` | Stores (userId, entityType, entityId, reason) for every excluded item |
 | `UserEntityStats` | Stores pre-computed visible counts per entity type per user |
 
 **Exclusion reasons tracked:**
@@ -51,12 +71,13 @@ LIMIT 25 OFFSET 100
 - `cascade` — Excluded due to a related entity (e.g., scene excluded because its performer is hidden)
 - `empty` — Organizational entity with no visible content
 
-**Cascade tracking:** Store `sourceType` and `sourceId` so we know WHY something was excluded. This enables efficient incremental updates when unhiding.
+**Design simplification:** We store one row per excluded entity without tracking the source of cascades (`sourceType`/`sourceId`). This simplifies the schema and queries. The tradeoff is that unhide operations trigger a targeted recompute rather than a simple DELETE, but unhide is rare and recompute is fast.
 
 **Recomputation triggers:**
-- Stash sync completes (diff-based)
-- Admin changes user's restrictions
-- User hides/unhides an entity
+- Stash sync completes → `recomputeAllUsers()`
+- Admin changes user's restrictions → `recomputeForUser(userId)`
+- User hides entity → `addHiddenEntity()` (synchronous, incremental)
+- User unhides entity → Remove from `UserHiddenEntity`, queue `recomputeForUser()` (async)
 
 ---
 
@@ -70,11 +91,7 @@ model UserExcludedEntity {
   entityType String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
   entityId   String   // Stash entity ID
 
-  // Why is this excluded? (for debugging and unhide logic)
   reason     String   // 'restricted', 'hidden', 'cascade', 'empty'
-  sourceType String?  // If cascade: which entity type caused it ('performer', 'tag', etc.)
-  sourceId   String?  // If cascade: which entity ID caused it
-
   computedAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -106,6 +123,34 @@ model UserEntityStats {
 
 ---
 
+## Cascade Rules
+
+When an entity is hidden or restricted, related entities are cascade-excluded:
+
+| When this is hidden/restricted... | These are cascade-excluded... |
+|-----------------------------------|-------------------------------|
+| Performer | Scenes with that performer |
+| Studio | Scenes from that studio |
+| Tag | Scenes with that tag (direct OR inherited via `inheritedTagIds`), Performers with that tag, Studios with that tag, Groups with that tag |
+| Group | Scenes in that group |
+| Gallery | Scenes linked to that gallery, Images in that gallery |
+| Scene | (no cascade — scenes are leaf content) |
+| Image | (no cascade — images are leaf content) |
+
+**Empty entity cascades** (organizational entities with no remaining visible content):
+
+| Entity type | Empty when... |
+|-------------|---------------|
+| Gallery | Has 0 visible images |
+| Group | Has 0 visible scenes AND no sub-groups with content (tree traversal) |
+| Studio | Has 0 visible scenes AND 0 visible images AND no child studios with content (tree traversal) |
+| Performer | Has 0 visible scenes AND 0 visible images |
+| Tag | Not attached to any visible scene/performer/studio/group/gallery/image (DAG traversal) |
+
+**Empty exclusions computed at sync time only** — not during hide/unhide operations. This keeps incremental operations fast. Users won't notice if an empty performer briefly appears until next sync.
+
+---
+
 ## New Services
 
 ### File: `server/services/ExclusionComputationService.ts`
@@ -114,58 +159,198 @@ Responsible for computing and maintaining exclusions.
 
 ```typescript
 class ExclusionComputationService {
-  // Full recompute for a user (initial setup, restriction change)
+  // Full recompute for a user (initial setup, restriction change, after sync)
   async recomputeForUser(userId: number): Promise<void>
 
-  // Incremental: user hid an entity
+  // Recompute for all users (after sync)
+  async recomputeAllUsers(): Promise<void>
+
+  // Incremental: user hid an entity (synchronous)
   async addHiddenEntity(userId: number, entityType: string, entityId: string): Promise<void>
 
-  // Incremental: user unhid an entity
+  // Incremental: user unhid an entity (queues async recompute)
   async removeHiddenEntity(userId: number, entityType: string, entityId: string): Promise<void>
 
-  // Diff-based: after Stash sync, update affected exclusions
-  async updateAfterSync(changedEntityIds: Map<string, string[]>): Promise<void>
-
-  // Recalculate visible counts for a user
-  async updateEntityStats(userId: number): Promise<void>
+  // Internal phases
+  private async computeDirectExclusions(tx: PrismaTransaction, userId: number): Promise<void>
+  private async computeCascadeExclusions(tx: PrismaTransaction, userId: number): Promise<void>
+  private async computeEmptyExclusions(tx: PrismaTransaction, userId: number): Promise<void>
+  private async updateEntityStats(tx: PrismaTransaction, userId: number): Promise<void>
 }
 ```
 
-**Cascade computation logic:**
+**Full recompute algorithm:**
 
-When computing exclusions for a user:
-1. Start with directly hidden/restricted entities
-2. For each hidden performer → find all their scenes → mark as cascade
-3. For each hidden studio → find all their scenes → mark as cascade
-4. For each hidden tag → find all scenes/performers/studios with that tag → mark as cascade
-5. For each hidden group → find all scenes in group → mark as cascade
-6. For each hidden gallery → find all scenes linked, all images in gallery → mark as cascade
-7. Compute empty entities (organizational entities with no remaining visible content)
-
-### File: `server/services/ExclusionQueryService.ts`
-
-Provides query builders with exclusion JOINs.
+The entire recompute runs in a transaction. If any phase fails, the transaction rolls back and the user keeps their previous exclusions — they never see unrestricted content due to a partial failure.
 
 ```typescript
-class ExclusionQueryService {
-  // Get visible scenes with pagination
-  async findScenes(userId: number, options: {
-    filters?: SceneFilters,
-    sort?: SortOption,
-    offset?: number,
-    limit?: number,
-    minimal?: boolean  // For dropdowns: only return id/name
-  }): Promise<{ scenes: NormalizedScene[], total: number }>
+async recomputeForUser(userId: number): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    // Phase 1: Clear existing exclusions
+    await tx.userExcludedEntity.deleteMany({ where: { userId } });
 
-  // Similar methods for other entity types
-  async findPerformers(userId: number, options: {...}): Promise<{...}>
-  async findStudios(userId: number, options: {...}): Promise<{...}>
-  async findTags(userId: number, options: {...}): Promise<{...}>
-  async findGroups(userId: number, options: {...}): Promise<{...}>
-  async findGalleries(userId: number, options: {...}): Promise<{...}>
-  async findImages(userId: number, options: {...}): Promise<{...}>
+    // Phase 2: Direct exclusions (restrictions + hidden)
+    await this.computeDirectExclusions(tx, userId);
+
+    // Phase 3: Cascade exclusions
+    await this.computeCascadeExclusions(tx, userId);
+
+    // Phase 4: Empty entity exclusions (sync-time only)
+    await this.computeEmptyExclusions(tx, userId);
+
+    // Phase 5: Update stats
+    await this.updateEntityStats(tx, userId);
+  });
 }
 ```
+
+**Computation order in Phase 3 (cascades):**
+
+1. For each hidden/restricted performer → exclude their scenes
+2. For each hidden/restricted studio → exclude their scenes
+3. For each hidden/restricted tag → exclude scenes (using `inheritedTagIds`), performers, studios, groups
+4. For each hidden/restricted group → exclude their scenes
+5. For each hidden/restricted gallery → exclude linked scenes, images in gallery
+
+### File: `server/services/ExclusionQueryBuilder.ts`
+
+Provides JOIN clause utilities for filtered queries.
+
+```typescript
+class ExclusionQueryBuilder {
+  /**
+   * Build the exclusion JOIN clause for raw SQL
+   */
+  buildExclusionJoin(
+    entityType: string,
+    tableAlias: string
+  ): { sql: string } {
+    return {
+      sql: `LEFT JOIN UserExcludedEntity e_${tableAlias}
+            ON e_${tableAlias}.userId = ?
+            AND e_${tableAlias}.entityType = '${entityType}'
+            AND e_${tableAlias}.entityId = ${tableAlias}.id`,
+    };
+  }
+
+  /**
+   * Build the WHERE clause for exclusion filtering
+   */
+  buildExclusionWhere(tableAlias: string): string {
+    return `e_${tableAlias}.id IS NULL`;
+  }
+}
+```
+
+This utility is used by `SceneQueryBuilder` and similar query builders for other entity types.
+
+---
+
+## Query Architecture Changes
+
+### SceneQueryBuilder Updates
+
+**Interface change:**
+
+```typescript
+// Before
+interface SceneQueryOptions {
+  userId: number;
+  excludedSceneIds?: Set<string>;  // Remove this
+  // ...
+}
+
+// After
+interface SceneQueryOptions {
+  userId: number;
+  applyExclusions?: boolean;  // Default true, false for admin override
+  // ...
+}
+```
+
+**FROM clause change:**
+
+```sql
+-- Before
+FROM StashScene s
+LEFT JOIN SceneRating r ON s.id = r.sceneId AND r.userId = ?
+LEFT JOIN WatchHistory w ON s.id = w.sceneId AND w.userId = ?
+
+-- After
+FROM StashScene s
+LEFT JOIN SceneRating r ON s.id = r.sceneId AND r.userId = ?
+LEFT JOIN WatchHistory w ON s.id = w.sceneId AND w.userId = ?
+LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id
+```
+
+**WHERE clause addition:**
+
+```sql
+WHERE s.deletedAt IS NULL
+  AND e.id IS NULL  -- Not in exclusion table
+  -- ... other filters
+```
+
+### Same Pattern for Other Entities
+
+The `UserExcludedEntity` table is uniform — the JOIN pattern is identical for all entity types:
+
+```sql
+LEFT JOIN UserExcludedEntity e
+  ON e.userId = ? AND e.entityType = '<type>' AND e.entityId = <table>.id
+WHERE e.id IS NULL
+```
+
+---
+
+## Incremental Updates
+
+### Hide Operation (Synchronous)
+
+When a user hides an entity, we add exclusions incrementally within a transaction:
+
+```typescript
+async addHiddenEntity(userId: number, entityType: string, entityId: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    // 1. Add the direct exclusion
+    await tx.userExcludedEntity.upsert({
+      where: { userId_entityType_entityId: { userId, entityType, entityId } },
+      create: { userId, entityType, entityId, reason: 'hidden' },
+      update: { reason: 'hidden' },
+    });
+
+    // 2. Compute and add cascades for this entity
+    await this.addCascadesForEntity(tx, userId, entityType, entityId);
+
+    // 3. Update affected stats
+    await this.updateEntityStats(tx, userId);
+  });
+}
+```
+
+This is fast — typically a few queries and INSERTs. User sees immediate feedback.
+
+### Unhide Operation (Async)
+
+Unhide is trickier — a scene might still be excluded by another hidden performer. We use a safe approach:
+
+```typescript
+async removeHiddenEntity(userId: number, entityType: string, entityId: string): Promise<void> {
+  // 1. Remove the source of truth entry (immediate)
+  await prisma.userHiddenEntity.delete({
+    where: { userId_entityType_entityId: { userId, entityType, entityId } },
+  });
+
+  // 2. Queue async recompute
+  setImmediate(() => {
+    this.recomputeForUser(userId).catch(err => {
+      logger.error('Failed to recompute exclusions after unhide', { userId, err });
+    });
+  });
+}
+```
+
+The response returns immediately. There's a brief window where the user might see stale exclusions, but the next request after recompute completes will be correct.
 
 ---
 
@@ -173,17 +358,18 @@ class ExclusionQueryService {
 
 **The problem:** Exclusion filtering must be applied consistently across ALL endpoints that return entities — including minimal endpoints for filter dropdowns.
 
-**Approach: Centralize all entity queries through `ExclusionQueryService`**
+**Approach: Centralize all entity queries through query builders that use exclusion JOINs**
 
 No controller should directly query Prisma or cache for user-visible entities. Instead:
 
 ```typescript
 // OLD (scattered, inconsistent)
-let tags = await stashEntityService.getAllTags();
-tags = await userRestrictionService.filterTagsForUser(tags, userId);
+const excludedIds = await userRestrictionService.getExcludedSceneIds(userId);
+const result = await sceneQueryBuilder.execute({ excludedSceneIds, ... });
 
 // NEW (centralized)
-const { tags, total } = await exclusionQueryService.findTags(userId, { filters, sort, limit, offset });
+const result = await sceneQueryBuilder.execute({ userId, ... });
+// Exclusion JOIN is built-in
 ```
 
 **Full endpoint audit:**
@@ -209,6 +395,7 @@ const { tags, total } = await exclusionQueryService.findTags(userId, { filters, 
 | GET /api/search | `search.ts` | Global search |
 | GET /api/playlists/:id | `playlist.ts` | Playlist items |
 | GET /api/home/carousels | `home.ts` | Home page carousels |
+| GET /api/carousel/* | `carousel.ts` | Carousel queries |
 
 **Why this works for all exclusion types:**
 
@@ -216,12 +403,13 @@ const { tags, total } = await exclusionQueryService.findTags(userId, { filters, 
 - **Hidden items** → Computation processes user hidden entities, adds entries with `reason='hidden'` or `reason='cascade'`
 - **Empty items** → Computation identifies organizational entities with no visible content, adds entries with `reason='empty'`
 
-All three end up in the same `UserExcludedEntity` table. `ExclusionQueryService` applies the same JOIN regardless of reason. The `reason` column is only for debugging and the unhide UI.
+All three end up in the same `UserExcludedEntity` table. Query builders apply the same JOIN regardless of reason. The `reason` column is for debugging and the unhide UI.
 
 **Enforcement:**
-1. Delete `stashEntityService.getAll*()` methods after migration
+1. Delete `userRestrictionService.getExcludedSceneIds()` after migration
 2. Delete `userRestrictionService.filter*ForUser()` methods after migration
-3. Compile errors force all callers to use new service
+3. Delete `emptyEntityFilterService` methods after migration
+4. Compile errors force all callers to use new pattern
 
 ---
 
@@ -236,22 +424,28 @@ All three end up in the same `UserExcludedEntity` table. `ExclusionQueryService`
 - Add admin endpoint to trigger recomputation manually
 - Test that exclusions are computed correctly
 
-**Phase 3: Implement query service**
-- Build `ExclusionQueryService` with JOIN-based queries
-- Add feature flag to switch between old and new query paths
-- Run both in parallel to validate results match
+**Phase 3: Implement query builder utility**
+- Build `ExclusionQueryBuilder` with JOIN clause helpers
+- Update `SceneQueryBuilder` to use exclusion JOIN instead of `excludedSceneIds` parameter
+- Test scene queries work correctly
 
 **Phase 4: Wire up triggers**
-- After Stash sync → call `updateAfterSync()`
+- After Stash sync → call `recomputeAllUsers()`
 - After restriction change → call `recomputeForUser()`
-- After hide/unhide → call incremental methods
+- After hide → call `addHiddenEntity()`
+- After unhide → call `removeHiddenEntity()`
 
-**Phase 5: Switch over**
-- Enable new query path by default
-- Monitor for issues
+**Phase 5: Update remaining entity queries**
+- Add exclusion JOINs to performer, studio, tag, group, gallery, image queries
+- Update all endpoints in audit list
+
+**Phase 6: Cleanup**
 - Remove old in-memory filtering code
+- Remove `getExcludedSceneIds()` and `filter*ForUser()` methods
+- Remove `EmptyEntityFilterService`
+- Remove `FilteredEntityCacheService`
 
-**Rollback plan:** Feature flag allows instant rollback to old query path if issues arise.
+**Rollback plan:** Keep old code paths available behind feature flag during migration. If issues arise, disable new code path instantly.
 
 **Existing tables preserved:**
 - `UserContentRestriction` — remains source of truth for admin restrictions
@@ -288,10 +482,10 @@ All three end up in the same `UserExcludedEntity` table. `ExclusionQueryService`
 
 | Concern | Mitigation |
 |---------|------------|
-| Full recomputation time | Never do full recompute except initial setup; use incremental updates |
+| Full recomputation time | Use transactions for atomicity; recompute is seconds not minutes |
 | COUNT queries | Pre-compute visible counts in `UserEntityStats` table |
 | Index memory | ~250MB for 5M rows is acceptable for modern servers |
-| Cascade complexity | Track `sourceType`/`sourceId` to enable targeted updates |
+| Failure during recompute | Transaction rollback preserves previous exclusions |
 
 ### Future Optimization: Table Splitting
 
@@ -310,18 +504,18 @@ Start with single table; split only if actual performance issues occur.
 
 1. **Cascade computation:**
    - Hide a performer → verify all their scenes are excluded with `reason='cascade'`
-   - Hide a tag → verify scenes/performers/studios with that tag are excluded
+   - Hide a tag → verify scenes/performers/studios/groups with that tag are excluded
    - Hide a group → verify scenes in group are excluded
    - Hide a gallery → verify linked scenes and images are excluded
 
 2. **Incremental updates:**
    - Hide entity → verify exclusions added correctly
-   - Unhide entity → verify exclusions removed
+   - Unhide entity → verify recompute removes exclusions
    - Unhide entity that's still excluded by another source → verify it stays excluded
 
-3. **Multi-source cascade:**
-   - Scene has two hidden performers → verify removing one doesn't unhide scene
-   - Scene has hidden performer AND hidden tag → both sources tracked
+3. **Transaction safety:**
+   - Simulate failure mid-recompute → verify previous exclusions preserved
+   - Verify user never sees unrestricted content due to partial failure
 
 ### Integration Tests
 
@@ -340,7 +534,7 @@ Start with single table; split only if actual performance issues occur.
    - Verify recomputation time is acceptable
 
 4. **All endpoints covered:**
-   - Verify each endpoint in audit list uses `ExclusionQueryService`
+   - Verify each endpoint in audit list uses exclusion JOINs
    - Verify filter dropdowns show only visible entities
    - Verify hidden performer doesn't appear in performer dropdown
 
@@ -358,27 +552,28 @@ Start with single table; split only if actual performance issues occur.
 
 ### New Files
 - `server/services/ExclusionComputationService.ts` — Computes and maintains exclusions
-- `server/services/ExclusionQueryService.ts` — Query builders with exclusion JOINs
+- `server/services/ExclusionQueryBuilder.ts` — JOIN clause utilities for filtered queries
 
 ### Modified Files
 - `server/prisma/schema.prisma` — Add `UserExcludedEntity` and `UserEntityStats` tables
-- `server/controllers/library/scenes.ts` — Use `ExclusionQueryService`
-- `server/controllers/library/performers.ts` — Use `ExclusionQueryService`
-- `server/controllers/library/studios.ts` — Use `ExclusionQueryService`
-- `server/controllers/library/tags.ts` — Use `ExclusionQueryService`
-- `server/controllers/library/groups.ts` — Use `ExclusionQueryService`
-- `server/controllers/library/galleries.ts` — Use `ExclusionQueryService`
-- `server/controllers/library/images.ts` — Use `ExclusionQueryService`
-- `server/controllers/recommendations.ts` — Use `ExclusionQueryService`
-- `server/controllers/search.ts` — Use `ExclusionQueryService`
-- `server/controllers/playlist.ts` — Use `ExclusionQueryService`
-- `server/controllers/home.ts` — Use `ExclusionQueryService`
-- `server/services/StashSyncService.ts` — Trigger exclusion update after sync
-- `server/controllers/user.ts` — Trigger exclusion update on hide/unhide
-- `server/controllers/admin.ts` — Trigger exclusion update on restriction change
+- `server/services/SceneQueryBuilder.ts` — Use exclusion JOIN instead of `excludedSceneIds`
+- `server/controllers/library/scenes.ts` — Remove `getExcludedSceneIds()` calls
+- `server/controllers/library/performers.ts` — Add exclusion JOIN to queries
+- `server/controllers/library/studios.ts` — Add exclusion JOIN to queries
+- `server/controllers/library/tags.ts` — Add exclusion JOIN to queries
+- `server/controllers/library/groups.ts` — Add exclusion JOIN to queries
+- `server/controllers/library/galleries.ts` — Add exclusion JOIN to queries
+- `server/controllers/library/images.ts` — Add exclusion JOIN to queries
+- `server/controllers/recommendations.ts` — Remove `getExcludedSceneIds()` calls
+- `server/controllers/search.ts` — Add exclusion JOINs
+- `server/controllers/playlist.ts` — Add exclusion JOINs
+- `server/controllers/carousel.ts` — Remove `getExcludedSceneIds()` calls
+- `server/services/StashSyncService.ts` — Trigger `recomputeAllUsers()` after sync
+- `server/controllers/user.ts` — Use `addHiddenEntity()`/`removeHiddenEntity()`
+- `server/controllers/admin.ts` — Trigger `recomputeForUser()` on restriction change
 
 ### Deleted Files (after migration complete)
-- `server/services/UserRestrictionService.ts` — Replaced by `ExclusionQueryService`
+- `server/services/UserRestrictionService.ts` — Replaced by `ExclusionComputationService` + query JOINs
 - `server/services/EmptyEntityFilterService.ts` — Replaced by `ExclusionComputationService`
 - `server/services/FilteredEntityCacheService.ts` — No longer needed
 
@@ -399,6 +594,6 @@ GET  /api/admin/exclusion-stats               — View exclusion table size, per
 ## Related Documentation
 
 - [Technical Overview](../development/technical-overview.md) — Full architecture documentation
-- [Fix Direct Stash Queries](2025-01-02-fix-direct-stash-queries-design.md) — Prerequisite fix
-- [Image Gallery Inheritance](2025-01-02-image-gallery-inheritance-design.md) — Similar denormalization pattern
-- [Scene Tag Inheritance](2025-01-02-scene-tag-inheritance-design.md) — Similar denormalization pattern
+- [Fix Direct Stash Queries](2025-01-02-fix-direct-stash-queries-design.md) — Prerequisite fix (completed)
+- [Image Gallery Inheritance](2025-01-02-image-gallery-inheritance-design.md) — Similar denormalization pattern (completed)
+- [Scene Tag Inheritance](2025-01-02-scene-tag-inheritance-design.md) — Similar denormalization pattern (completed)
