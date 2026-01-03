@@ -238,4 +238,34 @@ describe("ImageQueryBuilder", () => {
       expect(result.images[0].id).toBe("img-1");
     });
   });
+
+  describe("search and ID filters", () => {
+    it("filters by search query", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { q: "Two" },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-2");
+    });
+
+    it("filters by IDs", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { ids: { value: ["img-1", "img-3"], modifier: "INCLUDES" } },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(2);
+      expect(result.images.map((i: any) => i.id).sort()).toEqual(["img-1", "img-3"].sort());
+    });
+  });
 });

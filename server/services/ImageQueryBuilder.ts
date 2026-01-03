@@ -292,6 +292,51 @@ class ImageQueryBuilder {
     }
   }
 
+  // Build search query filter
+  private buildSearchFilter(q: string | undefined): FilterClause {
+    if (!q || q.trim() === "") {
+      return { sql: "", params: [] };
+    }
+
+    const searchTerm = `%${q.trim()}%`;
+    return {
+      sql: `(
+        i.title LIKE ? OR
+        i.details LIKE ? OR
+        i.photographer LIKE ? OR
+        i.filePath LIKE ?
+      )`,
+      params: [searchTerm, searchTerm, searchTerm, searchTerm],
+    };
+  }
+
+  // Build ID filter
+  private buildIdFilter(
+    filter: { value: string[]; modifier?: string } | undefined
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `i.id IN (${placeholders})`,
+          params: ids,
+        };
+      case "EXCLUDES":
+        return {
+          sql: `i.id NOT IN (${placeholders})`,
+          params: ids,
+        };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
   // Build sort clause
   private buildSortClause(sort: string, dir: "ASC" | "DESC"): string {
     const sortMap: Record<string, string> = {
@@ -355,6 +400,18 @@ class ImageQueryBuilder {
     if (filters?.galleries) {
       const galleryFilter = this.buildGalleryFilter(filters.galleries);
       if (galleryFilter.sql) whereClauses.push(galleryFilter);
+    }
+
+    // Add search filter
+    if (filters?.q) {
+      const searchFilter = this.buildSearchFilter(filters.q);
+      if (searchFilter.sql) whereClauses.push(searchFilter);
+    }
+
+    // Add ID filter
+    if (filters?.ids) {
+      const idFilter = this.buildIdFilter(filters.ids);
+      if (idFilter.sql) whereClauses.push(idFilter);
     }
 
     // Combine WHERE clauses
