@@ -8,7 +8,7 @@
  */
 
 import express from "express";
-import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { authenticated } from "../utils/routeHelpers.js";
 import prisma from "../prisma/singleton.js";
@@ -16,7 +16,7 @@ import prisma from "../prisma/singleton.js";
 const router = express.Router();
 
 // All exclusion routes require authentication
-router.use(authenticateToken);
+router.use(authenticate);
 
 /**
  * POST /api/exclusions/recompute/:userId
