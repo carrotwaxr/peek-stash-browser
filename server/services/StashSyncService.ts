@@ -44,6 +44,17 @@ export interface SyncResult {
 
 type EntityType = "scene" | "performer" | "studio" | "tag" | "group" | "gallery" | "image";
 
+// Plural forms for entity types (for logging)
+const ENTITY_PLURALS: Record<EntityType, string> = {
+  scene: "scenes",
+  performer: "performers",
+  studio: "studios",
+  tag: "tags",
+  group: "groups",
+  gallery: "galleries",
+  image: "images",
+};
+
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
 
@@ -185,36 +196,43 @@ class StashSyncService extends EventEmitter {
       let result: SyncResult;
 
       result = await this.syncTags(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("tag", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncStudios(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("studio", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncPerformers(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("performer", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGroups(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("group", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGalleries(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("gallery", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncScenes(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("scene", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncImages(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("image", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
 
@@ -245,7 +263,11 @@ class StashSyncService extends EventEmitter {
       const duration = Date.now() - startTime;
       logger.info("Full sync completed", {
         durationMs: duration,
-        results: results.map((r) => ({ type: r.entityType, synced: r.synced })),
+        results: results.map((r) => ({
+          type: r.entityType,
+          synced: r.synced,
+          deleted: r.deleted,
+        })),
       });
 
       return results;
@@ -331,6 +353,23 @@ class StashSyncService extends EventEmitter {
         }
       }
 
+      // Cleanup deleted entities (detect deletions/merges in Stash)
+      logger.info("Checking for deleted entities...");
+      let totalDeleted = 0;
+      for (const entityType of entityTypes) {
+        this.checkAbort();
+        const deleted = await this.cleanupDeletedEntities(entityType, stashInstanceId);
+        totalDeleted += deleted;
+        // Update the result for this entity type with deleted count
+        const result = results.find((r) => r.entityType === entityType);
+        if (result) {
+          result.deleted = deleted;
+        }
+      }
+      if (totalDeleted > 0) {
+        logger.info(`Cleanup complete: ${totalDeleted} entities marked as deleted`);
+      }
+
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
       await exclusionComputationService.recomputeAllUsers();
@@ -339,7 +378,7 @@ class StashSyncService extends EventEmitter {
       const duration = Date.now() - startTime;
       logger.info("Smart incremental sync completed", {
         durationMs: duration,
-        results: results.map((r) => ({ type: r.entityType, synced: r.synced })),
+        results: results.map((r) => ({ type: r.entityType, synced: r.synced, deleted: r.deleted })),
       });
 
       return results;
@@ -556,6 +595,23 @@ class StashSyncService extends EventEmitter {
         }
       }
 
+      // Cleanup deleted entities (detect deletions/merges in Stash)
+      logger.info("Checking for deleted entities...");
+      let totalDeleted = 0;
+      for (const entityType of entityTypes) {
+        this.checkAbort();
+        const deleted = await this.cleanupDeletedEntities(entityType, stashInstanceId);
+        totalDeleted += deleted;
+        // Update the result for this entity type with deleted count
+        const result = results.find((r) => r.entityType === entityType);
+        if (result) {
+          result.deleted = deleted;
+        }
+      }
+      if (totalDeleted > 0) {
+        logger.info(`Cleanup complete: ${totalDeleted} entities marked as deleted`);
+      }
+
       // Apply gallery inheritance if images were synced
       const imageResult = results.find((r) => r.entityType === "image");
       if (imageResult && imageResult.synced > 0) {
@@ -589,7 +645,7 @@ class StashSyncService extends EventEmitter {
       const duration = Date.now() - startTime;
       logger.info("Incremental sync completed", {
         durationMs: duration,
-        results: results.map((r) => ({ type: r.entityType, synced: r.synced })),
+        results: results.map((r) => ({ type: r.entityType, synced: r.synced, deleted: r.deleted })),
       });
 
       return results;
@@ -974,6 +1030,139 @@ class StashSyncService extends EventEmitter {
 
     await Promise.all(inserts);
 
+  }
+
+  /**
+   * Cleanup entities that no longer exist in Stash.
+   * Called during full sync after each entity type has been synced.
+   *
+   * Fetches all entity IDs from Stash and soft-deletes any entities in Peek
+   * that are not present in Stash (due to deletion or merge operations).
+   */
+  private async cleanupDeletedEntities(entityType: EntityType, stashInstanceId?: string): Promise<number> {
+    const plural = ENTITY_PLURALS[entityType];
+    logger.info(`Checking for deleted ${plural}...`);
+    const startTime = Date.now();
+    const stash = stashInstanceManager.getDefault();
+
+    try {
+      // Fetch all IDs from Stash in one query
+      // per_page: -1 means return all results
+      let stashIds: string[];
+
+      switch (entityType) {
+        case "scene": {
+          const result = await stash.findSceneIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findScenes.scenes.map((s) => s.id);
+          break;
+        }
+        case "performer": {
+          const result = await stash.findPerformerIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findPerformers.performers.map((p) => p.id);
+          break;
+        }
+        case "studio": {
+          const result = await stash.findStudioIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findStudios.studios.map((s) => s.id);
+          break;
+        }
+        case "tag": {
+          const result = await stash.findTagIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findTags.tags.map((t) => t.id);
+          break;
+        }
+        case "group": {
+          const result = await stash.findGroupIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findGroups.groups.map((g) => g.id);
+          break;
+        }
+        case "gallery": {
+          const result = await stash.findGalleryIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findGalleries.galleries.map((g) => g.id);
+          break;
+        }
+        case "image": {
+          const result = await stash.findImageIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findImages.images.map((i) => i.id);
+          break;
+        }
+        default:
+          logger.warn(`Unknown entity type for cleanup: ${entityType}`);
+          return 0;
+      }
+
+      logger.debug(`Found ${stashIds.length} ${plural} in Stash`);
+
+      // Check for abort before proceeding with database updates
+      this.checkAbort();
+
+      // Soft delete all entities that exist in Peek but not in Stash
+      const now = new Date();
+      let deletedCount = 0;
+
+      switch (entityType) {
+        case "scene":
+          deletedCount = (await prisma.stashScene.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "performer":
+          deletedCount = (await prisma.stashPerformer.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "studio":
+          deletedCount = (await prisma.stashStudio.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "tag":
+          deletedCount = (await prisma.stashTag.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "group":
+          deletedCount = (await prisma.stashGroup.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "gallery":
+          deletedCount = (await prisma.stashGallery.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "image":
+          deletedCount = (await prisma.stashImage.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+      }
+
+      if (deletedCount === 0) {
+        logger.info(`No deleted ${plural} found`);
+        return 0;
+      }
+
+      const durationMs = Date.now() - startTime;
+      logger.info(
+        `Marked ${deletedCount} ${plural} as deleted in ${(durationMs / 1000).toFixed(1)}s`
+      );
+
+      return deletedCount;
+    } catch (error) {
+      logger.error(`Failed to cleanup deleted ${plural}`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - cleanup is a best-effort operation
+      return 0;
+    }
   }
 
   // ==================== Performer Sync ====================
