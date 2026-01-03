@@ -23,7 +23,7 @@ import {
   transformStudio,
   transformTag,
 } from "../utils/stashUrlProxy.js";
-import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
+import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 
 /**
@@ -342,13 +342,18 @@ class StashCacheManager {
       this.cache.galleries = newGalleries;
       this.cache.groups = newGroups;
       this.cache.lastRefreshed = new Date();
-      this.cache.cacheVersion++; // Increment version to invalidate filtered entity caches
+      this.cache.cacheVersion++;
 
-      // Invalidate all filtered entity caches (they depend on this data)
-      filteredEntityCacheService.invalidateAll();
-      logger.info(
-        "Invalidated all filtered entity caches due to Stash cache refresh"
-      );
+      // Recompute exclusions for all users (empty entities may have changed)
+      // Run asynchronously to not block the cache refresh response
+      setImmediate(() => {
+        exclusionComputationService.recomputeAllUsers().catch((err) => {
+          logger.error("Failed to recompute exclusions after cache refresh", {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      });
+      logger.info("Triggered exclusion recomputation due to cache refresh");
 
       const duration = Date.now() - startTime;
       logger.info("✓ Cache refreshed successfully", {

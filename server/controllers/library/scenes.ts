@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import {
   buildDerivedWeightsFromScoringData,
@@ -911,17 +911,11 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
-    const requestingUser = req.user;
+    const _requestingUser = req.user;
 
     // NEW: Use SQL query builder if enabled
     if (USE_SQL_QUERY_BUILDER && !searchQuery) {
       logger.info("findScenes: using SQL query builder path");
-
-      // Get excluded scene IDs
-      const excludedIds = await userRestrictionService.getExcludedSceneIds(
-        userId,
-        requestingUser?.role === 'ADMIN'
-      );
 
       // Build filters object
       const filters: PeekSceneFilter = { ...scene_filter };
@@ -929,11 +923,10 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
         filters.ids = { value: ids, modifier: "INCLUDES" };
       }
 
-      // Execute query
+      // Execute query (applyExclusions defaults to true)
       const result = await sceneQueryBuilder.execute({
         userId,
         filters,
-        excludedSceneIds: excludedIds,
         sort: sortField,
         sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
         page,
@@ -979,13 +972,10 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       // FAST PATH: Database pagination with pre-computed exclusions (sub-second response)
       logger.info('findScenes: using FAST PATH (DB pagination with exclusions)');
 
-      // Pre-compute excluded scene IDs at DB level (much faster than loading all scenes)
+      // Get pre-computed scene exclusions
       const exclusionStart = Date.now();
-      const excludeIds = await userRestrictionService.getExcludedSceneIds(
-        userId,
-        requestingUser?.role === 'ADMIN' // Skip content restrictions for admins (but still apply hidden entities)
-      );
-      logger.info(`findScenes: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+      const excludeIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
+      logger.info(`findScenes: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
 
       const dbStart = Date.now();
       const { scenes: paginatedScenes, total } = await stashEntityService.getScenesPaginated({
@@ -1016,13 +1006,10 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // STANDARD PATH: Load all scenes and filter in memory
-    // Pre-compute excluded scene IDs at DB level (fast Set lookup instead of nested entity checks)
+    // Get pre-computed scene exclusions
     const exclusionStart = Date.now();
-    const excludeIds = await userRestrictionService.getExcludedSceneIds(
-      userId,
-      requestingUser?.role === 'ADMIN' // Skip content restrictions for admins
-    );
-    logger.info(`findScenes: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+    const excludeIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
+    logger.info(`findScenes: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
 
     // Step 1: Get all scenes from cache
     const cacheStart = Date.now();
@@ -1273,8 +1260,8 @@ export const findSimilarScenes = async (
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    // Get excluded scene IDs for this user
-    const excludedIds = await userRestrictionService.getExcludedSceneIds(userId, true);
+    // Get pre-computed scene exclusions for this user
+    const excludedIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
 
     // Phase 1: Get lightweight scoring data
     const allScoringData = await stashEntityService.getScenesForScoring();
@@ -1432,7 +1419,7 @@ export const getRecommendedScenes = async (
       prisma.sceneRating.findMany({ where: { userId } }),
       prisma.watchHistory.findMany({ where: { userId } }),
       stashEntityService.getScenesForScoring(),
-      userRestrictionService.getExcludedSceneIds(userId, true),
+      entityExclusionHelper.getExcludedIds(userId, 'scene'),
     ]);
 
     // Build sets of favorite and highly-rated entities

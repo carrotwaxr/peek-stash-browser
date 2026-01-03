@@ -48,7 +48,7 @@ async function main() {
           const watchedAtDate = entry.watchedAt ? new Date(entry.watchedAt) : now;
 
           // Exclude createdAt/updatedAt (managed by Prisma) and id (auto-increment)
-          // eslint-disable-next-line no-unused-vars
+           
           const { id, createdAt, updatedAt, ...restEntry } = entry;
 
           return {

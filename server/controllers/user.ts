@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 
 /**
  * Carousel preference configuration
@@ -1533,6 +1534,9 @@ export const updateUserRestrictions = async (
       )
     );
 
+    // Recompute exclusions for this user after restriction change
+    await exclusionComputationService.recomputeForUser(targetUserId);
+
     res.json({
       success: true,
       message: "Content restrictions updated successfully",
@@ -1566,9 +1570,14 @@ export const deleteUserRestrictions = async (
         .json({ error: "Only administrators can manage content restrictions" });
     }
 
+    const targetUserId = parseInt(userId);
+
     await prisma.userContentRestriction.deleteMany({
-      where: { userId: parseInt(userId) },
+      where: { userId: targetUserId },
     });
+
+    // Recompute exclusions for this user after restriction removal
+    await exclusionComputationService.recomputeForUser(targetUserId);
 
     res.json({
       success: true,

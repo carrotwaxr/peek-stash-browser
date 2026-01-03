@@ -2,7 +2,7 @@ import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -308,13 +308,16 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Merge with user data (ratings/favorites)
     images = await mergeImagesWithUserData(images, userId);
 
-    // Step 3: Apply content restrictions
+    // Step 3: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    images = await userRestrictionService.filterImagesForUser(
-      images,
-      userId,
-      requestingUser?.role === "ADMIN"
-    );
+    if (requestingUser?.role !== "ADMIN") {
+      images = await entityExclusionHelper.filterExcluded(
+        images,
+        userId,
+        "image"
+      );
+    }
 
     // Step 4: Apply search query
     if (searchQuery) {

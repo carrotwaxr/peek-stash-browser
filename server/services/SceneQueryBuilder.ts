@@ -19,7 +19,7 @@ interface FilterClause {
 export interface SceneQueryOptions {
   userId: number;
   filters?: PeekSceneFilter;
-  excludedSceneIds?: Set<string>;
+  applyExclusions?: boolean;  // Default true - use pre-computed exclusions
   sort: string;
   sortDirection: "ASC" | "DESC";
   page: number;
@@ -61,66 +61,38 @@ class SceneQueryBuilder {
   `.trim();
 
   // Base FROM clause with user data JOINs
-  private buildFromClause(userId: number): { sql: string; params: number[] } {
-    return {
-      sql: `
+  private buildFromClause(userId: number, applyExclusions: boolean = true): { sql: string; params: number[] } {
+    const baseJoins = `
         FROM StashScene s
         LEFT JOIN SceneRating r ON s.id = r.sceneId AND r.userId = ?
         LEFT JOIN WatchHistory w ON s.id = w.sceneId AND w.userId = ?
-      `.trim(),
+    `.trim();
+
+    if (applyExclusions) {
+      return {
+        sql: `${baseJoins}
+        LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id`,
+        params: [userId, userId, userId],
+      };
+    }
+
+    return {
+      sql: baseJoins,
       params: [userId, userId],
     };
   }
 
-  // Base WHERE clause (always filter deleted)
-  private buildBaseWhere(): FilterClause {
+  // Base WHERE clause (always filter deleted, optionally filter excluded)
+  private buildBaseWhere(applyExclusions: boolean = true): FilterClause {
+    if (applyExclusions) {
+      return {
+        sql: "s.deletedAt IS NULL AND e.id IS NULL",
+        params: [],
+      };
+    }
     return {
       sql: "s.deletedAt IS NULL",
       params: [],
-    };
-  }
-
-  /**
-   * Build exclusion filter clause
-   * Excludes scenes by ID (from user restrictions)
-   * Handles large sets by chunking into multiple NOT IN clauses
-   */
-  private buildExclusionFilter(excludedIds: Set<string>): FilterClause {
-    if (!excludedIds || excludedIds.size === 0) {
-      return { sql: "", params: [] };
-    }
-
-    const ids = Array.from(excludedIds);
-    const CHUNK_SIZE = 500;
-
-    if (ids.length <= CHUNK_SIZE) {
-      // Single NOT IN clause for small sets
-      const placeholders = ids.map(() => "?").join(", ");
-      return {
-        sql: `s.id NOT IN (${placeholders})`,
-        params: ids,
-      };
-    }
-
-    // Chunk large sets into multiple NOT IN clauses combined with AND
-    const clauses: string[] = [];
-    const allParams: string[] = [];
-
-    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-      const chunk = ids.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "?").join(", ");
-      clauses.push(`s.id NOT IN (${placeholders})`);
-      allParams.push(...chunk);
-    }
-
-    logger.debug("Large exclusion set chunked", {
-      totalSize: ids.length,
-      chunks: clauses.length,
-    });
-
-    return {
-      sql: `(${clauses.join(" AND ")})`,
-      params: allParams,
     };
   }
 
@@ -1052,7 +1024,7 @@ class SceneQueryBuilder {
           params: [...ids, ...ids],
         };
 
-      case "INCLUDES_ALL":
+      case "INCLUDES_ALL": {
         // Match if ALL tags are present (in direct tags OR inherited tags)
         // For each tag, check if it's in SceneTag OR in inheritedTagIds
         const allTagChecks = ids.map(() =>
@@ -1064,6 +1036,7 @@ class SceneQueryBuilder {
           sql: `(${allTagChecks})`,
           params: allTagParams,
         };
+      }
 
       case "EXCLUDES":
         // Exclude if tag is in direct tags OR in inherited tags
@@ -1129,19 +1102,13 @@ class SceneQueryBuilder {
 
   async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, excludedSceneIds, filters } = options;
+    const { userId, page, perPage, applyExclusions = true, filters } = options;
 
-    // Build FROM clause
-    const fromClause = this.buildFromClause(userId);
+    // Build FROM clause with optional exclusion JOIN
+    const fromClause = this.buildFromClause(userId, applyExclusions);
 
     // Build WHERE clauses
-    const whereClauses: FilterClause[] = [this.buildBaseWhere()];
-
-    // Add exclusion filter
-    const exclusionFilter = this.buildExclusionFilter(excludedSceneIds || new Set());
-    if (exclusionFilter.sql) {
-      whereClauses.push(exclusionFilter);
-    }
+    const whereClauses: FilterClause[] = [this.buildBaseWhere(applyExclusions)];
 
     // ID filter
     if (filters?.ids) {
@@ -1376,7 +1343,7 @@ class SceneQueryBuilder {
 
     logger.info("SceneQueryBuilder.execute", {
       whereClauseCount: whereClauses.length,
-      excludedCount: excludedSceneIds?.size || 0,
+      applyExclusions,
       sort: options.sort,
       sortDirection: options.sortDirection,
       paramCount: params.length,
@@ -1388,7 +1355,7 @@ class SceneQueryBuilder {
     const queryMs = Date.now() - queryStart;
 
     // Count query - use simplified count without JOINs when possible
-    // The JOINs are only needed for user data filtering, not for count
+    // The JOINs are only needed for user data filtering or exclusions, not for basic count
     const countStart = Date.now();
     let total: number;
 
@@ -1404,8 +1371,9 @@ class SceneQueryBuilder {
       filters?.studio_favorite === true ||
       filters?.tag_favorite === true;
 
-    if (hasUserDataFilters) {
-      // Need full JOINs for accurate count with user data filters
+    // Need full JOINs if user data filters OR exclusions are applied
+    if (hasUserDataFilters || applyExclusions) {
+      // Need full JOINs for accurate count with user data filters or exclusions
       const countSql = `
         SELECT COUNT(DISTINCT s.id) as total
         ${fromClause.sql}
@@ -1418,7 +1386,7 @@ class SceneQueryBuilder {
       );
       total = Number(countResult[0]?.total || 0);
     } else {
-      // Fast path: count without JOINs (user data not needed for filtering)
+      // Fast path: count without JOINs (no user data filters and no exclusions)
       // Build WHERE clause without user data conditions
       const baseWhereClauses = whereClauses.filter(
         (c) => !c.sql.includes("r.") && !c.sql.includes("w.")
@@ -1831,6 +1799,7 @@ class SceneQueryBuilder {
       filters: {
         ids: { value: ids, modifier: "INCLUDES" },
       },
+      applyExclusions: false, // IDs already filtered, don't double-exclude
       sort: "created_at", // Default sort, results will be reordered by caller if needed
       sortDirection: "DESC",
       page: 1,

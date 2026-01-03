@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
-import { userRestrictionService } from "../services/UserRestrictionService.js";
+import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
 import { logger } from "../utils/logger.js";
@@ -308,17 +308,10 @@ export async function executeCarouselQuery(
   if (USE_SQL_QUERY_BUILDER) {
     logger.info("executeCarouselQuery: using SQL query builder path");
 
-    // Get exclusions
-    const excludedIds = await userRestrictionService.getExcludedSceneIds(
-      userId,
-      false
-    );
-
-    // Execute query
+    // Execute query (applyExclusions defaults to true)
     const result = await sceneQueryBuilder.execute({
       userId,
       filters: rules,
-      excludedSceneIds: excludedIds,
       sort,
       sortDirection: direction.toUpperCase() as "ASC" | "DESC",
       page: 1,
@@ -361,10 +354,10 @@ export async function executeCarouselQuery(
   if (!hasFilters && canUseDbSort) {
     logger.info('executeCarouselQuery: using FAST PATH (no filters)');
 
-    // Pre-compute exclusions
+    // Get pre-computed scene exclusions
     const exclusionStart = Date.now();
-    const excludeIds = await userRestrictionService.getExcludedSceneIds(userId, false);
-    logger.info(`executeCarouselQuery: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+    const excludeIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
+    logger.info(`executeCarouselQuery: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
 
     // Get scenes with DB pagination (only need CAROUSEL_SCENE_LIMIT scenes)
     const dbStart = Date.now();
@@ -392,10 +385,10 @@ export async function executeCarouselQuery(
   // STANDARD PATH: Has filters, need to load more scenes
   logger.info(`executeCarouselQuery: using STANDARD PATH (hasFilters=${hasFilters}, hasExpensiveFilters=${hasExpensiveFilters})`);
 
-  // Pre-compute exclusions at DB level (much faster than in-memory filtering)
+  // Get pre-computed scene exclusions
   const exclusionStart = Date.now();
-  const excludeIds = await userRestrictionService.getExcludedSceneIds(userId, false);
-  logger.info(`executeCarouselQuery: getExcludedSceneIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
+  const excludeIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
+  logger.info(`executeCarouselQuery: getExcludedIds took ${Date.now() - exclusionStart}ms (${excludeIds.size} exclusions)`);
 
   // Get scenes from cache (lightweight browse query)
   const cacheStart = Date.now();

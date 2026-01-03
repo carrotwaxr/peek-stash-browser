@@ -22,6 +22,7 @@ import { imageGalleryInheritanceService } from "./ImageGalleryInheritanceService
 import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { userStatsService } from "./UserStatsService.js";
+import { exclusionComputationService } from "./ExclusionComputationService.js";
 
 export interface SyncProgress {
   entityType: string;
@@ -236,6 +237,11 @@ class StashSyncService extends EventEmitter {
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
 
+      // Recompute exclusions for all users after sync
+      logger.info("Sync complete, recomputing user exclusions...");
+      await exclusionComputationService.recomputeAllUsers();
+      logger.info("User exclusions recomputed");
+
       const duration = Date.now() - startTime;
       logger.info("Full sync completed", {
         durationMs: duration,
@@ -324,6 +330,11 @@ class StashSyncService extends EventEmitter {
           }
         }
       }
+
+      // Recompute exclusions for all users after sync
+      logger.info("Sync complete, recomputing user exclusions...");
+      await exclusionComputationService.recomputeAllUsers();
+      logger.info("User exclusions recomputed");
 
       const duration = Date.now() - startTime;
       logger.info("Smart incremental sync completed", {
@@ -569,6 +580,11 @@ class StashSyncService extends EventEmitter {
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
+
+      // Recompute exclusions for all users after sync
+      logger.info("Sync complete, recomputing user exclusions...");
+      await exclusionComputationService.recomputeAllUsers();
+      logger.info("User exclusions recomputed");
 
       const duration = Date.now() - startTime;
       logger.info("Incremental sync completed", {

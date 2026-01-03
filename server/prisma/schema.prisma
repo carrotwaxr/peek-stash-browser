@@ -53,6 +53,10 @@ model User {
   hiddenEntities           UserHiddenEntity[]
   hideConfirmationDisabled Boolean            @default(false) // Don't show hide confirmation dialog
 
+  // Pre-computed exclusions cache
+  excludedEntities UserExcludedEntity[]
+  entityStats      UserEntityStats[]
+
   // Custom carousels
   customCarousels UserCarousel[]
 }
@@ -372,6 +376,38 @@ model UserHiddenEntity {
   @@index([userId])
   @@index([entityType])
   @@index([entityId])
+}
+
+// Pre-computed exclusions (refreshed on sync/restriction changes)
+// This is a derived/cached table - can be rebuilt anytime from UserContentRestriction + UserHiddenEntity
+model UserExcludedEntity {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  entityType String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
+  entityId   String   // Stash entity ID
+
+  reason     String   // 'restricted', 'hidden', 'cascade', 'empty'
+  computedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId, entityType])
+  @@index([entityType, entityId])
+  @@index([userId, entityType, reason]) // For groupBy stats queries
+}
+
+// Pre-computed visible counts (avoids expensive COUNT queries)
+model UserEntityStats {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  entityType   String   // 'scene', 'performer', 'studio', 'tag', 'group', 'gallery', 'image'
+  visibleCount Int      // total - excluded
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType])
 }
 
 // Track which data migrations have been applied

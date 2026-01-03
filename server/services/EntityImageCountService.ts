@@ -32,12 +32,11 @@ class EntityImageCountService {
     logger.info("Rebuilding inherited image counts for all entities...");
 
     try {
-      // Rebuild counts for each entity type in parallel using SQL aggregation
-      await Promise.all([
-        this.rebuildPerformerImageCountsSQL(),
-        this.rebuildStudioImageCountsSQL(),
-        this.rebuildTagImageCountsSQL(),
-      ]);
+      // Rebuild counts for each entity type sequentially
+      // SQLite doesn't support concurrent writes, so we must run these in sequence
+      await this.rebuildPerformerImageCountsSQL();
+      await this.rebuildStudioImageCountsSQL();
+      await this.rebuildTagImageCountsSQL();
 
       const duration = Date.now() - startTime;
       logger.info(`Inherited image counts rebuilt in ${duration}ms`);

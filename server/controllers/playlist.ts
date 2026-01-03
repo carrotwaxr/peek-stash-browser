@@ -3,7 +3,7 @@ import { Scene } from "stashapp-api";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
-import { userRestrictionService } from "../services/UserRestrictionService.js";
+import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import type { NormalizedScene } from "../types/index.js";
 import { transformScene } from "../utils/stashUrlProxy.js";
 
@@ -73,11 +73,12 @@ export const getUserPlaylists = async (
           // 1. Fetch scenes from cache with relations
           const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
 
-          // 2. Apply user restrictions (filter out hidden/restricted scenes)
-          const isAdmin = req.user?.role === "ADMIN";
-          const visibleScenes = isAdmin
-            ? scenes
-            : await userRestrictionService.filterScenesForUser(scenes, userId);
+          // 2. Apply user exclusions (filter out hidden/restricted scenes)
+          const visibleScenes = await entityExclusionHelper.filterExcluded(
+            scenes,
+            userId,
+            'scene'
+          );
 
           // 3. Transform scenes to add proxy URLs
           const transformedScenes = visibleScenes.map((s) =>
@@ -159,11 +160,12 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
         // 1. Fetch scenes from cache with relations
         const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
 
-        // 2. Apply user restrictions (filter out hidden/restricted scenes)
-        const isAdmin = req.user?.role === "ADMIN";
-        const visibleScenes = isAdmin
-          ? scenes
-          : await userRestrictionService.filterScenesForUser(scenes, userId);
+        // 2. Apply user exclusions (filter out hidden/restricted scenes)
+        const visibleScenes = await entityExclusionHelper.filterExcluded(
+          scenes,
+          userId,
+          'scene'
+        );
 
         // 3. Reset user-specific fields to defaults before merging Peek user data
         const scenesWithDefaults = visibleScenes.map((s) => ({

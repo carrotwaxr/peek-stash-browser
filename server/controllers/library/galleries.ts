@@ -2,9 +2,7 @@ import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import {
   NormalizedGallery,
   NormalizedPerformer,
@@ -277,53 +275,16 @@ export const findGalleries = async (
     // Step 2: Merge with user data
     galleries = await mergeGalleriesWithUserData(galleries, userId);
 
-    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    const cacheVersion = await stashEntityService.getCacheVersion();
-
-    // Try to get filtered galleries from cache
-    let filteredGalleries = filteredEntityCacheService.get(
-      userId,
-      "galleries",
-      cacheVersion
-    ) as NormalizedGallery[] | null;
-
-    if (filteredGalleries === null) {
-      // Cache miss - compute filtered galleries
-      logger.debug("Galleries cache miss", { userId, cacheVersion });
-      filteredGalleries = galleries;
-
-      // Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      filteredGalleries = await userRestrictionService.filterGalleriesForUser(
-        filteredGalleries,
+    if (requestingUser?.role !== "ADMIN") {
+      galleries = await entityExclusionHelper.filterExcluded(
+        galleries,
         userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+        "gallery"
       );
-
-      // Filter empty galleries (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGalleries =
-          emptyEntityFilterService.filterEmptyGalleries(filteredGalleries);
-      }
-
-      // Store in cache
-      filteredEntityCacheService.set(
-        userId,
-        "galleries",
-        filteredGalleries,
-        cacheVersion
-      );
-    } else {
-      logger.debug("Galleries cache hit", {
-        userId,
-        entityCount: filteredGalleries.length,
-      });
     }
-
-    // Use cached/filtered galleries for remaining operations
-    galleries = filteredGalleries;
 
     // Step 3: Apply search query if provided
     if (searchQuery) {
@@ -541,15 +502,16 @@ export const findGalleriesMinimal = async (
     // Step 2: Merge with user data (for favorites)
     galleries = await mergeGalleriesWithUserData(galleries, userId);
 
-    // Step 2.5: Apply content restrictions and hidden entity filtering
-    // Hidden entities are ALWAYS filtered (for all users including admins)
-    // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
+    // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    galleries = await userRestrictionService.filterGalleriesForUser(
-      galleries,
-      userId,
-      requestingUser?.role === "ADMIN" // Skip content restrictions for admins
-    );
+    if (requestingUser?.role !== "ADMIN") {
+      galleries = await entityExclusionHelper.filterExcluded(
+        galleries,
+        userId,
+        "gallery"
+      );
+    }
 
     // Step 3: Apply search query if provided
     if (searchQuery) {
@@ -558,11 +520,6 @@ export const findGalleriesMinimal = async (
         const title = g.title || "";
         return title.toLowerCase().includes(lowerQuery);
       });
-    }
-
-    // Step 3.5: Filter empty galleries (non-admins only)
-    if (requestingUser && requestingUser.role !== "ADMIN") {
-      galleries = emptyEntityFilterService.filterEmptyGalleries(galleries);
     }
 
     // Step 4: Sort by title
