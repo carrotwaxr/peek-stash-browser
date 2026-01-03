@@ -44,6 +44,17 @@ export interface SyncResult {
 
 type EntityType = "scene" | "performer" | "studio" | "tag" | "group" | "gallery" | "image";
 
+// Plural forms for entity types (for logging)
+const ENTITY_PLURALS: Record<EntityType, string> = {
+  scene: "scenes",
+  performer: "performers",
+  studio: "studios",
+  tag: "tags",
+  group: "groups",
+  gallery: "galleries",
+  image: "images",
+};
+
 // Constants for sync configuration
 const BATCH_SIZE = 500; // Number of entities to fetch per page
 
@@ -1029,7 +1040,8 @@ class StashSyncService extends EventEmitter {
    * that are not present in Stash (due to deletion or merge operations).
    */
   private async cleanupDeletedEntities(entityType: EntityType): Promise<number> {
-    logger.info(`Checking for deleted ${entityType}s...`);
+    const plural = ENTITY_PLURALS[entityType];
+    logger.info(`Checking for deleted ${plural}...`);
     const startTime = Date.now();
     const stash = stashInstanceManager.getDefault();
 
@@ -1079,7 +1091,7 @@ class StashSyncService extends EventEmitter {
           return 0;
       }
 
-      logger.debug(`Found ${stashIds.length} ${entityType}s in Stash`);
+      logger.debug(`Found ${stashIds.length} ${plural} in Stash`);
 
       // Soft delete all entities that exist in Peek but not in Stash
       const now = new Date();
@@ -1131,18 +1143,18 @@ class StashSyncService extends EventEmitter {
       }
 
       if (deletedCount === 0) {
-        logger.info(`No deleted ${entityType}s found`);
+        logger.info(`No deleted ${plural} found`);
         return 0;
       }
 
       const durationMs = Date.now() - startTime;
       logger.info(
-        `Marked ${deletedCount} ${entityType}s as deleted in ${(durationMs / 1000).toFixed(1)}s`
+        `Marked ${deletedCount} ${plural} as deleted in ${(durationMs / 1000).toFixed(1)}s`
       );
 
       return deletedCount;
     } catch (error) {
-      logger.error(`Failed to cleanup deleted ${entityType}s`, {
+      logger.error(`Failed to cleanup deleted ${plural}`, {
         error: error instanceof Error ? error.message : String(error),
       });
       // Don't throw - cleanup is a best-effort operation
