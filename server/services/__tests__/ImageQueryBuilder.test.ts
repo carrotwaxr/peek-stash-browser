@@ -121,4 +121,121 @@ describe("ImageQueryBuilder", () => {
       expect(result.images[0].id).toBe("img-1");
     });
   });
+
+  describe("entity filters", () => {
+    beforeEach(async () => {
+      // Create performers
+      await prisma.stashPerformer.createMany({
+        data: [
+          { id: "perf-1", name: "Performer One" },
+          { id: "perf-2", name: "Performer Two" },
+        ],
+      });
+      // Create tags
+      await prisma.stashTag.createMany({
+        data: [
+          { id: "tag-1", name: "Tag One" },
+          { id: "tag-2", name: "Tag Two" },
+        ],
+      });
+      // Create studio
+      await prisma.stashStudio.create({
+        data: { id: "studio-1", name: "Studio One" },
+      });
+      // Create gallery
+      await prisma.stashGallery.create({
+        data: { id: "gallery-1", title: "Gallery One" },
+      });
+
+      // Link performers to images
+      await prisma.imagePerformer.createMany({
+        data: [
+          { imageId: "img-1", performerId: "perf-1" },
+          { imageId: "img-2", performerId: "perf-2" },
+        ],
+      });
+      // Link tags to images
+      await prisma.imageTag.createMany({
+        data: [
+          { imageId: "img-1", tagId: "tag-1" },
+          { imageId: "img-2", tagId: "tag-2" },
+        ],
+      });
+      // Set studio on image
+      await prisma.stashImage.update({
+        where: { id: "img-1" },
+        data: { studioId: "studio-1" },
+      });
+      // Link image to gallery
+      await prisma.imageGallery.create({
+        data: { imageId: "img-1", galleryId: "gallery-1" },
+      });
+    });
+
+    afterEach(async () => {
+      await prisma.imageGallery.deleteMany({});
+      await prisma.imagePerformer.deleteMany({});
+      await prisma.imageTag.deleteMany({});
+      await prisma.stashGallery.deleteMany({ where: { id: "gallery-1" } });
+      await prisma.stashStudio.deleteMany({ where: { id: "studio-1" } });
+      await prisma.stashTag.deleteMany({ where: { id: { startsWith: "tag-" } } });
+      await prisma.stashPerformer.deleteMany({ where: { id: { startsWith: "perf-" } } });
+    });
+
+    it("filters by performer INCLUDES", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { performers: { value: ["perf-1"], modifier: "INCLUDES" } },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-1");
+    });
+
+    it("filters by tag INCLUDES", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { tags: { value: ["tag-2"], modifier: "INCLUDES" } },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-2");
+    });
+
+    it("filters by studio INCLUDES", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { studios: { value: ["studio-1"], modifier: "INCLUDES" } },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-1");
+    });
+
+    it("filters by gallery INCLUDES", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { galleries: { value: ["gallery-1"], modifier: "INCLUDES" } },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-1");
+    });
+  });
 });

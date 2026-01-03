@@ -164,6 +164,134 @@ class ImageQueryBuilder {
     }
   }
 
+  // Build performer filter
+  private buildPerformerFilter(
+    filter: { value?: string[]; modifier?: string } | undefined
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `i.id IN (SELECT imageId FROM ImagePerformer WHERE performerId IN (${placeholders}))`,
+          params: ids,
+        };
+      case "INCLUDES_ALL":
+        return {
+          sql: `i.id IN (
+            SELECT imageId FROM ImagePerformer
+            WHERE performerId IN (${placeholders})
+            GROUP BY imageId
+            HAVING COUNT(DISTINCT performerId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+      case "EXCLUDES":
+        return {
+          sql: `i.id NOT IN (SELECT imageId FROM ImagePerformer WHERE performerId IN (${placeholders}))`,
+          params: ids,
+        };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  // Build tag filter
+  private buildTagFilter(
+    filter: { value?: string[]; modifier?: string } | undefined
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `i.id IN (SELECT imageId FROM ImageTag WHERE tagId IN (${placeholders}))`,
+          params: ids,
+        };
+      case "INCLUDES_ALL":
+        return {
+          sql: `i.id IN (
+            SELECT imageId FROM ImageTag
+            WHERE tagId IN (${placeholders})
+            GROUP BY imageId
+            HAVING COUNT(DISTINCT tagId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+      case "EXCLUDES":
+        return {
+          sql: `i.id NOT IN (SELECT imageId FROM ImageTag WHERE tagId IN (${placeholders}))`,
+          params: ids,
+        };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  // Build studio filter
+  private buildStudioFilter(
+    filter: { value?: string[]; modifier?: string } | undefined
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `i.studioId IN (${placeholders})`,
+          params: ids,
+        };
+      case "EXCLUDES":
+        return {
+          sql: `(i.studioId IS NULL OR i.studioId NOT IN (${placeholders}))`,
+          params: ids,
+        };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  // Build gallery filter
+  private buildGalleryFilter(
+    filter: { value?: string[]; modifier?: string } | undefined
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `i.id IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}))`,
+          params: ids,
+        };
+      case "EXCLUDES":
+        return {
+          sql: `i.id NOT IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}))`,
+          params: ids,
+        };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
   // Build sort clause
   private buildSortClause(sort: string, dir: "ASC" | "DESC"): string {
     const sortMap: Record<string, string> = {
@@ -206,6 +334,27 @@ class ImageQueryBuilder {
     if (filters?.o_counter) {
       const oCounterFilter = this.buildOCounterFilter(filters.o_counter);
       if (oCounterFilter.sql) whereClauses.push(oCounterFilter);
+    }
+
+    // Add entity filters
+    if (filters?.performers) {
+      const performerFilter = this.buildPerformerFilter(filters.performers);
+      if (performerFilter.sql) whereClauses.push(performerFilter);
+    }
+
+    if (filters?.tags) {
+      const tagFilter = this.buildTagFilter(filters.tags);
+      if (tagFilter.sql) whereClauses.push(tagFilter);
+    }
+
+    if (filters?.studios) {
+      const studioFilter = this.buildStudioFilter(filters.studios);
+      if (studioFilter.sql) whereClauses.push(studioFilter);
+    }
+
+    if (filters?.galleries) {
+      const galleryFilter = this.buildGalleryFilter(filters.galleries);
+      if (galleryFilter.sql) whereClauses.push(galleryFilter);
     }
 
     // Combine WHERE clauses
