@@ -81,6 +81,14 @@ vi.mock("../EntityImageCountService.js", () => ({
   },
 }));
 
+// Mock exclusion computation service
+vi.mock("../ExclusionComputationService.js", () => ({
+  exclusionComputationService: {
+    recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
+    recomputeForUser: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 describe("StashSyncService", () => {
   beforeEach(() => {
     vi.clearAllMocks();
