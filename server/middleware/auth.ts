@@ -52,9 +52,11 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   const proxyAuthHeader = process.env.PROXY_AUTH_HEADER;
-  const username = req.header(proxyAuthHeader || "");
-  if (proxyAuthHeader && username) {
-    return await authenticateUser(username, req, res, next);
+  if (proxyAuthHeader) {
+    const username = req.header(proxyAuthHeader);
+    if (username) {
+      return await authenticateUser(username, req, res, next);
+    }
   }
 
   return await authenticateToken(req, res, next);
