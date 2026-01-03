@@ -338,7 +338,11 @@ class ImageQueryBuilder {
   }
 
   // Build sort clause
-  private buildSortClause(sort: string, dir: "ASC" | "DESC"): string {
+  private buildSortClause(
+    sort: string,
+    dir: "ASC" | "DESC",
+    randomSeed?: number
+  ): string {
     const sortMap: Record<string, string> = {
       title: `COALESCE(i.title, i.filePath) ${dir}`,
       date: `i.date ${dir}`,
@@ -349,6 +353,10 @@ class ImageQueryBuilder {
       path: `i.filePath ${dir}`,
       created_at: `i.stashCreatedAt ${dir}`,
       updated_at: `i.stashUpdatedAt ${dir}`,
+      // Random with deterministic seed for stable pagination
+      // Uses Stash's formula with modulo at each step to prevent SQLite integer overflow
+      // Without intermediate modulo, large seeds cause overflow to float which breaks ordering
+      random: `(((((i.id + ${randomSeed || 12345}) % 2147483647) * ((i.id + ${randomSeed || 12345}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((i.id + ${randomSeed || 12345}) * 1047483763 % 2147483647)) % 2147483647) ${dir}`,
     };
 
     const sortExpr = sortMap[sort] || sortMap["created_at"];
@@ -424,7 +432,8 @@ class ImageQueryBuilder {
     // Build sort
     const sortClause = this.buildSortClause(
       options.sort,
-      options.sortDirection
+      options.sortDirection,
+      options.randomSeed
     );
 
     // Calculate offset

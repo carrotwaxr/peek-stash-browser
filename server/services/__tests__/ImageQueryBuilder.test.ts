@@ -5,24 +5,27 @@ import prisma from "../../prisma/singleton.js";
 describe("ImageQueryBuilder", () => {
   const testUserId = 9999;
 
+  // Use numeric string IDs to match real Stash IDs (which are numeric)
+  const testImageIds = ["999001", "999002", "999003"];
+
   beforeEach(async () => {
     // Create test user
     await prisma.user.create({
       data: { id: testUserId, username: "test-iqb", password: "test" },
     });
 
-    // Create test images
+    // Create test images with numeric string IDs (matching Stash's ID format)
     await prisma.stashImage.createMany({
       data: [
-        { id: "img-1", title: "Image One", stashCreatedAt: new Date("2024-01-01") },
-        { id: "img-2", title: "Image Two", stashCreatedAt: new Date("2024-01-02") },
-        { id: "img-3", title: "Image Three", stashCreatedAt: new Date("2024-01-03") },
+        { id: testImageIds[0], title: "Image One", stashCreatedAt: new Date("2024-01-01") },
+        { id: testImageIds[1], title: "Image Two", stashCreatedAt: new Date("2024-01-02") },
+        { id: testImageIds[2], title: "Image Three", stashCreatedAt: new Date("2024-01-03") },
       ],
     });
   });
 
   afterEach(async () => {
-    await prisma.stashImage.deleteMany({ where: { id: { startsWith: "img-" } } });
+    await prisma.stashImage.deleteMany({ where: { id: { in: testImageIds } } });
     await prisma.user.deleteMany({ where: { id: testUserId } });
   });
 
@@ -38,7 +41,7 @@ describe("ImageQueryBuilder", () => {
 
       expect(result.total).toBe(3);
       expect(result.images).toHaveLength(2);
-      expect(result.images[0].id).toBe("img-3"); // Most recent first
+      expect(result.images[0].id).toBe(testImageIds[2]); // Most recent first
     });
 
     it("respects page parameter", async () => {
@@ -52,7 +55,7 @@ describe("ImageQueryBuilder", () => {
 
       expect(result.total).toBe(3);
       expect(result.images).toHaveLength(1);
-      expect(result.images[0].id).toBe("img-1"); // Third image on page 2
+      expect(result.images[0].id).toBe(testImageIds[0]); // Third image on page 2
     });
   });
 
@@ -61,15 +64,15 @@ describe("ImageQueryBuilder", () => {
       // Add user ratings
       await prisma.imageRating.createMany({
         data: [
-          { userId: testUserId, imageId: "img-1", rating: 80, favorite: true },
-          { userId: testUserId, imageId: "img-2", rating: 40, favorite: false },
+          { userId: testUserId, imageId: testImageIds[0], rating: 80, favorite: true },
+          { userId: testUserId, imageId: testImageIds[1], rating: 40, favorite: false },
         ],
       });
       // Add view history
       await prisma.imageViewHistory.createMany({
         data: [
-          { userId: testUserId, imageId: "img-1", oCount: 5, viewCount: 10 },
-          { userId: testUserId, imageId: "img-3", oCount: 2, viewCount: 3 },
+          { userId: testUserId, imageId: testImageIds[0], oCount: 5, viewCount: 10 },
+          { userId: testUserId, imageId: testImageIds[2], oCount: 2, viewCount: 3 },
         ],
       });
     });
@@ -90,7 +93,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-1");
+      expect(result.images[0].id).toBe(testImageIds[0]);
     });
 
     it("filters by rating100 GREATER_THAN", async () => {
@@ -104,7 +107,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-1");
+      expect(result.images[0].id).toBe(testImageIds[0]);
     });
 
     it("filters by o_counter GREATER_THAN", async () => {
@@ -118,7 +121,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-1");
+      expect(result.images[0].id).toBe(testImageIds[0]);
     });
   });
 
@@ -150,25 +153,25 @@ describe("ImageQueryBuilder", () => {
       // Link performers to images
       await prisma.imagePerformer.createMany({
         data: [
-          { imageId: "img-1", performerId: "perf-1" },
-          { imageId: "img-2", performerId: "perf-2" },
+          { imageId: testImageIds[0], performerId: "perf-1" },
+          { imageId: testImageIds[1], performerId: "perf-2" },
         ],
       });
       // Link tags to images
       await prisma.imageTag.createMany({
         data: [
-          { imageId: "img-1", tagId: "tag-1" },
-          { imageId: "img-2", tagId: "tag-2" },
+          { imageId: testImageIds[0], tagId: "tag-1" },
+          { imageId: testImageIds[1], tagId: "tag-2" },
         ],
       });
       // Set studio on image
       await prisma.stashImage.update({
-        where: { id: "img-1" },
+        where: { id: testImageIds[0] },
         data: { studioId: "studio-1" },
       });
       // Link image to gallery
       await prisma.imageGallery.create({
-        data: { imageId: "img-1", galleryId: "gallery-1" },
+        data: { imageId: testImageIds[0], galleryId: "gallery-1" },
       });
     });
 
@@ -193,7 +196,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-1");
+      expect(result.images[0].id).toBe(testImageIds[0]);
     });
 
     it("filters by tag INCLUDES", async () => {
@@ -207,7 +210,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-2");
+      expect(result.images[0].id).toBe(testImageIds[1]);
     });
 
     it("filters by studio INCLUDES", async () => {
@@ -221,7 +224,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-1");
+      expect(result.images[0].id).toBe(testImageIds[0]);
     });
 
     it("filters by gallery INCLUDES", async () => {
@@ -235,7 +238,7 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-1");
+      expect(result.images[0].id).toBe(testImageIds[0]);
     });
   });
 
@@ -251,13 +254,13 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(1);
-      expect(result.images[0].id).toBe("img-2");
+      expect(result.images[0].id).toBe(testImageIds[1]);
     });
 
     it("filters by IDs", async () => {
       const result = await imageQueryBuilder.execute({
         userId: testUserId,
-        filters: { ids: { value: ["img-1", "img-3"], modifier: "INCLUDES" } },
+        filters: { ids: { value: [testImageIds[0], testImageIds[2]], modifier: "INCLUDES" } },
         sort: "created_at",
         sortDirection: "DESC",
         page: 1,
@@ -265,7 +268,95 @@ describe("ImageQueryBuilder", () => {
       });
 
       expect(result.total).toBe(2);
-      expect(result.images.map((i: any) => i.id).sort()).toEqual(["img-1", "img-3"].sort());
+      expect(result.images.map((i: any) => i.id).sort()).toEqual([testImageIds[0], testImageIds[2]].sort());
+    });
+  });
+
+  describe("random sort", () => {
+    it("returns stable ordering with same seed", async () => {
+      const seed = 12345;
+
+      const result1 = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "random",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        randomSeed: seed,
+      });
+
+      const result2 = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "random",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        randomSeed: seed,
+      });
+
+      // Same seed should produce same order
+      expect(result1.images.map((i: any) => i.id)).toEqual(
+        result2.images.map((i: any) => i.id)
+      );
+    });
+
+    it("returns different ordering with different seeds", async () => {
+      const seed1 = 11111111;
+      const seed2 = 99999999;
+
+      const result1 = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "random",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        randomSeed: seed1,
+      });
+
+      const result2 = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "random",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        randomSeed: seed2,
+      });
+
+      // Different seeds should produce different orders (with enough images)
+      if (result1.images.length >= 2 && result2.images.length >= 2) {
+        const order1 = result1.images.map((i: any) => i.id).join(",");
+        const order2 = result2.images.map((i: any) => i.id).join(",");
+        expect(order1).not.toEqual(order2);
+      }
+    });
+
+    it("reverses order when direction changes with same seed", async () => {
+      const seed = 12345678;
+
+      const ascResult = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "random",
+        sortDirection: "ASC",
+        page: 1,
+        perPage: 10,
+        randomSeed: seed,
+      });
+
+      const descResult = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "random",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+        randomSeed: seed,
+      });
+
+      // Same seed with opposite directions should give reversed order
+      if (ascResult.images.length >= 2 && descResult.images.length >= 2) {
+        const ascIds = ascResult.images.map((i: any) => i.id);
+        const descIds = descResult.images.map((i: any) => i.id);
+        expect(ascIds).toEqual(descIds.reverse());
+      }
     });
   });
 });
