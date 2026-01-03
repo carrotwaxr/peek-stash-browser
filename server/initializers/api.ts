@@ -26,6 +26,7 @@ import playlistRoutes from "../routes/playlist.js";
 import ratingsRoutes from "../routes/ratings.js";
 import setupRoutes from "../routes/setup.js";
 import syncRoutes from "../routes/sync.js";
+import exclusionsRoutes from "../routes/exclusions.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
@@ -114,6 +115,9 @@ export const setupAPI = () => {
 
   // Sync routes (protected - admin only for triggering syncs)
   app.use("/api/sync", syncRoutes);
+
+  // Exclusion routes (protected - admin only for recomputing exclusions)
+  app.use("/api/exclusions", exclusionsRoutes);
 
   // User settings routes (protected)
   app.use("/api/user", userRoutes);
