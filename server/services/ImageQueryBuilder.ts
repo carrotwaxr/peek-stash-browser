@@ -524,8 +524,14 @@ class ImageQueryBuilder {
     // Execute query
     const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
+    // Convert BigInt fields to Number (SQLite returns BigInt for large integers)
+    const transformedRows = rows.map((row) => ({
+      ...row,
+      fileSize: row.fileSize != null ? Number(row.fileSize) : null,
+    }));
+
     // Hydrate with related entities
-    const hydratedImages = await this.hydrateImages(rows);
+    const hydratedImages = await this.hydrateImages(transformedRows);
 
     // Count query
     const countSql = `
