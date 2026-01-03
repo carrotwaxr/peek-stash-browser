@@ -342,6 +342,23 @@ class StashSyncService extends EventEmitter {
         }
       }
 
+      // Cleanup deleted entities (detect deletions/merges in Stash)
+      logger.info("Checking for deleted entities...");
+      let totalDeleted = 0;
+      for (const entityType of entityTypes) {
+        this.checkAbort();
+        const deleted = await this.cleanupDeletedEntities(entityType);
+        totalDeleted += deleted;
+        // Update the result for this entity type with deleted count
+        const result = results.find((r) => r.entityType === entityType);
+        if (result) {
+          result.deleted = deleted;
+        }
+      }
+      if (totalDeleted > 0) {
+        logger.info(`Cleanup complete: ${totalDeleted} entities marked as deleted`);
+      }
+
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
       await exclusionComputationService.recomputeAllUsers();
@@ -350,7 +367,7 @@ class StashSyncService extends EventEmitter {
       const duration = Date.now() - startTime;
       logger.info("Smart incremental sync completed", {
         durationMs: duration,
-        results: results.map((r) => ({ type: r.entityType, synced: r.synced })),
+        results: results.map((r) => ({ type: r.entityType, synced: r.synced, deleted: r.deleted })),
       });
 
       return results;
@@ -567,6 +584,23 @@ class StashSyncService extends EventEmitter {
         }
       }
 
+      // Cleanup deleted entities (detect deletions/merges in Stash)
+      logger.info("Checking for deleted entities...");
+      let totalDeleted = 0;
+      for (const entityType of entityTypes) {
+        this.checkAbort();
+        const deleted = await this.cleanupDeletedEntities(entityType);
+        totalDeleted += deleted;
+        // Update the result for this entity type with deleted count
+        const result = results.find((r) => r.entityType === entityType);
+        if (result) {
+          result.deleted = deleted;
+        }
+      }
+      if (totalDeleted > 0) {
+        logger.info(`Cleanup complete: ${totalDeleted} entities marked as deleted`);
+      }
+
       // Apply gallery inheritance if images were synced
       const imageResult = results.find((r) => r.entityType === "image");
       if (imageResult && imageResult.synced > 0) {
@@ -600,7 +634,7 @@ class StashSyncService extends EventEmitter {
       const duration = Date.now() - startTime;
       logger.info("Incremental sync completed", {
         durationMs: duration,
-        results: results.map((r) => ({ type: r.entityType, synced: r.synced })),
+        results: results.map((r) => ({ type: r.entityType, synced: r.synced, deleted: r.deleted })),
       });
 
       return results;
