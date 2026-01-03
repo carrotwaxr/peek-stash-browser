@@ -1024,7 +1024,7 @@ class SceneQueryBuilder {
           params: [...ids, ...ids],
         };
 
-      case "INCLUDES_ALL":
+      case "INCLUDES_ALL": {
         // Match if ALL tags are present (in direct tags OR inherited tags)
         // For each tag, check if it's in SceneTag OR in inheritedTagIds
         const allTagChecks = ids.map(() =>
@@ -1036,6 +1036,7 @@ class SceneQueryBuilder {
           sql: `(${allTagChecks})`,
           params: allTagParams,
         };
+      }
 
       case "EXCLUDES":
         // Exclude if tag is in direct tags OR in inherited tags

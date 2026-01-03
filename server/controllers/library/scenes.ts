@@ -911,7 +911,7 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
-    const requestingUser = req.user;
+    const _requestingUser = req.user;
 
     // NEW: Use SQL query builder if enabled
     if (USE_SQL_QUERY_BUILDER && !searchQuery) {
