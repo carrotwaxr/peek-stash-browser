@@ -2,10 +2,8 @@ import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { hydrateEntityTags, hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
@@ -79,87 +77,16 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Step 2: Apply content restrictions & empty entity filtering with caching
-    // NOTE: We apply user stats AFTER this to ensure fresh data
+    // Step 2: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    const cacheVersion = await stashEntityService.getCacheVersion();
-
-    // Try to get filtered studios from cache
-    let filteredStudios = filteredEntityCacheService.get(
-      userId,
-      "studios",
-      cacheVersion
-    ) as NormalizedStudio[] | null;
-
-    if (filteredStudios === null) {
-      // Cache miss - compute filtered studios
-      logger.debug("Studios cache miss", { userId, cacheVersion });
-      filteredStudios = studios;
-
-      // Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      filteredStudios = await userRestrictionService.filterStudiosForUser(
-        filteredStudios,
+    if (requestingUser?.role !== "ADMIN") {
+      studios = await entityExclusionHelper.filterExcluded(
+        studios,
         userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+        "studio"
       );
-
-      // Filter empty studios (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = await stashEntityService.getAllScenes();
-        visibleScenes = await userRestrictionService.filterScenesForUser(
-          visibleScenes,
-          userId
-        );
-
-        // Get all entities from cache
-        let allGalleries = await stashEntityService.getAllGalleries();
-        let allGroups = await stashEntityService.getAllGroups();
-
-        // Apply user restrictions to groups/galleries FIRST
-        allGalleries = await userRestrictionService.filterGalleriesForUser(
-          allGalleries,
-          userId
-        );
-        allGroups = await userRestrictionService.filterGroupsForUser(
-          allGroups,
-          userId
-        );
-
-        // Then filter for empty entities
-        const visibleGalleries =
-          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups =
-          emptyEntityFilterService.filterEmptyGroups(allGroups);
-
-        // Finally filter studios using properly restricted visibility sets
-        // CRITICAL FIX: Pass visibleScenes to check actual visibility
-        filteredStudios = emptyEntityFilterService.filterEmptyStudios(
-          filteredStudios,
-          visibleGroups,
-          visibleGalleries,
-          visibleScenes // ← NEW: Pass visible scenes
-        );
-      }
-
-      // Store in cache
-      filteredEntityCacheService.set(
-        userId,
-        "studios",
-        filteredStudios,
-        cacheVersion
-      );
-    } else {
-      logger.debug("Studios cache hit", {
-        userId,
-        entityCount: filteredStudios.length,
-      });
     }
-
-    // Use cached/filtered studios for remaining operations
-    studios = filteredStudios;
 
     // Step 3: Merge with FRESH user data (ratings, stats)
     // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
@@ -535,87 +462,17 @@ export const findStudiosMinimal = async (
 
     let studios = await stashEntityService.getAllStudios();
 
-    // Apply content restrictions & empty entity filtering with caching
+    // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
     const userId = req.user?.id;
-    const cacheVersion = await stashEntityService.getCacheVersion();
-
-    // Try to get filtered studios from cache
-    let filteredStudios = filteredEntityCacheService.get(
-      userId,
-      "studios",
-      cacheVersion
-    ) as NormalizedStudio[] | null;
-
-    if (filteredStudios === null) {
-      // Cache miss - compute filtered studios
-      logger.debug("Studios minimal cache miss", { userId, cacheVersion });
-      filteredStudios = studios;
-
-      // Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      filteredStudios = await userRestrictionService.filterStudiosForUser(
-        filteredStudios,
+    if (requestingUser?.role !== "ADMIN") {
+      studios = await entityExclusionHelper.filterExcluded(
+        studios,
         userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+        "studio"
       );
-
-      // Filter empty studios (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        // CRITICAL FIX: Filter scenes first to get visibility baseline
-        let visibleScenes = await stashEntityService.getAllScenes();
-        visibleScenes = await userRestrictionService.filterScenesForUser(
-          visibleScenes,
-          userId
-        );
-
-        // Get all entities from cache
-        let allGalleries = await stashEntityService.getAllGalleries();
-        let allGroups = await stashEntityService.getAllGroups();
-
-        // Apply user restrictions to groups/galleries FIRST
-        allGalleries = await userRestrictionService.filterGalleriesForUser(
-          allGalleries,
-          userId
-        );
-        allGroups = await userRestrictionService.filterGroupsForUser(
-          allGroups,
-          userId
-        );
-
-        // Then filter for empty entities
-        const visibleGalleries =
-          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups =
-          emptyEntityFilterService.filterEmptyGroups(allGroups);
-
-        // Finally filter studios using properly restricted visibility sets
-        // CRITICAL FIX: Pass visibleScenes to check actual visibility
-        filteredStudios = emptyEntityFilterService.filterEmptyStudios(
-          filteredStudios,
-          visibleGroups,
-          visibleGalleries,
-          visibleScenes // ← NEW: Pass visible scenes
-        );
-      }
-
-      // Store in cache
-      filteredEntityCacheService.set(
-        userId,
-        "studios",
-        filteredStudios,
-        cacheVersion
-      );
-    } else {
-      logger.debug("Studios minimal cache hit", {
-        userId,
-        entityCount: filteredStudios.length,
-      });
     }
-
-    // Use cached/filtered studios
-    studios = filteredStudios;
 
     // Apply search query if provided
     if (searchQuery) {

@@ -2,9 +2,7 @@ import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
@@ -222,53 +220,16 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     // Step 2: Merge with user data
     groups = await mergeGroupsWithUserData(groups, userId);
 
-    // Step 2.5: Apply content restrictions & empty entity filtering with caching
+    // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    const cacheVersion = await stashEntityService.getCacheVersion();
-
-    // Try to get filtered groups from cache
-    let filteredGroups = filteredEntityCacheService.get(
-      userId,
-      "groups",
-      cacheVersion
-    ) as NormalizedGroup[] | null;
-
-    if (filteredGroups === null) {
-      // Cache miss - compute filtered groups
-      logger.debug("Groups cache miss", { userId, cacheVersion });
-      filteredGroups = groups;
-
-      // Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      filteredGroups = await userRestrictionService.filterGroupsForUser(
-        filteredGroups,
+    if (requestingUser?.role !== "ADMIN") {
+      groups = await entityExclusionHelper.filterExcluded(
+        groups,
         userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+        "group"
       );
-
-      // Filter empty groups (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGroups =
-          emptyEntityFilterService.filterEmptyGroups(filteredGroups);
-      }
-
-      // Store in cache
-      filteredEntityCacheService.set(
-        userId,
-        "groups",
-        filteredGroups,
-        cacheVersion
-      );
-    } else {
-      logger.debug("Groups cache hit", {
-        userId,
-        entityCount: filteredGroups.length,
-      });
     }
-
-    // Use cached/filtered groups for remaining operations
-    groups = filteredGroups;
 
     // Step 3: Apply search query if provided
     if (searchQuery) {
@@ -392,53 +353,16 @@ export const findGroupsMinimal = async (
     // Step 2: Merge with user data (for favorites)
     groups = await mergeGroupsWithUserData(groups, userId);
 
-    // Step 2.5: Apply empty entity filtering with caching
+    // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    const cacheVersion = await stashEntityService.getCacheVersion();
-
-    // Try to get filtered groups from cache
-    let filteredGroups = filteredEntityCacheService.get(
-      userId,
-      "groups",
-      cacheVersion
-    ) as NormalizedGroup[] | null;
-
-    if (filteredGroups === null) {
-      // Cache miss - compute filtered groups
-      logger.debug("Groups minimal cache miss", { userId, cacheVersion });
-      filteredGroups = groups;
-
-      // Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      filteredGroups = await userRestrictionService.filterGroupsForUser(
-        filteredGroups,
+    if (requestingUser?.role !== "ADMIN") {
+      groups = await entityExclusionHelper.filterExcluded(
+        groups,
         userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+        "group"
       );
-
-      // Filter empty groups (non-admins only)
-      if (requestingUser && requestingUser.role !== "ADMIN") {
-        filteredGroups =
-          emptyEntityFilterService.filterEmptyGroups(filteredGroups);
-      }
-
-      // Store in cache
-      filteredEntityCacheService.set(
-        userId,
-        "groups",
-        filteredGroups,
-        cacheVersion
-      );
-    } else {
-      logger.debug("Groups minimal cache hit", {
-        userId,
-        entityCount: filteredGroups.length,
-      });
     }
-
-    // Use cached/filtered groups
-    groups = filteredGroups;
 
     // Step 3: Apply search query if provided
     if (searchQuery) {

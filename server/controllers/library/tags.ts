@@ -2,10 +2,8 @@ import type { Response } from "express";
 import { AuthenticatedRequest } from "../../middleware/auth.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
-import { emptyEntityFilterService } from "../../services/EmptyEntityFilterService.js";
-import { filteredEntityCacheService } from "../../services/FilteredEntityCacheService.js";
+import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
-import { userRestrictionService } from "../../services/UserRestrictionService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
@@ -141,139 +139,37 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Step 2: Apply content restrictions & empty entity filtering with caching
-    // NOTE: We apply user stats AFTER this to ensure fresh data
+    // Step 2: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    const cacheVersion = await stashEntityService.getCacheVersion();
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
 
-    // Try to get filtered tags from cache
-    let filteredTags = filteredEntityCacheService.get(
-      userId,
-      "tags",
-      cacheVersion
-    ) as NormalizedTag[] | null;
-
-    if (filteredTags === null) {
-      // Cache miss - compute filtered tags
-      logger.debug("Tags cache miss", { userId, cacheVersion });
-      filteredTags = tags;
-
-      // Apply content restrictions and hidden entity filtering
-      // Hidden entities are ALWAYS filtered (for all users including admins)
-      // Content restrictions (INCLUDE/EXCLUDE) are only applied to non-admins
-      filteredTags = await userRestrictionService.filterTagsForUser(
-        filteredTags,
+    if (requestingUser?.role !== "ADMIN" && !isFetchingByIds) {
+      tags = await entityExclusionHelper.filterExcluded(
+        tags,
         userId,
-        requestingUser?.role === "ADMIN" // Skip content restrictions for admins
+        "tag"
       );
-
-      // Filter empty tags (non-admins only)
-      // Skip filtering when fetching by specific IDs (detail page requests)
-      if (
-        requestingUser &&
-        requestingUser.role !== "ADMIN" &&
-        !isFetchingByIds
-      ) {
-        // CRITICAL FIX: Filter scenes first to get visibility baseline
-        // Use getAllScenesWithPerformersAndTags() to include tag IDs needed for empty entity filtering
-        let visibleScenes = await stashEntityService.getAllScenesWithPerformersAndTags();
-        visibleScenes = await userRestrictionService.filterScenesForUser(
-          visibleScenes,
-          userId
-        );
-
-        // Get all entities from cache
-        let allGalleries = await stashEntityService.getAllGalleries();
-        let allGroups = await stashEntityService.getAllGroups();
-        let allStudios = await stashEntityService.getAllStudios();
-        let allPerformers = await stashEntityService.getAllPerformers();
-
-        // Apply user restrictions to all entity types FIRST
-        allGalleries = await userRestrictionService.filterGalleriesForUser(
-          allGalleries,
-          userId
-        );
-        allGroups = await userRestrictionService.filterGroupsForUser(
-          allGroups,
-          userId
-        );
-        allStudios = await userRestrictionService.filterStudiosForUser(
-          allStudios,
-          userId
-        );
-        // No direct performer restrictions, but we still process them
-
-        // Then filter for empty entities in dependency order
-        const visibleGalleries =
-          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups =
-          emptyEntityFilterService.filterEmptyGroups(allGroups);
-        const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
-          allStudios,
-          visibleGroups,
-          visibleGalleries,
-          visibleScenes // ← NEW: Pass visible scenes
-        );
-        const visiblePerformers =
-          emptyEntityFilterService.filterEmptyPerformers(
-            allPerformers,
-            visibleGroups,
-            visibleGalleries,
-            visibleScenes // ← NEW: Pass visible scenes
-          );
-
-        const visibilitySet = {
-          galleries: new Set(visibleGalleries.map((g) => g.id)),
-          groups: new Set(visibleGroups.map((g) => g.id)),
-          studios: new Set(visibleStudios.map((s) => s.id)),
-          performers: new Set(visiblePerformers.map((p) => p.id)),
-        };
-
-        // CRITICAL FIX: Pass visibleScenes to check actual visibility
-        filteredTags = emptyEntityFilterService.filterEmptyTags(
-          filteredTags,
-          visibilitySet,
-          visibleScenes, // ← NEW: Pass visible scenes
-          allPerformers // Pass performers for tag lookup
-        );
-
-        // Enhance tags with performer scene counts (inside cache block for performance)
-        // This adds scenes where performers have the tag, even if the scene doesn't
-        filteredTags = await enhanceTagsWithPerformerScenes(filteredTags);
-
-        // Add performer counts per tag (inside cache block for performance)
-        const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`
-          SELECT pt.tagId, COUNT(*) as count
-          FROM PerformerTag pt
-          JOIN StashPerformer p ON p.id = pt.performerId AND p.deletedAt IS NULL
-          GROUP BY pt.tagId
-        `;
-        const performerCountMap = new Map(performerCountsQuery.map(r => [r.tagId, Number(r.count)]));
-
-        // Merge performer counts into tags
-        filteredTags = filteredTags.map(tag => ({
-          ...tag,
-          performer_count: performerCountMap.get(tag.id) || 0
-        }));
-      }
-
-      // Store in cache (includes enhancement data and performer counts)
-      filteredEntityCacheService.set(
-        userId,
-        "tags",
-        filteredTags,
-        cacheVersion
-      );
-    } else {
-      logger.debug("Tags cache hit", {
-        userId,
-        entityCount: filteredTags.length,
-      });
     }
 
-    // Use cached/filtered tags for remaining operations
-    tags = filteredTags;
+    // Enhance tags with performer scene counts
+    // This adds scenes where performers have the tag, even if the scene doesn't
+    tags = await enhanceTagsWithPerformerScenes(tags);
+
+    // Add performer counts per tag
+    const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`
+      SELECT pt.tagId, COUNT(*) as count
+      FROM PerformerTag pt
+      JOIN StashPerformer p ON p.id = pt.performerId AND p.deletedAt IS NULL
+      GROUP BY pt.tagId
+    `;
+    const performerCountMap = new Map(performerCountsQuery.map(r => [r.tagId, Number(r.count)]));
+
+    // Merge performer counts into tags
+    tags = tags.map(tag => ({
+      ...tag,
+      performer_count: performerCountMap.get(tag.id) || 0
+    }));
 
     // Step 3: Merge with FRESH user data (ratings, stats)
     // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
@@ -744,134 +640,15 @@ export const findTagsMinimal = async (
 
     const requestingUser = req.user;
     const userId = req.user?.id;
-    const cacheVersion = await stashEntityService.getCacheVersion();
 
-    // OPTIMIZATION: Skip expensive filtering only if user has NO content restrictions
-    // Check if user has any restrictions configured
-    const userRestrictions =
-      requestingUser && requestingUser.role !== "ADMIN"
-        ? await prisma.userContentRestriction.findMany({ where: { userId } })
-        : [];
-
-    // Apply hidden entity filtering (ALWAYS applied, even for admins and users without restrictions)
-    // This is separate from content restrictions
-    tags = await userRestrictionService.filterTagsForUser(
-      tags,
-      userId,
-      requestingUser?.role === "ADMIN" // Skip content restrictions for admins
-    );
-
-    // Early return: If no restrictions, skip expensive empty entity filtering
-    if (userRestrictions.length === 0) {
-      // No restrictions - skip expensive empty entity filtering (but hidden filtering already applied above)
-    } else {
-      // User has restrictions - must do full filtering for security
-      // Use cached filtering from Priority 2
-      let filteredTags = filteredEntityCacheService.get(
+    // Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
+    // Admins skip exclusions to see everything
+    if (requestingUser?.role !== "ADMIN") {
+      tags = await entityExclusionHelper.filterExcluded(
+        tags,
         userId,
-        "tags",
-        cacheVersion
-      ) as NormalizedTag[] | null;
-
-      if (filteredTags === null) {
-        // Cache miss - compute filtered tags
-        logger.debug("Tags minimal cache miss", { userId, cacheVersion });
-        filteredTags = tags;
-
-        // Get visible scenes with tags for filtering
-        let visibleScenes = await stashEntityService.getAllScenesWithPerformersAndTags();
-        visibleScenes = await userRestrictionService.filterScenesForUser(
-          visibleScenes,
-          userId
-        );
-
-        // Get all entities from cache
-        let allGalleries = await stashEntityService.getAllGalleries();
-        let allGroups = await stashEntityService.getAllGroups();
-        let allStudios = await stashEntityService.getAllStudios();
-        let allPerformers = await stashEntityService.getAllPerformers();
-
-        // Apply user restrictions to all entity types FIRST
-        allGalleries = await userRestrictionService.filterGalleriesForUser(
-          allGalleries,
-          userId
-        );
-        allGroups = await userRestrictionService.filterGroupsForUser(
-          allGroups,
-          userId
-        );
-        allStudios = await userRestrictionService.filterStudiosForUser(
-          allStudios,
-          userId
-        );
-
-        // Then filter for empty entities in dependency order
-        const visibleGalleries =
-          emptyEntityFilterService.filterEmptyGalleries(allGalleries);
-        const visibleGroups =
-          emptyEntityFilterService.filterEmptyGroups(allGroups);
-        const visibleStudios = emptyEntityFilterService.filterEmptyStudios(
-          allStudios,
-          visibleGroups,
-          visibleGalleries,
-          visibleScenes
-        );
-        const visiblePerformers =
-          emptyEntityFilterService.filterEmptyPerformers(
-            allPerformers,
-            visibleGroups,
-            visibleGalleries,
-            visibleScenes
-          );
-
-        const visibilitySet = {
-          galleries: new Set(visibleGalleries.map((g) => g.id)),
-          groups: new Set(visibleGroups.map((g) => g.id)),
-          studios: new Set(visibleStudios.map((s) => s.id)),
-          performers: new Set(visiblePerformers.map((p) => p.id)),
-        };
-
-        filteredTags = emptyEntityFilterService.filterEmptyTags(
-          filteredTags,
-          visibilitySet,
-          visibleScenes,
-          allPerformers // Pass performers for tag lookup
-        );
-
-        // Enhance tags with performer scene counts (inside cache block for performance)
-        // This ensures cache consistency with findTags endpoint
-        filteredTags = await enhanceTagsWithPerformerScenes(filteredTags);
-
-        // Add performer counts per tag (inside cache block for performance)
-        const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`
-          SELECT pt.tagId, COUNT(*) as count
-          FROM PerformerTag pt
-          JOIN StashPerformer p ON p.id = pt.performerId AND p.deletedAt IS NULL
-          GROUP BY pt.tagId
-        `;
-        const performerCountMap = new Map(performerCountsQuery.map(r => [r.tagId, Number(r.count)]));
-
-        // Merge performer counts into tags
-        filteredTags = filteredTags.map(tag => ({
-          ...tag,
-          performer_count: performerCountMap.get(tag.id) || 0
-        }));
-
-        // Store in cache (includes enhancement data and performer counts)
-        filteredEntityCacheService.set(
-          userId,
-          "tags",
-          filteredTags,
-          cacheVersion
-        );
-      } else {
-        logger.debug("Tags minimal cache hit", {
-          userId,
-          entityCount: filteredTags.length,
-        });
-      }
-
-      tags = filteredTags;
+        "tag"
+      );
     }
 
     // Apply search query if provided
