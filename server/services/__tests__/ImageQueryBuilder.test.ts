@@ -272,6 +272,51 @@ describe("ImageQueryBuilder", () => {
     });
   });
 
+  describe("exclusion filtering", () => {
+    beforeEach(async () => {
+      // Exclude 999002 for the test user
+      await prisma.userExcludedEntity.create({
+        data: {
+          userId: testUserId,
+          entityType: "image",
+          entityId: "999002",
+          reason: "hidden",
+        },
+      });
+    });
+
+    afterEach(async () => {
+      await prisma.userExcludedEntity.deleteMany({ where: { userId: testUserId } });
+    });
+
+    it("excludes images when applyExclusions is true (default)", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(2);
+      expect(result.images.map((i: any) => i.id)).not.toContain("999002");
+    });
+
+    it("includes all images when applyExclusions is false", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        applyExclusions: false,
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(3);
+      expect(result.images.map((i: any) => i.id)).toContain("999002");
+    });
+  });
+
   describe("random sort", () => {
     it("returns stable ordering with same seed", async () => {
       const seed = 12345;
