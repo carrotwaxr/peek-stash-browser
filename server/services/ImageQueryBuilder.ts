@@ -390,13 +390,16 @@ class ImageQueryBuilder {
       }),
     ]);
 
-    // Build lookup maps
+    // Build lookup maps with transformed URLs
     const performersByImage = new Map<string, any[]>();
     for (const ip of performers) {
       if (!performersByImage.has(ip.imageId)) {
         performersByImage.set(ip.imageId, []);
       }
-      performersByImage.get(ip.imageId)!.push(ip.performer);
+      performersByImage.get(ip.imageId)!.push({
+        ...ip.performer,
+        imagePath: this.transformUrl(ip.performer.imagePath),
+      });
     }
 
     const tagsByImage = new Map<string, any[]>();
@@ -404,7 +407,10 @@ class ImageQueryBuilder {
       if (!tagsByImage.has(it.imageId)) {
         tagsByImage.set(it.imageId, []);
       }
-      tagsByImage.get(it.imageId)!.push(it.tag);
+      tagsByImage.get(it.imageId)!.push({
+        ...it.tag,
+        imagePath: this.transformUrl(it.tag.imagePath),
+      });
     }
 
     const galleriesByImage = new Map<string, any[]>();
@@ -412,10 +418,18 @@ class ImageQueryBuilder {
       if (!galleriesByImage.has(ig.imageId)) {
         galleriesByImage.set(ig.imageId, []);
       }
-      galleriesByImage.get(ig.imageId)!.push(ig.gallery);
+      galleriesByImage.get(ig.imageId)!.push({
+        ...ig.gallery,
+        coverPath: this.transformUrl(ig.gallery.coverPath),
+      });
     }
 
-    const studiosById = new Map(studios.map((s) => [s.id, s]));
+    const studiosById = new Map(
+      studios.map((s) => [
+        s.id,
+        { ...s, imagePath: this.transformUrl(s.imagePath) },
+      ])
+    );
 
     // Hydrate each row
     return rows.map((row) => ({
@@ -524,10 +538,13 @@ class ImageQueryBuilder {
     // Execute query
     const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
-    // Convert BigInt fields to Number (SQLite returns BigInt for large integers)
+    // Convert BigInt fields to Number and transform URLs to proxy paths
     const transformedRows = rows.map((row) => ({
       ...row,
       fileSize: row.fileSize != null ? Number(row.fileSize) : null,
+      pathThumbnail: this.transformUrl(row.pathThumbnail),
+      pathPreview: this.transformUrl(row.pathPreview),
+      pathImage: this.transformUrl(row.pathImage),
     }));
 
     // Hydrate with related entities
@@ -575,6 +592,33 @@ class ImageQueryBuilder {
       page: 1,
       perPage: ids.length,
     });
+  }
+
+  /**
+   * Transform a Stash URL/path to a proxy URL
+   */
+  private transformUrl(urlOrPath: string | null): string | null {
+    if (!urlOrPath) return null;
+
+    // If it's already a proxy URL, return as-is
+    if (urlOrPath.startsWith("/api/proxy/stash")) {
+      return urlOrPath;
+    }
+
+    // If it's a full URL (http://...), extract path + query
+    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
+      try {
+        const url = new URL(urlOrPath);
+        const pathWithQuery = url.pathname + url.search;
+        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+      } catch {
+        // If URL parsing fails, treat as path
+        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+      }
+    }
+
+    // Otherwise treat as path and encode it
+    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
   }
 }
 
