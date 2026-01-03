@@ -55,4 +55,70 @@ describe("ImageQueryBuilder", () => {
       expect(result.images[0].id).toBe("img-1"); // Third image on page 2
     });
   });
+
+  describe("user data filters", () => {
+    beforeEach(async () => {
+      // Add user ratings
+      await prisma.imageRating.createMany({
+        data: [
+          { userId: testUserId, imageId: "img-1", rating: 80, favorite: true },
+          { userId: testUserId, imageId: "img-2", rating: 40, favorite: false },
+        ],
+      });
+      // Add view history
+      await prisma.imageViewHistory.createMany({
+        data: [
+          { userId: testUserId, imageId: "img-1", oCount: 5, viewCount: 10 },
+          { userId: testUserId, imageId: "img-3", oCount: 2, viewCount: 3 },
+        ],
+      });
+    });
+
+    afterEach(async () => {
+      await prisma.imageRating.deleteMany({ where: { userId: testUserId } });
+      await prisma.imageViewHistory.deleteMany({ where: { userId: testUserId } });
+    });
+
+    it("filters by favorite", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { favorite: true },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-1");
+    });
+
+    it("filters by rating100 GREATER_THAN", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { rating100: { value: 50, modifier: "GREATER_THAN" } },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-1");
+    });
+
+    it("filters by o_counter GREATER_THAN", async () => {
+      const result = await imageQueryBuilder.execute({
+        userId: testUserId,
+        filters: { o_counter: { value: 3, modifier: "GREATER_THAN" } },
+        sort: "created_at",
+        sortDirection: "DESC",
+        page: 1,
+        perPage: 10,
+      });
+
+      expect(result.total).toBe(1);
+      expect(result.images[0].id).toBe("img-1");
+    });
+  });
 });

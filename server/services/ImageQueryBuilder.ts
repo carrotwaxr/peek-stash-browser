@@ -99,6 +99,71 @@ class ImageQueryBuilder {
     };
   }
 
+  // Build favorite filter
+  private buildFavoriteFilter(favorite: boolean | undefined): FilterClause {
+    if (favorite === undefined) {
+      return { sql: "", params: [] };
+    }
+    return {
+      sql: favorite ? "r.favorite = 1" : "(r.favorite = 0 OR r.favorite IS NULL)",
+      params: [],
+    };
+  }
+
+  // Build rating filter
+  private buildRatingFilter(
+    filter: { value: number; value2?: number; modifier: string } | undefined
+  ): FilterClause {
+    if (!filter) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier } = filter;
+    const ratingExpr = "COALESCE(r.rating, i.rating100, 0)";
+
+    switch (modifier) {
+      case "GREATER_THAN":
+        return { sql: `${ratingExpr} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${ratingExpr} < ?`, params: [value] };
+      case "EQUALS":
+        return { sql: `${ratingExpr} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${ratingExpr} != ?`, params: [value] };
+      case "BETWEEN":
+        return { sql: `${ratingExpr} BETWEEN ? AND ?`, params: [value, value2 ?? value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  // Build o_counter filter
+  private buildOCounterFilter(
+    filter: { value: number; value2?: number; modifier: string } | undefined
+  ): FilterClause {
+    if (!filter) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier } = filter;
+    const oExpr = "COALESCE(v.oCount, i.oCounter, 0)";
+
+    switch (modifier) {
+      case "GREATER_THAN":
+        return { sql: `${oExpr} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${oExpr} < ?`, params: [value] };
+      case "EQUALS":
+        return { sql: `${oExpr} = ?`, params: [value] };
+      case "NOT_EQUALS":
+        return { sql: `${oExpr} != ?`, params: [value] };
+      case "BETWEEN":
+        return { sql: `${oExpr} BETWEEN ? AND ?`, params: [value, value2 ?? value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
   // Build sort clause
   private buildSortClause(sort: string, dir: "ASC" | "DESC"): string {
     const sortMap: Record<string, string> = {
@@ -119,13 +184,29 @@ class ImageQueryBuilder {
 
   async execute(options: ImageQueryOptions): Promise<ImageQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters: _filters } = options;
+    const { userId, page, perPage, applyExclusions = true, filters } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
 
     // Build WHERE clauses
     const whereClauses: FilterClause[] = [this.buildBaseWhere(applyExclusions)];
+
+    // Add user data filters
+    if (filters?.favorite !== undefined) {
+      const favoriteFilter = this.buildFavoriteFilter(filters.favorite);
+      if (favoriteFilter.sql) whereClauses.push(favoriteFilter);
+    }
+
+    if (filters?.rating100) {
+      const ratingFilter = this.buildRatingFilter(filters.rating100);
+      if (ratingFilter.sql) whereClauses.push(ratingFilter);
+    }
+
+    if (filters?.o_counter) {
+      const oCounterFilter = this.buildOCounterFilter(filters.o_counter);
+      if (oCounterFilter.sql) whereClauses.push(oCounterFilter);
+    }
 
     // Combine WHERE clauses
     const whereSQL = whereClauses
