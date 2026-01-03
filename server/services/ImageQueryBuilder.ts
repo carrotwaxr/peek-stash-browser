@@ -482,6 +482,27 @@ class ImageQueryBuilder {
 
     return { images: rows, total };
   }
+
+  /**
+   * Get images by IDs with user data
+   */
+  async getByIds(options: { userId: number; ids: string[] }): Promise<ImageQueryResult> {
+    const { userId, ids } = options;
+
+    if (ids.length === 0) {
+      return { images: [], total: 0 };
+    }
+
+    return this.execute({
+      userId,
+      filters: { ids: { value: ids, modifier: "INCLUDES" } },
+      applyExclusions: false, // IDs explicitly requested, don't filter
+      sort: "created_at",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: ids.length,
+    });
+  }
 }
 
 // Export singleton instance

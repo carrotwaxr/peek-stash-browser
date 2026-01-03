@@ -317,6 +317,29 @@ describe("ImageQueryBuilder", () => {
     });
   });
 
+  describe("getByIds", () => {
+    it("returns images by IDs with user data", async () => {
+      await prisma.imageRating.create({
+        data: { userId: testUserId, imageId: "999001", rating: 90, favorite: true },
+      });
+
+      const result = await imageQueryBuilder.getByIds({
+        userId: testUserId,
+        ids: ["999001", "999003"],
+      });
+
+      expect(result.images).toHaveLength(2);
+
+      const img1 = result.images.find((i: any) => i.id === "999001");
+      expect(img1.userRating).toBe(90);
+      expect(img1.userFavorite).toBeTruthy(); // SQLite may return 1 or true
+    });
+
+    afterEach(async () => {
+      await prisma.imageRating.deleteMany({ where: { userId: testUserId } });
+    });
+  });
+
   describe("random sort", () => {
     it("returns stable ordering with same seed", async () => {
       const seed = 12345;
