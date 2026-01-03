@@ -54,6 +54,8 @@ class ExclusionComputationService {
   async recomputeForUser(userId: number): Promise<void> {
     logger.info("ExclusionComputationService.recomputeForUser starting", { userId });
 
+    // Use a longer timeout for large datasets (120 seconds)
+    // The default 5-second timeout is too short for users with many entities
     await prisma.$transaction(async (tx) => {
       // Phase 1: Compute direct exclusions (restrictions + hidden)
       const directExclusions = await this.computeDirectExclusions(userId, tx);
@@ -91,6 +93,10 @@ class ExclusionComputationService {
         userId,
         totalExclusions: allExclusions.length,
       });
+    }, {
+      // Increase timeout to 120 seconds for large datasets
+      // Default is 5 seconds which is too short for users with many entities
+      timeout: 120000,
     });
   }
 
@@ -722,6 +728,8 @@ class ExclusionComputationService {
 
       // Compute cascades for this specific entity
       await this.addCascadesForEntity(tx, userId, entityType, entityId);
+    }, {
+      timeout: 30000, // 30 seconds for hide operation
     });
 
     logger.info("ExclusionComputationService.addHiddenEntity complete", {
