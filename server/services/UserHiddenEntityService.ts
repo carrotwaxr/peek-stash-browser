@@ -1,6 +1,7 @@
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "./StashEntityService.js";
 import { filteredEntityCacheService } from "./FilteredEntityCacheService.js";
+import { exclusionComputationService } from "./ExclusionComputationService.js";
 
 
 export type EntityType =
@@ -58,6 +59,9 @@ class UserHiddenEntityService {
     // Invalidate caches for this user
     this.hiddenIdsCache.delete(userId);
     filteredEntityCacheService.invalidateUser(userId);
+
+    // Update pre-computed exclusions
+    await exclusionComputationService.addHiddenEntity(userId, entityType, entityId);
   }
 
   /**
@@ -79,6 +83,9 @@ class UserHiddenEntityService {
     // Invalidate caches for this user
     this.hiddenIdsCache.delete(userId);
     filteredEntityCacheService.invalidateUser(userId);
+
+    // Update pre-computed exclusions (async recompute)
+    await exclusionComputationService.removeHiddenEntity(userId, entityType, entityId);
   }
 
   /**
@@ -96,6 +103,11 @@ class UserHiddenEntityService {
     // Invalidate caches for this user
     this.hiddenIdsCache.delete(userId);
     filteredEntityCacheService.invalidateUser(userId);
+
+    // Recompute exclusions for this user (full recompute since multiple entities unhidden)
+    if (result.count > 0) {
+      await exclusionComputationService.recomputeForUser(userId);
+    }
 
     return result.count;
   }
