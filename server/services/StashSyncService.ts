@@ -211,6 +211,11 @@ class StashSyncService extends EventEmitter {
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
+      // Cleanup scenes that were deleted in Stash
+      const deletedCount = await this.cleanupDeletedScenes(stashInstanceId);
+      // Update the result to include deleted count
+      result.deleted = deletedCount;
+
       result = await this.syncImages(stashInstanceId, true);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
@@ -227,7 +232,11 @@ class StashSyncService extends EventEmitter {
       const duration = Date.now() - startTime;
       logger.info("Full sync completed", {
         durationMs: duration,
-        results: results.map((r) => ({ type: r.entityType, synced: r.synced })),
+        results: results.map((r) => ({
+          type: r.entityType,
+          synced: r.synced,
+          deleted: r.deleted,
+        })),
       });
 
       return results;
@@ -931,6 +940,64 @@ class StashSyncService extends EventEmitter {
 
     await Promise.all(inserts);
 
+  }
+
+  /**
+   * Cleanup scenes that no longer exist in Stash.
+   * Called during full sync after all scenes have been synced.
+   *
+   * Fetches all scene IDs from Stash and soft-deletes any scenes in Peek
+   * that are not present in Stash (due to deletion or merge operations).
+   */
+  private async cleanupDeletedScenes(_stashInstanceId: string | undefined): Promise<number> {
+    logger.info("Checking for deleted scenes...");
+    const startTime = Date.now();
+    const stash = stashInstanceManager.getDefault();
+
+    try {
+      // Fetch all scene IDs from Stash in one query
+      // per_page: -1 means return all results
+      const result = await stash.findScenes({
+        filter: { per_page: -1, page: 1 },
+      });
+
+      const stashSceneIds = result.findScenes.scenes.map((s) => s.id);
+      const totalInStash = stashSceneIds.length;
+
+      logger.debug(`Found ${totalInStash} scenes in Stash`);
+
+      // Soft delete all scenes that exist in Peek but not in Stash
+      // Let the database handle the "NOT IN" logic
+      const now = new Date();
+      const updateResult = await prisma.stashScene.updateMany({
+        where: {
+          deletedAt: null,
+          id: { notIn: stashSceneIds },
+        },
+        data: { deletedAt: now },
+      });
+
+      const deletedCount = updateResult.count;
+
+      if (deletedCount === 0) {
+        logger.info("No deleted scenes found");
+        return 0;
+      }
+
+      const durationMs = Date.now() - startTime;
+      logger.info(
+        `Marked ${deletedCount} scenes as deleted in ${(durationMs / 1000).toFixed(1)}s`
+      );
+
+      return deletedCount;
+    } catch (error) {
+      logger.error("Failed to cleanup deleted scenes", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - cleanup is a best-effort operation
+      // Return 0 to indicate no scenes were deleted
+      return 0;
+    }
   }
 
   // ==================== Performer Sync ====================
