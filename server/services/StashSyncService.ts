@@ -185,41 +185,43 @@ class StashSyncService extends EventEmitter {
       let result: SyncResult;
 
       result = await this.syncTags(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("tag");
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncStudios(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("studio");
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncPerformers(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("performer");
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGroups(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("group");
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGalleries(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("gallery");
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncScenes(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("scene");
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
-      // Cleanup scenes that were deleted in Stash
-      const deletedCount = await this.cleanupDeletedScenes(stashInstanceId);
-      // Update the result to include deleted count
-      result.deleted = deletedCount;
-
       result = await this.syncImages(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("image");
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
 
@@ -986,59 +988,130 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
-   * Cleanup scenes that no longer exist in Stash.
-   * Called during full sync after all scenes have been synced.
+   * Cleanup entities that no longer exist in Stash.
+   * Called during full sync after each entity type has been synced.
    *
-   * Fetches all scene IDs from Stash and soft-deletes any scenes in Peek
+   * Fetches all entity IDs from Stash and soft-deletes any entities in Peek
    * that are not present in Stash (due to deletion or merge operations).
    */
-  private async cleanupDeletedScenes(_stashInstanceId: string | undefined): Promise<number> {
-    logger.info("Checking for deleted scenes...");
+  private async cleanupDeletedEntities(entityType: EntityType): Promise<number> {
+    logger.info(`Checking for deleted ${entityType}s...`);
     const startTime = Date.now();
     const stash = stashInstanceManager.getDefault();
 
     try {
-      // Fetch all scene IDs from Stash in one query
+      // Fetch all IDs from Stash in one query
       // per_page: -1 means return all results
-      const result = await stash.findScenes({
-        filter: { per_page: -1, page: 1 },
-      });
+      let stashIds: string[];
 
-      const stashSceneIds = result.findScenes.scenes.map((s) => s.id);
-      const totalInStash = stashSceneIds.length;
+      switch (entityType) {
+        case "scene": {
+          const result = await stash.findSceneIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findScenes.scenes.map((s) => s.id);
+          break;
+        }
+        case "performer": {
+          const result = await stash.findPerformerIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findPerformers.performers.map((p) => p.id);
+          break;
+        }
+        case "studio": {
+          const result = await stash.findStudioIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findStudios.studios.map((s) => s.id);
+          break;
+        }
+        case "tag": {
+          const result = await stash.findTagIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findTags.tags.map((t) => t.id);
+          break;
+        }
+        case "group": {
+          const result = await stash.findGroupIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findGroups.groups.map((g) => g.id);
+          break;
+        }
+        case "gallery": {
+          const result = await stash.findGalleryIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findGalleries.galleries.map((g) => g.id);
+          break;
+        }
+        case "image": {
+          const result = await stash.findImageIDs({ filter: { per_page: -1, page: 1 } });
+          stashIds = result.findImages.images.map((i) => i.id);
+          break;
+        }
+        default:
+          logger.warn(`Unknown entity type for cleanup: ${entityType}`);
+          return 0;
+      }
 
-      logger.debug(`Found ${totalInStash} scenes in Stash`);
+      logger.debug(`Found ${stashIds.length} ${entityType}s in Stash`);
 
-      // Soft delete all scenes that exist in Peek but not in Stash
-      // Let the database handle the "NOT IN" logic
+      // Soft delete all entities that exist in Peek but not in Stash
       const now = new Date();
-      const updateResult = await prisma.stashScene.updateMany({
-        where: {
-          deletedAt: null,
-          id: { notIn: stashSceneIds },
-        },
-        data: { deletedAt: now },
-      });
+      let deletedCount = 0;
 
-      const deletedCount = updateResult.count;
+      switch (entityType) {
+        case "scene":
+          deletedCount = (await prisma.stashScene.updateMany({
+            where: { deletedAt: null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "performer":
+          deletedCount = (await prisma.stashPerformer.updateMany({
+            where: { deletedAt: null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "studio":
+          deletedCount = (await prisma.stashStudio.updateMany({
+            where: { deletedAt: null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "tag":
+          deletedCount = (await prisma.stashTag.updateMany({
+            where: { deletedAt: null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "group":
+          deletedCount = (await prisma.stashGroup.updateMany({
+            where: { deletedAt: null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "gallery":
+          deletedCount = (await prisma.stashGallery.updateMany({
+            where: { deletedAt: null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "image":
+          deletedCount = (await prisma.stashImage.updateMany({
+            where: { deletedAt: null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+      }
 
       if (deletedCount === 0) {
-        logger.info("No deleted scenes found");
+        logger.info(`No deleted ${entityType}s found`);
         return 0;
       }
 
       const durationMs = Date.now() - startTime;
       logger.info(
-        `Marked ${deletedCount} scenes as deleted in ${(durationMs / 1000).toFixed(1)}s`
+        `Marked ${deletedCount} ${entityType}s as deleted in ${(durationMs / 1000).toFixed(1)}s`
       );
 
       return deletedCount;
     } catch (error) {
-      logger.error("Failed to cleanup deleted scenes", {
+      logger.error(`Failed to cleanup deleted ${entityType}s`, {
         error: error instanceof Error ? error.message : String(error),
       });
       // Don't throw - cleanup is a best-effort operation
-      // Return 0 to indicate no scenes were deleted
       return 0;
     }
   }
