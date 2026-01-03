@@ -196,43 +196,43 @@ class StashSyncService extends EventEmitter {
       let result: SyncResult;
 
       result = await this.syncTags(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities("tag");
+      result.deleted = await this.cleanupDeletedEntities("tag", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncStudios(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities("studio");
+      result.deleted = await this.cleanupDeletedEntities("studio", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncPerformers(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities("performer");
+      result.deleted = await this.cleanupDeletedEntities("performer", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGroups(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities("group");
+      result.deleted = await this.cleanupDeletedEntities("group", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncGalleries(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities("gallery");
+      result.deleted = await this.cleanupDeletedEntities("gallery", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncScenes(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities("scene");
+      result.deleted = await this.cleanupDeletedEntities("scene", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
       result = await this.syncImages(stashInstanceId, true);
-      result.deleted = await this.cleanupDeletedEntities("image");
+      result.deleted = await this.cleanupDeletedEntities("image", stashInstanceId);
       results.push(result);
       await this.saveSyncState(stashInstanceId, "full", result);
 
@@ -358,7 +358,7 @@ class StashSyncService extends EventEmitter {
       let totalDeleted = 0;
       for (const entityType of entityTypes) {
         this.checkAbort();
-        const deleted = await this.cleanupDeletedEntities(entityType);
+        const deleted = await this.cleanupDeletedEntities(entityType, stashInstanceId);
         totalDeleted += deleted;
         // Update the result for this entity type with deleted count
         const result = results.find((r) => r.entityType === entityType);
@@ -600,7 +600,7 @@ class StashSyncService extends EventEmitter {
       let totalDeleted = 0;
       for (const entityType of entityTypes) {
         this.checkAbort();
-        const deleted = await this.cleanupDeletedEntities(entityType);
+        const deleted = await this.cleanupDeletedEntities(entityType, stashInstanceId);
         totalDeleted += deleted;
         // Update the result for this entity type with deleted count
         const result = results.find((r) => r.entityType === entityType);
@@ -1039,7 +1039,7 @@ class StashSyncService extends EventEmitter {
    * Fetches all entity IDs from Stash and soft-deletes any entities in Peek
    * that are not present in Stash (due to deletion or merge operations).
    */
-  private async cleanupDeletedEntities(entityType: EntityType): Promise<number> {
+  private async cleanupDeletedEntities(entityType: EntityType, stashInstanceId?: string): Promise<number> {
     const plural = ENTITY_PLURALS[entityType];
     logger.info(`Checking for deleted ${plural}...`);
     const startTime = Date.now();
@@ -1093,6 +1093,9 @@ class StashSyncService extends EventEmitter {
 
       logger.debug(`Found ${stashIds.length} ${plural} in Stash`);
 
+      // Check for abort before proceeding with database updates
+      this.checkAbort();
+
       // Soft delete all entities that exist in Peek but not in Stash
       const now = new Date();
       let deletedCount = 0;
@@ -1100,43 +1103,43 @@ class StashSyncService extends EventEmitter {
       switch (entityType) {
         case "scene":
           deletedCount = (await prisma.stashScene.updateMany({
-            where: { deletedAt: null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
         case "performer":
           deletedCount = (await prisma.stashPerformer.updateMany({
-            where: { deletedAt: null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
         case "studio":
           deletedCount = (await prisma.stashStudio.updateMany({
-            where: { deletedAt: null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
         case "tag":
           deletedCount = (await prisma.stashTag.updateMany({
-            where: { deletedAt: null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
         case "group":
           deletedCount = (await prisma.stashGroup.updateMany({
-            where: { deletedAt: null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
         case "gallery":
           deletedCount = (await prisma.stashGallery.updateMany({
-            where: { deletedAt: null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
         case "image":
           deletedCount = (await prisma.stashImage.updateMany({
-            where: { deletedAt: null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;

@@ -240,7 +240,7 @@ describe("StashSyncService Cleanup", () => {
 
       expect(result).toBe(2);
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { deletedAt: null, id: { notIn: ["1", "2", "3"] } },
+        where: { deletedAt: null, stashInstanceId: null, id: { notIn: ["1", "2", "3"] } },
         data: { deletedAt: expect.any(Date) },
       });
     });
@@ -255,7 +255,7 @@ describe("StashSyncService Cleanup", () => {
 
       expect(result).toBe(5);
       expect(prisma.stashPerformer.updateMany).toHaveBeenCalledWith({
-        where: { deletedAt: null, id: { notIn: ["p1", "p2"] } },
+        where: { deletedAt: null, stashInstanceId: null, id: { notIn: ["p1", "p2"] } },
         data: { deletedAt: expect.any(Date) },
       });
     });
@@ -316,7 +316,7 @@ describe("StashSyncService Cleanup", () => {
 
       expect(result).toBe(100);
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { deletedAt: null, id: { notIn: [] } },
+        where: { deletedAt: null, stashInstanceId: null, id: { notIn: [] } },
         data: { deletedAt: expect.any(Date) },
       });
     });
