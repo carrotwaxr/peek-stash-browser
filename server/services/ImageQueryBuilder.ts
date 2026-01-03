@@ -391,6 +391,7 @@ class ImageQueryBuilder {
     ]);
 
     // Build lookup maps with transformed URLs
+    // Note: Frontend expects snake_case field names (image_path) and paths.cover for galleries
     const performersByImage = new Map<string, any[]>();
     for (const ip of performers) {
       if (!performersByImage.has(ip.imageId)) {
@@ -398,7 +399,7 @@ class ImageQueryBuilder {
       }
       performersByImage.get(ip.imageId)!.push({
         ...ip.performer,
-        imagePath: this.transformUrl(ip.performer.imagePath),
+        image_path: this.transformUrl(ip.performer.imagePath),
       });
     }
 
@@ -409,7 +410,7 @@ class ImageQueryBuilder {
       }
       tagsByImage.get(it.imageId)!.push({
         ...it.tag,
-        imagePath: this.transformUrl(it.tag.imagePath),
+        image_path: this.transformUrl(it.tag.imagePath),
       });
     }
 
@@ -420,14 +421,16 @@ class ImageQueryBuilder {
       }
       galleriesByImage.get(ig.imageId)!.push({
         ...ig.gallery,
-        coverPath: this.transformUrl(ig.gallery.coverPath),
+        paths: {
+          cover: this.transformUrl(ig.gallery.coverPath),
+        },
       });
     }
 
     const studiosById = new Map(
       studios.map((s) => [
         s.id,
-        { ...s, imagePath: this.transformUrl(s.imagePath) },
+        { ...s, image_path: this.transformUrl(s.imagePath) },
       ])
     );
 
