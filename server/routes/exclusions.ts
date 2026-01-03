@@ -35,6 +35,18 @@ router.post(
         });
       }
 
+      // Check if user exists
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (!user) {
+        return res.status(404).json({
+          error: "User not found",
+          message: `No user with ID ${userId}`,
+        });
+      }
+
       await exclusionComputationService.recomputeForUser(userId);
 
       res.json({
@@ -59,11 +71,14 @@ router.post(
   requireAdmin,
   authenticated(async (req, res) => {
     try {
-      await exclusionComputationService.recomputeAllUsers();
+      const result = await exclusionComputationService.recomputeAllUsers();
 
       res.json({
-        ok: true,
-        message: "Recomputed exclusions for all users",
+        ok: result.failed === 0,
+        message: `Recomputed exclusions for ${result.success} users${result.failed > 0 ? `, ${result.failed} failed` : ""}`,
+        success: result.success,
+        failed: result.failed,
+        errors: result.errors,
       });
     } catch (error) {
       res.status(500).json({

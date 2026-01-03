@@ -394,6 +394,7 @@ model UserExcludedEntity {
   @@unique([userId, entityType, entityId])
   @@index([userId, entityType])
   @@index([entityType, entityId])
+  @@index([userId, entityType, reason]) // For groupBy stats queries
 }
 
 // Pre-computed visible counts (avoids expensive COUNT queries)

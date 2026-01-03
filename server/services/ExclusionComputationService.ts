@@ -12,7 +12,8 @@
  * - Empty organizational entities -> reason='empty'
  */
 
-import type { PrismaClient, Prisma } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { stashCacheManager } from "./StashCacheManager.js";
@@ -46,12 +47,47 @@ interface ExclusionRecord {
   reason: string;
 }
 
+/**
+ * Result of recomputing exclusions for all users.
+ */
+interface RecomputeAllResult {
+  success: number;
+  failed: number;
+  errors: Array<{ userId: number; error: string }>;
+}
+
 class ExclusionComputationService {
+  // Track pending recomputes to prevent race conditions
+  private pendingRecomputes = new Map<number, Promise<void>>();
+
   /**
    * Full recompute for a user.
    * Runs in a transaction - if any phase fails, previous exclusions are preserved.
+   * Prevents concurrent recomputes for the same user.
    */
   async recomputeForUser(userId: number): Promise<void> {
+    // If there's already a pending recompute for this user, wait for it
+    const pending = this.pendingRecomputes.get(userId);
+    if (pending) {
+      logger.info("ExclusionComputationService.recomputeForUser already pending, waiting", { userId });
+      await pending;
+      return;
+    }
+
+    const recomputePromise = this.doRecomputeForUser(userId);
+    this.pendingRecomputes.set(userId, recomputePromise);
+
+    try {
+      await recomputePromise;
+    } finally {
+      this.pendingRecomputes.delete(userId);
+    }
+  }
+
+  /**
+   * Internal recompute implementation.
+   */
+  private async doRecomputeForUser(userId: number): Promise<void> {
     logger.info("ExclusionComputationService.recomputeForUser starting", { userId });
 
     // Use a longer timeout for large datasets (120 seconds)
@@ -103,29 +139,44 @@ class ExclusionComputationService {
   /**
    * Recompute exclusions for all users.
    * Called after Stash sync completes.
+   * @returns Result with success/failure counts and error details
    */
-  async recomputeAllUsers(): Promise<void> {
+  async recomputeAllUsers(): Promise<RecomputeAllResult> {
     logger.info("ExclusionComputationService.recomputeAllUsers starting");
 
     const users = await prisma.user.findMany({
       select: { id: true },
     });
 
+    const result = {
+      success: 0,
+      failed: 0,
+      errors: [] as Array<{ userId: number; error: string }>,
+    };
+
     for (const user of users) {
       try {
         await this.recomputeForUser(user.id);
+        result.success++;
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         logger.error("Failed to recompute exclusions for user", {
           userId: user.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
         });
+        result.failed++;
+        result.errors.push({ userId: user.id, error: errorMessage });
         // Continue with other users even if one fails
       }
     }
 
     logger.info("ExclusionComputationService.recomputeAllUsers completed", {
       userCount: users.length,
+      success: result.success,
+      failed: result.failed,
     });
+
+    return result;
   }
 
   /**
@@ -293,14 +344,16 @@ class ExclusionComputationService {
       }
 
       // 3b. Scenes with inherited tag (via inheritedTagIds JSON column)
-      // Use raw SQL for JSON array querying
-      for (const tagId of excludedTags) {
+      // Batch all tags into a single query for efficiency
+      if (excludedTags.length > 0) {
+        // Build a query that checks if ANY of the excluded tags is in inheritedTagIds
+        const tagList = excludedTags.map(t => `'${t}'`).join(",");
         const inheritedScenes = await (tx as any).$queryRaw`
-          SELECT id FROM StashScene
-          WHERE deletedAt IS NULL
+          SELECT DISTINCT s.id FROM StashScene s
+          WHERE s.deletedAt IS NULL
           AND EXISTS (
-            SELECT 1 FROM json_each(inheritedTagIds)
-            WHERE json_each.value = ${tagId}
+            SELECT 1 FROM json_each(s.inheritedTagIds) je
+            WHERE je.value IN (${Prisma.raw(tagList)})
           )
         ` as Array<{ id: string }>;
 
@@ -398,6 +451,20 @@ class ExclusionComputationService {
     tx: TransactionClient
   ): Promise<ExclusionRecord[]> {
     const emptyExclusions: ExclusionRecord[] = [];
+
+    // Warn about potential memory issues with large datasets
+    const LARGE_DATASET_THRESHOLD = 50000;
+    const entityCounts = {
+      galleries: await tx.stashGallery.count({ where: { deletedAt: null } }),
+      images: await tx.stashImage.count({ where: { deletedAt: null } }),
+    };
+    if (entityCounts.galleries > LARGE_DATASET_THRESHOLD || entityCounts.images > LARGE_DATASET_THRESHOLD) {
+      logger.warn("computeEmptyExclusions: Large dataset detected, may use significant memory", {
+        userId,
+        galleries: entityCounts.galleries,
+        images: entityCounts.images,
+      });
+    }
 
     // Build sets of already-excluded entity IDs by type for efficient lookup
     const excludedSceneIds = new Set<string>();
