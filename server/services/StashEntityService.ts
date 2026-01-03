@@ -1808,12 +1808,20 @@ class StashEntityService {
   private transformGallery(gallery: any): NormalizedGallery {
     const coverUrl = this.transformUrl(gallery.coverPath);
     // Extract tags from junction table relation (if included) or empty array
-    const tags = gallery.tags?.map((gt: any) => ({ id: gt.tagId, name: gt.tag?.name || "Unknown" })) || [];
+    // Include image_path for TooltipEntityGrid display
+    const tags = gallery.tags?.map((gt: any) => ({
+      id: gt.tagId,
+      name: gt.tag?.name || "Unknown",
+      image_path: this.transformUrl(gt.tag?.imagePath),
+    })) || [];
 
     // Transform performers from junction table
+    // Include image_path and gender for TooltipEntityGrid display
     const performers = gallery.performers?.map((gp: any) => ({
       id: gp.performer.id,
       name: gp.performer.name,
+      gender: gp.performer.gender,
+      image_path: this.transformUrl(gp.performer.imagePath),
     })) || [];
 
     // Build files array for frontend title fallback (zip galleries)
