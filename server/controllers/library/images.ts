@@ -68,6 +68,12 @@ function transformImageResult(image: any): any {
     oCounter: image.userOCount ?? image.stashOCounter ?? 0,
     viewCount: image.userViewCount ?? 0,
     lastViewedAt: image.userLastViewedAt ?? null,
+    // Add paths object for frontend compatibility
+    paths: {
+      thumbnail: image.pathThumbnail,
+      preview: image.pathPreview,
+      image: image.pathImage,
+    },
     // Clean up internal field names
     userRating: undefined,
     userFavorite: undefined,
