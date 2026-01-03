@@ -363,6 +363,70 @@ class ImageQueryBuilder {
     return `${sortExpr}, i.id ${dir}`;
   }
 
+  /**
+   * Hydrate image rows with related entities
+   */
+  private async hydrateImages(rows: any[]): Promise<any[]> {
+    if (rows.length === 0) return [];
+
+    const imageIds = rows.map((r) => r.id);
+
+    // Fetch all related data in parallel
+    const [performers, tags, galleries, studios] = await Promise.all([
+      prisma.imagePerformer.findMany({
+        where: { imageId: { in: imageIds } },
+        include: { performer: true },
+      }),
+      prisma.imageTag.findMany({
+        where: { imageId: { in: imageIds } },
+        include: { tag: true },
+      }),
+      prisma.imageGallery.findMany({
+        where: { imageId: { in: imageIds } },
+        include: { gallery: true },
+      }),
+      prisma.stashStudio.findMany({
+        where: { id: { in: rows.map((r) => r.studioId).filter(Boolean) } },
+      }),
+    ]);
+
+    // Build lookup maps
+    const performersByImage = new Map<string, any[]>();
+    for (const ip of performers) {
+      if (!performersByImage.has(ip.imageId)) {
+        performersByImage.set(ip.imageId, []);
+      }
+      performersByImage.get(ip.imageId)!.push(ip.performer);
+    }
+
+    const tagsByImage = new Map<string, any[]>();
+    for (const it of tags) {
+      if (!tagsByImage.has(it.imageId)) {
+        tagsByImage.set(it.imageId, []);
+      }
+      tagsByImage.get(it.imageId)!.push(it.tag);
+    }
+
+    const galleriesByImage = new Map<string, any[]>();
+    for (const ig of galleries) {
+      if (!galleriesByImage.has(ig.imageId)) {
+        galleriesByImage.set(ig.imageId, []);
+      }
+      galleriesByImage.get(ig.imageId)!.push(ig.gallery);
+    }
+
+    const studiosById = new Map(studios.map((s) => [s.id, s]));
+
+    // Hydrate each row
+    return rows.map((row) => ({
+      ...row,
+      performers: performersByImage.get(row.id) || [],
+      tags: tagsByImage.get(row.id) || [],
+      galleries: galleriesByImage.get(row.id) || [],
+      studio: row.studioId ? studiosById.get(row.studioId) : null,
+    }));
+  }
+
   async execute(options: ImageQueryOptions): Promise<ImageQueryResult> {
     const startTime = Date.now();
     const { userId, page, perPage, applyExclusions = true, filters } = options;
@@ -460,6 +524,9 @@ class ImageQueryBuilder {
     // Execute query
     const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
+    // Hydrate with related entities
+    const hydratedImages = await this.hydrateImages(rows);
+
     // Count query
     const countSql = `
       SELECT COUNT(DISTINCT i.id) as total
@@ -476,11 +543,11 @@ class ImageQueryBuilder {
     const duration = Date.now() - startTime;
     logger.debug("ImageQueryBuilder.execute completed", {
       total,
-      returned: rows.length,
+      returned: hydratedImages.length,
       durationMs: duration,
     });
 
-    return { images: rows, total };
+    return { images: hydratedImages, total };
   }
 
   /**
