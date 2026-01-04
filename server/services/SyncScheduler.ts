@@ -10,6 +10,7 @@
  * that would require WebSocket connection to Stash GraphQL.
  */
 
+import { wereMigrationsApplied } from "../initializers/database.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
@@ -214,6 +215,21 @@ class SyncScheduler {
   }
 
   private async performStartupSync(): Promise<void> {
+    // Check if migrations were applied - if so, force full sync to ensure
+    // database schema changes are properly reflected in cached data
+    if (wereMigrationsApplied()) {
+      logger.info("Database migrations were applied, performing full sync to refresh cache");
+      try {
+        await stashSyncService.fullSync();
+      } catch (error) {
+        logger.error("Post-migration full sync failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Don't throw - let the app continue, sync can be retried manually
+      }
+      return;
+    }
+
     // Check sync state for ALL entity types, not just scenes
     // This prevents re-syncing already completed entities when scene sync fails/never completes
     const syncStates = await prisma.syncState.findMany();
