@@ -1,139 +1,129 @@
 # Integration Test Failures Analysis
 
 **Date:** 2026-01-04
-**Goal:** Identify and prioritize bugs found by integration tests for 3.1.0 release
-**Test Results:** 46 passed, 30 failed
+**Status:** RESOLVED
+**Final Results:** 76 passed, 0 failed
 
 ---
 
 ## Summary
 
-After running integration tests against a real Stash server, we identified **30 failing tests**. Analysis reveals these fall into **3 categories**:
-
-| Category | Count | Priority | Type |
-|----------|-------|----------|------|
-| Test assertion issues (not bugs) | 5 | Low | Fix tests |
-| Library API endpoints returning 503 | ~20 | **Critical** | Real bug |
-| Hidden entity cascade errors | 5 | Medium | Real bug |
+The original test run showed 46 passed, 30 failed. After investigation, **all 30 failures were test implementation issues, not application bugs**. The tests have been fixed and all 76 tests now pass.
 
 ---
 
-## Category 1: Test Assertion Issues (Fix Tests, Not App)
+## Issues Found and Fixed
 
-**Priority: Low** - These are incorrect test expectations, not application bugs.
+### Issue 1: adminClient Singleton Not Shared Across Processes
 
-### Issue 1.1: Role case mismatch
-- **Tests:** `auth.integration.test.ts` - login and /me endpoints
-- **Error:** `expected 'ADMIN' to be 'admin'`
-- **Root Cause:** Test expects lowercase `'admin'` but API returns `'ADMIN'`
-- **Fix:** Update test to expect `'ADMIN'` (matches Prisma enum)
+**Root Cause:** Vitest's `globalSetup.ts` runs in a separate process from the test workers. The `adminClient.login()` call in globalSetup authenticated a different instance than the one imported by test files.
 
-### Issue 1.2: Wrong route paths for unauthenticated access
-- **Tests:** `auth.integration.test.ts` - "Protected routes require authentication"
-- **Error:** `expected 404 to be 401`
-- **Root Cause:** Tests call `/api/scenes` but routes are at `/api/library/scenes`
-- **Fix:** Update test to use correct routes (`/api/library/scenes`)
+**Fix:** Added `beforeAll(async () => { await adminClient.login(...) })` to each test file that uses `adminClient`.
 
-**Action:** Create `bugfix/fix-integration-test-assertions` branch
-
----
-
-## Category 2: Library API Endpoints Returning 503 (CRITICAL)
-
-**Priority: Critical** - These affect all library browsing functionality.
-
-### Issue 2.1: All library endpoints failing for test user
-
-**Affected Endpoints:**
-- `POST /api/library/scenes` - pagination, filtering, by ID
-- `POST /api/library/performers` - pagination, minimal, by ID
-- `POST /api/library/studios` - pagination, minimal, by ID
-- `POST /api/library/tags` - pagination, minimal, by ID
-- `POST /api/library/groups` - pagination, minimal, by ID
-- `POST /api/library/galleries` - pagination, by ID, images
-- `POST /api/library/images` - pagination
-- `GET /api/library/scenes/:id/similar`
-
-**Error Pattern:** `response.ok` is `false` (non-2xx status)
-
-**Likely Root Cause:** The `requireCacheReady` middleware is returning 503 "Server is initializing" for the test user, even though:
-1. Sync has completed
-2. Admin user can access data (health tests pass)
-
-**Hypothesis:** The `stashEntityService.isReady()` check may be failing for non-admin users, OR there's a timing issue where the cache isn't marked ready for the integration test user's session.
-
-**Investigation Steps:**
-1. Check `stashEntityService.isReady()` logic
-2. Verify sync state timestamps are set correctly
-3. Check if there's a per-user cache readiness issue
-
-**Action:** Create `bugfix/library-endpoints-503-cache-ready` branch
+**Files Changed:**
+- `integration/api/scenes.integration.test.ts`
+- `integration/api/performers.integration.test.ts`
+- `integration/api/studios.integration.test.ts`
+- `integration/api/tags.integration.test.ts`
+- `integration/api/galleries.integration.test.ts`
+- `integration/api/groups.integration.test.ts`
+- `integration/api/images.integration.test.ts`
 
 ---
 
-## Category 3: Hidden Entity Cascade Errors
+### Issue 2: Incorrect API Response Format Expectations
 
-**Priority: Medium** - Affects content restrictions feature.
+**Root Cause:** Tests expected `response.data.scenes` but the API returns `response.data.findScenes.scenes`.
 
-### Issue 3.1: Prisma createMany validation errors
+**API Response Formats:**
+| Endpoint | Response Format |
+|----------|-----------------|
+| `/api/library/scenes` | `{ findScenes: { count, scenes } }` |
+| `/api/library/performers` | `{ findPerformers: { count, performers } }` |
+| `/api/library/studios` | `{ findStudios: { count, studios } }` |
+| `/api/library/tags` | `{ findTags: { count, tags } }` |
+| `/api/library/galleries` | `{ findGalleries: { count, galleries } }` |
+| `/api/library/groups` | `{ findGroups: { count, groups } }` |
+| `/api/library/images` | `{ findImages: { count, images } }` |
+| `/api/library/*/minimal` | `{ <entities>: [...] }` (no wrapper) |
 
-**Location:** `UserHiddenEntityService` or `ExclusionComputationService`
-
-**Errors:**
-```
-Error hiding entity: PrismaClientValidationError
-Error hiding entity: PrismaClientKnownRequestError
-```
-
-**Context:** Occurs during cascade operations when hiding a performer that appears in multiple scenes.
-
-**Root Cause:** The `createMany` operation for cascade exclusions may be:
-1. Missing a required field
-2. Hitting a unique constraint violation
-3. Passing invalid data types
-
-**Affected Tests:**
-- `content-restrictions.integration.test.ts` - hide/unhide entity operations
-
-**Action:** Create `bugfix/hidden-entity-cascade-prisma-errors` branch
+**Fix:** Updated all test files to use correct response paths.
 
 ---
 
-## Recommended Fix Order for 3.1.0 Release
+### Issue 3: Incorrect Request Body Format
 
-### Phase 1: Critical (Must Fix)
-1. **`bugfix/library-endpoints-503-cache-ready`**
-   - Fix the cache readiness check so library endpoints work
-   - This blocks ~20 tests and affects core browsing functionality
-   - Estimated scope: Small (likely a timing/state issue)
+**Root Cause:** Tests sent `{ page: 1, per_page: 10 }` but the API expects `{ filter: { page: 1, per_page: 10 } }`.
 
-### Phase 2: Medium Priority
-2. **`bugfix/hidden-entity-cascade-prisma-errors`**
-   - Fix Prisma validation in cascade logic
-   - Affects content restrictions feature
-   - Estimated scope: Medium (need to debug Prisma query)
+**Correct Request Formats:**
+\`\`\`typescript
+// Pagination
+{ filter: { page: 1, per_page: 10, sort: "created_at", direction: "DESC" } }
 
-### Phase 3: Test Fixes (Can Be Done Anytime)
-3. **`bugfix/fix-integration-test-assertions`**
-   - Fix incorrect test expectations (role case, route paths)
-   - No app changes needed
-   - Estimated scope: Small (5 test file edits)
+// Filtering by entity
+{ filter: { per_page: 50 }, scene_filter: { performers: { value: ["123"], modifier: "INCLUDES" } } }
+
+// Fetch by ID
+{ ids: ["123", "456"] }
+\`\`\`
+
+**Fix:** Updated test requests to use the correct nested structure.
 
 ---
 
-## After Fixes: Expected Results
+### Issue 4: Role Case Mismatch
 
-Once all fixes are applied:
-- **76 tests should pass** (current 46 + 30 fixed)
-- All library endpoints functional
-- Content restrictions working
-- Integration tests provide reliable pre-release validation
+**Root Cause:** Tests expected lowercase `"admin"` but the API returns uppercase `"ADMIN"` (matching Prisma enum).
+
+**Fix:** Changed `expect(role).toBe("admin")` to `expect(role).toBe("ADMIN")`.
+
+**Files Changed:**
+- `integration/api/auth.integration.test.ts`
 
 ---
 
-## Notes
+### Issue 5: Wrong Route Paths
 
-- The integration test infrastructure is working correctly
-- Tests are successfully exposing real issues
-- Most failures trace to a single root cause (cache readiness)
-- Fixing Category 2 will likely resolve 20+ tests at once
+**Root Cause:** Tests called `/api/scenes` but the actual routes are at `/api/library/scenes`.
+
+**Fix:** Updated route paths in protected routes authentication tests.
+
+**Files Changed:**
+- `integration/api/auth.integration.test.ts`
+
+---
+
+## Verification
+
+After all fixes, the full test suite passes:
+
+\`\`\`
+Test Files  10 passed (10)
+Tests       76 passed (76)
+\`\`\`
+
+---
+
+## Lessons Learned
+
+1. **Vitest globalSetup runs in a separate process** - Module singletons don't share state with test workers. Use `beforeAll` in test files for setup that requires shared state.
+
+2. **Test against actual API contracts** - Before writing tests, verify the actual request/response format by checking:
+   - Controller code (`res.json(...)` calls)
+   - Frontend API service calls
+   - TypeScript types
+
+3. **Integration tests successfully validated the infrastructure** - Even though the failures were test issues, the process of fixing them verified that:
+   - The test server starts correctly
+   - Database migrations work
+   - Authentication flows correctly
+   - Stash sync completes
+   - Library endpoints return data
+
+---
+
+## No Application Bugs Found
+
+The integration test infrastructure is working correctly. All 30 "failures" were due to incorrect test implementation, not application bugs.
+
+The pre-release skill (\`/pre-release\`) can now be used with confidence - if tests fail, they're detecting real issues.
