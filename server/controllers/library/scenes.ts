@@ -1,5 +1,18 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  FindScenesRequest,
+  FindScenesResponse,
+  FindSimilarScenesParams,
+  FindSimilarScenesQuery,
+  FindSimilarScenesResponse,
+  GetRecommendedScenesQuery,
+  GetRecommendedScenesResponse,
+  UpdateSceneParams,
+  UpdateSceneRequest,
+  UpdateSceneResponse,
+  ApiErrorResponse,
+} from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
@@ -878,7 +891,10 @@ function getFieldValue(
 /**
  * Simplified findScenes using cache with pagination-aware filtering
  */
-export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
+export const findScenes = async (
+  req: TypedAuthRequest<FindScenesRequest>,
+  res: TypedResponse<FindScenesResponse | ApiErrorResponse>
+) => {
   const requestStart = Date.now();
   try {
     const userId = req.user?.id;
@@ -910,7 +926,11 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
       randomSeed = (userId + Date.now()) % 1e8;
     }
 
-    const mergedFilter = { ...scene_filter, ids: ids || scene_filter?.ids };
+    // Normalize ids to PeekSceneFilter format
+    const normalizedIds = ids
+      ? { value: ids, modifier: "INCLUDES" }
+      : scene_filter?.ids;
+    const mergedFilter: PeekSceneFilter = { ...scene_filter, ids: normalizedIds };
     const _requestingUser = req.user;
 
     // NEW: Use SQL query builder if enabled
@@ -1099,7 +1119,8 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
       // Step 6: Sort
       const sortStart = Date.now();
-      const groupIdForSort = scene_filter?.groups?.value?.[0];
+      const groupIdRaw = scene_filter?.groups?.value?.[0];
+      const groupIdForSort = groupIdRaw ? parseInt(groupIdRaw, 10) : undefined;
       scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
       logger.info(`findScenes: sort took ${Date.now() - sortStart}ms`);
 
@@ -1157,7 +1178,8 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
 
       // Step 4: Sort (using quick sort fields only)
       const sortStart = Date.now();
-      const groupIdForSort = scene_filter?.groups?.value?.[0];
+      const groupIdRaw = scene_filter?.groups?.value?.[0];
+      const groupIdForSort = groupIdRaw ? parseInt(groupIdRaw, 10) : undefined;
       scenes = sortScenes(scenes, sortField, sortDirection, groupIdForSort);
       logger.info(`findScenes: sort took ${Date.now() - sortStart}ms`);
 
@@ -1205,7 +1227,10 @@ export const findScenes = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-export const updateScene = async (req: AuthenticatedRequest, res: Response) => {
+export const updateScene = async (
+  req: TypedAuthRequest<UpdateSceneRequest, UpdateSceneParams>,
+  res: TypedResponse<UpdateSceneResponse | ApiErrorResponse>
+) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
@@ -1247,8 +1272,8 @@ export const updateScene = async (req: AuthenticatedRequest, res: Response) => {
  * 2. SceneQueryBuilder to fetch final results with relations
  */
 export const findSimilarScenes = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, FindSimilarScenesParams, FindSimilarScenesQuery>,
+  res: TypedResponse<FindSimilarScenesResponse | ApiErrorResponse>
 ) => {
   try {
     const { id } = req.params;
@@ -1391,8 +1416,8 @@ export const findSimilarScenes = async (
  * 2. Full fetch: Get complete scene data for paginated results via SceneQueryBuilder
  */
 export const getRecommendedScenes = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, Record<string, string>, GetRecommendedScenesQuery>,
+  res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>
 ) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
