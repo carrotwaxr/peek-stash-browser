@@ -1,5 +1,15 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  FindPerformersRequest,
+  FindPerformersResponse,
+  FindPerformersMinimalRequest,
+  FindPerformersMinimalResponse,
+  UpdatePerformerParams,
+  UpdatePerformerRequest,
+  UpdatePerformerResponse,
+  ApiErrorResponse,
+} from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -128,8 +138,8 @@ export async function mergePerformersWithUserData(
  * Simplified findPerformers using cache
  */
 export const findPerformers = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<FindPerformersRequest>,
+  res: TypedResponse<FindPerformersResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -183,9 +193,13 @@ export const findPerformers = async (
     }
 
     // Step 5: Apply filters (merge root-level ids with performer_filter)
-    const mergedFilter = {
+    // Normalize ids to PeekPerformerFilter format (ids is string[] in request, but filter expects { value, modifier })
+    const normalizedIds = ids
+      ? { value: ids, modifier: "INCLUDES" }
+      : performer_filter?.ids;
+    const mergedFilter: PeekPerformerFilter & Record<string, unknown> = {
       ...performer_filter,
-      ids: ids || performer_filter?.ids,
+      ids: normalizedIds,
     };
     performers = await applyPerformerFilters(performers, mergedFilter);
 
@@ -264,8 +278,9 @@ export async function applyPerformerFilters(
   let filtered = performers;
 
   // Filter by IDs (for detail pages)
-  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
-    const idSet = new Set(filters.ids);
+  // ids is normalized to { value: string[], modifier?: string } format
+  if (filters.ids && filters.ids.value && filters.ids.value.length > 0) {
+    const idSet = new Set(filters.ids.value);
     filtered = filtered.filter((p) => idSet.has(p.id));
   }
 
@@ -872,8 +887,8 @@ function getPerformerFieldValue(
  * Get minimal performers (id + name only) for filter dropdowns
  */
 export const findPerformersMinimal = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<FindPerformersMinimalRequest>,
+  res: TypedResponse<FindPerformersMinimalResponse | ApiErrorResponse>
 ) => {
   try {
     const { filter } = req.body;
@@ -950,8 +965,8 @@ export const findPerformersMinimal = async (
 };
 
 export const updatePerformer = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdatePerformerRequest, UpdatePerformerParams>,
+  res: TypedResponse<UpdatePerformerResponse | ApiErrorResponse>
 ) => {
   try {
     const { id } = req.params;
@@ -965,7 +980,11 @@ export const updatePerformer = async (
       },
     });
 
-    res.json({ success: true, performer: updatedPerformer.performerUpdate });
+    if (!updatedPerformer.performerUpdate) {
+      return res.status(500).json({ error: "Performer update returned null" });
+    }
+
+    res.json({ success: true, performer: updatedPerformer.performerUpdate as NormalizedPerformer });
   } catch (error) {
     console.error("Error updating performer:", error);
     res.status(500).json({ error: "Failed to update performer" });

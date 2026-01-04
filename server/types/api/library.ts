@@ -141,7 +141,7 @@ export interface FindPerformersMinimalResponse {
 /**
  * PUT /api/library/performers/:id - Update performer
  */
-export interface UpdatePerformerParams {
+export interface UpdatePerformerParams extends Record<string, string> {
   id: string;
 }
 

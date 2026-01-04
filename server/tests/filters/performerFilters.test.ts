@@ -27,7 +27,7 @@ describe("Performer Filters", () => {
     it("should filter performers by single ID", async () => {
       const targetId = mockPerformers[0].id;
       const filter: PeekPerformerFilter = {
-        ids: [targetId],
+        ids: { value: [targetId], modifier: "INCLUDES" },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -39,7 +39,7 @@ describe("Performer Filters", () => {
     it("should filter performers by multiple IDs", async () => {
       const targetIds = [mockPerformers[0].id, mockPerformers[5].id, mockPerformers[10].id];
       const filter: PeekPerformerFilter = {
-        ids: targetIds,
+        ids: { value: targetIds, modifier: "INCLUDES" },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -52,7 +52,7 @@ describe("Performer Filters", () => {
 
     it("should return all performers when ids array is empty", async () => {
       const filter: PeekPerformerFilter = {
-        ids: [],
+        ids: { value: [], modifier: "INCLUDES" },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
@@ -62,7 +62,7 @@ describe("Performer Filters", () => {
 
     it("should return empty array when no performers match the IDs", async () => {
       const filter: PeekPerformerFilter = {
-        ids: ["non-existent-id"],
+        ids: { value: ["non-existent-id"], modifier: "INCLUDES" },
       };
 
       const result = await applyPerformerFilters(mockPerformers, filter);
