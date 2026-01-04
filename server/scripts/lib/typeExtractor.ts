@@ -91,3 +91,59 @@ function splitTypeParams(typeStr: string): string[] {
 
   return result;
 }
+
+/**
+ * Resolve a type name to its full definition from types/api/*.ts files
+ */
+export function resolveTypeDefinition(
+  typeName: string,
+  serverDir: string
+): TypeInfo | null {
+  const apiTypesDir = path.join(serverDir, "types", "api");
+
+  if (!fs.existsSync(apiTypesDir)) {
+    return null;
+  }
+
+  const files = fs.readdirSync(apiTypesDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
+
+  for (const file of files) {
+    const filePath = path.join(apiTypesDir, file);
+    const content = fs.readFileSync(filePath, "utf-8");
+
+    // Match: export interface TypeName { ... }
+    const interfaceRegex = new RegExp(
+      `export\\s+interface\\s+${typeName}\\s*(?:extends[^{]+)?{([^}]+(?:{[^}]*}[^}]*)*)}`,
+      "m"
+    );
+
+    const match = content.match(interfaceRegex);
+    if (match) {
+      return {
+        name: typeName,
+        definition: `interface ${typeName} {${match[1]}}`,
+        sourceFile: `types/api/${file}`,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Enrich ControllerTypes with resolved definitions
+ */
+export function enrichTypes(types: ControllerTypes, serverDir: string): ControllerTypes {
+  const enrich = (info?: TypeInfo): TypeInfo | undefined => {
+    if (!info) return undefined;
+    const resolved = resolveTypeDefinition(info.name, serverDir);
+    return resolved || info;
+  };
+
+  return {
+    requestBody: enrich(types.requestBody),
+    requestParams: enrich(types.requestParams),
+    requestQuery: enrich(types.requestQuery),
+    response: enrich(types.response),
+  };
+}
