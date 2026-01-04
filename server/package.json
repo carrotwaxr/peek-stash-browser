@@ -18,7 +18,8 @@
     "test:coverage": "vitest run --coverage",
     "depcheck": "depcheck",
     "knip": "knip",
-    "analyze": "npm run depcheck && npm run knip"
+    "analyze": "npm run depcheck && npm run knip",
+    "generate-api-docs": "npx tsx scripts/generate-api-docs.ts"
   },
   "prisma": {
     "seed": "node --loader ts-node/esm prisma/seed.ts"
@@ -44,6 +45,7 @@
     "prettier": "^3.6.2",
     "prisma": "^6.17.0",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "vitest": "^3.2.4"
   },
   "dependencies": {
