@@ -1,14 +1,23 @@
-import { Response } from "express";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  ApiErrorResponse,
+  IncrementImageOCounterRequest,
+  IncrementImageOCounterResponse,
+  RecordImageViewRequest,
+  RecordImageViewResponse,
+  GetImageViewHistoryParams,
+  GetImageViewHistoryResponse,
+} from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
 
 /**
  * Increment O counter for an image
  */
 export async function incrementImageOCounter(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<IncrementImageOCounterRequest>,
+  res: TypedResponse<IncrementImageOCounterResponse | ApiErrorResponse>
 ) {
   try {
     const { imageId } = req.body;
@@ -90,8 +99,8 @@ export async function incrementImageOCounter(
  * Record image view (when opened in Lightbox)
  */
 export async function recordImageView(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<RecordImageViewRequest>,
+  res: TypedResponse<RecordImageViewResponse | ApiErrorResponse>
 ) {
   try {
     const { imageId } = req.body;
@@ -154,8 +163,8 @@ export async function recordImageView(
  * Get image view history for a specific image
  */
 export async function getImageViewHistory(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, GetImageViewHistoryParams>,
+  res: TypedResponse<GetImageViewHistoryResponse | ApiErrorResponse>
 ) {
   try {
     const { imageId } = req.params;

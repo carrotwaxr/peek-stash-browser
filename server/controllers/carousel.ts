@@ -1,11 +1,28 @@
-import type { Response } from "express";
 import type { Prisma } from "@prisma/client";
-import type { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../services/SceneQueryBuilder.js";
 import type { NormalizedScene, PeekSceneFilter } from "../types/index.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  ApiErrorResponse,
+  GetUserCarouselsResponse,
+  GetCarouselParams,
+  GetCarouselResponse,
+  CreateCarouselRequest,
+  CreateCarouselResponse,
+  UpdateCarouselParams,
+  UpdateCarouselRequest,
+  UpdateCarouselResponse,
+  DeleteCarouselParams,
+  DeleteCarouselResponse,
+  PreviewCarouselRequest,
+  PreviewCarouselResponse,
+  ExecuteCarouselByIdParams,
+  ExecuteCarouselByIdResponse,
+} from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
 import {
   mergeScenesWithUserData,
@@ -28,8 +45,8 @@ const USE_SQL_QUERY_BUILDER = process.env.USE_SQL_QUERY_BUILDER !== "false";
  * Get all custom carousels for the current user
  */
 export const getUserCarousels = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetUserCarouselsResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -53,7 +70,10 @@ export const getUserCarousels = async (
 /**
  * Get a single carousel by ID
  */
-export const getCarousel = async (req: AuthenticatedRequest, res: Response) => {
+export const getCarousel = async (
+  req: TypedAuthRequest<unknown, GetCarouselParams>,
+  res: TypedResponse<GetCarouselResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user?.id;
     const carouselId = req.params.id;
@@ -90,8 +110,8 @@ interface CarouselPreference {
  * Create a new custom carousel
  */
 export const createCarousel = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<CreateCarouselRequest>,
+  res: TypedResponse<CreateCarouselResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -167,8 +187,8 @@ export const createCarousel = async (
  * Update an existing carousel
  */
 export const updateCarousel = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateCarouselRequest, UpdateCarouselParams>,
+  res: TypedResponse<UpdateCarouselResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -219,8 +239,8 @@ export const updateCarousel = async (
  * Delete a carousel
  */
 export const deleteCarousel = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, DeleteCarouselParams>,
+  res: TypedResponse<DeleteCarouselResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -258,8 +278,8 @@ export const deleteCarousel = async (
  * Executes the carousel query and returns matching scenes
  */
 export const previewCarousel = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<PreviewCarouselRequest>,
+  res: TypedResponse<PreviewCarouselResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -431,8 +451,8 @@ export async function executeCarouselQuery(
  * Used by the homepage to render a specific carousel
  */
 export const executeCarouselById = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, ExecuteCarouselByIdParams>,
+  res: TypedResponse<ExecuteCarouselByIdResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;

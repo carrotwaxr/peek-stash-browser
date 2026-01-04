@@ -1,15 +1,20 @@
-import { Request, Response } from "express";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  UpdateRatingRequest,
+  UpdateRatingResponse,
+  UpdateSceneRatingParams,
+  UpdatePerformerRatingParams,
+  UpdateStudioRatingParams,
+  UpdateTagRatingParams,
+  UpdateGalleryRatingParams,
+  UpdateGroupRatingParams,
+  UpdateImageRatingParams,
+  ApiErrorResponse,
+} from "../types/api/index.js";
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
-
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    username: string;
-    role: string;
-  };
-}
 
 /**
  * IMPORTANT: Rating and Favorite Sync Policy
@@ -40,8 +45,8 @@ interface AuthenticatedRequest extends Request {
  * Syncs rating to Stash if user.syncToStash is enabled (favorite NOT synced for scenes)
  */
 export async function updateSceneRating(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateRatingRequest, UpdateSceneRatingParams>,
+  res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -134,8 +139,8 @@ export async function updateSceneRating(
  * Syncs both rating and favorite to Stash if user.syncToStash is enabled
  */
 export async function updatePerformerRating(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateRatingRequest, UpdatePerformerRatingParams>,
+  res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -234,8 +239,8 @@ export async function updatePerformerRating(
  * Syncs both rating and favorite to Stash if user.syncToStash is enabled
  */
 export async function updateStudioRating(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateRatingRequest, UpdateStudioRatingParams>,
+  res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -334,8 +339,8 @@ export async function updateStudioRating(
  * Syncs favorite only to Stash if user.syncToStash is enabled (tags don't support rating in Stash)
  */
 export async function updateTagRating(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateRatingRequest, UpdateTagRatingParams>,
+  res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -427,8 +432,8 @@ export async function updateTagRating(
  * Syncs rating only to Stash if user.syncToStash is enabled (galleries don't support favorite in Stash)
  */
 export async function updateGalleryRating(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateRatingRequest, UpdateGalleryRatingParams>,
+  res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -525,8 +530,8 @@ export async function updateGalleryRating(
  * Syncs rating only to Stash if user.syncToStash is enabled (groups don't support favorite in Stash)
  */
 export async function updateGroupRating(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateRatingRequest, UpdateGroupRatingParams>,
+  res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -618,8 +623,8 @@ export async function updateGroupRating(
  * Syncs rating only to Stash if user.syncToStash is enabled (images don't support favorite in Stash)
  */
 export async function updateImageRating(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateRatingRequest, UpdateImageRatingParams>,
+  res: TypedResponse<UpdateRatingResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;

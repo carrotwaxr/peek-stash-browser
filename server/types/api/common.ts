@@ -21,6 +21,7 @@ export interface PaginationFilter {
  */
 export interface ApiErrorResponse {
   error: string;
+  message?: string;
   details?: string;
   errorType?: string;
 }
