@@ -49,6 +49,11 @@ export const convertToProxyUrl = (url: string): string => {
       return url;
     }
 
+    // Skip URLs that are already proxy URLs (relative paths starting with /api/proxy)
+    if (url.startsWith("/api/proxy")) {
+      return url;
+    }
+
     const urlObj = new URL(url);
 
     // Extract the path and query string from the Stash URL
