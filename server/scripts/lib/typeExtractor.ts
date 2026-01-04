@@ -32,36 +32,59 @@ export function extractControllerTypes(
   const content = fs.readFileSync(fullPath, "utf-8");
   const result: ControllerTypes = {};
 
-  // Match: export const controllerName = async (req: TypedAuthRequest<Body, Params, Query>, res: TypedResponse<Response>)
-  // Note: Uses [\s\S]*? instead of \s* to match across newlines (multiline signatures)
-  const signatureRegex = new RegExp(
-    `export\\s+const\\s+${controllerName}\\s*=\\s*async\\s*\\([\\s\\S]*?req:\\s*(?:TypedAuthRequest|TypedRequest)(?:<([^>]+)>)?[\\s\\S]*?res:\\s*TypedResponse<([^>]+)>`,
+  // Step 1: Find the controller's function signature (up to the opening brace)
+  // This prevents matching across multiple function definitions
+  const signatureStartRegex = new RegExp(
+    `export\\s+const\\s+${controllerName}\\s*=\\s*async\\s*\\(`,
     "m"
   );
 
-  const match = content.match(signatureRegex);
-  if (match) {
-    const [, reqTypes, resType] = match;
+  const startMatch = signatureStartRegex.exec(content);
+  if (!startMatch) {
+    return {};
+  }
 
-    // Parse request type parameters (Body, Params, Query)
-    if (reqTypes) {
-      const parts = splitTypeParams(reqTypes);
-      if (parts[0] && parts[0] !== "unknown") {
-        result.requestBody = { name: parts[0], definition: "", sourceFile: "" };
-      }
-      if (parts[1]) {
-        result.requestParams = { name: parts[1], definition: "", sourceFile: "" };
-      }
-      if (parts[2]) {
-        result.requestQuery = { name: parts[2], definition: "", sourceFile: "" };
-      }
-    }
+  // Find the end of the parameter list (closing paren before arrow or opening brace)
+  const startIndex = startMatch.index + startMatch[0].length;
+  let parenDepth = 1;
+  let endIndex = startIndex;
 
-    // Parse response type (strip | ApiErrorResponse)
-    if (resType) {
-      const cleanType = resType.replace(/\s*\|\s*ApiErrorResponse/, "").trim();
-      result.response = { name: cleanType, definition: "", sourceFile: "" };
+  while (endIndex < content.length && parenDepth > 0) {
+    const char = content[endIndex];
+    if (char === "(") parenDepth++;
+    else if (char === ")") parenDepth--;
+    endIndex++;
+  }
+
+  // Extract just the parameter list for this specific controller
+  const parameterList = content.slice(startIndex, endIndex - 1);
+
+  // Step 2: Check if this controller uses TypedRequest or TypedAuthRequest with generics
+  // Only match if there's an actual <...> with type parameters
+  const reqMatch = parameterList.match(/req:\s*(?:TypedAuthRequest|TypedRequest)<([^>]+)>/);
+
+  if (reqMatch) {
+    const reqTypes = reqMatch[1];
+    const parts = splitTypeParams(reqTypes);
+    if (parts[0] && parts[0] !== "unknown") {
+      result.requestBody = { name: parts[0], definition: "", sourceFile: "" };
     }
+    if (parts[1]) {
+      result.requestParams = { name: parts[1], definition: "", sourceFile: "" };
+    }
+    if (parts[2]) {
+      result.requestQuery = { name: parts[2], definition: "", sourceFile: "" };
+    }
+  }
+  // If req uses plain Request or AuthenticatedRequest (no generics), don't populate request types
+
+  // Step 3: Extract response type
+  const resMatch = parameterList.match(/res:\s*TypedResponse<([^>]+)>/);
+
+  if (resMatch) {
+    const resType = resMatch[1];
+    const cleanType = resType.replace(/\s*\|\s*ApiErrorResponse/, "").trim();
+    result.response = { name: cleanType, definition: "", sourceFile: "" };
   }
 
   return result;

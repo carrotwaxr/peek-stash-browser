@@ -30,26 +30,15 @@ Setup wizard endpoints for initial configuration.
 
 **Authentication:** None
 
-**Request Body:**
-
-```typescript
-interface CreateFirstAdminRequest {
-  username: string;
-  password: string;
-}
-```
-
 **Response:**
 
 ```typescript
-interface CreateFirstAdminResponse {
-  success: true;
-  user: {
-  id: number;
-  username: string;
-  role: string;
-  createdAt: Date;
-};
+interface GetSetupStatusResponse {
+  setupComplete: boolean;
+  hasUsers: boolean;
+  hasStashInstance: boolean;
+  userCount: number;
+  stashInstanceCount: number;
 }
 ```
 
@@ -153,6 +142,19 @@ interface CreateFirstStashInstanceResponse {
 
 **Authentication:** None
 
+**Response:**
+
+```typescript
+interface ResetSetupResponse {
+  success: true;
+  message: string;
+  deleted: {
+  users: number;
+  stashInstances: number;
+};
+}
+```
+
 **Controller:** `resetSetup` in `../controllers/setup.ts`
 
 ---
@@ -160,6 +162,23 @@ interface CreateFirstStashInstanceResponse {
 ### GET /api/setup/stash-instance
 
 **Authentication:** None
+
+**Response:**
+
+```typescript
+interface GetStashInstanceResponse {
+  instance: {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  priority: number;
+  createdAt: Date;
+  updatedAt: Date;
+} | null;
+  instanceCount: number;
+}
+```
 
 **Controller:** `getStashInstance` in `../controllers/setup.ts`
 
