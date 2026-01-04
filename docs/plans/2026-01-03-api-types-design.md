@@ -366,3 +366,43 @@ Leverage existing filter types from `types/filters.ts` and `types/peekFilters.ts
    - Strict: `res.json()` only accepts exact type
    - Permissive: Allow additional fields
    - Recommendation: Start strict; loosen if needed
+
+## Implementation Status
+
+### Completed (Phase 1 - 2026-01-03)
+
+- [x] Type infrastructure (`types/api/common.ts`, `types/api/express.ts`)
+- [x] Library endpoint types (`types/api/library.ts`)
+- [x] API types index (`types/api/index.ts`)
+- [x] Scenes controller typed signatures
+- [x] Performers controller typed signatures
+- [x] Updated `authenticated()` helper for type compatibility
+
+**Commits:**
+- `feat(types): add common API types`
+- `feat(types): add typed Express request/response helpers`
+- `feat(types): add library API request/response types`
+- `feat(types): add API types index`
+- `feat(types): add typed signatures to scenes controller`
+- `feat(types): add typed signatures to performers controller`
+- `fix: remove unused imports from typed controllers`
+
+**Bugs Found During Migration:**
+- `ids` filter format needed normalization (was `string[]`, expected `{ value: string[], modifier: string }`)
+- `groupIdForSort` needed parsing from string to number
+
+### Remaining (Future Phases)
+
+- [ ] Studios controller typed signatures
+- [ ] Tags controller typed signatures
+- [ ] Galleries controller typed signatures
+- [ ] Groups controller typed signatures
+- [ ] Images controller typed signatures
+- [ ] Auth endpoints
+- [ ] Playlist endpoints
+- [ ] Carousel endpoints
+- [ ] Rating endpoints
+- [ ] Watch history endpoints
+- [ ] Setup endpoints
+- [ ] User endpoints
+- [ ] API documentation generator script
