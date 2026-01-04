@@ -77,9 +77,40 @@ export async function setup() {
   // Wait for server to be ready
   await waitForServer();
 
-  // Ensure admin user exists and is logged in
+  // Ensure admin user exists and Stash is connected
+  // This creates the admin user and Stash instance in the DB if needed
   const { ensureTestSetup } = await import("./testSetup.js");
   await ensureTestSetup();
+
+  // Initialize the StashInstanceManager - loads Stash config from DB
+  // This MUST happen after testSetup creates the Stash instance
+  console.log("[Integration Tests] Initializing Stash instance manager...");
+  const { stashInstanceManager } = await import(
+    "../../services/StashInstanceManager.js"
+  );
+  await stashInstanceManager.initialize();
+
+  // Initialize the cache - starts sync scheduler
+  // On subsequent runs, this will do an incremental sync (fast)
+  // The initial full sync was done by testSetup on first run
+  console.log("[Integration Tests] Initializing cache (starting sync scheduler)...");
+  const { initializeCache } = await import("../../initializers/cache.js");
+  await initializeCache();
+
+  // Wait for any ongoing sync to complete before running tests
+  console.log("[Integration Tests] Waiting for sync to complete...");
+  const { stashSyncService } = await import("../../services/StashSyncService.js");
+  let attempts = 0;
+  while (stashSyncService.isSyncing() && attempts < 120) {
+    await new Promise((r) => setTimeout(r, 2000));
+    attempts++;
+    if (attempts % 10 === 0) {
+      console.log(`[Integration Tests] Still syncing... (attempt ${attempts})`);
+    }
+  }
+  if (stashSyncService.isSyncing()) {
+    throw new Error("Sync did not complete within timeout");
+  }
 
   console.log("[Integration Tests] Global setup complete");
 

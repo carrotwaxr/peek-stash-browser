@@ -37,11 +37,9 @@ export async function ensureTestSetup(): Promise<void> {
   // Step 3: Login as admin
   await loginAdmin();
 
-  // Step 4: Wait for initial sync to complete
-  console.log("[Integration Tests] Waiting for initial sync...");
-  await waitForSync();
-
-  console.log("[Integration Tests] Setup complete");
+  // Note: We don't wait for sync here - globalSetup handles that after
+  // initializing StashInstanceManager and the cache
+  console.log("[Integration Tests] Initial setup complete (sync will complete in globalSetup)");
 }
 
 async function getSetupStatus(): Promise<SetupStatus> {
@@ -107,30 +105,4 @@ async function connectStash(): Promise<void> {
 async function loginAdmin(): Promise<void> {
   const { TEST_ADMIN } = await import("../fixtures/testEntities.js");
   await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
-}
-
-async function waitForSync(maxAttempts = 120, delayMs = 2000): Promise<void> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const response = await adminClient.get<{ isSyncing: boolean }>("/api/sync/status");
-
-    if (response.ok && !response.data.isSyncing) {
-      // Verify we have data
-      const sceneResponse = await adminClient.post<{ count: number }>("/api/library/scenes", {
-        per_page: 1,
-      });
-
-      if (sceneResponse.ok && sceneResponse.data.count > 0) {
-        console.log(`[Integration Tests] Sync complete. ${sceneResponse.data.count} scenes available.`);
-        return;
-      }
-    }
-
-    if (i % 10 === 0) {
-      console.log(`[Integration Tests] Waiting for sync... (attempt ${i + 1}/${maxAttempts})`);
-    }
-
-    await new Promise((r) => setTimeout(r, delayMs));
-  }
-
-  throw new Error("Sync did not complete within timeout");
 }
