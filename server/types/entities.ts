@@ -14,6 +14,7 @@
 import type {
   Gallery,
   Group,
+  Image,
   Performer,
   Scene,
   Studio,
@@ -154,6 +155,28 @@ export type NormalizedGallery = Gallery & {
 export type NormalizedGroup = Group & {
   rating: number | null;
   favorite: boolean;
+};
+
+/**
+ * Normalized Image
+ *
+ * Extends the base Image type from Stash with Peek-specific user data.
+ *
+ * Additional fields:
+ * - rating: User's 1-5 star rating (null if unrated)
+ * - rating100: User's 0-100 rating (null if unrated)
+ * - favorite: Whether user favorited this image
+ * - oCounter: User's orgasm counter for this image
+ * - viewCount: Number of times user viewed this image
+ * - lastViewedAt: ISO timestamp of last view (null if never viewed)
+ */
+export type NormalizedImage = Image & {
+  rating: number | null;
+  rating100: number | null;
+  favorite: boolean;
+  oCounter: number;
+  viewCount: number;
+  lastViewedAt: string | null;
 };
 
 /**

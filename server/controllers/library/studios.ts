@@ -1,5 +1,15 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  FindStudiosRequest,
+  FindStudiosResponse,
+  FindStudiosMinimalRequest,
+  FindStudiosMinimalResponse,
+  UpdateStudioParams,
+  UpdateStudioRequest,
+  UpdateStudioResponse,
+  ApiErrorResponse,
+} from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -53,7 +63,10 @@ export async function mergeStudiosWithUserData(
 /**
  * Simplified findStudios using cache
  */
-export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
+export const findStudios = async (
+  req: TypedAuthRequest<FindStudiosRequest>,
+  res: TypedResponse<FindStudiosResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user?.id;
     const { filter, studio_filter, ids } = req.body;
@@ -106,7 +119,14 @@ export const findStudios = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Step 5: Apply filters (merge root-level ids with studio_filter)
-    const mergedFilter = { ...studio_filter, ids: ids || studio_filter?.ids };
+    // Normalize ids to PeekStudioFilter format (ids is string[] in request, but filter expects { value, modifier })
+    const normalizedIds = ids
+      ? { value: ids, modifier: "INCLUDES" }
+      : studio_filter?.ids;
+    const mergedFilter: PeekStudioFilter & Record<string, unknown> = {
+      ...studio_filter,
+      ids: normalizedIds,
+    };
     studios = applyStudioFilters(studios, mergedFilter);
 
     // Step 6: Sort
@@ -200,8 +220,8 @@ export function applyStudioFilters(
   let filtered = studios;
 
   // Filter by IDs (for detail pages)
-  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
-    const idSet = new Set(filters.ids);
+  if (filters.ids?.value && filters.ids.value.length > 0) {
+    const idSet = new Set(filters.ids.value);
     filtered = filtered.filter((s) => idSet.has(s.id));
   }
 
@@ -450,8 +470,8 @@ function getStudioFieldValue(
  * Get minimal studios (id + name only) for filter dropdowns
  */
 export const findStudiosMinimal = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<FindStudiosMinimalRequest>,
+  res: TypedResponse<FindStudiosMinimalResponse | ApiErrorResponse>
 ) => {
   try {
     const { filter } = req.body;
@@ -525,8 +545,8 @@ export const findStudiosMinimal = async (
 };
 
 export const updateStudio = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateStudioRequest, UpdateStudioParams>,
+  res: TypedResponse<UpdateStudioResponse | ApiErrorResponse>
 ) => {
   try {
     const { id } = req.params;
@@ -540,7 +560,11 @@ export const updateStudio = async (
       },
     });
 
-    res.json({ success: true, studio: updatedStudio.studioUpdate });
+    if (!updatedStudio.studioUpdate) {
+      return res.status(500).json({ error: "Studio update returned null" });
+    }
+
+    res.json({ success: true, studio: updatedStudio.studioUpdate as NormalizedStudio });
   } catch (error) {
     console.error("Error updating studio:", error);
     res.status(500).json({ error: "Failed to update studio" });

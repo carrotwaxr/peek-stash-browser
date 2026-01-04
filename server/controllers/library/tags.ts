@@ -1,5 +1,15 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  FindTagsRequest,
+  FindTagsResponse,
+  FindTagsMinimalRequest,
+  FindTagsMinimalResponse,
+  UpdateTagParams,
+  UpdateTagRequest,
+  UpdateTagResponse,
+  ApiErrorResponse,
+} from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -115,7 +125,10 @@ export async function mergeTagsWithUserData(
 /**
  * Simplified findTags using cache
  */
-export const findTags = async (req: AuthenticatedRequest, res: Response) => {
+export const findTags = async (
+  req: TypedAuthRequest<FindTagsRequest>,
+  res: TypedResponse<FindTagsResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user?.id;
     const { filter, tag_filter, ids } = req.body;
@@ -191,7 +204,14 @@ export const findTags = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Step 5: Apply filters (merge root-level ids with tag_filter)
-    const mergedFilter = { ...tag_filter, ids: ids || tag_filter?.ids };
+    // Normalize ids to PeekTagFilter format (ids is string[] in request, but filter expects { value, modifier })
+    const normalizedIds = ids
+      ? { value: ids, modifier: "INCLUDES" }
+      : tag_filter?.ids;
+    const mergedFilter: PeekTagFilter & Record<string, unknown> = {
+      ...tag_filter,
+      ids: normalizedIds,
+    };
     tags = await applyTagFilters(tags, mergedFilter);
 
     // Step 6: Sort
@@ -279,8 +299,8 @@ export async function applyTagFilters(
   let filtered = tags;
 
   // Filter by IDs (for detail pages)
-  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
-    const idSet = new Set(filters.ids);
+  if (filters.ids?.value && filters.ids.value.length > 0) {
+    const idSet = new Set(filters.ids.value);
     filtered = filtered.filter((t) => idSet.has(t.id));
   }
 
@@ -626,8 +646,8 @@ function getTagFieldValue(
  * Get minimal tags (id + name only) for filter dropdowns
  */
 export const findTagsMinimal = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<FindTagsMinimalRequest>,
+  res: TypedResponse<FindTagsMinimalResponse | ApiErrorResponse>
 ) => {
   try {
     const { filter } = req.body;
@@ -703,7 +723,10 @@ export const findTagsMinimal = async (
   }
 };
 
-export const updateTag = async (req: AuthenticatedRequest, res: Response) => {
+export const updateTag = async (
+  req: TypedAuthRequest<UpdateTagRequest, UpdateTagParams>,
+  res: TypedResponse<UpdateTagResponse | ApiErrorResponse>
+) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -716,7 +739,11 @@ export const updateTag = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    res.json({ success: true, tag: updatedTag.tagUpdate });
+    if (!updatedTag.tagUpdate) {
+      return res.status(500).json({ error: "Tag update returned null" });
+    }
+
+    res.json({ success: true, tag: updatedTag.tagUpdate as NormalizedTag });
   } catch (error) {
     console.error("Error updating tag:", error);
     res.status(500).json({ error: "Failed to update tag" });

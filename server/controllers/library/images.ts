@@ -1,5 +1,12 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  FindImagesRequest,
+  FindImagesResponse,
+  GetImageParams,
+  GetImageResponse,
+  ApiErrorResponse,
+} from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import {
@@ -88,7 +95,10 @@ function transformImageResult(image: any): any {
 /**
  * Find images endpoint - uses SQL-native ImageQueryBuilder
  */
-export const findImages = async (req: AuthenticatedRequest, res: Response) => {
+export const findImages = async (
+  req: TypedAuthRequest<FindImagesRequest>,
+  res: TypedResponse<FindImagesResponse | ApiErrorResponse>
+) => {
   const startTime = Date.now();
   try {
     const userId = req.user?.id;
@@ -218,8 +228,8 @@ export const findImages = async (req: AuthenticatedRequest, res: Response) => {
  * Find single image by ID
  */
 export const findImageById = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, GetImageParams>,
+  res: TypedResponse<GetImageResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;

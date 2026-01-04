@@ -19,6 +19,7 @@ export type {
   NormalizedTag,
   NormalizedGallery,
   NormalizedGroup,
+  NormalizedImage,
   SceneScoringData,
 } from "./entities.js";
 

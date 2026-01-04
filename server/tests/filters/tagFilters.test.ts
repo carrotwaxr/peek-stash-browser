@@ -18,7 +18,7 @@ describe("Tag Filters", () => {
   describe("ID Filter", () => {
     it("should filter tags by single ID", async () => {
       const filter: PeekTagFilter = {
-        ids: [mockTags[0].id],
+        ids: { value: [mockTags[0].id], modifier: "INCLUDES" },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -30,7 +30,7 @@ describe("Tag Filters", () => {
     it("should filter tags by multiple IDs", async () => {
       const targetIds = [mockTags[0].id, mockTags[5].id, mockTags[10].id];
       const filter: PeekTagFilter = {
-        ids: targetIds,
+        ids: { value: targetIds, modifier: "INCLUDES" },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -43,7 +43,7 @@ describe("Tag Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", async () => {
       const filter: PeekTagFilter = {
-        ids: ["nonexistent-id"],
+        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
       };
 
       const result = await applyTagFilters(mockTags, filter);
@@ -53,7 +53,7 @@ describe("Tag Filters", () => {
 
     it("should return all tags when ids is empty array", async () => {
       const filter: PeekTagFilter = {
-        ids: [],
+        ids: { value: [], modifier: "INCLUDES" },
       };
 
       const result = await applyTagFilters(mockTags, filter);

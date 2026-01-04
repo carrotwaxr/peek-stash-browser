@@ -1,5 +1,12 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  FindGroupsRequest,
+  FindGroupsResponse,
+  FindGroupsMinimalRequest,
+  FindGroupsMinimalResponse,
+  ApiErrorResponse,
+} from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -58,8 +65,8 @@ export async function applyGroupFilters(
   let filtered = groups;
 
   // Filter by IDs (for detail pages)
-  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
-    const idSet = new Set(filters.ids);
+  if (filters.ids?.value && filters.ids.value.length > 0) {
+    const idSet = new Set(filters.ids.value);
     filtered = filtered.filter((g) => idSet.has(g.id));
   }
 
@@ -193,7 +200,10 @@ function sortGroups(
 /**
  * Simplified findGroups using cache
  */
-export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
+export const findGroups = async (
+  req: TypedAuthRequest<FindGroupsRequest>,
+  res: TypedResponse<FindGroupsResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user?.id;
     const { filter, group_filter, ids } = req.body;
@@ -245,7 +255,14 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Step 4: Apply filters (merge root-level ids with group_filter)
-    const mergedFilter = { ...group_filter, ids: ids || group_filter?.ids };
+    // Normalize ids to PeekGroupFilter format (ids is string[] in request, but filter expects { value, modifier })
+    const normalizedIds = ids
+      ? { value: ids, modifier: "INCLUDES" }
+      : group_filter?.ids;
+    const mergedFilter: PeekGroupFilter & Record<string, unknown> = {
+      ...group_filter,
+      ids: normalizedIds,
+    };
     groups = await applyGroupFilters(groups, mergedFilter);
 
     // Step 5: Sort
@@ -332,8 +349,8 @@ export const findGroups = async (req: AuthenticatedRequest, res: Response) => {
  * Minimal groups - just id and name for dropdowns
  */
 export const findGroupsMinimal = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<FindGroupsMinimalRequest>,
+  res: TypedResponse<FindGroupsMinimalResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;

@@ -25,7 +25,7 @@ describe("Group Filters", () => {
   describe("ID Filter", () => {
     it("should filter groups by single ID", async () => {
       const filter: PeekGroupFilter = {
-        ids: [mockGroups[0].id],
+        ids: { value: [mockGroups[0].id], modifier: "INCLUDES" },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -37,7 +37,7 @@ describe("Group Filters", () => {
     it("should filter groups by multiple IDs", async () => {
       const targetIds = [mockGroups[0].id, mockGroups[5].id, mockGroups[10].id];
       const filter: PeekGroupFilter = {
-        ids: targetIds,
+        ids: { value: targetIds, modifier: "INCLUDES" },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -50,7 +50,7 @@ describe("Group Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", async () => {
       const filter: PeekGroupFilter = {
-        ids: ["nonexistent-id"],
+        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);
@@ -60,7 +60,7 @@ describe("Group Filters", () => {
 
     it("should return all groups when ids is empty array", async () => {
       const filter: PeekGroupFilter = {
-        ids: [],
+        ids: { value: [], modifier: "INCLUDES" },
       };
 
       const result = await applyGroupFilters(mockGroups, filter);

@@ -11,6 +11,7 @@ import type {
   NormalizedTag,
   NormalizedGallery,
   NormalizedGroup,
+  NormalizedImage,
   PeekSceneFilter,
   PeekPerformerFilter,
   PeekStudioFilter,
@@ -187,6 +188,24 @@ export interface FindStudiosMinimalResponse {
   studios: Array<{ id: string; name: string }>;
 }
 
+/**
+ * PUT /api/library/studios/:id - Update studio
+ */
+export interface UpdateStudioParams extends Record<string, string> {
+  id: string;
+}
+
+export interface UpdateStudioRequest {
+  name?: string;
+  details?: string;
+  [key: string]: unknown;
+}
+
+export interface UpdateStudioResponse {
+  success: true;
+  studio: NormalizedStudio;
+}
+
 // =============================================================================
 // TAGS
 // =============================================================================
@@ -216,6 +235,24 @@ export interface FindTagsMinimalRequest {
 
 export interface FindTagsMinimalResponse {
   tags: Array<{ id: string; name: string }>;
+}
+
+/**
+ * PUT /api/library/tags/:id - Update tag
+ */
+export interface UpdateTagParams extends Record<string, string> {
+  id: string;
+}
+
+export interface UpdateTagRequest {
+  name?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
+export interface UpdateTagResponse {
+  success: true;
+  tag: NormalizedTag;
 }
 
 // =============================================================================
@@ -262,17 +299,58 @@ export interface GetGalleryImagesQuery
   per_page?: string;
 }
 
-export interface GetGalleryImagesResponse {
-  images: Array<{
+/**
+ * Gallery image with context for inheritance support
+ */
+export interface GalleryImageWithContext {
+  id: string;
+  title?: string | null;
+  code?: string | null;
+  details?: string | null;
+  photographer?: string | null;
+  date?: string | null;
+  paths: {
+    thumbnail: string;
+    preview: string;
+    image: string;
+  };
+  width?: number | null;
+  height?: number | null;
+  rating100?: number | null;
+  o_counter?: number | null;
+  filePath?: string | null;
+  fileSize?: number | null;
+  performers: Array<{ id: string; name: string }>;
+  tags: Array<{ id: string; name: string }>;
+  studio?: { id: string; name: string } | null;
+  stashCreatedAt?: string | null;
+  stashUpdatedAt?: string | null;
+  galleries: Array<{
     id: string;
-    title?: string;
-    files?: Array<{ width?: number; height?: number }>;
-    paths?: { thumbnail?: string };
+    title?: string | null;
+    date?: string | null;
+    details?: string | null;
+    photographer?: string | null;
+    studio?: NormalizedStudio | null;
+    studioId?: string | null;
+    performers: NormalizedPerformer[];
+    tags: NormalizedTag[];
+    urls?: string[];
   }>;
+  // User data merged in
+  rating?: number | null;
+  favorite?: boolean;
+}
+
+export interface GetGalleryImagesResponse {
+  images: GalleryImageWithContext[];
   count: number;
-  page: number;
-  perPage: number;
-  totalPages: number;
+  pagination?: {
+    page: number;
+    per_page: number;
+    total: number;
+    total_pages: number;
+  };
 }
 
 /**
@@ -322,29 +400,43 @@ export interface FindGroupsMinimalResponse {
 // =============================================================================
 
 /**
+ * Image filter for API requests
+ * Matches the internal ImageFilter structure from ImageQueryBuilder
+ */
+export interface PeekImageFilter {
+  ids?: { value: string[]; modifier?: string };
+  favorite?: boolean;
+  rating100?: { value: number; value2?: number; modifier: string };
+  o_counter?: { value: number; value2?: number; modifier: string };
+  performers?: { value: string[]; modifier?: string };
+  tags?: { value: string[]; modifier?: string; depth?: number };
+  studios?: { value: string[]; modifier?: string; depth?: number };
+  galleries?: { value: string[]; modifier?: string };
+}
+
+/**
  * POST /api/library/images - Find images with filters
  */
 export interface FindImagesRequest {
   filter?: PaginationFilter;
-  image_filter?: Record<string, unknown>; // TODO: Add PeekImageFilter
+  image_filter?: PeekImageFilter;
   ids?: string[];
 }
 
 export interface FindImagesResponse {
   findImages: {
     count: number;
-    images: Array<{
-      id: string;
-      title?: string;
-      rating100?: number;
-      favorite?: boolean;
-      o_counter?: number;
-      files?: Array<{ width?: number; height?: number }>;
-      paths?: { thumbnail?: string };
-      galleries?: Array<{ id: string; title?: string }>;
-      performers?: Array<{ id: string; name: string }>;
-      studio?: { id: string; name: string } | null;
-      tags?: Array<{ id: string; name: string }>;
-    }>;
+    images: NormalizedImage[];
   };
+}
+
+/**
+ * GET /api/library/images/:id - Get single image
+ */
+export interface GetImageParams extends Record<string, string> {
+  id: string;
+}
+
+export interface GetImageResponse extends NormalizedImage {
+  stashUrl: string;
 }

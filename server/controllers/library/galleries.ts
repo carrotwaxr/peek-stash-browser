@@ -1,5 +1,14 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  FindGalleriesRequest,
+  FindGalleriesResponse,
+  GetGalleryImagesQuery,
+  GetGalleryImagesResponse,
+  FindGalleriesMinimalRequest,
+  FindGalleriesMinimalResponse,
+  ApiErrorResponse,
+} from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
@@ -83,8 +92,8 @@ export async function applyGalleryFilters(
   let filtered = galleries;
 
   // Filter by IDs
-  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
-    const idSet = new Set(filters.ids);
+  if (filters.ids?.value && filters.ids.value.length > 0) {
+    const idSet = new Set(filters.ids.value);
     filtered = filtered.filter((g) => idSet.has(g.id));
   }
 
@@ -246,8 +255,8 @@ function sortGalleries(
  * Find galleries endpoint
  */
 export const findGalleries = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<FindGalleriesRequest>,
+  res: TypedResponse<FindGalleriesResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -302,7 +311,14 @@ export const findGalleries = async (
     }
 
     // Step 4: Apply filters (merge root-level ids with gallery_filter)
-    const mergedFilter = { ...gallery_filter, ids: ids || gallery_filter?.ids };
+    // Normalize ids to PeekGalleryFilter format (ids is string[] in request, but filter expects { value, modifier })
+    const normalizedIds = ids
+      ? { value: ids, modifier: "INCLUDES" }
+      : gallery_filter?.ids;
+    const mergedFilter: PeekGalleryFilter & Record<string, unknown> = {
+      ...gallery_filter,
+      ids: normalizedIds,
+    };
     galleries = await applyGalleryFilters(galleries, mergedFilter);
 
     // Step 5: Sort
@@ -383,8 +399,8 @@ export const findGalleries = async (
  * Find single gallery by ID
  */
 export const findGalleryById = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, { id: string }>,
+  res: TypedResponse<NormalizedGallery | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -481,8 +497,8 @@ export const findGalleryById = async (
  * Minimal galleries - just id and title for dropdowns
  */
 export const findGalleriesMinimal = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<FindGalleriesMinimalRequest>,
+  res: TypedResponse<FindGalleriesMinimalResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -532,8 +548,7 @@ export const findGalleriesMinimal = async (
     // Step 5: Map to minimal shape
     const minimalGalleries = galleries.map((g) => ({
       id: g.id,
-      name: g.title, // Use 'title' field but map to 'name' for consistency with other entities
-      favorite: g.favorite,
+      title: g.title || "", // Galleries use 'title' not 'name'
     }));
 
     res.json({
@@ -555,8 +570,8 @@ export const findGalleriesMinimal = async (
  * Get images for a specific gallery from local database
  */
 export const getGalleryImages = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, { galleryId: string }, GetGalleryImagesQuery>,
+  res: TypedResponse<GetGalleryImagesResponse | ApiErrorResponse>
 ) => {
   try {
     const { galleryId } = req.params;

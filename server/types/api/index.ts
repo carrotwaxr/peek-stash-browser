@@ -49,11 +49,17 @@ export type {
   FindStudiosResponse,
   FindStudiosMinimalRequest,
   FindStudiosMinimalResponse,
+  UpdateStudioParams,
+  UpdateStudioRequest,
+  UpdateStudioResponse,
   // Tags
   FindTagsRequest,
   FindTagsResponse,
   FindTagsMinimalRequest,
   FindTagsMinimalResponse,
+  UpdateTagParams,
+  UpdateTagRequest,
+  UpdateTagResponse,
   // Galleries
   FindGalleriesRequest,
   FindGalleriesResponse,
@@ -62,6 +68,7 @@ export type {
   GetGalleryImagesParams,
   GetGalleryImagesQuery,
   GetGalleryImagesResponse,
+  GalleryImageWithContext,
   FindGalleriesMinimalRequest,
   FindGalleriesMinimalResponse,
   // Groups
@@ -72,4 +79,6 @@ export type {
   // Images
   FindImagesRequest,
   FindImagesResponse,
+  GetImageParams,
+  GetImageResponse,
 } from "./library.js";
