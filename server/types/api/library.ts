@@ -241,7 +241,7 @@ export interface FindGalleriesResponse {
 /**
  * GET /api/library/galleries/:id - Get single gallery
  */
-export interface GetGalleryParams {
+export interface GetGalleryParams extends Record<string, string> {
   id: string;
 }
 
@@ -252,11 +252,12 @@ export interface GetGalleryResponse {
 /**
  * GET /api/library/galleries/:id/images - Get gallery images
  */
-export interface GetGalleryImagesParams {
+export interface GetGalleryImagesParams extends Record<string, string> {
   id: string;
 }
 
-export interface GetGalleryImagesQuery {
+export interface GetGalleryImagesQuery
+  extends Record<string, string | undefined> {
   page?: string;
   per_page?: string;
 }
