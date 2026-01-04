@@ -33,8 +33,9 @@ export function extractControllerTypes(
   const result: ControllerTypes = {};
 
   // Match: export const controllerName = async (req: TypedAuthRequest<Body, Params, Query>, res: TypedResponse<Response>)
+  // Note: Uses [\s\S]*? instead of \s* to match across newlines (multiline signatures)
   const signatureRegex = new RegExp(
-    `export\\s+const\\s+${controllerName}\\s*=\\s*async\\s*\\(\\s*req:\\s*(?:TypedAuthRequest|TypedRequest)(?:<([^>]+)>)?\\s*,\\s*res:\\s*TypedResponse<([^>]+)>`,
+    `export\\s+const\\s+${controllerName}\\s*=\\s*async\\s*\\([\\s\\S]*?req:\\s*(?:TypedAuthRequest|TypedRequest)(?:<([^>]+)>)?[\\s\\S]*?res:\\s*TypedResponse<([^>]+)>`,
     "m"
   );
 
