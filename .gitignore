@@ -79,3 +79,8 @@ site/
 # Screenshot output directories and config (API keys, uploaded to ImageChest, not tracked in git)
 screenshots/output/
 screenshots/config.json
+
+# Integration test secrets and data
+server/integration/fixtures/testEntities.ts
+server/integration/*.db
+server/integration/.env.integration
