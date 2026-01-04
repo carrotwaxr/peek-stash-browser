@@ -43,11 +43,11 @@ export interface FindScenesResponse {
 /**
  * GET /api/library/scenes/:id/similar - Find similar scenes
  */
-export interface FindSimilarScenesParams {
+export interface FindSimilarScenesParams extends Record<string, string> {
   id: string;
 }
 
-export interface FindSimilarScenesQuery {
+export interface FindSimilarScenesQuery extends Record<string, string | undefined> {
   page?: string;
 }
 
@@ -61,7 +61,7 @@ export interface FindSimilarScenesResponse {
 /**
  * GET /api/library/scenes/recommended - Get recommended scenes
  */
-export interface GetRecommendedScenesQuery {
+export interface GetRecommendedScenesQuery extends Record<string, string | undefined> {
   page?: string;
   per_page?: string;
 }
@@ -73,21 +73,21 @@ export interface GetRecommendedScenesResponse {
   perPage: number;
   message?: string;
   criteria?: {
-    favoritePerformers: number;
-    highlyRatedPerformers: number;
-    favoriteStudios: number;
-    highlyRatedStudios: number;
-    favoriteTags: number;
-    highlyRatedTags: number;
-    favoriteScenes: number;
-    highlyRatedScenes: number;
+    favoritedPerformers: number;
+    ratedPerformers: number;
+    favoritedStudios: number;
+    ratedStudios: number;
+    favoritedTags: number;
+    ratedTags: number;
+    favoritedScenes: number;
+    ratedScenes: number;
   };
 }
 
 /**
  * PUT /api/library/scenes/:id - Update scene
  */
-export interface UpdateSceneParams {
+export interface UpdateSceneParams extends Record<string, string> {
   id: string;
 }
 
