@@ -8,6 +8,10 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'server/routes/**'
+      - 'server/types/api/**'
+      - 'server/controllers/**'
+      - 'server/scripts/**'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -22,6 +26,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server dependencies
+        run: cd server && npm ci
+
+      - name: Generate API documentation
+        run: cd server && npm run generate-api-docs
 
       - name: Set up Python
         uses: actions/setup-python@v5
