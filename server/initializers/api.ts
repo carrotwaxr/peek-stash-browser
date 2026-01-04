@@ -147,15 +147,21 @@ export const setupAPI = () => {
   // Video routes (playback, sessions, HLS streaming)
   app.use("/api", videoRoutes);
 
-  // Start API server immediately so /api/setup/status is available
-  app.listen(8000, () => {
+  return app;
+};
+
+/**
+ * Start the API server on the specified port.
+ * Separated from setupAPI() to allow integration tests to start on a different port.
+ */
+export const startServer = (
+  app: ReturnType<typeof setupAPI>,
+  port: number = 8000
+) => {
+  return app.listen(port, () => {
     logger.info("Server is running", {
-      url: "http://localhost:8000",
+      url: `http://localhost:${port}`,
       transcodingSystem: "session-based",
     });
   });
-
-  logger.info("Server started - accepting connections during cache load");
-
-  return app;
 };
