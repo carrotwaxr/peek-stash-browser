@@ -19,7 +19,10 @@
     "depcheck": "depcheck",
     "knip": "knip",
     "analyze": "npm run depcheck && npm run knip",
-    "generate-api-docs": "npx tsx scripts/generate-api-docs.ts"
+    "generate-api-docs": "npx tsx scripts/generate-api-docs.ts",
+    "test:integration": "vitest run --config integration/vitest.integration.config.ts",
+    "test:integration:watch": "vitest --config integration/vitest.integration.config.ts",
+    "test:integration:fresh": "FRESH_DB=true npm run test:integration"
   },
   "prisma": {
     "seed": "node --loader ts-node/esm prisma/seed.ts"

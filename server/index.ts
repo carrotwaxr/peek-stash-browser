@@ -2,7 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { setupAPI } from "./initializers/api.js";
+import { setupAPI, startServer } from "./initializers/api.js";
 import { initializeCache } from "./initializers/cache.js";
 import { initializeDatabase } from "./initializers/database.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
@@ -43,7 +43,8 @@ const main = async () => {
   await stashInstanceManager.initialize();
 
   // Start API server (needed for setup wizard if no Stash configured)
-  setupAPI();
+  const app = setupAPI();
+  startServer(app);
 
   // Only initialize cache if we have Stash instances configured
   if (stashConfig.needsSetup) {

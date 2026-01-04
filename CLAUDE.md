@@ -86,6 +86,23 @@ Use `/publish-peek` command. Workflow:
 Required: `STASH_URL`, `STASH_API_KEY`, `DATABASE_URL`, `JWT_SECRET`
 Optional: `CONFIG_DIR`, `STASH_INTERNAL_PATH`, `STASH_MEDIA_PATH`
 
+## Integration Testing
+
+Integration tests run against a real Stash server to validate API functionality.
+
+**Setup (first time):**
+1. Ensure `.env` has `STASH_URL` and `STASH_API_KEY`
+2. Copy `server/integration/fixtures/testEntities.example.ts` to `testEntities.ts`
+3. Fill in entity IDs from your Stash library
+
+**Running tests:**
+- `cd server && npm run test:integration` - Run against persistent test DB
+- `cd server && npm run test:integration:fresh` - Reset DB and test setup flow
+- `cd server && npm run test:integration:watch` - Watch mode for development
+
+**Pre-release validation:**
+Run `/pre-release` to execute all checks before tagging a release.
+
 ## Issue Tracking
 
 - GitHub: https://github.com/carrotwaxr/peek-stash-browser/issues
