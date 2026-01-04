@@ -21,6 +21,10 @@
          <lastmod>2026-01-04</lastmod>
     </url>
     <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/development/api-reference/</loc>
+         <lastmod>2026-01-04</lastmod>
+    </url>
+    <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/development/regression-testing/</loc>
          <lastmod>2026-01-04</lastmod>
     </url>
@@ -206,6 +210,14 @@
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/plans/2026-01-03-api-types-implementation/</loc>
+         <lastmod>2026-01-04</lastmod>
+    </url>
+    <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/plans/2026-01-04-api-docs-generator-design/</loc>
+         <lastmod>2026-01-04</lastmod>
+    </url>
+    <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/plans/2026-01-04-api-docs-generator-implementation/</loc>
          <lastmod>2026-01-04</lastmod>
     </url>
     <url>
