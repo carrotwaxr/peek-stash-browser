@@ -88,8 +88,21 @@ router.get(
 );
 
 // First-time password setup (for setup wizard)
+// SECURITY: Only works during initial setup (before setup is complete)
 router.post("/first-time-password", async (req, res) => {
   try {
+    // SECURITY CHECK: Only allow during initial setup
+    const userCount = await prisma.user.count();
+    const stashCount = await prisma.stashInstance.count();
+    const setupComplete = userCount > 0 && stashCount > 0;
+
+    if (setupComplete) {
+      return res.status(403).json({
+        error:
+          "Setup is complete. Use account settings to change your password.",
+      });
+    }
+
     const { username, newPassword } = req.body;
 
     if (!username || !newPassword) {
