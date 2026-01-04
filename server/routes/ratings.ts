@@ -9,6 +9,7 @@ import {
   updateTagRating,
 } from "../controllers/ratings.js";
 import { authenticate } from "../middleware/auth.js";
+import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
@@ -16,12 +17,12 @@ const router = express.Router();
 router.use(authenticate);
 
 // Update ratings and favorites
-router.put("/scene/:sceneId", updateSceneRating);
-router.put("/performer/:performerId", updatePerformerRating);
-router.put("/studio/:studioId", updateStudioRating);
-router.put("/tag/:tagId", updateTagRating);
-router.put("/gallery/:galleryId", updateGalleryRating);
-router.put("/group/:groupId", updateGroupRating);
-router.put("/image/:imageId", updateImageRating);
+router.put("/scene/:sceneId", authenticated(updateSceneRating));
+router.put("/performer/:performerId", authenticated(updatePerformerRating));
+router.put("/studio/:studioId", authenticated(updateStudioRating));
+router.put("/tag/:tagId", authenticated(updateTagRating));
+router.put("/gallery/:galleryId", authenticated(updateGalleryRating));
+router.put("/group/:groupId", authenticated(updateGroupRating));
+router.put("/image/:imageId", authenticated(updateImageRating));
 
 export default router;

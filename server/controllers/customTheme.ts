@@ -1,36 +1,22 @@
-import { Response } from "express";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
-
-/**
- * Theme config validation schema
- */
-interface ThemeConfig {
-  mode: "dark" | "light";
-  fonts: {
-    brand: string;
-    heading: string;
-    body: string;
-    mono: string;
-  };
-  colors: {
-    background: string;
-    backgroundSecondary: string;
-    backgroundCard: string;
-    text: string;
-    border: string;
-  };
-  accents: {
-    primary: string;
-    secondary: string;
-  };
-  status: {
-    success: string;
-    error: string;
-    info: string;
-    warning: string;
-  };
-}
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  ApiErrorResponse,
+  ThemeConfig,
+  GetUserCustomThemesResponse,
+  GetCustomThemeParams,
+  GetCustomThemeResponse,
+  CreateCustomThemeRequest,
+  CreateCustomThemeResponse,
+  UpdateCustomThemeParams,
+  UpdateCustomThemeRequest,
+  UpdateCustomThemeResponse,
+  DeleteCustomThemeParams,
+  DeleteCustomThemeResponse,
+  DuplicateCustomThemeParams,
+  DuplicateCustomThemeResponse,
+} from "../types/api/index.js";
 
 /**
  * Validate hex color format
@@ -97,8 +83,8 @@ const validateThemeConfig = (config: ThemeConfig): config is ThemeConfig => {
  * Get all custom themes for current user
  */
 export const getUserCustomThemes = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetUserCustomThemesResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -130,8 +116,8 @@ export const getUserCustomThemes = async (
  * Get single custom theme
  */
 export const getCustomTheme = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, GetCustomThemeParams>,
+  res: TypedResponse<GetCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -167,8 +153,8 @@ export const getCustomTheme = async (
  * Create new custom theme
  */
 export const createCustomTheme = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<CreateCustomThemeRequest>,
+  res: TypedResponse<CreateCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -228,8 +214,8 @@ export const createCustomTheme = async (
  * Update custom theme
  */
 export const updateCustomTheme = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdateCustomThemeRequest, UpdateCustomThemeParams>,
+  res: TypedResponse<UpdateCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -311,8 +297,8 @@ export const updateCustomTheme = async (
  * Delete custom theme
  */
 export const deleteCustomTheme = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, DeleteCustomThemeParams>,
+  res: TypedResponse<DeleteCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -354,8 +340,8 @@ export const deleteCustomTheme = async (
  * Duplicate custom theme
  */
 export const duplicateCustomTheme = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, DuplicateCustomThemeParams>,
+  res: TypedResponse<DuplicateCustomThemeResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;

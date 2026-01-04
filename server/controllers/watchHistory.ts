@@ -1,7 +1,23 @@
 import { WatchHistory } from "@prisma/client";
-import { Response } from "express";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  ApiErrorResponse,
+  PingWatchHistoryRequest,
+  PingWatchHistoryResponse,
+  SaveActivityRequest,
+  SaveActivityResponse,
+  IncrementPlayCountRequest,
+  IncrementPlayCountResponse,
+  IncrementOCounterRequest,
+  IncrementOCounterResponse,
+  GetAllWatchHistoryQuery,
+  GetAllWatchHistoryResponse,
+  GetWatchHistoryParams,
+  GetWatchHistoryResponse,
+  ClearAllWatchHistoryResponse,
+} from "../types/api/index.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { userStatsService } from "../services/UserStatsService.js";
 import { logger } from "../utils/logger.js";
@@ -19,8 +35,8 @@ function getSessionKey(userId: number, sceneId: string): string {
  * Tracks playback progress matching Stash's pattern with per-user tracking
  */
 export async function pingWatchHistory(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<PingWatchHistoryRequest>,
+  res: TypedResponse<PingWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
     const { sceneId, currentTime, quality, sessionStart, seekEvents } =
@@ -295,8 +311,8 @@ export async function pingWatchHistory(
  * Increment O counter for a scene
  */
 export async function incrementOCounter(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<IncrementOCounterRequest>,
+  res: TypedResponse<IncrementOCounterResponse | ApiErrorResponse>
 ) {
   try {
     const { sceneId } = req.body;
@@ -421,8 +437,8 @@ export async function incrementOCounter(
  * Get watch history for a specific scene
  */
 export async function getWatchHistory(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, GetWatchHistoryParams>,
+  res: TypedResponse<GetWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
     const { sceneId } = req.params;
@@ -484,8 +500,8 @@ export async function getWatchHistory(
  * Get all watch history for current user (for Continue Watching carousel)
  */
 export async function getAllWatchHistory(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, Record<string, string>, GetAllWatchHistoryQuery>,
+  res: TypedResponse<GetAllWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -533,8 +549,8 @@ export async function getAllWatchHistory(
  * This includes O counters, play counts, and all viewing statistics
  */
 export async function clearAllWatchHistory(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<ClearAllWatchHistoryResponse | ApiErrorResponse>
 ) {
   try {
     const userId = req.user?.id;
@@ -586,7 +602,10 @@ export async function clearAllWatchHistory(
  * Save activity (resume time and play duration delta)
  * Simplified endpoint matching Stash's pattern - called by track-activity plugin
  */
-export async function saveActivity(req: AuthenticatedRequest, res: Response) {
+export async function saveActivity(
+  req: TypedAuthRequest<SaveActivityRequest>,
+  res: TypedResponse<SaveActivityResponse | ApiErrorResponse>
+) {
   try {
     const { sceneId, resumeTime, playDuration } = req.body;
     const userId = req.user?.id;
@@ -683,8 +702,8 @@ export async function saveActivity(req: AuthenticatedRequest, res: Response) {
  * Called by track-activity plugin when minimum play percentage is reached
  */
 export async function incrementPlayCount(
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<IncrementPlayCountRequest>,
+  res: TypedResponse<IncrementPlayCountResponse | ApiErrorResponse>
 ) {
   try {
     const { sceneId } = req.body;

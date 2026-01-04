@@ -1,10 +1,31 @@
-import { Response } from "express";
 import { Scene } from "stashapp-api";
-import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import type { NormalizedScene } from "../types/index.js";
+import type {
+  TypedAuthRequest,
+  TypedResponse,
+  ApiErrorResponse,
+  GetUserPlaylistsResponse,
+  GetPlaylistParams,
+  GetPlaylistResponse,
+  CreatePlaylistRequest,
+  CreatePlaylistResponse,
+  UpdatePlaylistParams,
+  UpdatePlaylistRequest,
+  UpdatePlaylistResponse,
+  DeletePlaylistParams,
+  DeletePlaylistResponse,
+  AddSceneToPlaylistParams,
+  AddSceneToPlaylistRequest,
+  AddSceneToPlaylistResponse,
+  RemoveSceneFromPlaylistParams,
+  RemoveSceneFromPlaylistResponse,
+  ReorderPlaylistParams,
+  ReorderPlaylistRequest,
+  ReorderPlaylistResponse,
+} from "../types/api/index.js";
 import { transformScene } from "../utils/stashUrlProxy.js";
 
 /**
@@ -30,8 +51,8 @@ const DEFAULT_SCENE_USER_FIELDS = {
  * Includes first 4 items with scene preview data for thumbnail display
  */
 export const getUserPlaylists = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest,
+  res: TypedResponse<GetUserPlaylistsResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -121,7 +142,10 @@ export const getUserPlaylists = async (
 /**
  * Get single playlist with items and scene details from cache
  */
-export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
+export const getPlaylist = async (
+  req: TypedAuthRequest<unknown, GetPlaylistParams>,
+  res: TypedResponse<GetPlaylistResponse | ApiErrorResponse>
+) => {
   try {
     const userId = req.user?.id;
     const playlistId = parseInt(req.params.id);
@@ -222,8 +246,8 @@ export const getPlaylist = async (req: AuthenticatedRequest, res: Response) => {
  * Create new playlist
  */
 export const createPlaylist = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<CreatePlaylistRequest>,
+  res: TypedResponse<CreatePlaylistResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -263,8 +287,8 @@ export const createPlaylist = async (
  * Update playlist
  */
 export const updatePlaylist = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<UpdatePlaylistRequest, UpdatePlaylistParams>,
+  res: TypedResponse<UpdatePlaylistResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -321,8 +345,8 @@ export const updatePlaylist = async (
  * Delete playlist
  */
 export const deletePlaylist = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, DeletePlaylistParams>,
+  res: TypedResponse<DeletePlaylistResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -364,8 +388,8 @@ export const deletePlaylist = async (
  * Add scene to playlist
  */
 export const addSceneToPlaylist = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<AddSceneToPlaylistRequest, AddSceneToPlaylistParams>,
+  res: TypedResponse<AddSceneToPlaylistResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -442,8 +466,8 @@ export const addSceneToPlaylist = async (
  * Remove scene from playlist
  */
 export const removeSceneFromPlaylist = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<unknown, RemoveSceneFromPlaylistParams>,
+  res: TypedResponse<RemoveSceneFromPlaylistResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
@@ -491,8 +515,8 @@ export const removeSceneFromPlaylist = async (
  * Reorder playlist items
  */
 export const reorderPlaylist = async (
-  req: AuthenticatedRequest,
-  res: Response
+  req: TypedAuthRequest<ReorderPlaylistRequest, ReorderPlaylistParams>,
+  res: TypedResponse<ReorderPlaylistResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
