@@ -1,5 +1,4 @@
-import { NextFunction, RequestHandler, Response } from "express";
-import { AuthenticatedRequest } from "../middleware/auth.js";
+import { NextFunction, RequestHandler } from "express";
 
 /**
  * Wraps an authenticated route handler to satisfy Express's type requirements.

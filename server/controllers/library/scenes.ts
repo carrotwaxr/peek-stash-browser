@@ -1,5 +1,3 @@
-import type { Response } from "express";
-import { AuthenticatedRequest } from "../../middleware/auth.js";
 import type {
   TypedAuthRequest,
   TypedResponse,
