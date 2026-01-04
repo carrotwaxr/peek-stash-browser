@@ -24,7 +24,7 @@ describe("Authentication API Integration Tests", () => {
       expect(response.data.success).toBe(true);
       expect(response.data.user).toBeDefined();
       expect(response.data.user.username).toBe(TEST_ADMIN.username);
-      expect(response.data.user.role).toBe("admin");
+      expect(response.data.user.role).toBe("ADMIN");
     });
 
     it("should reject invalid password", async () => {
@@ -108,7 +108,7 @@ describe("Authentication API Integration Tests", () => {
       expect(response.status).toBe(200);
       expect(response.data.user).toBeDefined();
       expect(response.data.user.username).toBe(TEST_ADMIN.username);
-      expect(response.data.user.role).toBe("admin");
+      expect(response.data.user.role).toBe("ADMIN");
     });
 
     it("should reject unauthenticated requests", async () => {
@@ -180,32 +180,32 @@ describe("Authentication API Integration Tests", () => {
   });
 
   describe("Protected routes require authentication", () => {
-    it("should reject unauthenticated access to scenes", async () => {
+    it("should reject unauthenticated access to library scenes", async () => {
       const client = new TestClient();
-      const response = await client.get("/api/scenes");
+      const response = await client.post("/api/library/scenes", {});
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(401);
     });
 
-    it("should reject unauthenticated access to performers", async () => {
+    it("should reject unauthenticated access to library performers", async () => {
       const client = new TestClient();
-      const response = await client.get("/api/performers");
+      const response = await client.post("/api/library/performers", {});
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(401);
     });
 
-    it("should reject unauthenticated access to studios", async () => {
+    it("should reject unauthenticated access to library studios", async () => {
       const client = new TestClient();
-      const response = await client.get("/api/studios");
+      const response = await client.post("/api/library/studios", {});
 
       expect(response.ok).toBe(false);
       expect(response.status).toBe(401);
     });
 
-    it("should allow authenticated access to scenes", async () => {
-      const response = await adminClient.get("/api/scenes");
+    it("should allow authenticated access to library scenes", async () => {
+      const response = await adminClient.post("/api/library/scenes", {});
 
       expect(response.ok).toBe(true);
       expect(response.status).toBe(200);
