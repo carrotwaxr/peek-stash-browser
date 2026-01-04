@@ -111,23 +111,51 @@ export function resolveTypeDefinition(
     const filePath = path.join(apiTypesDir, file);
     const content = fs.readFileSync(filePath, "utf-8");
 
-    // Match: export interface TypeName { ... }
-    const interfaceRegex = new RegExp(
-      `export\\s+interface\\s+${typeName}\\s*(?:extends[^{]+)?{([^}]+(?:{[^}]*}[^}]*)*)}`,
+    // Find: export interface TypeName
+    const interfaceStart = new RegExp(
+      `export\\s+interface\\s+${typeName}\\s*(?:extends[^{]+)?{`,
       "m"
     );
 
-    const match = content.match(interfaceRegex);
+    const match = interfaceStart.exec(content);
     if (match) {
-      return {
-        name: typeName,
-        definition: `interface ${typeName} {${match[1]}}`,
-        sourceFile: `types/api/${file}`,
-      };
+      const startIndex = match.index + match[0].length - 1; // Position of opening {
+      const body = extractBracedContent(content, startIndex);
+      if (body) {
+        return {
+          name: typeName,
+          definition: `interface ${typeName} ${body}`,
+          sourceFile: `types/api/${file}`,
+        };
+      }
     }
   }
 
   return null;
+}
+
+/**
+ * Extract content between matching braces using depth counting
+ */
+function extractBracedContent(content: string, startIndex: number): string | null {
+  if (content[startIndex] !== "{") return null;
+
+  let depth = 0;
+  let i = startIndex;
+
+  while (i < content.length) {
+    const char = content[i];
+    if (char === "{") depth++;
+    else if (char === "}") {
+      depth--;
+      if (depth === 0) {
+        return content.slice(startIndex, i + 1);
+      }
+    }
+    i++;
+  }
+
+  return null; // Unbalanced braces
 }
 
 /**
