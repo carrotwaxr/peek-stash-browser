@@ -107,8 +107,19 @@ class ExclusionComputationService {
         tx
       );
 
-      // Combine all exclusions
-      const allExclusions = [...directExclusions, ...cascadeExclusions, ...emptyExclusions];
+      // Combine all exclusions and deduplicate
+      // An entity can be excluded via multiple paths (e.g., cascade from performer + cascade from tag)
+      // but we only need one record per (userId, entityType, entityId)
+      const allExclusionsRaw = [...directExclusions, ...cascadeExclusions, ...emptyExclusions];
+      const seen = new Set<string>();
+      const allExclusions: ExclusionRecord[] = [];
+      for (const excl of allExclusionsRaw) {
+        const key = `${excl.entityType}:${excl.entityId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          allExclusions.push(excl);
+        }
+      }
 
       // Delete existing exclusions for this user
       await tx.userExcludedEntity.deleteMany({
