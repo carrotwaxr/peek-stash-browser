@@ -220,8 +220,8 @@ export function applyStudioFilters(
   let filtered = studios;
 
   // Filter by IDs (for detail pages)
-  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
-    const idSet = new Set(filters.ids);
+  if (filters.ids?.value && filters.ids.value.length > 0) {
+    const idSet = new Set(filters.ids.value);
     filtered = filtered.filter((s) => idSet.has(s.id));
   }
 

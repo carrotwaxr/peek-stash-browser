@@ -30,7 +30,7 @@ describe("Gallery Filters", () => {
   describe("ID Filter", () => {
     it("should filter galleries by single ID", async () => {
       const filter: PeekGalleryFilter = {
-        ids: [mockGalleries[0].id],
+        ids: { value: [mockGalleries[0].id], modifier: "INCLUDES" },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -42,7 +42,7 @@ describe("Gallery Filters", () => {
     it("should filter galleries by multiple IDs", async () => {
       const targetIds = [mockGalleries[0].id, mockGalleries[5].id, mockGalleries[10].id];
       const filter: PeekGalleryFilter = {
-        ids: targetIds,
+        ids: { value: targetIds, modifier: "INCLUDES" },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -55,7 +55,7 @@ describe("Gallery Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", async () => {
       const filter: PeekGalleryFilter = {
-        ids: ["nonexistent-id"],
+        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);
@@ -65,7 +65,7 @@ describe("Gallery Filters", () => {
 
     it("should return all galleries when ids is empty array", async () => {
       const filter: PeekGalleryFilter = {
-        ids: [],
+        ids: { value: [], modifier: "INCLUDES" },
       };
 
       const result = await applyGalleryFilters(mockGalleries, filter);

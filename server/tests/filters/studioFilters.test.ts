@@ -24,7 +24,7 @@ describe("Studio Filters", () => {
   describe("ID Filter", () => {
     it("should filter studios by single ID", () => {
       const filter: PeekStudioFilter = {
-        ids: [mockStudios[0].id],
+        ids: { value: [mockStudios[0].id], modifier: "INCLUDES" },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -36,7 +36,7 @@ describe("Studio Filters", () => {
     it("should filter studios by multiple IDs", () => {
       const targetIds = [mockStudios[0].id, mockStudios[5].id, mockStudios[10].id];
       const filter: PeekStudioFilter = {
-        ids: targetIds,
+        ids: { value: targetIds, modifier: "INCLUDES" },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -49,7 +49,7 @@ describe("Studio Filters", () => {
 
     it("should return empty array when filtering by non-existent ID", () => {
       const filter: PeekStudioFilter = {
-        ids: ["nonexistent-id"],
+        ids: { value: ["nonexistent-id"], modifier: "INCLUDES" },
       };
 
       const result = applyStudioFilters(mockStudios, filter);
@@ -59,7 +59,7 @@ describe("Studio Filters", () => {
 
     it("should return all studios when ids is empty array", () => {
       const filter: PeekStudioFilter = {
-        ids: [],
+        ids: { value: [], modifier: "INCLUDES" },
       };
 
       const result = applyStudioFilters(mockStudios, filter);

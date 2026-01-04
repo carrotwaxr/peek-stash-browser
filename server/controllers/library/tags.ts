@@ -299,8 +299,8 @@ export async function applyTagFilters(
   let filtered = tags;
 
   // Filter by IDs (for detail pages)
-  if (filters.ids && Array.isArray(filters.ids) && filters.ids.length > 0) {
-    const idSet = new Set(filters.ids);
+  if (filters.ids?.value && filters.ids.value.length > 0) {
+    const idSet = new Set(filters.ids.value);
     filtered = filtered.filter((t) => idSet.has(t.id));
   }
 

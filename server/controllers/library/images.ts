@@ -4,6 +4,7 @@ import type {
   FindImagesRequest,
   FindImagesResponse,
   GetImageParams,
+  GetImageResponse,
   ApiErrorResponse,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
@@ -14,7 +15,6 @@ import {
 } from "../../services/ImageQueryBuilder.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import type { NormalizedImage } from "../../types/index.js";
 
 /**
  * Merge images with user rating/favorite data and O counter
@@ -229,7 +229,7 @@ export const findImages = async (
  */
 export const findImageById = async (
   req: TypedAuthRequest<unknown, GetImageParams>,
-  res: TypedResponse<(NormalizedImage & { stashUrl: string }) | ApiErrorResponse>
+  res: TypedResponse<GetImageResponse | ApiErrorResponse>
 ) => {
   try {
     const userId = req.user?.id;
