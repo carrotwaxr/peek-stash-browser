@@ -77,6 +77,10 @@ export async function setup() {
   // Wait for server to be ready
   await waitForServer();
 
+  // Ensure admin user exists and is logged in
+  const { ensureTestSetup } = await import("./testSetup.js");
+  await ensureTestSetup();
+
   console.log("[Integration Tests] Global setup complete");
 
   // Return teardown function for Vitest
