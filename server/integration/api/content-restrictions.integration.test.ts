@@ -228,6 +228,44 @@ describe("Content Restrictions Integration Tests", () => {
         expect(response.data.success).toBe(true);
       });
 
+      it("should cascade exclusions when hiding performer with scenes", async () => {
+        // First, clean up any existing hidden entities for this user
+        await testUserClient.delete("/api/user/hidden-entities/all");
+
+        // Hide a performer that has scenes - this should cascade to exclude those scenes
+        const hideResponse = await testUserClient.post<{
+          success: boolean;
+          message: string;
+        }>("/api/user/hidden-entities", {
+          entityType: "performer",
+          entityId: TEST_ENTITIES.performerWithScenes,
+        });
+
+        // If this fails with a 500 error, it means the cascade exclusion code is broken
+        // (e.g., using skipDuplicates which SQLite doesn't support)
+        expect(hideResponse.ok).toBe(true);
+        expect(hideResponse.status).toBe(200);
+        expect(hideResponse.data.success).toBe(true);
+
+        // Verify the exclusion was created by checking the hidden entities list
+        const hiddenResponse = await testUserClient.get<{
+          hiddenEntities: Array<{ entityType: string; entityId: string }>;
+        }>("/api/user/hidden-entities");
+
+        expect(hiddenResponse.ok).toBe(true);
+        const hiddenPerformer = hiddenResponse.data.hiddenEntities.find(
+          (e) =>
+            e.entityType === "performer" &&
+            e.entityId === TEST_ENTITIES.performerWithScenes
+        );
+        expect(hiddenPerformer).toBeDefined();
+
+        // Clean up
+        await testUserClient.delete(
+          `/api/user/hidden-entities/performer/${TEST_ENTITIES.performerWithScenes}`
+        );
+      });
+
       it("should require entity type and ID", async () => {
         const response = await testUserClient.post<{ error: string }>(
           "/api/user/hidden-entities",
