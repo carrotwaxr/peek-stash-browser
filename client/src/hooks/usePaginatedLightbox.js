@@ -29,6 +29,7 @@ export function usePaginatedLightbox({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxAutoPlay, setLightboxAutoPlay] = useState(false);
+  const [isPageTransitioning, setIsPageTransitioning] = useState(false);
 
   // Track pending page load for lightbox cross-page navigation
   const pendingLightboxNav = useRef(null);
@@ -64,6 +65,7 @@ export function usePaginatedLightbox({
         // User navigated past last image on current page - load next page
         const targetIndex = 0; // First image of next page
         setLightboxIndex(targetIndex); // Update immediately to prevent counter flicker
+        setIsPageTransitioning(true); // Show loading state until new data arrives
         pendingLightboxNav.current = targetIndex; // Also store for data callback
         handlePageChange(currentPage + 1);
         return true;
@@ -71,6 +73,7 @@ export function usePaginatedLightbox({
         // User navigated before first image on current page - load previous page
         const targetIndex = perPage - 1; // Last image of previous page
         setLightboxIndex(targetIndex); // Update immediately to prevent counter flicker
+        setIsPageTransitioning(true); // Show loading state until new data arrives
         pendingLightboxNav.current = targetIndex; // Also store for data callback
         handlePageChange(currentPage - 1);
         return true;
@@ -105,6 +108,7 @@ export function usePaginatedLightbox({
       const targetIndex = pendingLightboxNav.current;
       pendingLightboxNav.current = null;
       setLightboxIndex(targetIndex);
+      setIsPageTransitioning(false); // New data has arrived, stop showing loading state
       return targetIndex;
     }
     return null;
@@ -121,6 +125,7 @@ export function usePaginatedLightbox({
     lightboxOpen,
     lightboxIndex,
     lightboxAutoPlay,
+    isPageTransitioning,
 
     // Lightbox handlers
     openLightbox,

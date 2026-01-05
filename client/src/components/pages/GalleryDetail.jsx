@@ -414,6 +414,7 @@ const GalleryDetail = () => {
         totalCount={totalCount}
         pageOffset={lightbox.pageOffset}
         onIndexChange={lightbox.onIndexChange}
+        isPageTransitioning={lightbox.isPageTransitioning}
       />
     </div>
   );
