@@ -117,7 +117,20 @@ export async function setup() {
   // Return teardown function for Vitest
   return async () => {
     console.log("[Integration Tests] Starting global teardown...");
+
+    // Stop the sync scheduler first to prevent new sync operations
+    console.log("[Integration Tests] Stopping sync scheduler...");
+    const { syncScheduler } = await import("../../services/SyncScheduler.js");
+    syncScheduler.stop();
+
+    // Close the HTTP server
     await stopServer();
+
+    // Disconnect Prisma to close database connections
+    console.log("[Integration Tests] Disconnecting Prisma...");
+    const { default: prisma } = await import("../../prisma/singleton.js");
+    await prisma.$disconnect();
+
     console.log("[Integration Tests] Global teardown complete");
   };
 }

@@ -991,13 +991,24 @@ class ExclusionComputationService {
       }
     }
 
-    // Insert cascade exclusions if any, using skipDuplicates to handle
-    // cases where the scene/entity is already excluded
+    // Insert cascade exclusions if any
+    // SQLite doesn't support skipDuplicates, so we use individual upserts
     if (cascadeExclusions.length > 0) {
-      await (tx.userExcludedEntity.createMany as any)({
-        data: cascadeExclusions,
-        skipDuplicates: true,
-      });
+      await Promise.all(
+        cascadeExclusions.map((exclusion) =>
+          tx.userExcludedEntity.upsert({
+            where: {
+              userId_entityType_entityId: {
+                userId: exclusion.userId,
+                entityType: exclusion.entityType,
+                entityId: exclusion.entityId,
+              },
+            },
+            create: exclusion,
+            update: {}, // No update needed - just ensure it exists
+          })
+        )
+      );
     }
   }
 

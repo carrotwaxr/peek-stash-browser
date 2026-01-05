@@ -278,7 +278,8 @@ describe("Combined Filters", () => {
     });
 
     it("handles empty result set gracefully", async () => {
-      // Create an impossible filter combination
+      // Create an impossible filter combination using rating
+      // (no scene has rating > 999)
       const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
         filter: { per_page: 50 },
         scene_filter: {
@@ -286,17 +287,17 @@ describe("Combined Filters", () => {
             value: [TEST_ENTITIES.performerWithScenes],
             modifier: "INCLUDES",
           },
-          performers: {
-            value: [TEST_ENTITIES.performerWithScenes],
-            modifier: "EXCLUDES",
+          rating100: {
+            value: 999,
+            modifier: "GREATER_THAN",
           },
         },
       });
 
-      // This should still return OK, just with 0 results
-      // (though the duplicate key might just use the last value)
+      // This should return OK with 0 results
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
+      expect(response.data.findScenes.count).toBe(0);
     });
   });
 
