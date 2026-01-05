@@ -113,6 +113,8 @@ nav:
       - Quick Start: getting-started/quick-start.md
       - Upgrading: getting-started/upgrading.md
   - User Guide:
+      - Images: user-guide/images.md
+      - Recommendations: user-guide/recommendations.md
       - Custom Carousels: user-guide/custom-carousels.md
       - Watch History: user-guide/watch-history.md
       - Keyboard Navigation: user-guide/keyboard-navigation.md
@@ -126,6 +128,8 @@ nav:
   - Reference:
       - Troubleshooting: reference/troubleshooting.md
       - FAQ: reference/faq.md
+  - Releases:
+      - v3.1.0: releases/v3.1.0.md
 
 # Social links
 extra:
