@@ -42,7 +42,9 @@ const Images = () => {
   const totalCount = data?.count || 0;
 
   const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
+  const urlPage = parseInt(searchParams.get("page")) || 1;
   const totalPages = Math.ceil(totalCount / urlPerPage);
+  const pageOffset = (urlPage - 1) * urlPerPage;
 
   // Handle image click - open lightbox
   const handleImageClick = (image) => {
@@ -85,6 +87,7 @@ const Images = () => {
   const {
     isTVMode,
     _tvNavigation,
+    paginationHandlerRef,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -93,6 +96,25 @@ const Images = () => {
     totalPages,
     onItemSelect: handleImageClick,
   });
+
+  // Handle lightbox crossing page boundary
+  const handlePageBoundary = useCallback(
+    (direction) => {
+      if (!paginationHandlerRef.current) return false;
+
+      if (direction === "next" && urlPage < totalPages) {
+        setLightboxIndex(0); // First image of next page
+        paginationHandlerRef.current(urlPage + 1);
+        return true;
+      } else if (direction === "prev" && urlPage > 1) {
+        setLightboxIndex(urlPerPage - 1); // Last image of previous page
+        paginationHandlerRef.current(urlPage - 1);
+        return true;
+      }
+      return false;
+    },
+    [urlPage, totalPages, urlPerPage, paginationHandlerRef]
+  );
 
   useInitialFocus(
     pageRef,
@@ -189,6 +211,10 @@ const Images = () => {
                 }),
               }));
             }}
+            // Cross-page navigation support
+            onPageBoundary={totalPages > 1 ? handlePageBoundary : undefined}
+            totalCount={totalCount}
+            pageOffset={pageOffset}
           />
         )}
       </div>

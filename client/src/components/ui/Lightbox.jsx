@@ -4,6 +4,7 @@ import { useSwipeable } from "react-swipeable";
 import { useFullscreen } from "../../hooks/useFullscreen.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
+import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import MetadataDrawer from "./MetadataDrawer.jsx";
 
 const Lightbox = ({
@@ -383,7 +384,7 @@ const Lightbox = ({
 
   const currentImage = images[currentIndex];
   const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
-  const imageTitle = currentImage?.title || `Image ${currentIndex + 1}`;
+  const imageTitle = getImageTitle(currentImage);
 
   // Handle backdrop click - close drawer if open, otherwise close lightbox
   const handleBackdropClick = () => {

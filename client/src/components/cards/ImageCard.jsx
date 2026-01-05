@@ -1,5 +1,5 @@
 import { forwardRef } from "react";
-import { getEffectiveImageMetadata } from "../../utils/imageGalleryInheritance.js";
+import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 
@@ -14,19 +14,6 @@ const formatResolution = (width, height) => {
   if (height >= 720) return "720p";
   if (height >= 480) return "480p";
   return `${width}x${height}`;
-};
-
-/**
- * Get image title with fallback to filename
- */
-const getImageTitle = (image) => {
-  if (image.title) return image.title;
-  if (image.filePath) {
-    // Extract filename from path
-    const parts = image.filePath.split(/[\\/]/);
-    return parts[parts.length - 1];
-  }
-  return `Image ${image.id}`;
 };
 
 /**

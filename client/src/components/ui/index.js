@@ -43,6 +43,7 @@ export { default as OCounterButton } from "./OCounterButton.jsx";
 export { default as PageHeader } from "./PageHeader.jsx";
 export { default as PageLayout } from "./PageLayout.jsx";
 export { default as Pagination } from "./Pagination.jsx";
+export { default as PaginatedImageGrid } from "./PaginatedImageGrid.jsx";
 export { default as Paper } from "./Paper.jsx";
 export { PerformerCard } from "../cards/index.js";
 export { default as PlayCountIndicator } from "./PlayCountIndicator.jsx";
