@@ -868,6 +868,7 @@ model ImagePerformer {
 
   @@id([imageId, performerId])
   @@index([performerId])
+  @@index([imageId])
 }
 
 model ImageTag {
@@ -878,6 +879,7 @@ model ImageTag {
 
   @@id([imageId, tagId])
   @@index([tagId])
+  @@index([imageId])
 }
 
 model ImageGallery {
