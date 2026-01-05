@@ -219,10 +219,17 @@ describe("Scene API", () => {
         console.log(`Auto-discovered inherited tag ID: ${inheritedTagId}`);
       }
 
-      // Filter scenes by the inherited tag - should find our test scene
+      // Filter scenes by the inherited tag AND the specific scene ID
+      // This tests that the scene is correctly filterable by its inherited tag
+      // We use scene_filter.ids instead of per_page pagination to avoid issues
+      // where the test scene might not appear in the first N results
       const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 100 },
+        filter: { per_page: 10 },
         scene_filter: {
+          ids: {
+            value: [sceneId],
+            modifier: "INCLUDES",
+          },
           tags: {
             value: [inheritedTagId],
             modifier: "INCLUDES",
@@ -233,12 +240,11 @@ describe("Scene API", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
 
-      // The key assertion: should find the scene even though tag is inherited
+      // The key assertion: should find the scene when filtering by inherited tag
       // This test FAILS if scene tag inheritance didn't run during sync
-      expect(response.data.findScenes.count).toBeGreaterThan(0);
-
-      const foundSceneIds = response.data.findScenes.scenes.map((s) => s.id);
-      expect(foundSceneIds).toContain(sceneId);
+      // or if the tag filter doesn't check inheritedTagIds
+      expect(response.data.findScenes.count).toBe(1);
+      expect(response.data.findScenes.scenes[0].id).toBe(sceneId);
     });
 
     it("verifies scene has both direct tags and inherited tags", async () => {
@@ -271,25 +277,29 @@ describe("Scene API", () => {
       const directTagId = scene.tags![0].id;
       const inheritedTagId = scene.inheritedTagIds![0];
 
-      // Filter by direct tag
+      // Filter by direct tag AND scene ID - should find the scene
       const directResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
+        filter: { per_page: 10 },
         scene_filter: {
+          ids: { value: [sceneId], modifier: "INCLUDES" },
           tags: { value: [directTagId], modifier: "INCLUDES" },
         },
       });
       expect(directResponse.ok).toBe(true);
-      expect(directResponse.data.findScenes.scenes.map((s) => s.id)).toContain(sceneId);
+      expect(directResponse.data.findScenes.count).toBe(1);
+      expect(directResponse.data.findScenes.scenes[0].id).toBe(sceneId);
 
-      // Filter by inherited tag
+      // Filter by inherited tag AND scene ID - should also find the scene
       const inheritedResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-        filter: { per_page: 50 },
+        filter: { per_page: 10 },
         scene_filter: {
+          ids: { value: [sceneId], modifier: "INCLUDES" },
           tags: { value: [inheritedTagId], modifier: "INCLUDES" },
         },
       });
       expect(inheritedResponse.ok).toBe(true);
-      expect(inheritedResponse.data.findScenes.scenes.map((s) => s.id)).toContain(sceneId);
+      expect(inheritedResponse.data.findScenes.count).toBe(1);
+      expect(inheritedResponse.data.findScenes.scenes[0].id).toBe(sceneId);
     });
 
     it("verifies ALL inherited tags are filterable", async () => {
@@ -315,17 +325,19 @@ describe("Scene API", () => {
 
       // Test filtering by EACH inherited tag - all should find this scene
       // This catches bugs where only some tags are being inherited
+      // We filter by scene ID + tag to ensure the specific scene matches each tag
       for (const inheritedTagId of scene.inheritedTagIds) {
         const filterResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
-          filter: { per_page: 50 },
+          filter: { per_page: 10 },
           scene_filter: {
+            ids: { value: [sceneId], modifier: "INCLUDES" },
             tags: { value: [inheritedTagId], modifier: "INCLUDES" },
           },
         });
 
         expect(filterResponse.ok).toBe(true);
-        const foundSceneIds = filterResponse.data.findScenes.scenes.map((s) => s.id);
-        expect(foundSceneIds).toContain(sceneId);
+        expect(filterResponse.data.findScenes.count).toBe(1);
+        expect(filterResponse.data.findScenes.scenes[0].id).toBe(sceneId);
       }
     });
 

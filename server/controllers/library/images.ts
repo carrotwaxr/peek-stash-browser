@@ -133,8 +133,14 @@ export const findImages = async (
       filters.q = searchQuery;
     }
 
+    // Support both top-level ids and image_filter.ids (like scenes controller)
     if (ids && Array.isArray(ids) && ids.length > 0) {
       filters.ids = { value: ids, modifier: "INCLUDES" };
+    } else if (image_filter?.ids?.value) {
+      filters.ids = {
+        value: image_filter.ids.value.map(String),
+        modifier: image_filter.ids.modifier || "INCLUDES",
+      };
     }
 
     if (image_filter?.favorite !== undefined) {
