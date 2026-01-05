@@ -370,6 +370,33 @@ class StashSyncService extends EventEmitter {
         logger.info(`Cleanup complete: ${totalDeleted} entities marked as deleted`);
       }
 
+      // Apply gallery inheritance if images or galleries were synced
+      // (galleries may have new performers/tags that need to propagate to images)
+      const imageResult = results.find((r) => r.entityType === "image");
+      const galleryResult = results.find((r) => r.entityType === "gallery");
+      if ((imageResult && imageResult.synced > 0) || (galleryResult && galleryResult.synced > 0)) {
+        logger.info("Applying gallery inheritance after smart incremental sync...");
+        await imageGalleryInheritanceService.applyGalleryInheritance();
+        logger.info("Gallery inheritance complete");
+      }
+
+      // Compute inherited tags for scenes if scenes were updated
+      const sceneResult = results.find((r) => r.entityType === "scene");
+      if (sceneResult && sceneResult.synced > 0) {
+        logger.info("Computing inherited tags for scenes after smart incremental sync...");
+        await sceneTagInheritanceService.computeInheritedTags();
+        logger.info("Scene tag inheritance complete");
+      }
+
+      // Rebuild inherited image counts (must happen after gallery inheritance)
+      logger.info("Rebuilding inherited image counts...");
+      await entityImageCountService.rebuildAllImageCounts();
+      logger.info("Inherited image counts rebuild complete");
+
+      logger.info("Rebuilding user stats after sync...");
+      await userStatsService.rebuildAllStats();
+      logger.info("User stats rebuild complete");
+
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
       await exclusionComputationService.recomputeAllUsers();
@@ -612,9 +639,11 @@ class StashSyncService extends EventEmitter {
         logger.info(`Cleanup complete: ${totalDeleted} entities marked as deleted`);
       }
 
-      // Apply gallery inheritance if images were synced
+      // Apply gallery inheritance if images or galleries were synced
+      // (galleries may have new performers/tags that need to propagate to images)
       const imageResult = results.find((r) => r.entityType === "image");
-      if (imageResult && imageResult.synced > 0) {
+      const galleryResult = results.find((r) => r.entityType === "gallery");
+      if ((imageResult && imageResult.synced > 0) || (galleryResult && galleryResult.synced > 0)) {
         logger.info("Applying gallery inheritance after incremental sync...");
         await imageGalleryInheritanceService.applyGalleryInheritance();
         logger.info("Gallery inheritance complete");

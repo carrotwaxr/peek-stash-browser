@@ -123,6 +123,7 @@ nav:
       - External Player: user-guide/external-player.md
   - Development:
       - Technical Overview: development/technical-overview.md
+      - Sync Architecture: development/sync-architecture.md
       - API Reference: development/api-reference.md
       - Regression Testing Guide: development/regression-testing.md
   - Reference:
