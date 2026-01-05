@@ -62,12 +62,16 @@ export function usePaginatedLightbox({
     (direction) => {
       if (direction === "next" && currentPage < totalPages) {
         // User navigated past last image on current page - load next page
-        pendingLightboxNav.current = 0; // First image of next page
+        const targetIndex = 0; // First image of next page
+        setLightboxIndex(targetIndex); // Update immediately to prevent counter flicker
+        pendingLightboxNav.current = targetIndex; // Also store for data callback
         handlePageChange(currentPage + 1);
         return true;
       } else if (direction === "prev" && currentPage > 1) {
         // User navigated before first image on current page - load previous page
-        pendingLightboxNav.current = perPage - 1; // Last image of previous page
+        const targetIndex = perPage - 1; // Last image of previous page
+        setLightboxIndex(targetIndex); // Update immediately to prevent counter flicker
+        pendingLightboxNav.current = targetIndex; // Also store for data callback
         handlePageChange(currentPage - 1);
         return true;
       }

@@ -161,8 +161,8 @@ const Images = () => {
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}
-          paginationHandlerRef={paginationHandlerRef}
           {...searchControlsProps}
+          paginationHandlerRef={paginationHandlerRef}
         >
           {isLoading ? (
             <div className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
