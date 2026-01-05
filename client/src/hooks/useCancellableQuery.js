@@ -7,9 +7,10 @@ import { useAuth } from "./useAuth.js";
  *
  * @param {Object} options
  * @param {boolean} options.initialLoading - Initial loading state (default: true)
+ * @param {Function} options.onDataChange - Callback called synchronously after data loads
  * @returns {Object} { data, isLoading, error, execute, setData, initMessage }
  */
-export function useCancellableQuery({ initialLoading = true } = {}) {
+export function useCancellableQuery({ initialLoading = true, onDataChange } = {}) {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(initialLoading);
   const [error, setError] = useState(null);
@@ -57,6 +58,7 @@ export function useCancellableQuery({ initialLoading = true } = {}) {
         // Only update state if not aborted
         if (!controller.signal.aborted) {
           setData(result);
+          onDataChange?.(result);
           setIsLoading(false);
         }
       } catch (err) {
@@ -81,7 +83,7 @@ export function useCancellableQuery({ initialLoading = true } = {}) {
         }
       }
     },
-    [isAuthLoading, isAuthenticated]
+    [isAuthLoading, isAuthenticated, onDataChange]
   );
 
   /**
