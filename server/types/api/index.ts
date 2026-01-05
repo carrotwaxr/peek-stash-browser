@@ -196,5 +196,6 @@ export type {
   CreateFirstStashInstanceRequest,
   CreateFirstStashInstanceResponse,
   GetStashInstanceResponse,
+  ResetSetupRequest,
   ResetSetupResponse,
 } from "./setup.js";
