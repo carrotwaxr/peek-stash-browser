@@ -12,6 +12,13 @@
  * - groupWithScenes: A group/collection containing scenes
  * - galleryWithImages: A gallery containing images
  * - restrictableTag: A tag that can be used for content restriction tests
+ * - galleryPerformerForInheritance: (Optional) A performer assigned to a gallery
+ *   where the gallery's images do NOT have this performer directly assigned.
+ *   Used to test gallery-to-image inheritance. Set to empty string to skip test.
+ * - imageWithGalleryInheritance: (Optional) Image that inherits from gallery.
+ *   Should be an image with no direct performers/tags that gets them from gallery.
+ * - imageWithOwnProperties: (Optional) Image with its OWN properties while in a gallery.
+ *   Used to verify inheritance doesn't overwrite existing image properties.
  */
 export const TEST_ENTITIES = {
   sceneWithRelations: "REPLACE_WITH_SCENE_ID",
@@ -21,6 +28,11 @@ export const TEST_ENTITIES = {
   groupWithScenes: "REPLACE_WITH_GROUP_ID",
   galleryWithImages: "REPLACE_WITH_GALLERY_ID",
   restrictableTag: "REPLACE_WITH_TAG_ID_FOR_RESTRICTIONS",
+  galleryPerformerForInheritance: "", // Optional - leave empty to skip inheritance test
+  imageWithGalleryInheritance: "", // Optional - image that inherits from gallery
+  imageWithOwnProperties: "", // Optional - image with own properties in gallery
+  sceneWithInheritedTags: "", // Optional - scene inheriting tags from performer/studio
+  inheritedTagFromPerformerOrStudio: "", // Optional - the tag ID inherited by the scene
 };
 
 /**

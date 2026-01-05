@@ -204,6 +204,47 @@ Smart incremental sync uses the more recent of `lastFullSyncTimestamp` or `lastI
 
 ---
 
+## Testing Strategy
+
+### How to catch sync parity bugs
+
+The bug fixed in v3.1.0-beta.13 was that `smartIncrementalSync` was missing gallery inheritance. To catch this type of bug:
+
+**1. Integration tests for end-to-end behavior:**
+
+Add a test entity `galleryWithPerformerNoDirectImagePerformer` - a gallery that has a performer, containing images that do NOT have that performer directly assigned. Then test:
+
+```typescript
+it("filters images by performer inherited from gallery", async () => {
+  const response = await adminClient.post("/api/library/images", {
+    filter: { per_page: 50 },
+    image_filter: {
+      performers: {
+        value: [TEST_ENTITIES.galleryPerformerNotOnImages],
+        modifier: "INCLUDES",
+      },
+    },
+  });
+
+  expect(response.ok).toBe(true);
+  expect(response.data.findImages.count).toBeGreaterThan(0);
+});
+```
+
+This test will fail if gallery inheritance doesn't run.
+
+**2. Behavioral parity checks:**
+
+When adding post-sync processing to one sync method, verify all three methods have equivalent processing. The three sync methods should have the same set of post-processing steps:
+
+- Gallery inheritance (conditional on images/galleries synced)
+- Scene tag inheritance (conditional on scenes synced)
+- Image count rebuild
+- User stats rebuild
+- Exclusion recomputation
+
+---
+
 ## Implementation Reference
 
 The sync logic is implemented in:
