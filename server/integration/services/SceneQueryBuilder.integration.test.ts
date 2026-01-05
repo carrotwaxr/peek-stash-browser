@@ -234,4 +234,34 @@ describeWithDb("SceneQueryBuilder Integration", () => {
       expect(Array.isArray(scene.tags)).toBe(true);
     }
   });
+
+  it("should not leak Stash user data for users without watch history", async () => {
+    // Use a high user ID that is unlikely to have any WatchHistory records
+    // This simulates a new Peek user viewing scenes for the first time
+    const newUserId = 999999;
+
+    const result = await sceneQueryBuilder.execute({
+      userId: newUserId,
+      applyExclusions: false, // Skip exclusions since this user has no exclusion records
+      sort: "created_at",
+      sortDirection: "DESC",
+      page: 1,
+      perPage: 10,
+    });
+
+    // For a user with no watch history, ALL user-specific fields should be defaults
+    // (not the Stash user's values which may be non-zero)
+    for (const scene of result.scenes) {
+      // These should be 0 for a user with no watch history, never Stash values
+      expect(scene.o_counter).toBe(0);
+      expect(scene.play_count).toBe(0);
+      expect(scene.play_duration).toBe(0);
+      expect(scene.resume_time).toBe(0);
+
+      // Rating/favorite should be null/false for a user with no ratings
+      expect(scene.rating).toBeNull();
+      expect(scene.rating100).toBeNull();
+      expect(scene.favorite).toBe(false);
+    }
+  });
 });

@@ -1458,13 +1458,15 @@ class SceneQueryBuilder {
       // Store studioId for later population
       studioId: row.studioId,
 
-      // User data - prefer Peek user data over Stash data
+      // User data - Peek user data ONLY, never fall back to Stash user data
+      // Stash data (stashOCounter, stashPlayCount, etc.) belongs to the Stash user,
+      // not the Peek user. Each Peek user starts at 0 for these fields.
       rating: row.userRating ?? null,
       rating100: row.userRating ?? null,
       favorite: Boolean(row.userFavorite),
-      o_counter: row.userOCount ?? row.stashOCounter ?? 0,
-      play_count: row.userPlayCount ?? row.stashPlayCount ?? 0,
-      play_duration: row.userPlayDuration ?? row.stashPlayDuration ?? 0,
+      o_counter: row.userOCount ?? 0,
+      play_count: row.userPlayCount ?? 0,
+      play_duration: row.userPlayDuration ?? 0,
       resume_time: row.userResumeTime ?? 0,
       play_history: playHistory,
       o_history: oHistory.map((ts: string) => new Date(ts)),
