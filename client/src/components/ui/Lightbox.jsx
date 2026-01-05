@@ -4,6 +4,7 @@ import { useSwipeable } from "react-swipeable";
 import { useFullscreen } from "../../hooks/useFullscreen.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
+import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import MetadataDrawer from "./MetadataDrawer.jsx";
 
 const Lightbox = ({
@@ -18,6 +19,7 @@ const Lightbox = ({
   totalCount, // Total images across all pages (for counter display)
   pageOffset = 0, // Offset of current page (e.g., page 2 with 100/page = 100)
   onIndexChange, // (index: number) => void - called when current index changes (for syncing with parent)
+  isPageTransitioning = false, // Whether we're loading a new page (show loading state, hide current image)
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -383,7 +385,7 @@ const Lightbox = ({
 
   const currentImage = images[currentIndex];
   const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
-  const imageTitle = currentImage?.title || `Image ${currentIndex + 1}`;
+  const imageTitle = getImageTitle(currentImage);
 
   // Handle backdrop click - close drawer if open, otherwise close lightbox
   const handleBackdropClick = () => {
@@ -512,21 +514,23 @@ const Lightbox = ({
         </div>
       </div>
 
-      {/* Image counter - bottom left */}
-      <div
-        className={`absolute bottom-4 left-4 z-50 px-4 py-2 rounded-lg text-lg font-medium transition-opacity duration-300 ${
-          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        style={{
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          color: "var(--text-primary)",
-        }}
-      >
-        {/* Show global position if totalCount provided, otherwise local position */}
-        {totalCount
-          ? `${pageOffset + currentIndex + 1} / ${totalCount}`
-          : `${currentIndex + 1} / ${images.length}`}
-      </div>
+      {/* Image counter - bottom left, hide during page transition to prevent showing stale count */}
+      {!isPageTransitioning && (
+        <div
+          className={`absolute bottom-4 left-4 z-50 px-4 py-2 rounded-lg text-lg font-medium transition-opacity duration-300 ${
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            color: "var(--text-primary)",
+          }}
+        >
+          {/* Show global position if totalCount provided, otherwise local position */}
+          {totalCount
+            ? `${pageOffset + currentIndex + 1} / ${totalCount}`
+            : `${currentIndex + 1} / ${images.length}`}
+        </div>
+      )}
 
       {/* Previous button - show if multiple images OR if cross-page navigation available */}
       {(images.length > 1 || (totalCount && totalCount > images.length)) && (
@@ -568,8 +572,8 @@ const Lightbox = ({
         </button>
       )}
 
-      {/* Loading spinner - centered in viewport, not in image container */}
-      {!imageLoaded && (
+      {/* Loading spinner - show when image loading OR page transitioning */}
+      {(!imageLoaded || isPageTransitioning) && (
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           style={{ color: "var(--text-primary)" }}
@@ -578,10 +582,13 @@ const Lightbox = ({
         </div>
       )}
 
-      {/* Image container */}
+      {/* Image container - hide during page transition to prevent showing stale image */}
       <div
         className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          visibility: isPageTransitioning ? "hidden" : "visible",
+        }}
       >
         {/* Image */}
         <img
@@ -597,8 +604,8 @@ const Lightbox = ({
         />
       </div>
 
-      {/* Image title */}
-      {imageTitle && (
+      {/* Image title - hide during page transition to prevent showing stale title */}
+      {imageTitle && !isPageTransitioning && (
         <div
           className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-center max-w-[80vw] transition-opacity duration-300 ${
             controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"

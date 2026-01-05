@@ -6,6 +6,7 @@ import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
+import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import {
   Button,
   FavoriteButton,
@@ -332,7 +333,7 @@ const GalleryDetail = () => {
                   <LazyImage
                     key={image.id}
                     src={image.paths?.thumbnail}
-                    alt={image.title || `Image ${index + 1}`}
+                    alt={getImageTitle(image)}
                     className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
                     style={{
                       backgroundColor: "var(--bg-secondary)",
@@ -413,6 +414,7 @@ const GalleryDetail = () => {
         totalCount={totalCount}
         pageOffset={lightbox.pageOffset}
         onIndexChange={lightbox.onIndexChange}
+        isPageTransitioning={lightbox.isPageTransitioning}
       />
     </div>
   );

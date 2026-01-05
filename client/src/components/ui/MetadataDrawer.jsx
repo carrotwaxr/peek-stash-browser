@@ -1,24 +1,12 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { getEffectiveImageMetadata } from "../../utils/imageGalleryInheritance.js";
+import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import FavoriteButton from "./FavoriteButton.jsx";
 import OCounterButton from "./OCounterButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
 import RatingSliderDialog from "./RatingSliderDialog.jsx";
 import SectionLink from "./SectionLink.jsx";
 import TagChips from "./TagChips.jsx";
-
-/**
- * Get image title with fallback to filename or ID
- */
-const getImageTitle = (image) => {
-  if (image.title) return image.title;
-  if (image.filePath) {
-    const parts = image.filePath.split(/[\\/]/);
-    return parts[parts.length - 1];
-  }
-  return `Image ${image.id}`;
-};
 
 /**
  * Bottom sheet drawer displaying image metadata

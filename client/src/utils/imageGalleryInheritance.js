@@ -253,3 +253,18 @@ export function enrichImageWithInheritedMetadata(image) {
     effectiveUrls,
   };
 }
+
+/**
+ * Get image title with fallback chain: title → filename from filePath → Image {id}
+ * @param {Object} image - Image object
+ * @returns {string|null} Title string or null
+ */
+export function getImageTitle(image) {
+  if (image?.title) return image.title;
+  if (image?.filePath) {
+    // Extract filename from path (handles both / and \ separators)
+    const parts = image.filePath.split(/[\\/]/);
+    return parts[parts.length - 1];
+  }
+  return image?.id ? `Image ${image.id}` : null;
+}
