@@ -9,14 +9,23 @@ import { useCallback, useRef, useState } from "react";
  * @param {number} options.perPage - Images per page
  * @param {number} options.totalCount - Total images across all pages
  * @param {Function} options.onPageChange - Callback when page changes (receives new page number)
+ * @param {number} options.externalPage - External page number (from URL), makes hook use external state
+ * @param {Function} options.onExternalPageChange - Callback to change external page (required if externalPage provided)
  * @returns {Object} Lightbox and pagination state/handlers
  */
 export function usePaginatedLightbox({
   perPage = 100,
   totalCount = 0,
   onPageChange,
+  externalPage,
+  onExternalPageChange,
 }) {
-  const [currentPage, setCurrentPage] = useState(1);
+  // Internal page state - only used when externalPage is not provided
+  const [internalPage, setInternalPage] = useState(1);
+
+  // Use external page if provided, otherwise internal
+  const currentPage = externalPage !== undefined ? externalPage : internalPage;
+
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxAutoPlay, setLightboxAutoPlay] = useState(false);
@@ -29,15 +38,22 @@ export function usePaginatedLightbox({
 
   const totalPages = Math.ceil(totalCount / perPage);
 
-  // Handle page change (internal + notify parent)
+  // Handle page change - use external callback if provided, otherwise internal
   const handlePageChange = useCallback(
     (newPage) => {
-      setCurrentPage(newPage);
+      if (externalPage !== undefined && onExternalPageChange) {
+        // External pagination mode - call the external handler
+        onExternalPageChange(newPage);
+      } else {
+        // Internal pagination mode - update internal state
+        setInternalPage(newPage);
+      }
+      // Always call onPageChange if provided (for additional side effects)
       if (onPageChange) {
         onPageChange(newPage);
       }
     },
-    [onPageChange]
+    [externalPage, onExternalPageChange, onPageChange]
   );
 
   // Handle lightbox reaching page boundary
