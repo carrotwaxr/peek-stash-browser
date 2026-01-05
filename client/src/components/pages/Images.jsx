@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
@@ -6,6 +6,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
 import { libraryApi } from "../../services/api.js";
 import { ImageCard } from "../cards/index.js";
 import {
@@ -25,11 +26,49 @@ const Images = () => {
   const gridRef = useRef(null);
   const columns = useGridColumns("images");
 
-  const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery();
+  // Extract URL pagination params early (needed for hooks)
+  const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
+  const urlPage = parseInt(searchParams.get("page")) || 1;
 
-  // Lightbox state
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
+  // Ref to expose SearchControls pagination handler for external use
+  const paginationHandlerRef = useRef(null);
+
+  // Ref to store the lightbox consumePendingLightboxIndex function
+  // This avoids circular dependency between usePaginatedLightbox and useCancellableQuery
+  const consumePendingLightboxIndexRef = useRef(null);
+
+  // Query hook with onDataChange to consume pending lightbox index when data loads
+  const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery({
+    onDataChange: () => {
+      // Synchronously consume pending lightbox index when new data arrives
+      // This fixes flicker during cross-page navigation
+      consumePendingLightboxIndexRef.current?.();
+    },
+  });
+
+  const currentImages = useMemo(() => data?.images || [], [data?.images]);
+  const totalCount = data?.count || 0;
+  const totalPages = Math.ceil(totalCount / urlPerPage);
+  const pageOffset = (urlPage - 1) * urlPerPage;
+
+  // Paginated lightbox with external pagination (synced to URL)
+  const lightbox = usePaginatedLightbox({
+    perPage: urlPerPage,
+    totalCount,
+    externalPage: urlPage,
+    onExternalPageChange: (newPage) => {
+      // Delegate to SearchControls pagination handler
+      if (paginationHandlerRef.current) {
+        paginationHandlerRef.current(newPage);
+      }
+    },
+  });
+
+  // Destructure for stable references in callbacks
+  const { openLightbox } = lightbox;
+
+  // Store the consume function in ref for the onDataChange callback
+  consumePendingLightboxIndexRef.current = lightbox.consumePendingLightboxIndex;
 
   const handleQueryChange = useCallback(
     (newQuery) => {
@@ -38,56 +77,50 @@ const Images = () => {
     [execute]
   );
 
-  const currentImages = data?.images || [];
-  const totalCount = data?.count || 0;
-
-  const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
-  const urlPage = parseInt(searchParams.get("page")) || 1;
-  const totalPages = Math.ceil(totalCount / urlPerPage);
-  const pageOffset = (urlPage - 1) * urlPerPage;
-
   // Handle image click - open lightbox
-  const handleImageClick = (image) => {
-    const index = currentImages.findIndex((img) => img.id === image.id);
-    setLightboxIndex(index >= 0 ? index : 0);
-    setLightboxOpen(true);
-  };
+  const handleImageClick = useCallback(
+    (image) => {
+      const index = currentImages.findIndex((img) => img.id === image.id);
+      openLightbox(index >= 0 ? index : 0);
+    },
+    [currentImages, openLightbox]
+  );
 
   // Handle O counter change from card - update local state
-  const handleOCounterChange = (imageId, newCount) => {
+  const handleOCounterChange = useCallback((imageId, newCount) => {
     setData((prev) => ({
       ...prev,
       images: prev.images.map((img) =>
         img.id === imageId ? { ...img, oCounter: newCount } : img
       ),
     }));
-  };
+  }, [setData]);
 
   // Handle rating change from card - update local state
-  const handleRatingChange = (imageId, newRating) => {
+  const handleRatingChange = useCallback((imageId, newRating) => {
     setData((prev) => ({
       ...prev,
       images: prev.images.map((img) =>
         img.id === imageId ? { ...img, rating100: newRating } : img
       ),
     }));
-  };
+  }, [setData]);
 
   // Handle favorite change from card - update local state
-  const handleFavoriteChange = (imageId, newFavorite) => {
+  const handleFavoriteChange = useCallback((imageId, newFavorite) => {
     setData((prev) => ({
       ...prev,
       images: prev.images.map((img) =>
         img.id === imageId ? { ...img, favorite: newFavorite } : img
       ),
     }));
-  };
+  }, [setData]);
 
   // TV Navigation - use shared hook for all grid pages
+  // Note: We use our own paginationHandlerRef for lightbox cross-page navigation
   const {
     isTVMode,
     _tvNavigation,
-    paginationHandlerRef,
     searchControlsProps,
     gridItemProps,
   } = useGridPageTVNavigation({
@@ -96,25 +129,6 @@ const Images = () => {
     totalPages,
     onItemSelect: handleImageClick,
   });
-
-  // Handle lightbox crossing page boundary
-  const handlePageBoundary = useCallback(
-    (direction) => {
-      if (!paginationHandlerRef.current) return false;
-
-      if (direction === "next" && urlPage < totalPages) {
-        setLightboxIndex(0); // First image of next page
-        paginationHandlerRef.current(urlPage + 1);
-        return true;
-      } else if (direction === "prev" && urlPage > 1) {
-        setLightboxIndex(urlPerPage - 1); // Last image of previous page
-        paginationHandlerRef.current(urlPage - 1);
-        return true;
-      }
-      return false;
-    },
-    [urlPage, totalPages, urlPerPage, paginationHandlerRef]
-  );
 
   useInitialFocus(
     pageRef,
@@ -147,6 +161,7 @@ const Images = () => {
           onQueryChange={handleQueryChange}
           totalPages={totalPages}
           totalCount={totalCount}
+          paginationHandlerRef={paginationHandlerRef}
           {...searchControlsProps}
         >
           {isLoading ? (
@@ -189,7 +204,7 @@ const Images = () => {
         {/* Lightbox for viewing images */}
         {currentImages.length > 0 && (
           <Lightbox
-            isOpen={lightboxOpen}
+            isOpen={lightbox.lightboxOpen}
             images={currentImages.map((img) => ({
               ...img,
               paths: {
@@ -199,8 +214,8 @@ const Images = () => {
               },
               oCounter: img.oCounter ?? 0,
             }))}
-            initialIndex={lightboxIndex}
-            onClose={() => setLightboxOpen(false)}
+            initialIndex={lightbox.lightboxIndex}
+            onClose={lightbox.closeLightbox}
             onImagesUpdate={(updatedImages) => {
               // Sync updated images back to page state
               setData((prev) => ({
@@ -212,7 +227,7 @@ const Images = () => {
               }));
             }}
             // Cross-page navigation support
-            onPageBoundary={totalPages > 1 ? handlePageBoundary : undefined}
+            onPageBoundary={lightbox.onPageBoundary}
             totalCount={totalCount}
             pageOffset={pageOffset}
           />
