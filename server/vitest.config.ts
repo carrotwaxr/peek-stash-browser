@@ -5,7 +5,13 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["**/*.{test,spec}.{js,ts}"],
-    exclude: ["node_modules", "dist", "prisma/migrations"],
+    exclude: [
+      "node_modules",
+      "dist",
+      "prisma/migrations",
+      "**/*.integration.test.ts",
+      "integration/**",
+    ],
     // Run test files sequentially to avoid database isolation issues
     // Tests using the real database (not mocks) can conflict when run in parallel
     fileParallelism: false,
@@ -19,6 +25,8 @@ export default defineConfig({
         "**/*.config.ts",
         "**/*.spec.{js,ts}",
         "**/*.test.{js,ts}",
+        "**/*.integration.test.ts",
+        "integration/**",
         "index.ts",
       ],
     },

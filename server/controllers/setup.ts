@@ -16,6 +16,7 @@ import type {
   CreateFirstStashInstanceRequest,
   CreateFirstStashInstanceResponse,
   GetStashInstanceResponse,
+  ResetSetupRequest,
   ResetSetupResponse,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
@@ -399,10 +400,20 @@ export const getStashInstance = async (
  * This prevents accidental data loss on systems with multiple users.
  */
 export const resetSetup = async (
-  req: Request,
+  req: TypedRequest<ResetSetupRequest>,
   res: TypedResponse<ResetSetupResponse | ApiErrorResponse>
 ) => {
   try {
+    // Require explicit confirmation to prevent accidental resets
+    const { confirm } = req.body;
+    if (confirm !== "RESET_SETUP") {
+      return res.status(400).json({
+        error: "Confirmation required",
+        message:
+          "Send { confirm: 'RESET_SETUP' } to confirm this destructive action",
+      });
+    }
+
     // Check current setup state
     const userCount = await prisma.user.count();
     const stashInstanceCount = await prisma.stashInstance.count();

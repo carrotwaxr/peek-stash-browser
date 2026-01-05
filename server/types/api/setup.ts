@@ -119,6 +119,10 @@ export interface GetStashInstanceResponse {
  * POST /api/setup/reset
  * Reset setup state for recovery from partial setup
  */
+export interface ResetSetupRequest {
+  confirm: "RESET_SETUP";
+}
+
 export interface ResetSetupResponse {
   success: true;
   message: string;
