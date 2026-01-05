@@ -34,6 +34,7 @@ const Lightbox = ({
   // New state for enhanced features
   const [controlsVisible, setControlsVisible] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [hasHoverCapability, setHasHoverCapability] = useState(true);
   const { isFullscreen, toggleFullscreen, supportsFullscreen } = useFullscreen();
   const controlsTimeoutRef = useRef(null);
 
@@ -58,6 +59,16 @@ const Lightbox = ({
       setIsPlaying(false);
     }
   }, [isOpen, autoPlay]);
+
+  // Detect hover capability (mouse/trackpad vs touch-only) to hide keyboard hints on mobile
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(hover: hover)");
+    setHasHoverCapability(mediaQuery.matches);
+
+    const handleChange = (e) => setHasHoverCapability(e.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
 
   // Navigation functions with cross-page support
   const goToPrevious = useCallback(() => {
@@ -601,21 +612,23 @@ const Lightbox = ({
         </div>
       )}
 
-      {/* Keyboard hints */}
-      <div
-        className={`absolute bottom-4 right-4 z-50 px-3 py-2 rounded-lg text-xs transition-opacity duration-300 ${
-          controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
-        style={{
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          color: "var(--text-muted)",
-        }}
-      >
-        <div>← → Navigate</div>
-        <div>Space Slideshow</div>
-        <div>i Info • f Fullscreen</div>
-        <div>Esc Close</div>
-      </div>
+      {/* Keyboard hints - only show on devices with hover capability (not touch-only) */}
+      {hasHoverCapability && (
+        <div
+          className={`absolute bottom-4 right-4 z-50 px-3 py-2 rounded-lg text-xs transition-opacity duration-300 ${
+            controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            color: "var(--text-muted)",
+          }}
+        >
+          <div>← → Navigate</div>
+          <div>Space Slideshow</div>
+          <div>i Info • f Fullscreen</div>
+          <div>Esc Close</div>
+        </div>
+      )}
 
       {/* Metadata Drawer */}
       <MetadataDrawer
