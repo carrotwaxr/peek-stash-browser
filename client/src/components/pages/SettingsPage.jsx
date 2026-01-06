@@ -10,6 +10,8 @@ import PlaybackTab from "../settings/tabs/PlaybackTab.jsx";
 import CustomizationTab from "../settings/tabs/CustomizationTab.jsx";
 import ContentTab from "../settings/tabs/ContentTab.jsx";
 import AccountTab from "../settings/tabs/AccountTab.jsx";
+import UserManagementTab from "../settings/tabs/UserManagementTab.jsx";
+import ServerConfigTab from "../settings/tabs/ServerConfigTab.jsx";
 
 // Tab definitions
 const USER_TABS = [
@@ -108,21 +110,10 @@ const SettingsPage = () => {
           )}
 
           {activeSection === "server" && (
-            <div
-              className="p-6 rounded-lg border"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                borderColor: "var(--border-color)",
-                minHeight: "400px",
-              }}
-            >
-              <p style={{ color: "var(--text-primary)" }}>
-                Server Settings - {activeTab} tab
-              </p>
-              <p style={{ color: "var(--text-muted)", marginTop: "1rem" }}>
-                Server tabs will be implemented in Phase 3
-              </p>
-            </div>
+            <>
+              {activeTab === "user-management" && <UserManagementTab />}
+              {activeTab === "server-config" && <ServerConfigTab />}
+            </>
           )}
         </SettingsLayout>
       </div>
