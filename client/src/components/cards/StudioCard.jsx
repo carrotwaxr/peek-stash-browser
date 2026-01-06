@@ -6,7 +6,7 @@ import { BaseCard } from "../ui/BaseCard.jsx";
  * StudioCard - Card for displaying studio entities
  */
 const StudioCard = forwardRef(
-  ({ studio, referrerUrl, tabIndex, onHideSuccess, ...rest }, ref) => {
+  ({ studio, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     const indicators = [
@@ -65,6 +65,7 @@ const StudioCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
+        displayPreferences={displayPreferences}
         ratingControlsProps={{
           entityId: studio.id,
           initialRating: studio.rating100,

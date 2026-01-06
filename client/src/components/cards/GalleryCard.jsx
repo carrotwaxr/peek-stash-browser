@@ -8,7 +8,7 @@ import { galleryTitle } from "../../utils/gallery.js";
  * GalleryCard - Card for displaying gallery entities
  */
 const GalleryCard = forwardRef(
-  ({ gallery, referrerUrl, tabIndex, onHideSuccess, ...rest }, ref) => {
+  ({ gallery, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     // Build subtitle from studio and date
@@ -87,6 +87,7 @@ const GalleryCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
+        displayPreferences={displayPreferences}
         ratingControlsProps={{
           entityId: gallery.id,
           initialRating: gallery.rating100,

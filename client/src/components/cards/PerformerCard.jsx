@@ -7,7 +7,7 @@ import GenderIcon from "../ui/GenderIcon.jsx";
  * Uses BaseCard with performer-specific configuration
  */
 const PerformerCard = forwardRef(
-  ({ performer, referrerUrl, isTVMode, tabIndex, onHideSuccess, ...rest }, ref) => {
+  ({ performer, referrerUrl, isTVMode, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const indicators = [
       { type: "PLAY_COUNT", count: performer.play_count },
       { type: "SCENES", count: performer.scene_count },
@@ -34,6 +34,7 @@ const PerformerCard = forwardRef(
         hideDescription
         hideSubtitle
         indicators={indicators}
+        displayPreferences={displayPreferences}
         ratingControlsProps={{
           entityId: performer.id,
           initialRating: performer.rating,
