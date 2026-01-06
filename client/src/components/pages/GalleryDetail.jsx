@@ -116,10 +116,7 @@ const GalleryDetail = () => {
     toggleFavorite,
   });
 
-  // Check if there's any sidebar content to display (tags moved to main content)
-  const hasSidebarContent =
-    gallery &&
-    ((gallery.scenes && gallery.scenes.length > 0) || gallery.details);
+  // No longer using sidebar - all content moved to main header area
 
   if (isLoading) {
     return (
@@ -224,6 +221,78 @@ const GalleryDetail = () => {
             />
           </div>
 
+          {/* Details */}
+          {gallery.details && (
+            <div className="mt-6">
+              <h3
+                className="text-sm font-medium mb-3"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Details
+              </h3>
+              <p
+                className="text-sm whitespace-pre-wrap"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {gallery.details}
+              </p>
+            </div>
+          )}
+
+          {/* Related Scenes */}
+          {gallery.scenes && gallery.scenes.length > 0 && (
+            <div className="mt-6">
+              <h3
+                className="text-sm font-medium mb-3"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Related Scenes
+              </h3>
+              <div
+                className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
+                style={{ scrollbarWidth: "thin" }}
+              >
+                {gallery.scenes.map((scene) => (
+                  <Link
+                    key={scene.id}
+                    to={`/scene/${scene.id}`}
+                    className="flex flex-col items-center flex-shrink-0 group w-[160px]"
+                  >
+                    <div
+                      className="aspect-video rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
+                      style={{
+                        backgroundColor: "var(--border-color)",
+                      }}
+                    >
+                      {scene.paths?.screenshot ? (
+                        <img
+                          src={scene.paths.screenshot}
+                          alt={scene.title || `Scene ${scene.id}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span
+                            className="text-4xl"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            🎬
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <span
+                      className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
+                      style={{ color: "var(--text-primary)" }}
+                    >
+                      {scene.title || `Scene ${scene.id}`}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Performers Row */}
           {gallery.performers && gallery.performers.length > 0 && (
             <div className="mt-6">
@@ -292,15 +361,9 @@ const GalleryDetail = () => {
           )}
         </div>
 
-        {/* Images Grid - Conditional sidebar layout */}
-        <div
-          className={
-            hasSidebarContent
-              ? "grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-6"
-              : "mb-6"
-          }
-        >
-          {/* Main Content - Images Grid (full width) */}
+        {/* Images Grid - Full width layout */}
+        <div className="mb-6">
+          {/* Main Content - Images Grid */}
           <div>
             {/* Pagination - Top */}
             {lightbox.totalPages > 1 && (
@@ -363,42 +426,6 @@ const GalleryDetail = () => {
               </div>
             )}
           </div>
-
-          {/* Sidebar - Metadata (only render if there's content) */}
-          {hasSidebarContent && (
-            <aside className="space-y-4">
-              {/* Linked Scenes */}
-              {gallery.scenes && gallery.scenes.length > 0 && (
-                <Card title="Related Scenes">
-                  <div className="flex flex-col gap-2">
-                    {gallery.scenes.map((scene) => (
-                      <Button
-                        key={scene.id}
-                        variant="secondary"
-                        onClick={() => navigate(`/scene/${scene.id}`)}
-                        className="w-full text-left justify-start truncate"
-                        title={scene.title || `Scene ${scene.id}`}
-                      >
-                        {scene.title || `Scene ${scene.id}`}
-                      </Button>
-                    ))}
-                  </div>
-                </Card>
-              )}
-
-              {/* Details */}
-              {gallery.details && (
-                <Card title="Details">
-                  <p
-                    className="text-sm whitespace-pre-wrap"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {gallery.details}
-                  </p>
-                </Card>
-              )}
-            </aside>
-          )}
         </div>
       </div>
 
@@ -416,29 +443,6 @@ const GalleryDetail = () => {
         onIndexChange={lightbox.onIndexChange}
         isPageTransitioning={lightbox.isPageTransitioning}
       />
-    </div>
-  );
-};
-
-// Reusable Card component
-const Card = ({ title, children }) => {
-  return (
-    <div
-      className="p-6 rounded-lg border"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-      }}
-    >
-      {title && (
-        <h3
-          className="text-lg font-semibold mb-4"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {title}
-        </h3>
-      )}
-      {children}
     </div>
   );
 };

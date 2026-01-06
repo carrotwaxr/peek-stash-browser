@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { Paper, SectionLink, TagChips, useLazyLoad } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
+import { galleryTitle } from "../../utils/gallery.js";
 
 /**
  * LazyThumbnail - Lazy-loaded thumbnail for performer images
@@ -240,6 +241,43 @@ const SceneDetails = ({
                             style={{ color: "var(--text-primary)" }}
                           >
                             {performer.name}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Related Galleries - Horizontal scrollable with gallery covers */}
+                {scene.galleries && scene.galleries.length > 0 && (
+                  <div className="mb-6">
+                    <h3
+                      className="text-sm font-medium mb-3"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      Related Galleries
+                    </h3>
+                    <div
+                      className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
+                      style={{ scrollbarWidth: "thin" }}
+                    >
+                      {scene.galleries.map((gallery) => (
+                        <Link
+                          key={gallery.id}
+                          to={`/gallery/${gallery.id}`}
+                          className="flex flex-col items-center flex-shrink-0 group w-[120px]"
+                        >
+                          <LazyThumbnail
+                            src={gallery.paths?.cover}
+                            alt={galleryTitle(gallery)}
+                            fallback="🖼️"
+                            className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
+                          />
+                          <span
+                            className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
+                            style={{ color: "var(--text-primary)" }}
+                          >
+                            {galleryTitle(gallery)}
                           </span>
                         </Link>
                       ))}

@@ -1723,10 +1723,14 @@ class SceneQueryBuilder {
   }
 
   private transformStashGallery(g: any): any {
+    const coverUrl = g.coverPath ? this.transformUrl(g.coverPath) : null;
     return {
       id: g.id,
       title: g.title,
-      cover: g.coverPath ? { paths: { thumbnail: this.transformUrl(g.coverPath) } } : null,
+      // Keep cover structure for compatibility
+      cover: coverUrl ? { paths: { thumbnail: coverUrl } } : null,
+      // Frontend expects gallery.paths.cover for the cover image (DRY - matches transformGallery)
+      paths: coverUrl ? { cover: coverUrl } : null,
     };
   }
 
