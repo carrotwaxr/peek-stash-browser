@@ -5,6 +5,11 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import SectionSelector from "../settings/SectionSelector.jsx";
 import SettingsLayout from "../settings/SettingsLayout.jsx";
 import { PageHeader, PageLayout } from "../ui/index.js";
+import ThemeTab from "../settings/tabs/ThemeTab.jsx";
+import PlaybackTab from "../settings/tabs/PlaybackTab.jsx";
+import CustomizationTab from "../settings/tabs/CustomizationTab.jsx";
+import ContentTab from "../settings/tabs/ContentTab.jsx";
+import AccountTab from "../settings/tabs/AccountTab.jsx";
 
 // Tab definitions
 const USER_TABS = [
@@ -91,22 +96,34 @@ const SettingsPage = () => {
           activeTab={activeTab}
           onTabChange={handleTabChange}
         >
-          {/* Placeholder for tab content */}
-          <div
-            className="p-6 rounded-lg border"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-color)",
-              minHeight: "400px",
-            }}
-          >
-            <p style={{ color: "var(--text-primary)" }}>
-              {activeSection === "user" ? "User" : "Server"} Settings - {activeTab} tab
-            </p>
-            <p style={{ color: "var(--text-muted)", marginTop: "1rem" }}>
-              Tab content will be implemented in next phase
-            </p>
-          </div>
+          {/* Render active tab content */}
+          {activeSection === "user" && (
+            <>
+              {activeTab === "theme" && <ThemeTab />}
+              {activeTab === "playback" && <PlaybackTab />}
+              {activeTab === "customization" && <CustomizationTab />}
+              {activeTab === "content" && <ContentTab />}
+              {activeTab === "account" && <AccountTab />}
+            </>
+          )}
+
+          {activeSection === "server" && (
+            <div
+              className="p-6 rounded-lg border"
+              style={{
+                backgroundColor: "var(--bg-card)",
+                borderColor: "var(--border-color)",
+                minHeight: "400px",
+              }}
+            >
+              <p style={{ color: "var(--text-primary)" }}>
+                Server Settings - {activeTab} tab
+              </p>
+              <p style={{ color: "var(--text-muted)", marginTop: "1rem" }}>
+                Server tabs will be implemented in Phase 3
+              </p>
+            </div>
+          )}
         </SettingsLayout>
       </div>
     </PageLayout>
