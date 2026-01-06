@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ScenePlayerProvider,
   useScenePlayer,
@@ -7,18 +7,17 @@ import {
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { canDirectPlayVideo } from "../../utils/videoFormat.js";
-import { galleryTitle } from "../../utils/gallery.js";
 import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
 import {
   Button,
   ExternalPlayerButton,
-  LazyThumbnail,
   Navigation,
   RecommendedSidebar,
   ScenesLikeThis,
   TabNavigation,
 } from "../ui/index.js";
+import { GalleryGrid, GroupGrid } from "../grids/index.js";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
@@ -27,6 +26,7 @@ import SceneDetails from "./SceneDetails.jsx";
 // Inner component that reads from context
 const SceneContent = ({ location }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const leftColumnRef = useRef(null);
 
@@ -44,7 +44,6 @@ const SceneContent = ({ location }) => {
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [sidebarHeight, setSidebarHeight] = useState(null);
-  const [activeTab, setActiveTab] = useState('similar');
 
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
@@ -199,127 +198,42 @@ const SceneContent = ({ location }) => {
           <div className="mt-6">
             <TabNavigation
               tabs={[
-                { id: 'similar', label: 'Similar Scenes', count: null },
+                { id: 'similar', label: 'Similar Scenes', count: 1 },
                 { id: 'collections', label: 'Collections', count: scene.groups?.length || 0 },
                 { id: 'galleries', label: 'Galleries', count: scene.galleries?.length || 0 },
               ]}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
+              defaultTab="similar"
             />
 
-            {/* Similar Scenes Tab */}
-            {activeTab === 'similar' && (
-              <div className="mt-6">
-                <ScenesLikeThis sceneId={scene.id} />
-              </div>
-            )}
+            {/* Get active tab from URL */}
+            {(() => {
+              const activeTab = searchParams.get('tab') || 'similar';
 
-            {/* Collections Tab */}
-            {activeTab === 'collections' && (
-              <div className="mt-6">
-                {scene.groups && scene.groups.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {scene.groups.map((group) => {
-                      // Generate a color based on group ID for consistency
-                      const hue = (parseInt(group.id, 10) * 137.5) % 360;
-                      return (
-                        <div key={group.id} className="relative group/tooltip">
-                          <Link
-                            to={`/collection/${group.id}`}
-                            className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium inline-block"
-                            style={{
-                              backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                              color: "white",
-                            }}
-                          >
-                            {group.name}
-                          </Link>
-                          {/* Tooltip with image and name on hover */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity duration-200 z-10">
-                            <div
-                              className="rounded-lg overflow-hidden shadow-lg"
-                              style={{
-                                backgroundColor: "var(--bg-secondary)",
-                                border: "1px solid var(--border-color)",
-                                width: "120px",
-                              }}
-                            >
-                              <div
-                                className="w-full overflow-hidden flex items-center justify-center"
-                                style={{
-                                  backgroundColor: "var(--border-color)",
-                                  height: "180px",
-                                }}
-                              >
-                                {group.front_image_path || group.back_image_path ? (
-                                  <img
-                                    src={
-                                      group.front_image_path ||
-                                      group.back_image_path
-                                    }
-                                    alt={group.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span
-                                    className="text-3xl"
-                                    style={{ color: "var(--text-secondary)" }}
-                                  >
-                                    🎬
-                                  </span>
-                                )}
-                              </div>
-                              <div className="px-2 py-2 text-center">
-                                <span
-                                  className="text-xs font-medium line-clamp-2"
-                                  style={{ color: "var(--text-primary)" }}
-                                >
-                                  {group.name}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p style={{ color: "var(--text-muted)" }}>No collections for this scene</p>
-                )}
-              </div>
-            )}
+              return (
+                <>
+                  {/* Similar Scenes Tab */}
+                  {activeTab === 'similar' && (
+                    <div className="mt-6">
+                      <ScenesLikeThis sceneId={scene.id} />
+                    </div>
+                  )}
 
-            {/* Galleries Tab */}
-            {activeTab === 'galleries' && (
-              <div className="mt-6">
-                {scene.galleries && scene.galleries.length > 0 ? (
-                  <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
-                    {scene.galleries.map((gallery) => (
-                      <Link
-                        key={gallery.id}
-                        to={`/gallery/${gallery.id}`}
-                        className="flex flex-col items-center flex-shrink-0 group w-[120px]"
-                      >
-                        <LazyThumbnail
-                          src={gallery.paths?.cover}
-                          alt={galleryTitle(gallery)}
-                          fallback="🖼️"
-                          className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
-                        />
-                        <span
-                          className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
-                          style={{ color: "var(--text-primary)" }}
-                        >
-                          {galleryTitle(gallery)}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p style={{ color: "var(--text-muted)" }}>No galleries for this scene</p>
-                )}
-              </div>
-            )}
+                  {/* Collections Tab */}
+                  {activeTab === 'collections' && (
+                    <div className="mt-6">
+                      <GroupGrid groups={scene.groups || []} />
+                    </div>
+                  )}
+
+                  {/* Galleries Tab */}
+                  {activeTab === 'galleries' && (
+                    <div className="mt-6">
+                      <GalleryGrid galleries={scene.galleries || []} />
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </main>
