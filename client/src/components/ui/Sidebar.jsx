@@ -48,11 +48,8 @@ const Sidebar = ({ navPreferences = [] }) => {
   const allNavItems = useMemo(() => {
     const bottomItems = [
       { name: "Help", path: null, isButton: true, icon: "questionCircle" },
+      { name: "Settings", path: "/settings", icon: "settings" },
     ];
-
-    if (user && user.role === "ADMIN") {
-      bottomItems.push({ name: "Server Settings", path: "/server-settings", icon: "wrench" });
-    }
 
     // User menu parent item
     bottomItems.push({
@@ -68,7 +65,7 @@ const Sidebar = ({ navPreferences = [] }) => {
     }
 
     return [...navItems, ...bottomItems];
-  }, [navItems, user, isUserMenuExpanded, userMenuSubItems]);
+  }, [navItems, isUserMenuExpanded, userMenuSubItems]);
 
   // Get current page from React Router location
   const getCurrentPage = () => {
@@ -276,33 +273,33 @@ const Sidebar = ({ navPreferences = [] }) => {
                 );
               })()}
 
-              {/* Server Settings (admin only) */}
-              {user && user.role === "ADMIN" && (() => {
+              {/* Settings (universal) */}
+              {(() => {
                 const itemIndex = navItems.length + 1;
                 const isFocused = isTVMode && isMainNavActive && focusedIndex === itemIndex;
                 return (
                   <>
                     <div className="xl:hidden">
-                      <Tooltip content="Server Settings" position="right">
+                      <Tooltip content="Settings" position="right">
                         <Link
                           ref={(el) => (itemRefs.current[itemIndex] = el)}
-                          to="/server-settings"
+                          to="/settings"
                           className={`flex items-center justify-center h-12 w-12 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
-                          aria-label="Server Settings"
+                          aria-label="Settings"
                           tabIndex={isFocused ? 0 : -1}
                         >
-                          <ThemedIcon name="wrench" size={20} />
+                          <ThemedIcon name="settings" size={20} />
                         </Link>
                       </Tooltip>
                     </div>
                     <Link
                       ref={(el) => (itemRefs.current[itemIndex] = el)}
-                      to="/server-settings"
+                      to="/settings"
                       className={`hidden xl:flex items-center gap-3 px-4 py-3 rounded-lg transition-colors duration-200 ${isFocused ? "keyboard-focus" : "nav-link"}`}
                       tabIndex={isFocused ? 0 : -1}
                     >
-                      <ThemedIcon name="wrench" size={20} />
-                      <span className="text-sm font-medium">Server Settings</span>
+                      <ThemedIcon name="settings" size={20} />
+                      <span className="text-sm font-medium">Settings</span>
                     </Link>
                   </>
                 );
@@ -310,7 +307,7 @@ const Sidebar = ({ navPreferences = [] }) => {
 
               {/* User Menu */}
               {(() => {
-                const userMenuItemIndex = navItems.length + (user && user.role === "ADMIN" ? 2 : 1);
+                const userMenuItemIndex = navItems.length + 2;
                 const isUserMenuFocused = isTVMode && isMainNavActive && focusedIndex === userMenuItemIndex;
 
                 return (
