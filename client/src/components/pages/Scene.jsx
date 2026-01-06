@@ -13,12 +13,12 @@ import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
 import {
   Button,
   ExternalPlayerButton,
-  LazyThumbnail,
   Navigation,
   RecommendedSidebar,
   ScenesLikeThis,
   TabNavigation,
 } from "../ui/index.js";
+import LazyThumbnail from "../ui/LazyThumbnail.jsx";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
