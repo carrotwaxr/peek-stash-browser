@@ -155,29 +155,25 @@ const TopBar = ({ navPreferences = [] }) => {
               ))}
             </ul>
 
-            {/* Server Settings (admin only) - with divider */}
-            {user && user.role === "ADMIN" && (
-              <>
-                <div
-                  className="my-2 border-t"
-                  style={{ borderColor: "var(--border-color)" }}
-                />
-                <ul className="flex flex-col space-y-2">
-                  <li>
-                    <Link
-                      to="/server-settings"
-                      className="nav-link block text-base font-medium transition-colors duration-200 px-3 py-2 rounded"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <ThemedIcon name="wrench" size={18} />
-                        Server Settings
-                      </div>
-                    </Link>
-                  </li>
-                </ul>
-              </>
-            )}
+            {/* Settings (all users) - with divider */}
+            <div
+              className="my-2 border-t"
+              style={{ borderColor: "var(--border-color)" }}
+            />
+            <ul className="flex flex-col space-y-2">
+              <li>
+                <Link
+                  to="/settings"
+                  className="nav-link block text-base font-medium transition-colors duration-200 px-3 py-2 rounded"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <div className="flex items-center gap-2">
+                    <ThemedIcon name="settings" size={18} />
+                    Settings
+                  </div>
+                </Link>
+              </li>
+            </ul>
           </div>
         )}
       </nav>
