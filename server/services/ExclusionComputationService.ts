@@ -16,7 +16,6 @@ import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
-import { stashCacheManager } from "./StashCacheManager.js";
 
 /**
  * Transaction client type for Prisma operations within transactions
@@ -222,7 +221,7 @@ class ExclusionComputationService {
         }
       } else if (restriction.mode === "INCLUDE") {
         // INCLUDE mode: exclude everything NOT in the list
-        const allEntityIds = this.getAllEntityIds(restriction.entityType);
+        const allEntityIds = await this.getAllEntityIds(restriction.entityType, tx);
         const includeSet = new Set(entityIds);
 
         for (const entityId of allEntityIds) {
@@ -790,19 +789,42 @@ class ExclusionComputationService {
   }
 
   /**
-   * Get all entity IDs for a given entity type from the cache.
+   * Get all entity IDs for a given entity type from the database.
    * Used for INCLUDE mode inversion.
    */
-  private getAllEntityIds(entityType: string): string[] {
+  private async getAllEntityIds(
+    entityType: string,
+    tx: TransactionClient
+  ): Promise<string[]> {
     switch (entityType) {
-      case "tags":
-        return stashCacheManager.getAllTags().map((t) => t.id);
-      case "studios":
-        return stashCacheManager.getAllStudios().map((s) => s.id);
-      case "groups":
-        return stashCacheManager.getAllGroups().map((g) => g.id);
-      case "galleries":
-        return stashCacheManager.getAllGalleries().map((g) => g.id);
+      case "tags": {
+        const tags = await tx.stashTag.findMany({
+          where: { deletedAt: null },
+          select: { id: true },
+        });
+        return tags.map((t) => t.id);
+      }
+      case "studios": {
+        const studios = await tx.stashStudio.findMany({
+          where: { deletedAt: null },
+          select: { id: true },
+        });
+        return studios.map((s) => s.id);
+      }
+      case "groups": {
+        const groups = await tx.stashGroup.findMany({
+          where: { deletedAt: null },
+          select: { id: true },
+        });
+        return groups.map((g) => g.id);
+      }
+      case "galleries": {
+        const galleries = await tx.stashGallery.findMany({
+          where: { deletedAt: null },
+          select: { id: true },
+        });
+        return galleries.map((g) => g.id);
+      }
       default:
         logger.warn("Unknown entity type for getAllEntityIds", { entityType });
         return [];
