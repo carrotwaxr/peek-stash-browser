@@ -281,13 +281,37 @@ const SceneContent = ({ location }) => {
 
             {activeTab === 'collections' && (
               <div className="mt-6">
-                <GroupGrid groups={scene.groups || []} />
+                <GroupGrid
+                  lockedFilters={{
+                    group_filter: {
+                      scenes: {
+                        value: [parseInt(sceneId, 10)],
+                        modifier: "INCLUDES"
+                      }
+                    }
+                  }}
+                  hideLockedFilters
+                  syncToUrl={false}
+                  emptyMessage="No collections found for this scene"
+                />
               </div>
             )}
 
             {activeTab === 'galleries' && (
               <div className="mt-6">
-                <GalleryGrid galleries={scene.galleries || []} />
+                <GalleryGrid
+                  lockedFilters={{
+                    gallery_filter: {
+                      scenes: {
+                        value: [parseInt(sceneId, 10)],
+                        modifier: "INCLUDES"
+                      }
+                    }
+                  }}
+                  hideLockedFilters
+                  syncToUrl={false}
+                  emptyMessage="No galleries found for this scene"
+                />
               </div>
             )}
           </div>
