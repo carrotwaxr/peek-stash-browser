@@ -463,20 +463,6 @@ class ExclusionComputationService {
   ): Promise<ExclusionRecord[]> {
     const emptyExclusions: ExclusionRecord[] = [];
 
-    // Warn about potential memory issues with large datasets
-    const LARGE_DATASET_THRESHOLD = 50000;
-    const entityCounts = {
-      galleries: await tx.stashGallery.count({ where: { deletedAt: null } }),
-      images: await tx.stashImage.count({ where: { deletedAt: null } }),
-    };
-    if (entityCounts.galleries > LARGE_DATASET_THRESHOLD || entityCounts.images > LARGE_DATASET_THRESHOLD) {
-      logger.warn("computeEmptyExclusions: Large dataset detected, may use significant memory", {
-        userId,
-        galleries: entityCounts.galleries,
-        images: entityCounts.images,
-      });
-    }
-
     // Build sets of already-excluded entity IDs by type
     // These will be used in temporary tables for SQL-based filtering
     const excludedSceneIds = new Set<string>();
