@@ -170,13 +170,13 @@ const CarouselSettings = ({ carouselPreferences = [], onSave }) => {
   };
 
   const handleCreateCarousel = () => {
-    navigate("/my-settings/carousels/new");
+    navigate("/settings/carousels/new");
   };
 
   const handleEditCarousel = (carouselId) => {
     // carouselId is the full "custom-{uuid}" format, extract the uuid
     const actualId = carouselId.replace("custom-", "");
-    navigate(`/my-settings/carousels/${actualId}/edit`);
+    navigate(`/settings/carousels/${actualId}/edit`);
   };
 
   const handleDeleteCarousel = async (carouselId) => {

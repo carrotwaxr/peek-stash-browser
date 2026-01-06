@@ -262,16 +262,6 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/my-settings"
-            element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
-                <GlobalLayout>
-                  <Settings />
-                </GlobalLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/watch-history"
             element={
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
@@ -287,16 +277,6 @@ const AppContent = () => {
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
                   <HiddenItemsPage />
-                </GlobalLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/server-settings"
-            element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
-                <GlobalLayout>
-                  <ServerSettings />
                 </GlobalLayout>
               </ProtectedRoute>
             }
@@ -351,7 +331,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/my-settings/carousels/new"
+            path="/settings/carousels/new"
             element={
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
@@ -361,7 +341,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/my-settings/carousels/:id/edit"
+            path="/settings/carousels/:id/edit"
             element={
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
