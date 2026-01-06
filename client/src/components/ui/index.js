@@ -36,6 +36,7 @@ export { default as GenderIcon } from "./GenderIcon.jsx";
 export { default as GlobalLayout } from "./GlobalLayout.jsx";
 export { default as HelpModal } from "./HelpModal.jsx";
 export { default as InfoMessage } from "./InfoMessage.jsx";
+export { default as LazyThumbnail } from "./LazyThumbnail.jsx";
 export { default as Lightbox } from "./Lightbox.jsx";
 export { default as LoadingSpinner } from "./LoadingSpinner.jsx";
 export { default as Navigation } from "./Navigation.jsx";

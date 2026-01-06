@@ -11,6 +11,7 @@ import {
   Button,
   FavoriteButton,
   LazyImage,
+  LazyThumbnail,
   Lightbox,
   LoadingSpinner,
   PageHeader,
@@ -20,7 +21,6 @@ import {
   TagChips,
 } from "../ui/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
-import LazyThumbnail from "../ui/LazyThumbnail.jsx";
 
 const PER_PAGE = 100;
 
