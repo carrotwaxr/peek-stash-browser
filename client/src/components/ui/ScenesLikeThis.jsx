@@ -55,29 +55,27 @@ const ScenesLikeThis = ({ sceneId }) => {
     setScenes((prev) => prev.filter((s) => s.id !== hiddenSceneId));
   };
 
-  // Don't render anything if error or no results
+  // Show loading/error states, but don't completely hide if empty
   if (error) {
-    return null; // Silently fail - this is a nice-to-have feature
+    return (
+      <div className="text-center py-8" style={{ color: "var(--text-muted)" }}>
+        Failed to load similar scenes
+      </div>
+    );
   }
 
   if (!loading && scenes.length === 0) {
-    return null; // No similar scenes found - don't show section
+    return (
+      <div className="text-center py-8" style={{ color: "var(--text-muted)" }}>
+        No similar scenes found
+      </div>
+    );
   }
 
   const totalPages = Math.ceil(totalCount / perPage);
 
   return (
-    <div className="w-full py-4">
-      {/* Section Header */}
-      <div className="mb-4">
-        <h2
-          className="text-2xl font-bold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Recommended Scenes
-        </h2>
-      </div>
-
+    <>
       {/* Scene Grid - reuse existing component */}
       <SceneGrid
         scenes={scenes}
@@ -104,7 +102,7 @@ const ScenesLikeThis = ({ sceneId }) => {
           showPerPageSelector={false}
         />
       )}
-    </div>
+    </>
   );
 };
 
