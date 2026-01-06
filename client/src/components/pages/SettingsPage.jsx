@@ -28,11 +28,12 @@ const SettingsPage = () => {
 
   // Parse URL parameters
   const sectionParam = searchParams.get("section") || "user";
+  const validSection = ["user", "server"].includes(sectionParam) ? sectionParam : "user";
   const tabParam = searchParams.get("tab");
 
   // Determine active section (redirect non-admins from server section)
   const isAdmin = user?.role === "ADMIN";
-  const activeSection = sectionParam === "server" && !isAdmin ? "user" : sectionParam;
+  const activeSection = validSection === "server" && !isAdmin ? "user" : validSection;
 
   // Redirect if non-admin tries to access server section
   useEffect(() => {
