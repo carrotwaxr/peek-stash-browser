@@ -38,7 +38,6 @@ const Sidebar = ({ navPreferences = [] }) => {
   // User menu sub-items (static definition)
   const userMenuSubItems = useMemo(() => [
     { name: "Watch History", path: "/watch-history", icon: "history", isSubItem: true },
-    { name: "My Settings", path: "/my-settings", icon: "settings", isSubItem: true },
     { name: "TV Mode", path: null, isToggle: true, icon: "tv", isSubItem: true },
     { name: "Sign Out", path: null, isButton: true, icon: "logout", isSubItem: true },
   ], []);
@@ -328,13 +327,6 @@ const Sidebar = ({ navPreferences = [] }) => {
                             >
                               <ThemedIcon name="history" size={16} />
                               <span>Watch History</span>
-                            </Link>
-                            <Link
-                              to="/my-settings"
-                              className="flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 nav-link"
-                            >
-                              <ThemedIcon name="settings" size={16} />
-                              <span>My Settings</span>
                             </Link>
                             <button
                               onClick={toggleTVMode}
