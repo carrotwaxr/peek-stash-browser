@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { Paper, SectionLink, TagChips, useLazyLoad } from "../ui/index.js";
+import { Paper, SectionLink, TabNavigation, TagChips, useLazyLoad } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
 import { galleryTitle } from "../../utils/gallery.js";
+import ScenesLikeThis from "../ui/ScenesLikeThis.jsx";
 
 /**
  * LazyThumbnail - Lazy-loaded thumbnail for performer images
@@ -70,6 +72,7 @@ const SceneDetails = ({
   setShowTechnicalDetails,
 }) => {
   const { scene, sceneLoading, compatibility } = useScenePlayer();
+  const [activeTab, setActiveTab] = useState('similar');
 
   // Don't render if no scene data yet
   if (!scene) {
@@ -211,7 +214,7 @@ const SceneDetails = ({
                   </p>
                 </div>
 
-                {/* Performers - Horizontal scrollable with 2/3 aspect ratio */}
+                {/* Performers - Horizontal scrollable with 2/3 aspect ratio (kept for at-a-glance importance) */}
                 {scene.performers && scene.performers.length > 0 && (
                   <div className="mb-6">
                     <h3
@@ -247,159 +250,174 @@ const SceneDetails = ({
                     </div>
                   </div>
                 )}
-
-                {/* Related Galleries - Horizontal scrollable with gallery covers */}
-                {scene.galleries && scene.galleries.length > 0 && (
-                  <div className="mb-6">
-                    <h3
-                      className="text-sm font-medium mb-3"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Related Galleries
-                    </h3>
-                    <div
-                      className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
-                      style={{ scrollbarWidth: "thin" }}
-                    >
-                      {scene.galleries.map((gallery) => (
-                        <Link
-                          key={gallery.id}
-                          to={`/gallery/${gallery.id}`}
-                          className="flex flex-col items-center flex-shrink-0 group w-[120px]"
-                        >
-                          <LazyThumbnail
-                            src={gallery.paths?.cover}
-                            alt={galleryTitle(gallery)}
-                            fallback="🖼️"
-                            className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
-                          />
-                          <span
-                            className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
-                            style={{ color: "var(--text-primary)" }}
-                          >
-                            {galleryTitle(gallery)}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Groups/Collections - Display as colored chips like tags */}
-                {scene.groups && scene.groups.length > 0 && (
-                  <div className="mb-6">
-                    <h3
-                      className="text-sm font-medium mb-3"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Collections
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {scene.groups.map((group) => {
-                        // Generate a color based on group ID for consistency
-                        const hue = (parseInt(group.id, 10) * 137.5) % 360;
-                        return (
-                          <div key={group.id} className="relative group/tooltip">
-                            <Link
-                              to={`/collection/${group.id}`}
-                              className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium inline-block"
-                              style={{
-                                backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                                color: "white",
-                              }}
-                            >
-                              {group.name}
-                            </Link>
-                            {/* Tooltip with image and name on hover */}
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity duration-200 z-10">
-                              <div
-                                className="rounded-lg overflow-hidden shadow-lg"
-                                style={{
-                                  backgroundColor: "var(--bg-secondary)",
-                                  border: "1px solid var(--border-color)",
-                                  width: "120px",
-                                }}
-                              >
-                                <div
-                                  className="w-full overflow-hidden flex items-center justify-center"
-                                  style={{
-                                    backgroundColor: "var(--border-color)",
-                                    height: "180px",
-                                  }}
-                                >
-                                  {group.front_image_path || group.back_image_path ? (
-                                    <img
-                                      src={
-                                        group.front_image_path ||
-                                        group.back_image_path
-                                      }
-                                      alt={group.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span
-                                      className="text-3xl"
-                                      style={{ color: "var(--text-secondary)" }}
-                                    >
-                                      🎬
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="px-2 py-2 text-center">
-                                  <span
-                                    className="text-xs font-medium line-clamp-2"
-                                    style={{ color: "var(--text-primary)" }}
-                                  >
-                                    {group.name}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Tags */}
-                {(() => {
-                  const allTags = mergeAllTags(scene);
-                  return (
-                    allTags.length > 0 && (
-                      <div>
-                        <h3
-                          className="text-sm font-medium mb-3"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          Tags
-                        </h3>
-                        <TagChips tags={allTags} />
-                      </div>
-                    )
-                  );
-                })()}
-
-                {/* URLs/Links */}
-                {scene.urls && scene.urls.length > 0 && (
-                  <div className="mt-6">
-                    <h3
-                      className="text-sm font-medium mb-3"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Links
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {scene.urls.map((url, index) => (
-                        <SectionLink key={index} url={url} />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </Paper.Body>
             )}
           </Paper>
         </div>
+
+        {/* Tabbed Content Section */}
+        <div>
+          <TabNavigation
+            tabs={[
+              { id: 'similar', label: 'Similar Scenes', count: null },
+              { id: 'collections', label: 'Collections', count: scene.groups?.length || 0 },
+              { id: 'galleries', label: 'Galleries', count: scene.galleries?.length || 0 },
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
+
+          {/* Similar Scenes Tab */}
+          {activeTab === 'similar' && (
+            <div className="mt-6">
+              <ScenesLikeThis sceneId={scene.id} />
+            </div>
+          )}
+
+          {/* Collections Tab */}
+          {activeTab === 'collections' && (
+            <div className="mt-6">
+              {scene.groups && scene.groups.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {scene.groups.map((group) => {
+                    // Generate a color based on group ID for consistency
+                    const hue = (parseInt(group.id, 10) * 137.5) % 360;
+                    return (
+                      <div key={group.id} className="relative group/tooltip">
+                        <Link
+                          to={`/collection/${group.id}`}
+                          className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium inline-block"
+                          style={{
+                            backgroundColor: `hsl(${hue}, 70%, 45%)`,
+                            color: "white",
+                          }}
+                        >
+                          {group.name}
+                        </Link>
+                        {/* Tooltip with image and name on hover */}
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity duration-200 z-10">
+                          <div
+                            className="rounded-lg overflow-hidden shadow-lg"
+                            style={{
+                              backgroundColor: "var(--bg-secondary)",
+                              border: "1px solid var(--border-color)",
+                              width: "120px",
+                            }}
+                          >
+                            <div
+                              className="w-full overflow-hidden flex items-center justify-center"
+                              style={{
+                                backgroundColor: "var(--border-color)",
+                                height: "180px",
+                              }}
+                            >
+                              {group.front_image_path || group.back_image_path ? (
+                                <img
+                                  src={
+                                    group.front_image_path ||
+                                    group.back_image_path
+                                  }
+                                  alt={group.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span
+                                  className="text-3xl"
+                                  style={{ color: "var(--text-secondary)" }}
+                                >
+                                  🎬
+                                </span>
+                              )}
+                            </div>
+                            <div className="px-2 py-2 text-center">
+                              <span
+                                className="text-xs font-medium line-clamp-2"
+                                style={{ color: "var(--text-primary)" }}
+                              >
+                                {group.name}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ color: "var(--text-muted)" }}>No collections for this scene</p>
+              )}
+            </div>
+          )}
+
+          {/* Galleries Tab */}
+          {activeTab === 'galleries' && (
+            <div className="mt-6">
+              {scene.galleries && scene.galleries.length > 0 ? (
+                <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
+                  {scene.galleries.map((gallery) => (
+                    <Link
+                      key={gallery.id}
+                      to={`/gallery/${gallery.id}`}
+                      className="flex flex-col items-center flex-shrink-0 group w-[120px]"
+                    >
+                      <LazyThumbnail
+                        src={gallery.paths?.cover}
+                        alt={galleryTitle(gallery)}
+                        fallback="🖼️"
+                        className="aspect-[2/3] rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
+                      />
+                      <span
+                        className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {galleryTitle(gallery)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: "var(--text-muted)" }}>No galleries for this scene</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Tags Section (after tabs) */}
+        <div>
+          <Paper>
+            <Paper.Header>
+              <Paper.Title>Tags</Paper.Title>
+            </Paper.Header>
+            <Paper.Body>
+              {(() => {
+                const allTags = mergeAllTags(scene);
+                return allTags.length > 0 ? (
+                  <TagChips tags={allTags} />
+                ) : (
+                  <p style={{ color: "var(--text-muted)" }}>No tags for this scene</p>
+                );
+              })()}
+            </Paper.Body>
+          </Paper>
+        </div>
+
+        {/* URLs/Links Section */}
+        {scene.urls && scene.urls.length > 0 && (
+          <div>
+            <Paper>
+              <Paper.Header>
+                <Paper.Title>Links</Paper.Title>
+              </Paper.Header>
+              <Paper.Body>
+                <div className="flex flex-wrap gap-2">
+                  {scene.urls.map((url, index) => (
+                    <SectionLink key={index} url={url} />
+                  ))}
+                </div>
+              </Paper.Body>
+            </Paper>
+          </div>
+        )}
 
         {/* Technical details - inline with primary details */}
         <div>

@@ -14,7 +14,6 @@ import {
   ExternalPlayerButton,
   Navigation,
   RecommendedSidebar,
-  ScenesLikeThis,
 } from "../ui/index.js";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
@@ -189,9 +188,6 @@ const SceneContent = ({ location }) => {
           showTechnicalDetails={showTechnicalDetails}
           setShowTechnicalDetails={setShowTechnicalDetails}
         />
-
-        {/* Scenes Like This - lazy loaded */}
-        {scene && <ScenesLikeThis sceneId={scene.id} />}
       </main>
     </div>
   );

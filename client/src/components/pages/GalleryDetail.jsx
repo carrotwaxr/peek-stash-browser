@@ -16,9 +16,11 @@ import {
   PageHeader,
   Pagination,
   RatingSlider,
+  TabNavigation,
   TagChips,
 } from "../ui/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
+import LazyThumbnail from "../ui/LazyThumbnail.jsx";
 
 const PER_PAGE = 100;
 
@@ -33,6 +35,7 @@ const GalleryDetail = () => {
   const [imagesLoading, setImagesLoading] = useState(true);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [activeTab, setActiveTab] = useState('images');
 
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
@@ -239,61 +242,7 @@ const GalleryDetail = () => {
             </div>
           )}
 
-          {/* Related Scenes */}
-          {gallery.scenes && gallery.scenes.length > 0 && (
-            <div className="mt-6">
-              <h3
-                className="text-sm font-medium mb-3"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                Related Scenes
-              </h3>
-              <div
-                className="flex gap-4 overflow-x-auto pb-2 scroll-smooth"
-                style={{ scrollbarWidth: "thin" }}
-              >
-                {gallery.scenes.map((scene) => (
-                  <Link
-                    key={scene.id}
-                    to={`/scene/${scene.id}`}
-                    className="flex flex-col items-center flex-shrink-0 group w-[160px]"
-                  >
-                    <div
-                      className="aspect-video rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
-                      style={{
-                        backgroundColor: "var(--border-color)",
-                      }}
-                    >
-                      {scene.paths?.screenshot ? (
-                        <img
-                          src={scene.paths.screenshot}
-                          alt={scene.title || `Scene ${scene.id}`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span
-                            className="text-4xl"
-                            style={{ color: "var(--text-secondary)" }}
-                          >
-                            🎬
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <span
-                      className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {scene.title || `Scene ${scene.id}`}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Performers Row */}
+          {/* Performers Row (kept for at-a-glance importance) */}
           {gallery.performers && gallery.performers.length > 0 && (
             <div className="mt-6">
               <h3
@@ -361,71 +310,114 @@ const GalleryDetail = () => {
           )}
         </div>
 
-        {/* Images Grid - Full width layout */}
+        {/* Tabbed Content Section */}
         <div className="mb-6">
-          {/* Main Content - Images Grid */}
-          <div>
-            {/* Pagination - Top */}
-            {lightbox.totalPages > 1 && (
-              <div className="mb-4">
-                <Pagination
-                  currentPage={lightbox.currentPage}
-                  totalPages={lightbox.totalPages}
-                  onPageChange={lightbox.setCurrentPage}
-                />
-              </div>
-            )}
+          <TabNavigation
+            tabs={[
+              { id: 'images', label: 'Images', count: totalCount || gallery.image_count || 0 },
+              { id: 'scenes', label: 'Scenes', count: gallery.scenes?.length || 0 },
+            ]}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
 
-            {imagesLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                {[...Array(Math.min(PER_PAGE, gallery.image_count || 12))].map(
-                  (_, index) => (
-                    <div
-                      key={index}
-                      className="aspect-square rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                      }}
-                    />
-                  )
-                )}
-              </div>
-            ) : images.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                {images.map((image, index) => (
-                  <LazyImage
-                    key={image.id}
-                    src={image.paths?.thumbnail}
-                    alt={getImageTitle(image)}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      borderColor: "var(--border-color)",
-                    }}
-                    onClick={() => lightbox.openLightbox(index)}
+          {/* Images Tab */}
+          {activeTab === 'images' && (
+            <div className="mt-6">
+              {/* Pagination - Top */}
+              {lightbox.totalPages > 1 && (
+                <div className="mb-4">
+                  <Pagination
+                    currentPage={lightbox.currentPage}
+                    totalPages={lightbox.totalPages}
+                    onPageChange={lightbox.setCurrentPage}
                   />
-                ))}
-              </div>
-            ) : (
-              <div
-                className="text-center py-12"
-                style={{ color: "var(--text-muted)" }}
-              >
-                No images found in this gallery
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* Pagination - Bottom */}
-            {lightbox.totalPages > 1 && (
-              <div className="mt-4">
-                <Pagination
-                  currentPage={lightbox.currentPage}
-                  totalPages={lightbox.totalPages}
-                  onPageChange={lightbox.setCurrentPage}
-                />
-              </div>
-            )}
-          </div>
+              {imagesLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+                  {[...Array(Math.min(PER_PAGE, gallery.image_count || 12))].map(
+                    (_, index) => (
+                      <div
+                        key={index}
+                        className="aspect-square rounded-lg animate-pulse"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                        }}
+                      />
+                    )
+                  )}
+                </div>
+              ) : images.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+                  {images.map((image, index) => (
+                    <LazyImage
+                      key={image.id}
+                      src={image.paths?.thumbnail}
+                      alt={getImageTitle(image)}
+                      className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        borderColor: "var(--border-color)",
+                      }}
+                      onClick={() => lightbox.openLightbox(index)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="text-center py-12"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  No images found in this gallery
+                </div>
+              )}
+
+              {/* Pagination - Bottom */}
+              {lightbox.totalPages > 1 && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={lightbox.currentPage}
+                    totalPages={lightbox.totalPages}
+                    onPageChange={lightbox.setCurrentPage}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Scenes Tab */}
+          {activeTab === 'scenes' && (
+            <div className="mt-6">
+              {gallery.scenes && gallery.scenes.length > 0 ? (
+                <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
+                  {gallery.scenes.map((scene) => (
+                    <Link
+                      key={scene.id}
+                      to={`/scene/${scene.id}`}
+                      className="flex flex-col items-center flex-shrink-0 group w-[160px]"
+                    >
+                      <LazyThumbnail
+                        src={scene.paths?.screenshot}
+                        alt={scene.title || `Scene ${scene.id}`}
+                        fallback="🎬"
+                        className="aspect-video rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
+                      />
+                      <span
+                        className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
+                        style={{ color: "var(--text-primary)" }}
+                      >
+                        {scene.title || `Scene ${scene.id}`}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: "var(--text-muted)" }}>No scenes for this gallery</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
