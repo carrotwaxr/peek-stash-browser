@@ -85,34 +85,6 @@ const CustomizationTab = () => {
 
   return (
     <div className="space-y-6">
-      {/* Navigation Settings */}
-      <div
-        className="p-6 rounded-lg border"
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
-        }}
-      >
-        <NavigationSettings
-          navPreferences={navPreferences}
-          onSave={saveNavPreferences}
-        />
-      </div>
-
-      {/* Carousel Settings */}
-      <div
-        className="p-6 rounded-lg border"
-        style={{
-          backgroundColor: "var(--bg-card)",
-          borderColor: "var(--border-color)",
-        }}
-      >
-        <CarouselSettings
-          carouselPreferences={carouselPreferences}
-          onSave={saveCarouselPreferences}
-        />
-      </div>
-
       {/* Measurement Units */}
       <div
         className="p-6 rounded-lg border"
@@ -154,6 +126,34 @@ const CustomizationTab = () => {
             system.
           </p>
         </div>
+      </div>
+
+      {/* Navigation Settings */}
+      <div
+        className="p-6 rounded-lg border"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <NavigationSettings
+          navPreferences={navPreferences}
+          onSave={saveNavPreferences}
+        />
+      </div>
+
+      {/* Carousel Settings */}
+      <div
+        className="p-6 rounded-lg border"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <CarouselSettings
+          carouselPreferences={carouselPreferences}
+          onSave={saveCarouselPreferences}
+        />
       </div>
     </div>
   );

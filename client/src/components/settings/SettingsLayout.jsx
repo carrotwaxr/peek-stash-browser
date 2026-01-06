@@ -98,6 +98,7 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
                   borderBottom: isActive
                     ? "3px solid var(--accent-primary)"
                     : "3px solid transparent",
+                  backgroundColor: "transparent",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -105,9 +106,7 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = "transparent";
-                  }
+                  e.currentTarget.style.backgroundColor = "transparent";
                 }}
                 role="tab"
                 aria-selected={isActive}
