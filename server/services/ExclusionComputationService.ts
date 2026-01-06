@@ -463,21 +463,8 @@ class ExclusionComputationService {
   ): Promise<ExclusionRecord[]> {
     const emptyExclusions: ExclusionRecord[] = [];
 
-    // Warn about potential memory issues with large datasets
-    const LARGE_DATASET_THRESHOLD = 50000;
-    const entityCounts = {
-      galleries: await tx.stashGallery.count({ where: { deletedAt: null } }),
-      images: await tx.stashImage.count({ where: { deletedAt: null } }),
-    };
-    if (entityCounts.galleries > LARGE_DATASET_THRESHOLD || entityCounts.images > LARGE_DATASET_THRESHOLD) {
-      logger.warn("computeEmptyExclusions: Large dataset detected, may use significant memory", {
-        userId,
-        galleries: entityCounts.galleries,
-        images: entityCounts.images,
-      });
-    }
-
-    // Build sets of already-excluded entity IDs by type for efficient lookup
+    // Build sets of already-excluded entity IDs by type
+    // These will be used in temporary tables for SQL-based filtering
     const excludedSceneIds = new Set<string>();
     const excludedImageIds = new Set<string>();
     const excludedPerformerIds = new Set<string>();
@@ -504,203 +491,247 @@ class ExclusionComputationService {
       }
     }
 
-    // Helper to check if entity is visible (not in exclusion set)
-    const isSceneVisible = (id: string) => !excludedSceneIds.has(id);
-    const isImageVisible = (id: string) => !excludedImageIds.has(id);
-    const isPerformerVisible = (id: string) => !excludedPerformerIds.has(id);
-    const isStudioVisible = (id: string) => !excludedStudioIds.has(id);
-    const isGroupVisible = (id: string) => !excludedGroupIds.has(id);
-
     // 1. Empty galleries - galleries with 0 visible images
-    // Get all galleries with their images
-    const galleriesWithImages = await (tx as any).$queryRaw`
-      SELECT g.id as galleryId, i.id as imageId
-      FROM StashGallery g
-      LEFT JOIN ImageGallery ig ON ig.galleryId = g.id
-      LEFT JOIN StashImage i ON ig.imageId = i.id AND i.deletedAt IS NULL
-      WHERE g.deletedAt IS NULL
-    ` as Array<{ galleryId: string; imageId: string | null }>;
-
-    // Group by gallery and check if any image is visible
-    const galleryVisibleImages = new Map<string, boolean>();
-    for (const row of galleriesWithImages) {
-      if (!galleryVisibleImages.has(row.galleryId)) {
-        galleryVisibleImages.set(row.galleryId, false);
-      }
-      if (row.imageId && isImageVisible(row.imageId)) {
-        galleryVisibleImages.set(row.galleryId, true);
-      }
+    // Use a temporary table to avoid loading all relationships into memory
+    // Create temp table with excluded image IDs
+    if (excludedImageIds.size > 0) {
+      const excludedImageIdsList = Array.from(excludedImageIds).map(id => `'${id}'`).join(',');
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw(Prisma.raw(`
+        DELETE FROM temp_excluded_images
+      `));
+      await (tx as any).$executeRaw(Prisma.raw(`
+        INSERT INTO temp_excluded_images (imageId) VALUES ${Array.from(excludedImageIds).map(id => `('${id}')`).join(',')}
+      `));
+    } else {
+      // If no excluded images, create empty temp table
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_images`;
     }
 
-    for (const [galleryId, hasVisibleImages] of galleryVisibleImages) {
-      if (!hasVisibleImages) {
-        emptyExclusions.push({
-          userId,
-          entityType: "gallery",
-          entityId: galleryId,
-          reason: "empty",
-        });
-      }
+    // Query for empty galleries using temp table
+    const emptyGalleries = await (tx as any).$queryRaw`
+      SELECT g.id as galleryId
+      FROM StashGallery g
+      WHERE g.deletedAt IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM ImageGallery ig
+        JOIN StashImage i ON ig.imageId = i.id
+        WHERE ig.galleryId = g.id
+          AND i.deletedAt IS NULL
+          AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
+      )
+    ` as Array<{ galleryId: string }>;
+
+    for (const row of emptyGalleries) {
+      emptyExclusions.push({
+        userId,
+        entityType: "gallery",
+        entityId: row.galleryId,
+        reason: "empty",
+      });
     }
 
     // 2. Empty performers - performers with 0 visible scenes AND 0 visible images
-    const performersWithContent = await (tx as any).$queryRaw`
-      SELECT p.id as performerId,
-             sp.sceneId,
-             ip.imageId
-      FROM StashPerformer p
-      LEFT JOIN ScenePerformer sp ON sp.performerId = p.id
-      LEFT JOIN StashScene s ON sp.sceneId = s.id AND s.deletedAt IS NULL
-      LEFT JOIN ImagePerformer ip ON ip.performerId = p.id
-      LEFT JOIN StashImage i ON ip.imageId = i.id AND i.deletedAt IS NULL
-      WHERE p.deletedAt IS NULL
-    ` as Array<{ performerId: string; sceneId: string | null; imageId: string | null }>;
-
-    // Group by performer and check visibility
-    const performerHasVisibleContent = new Map<string, boolean>();
-    for (const row of performersWithContent) {
-      if (!performerHasVisibleContent.has(row.performerId)) {
-        performerHasVisibleContent.set(row.performerId, false);
-      }
-      // Skip if performer is already excluded via direct/cascade
-      if (excludedPerformerIds.has(row.performerId)) {
-        continue;
-      }
-      if ((row.sceneId && isSceneVisible(row.sceneId)) ||
-          (row.imageId && isImageVisible(row.imageId))) {
-        performerHasVisibleContent.set(row.performerId, true);
-      }
+    // Create temp tables for excluded entities
+    if (excludedSceneIds.size > 0) {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_scenes (sceneId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_scenes`;
+      await (tx as any).$executeRaw(Prisma.raw(`
+        INSERT INTO temp_excluded_scenes (sceneId) VALUES ${Array.from(excludedSceneIds).map(id => `('${id}')`).join(',')}
+      `));
+    } else {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_scenes (sceneId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_scenes`;
     }
 
-    for (const [performerId, hasVisibleContent] of performerHasVisibleContent) {
-      if (!hasVisibleContent && !excludedPerformerIds.has(performerId)) {
-        emptyExclusions.push({
-          userId,
-          entityType: "performer",
-          entityId: performerId,
-          reason: "empty",
-        });
-      }
+    if (excludedPerformerIds.size > 0) {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_performers (performerId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_performers`;
+      await (tx as any).$executeRaw(Prisma.raw(`
+        INSERT INTO temp_excluded_performers (performerId) VALUES ${Array.from(excludedPerformerIds).map(id => `('${id}')`).join(',')}
+      `));
+    } else {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_performers (performerId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_performers`;
+    }
+
+    // Query for empty performers
+    const emptyPerformers = await (tx as any).$queryRaw`
+      SELECT p.id as performerId
+      FROM StashPerformer p
+      WHERE p.deletedAt IS NULL
+      AND p.id NOT IN (SELECT performerId FROM temp_excluded_performers)
+      AND NOT EXISTS (
+        SELECT 1 FROM ScenePerformer sp
+        JOIN StashScene s ON sp.sceneId = s.id
+        WHERE sp.performerId = p.id
+          AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM ImagePerformer ip
+        JOIN StashImage i ON ip.imageId = i.id
+        WHERE ip.performerId = p.id
+          AND i.deletedAt IS NULL
+          AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
+      )
+    ` as Array<{ performerId: string }>;
+
+    for (const row of emptyPerformers) {
+      emptyExclusions.push({
+        userId,
+        entityType: "performer",
+        entityId: row.performerId,
+        reason: "empty",
+      });
     }
 
     // 3. Empty studios - studios with 0 visible scenes AND 0 visible images
-    const studiosWithContent = await (tx as any).$queryRaw`
-      SELECT st.id as studioId,
-             s.id as sceneId,
-             i.id as imageId
-      FROM StashStudio st
-      LEFT JOIN StashScene s ON s.studioId = st.id AND s.deletedAt IS NULL
-      LEFT JOIN StashImage i ON i.studioId = st.id AND i.deletedAt IS NULL
-      WHERE st.deletedAt IS NULL
-    ` as Array<{ studioId: string; sceneId: string | null; imageId: string | null }>;
-
-    const studioHasVisibleContent = new Map<string, boolean>();
-    for (const row of studiosWithContent) {
-      if (!studioHasVisibleContent.has(row.studioId)) {
-        studioHasVisibleContent.set(row.studioId, false);
-      }
-      if (excludedStudioIds.has(row.studioId)) {
-        continue;
-      }
-      if ((row.sceneId && isSceneVisible(row.sceneId)) ||
-          (row.imageId && isImageVisible(row.imageId))) {
-        studioHasVisibleContent.set(row.studioId, true);
-      }
+    if (excludedStudioIds.size > 0) {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_studios (studioId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_studios`;
+      await (tx as any).$executeRaw(Prisma.raw(`
+        INSERT INTO temp_excluded_studios (studioId) VALUES ${Array.from(excludedStudioIds).map(id => `('${id}')`).join(',')}
+      `));
+    } else {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_studios (studioId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_studios`;
     }
 
-    for (const [studioId, hasVisibleContent] of studioHasVisibleContent) {
-      if (!hasVisibleContent && !excludedStudioIds.has(studioId)) {
-        emptyExclusions.push({
-          userId,
-          entityType: "studio",
-          entityId: studioId,
-          reason: "empty",
-        });
-      }
+    const emptyStudios = await (tx as any).$queryRaw`
+      SELECT st.id as studioId
+      FROM StashStudio st
+      WHERE st.deletedAt IS NULL
+      AND st.id NOT IN (SELECT studioId FROM temp_excluded_studios)
+      AND NOT EXISTS (
+        SELECT 1 FROM StashScene s
+        WHERE s.studioId = st.id
+          AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM StashImage i
+        WHERE i.studioId = st.id
+          AND i.deletedAt IS NULL
+          AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
+      )
+    ` as Array<{ studioId: string }>;
+
+    for (const row of emptyStudios) {
+      emptyExclusions.push({
+        userId,
+        entityType: "studio",
+        entityId: row.studioId,
+        reason: "empty",
+      });
     }
 
     // 4. Empty groups - groups with 0 visible scenes
-    const groupsWithScenes = await (tx as any).$queryRaw`
-      SELECT g.id as groupId, s.id as sceneId
-      FROM StashGroup g
-      LEFT JOIN SceneGroup sg ON sg.groupId = g.id
-      LEFT JOIN StashScene s ON sg.sceneId = s.id AND s.deletedAt IS NULL
-      WHERE g.deletedAt IS NULL
-    ` as Array<{ groupId: string; sceneId: string | null }>;
-
-    const groupHasVisibleScenes = new Map<string, boolean>();
-    for (const row of groupsWithScenes) {
-      if (!groupHasVisibleScenes.has(row.groupId)) {
-        groupHasVisibleScenes.set(row.groupId, false);
-      }
-      if (excludedGroupIds.has(row.groupId)) {
-        continue;
-      }
-      if (row.sceneId && isSceneVisible(row.sceneId)) {
-        groupHasVisibleScenes.set(row.groupId, true);
-      }
+    if (excludedGroupIds.size > 0) {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_groups (groupId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_groups`;
+      await (tx as any).$executeRaw(Prisma.raw(`
+        INSERT INTO temp_excluded_groups (groupId) VALUES ${Array.from(excludedGroupIds).map(id => `('${id}')`).join(',')}
+      `));
+    } else {
+      await (tx as any).$executeRaw`
+        CREATE TEMP TABLE IF NOT EXISTS temp_excluded_groups (groupId TEXT PRIMARY KEY)
+      `;
+      await (tx as any).$executeRaw`DELETE FROM temp_excluded_groups`;
     }
 
-    for (const [groupId, hasVisibleScenes] of groupHasVisibleScenes) {
-      if (!hasVisibleScenes && !excludedGroupIds.has(groupId)) {
-        emptyExclusions.push({
-          userId,
-          entityType: "group",
-          entityId: groupId,
-          reason: "empty",
-        });
-      }
+    const emptyGroups = await (tx as any).$queryRaw`
+      SELECT g.id as groupId
+      FROM StashGroup g
+      WHERE g.deletedAt IS NULL
+      AND g.id NOT IN (SELECT groupId FROM temp_excluded_groups)
+      AND NOT EXISTS (
+        SELECT 1 FROM SceneGroup sg
+        JOIN StashScene s ON sg.sceneId = s.id
+        WHERE sg.groupId = g.id
+          AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+      )
+    ` as Array<{ groupId: string }>;
+
+    for (const row of emptyGroups) {
+      emptyExclusions.push({
+        userId,
+        entityType: "group",
+        entityId: row.groupId,
+        reason: "empty",
+      });
     }
 
     // 5. Empty tags - tags not attached to any visible scene, performer, studio, or group
-    const tagsWithEntities = await (tx as any).$queryRaw`
-      SELECT t.id as tagId,
-             st.sceneId,
-             pt.performerId,
-             stt.studioId,
-             gt.groupId
+    const emptyTags = await (tx as any).$queryRaw`
+      SELECT t.id as tagId
       FROM StashTag t
-      LEFT JOIN SceneTag st ON st.tagId = t.id
-      LEFT JOIN StashScene s ON st.sceneId = s.id AND s.deletedAt IS NULL
-      LEFT JOIN PerformerTag pt ON pt.tagId = t.id
-      LEFT JOIN StashPerformer p ON pt.performerId = p.id AND p.deletedAt IS NULL
-      LEFT JOIN StudioTag stt ON stt.tagId = t.id
-      LEFT JOIN StashStudio stu ON stt.studioId = stu.id AND stu.deletedAt IS NULL
-      LEFT JOIN GroupTag gt ON gt.tagId = t.id
-      LEFT JOIN StashGroup g ON gt.groupId = g.id AND g.deletedAt IS NULL
       WHERE t.deletedAt IS NULL
-    ` as Array<{
-      tagId: string;
-      sceneId: string | null;
-      performerId: string | null;
-      studioId: string | null;
-      groupId: string | null;
-    }>;
+      AND NOT EXISTS (
+        SELECT 1 FROM SceneTag st
+        JOIN StashScene s ON st.sceneId = s.id
+        WHERE st.tagId = t.id
+          AND s.deletedAt IS NULL
+          AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM PerformerTag pt
+        JOIN StashPerformer p ON pt.performerId = p.id
+        WHERE pt.tagId = t.id
+          AND p.deletedAt IS NULL
+          AND p.id NOT IN (SELECT performerId FROM temp_excluded_performers)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM StudioTag stt
+        JOIN StashStudio stu ON stt.studioId = stu.id
+        WHERE stt.tagId = t.id
+          AND stu.deletedAt IS NULL
+          AND stu.id NOT IN (SELECT studioId FROM temp_excluded_studios)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM GroupTag gt
+        JOIN StashGroup g ON gt.groupId = g.id
+        WHERE gt.tagId = t.id
+          AND g.deletedAt IS NULL
+          AND g.id NOT IN (SELECT groupId FROM temp_excluded_groups)
+      )
+    ` as Array<{ tagId: string }>;
 
-    const tagHasVisibleEntities = new Map<string, boolean>();
-    for (const row of tagsWithEntities) {
-      if (!tagHasVisibleEntities.has(row.tagId)) {
-        tagHasVisibleEntities.set(row.tagId, false);
-      }
-      // Check if any attached entity is visible
-      if ((row.sceneId && isSceneVisible(row.sceneId)) ||
-          (row.performerId && isPerformerVisible(row.performerId)) ||
-          (row.studioId && isStudioVisible(row.studioId)) ||
-          (row.groupId && isGroupVisible(row.groupId))) {
-        tagHasVisibleEntities.set(row.tagId, true);
-      }
+    for (const row of emptyTags) {
+      emptyExclusions.push({
+        userId,
+        entityType: "tag",
+        entityId: row.tagId,
+        reason: "empty",
+      });
     }
 
-    for (const [tagId, hasVisibleEntities] of tagHasVisibleEntities) {
-      if (!hasVisibleEntities) {
-        emptyExclusions.push({
-          userId,
-          entityType: "tag",
-          entityId: tagId,
-          reason: "empty",
-        });
-      }
-    }
+    // Clean up temporary tables
+    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_images`;
+    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_scenes`;
+    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_performers`;
+    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_studios`;
+    await (tx as any).$executeRaw`DROP TABLE IF EXISTS temp_excluded_groups`;
 
     return emptyExclusions;
   }

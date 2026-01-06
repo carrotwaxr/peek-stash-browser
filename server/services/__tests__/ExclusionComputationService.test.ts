@@ -5,6 +5,7 @@ vi.mock("../../prisma/singleton.js", () => ({
   default: {
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
+    $executeRaw: vi.fn(),
     userExcludedEntity: {
       deleteMany: vi.fn(),
       createMany: vi.fn(),
@@ -133,6 +134,8 @@ describe("computeDirectExclusions", () => {
     mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
     mockPrisma.imageGallery.findMany.mockResolvedValue([]);
     mockPrisma.$queryRaw.mockResolvedValue([]);
+    // Mock $executeRaw for temp table operations
+    mockPrisma.$executeRaw.mockResolvedValue(undefined);
     // Default count responses for entity stats
     mockPrisma.stashScene.count.mockResolvedValue(0);
     mockPrisma.stashPerformer.count.mockResolvedValue(0);
@@ -932,34 +935,10 @@ describe("computeEmptyExclusions", () => {
     mockPrisma.userHiddenEntity.findMany.mockResolvedValue([]);
     mockPrisma.userExcludedEntity.deleteMany.mockResolvedValue({ count: 0 });
 
-    // Mock raw queries - all entities have visible content (return populated content)
-    let queryCallCount = 0;
-    mockPrisma.$queryRaw = vi.fn().mockImplementation(() => {
-      queryCallCount++;
-      switch (queryCallCount) {
-        // Query 1: galleries - gallery1 has visible image
-        case 1: return Promise.resolve([
-          { galleryId: "gallery1", imageId: "image1" },
-        ]);
-        // Query 2: performers - performer1 has visible scene
-        case 2: return Promise.resolve([
-          { performerId: "performer1", sceneId: "scene1", imageId: null },
-        ]);
-        // Query 3: studios - studio1 has visible scene
-        case 3: return Promise.resolve([
-          { studioId: "studio1", sceneId: "scene1", imageId: null },
-        ]);
-        // Query 4: groups - group1 has visible scene
-        case 4: return Promise.resolve([
-          { groupId: "group1", sceneId: "scene1" },
-        ]);
-        // Query 5: tags - tag1 has visible scene
-        case 5: return Promise.resolve([
-          { tagId: "tag1", sceneId: "scene1", performerId: null, studioId: null, groupId: null },
-        ]);
-        default: return Promise.resolve([]);
-      }
-    });
+    // Mock raw queries - new implementation uses NOT EXISTS and returns empty arrays
+    // when entities have visible content (they are NOT empty)
+    // All queries should return empty arrays since entities have visible content
+    mockPrisma.$queryRaw.mockResolvedValue([]);
 
     mockPrisma.$transaction.mockImplementation(async (callback: any) => {
       return callback(mockPrisma);
