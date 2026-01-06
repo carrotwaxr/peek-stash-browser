@@ -1,33 +1,8 @@
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { Paper, SectionLink, TagChips, useLazyLoad } from "../ui/index.js";
+import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
 import { galleryTitle } from "../../utils/gallery.js";
-
-/**
- * LazyThumbnail - Lazy-loaded thumbnail for performer images
- */
-const LazyThumbnail = ({ src, alt, fallback, className }) => {
-  const [ref, shouldLoad] = useLazyLoad();
-
-  return (
-    <div
-      ref={ref}
-      className={className}
-      style={{ backgroundColor: "var(--bg-secondary)" }}
-    >
-      {shouldLoad && src ? (
-        <img src={src} alt={alt} className="w-full h-full object-cover" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <span className="text-2xl" style={{ color: "var(--text-muted)" }}>
-            {fallback}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";
