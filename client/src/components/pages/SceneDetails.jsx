@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { Paper, SectionLink, TabNavigation, TagChips, useLazyLoad } from "../ui/index.js";
+import { Paper, SectionLink, TagChips, useLazyLoad } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
 import { galleryTitle } from "../../utils/gallery.js";
-import ScenesLikeThis from "../ui/ScenesLikeThis.jsx";
 
 /**
  * LazyThumbnail - Lazy-loaded thumbnail for performer images
@@ -72,7 +70,6 @@ const SceneDetails = ({
   setShowTechnicalDetails,
 }) => {
   const { scene, sceneLoading, compatibility } = useScenePlayer();
-  const [activeTab, setActiveTab] = useState('similar');
 
   // Don't render if no scene data yet
   if (!scene) {
@@ -255,29 +252,14 @@ const SceneDetails = ({
           </Paper>
         </div>
 
-        {/* Tabbed Content Section */}
-        <div>
-          <TabNavigation
-            tabs={[
-              { id: 'similar', label: 'Similar Scenes', count: null },
-              { id: 'collections', label: 'Collections', count: scene.groups?.length || 0 },
-              { id: 'galleries', label: 'Galleries', count: scene.galleries?.length || 0 },
-            ]}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-
-          {/* Similar Scenes Tab */}
-          {activeTab === 'similar' && (
-            <div className="mt-6">
-              <ScenesLikeThis sceneId={scene.id} />
-            </div>
-          )}
-
-          {/* Collections Tab */}
-          {activeTab === 'collections' && (
-            <div className="mt-6">
-              {scene.groups && scene.groups.length > 0 ? (
+        {/* Collections Section */}
+        {scene.groups && scene.groups.length > 0 && (
+          <div>
+            <Paper>
+              <Paper.Header>
+                <Paper.Title>Collections</Paper.Title>
+              </Paper.Header>
+              <Paper.Body>
                 <div className="flex flex-wrap gap-2">
                   {scene.groups.map((group) => {
                     // Generate a color based on group ID for consistency
@@ -343,16 +325,19 @@ const SceneDetails = ({
                     );
                   })}
                 </div>
-              ) : (
-                <p style={{ color: "var(--text-muted)" }}>No collections for this scene</p>
-              )}
-            </div>
-          )}
+              </Paper.Body>
+            </Paper>
+          </div>
+        )}
 
-          {/* Galleries Tab */}
-          {activeTab === 'galleries' && (
-            <div className="mt-6">
-              {scene.galleries && scene.galleries.length > 0 ? (
+        {/* Galleries Section */}
+        {scene.galleries && scene.galleries.length > 0 && (
+          <div>
+            <Paper>
+              <Paper.Header>
+                <Paper.Title>Galleries</Paper.Title>
+              </Paper.Header>
+              <Paper.Body>
                 <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
                   {scene.galleries.map((gallery) => (
                     <Link
@@ -375,14 +360,12 @@ const SceneDetails = ({
                     </Link>
                   ))}
                 </div>
-              ) : (
-                <p style={{ color: "var(--text-muted)" }}>No galleries for this scene</p>
-              )}
-            </div>
-          )}
-        </div>
+              </Paper.Body>
+            </Paper>
+          </div>
+        )}
 
-        {/* Tags Section (after tabs) */}
+        {/* Tags Section */}
         <div>
           <Paper>
             <Paper.Header>
