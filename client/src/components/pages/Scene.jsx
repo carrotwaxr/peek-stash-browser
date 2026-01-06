@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ScenePlayerProvider,
   useScenePlayer,
@@ -15,7 +15,6 @@ import {
   Navigation,
   RecommendedSidebar,
   ScenesLikeThis,
-  TabNavigation,
 } from "../ui/index.js";
 import { GalleryGrid, GroupGrid } from "../grids/index.js";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
@@ -26,7 +25,6 @@ import SceneDetails from "./SceneDetails.jsx";
 // Inner component that reads from context
 const SceneContent = ({ location }) => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const leftColumnRef = useRef(null);
 
@@ -44,6 +42,7 @@ const SceneContent = ({ location }) => {
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [sidebarHeight, setSidebarHeight] = useState(null);
+  const [activeTab, setActiveTab] = useState('similar');
 
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
@@ -196,44 +195,101 @@ const SceneContent = ({ location }) => {
         {/* Tabbed Relationship Content */}
         {scene && (
           <div className="mt-6">
-            <TabNavigation
-              tabs={[
-                { id: 'similar', label: 'Similar Scenes', count: 1 },
-                { id: 'collections', label: 'Collections', count: scene.groups?.length || 0 },
-                { id: 'galleries', label: 'Galleries', count: scene.galleries?.length || 0 },
-              ]}
-              defaultTab="similar"
-            />
+            {/* Tab Navigation - Local state, no URL params */}
+            <div
+              className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-rounded"
+              style={{
+                borderBottom: '2px solid var(--bg-tertiary)',
+                marginBottom: '1.5rem',
+              }}
+            >
+              <div className="flex gap-1 min-w-full">
+                <button
+                  onClick={() => setActiveTab('similar')}
+                  className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{
+                    color: activeTab === 'similar' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    borderBottom: activeTab === 'similar' ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                    backgroundColor: activeTab === 'similar' ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                    cursor: activeTab === 'similar' ? 'default' : 'pointer',
+                  }}
+                  disabled={activeTab === 'similar'}
+                >
+                  Similar Scenes
+                </button>
+                {scene.groups && scene.groups.length > 0 && (
+                  <button
+                    onClick={() => setActiveTab('collections')}
+                    className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    style={{
+                      color: activeTab === 'collections' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      borderBottom: activeTab === 'collections' ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                      backgroundColor: activeTab === 'collections' ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                      cursor: activeTab === 'collections' ? 'default' : 'pointer',
+                    }}
+                    disabled={activeTab === 'collections'}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>Collections</span>
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: activeTab === 'collections' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                          color: activeTab === 'collections' ? 'white' : 'var(--text-muted)',
+                        }}
+                      >
+                        {scene.groups.length}
+                      </span>
+                    </span>
+                  </button>
+                )}
+                {scene.galleries && scene.galleries.length > 0 && (
+                  <button
+                    onClick={() => setActiveTab('galleries')}
+                    className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    style={{
+                      color: activeTab === 'galleries' ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      borderBottom: activeTab === 'galleries' ? '3px solid var(--accent-primary)' : '3px solid transparent',
+                      backgroundColor: activeTab === 'galleries' ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+                      cursor: activeTab === 'galleries' ? 'default' : 'pointer',
+                    }}
+                    disabled={activeTab === 'galleries'}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>Galleries</span>
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: activeTab === 'galleries' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                          color: activeTab === 'galleries' ? 'white' : 'var(--text-muted)',
+                        }}
+                      >
+                        {scene.galleries.length}
+                      </span>
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
 
-            {/* Get active tab from URL */}
-            {(() => {
-              const activeTab = searchParams.get('tab') || 'similar';
+            {/* Tab Content */}
+            {activeTab === 'similar' && (
+              <div className="mt-6">
+                <ScenesLikeThis sceneId={scene.id} />
+              </div>
+            )}
 
-              return (
-                <>
-                  {/* Similar Scenes Tab */}
-                  {activeTab === 'similar' && (
-                    <div className="mt-6">
-                      <ScenesLikeThis sceneId={scene.id} />
-                    </div>
-                  )}
+            {activeTab === 'collections' && (
+              <div className="mt-6">
+                <GroupGrid groups={scene.groups || []} />
+              </div>
+            )}
 
-                  {/* Collections Tab */}
-                  {activeTab === 'collections' && (
-                    <div className="mt-6">
-                      <GroupGrid groups={scene.groups || []} />
-                    </div>
-                  )}
-
-                  {/* Galleries Tab */}
-                  {activeTab === 'galleries' && (
-                    <div className="mt-6">
-                      <GalleryGrid galleries={scene.galleries || []} />
-                    </div>
-                  )}
-                </>
-              );
-            })()}
+            {activeTab === 'galleries' && (
+              <div className="mt-6">
+                <GalleryGrid galleries={scene.galleries || []} />
+              </div>
+            )}
           </div>
         )}
       </main>
