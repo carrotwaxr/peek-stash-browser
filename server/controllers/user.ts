@@ -4,6 +4,7 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Carousel preference configuration
@@ -1014,7 +1015,7 @@ export const syncFromStash = async (
       return results;
     }
 
-    console.log("Syncing from Stash: Fetching entities in paginated batches...");
+    logger.info("Syncing from Stash: Fetching entities in paginated batches...");
 
     // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
     if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
