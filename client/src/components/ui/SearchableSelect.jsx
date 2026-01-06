@@ -171,13 +171,16 @@ const SearchableSelect = ({
 
         // Fetch from API
         const apiMethod = apiMethods[entityType];
-        const filter = search
-          ? { q: search, per_page: 50 } // Limited results for search
-          : { per_page: -1, sort: "name", direction: "ASC" }; // All results, sorted
+        const filter = {
+          per_page: 50,
+          sort: "name",
+          direction: "ASC",
+          ...(search ? { q: search } : {}),
+        };
 
         const results = await apiMethod({ filter });
 
-        // Cache if we fetched all (no search)
+        // Cache first page of results (no search = initial batch)
         if (!search && results.length > 0) {
           setCache(entityType, results);
         }
@@ -379,7 +382,7 @@ const SearchableSelect = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={`Search ${entityType}...`}
+                placeholder="Type to search..."
                 className="w-full pl-9 pr-3 py-2 rounded-md border text-sm"
                 style={{
                   backgroundColor: "var(--bg-secondary)",

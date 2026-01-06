@@ -259,6 +259,7 @@ export const findGalleries = async (
   res: TypedResponse<FindGalleriesResponse | ApiErrorResponse>
 ) => {
   try {
+    const startTime = Date.now();
     const userId = req.user?.id;
     const { filter, gallery_filter, ids } = req.body;
 
@@ -377,6 +378,14 @@ export const findGalleries = async (
       ...gallery,
       stashUrl: buildStashEntityUrl("gallery", gallery.id),
     }));
+
+    logger.info("findGalleries completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      totalCount: total,
+      returnedCount: galleriesWithStashUrl.length,
+      page,
+      perPage,
+    });
 
     res.json({
       findGalleries: {

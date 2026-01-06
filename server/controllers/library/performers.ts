@@ -142,6 +142,7 @@ export const findPerformers = async (
   res: TypedResponse<FindPerformersResponse | ApiErrorResponse>
 ) => {
   try {
+    const startTime = Date.now();
     const userId = req.user?.id;
     const { filter, performer_filter, ids } = req.body;
 
@@ -248,6 +249,14 @@ export const findPerformers = async (
       ...performer,
       stashUrl: buildStashEntityUrl('performer', performer.id),
     }));
+
+    logger.info("findPerformers completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      totalCount: total,
+      returnedCount: performersWithStashUrl.length,
+      page,
+      perPage,
+    });
 
     res.json({
       findPerformers: {
