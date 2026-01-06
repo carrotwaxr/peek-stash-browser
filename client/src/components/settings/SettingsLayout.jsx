@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 
 /**
@@ -6,20 +6,21 @@ import PropTypes from "prop-types";
  * Handles mobile scrolling, active tab indication, and tab content rendering
  */
 const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
+  const SCROLL_THRESHOLD = 1;
   const tabContainerRef = useRef(null);
   const [showLeftFade, setShowLeftFade] = useState(false);
   const [showRightFade, setShowRightFade] = useState(false);
 
   // Check scroll position to show/hide fade indicators
-  const checkScroll = () => {
+  const checkScroll = useCallback(() => {
     const container = tabContainerRef.current;
     if (!container) return;
 
     setShowLeftFade(container.scrollLeft > 0);
     setShowRightFade(
-      container.scrollLeft < container.scrollWidth - container.clientWidth - 1
+      container.scrollLeft < container.scrollWidth - container.clientWidth - SCROLL_THRESHOLD
     );
-  };
+  }, []);
 
   // Scroll active tab into view
   useEffect(() => {
@@ -38,7 +39,7 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
     }
 
     checkScroll();
-  }, [activeTab]);
+  }, [activeTab, checkScroll]);
 
   // Add scroll listener
   useEffect(() => {
@@ -54,7 +55,7 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
       container.removeEventListener("scroll", checkScroll);
       window.removeEventListener("resize", checkScroll);
     };
-  }, []);
+  }, [checkScroll]);
 
   return (
     <div>
@@ -73,7 +74,7 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
         {/* Tab container */}
         <div
           ref={tabContainerRef}
-          className="flex gap-4 overflow-x-auto pb-2"
+          className="settings-tab-container flex gap-4 overflow-x-auto pb-2"
           style={{
             scrollbarWidth: "none",
             WebkitOverflowScrolling: "touch",
@@ -98,9 +99,6 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
                   borderBottom: isActive
                     ? "3px solid var(--accent-primary)"
                     : "3px solid transparent",
-                  backgroundColor: !isActive
-                    ? "transparent"
-                    : "transparent",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -134,8 +132,8 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
         )}
 
         {/* Hide scrollbar */}
-        <style jsx>{`
-          div::-webkit-scrollbar {
+        <style>{`
+          .settings-tab-container::-webkit-scrollbar {
             display: none;
           }
         `}</style>
