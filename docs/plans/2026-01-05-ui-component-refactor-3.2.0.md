@@ -32,7 +32,7 @@ UI Display Components:
 ├── Base Components (Foundation)
 │   ├── BaseCard.jsx - Composable card with render slots
 │   ├── BaseGrid.jsx - Layout, pagination, loading/empty states
-│   ├── SearchableGrid.jsx - BaseGrid + search controls + data fetching
+│   ├── EntitySearch.jsx - BaseGrid + search controls + data fetching
 │   └── CardComponents.jsx - Shared primitives
 │       ├── CardContainer
 │       ├── CardImage (with lazy loading)
@@ -52,12 +52,12 @@ UI Display Components:
 │
 ├── Entity Grids (7 types)
 │   ├── SceneGrid.jsx - Custom implementation (selection, TV navigation)
-│   ├── GalleryGrid.jsx - Thin wrapper around SearchableGrid
-│   ├── GroupGrid.jsx - Thin wrapper around SearchableGrid
-│   ├── PerformerGrid.jsx - Thin wrapper around SearchableGrid
-│   ├── StudioGrid.jsx - Thin wrapper around SearchableGrid
-│   ├── TagGrid.jsx - Thin wrapper around SearchableGrid
-│   └── ImageGrid.jsx - Thin wrapper around SearchableGrid
+│   ├── GalleryGrid.jsx - Thin wrapper around EntitySearch
+│   ├── GroupGrid.jsx - Thin wrapper around EntitySearch
+│   ├── PerformerGrid.jsx - Thin wrapper around EntitySearch
+│   ├── StudioGrid.jsx - Thin wrapper around EntitySearch
+│   ├── TagGrid.jsx - Thin wrapper around EntitySearch
+│   └── ImageGrid.jsx - Thin wrapper around EntitySearch
 │
 └── Special Display Patterns
     ├── SceneListItem.jsx - Row-based layout (playlists, watch history)
@@ -69,7 +69,7 @@ UI Display Components:
 ### Data Flow Pattern
 
 ```
-SearchableGrid (data fetching)
+EntitySearch (data fetching)
     ↓
 BaseGrid (layout + states)
     ↓
@@ -90,7 +90,7 @@ BaseCard + CardComponents (primitives)
 - **Consistent prop interface** across all entity cards (except SceneCard)
 - **Good separation of concerns** - BaseCard handles layout, entity cards provide data mapping
 
-### 2. SearchableGrid Pattern ✅
+### 2. EntitySearch Pattern ✅
 - **Consistent search/filter/pagination** across all entity types
 - **Centralized data fetching** via libraryApi
 - **URL state sync** for shareable links
@@ -481,7 +481,7 @@ Build a **flexible, composable card system** that supports:
 ### Architecture Philosophy
 
 **Separation of Concerns:**
-- **Data fetching** - SearchableGrid (knows about API, filtering, pagination)
+- **Data fetching** - EntitySearch (knows about API, filtering, pagination)
 - **Layout rendering** - LayoutRenderer (knows about spacing, columns, arrangement)
 - **Entity presentation** - Entity Cards (know about entity structure, not layout)
 - **Visual primitives** - CardComponents (know about UI, not entities)
@@ -491,7 +491,7 @@ Build a **flexible, composable card system** that supports:
 ```
 Page Component (e.g., Scenes.jsx)
     └── EntityGrid (e.g., SceneGrid.jsx) - Entity-specific wrapper
-            └── SearchableGrid - Data fetching + search/filter UI
+            └── EntitySearch - Data fetching + search/filter UI
                     └── SearchResults - Layout mode controller (NEW)
                             └── LayoutRenderer - Grid/List/Compact renderer (NEW)
                                     └── Entity Card (e.g., SceneCard.jsx)
@@ -519,7 +519,7 @@ Page Component (e.g., Scenes.jsx)
 └──────────────────────────────────────────────────────────────────┘
                               ↓
 ┌──────────────────────────────────────────────────────────────────┐
-│ Data Layer (SearchableGrid)                                      │
+│ Data Layer (EntitySearch)                                      │
 │                                                                  │
 │  Responsibilities:                                               │
 │  • API calls via libraryApi.findScenes()                         │
@@ -908,9 +908,9 @@ export const ListLayout = ({
 };
 ```
 
-### How SearchableGrid Changes
+### How EntitySearch Changes
 
-**Current SearchableGrid:**
+**Current EntitySearch:**
 ```jsx
 // Currently returns BaseGrid directly
 return (
@@ -927,7 +927,7 @@ return (
 );
 ```
 
-**New SearchableGrid (Phase 1 - Grid only):**
+**New EntitySearch (Phase 1 - Grid only):**
 ```jsx
 // Phase 1: Use SearchResults instead of BaseGrid
 return (
@@ -947,7 +947,7 @@ return (
 );
 ```
 
-**Future SearchableGrid (Phase 2 - Multiple layouts):**
+**Future EntitySearch (Phase 2 - Multiple layouts):**
 ```jsx
 // Phase 2: SearchResults reads layoutType preference and renders accordingly
 // No code changes needed - SearchResults handles it internally
@@ -980,11 +980,11 @@ return (
 );
 ```
 
-**2. All Grids Share SearchableGrid**
+**2. All Grids Share EntitySearch**
 ```jsx
 // PerformerGrid.jsx - minimal wrapper
 const PerformerGrid = (props) => (
-  <SearchableGrid
+  <EntitySearch
     entityType="performer"
     renderItem={(performer, _, { onHideSuccess }) => (
       <PerformerCard performer={performer} onHideSuccess={onHideSuccess} />
