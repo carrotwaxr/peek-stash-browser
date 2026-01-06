@@ -984,8 +984,36 @@ export const syncFromStash = async (
       groups: { checked: 0, updated: 0, created: 0 },
     };
 
-    // Fetch all entities from Stash (per_page: -1 = unlimited)
-    console.log("Syncing from Stash: Fetching all entities...");
+    // Pagination settings - match StashSyncService.PAGE_SIZE
+    const PAGE_SIZE = 1000;
+
+    // Helper to fetch paginated results
+    async function fetchPaginated<T>(
+      fetchFn: (page: number) => Promise<{ items: T[]; count: number }>,
+      filter: (item: T) => boolean = () => true
+    ): Promise<T[]> {
+      const results: T[] = [];
+      let page = 1;
+      let fetchedCount = 0;
+      let totalCount = 0;
+
+      while (true) {
+        const { items, count } = await fetchFn(page);
+        totalCount = count;
+
+        const filtered = items.filter(filter);
+        results.push(...filtered);
+        fetchedCount += items.length;
+
+        // Stop when we've fetched all items OR received an empty page
+        if (fetchedCount >= totalCount || items.length === 0) break;
+        page++;
+      }
+
+      return results;
+    }
+
+    console.log("Syncing from Stash: Fetching entities in paginated batches...");
 
     // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
     if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
@@ -999,26 +1027,32 @@ export const syncFromStash = async (
       }
       // If both are selected, fetch all scenes (can't do OR in single query)
 
-      const scenesData = await stash.findScenes({
-        filter: { per_page: -1 },
-        scene_filter:
-          Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined,
-      });
-      const scenes = scenesData.findScenes.scenes;
-
-      // Filter in code only if both options are selected
-      const filteredScenes =
+      // Build filter function for in-code filtering when both options selected
+      const sceneFilterFn =
         syncOptions.scenes.rating && syncOptions.scenes.oCounter
-          ? scenes.filter(
-              (s: { rating100?: number | null; o_counter?: number | null }) =>
-                (s.rating100 !== null &&
-                  s.rating100 !== undefined &&
-                  s.rating100 > 0) ||
-                (s.o_counter !== null &&
-                  s.o_counter !== undefined &&
-                  s.o_counter > 0)
-            )
-          : scenes;
+          ? (s: { rating100?: number | null; o_counter?: number | null }) =>
+              (s.rating100 !== null &&
+                s.rating100 !== undefined &&
+                s.rating100 > 0) ||
+              (s.o_counter !== null &&
+                s.o_counter !== undefined &&
+                s.o_counter > 0)
+          : () => true;
+
+      const filteredScenes = await fetchPaginated(
+        async (page) => {
+          const result = await stash.findScenes({
+            filter: { page, per_page: PAGE_SIZE },
+            scene_filter:
+              Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined,
+          });
+          return {
+            items: result.findScenes.scenes,
+            count: result.findScenes.count,
+          };
+        },
+        sceneFilterFn
+      );
 
       stats.scenes.checked = filteredScenes.length;
 
@@ -1130,24 +1164,32 @@ export const syncFromStash = async (
       }
       // If both are selected, fetch all and filter in code (can't do OR in single query)
 
-      const performersData = await stash.findPerformers({
-        filter: { per_page: -1 },
-        performer_filter:
-          Object.keys(performerFilter).length > 0 ? performerFilter : undefined,
-      });
-      const performers = performersData.findPerformers.performers;
-
-      // Filter in code only if both options are selected
-      const filteredPerformers =
+      // Build filter function for in-code filtering when both options selected
+      const performerFilterFn =
         syncOptions.performers.rating && syncOptions.performers.favorite
-          ? performers.filter(
-              (p: { rating100?: number | null; favorite?: boolean }) =>
-                (p.rating100 !== null &&
-                  p.rating100 !== undefined &&
-                  p.rating100 > 0) ||
-                p.favorite
-            )
-          : performers;
+          ? (p: { rating100?: number | null; favorite?: boolean }) =>
+              (p.rating100 !== null &&
+                p.rating100 !== undefined &&
+                p.rating100 > 0) ||
+              p.favorite
+          : () => true;
+
+      const filteredPerformers = await fetchPaginated(
+        async (page) => {
+          const result = await stash.findPerformers({
+            filter: { page, per_page: PAGE_SIZE },
+            performer_filter:
+              Object.keys(performerFilter).length > 0
+                ? performerFilter
+                : undefined,
+          });
+          return {
+            items: result.findPerformers.performers,
+            count: result.findPerformers.count,
+          };
+        },
+        performerFilterFn
+      );
 
       stats.performers.checked = filteredPerformers.length;
 
@@ -1223,24 +1265,30 @@ export const syncFromStash = async (
       }
       // If both are selected, fetch all and filter in code (can't do OR in single query)
 
-      const studiosData = await stash.findStudios({
-        filter: { per_page: -1 },
-        studio_filter:
-          Object.keys(studioFilter).length > 0 ? studioFilter : undefined,
-      });
-      const studios = studiosData.findStudios.studios;
-
-      // Filter in code only if both options are selected
-      const filteredStudios =
+      // Build filter function for in-code filtering when both options selected
+      const studioFilterFn =
         syncOptions.studios.rating && syncOptions.studios.favorite
-          ? studios.filter(
-              (s: { rating100?: number | null; favorite?: boolean }) =>
-                (s.rating100 !== null &&
-                  s.rating100 !== undefined &&
-                  s.rating100 > 0) ||
-                s.favorite
-            )
-          : studios;
+          ? (s: { rating100?: number | null; favorite?: boolean }) =>
+              (s.rating100 !== null &&
+                s.rating100 !== undefined &&
+                s.rating100 > 0) ||
+              s.favorite
+          : () => true;
+
+      const filteredStudios = await fetchPaginated(
+        async (page) => {
+          const result = await stash.findStudios({
+            filter: { page, per_page: PAGE_SIZE },
+            studio_filter:
+              Object.keys(studioFilter).length > 0 ? studioFilter : undefined,
+          });
+          return {
+            items: result.findStudios.studios,
+            count: result.findStudios.count,
+          };
+        },
+        studioFilterFn
+      );
 
       stats.studios.checked = filteredStudios.length;
 
@@ -1300,11 +1348,13 @@ export const syncFromStash = async (
 
     // 4. Sync Tags - Only fetch favorited tags
     if (syncOptions.tags.favorite) {
-      const tagsData = await stash.findTags({
-        filter: { per_page: -1 },
-        tag_filter: { favorite: true },
+      const tags = await fetchPaginated(async (page) => {
+        const result = await stash.findTags({
+          filter: { page, per_page: PAGE_SIZE },
+          tag_filter: { favorite: true },
+        });
+        return { items: result.findTags.tags, count: result.findTags.count };
       });
-      const tags = tagsData.findTags.tags;
       stats.tags.checked = tags.length;
 
       for (const tag of tags) {
@@ -1336,12 +1386,18 @@ export const syncFromStash = async (
 
     // 5. Sync Galleries (rating only - no favorite in Stash)
     if (syncOptions.galleries && syncOptions.galleries.rating) {
-      const galleriesData = await stash.findGalleries({
-        filter: { per_page: -1 },
-        gallery_filter: undefined, // Fetch all galleries
-      });
       // Filter for rated galleries in code
-      const galleries = galleriesData.findGalleries.galleries.filter(
+      const galleries = await fetchPaginated(
+        async (page) => {
+          const result = await stash.findGalleries({
+            filter: { page, per_page: PAGE_SIZE },
+            gallery_filter: undefined, // Fetch all galleries
+          });
+          return {
+            items: result.findGalleries.galleries,
+            count: result.findGalleries.count,
+          };
+        },
         (g: { rating100?: number | null }) =>
           g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
       );
@@ -1380,12 +1436,18 @@ export const syncFromStash = async (
 
     // 6. Sync Groups/Collections (rating only - no favorite in Stash)
     if (syncOptions.groups && syncOptions.groups.rating) {
-      const groupsData = await stash.findGroups({
-        filter: { per_page: -1 },
-        group_filter: undefined, // Fetch all groups
-      });
       // Filter for rated groups in code
-      const groups = groupsData.findGroups.groups.filter(
+      const groups = await fetchPaginated(
+        async (page) => {
+          const result = await stash.findGroups({
+            filter: { page, per_page: PAGE_SIZE },
+            group_filter: undefined, // Fetch all groups
+          });
+          return {
+            items: result.findGroups.groups,
+            count: result.findGroups.count,
+          };
+        },
         (g: { rating100?: number | null }) =>
           g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
       );
