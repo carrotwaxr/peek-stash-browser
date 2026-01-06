@@ -105,7 +105,7 @@ const UserMenu = () => {
             <Link
               to="/watch-history"
               onClick={() => setIsOpen(false)}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200 mb-1"
+              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200"
               style={{
                 color: "var(--text-primary)",
               }}
@@ -118,23 +118,6 @@ const UserMenu = () => {
             >
               <ThemedIcon name="history" size={16} />
               <span>Watch History</span>
-            </Link>
-            <Link
-              to="/my-settings"
-              onClick={() => setIsOpen(false)}
-              className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded transition-colors duration-200"
-              style={{
-                color: "var(--text-primary)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              <ThemedIcon name="settings" size={16} />
-              <span>My Settings</span>
             </Link>
           </div>
 

@@ -349,7 +349,7 @@ const CarouselBuilder = () => {
         await libraryApi.createCarousel(carouselData);
       }
 
-      navigate("/my-settings");
+      navigate("/settings?section=user&tab=customization");
     } catch (err) {
       setError(err.message || "Failed to save carousel");
     } finally {
@@ -382,7 +382,7 @@ const CarouselBuilder = () => {
       >
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={() => navigate("/my-settings")} icon={<ArrowLeft className="w-4 h-4" />}>
+            <Button variant="secondary" onClick={() => navigate("/settings?section=user&tab=customization")} icon={<ArrowLeft className="w-4 h-4" />}>
               Back
             </Button>
             <h1 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>

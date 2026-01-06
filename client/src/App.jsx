@@ -32,14 +32,11 @@ const PerformerDetail = lazy(
 );
 const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
 const TagDetail = lazy(() => import("./components/pages/TagDetail.jsx"));
-const Settings = lazy(() => import("./components/pages/Settings.jsx"));
 const Playlists = lazy(() => import("./components/pages/Playlists.jsx"));
 const PlaylistDetail = lazy(
   () => import("./components/pages/PlaylistDetail.jsx")
 );
-const ServerSettings = lazy(
-  () => import("./components/pages/ServerSettings.jsx")
-);
+const SettingsPage = lazy(() => import("./components/pages/SettingsPage.jsx"));
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
 const HiddenItemsPage = lazy(
   () => import("./components/pages/HiddenItemsPage.jsx")
@@ -261,16 +258,6 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/my-settings"
-            element={
-              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
-                <GlobalLayout>
-                  <Settings />
-                </GlobalLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/watch-history"
             element={
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
@@ -291,14 +278,23 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/server-settings"
+            path="/settings"
             element={
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
-                  <ServerSettings />
+                  <SettingsPage />
                 </GlobalLayout>
               </ProtectedRoute>
             }
+          />
+          {/* Redirects from legacy routes */}
+          <Route
+            path="/my-settings"
+            element={<Navigate to="/settings?section=user&tab=theme" replace />}
+          />
+          <Route
+            path="/server-settings"
+            element={<Navigate to="/settings?section=server&tab=user-management" replace />}
           />
           <Route
             path="/playlists"
@@ -331,7 +327,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/my-settings/carousels/new"
+            path="/settings/carousels/new"
             element={
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
@@ -341,7 +337,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/my-settings/carousels/:id/edit"
+            path="/settings/carousels/:id/edit"
             element={
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>

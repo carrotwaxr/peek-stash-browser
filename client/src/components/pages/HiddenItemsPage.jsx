@@ -119,12 +119,12 @@ const HiddenItemsPage = () => {
       {/* Back Button */}
       <div className="mt-6 mb-4">
         <Button
-          onClick={() => navigate("/my-settings")}
+          onClick={() => navigate("/settings?section=user&tab=content")}
           variant="secondary"
           icon={<ArrowLeft size={16} />}
-          title="Back to My Settings"
+          title="Back to Settings"
         >
-          <span className="hidden sm:inline">Back to My Settings</span>
+          <span className="hidden sm:inline">Back to Settings</span>
         </Button>
       </div>
 
