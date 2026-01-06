@@ -311,6 +311,15 @@ const AppContent = () => {
               </ProtectedRoute>
             }
           />
+          {/* Redirects from legacy routes */}
+          <Route
+            path="/my-settings"
+            element={<Navigate to="/settings?section=user&tab=theme" replace />}
+          />
+          <Route
+            path="/server-settings"
+            element={<Navigate to="/settings?section=server&tab=user-management" replace />}
+          />
           <Route
             path="/playlists"
             element={
