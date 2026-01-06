@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import PropTypes from "prop-types";
 
 /**
  * SettingsLayout - Reusable layout for settings with horizontal tab navigation
@@ -149,18 +148,6 @@ const SettingsLayout = ({ tabs, activeTab, onTabChange, children }) => {
       </div>
     </div>
   );
-};
-
-SettingsLayout.propTypes = {
-  tabs: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      label: PropTypes.string.isRequired,
-    })
-  ).isRequired,
-  activeTab: PropTypes.string.isRequired,
-  onTabChange: PropTypes.func.isRequired,
-  children: PropTypes.node.isRequired,
 };
 
 export default SettingsLayout;

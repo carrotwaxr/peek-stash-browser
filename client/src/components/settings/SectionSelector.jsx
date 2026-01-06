@@ -1,5 +1,3 @@
-import PropTypes from "prop-types";
-
 /**
  * SectionSelector - Segmented control for switching between User/Server settings
  * Two-button toggle with accent styling for active section
@@ -52,12 +50,6 @@ const SectionSelector = ({ activeSection, onSectionChange, isAdmin }) => {
       </div>
     </div>
   );
-};
-
-SectionSelector.propTypes = {
-  activeSection: PropTypes.oneOf(["user", "server"]).isRequired,
-  onSectionChange: PropTypes.func.isRequired,
-  isAdmin: PropTypes.bool.isRequired,
 };
 
 export default SectionSelector;
