@@ -6,7 +6,7 @@ import { BaseCard } from "../ui/BaseCard.jsx";
  * TagCard - Card for displaying tag entities
  */
 const TagCard = forwardRef(
-  ({ tag, referrerUrl, tabIndex, onHideSuccess, ...rest }, ref) => {
+  ({ tag, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     // Build subtitle from child count
@@ -80,6 +80,7 @@ const TagCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
+        displayPreferences={displayPreferences}
         ratingControlsProps={
           tag.rating100 !== undefined
             ? {

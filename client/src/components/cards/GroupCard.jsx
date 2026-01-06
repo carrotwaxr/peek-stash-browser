@@ -6,7 +6,7 @@ import { BaseCard } from "../ui/BaseCard.jsx";
  * GroupCard - Card for displaying group/collection entities
  */
 const GroupCard = forwardRef(
-  ({ group, referrerUrl, tabIndex, onHideSuccess, ...rest }, ref) => {
+  ({ group, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     // Build subtitle from studio and date
@@ -69,6 +69,7 @@ const GroupCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
+        displayPreferences={displayPreferences}
         ratingControlsProps={{
           entityId: group.id,
           initialRating: group.rating100,

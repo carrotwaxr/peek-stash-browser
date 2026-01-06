@@ -2,17 +2,16 @@ import { useCallback, useMemo, useState } from "react";
 import deepEqual from "fast-deep-equal";
 import { useAuth } from "../../hooks/useAuth.js";
 import { libraryApi } from "../../services/api.js";
-import BaseGrid from "./BaseGrid.jsx";
+import SearchResults from "./SearchResults.jsx";
 import SearchControls from "./SearchControls.jsx";
 
 /**
- * SearchableGrid - BaseGrid with integrated search controls and data fetching
+ * SearchableGrid - SearchResults with integrated search controls and data fetching
  *
  * @param {Object} props
  * @param {'scene'|'performer'|'gallery'|'group'|'studio'|'tag'|'image'} props.entityType
  * @param {Object} [props.lockedFilters] - Filters that cannot be changed by user
  * @param {boolean} [props.hideLockedFilters] - Hide locked filters from UI
- * @param {'scene'|'standard'} [props.gridType] - Grid layout type
  * @param {Function} props.renderItem - Function to render each item
  * @param {Object} [props.defaultSort] - Default sort configuration
  * @param {Object} [props.defaultFilters] - Default filters
@@ -26,7 +25,6 @@ export const SearchableGrid = ({
   entityType,
   lockedFilters = {},
   hideLockedFilters = false,
-  gridType = "standard",
   renderItem,
   defaultSort = "name",
   // eslint-disable-next-line no-unused-vars
@@ -146,17 +144,23 @@ export const SearchableGrid = ({
       totalCount={totalCount}
       syncToUrl={syncToUrl}
     >
-      <BaseGrid
+      <SearchResults
+        entityType={entityType}
         items={data}
         renderItem={(item, index) =>
           renderItem(item, index, { onHideSuccess: handleHideSuccess })
         }
-        gridType={gridType}
         loading={isLoading}
         error={error}
         emptyMessage={emptyMessage || `No ${entityType}s found`}
         emptyDescription={emptyDescription}
         skeletonCount={skeletonCount}
+        currentPage={lastQuery?.filter?.page || 1}
+        totalPages={totalPages}
+        onPageChange={() => {
+          // SearchControls manages pagination state, but we pass it through for SearchResults to render
+          // The actual page change is handled by SearchControls
+        }}
       />
     </SearchControls>
   );

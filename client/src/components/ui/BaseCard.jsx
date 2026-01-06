@@ -28,6 +28,9 @@ export const BaseCard = forwardRef(
       indicators = [],
       ratingControlsProps,
 
+      // Display preferences (future: from useEntityDisplayPreferences hook)
+      displayPreferences = {},
+
       // Display options
       hideDescription = false,
       hideSubtitle = false,
@@ -51,6 +54,13 @@ export const BaseCard = forwardRef(
     ref
   ) => {
     const aspectRatio = useEntityImageAspectRatio(entityType);
+
+    // Merge display preferences with explicit props (props take precedence)
+    // When hideDescription is explicitly true, respect it
+    // Otherwise, check displayPreferences.showDescription (default: true)
+    const shouldShowDescription = hideDescription === true
+      ? false
+      : (displayPreferences.showDescription ?? true);
 
     return (
       <CardContainer
@@ -89,7 +99,7 @@ export const BaseCard = forwardRef(
         {renderAfterTitle?.()}
 
         {/* Description */}
-        {!hideDescription && (
+        {shouldShowDescription && (
           <CardDescription
             description={description}
             maxLines={maxDescriptionLines}
