@@ -130,6 +130,7 @@ export const findTags = async (
   res: TypedResponse<FindTagsResponse | ApiErrorResponse>
 ) => {
   try {
+    const startTime = Date.now();
     const userId = req.user?.id;
     const { filter, tag_filter, ids } = req.body;
 
@@ -269,6 +270,14 @@ export const findTags = async (
       ...tag,
       stashUrl: buildStashEntityUrl('tag', tag.id),
     }));
+
+    logger.info("findTags completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      totalCount: total,
+      returnedCount: tagsWithStashUrl.length,
+      page,
+      perPage,
+    });
 
     res.json({
       findTags: {

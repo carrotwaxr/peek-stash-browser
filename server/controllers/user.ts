@@ -1193,12 +1193,12 @@ export const syncFromStash = async (
       // Build filter function for in-code filtering when both options selected
       const performerFilterFn =
         syncOptions.performers.rating && syncOptions.performers.favorite
-          ? (p: { rating100?: number | null; favorite?: boolean }) =>
+          ? (p: { rating100?: number | null; favorite?: boolean }): boolean =>
               (p.rating100 !== null &&
                 p.rating100 !== undefined &&
                 p.rating100 > 0) ||
-              p.favorite
-          : () => true;
+              !!p.favorite
+          : (): boolean => true;
 
       const filteredPerformers = await fetchPaginated(
         async (page) => {
@@ -1312,12 +1312,12 @@ export const syncFromStash = async (
       // Build filter function for in-code filtering when both options selected
       const studioFilterFn =
         syncOptions.studios.rating && syncOptions.studios.favorite
-          ? (s: { rating100?: number | null; favorite?: boolean }) =>
+          ? (s: { rating100?: number | null; favorite?: boolean }): boolean =>
               (s.rating100 !== null &&
                 s.rating100 !== undefined &&
                 s.rating100 > 0) ||
-              s.favorite
-          : () => true;
+              !!s.favorite
+          : (): boolean => true;
 
       const filteredStudios = await fetchPaginated(
         async (page) => {

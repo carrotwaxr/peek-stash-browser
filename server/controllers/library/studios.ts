@@ -68,6 +68,7 @@ export const findStudios = async (
   res: TypedResponse<FindStudiosResponse | ApiErrorResponse>
 ) => {
   try {
+    const startTime = Date.now();
     const userId = req.user?.id;
     const { filter, studio_filter, ids } = req.body;
 
@@ -190,6 +191,14 @@ export const findStudios = async (
       ...studio,
       stashUrl: buildStashEntityUrl('studio', studio.id),
     }));
+
+    logger.info("findStudios completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      totalCount: total,
+      returnedCount: studiosWithStashUrl.length,
+      page,
+      perPage,
+    });
 
     res.json({
       findStudios: {

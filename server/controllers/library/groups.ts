@@ -205,6 +205,7 @@ export const findGroups = async (
   res: TypedResponse<FindGroupsResponse | ApiErrorResponse>
 ) => {
   try {
+    const startTime = Date.now();
     const userId = req.user?.id;
     const { filter, group_filter, ids } = req.body;
 
@@ -327,6 +328,14 @@ export const findGroups = async (
       ...group,
       stashUrl: buildStashEntityUrl('group', group.id),
     }));
+
+    logger.info("findGroups completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      totalCount: total,
+      returnedCount: groupsWithStashUrl.length,
+      page,
+      perPage,
+    });
 
     res.json({
       findGroups: {
