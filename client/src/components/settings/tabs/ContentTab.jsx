@@ -57,7 +57,7 @@ const ContentTab = () => {
               checked={hideConfirmationDisabled}
               onChange={(e) => updateHideConfirmation(e.target.checked)}
               className="w-5 h-5 cursor-pointer"
-              style={{ accentColor: "var(--accent-color)" }}
+              style={{ accentColor: "var(--accent-primary)" }}
             />
             <div>
               <div className="font-medium" style={{ color: "var(--text-primary)" }}>

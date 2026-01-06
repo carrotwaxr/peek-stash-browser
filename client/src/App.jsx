@@ -32,13 +32,9 @@ const PerformerDetail = lazy(
 );
 const StudioDetail = lazy(() => import("./components/pages/StudioDetail.jsx"));
 const TagDetail = lazy(() => import("./components/pages/TagDetail.jsx"));
-const Settings = lazy(() => import("./components/pages/Settings.jsx"));
 const Playlists = lazy(() => import("./components/pages/Playlists.jsx"));
 const PlaylistDetail = lazy(
   () => import("./components/pages/PlaylistDetail.jsx")
-);
-const ServerSettings = lazy(
-  () => import("./components/pages/ServerSettings.jsx")
 );
 const SettingsPage = lazy(() => import("./components/pages/SettingsPage.jsx"));
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
