@@ -75,16 +75,6 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-// Mock StashCacheManager for INCLUDE mode inversion
-vi.mock("../StashCacheManager.js", () => ({
-  stashCacheManager: {
-    getAllTags: vi.fn(() => []),
-    getAllStudios: vi.fn(() => []),
-    getAllGroups: vi.fn(() => []),
-    getAllGalleries: vi.fn(() => []),
-  },
-}));
-
 import { exclusionComputationService } from "../ExclusionComputationService.js";
 import prisma from "../../prisma/singleton.js";
 
