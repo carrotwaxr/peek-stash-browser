@@ -986,6 +986,7 @@ export const syncFromStash = async (
 
     // Pagination settings - match StashSyncService.PAGE_SIZE
     const PAGE_SIZE = 1000;
+    const BATCH_SIZE = 500;
 
     // Helper to fetch paginated results
     async function fetchPaginated<T>(
@@ -1054,98 +1055,123 @@ export const syncFromStash = async (
         sceneFilterFn
       );
 
-      stats.scenes.checked = filteredScenes.length;
 
       // Track unique scenes to avoid double-counting when syncing both rating and o_counter
       const createdScenes = new Set<string>();
       const updatedScenes = new Set<string>();
 
-      for (const scene of filteredScenes) {
-        let sceneWasCreated = false;
-        let sceneWasUpdated = false;
+      for (let i = 0; i < filteredScenes.length; i += BATCH_SIZE) {
+        const batch = filteredScenes.slice(i, i + BATCH_SIZE);
+        const sceneIds = batch.map((s) => s.id);
 
-        // Handle rating sync (use upsert to prevent duplicate key errors)
-        if (
-          syncOptions.scenes.rating &&
-          scene.rating100 &&
-          scene.rating100 > 0
-        ) {
-          const stashRating = scene.rating100;
+        // Collect all existing records in one query
+        const [existingRatings, existingWatchHistory] = await Promise.all([
+          syncOptions.scenes.rating
+            ? prisma.sceneRating.findMany({
+                where: { userId: targetUserId, sceneId: { in: sceneIds } },
+              })
+            : Promise.resolve([]),
+          syncOptions.scenes.oCounter
+            ? prisma.watchHistory.findMany({
+                where: { userId: targetUserId, sceneId: { in: sceneIds } },
+              })
+            : Promise.resolve([]),
+        ]);
 
-          // Check if record exists before upsert to track created vs updated
-          const existingRating = await prisma.sceneRating.findUnique({
-            where: {
-              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
-            },
-          });
+        const existingRatingMap = new Map(
+          existingRatings.map((r) => [r.sceneId, r])
+        );
+        const existingWatchMap = new Map(
+          existingWatchHistory.map((w) => [w.sceneId, w])
+        );
 
-          await prisma.sceneRating.upsert({
-            where: {
-              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
-            },
-            update: { rating: stashRating },
-            create: {
-              userId: targetUserId,
-              sceneId: scene.id,
-              rating: stashRating,
-              favorite: false,
-            },
-          });
+        // Build bulk operations
+        const ratingUpserts: Parameters<typeof prisma.sceneRating.upsert>[0][] =
+          [];
+        const watchUpserts: Parameters<typeof prisma.watchHistory.upsert>[0][] =
+          [];
 
-          if (!existingRating) {
-            sceneWasCreated = true;
-          } else if (existingRating.rating !== stashRating) {
-            sceneWasUpdated = true;
+        for (const scene of batch) {
+          let sceneWasCreated = false;
+          let sceneWasUpdated = false;
+
+          // Rating sync
+          if (
+            syncOptions.scenes.rating &&
+            scene.rating100 &&
+            scene.rating100 > 0
+          ) {
+            const existing = existingRatingMap.get(scene.id);
+            ratingUpserts.push({
+              where: {
+                userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+              },
+              update: { rating: scene.rating100 },
+              create: {
+                userId: targetUserId,
+                sceneId: scene.id,
+                rating: scene.rating100,
+                favorite: false,
+              },
+            });
+
+            if (!existing) {
+              sceneWasCreated = true;
+            } else if (existing.rating !== scene.rating100) {
+              sceneWasUpdated = true;
+            }
+          }
+
+          // O-counter sync
+          if (
+            syncOptions.scenes.oCounter &&
+            scene.o_counter &&
+            scene.o_counter > 0
+          ) {
+            const existing = existingWatchMap.get(scene.id);
+            watchUpserts.push({
+              where: {
+                userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+              },
+              update: { oCount: scene.o_counter },
+              create: {
+                userId: targetUserId,
+                sceneId: scene.id,
+                oCount: scene.o_counter,
+                oHistory: [],
+                playCount: 0,
+                playDuration: 0,
+                playHistory: [],
+              },
+            });
+
+            if (!existing) {
+              sceneWasCreated = true;
+            } else if (existing.oCount !== scene.o_counter) {
+              sceneWasUpdated = true;
+            }
+          }
+
+          // Count each unique scene only once (not once per record type)
+          if (sceneWasCreated && !createdScenes.has(scene.id)) {
+            stats.scenes.created++;
+            createdScenes.add(scene.id);
+          }
+          if (sceneWasUpdated && !updatedScenes.has(scene.id)) {
+            stats.scenes.updated++;
+            updatedScenes.add(scene.id);
           }
         }
 
-        // Handle o_counter sync (use upsert to prevent duplicate key errors)
-        if (
-          syncOptions.scenes.oCounter &&
-          scene.o_counter &&
-          scene.o_counter > 0
-        ) {
-          const stashOCounter = scene.o_counter;
-
-          // Check if record exists before upsert to track created vs updated
-          const existingWatchHistory = await prisma.watchHistory.findUnique({
-            where: {
-              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
-            },
-          });
-
-          await prisma.watchHistory.upsert({
-            where: {
-              userId_sceneId: { userId: targetUserId, sceneId: scene.id },
-            },
-            update: { oCount: stashOCounter },
-            create: {
-              userId: targetUserId,
-              sceneId: scene.id,
-              oCount: stashOCounter,
-              oHistory: [], // Don't have timestamp data, just the count
-              playCount: 0,
-              playDuration: 0,
-              playHistory: [],
-            },
-          });
-
-          if (!existingWatchHistory) {
-            sceneWasCreated = true;
-          } else if (existingWatchHistory.oCount !== stashOCounter) {
-            sceneWasUpdated = true;
-          }
+        // Execute upserts in transaction
+        if (ratingUpserts.length > 0 || watchUpserts.length > 0) {
+          await prisma.$transaction([
+            ...ratingUpserts.map((u) => prisma.sceneRating.upsert(u)),
+            ...watchUpserts.map((u) => prisma.watchHistory.upsert(u)),
+          ]);
         }
 
-        // Count each unique scene only once (not once per record type)
-        if (sceneWasCreated && !createdScenes.has(scene.id)) {
-          stats.scenes.created++;
-          createdScenes.add(scene.id);
-        }
-        if (sceneWasUpdated && !updatedScenes.has(scene.id)) {
-          stats.scenes.updated++;
-          updatedScenes.add(scene.id);
-        }
+        stats.scenes.checked += batch.length;
       }
     }
 
@@ -1191,65 +1217,83 @@ export const syncFromStash = async (
         performerFilterFn
       );
 
-      stats.performers.checked = filteredPerformers.length;
 
-      for (const performer of filteredPerformers) {
-        const stashRating = syncOptions.performers.rating
-          ? performer.rating100
-          : null;
-        const stashFavorite = syncOptions.performers.favorite
-          ? performer.favorite || false
-          : false;
+      for (let i = 0; i < filteredPerformers.length; i += BATCH_SIZE) {
+        const batch = filteredPerformers.slice(i, i + BATCH_SIZE);
+        const performerIds = batch.map((p) => p.id);
 
-        // Check if record exists before upsert to track created vs updated
-        const existingRating = await prisma.performerRating.findUnique({
-          where: {
-            userId_performerId: {
-              userId: targetUserId,
-              performerId: performer.id,
-            },
-          },
+        // Fetch all existing records in one query
+        const existingRatings = await prisma.performerRating.findMany({
+          where: { userId: targetUserId, performerId: { in: performerIds } },
         });
 
-        const updates: SyncUpdates = {};
-        if (syncOptions.performers.rating) updates.rating = stashRating;
-        if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
+        const existingRatingMap = new Map(
+          existingRatings.map((r) => [r.performerId, r])
+        );
 
-        await prisma.performerRating.upsert({
-          where: {
-            userId_performerId: {
+        // Build bulk operations
+        const upserts: Parameters<typeof prisma.performerRating.upsert>[0][] =
+          [];
+
+        for (const performer of batch) {
+          const stashRating = syncOptions.performers.rating
+            ? performer.rating100
+            : null;
+          const stashFavorite = syncOptions.performers.favorite
+            ? performer.favorite || false
+            : false;
+
+          const existing = existingRatingMap.get(performer.id);
+
+          const updates: SyncUpdates = {};
+          if (syncOptions.performers.rating) updates.rating = stashRating;
+          if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
+
+          upserts.push({
+            where: {
+              userId_performerId: {
+                userId: targetUserId,
+                performerId: performer.id,
+              },
+            },
+            update: updates,
+            create: {
               userId: targetUserId,
               performerId: performer.id,
+              rating: stashRating,
+              favorite: stashFavorite,
             },
-          },
-          update: updates,
-          create: {
-            userId: targetUserId,
-            performerId: performer.id,
-            rating: stashRating,
-            favorite: stashFavorite,
-          },
-        });
+          });
 
-        if (!existingRating) {
-          stats.performers.created++;
-        } else {
-          let needsUpdate = false;
-          if (
-            syncOptions.performers.rating &&
-            existingRating.rating !== stashRating
-          )
-            needsUpdate = true;
-          if (
-            syncOptions.performers.favorite &&
-            existingRating.favorite !== stashFavorite
-          )
-            needsUpdate = true;
+          if (!existing) {
+            stats.performers.created++;
+          } else {
+            let needsUpdate = false;
+            if (
+              syncOptions.performers.rating &&
+              existing.rating !== stashRating
+            )
+              needsUpdate = true;
+            if (
+              syncOptions.performers.favorite &&
+              existing.favorite !== stashFavorite
+            )
+              needsUpdate = true;
 
-          if (needsUpdate) {
-            stats.performers.updated++;
+            if (needsUpdate) {
+              stats.performers.updated++;
+            }
           }
         }
+
+        // Execute upserts in transaction
+        if (upserts.length > 0) {
+          await prisma.$transaction(
+            upserts.map((u) => prisma.performerRating.upsert(u))
+          );
+        }
+
+        stats.performers.checked += batch.length;
       }
     }
 
@@ -1290,59 +1334,76 @@ export const syncFromStash = async (
         studioFilterFn
       );
 
-      stats.studios.checked = filteredStudios.length;
 
-      for (const studio of filteredStudios) {
-        const stashRating = syncOptions.studios.rating
-          ? studio.rating100
-          : null;
-        const stashFavorite = syncOptions.studios.favorite
-          ? studio.favorite || false
-          : false;
+      for (let i = 0; i < filteredStudios.length; i += BATCH_SIZE) {
+        const batch = filteredStudios.slice(i, i + BATCH_SIZE);
+        const studioIds = batch.map((s) => s.id);
 
-        // Check if record exists before upsert to track created vs updated
-        const existingRating = await prisma.studioRating.findUnique({
-          where: {
-            userId_studioId: { userId: targetUserId, studioId: studio.id },
-          },
+        // Fetch all existing records in one query
+        const existingRatings = await prisma.studioRating.findMany({
+          where: { userId: targetUserId, studioId: { in: studioIds } },
         });
 
-        const updates: SyncUpdates = {};
-        if (syncOptions.studios.rating) updates.rating = stashRating;
-        if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
+        const existingRatingMap = new Map(
+          existingRatings.map((r) => [r.studioId, r])
+        );
 
-        await prisma.studioRating.upsert({
-          where: {
-            userId_studioId: { userId: targetUserId, studioId: studio.id },
-          },
-          update: updates,
-          create: {
-            userId: targetUserId,
-            studioId: studio.id,
-            rating: stashRating,
-            favorite: stashFavorite,
-          },
-        });
+        // Build bulk operations
+        const upserts: Parameters<typeof prisma.studioRating.upsert>[0][] = [];
 
-        if (!existingRating) {
-          stats.studios.created++;
-        } else {
-          let needsUpdate = false;
-          if (
-            syncOptions.studios.rating &&
-            existingRating.rating !== stashRating
-          )
-            needsUpdate = true;
-          if (
-            syncOptions.studios.favorite &&
-            existingRating.favorite !== stashFavorite
-          )
-            needsUpdate = true;
+        for (const studio of batch) {
+          const stashRating = syncOptions.studios.rating
+            ? studio.rating100
+            : null;
+          const stashFavorite = syncOptions.studios.favorite
+            ? studio.favorite || false
+            : false;
 
-          if (needsUpdate) {
-            stats.studios.updated++;
+          const existing = existingRatingMap.get(studio.id);
+
+          const updates: SyncUpdates = {};
+          if (syncOptions.studios.rating) updates.rating = stashRating;
+          if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
+
+          upserts.push({
+            where: {
+              userId_studioId: { userId: targetUserId, studioId: studio.id },
+            },
+            update: updates,
+            create: {
+              userId: targetUserId,
+              studioId: studio.id,
+              rating: stashRating,
+              favorite: stashFavorite,
+            },
+          });
+
+          if (!existing) {
+            stats.studios.created++;
+          } else {
+            let needsUpdate = false;
+            if (syncOptions.studios.rating && existing.rating !== stashRating)
+              needsUpdate = true;
+            if (
+              syncOptions.studios.favorite &&
+              existing.favorite !== stashFavorite
+            )
+              needsUpdate = true;
+
+            if (needsUpdate) {
+              stats.studios.updated++;
+            }
           }
         }
+
+        // Execute upserts in transaction
+        if (upserts.length > 0) {
+          await prisma.$transaction(
+            upserts.map((u) => prisma.studioRating.upsert(u))
+          );
+        }
+
+        stats.studios.checked += batch.length;
       }
     }
 
@@ -1355,32 +1416,53 @@ export const syncFromStash = async (
         });
         return { items: result.findTags.tags, count: result.findTags.count };
       });
-      stats.tags.checked = tags.length;
 
-      for (const tag of tags) {
-        const stashFavorite = tag.favorite || false;
+      for (let i = 0; i < tags.length; i += BATCH_SIZE) {
+        const batch = tags.slice(i, i + BATCH_SIZE);
+        const tagIds = batch.map((t) => t.id);
 
-        // Check if record exists before upsert to track created vs updated
-        const existingRating = await prisma.tagRating.findUnique({
-          where: { userId_tagId: { userId: targetUserId, tagId: tag.id } },
+        // Fetch all existing records in one query
+        const existingRatings = await prisma.tagRating.findMany({
+          where: { userId: targetUserId, tagId: { in: tagIds } },
         });
 
-        await prisma.tagRating.upsert({
-          where: { userId_tagId: { userId: targetUserId, tagId: tag.id } },
-          update: { favorite: stashFavorite },
-          create: {
-            userId: targetUserId,
-            tagId: tag.id,
-            rating: null, // Tags don't have ratings in Stash
-            favorite: stashFavorite,
-          },
-        });
+        const existingRatingMap = new Map(
+          existingRatings.map((r) => [r.tagId, r])
+        );
 
-        if (!existingRating) {
-          stats.tags.created++;
-        } else if (existingRating.favorite !== stashFavorite) {
-          stats.tags.updated++;
+        // Build bulk operations
+        const upserts: Parameters<typeof prisma.tagRating.upsert>[0][] = [];
+
+        for (const tag of batch) {
+          const stashFavorite = tag.favorite || false;
+          const existing = existingRatingMap.get(tag.id);
+
+          upserts.push({
+            where: { userId_tagId: { userId: targetUserId, tagId: tag.id } },
+            update: { favorite: stashFavorite },
+            create: {
+              userId: targetUserId,
+              tagId: tag.id,
+              rating: null, // Tags don't have ratings in Stash
+              favorite: stashFavorite,
+            },
+          });
+
+          if (!existing) {
+            stats.tags.created++;
+          } else if (existing.favorite !== stashFavorite) {
+            stats.tags.updated++;
+          }
         }
+
+        // Execute upserts in transaction
+        if (upserts.length > 0) {
+          await prisma.$transaction(
+            upserts.map((u) => prisma.tagRating.upsert(u))
+          );
+        }
+
+        stats.tags.checked += batch.length;
       }
     }
 
@@ -1401,36 +1483,55 @@ export const syncFromStash = async (
         (g: { rating100?: number | null }) =>
           g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
       );
-      stats.galleries.checked = galleries.length;
 
-      for (const gallery of galleries) {
-        const stashRating = gallery.rating100;
+      for (let i = 0; i < galleries.length; i += BATCH_SIZE) {
+        const batch = galleries.slice(i, i + BATCH_SIZE);
+        const galleryIds = batch.map((g) => g.id);
 
-        // Check if record exists before upsert to track created vs updated
-        const existingRating = await prisma.galleryRating.findUnique({
-          where: {
-            userId_galleryId: { userId: targetUserId, galleryId: gallery.id },
-          },
+        // Fetch all existing records in one query
+        const existingRatings = await prisma.galleryRating.findMany({
+          where: { userId: targetUserId, galleryId: { in: galleryIds } },
         });
 
-        await prisma.galleryRating.upsert({
-          where: {
-            userId_galleryId: { userId: targetUserId, galleryId: gallery.id },
-          },
-          update: { rating: stashRating },
-          create: {
-            userId: targetUserId,
-            galleryId: gallery.id,
-            rating: stashRating,
-            favorite: false, // Galleries don't have favorites
-          },
-        });
+        const existingRatingMap = new Map(
+          existingRatings.map((r) => [r.galleryId, r])
+        );
 
-        if (!existingRating) {
-          stats.galleries.created++;
-        } else if (existingRating.rating !== stashRating) {
-          stats.galleries.updated++;
+        // Build bulk operations
+        const upserts: Parameters<typeof prisma.galleryRating.upsert>[0][] = [];
+
+        for (const gallery of batch) {
+          const stashRating = gallery.rating100;
+          const existing = existingRatingMap.get(gallery.id);
+
+          upserts.push({
+            where: {
+              userId_galleryId: { userId: targetUserId, galleryId: gallery.id },
+            },
+            update: { rating: stashRating },
+            create: {
+              userId: targetUserId,
+              galleryId: gallery.id,
+              rating: stashRating,
+              favorite: false, // Galleries don't have favorites
+            },
+          });
+
+          if (!existing) {
+            stats.galleries.created++;
+          } else if (existing.rating !== stashRating) {
+            stats.galleries.updated++;
+          }
         }
+
+        // Execute upserts in transaction
+        if (upserts.length > 0) {
+          await prisma.$transaction(
+            upserts.map((u) => prisma.galleryRating.upsert(u))
+          );
+        }
+
+        stats.galleries.checked += batch.length;
       }
     }
 
@@ -1451,36 +1552,55 @@ export const syncFromStash = async (
         (g: { rating100?: number | null }) =>
           g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
       );
-      stats.groups.checked = groups.length;
 
-      for (const group of groups) {
-        const stashRating = group.rating100;
+      for (let i = 0; i < groups.length; i += BATCH_SIZE) {
+        const batch = groups.slice(i, i + BATCH_SIZE);
+        const groupIds = batch.map((g) => g.id);
 
-        // Check if record exists before upsert to track created vs updated
-        const existingRating = await prisma.groupRating.findUnique({
-          where: {
-            userId_groupId: { userId: targetUserId, groupId: group.id },
-          },
+        // Fetch all existing records in one query
+        const existingRatings = await prisma.groupRating.findMany({
+          where: { userId: targetUserId, groupId: { in: groupIds } },
         });
 
-        await prisma.groupRating.upsert({
-          where: {
-            userId_groupId: { userId: targetUserId, groupId: group.id },
-          },
-          update: { rating: stashRating },
-          create: {
-            userId: targetUserId,
-            groupId: group.id,
-            rating: stashRating,
-            favorite: false, // Groups don't have favorites
-          },
-        });
+        const existingRatingMap = new Map(
+          existingRatings.map((r) => [r.groupId, r])
+        );
 
-        if (!existingRating) {
-          stats.groups.created++;
-        } else if (existingRating.rating !== stashRating) {
-          stats.groups.updated++;
+        // Build bulk operations
+        const upserts: Parameters<typeof prisma.groupRating.upsert>[0][] = [];
+
+        for (const group of batch) {
+          const stashRating = group.rating100;
+          const existing = existingRatingMap.get(group.id);
+
+          upserts.push({
+            where: {
+              userId_groupId: { userId: targetUserId, groupId: group.id },
+            },
+            update: { rating: stashRating },
+            create: {
+              userId: targetUserId,
+              groupId: group.id,
+              rating: stashRating,
+              favorite: false, // Groups don't have favorites
+            },
+          });
+
+          if (!existing) {
+            stats.groups.created++;
+          } else if (existing.rating !== stashRating) {
+            stats.groups.updated++;
+          }
         }
+
+        // Execute upserts in transaction
+        if (upserts.length > 0) {
+          await prisma.$transaction(
+            upserts.map((u) => prisma.groupRating.upsert(u))
+          );
+        }
+
+        stats.groups.checked += batch.length;
       }
     }
 
