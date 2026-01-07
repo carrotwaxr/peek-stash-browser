@@ -1020,39 +1020,127 @@ class PerformerQueryBuilder {
   }
 
   /**
-   * Populate performer relations (tags)
+   * Populate performer relations (tags, groups, galleries, studios)
+   * Includes minimal data for TooltipEntityGrid: id, name, image_path/cover
    */
   async populateRelations(performers: NormalizedPerformer[]): Promise<void> {
     if (performers.length === 0) return;
 
     const performerIds = performers.map((p) => p.id);
 
-    // Load tag junctions
-    const tagJunctions = await prisma.performerTag.findMany({
-      where: { performerId: { in: performerIds } },
-    });
+    // Load all junctions in parallel
+    const [tagJunctions, scenePerformers] = await Promise.all([
+      prisma.performerTag.findMany({
+        where: { performerId: { in: performerIds } },
+      }),
+      // Get scenes this performer appears in to derive groups, galleries, studios
+      prisma.scenePerformer.findMany({
+        where: { performerId: { in: performerIds } },
+        select: { performerId: true, sceneId: true },
+      }),
+    ]);
 
-    // Get unique tag IDs
+    // Get scene IDs for this performer
+    const sceneIds = [...new Set(scenePerformers.map((sp) => sp.sceneId))];
+
+    // Load related entities from scenes
+    const [sceneGroups, sceneGalleries, scenes] = await Promise.all([
+      sceneIds.length > 0
+        ? prisma.sceneGroup.findMany({
+            where: { sceneId: { in: sceneIds } },
+            select: { sceneId: true, groupId: true },
+          })
+        : [],
+      sceneIds.length > 0
+        ? prisma.sceneGallery.findMany({
+            where: { sceneId: { in: sceneIds } },
+            select: { sceneId: true, galleryId: true },
+          })
+        : [],
+      sceneIds.length > 0
+        ? prisma.stashScene.findMany({
+            where: { id: { in: sceneIds } },
+            select: { id: true, studioId: true },
+          })
+        : [],
+    ]);
+
+    // Get unique entity IDs
     const tagIds = [...new Set(tagJunctions.map((j) => j.tagId))];
+    const groupIds = [...new Set(sceneGroups.map((sg) => sg.groupId))];
+    const galleryIds = [...new Set(sceneGalleries.map((sg) => sg.galleryId))];
+    const studioIds = [...new Set(scenes.map((s) => s.studioId).filter((id): id is string => !!id))];
 
-    // Load tags
-    const tags = tagIds.length > 0
-      ? await prisma.stashTag.findMany({
-          where: { id: { in: tagIds } },
-        })
-      : [];
+    // Load all entities in parallel
+    const [tags, groups, galleries, studios] = await Promise.all([
+      tagIds.length > 0
+        ? prisma.stashTag.findMany({ where: { id: { in: tagIds } } })
+        : [],
+      groupIds.length > 0
+        ? prisma.stashGroup.findMany({ where: { id: { in: groupIds } } })
+        : [],
+      galleryIds.length > 0
+        ? prisma.stashGallery.findMany({ where: { id: { in: galleryIds } } })
+        : [],
+      studioIds.length > 0
+        ? prisma.stashStudio.findMany({ where: { id: { in: studioIds } } })
+        : [],
+    ]);
 
-    // Build tag lookup map
-    const tagsById = new Map<string, any>();
-    for (const tag of tags) {
-      tagsById.set(tag.id, {
-        id: tag.id,
-        name: tag.name,
-        image_path: this.transformUrl(tag.imagePath),
-      });
+    // Build lookup maps with minimal tooltip data
+    const tagsById = new Map(tags.map((t) => [t.id, {
+      id: t.id,
+      name: t.name,
+      image_path: this.transformUrl(t.imagePath),
+    }]));
+
+    const groupsById = new Map(groups.map((g) => [g.id, {
+      id: g.id,
+      name: g.name,
+      front_image_path: this.transformUrl(g.frontImagePath),
+    }]));
+
+    const galleriesById = new Map(galleries.map((g) => [g.id, {
+      id: g.id,
+      title: g.title,
+      cover: this.transformUrl(g.coverPath),
+    }]));
+
+    const studiosById = new Map(studios.map((s) => [s.id, {
+      id: s.id,
+      name: s.name,
+      image_path: this.transformUrl(s.imagePath),
+    }]));
+
+    // Build performer -> scene mapping
+    const scenesByPerformer = new Map<string, Set<string>>();
+    for (const sp of scenePerformers) {
+      const set = scenesByPerformer.get(sp.performerId) || new Set();
+      set.add(sp.sceneId);
+      scenesByPerformer.set(sp.performerId, set);
     }
 
-    // Build performer-to-tags map
+    // Build scene -> entities mappings
+    const groupsByScene = new Map<string, Set<string>>();
+    for (const sg of sceneGroups) {
+      const set = groupsByScene.get(sg.sceneId) || new Set();
+      set.add(sg.groupId);
+      groupsByScene.set(sg.sceneId, set);
+    }
+
+    const galleriesByScene = new Map<string, Set<string>>();
+    for (const sg of sceneGalleries) {
+      const set = galleriesByScene.get(sg.sceneId) || new Set();
+      set.add(sg.galleryId);
+      galleriesByScene.set(sg.sceneId, set);
+    }
+
+    const studioByScene = new Map<string, string>();
+    for (const s of scenes) {
+      if (s.studioId) studioByScene.set(s.id, s.studioId);
+    }
+
+    // Build performer -> tags map
     const tagsByPerformer = new Map<string, any[]>();
     for (const junction of tagJunctions) {
       const tag = tagsById.get(junction.tagId);
@@ -1062,9 +1150,27 @@ class PerformerQueryBuilder {
       tagsByPerformer.set(junction.performerId, list);
     }
 
-    // Populate performers
+    // Populate performers with all relations
     for (const performer of performers) {
       performer.tags = tagsByPerformer.get(performer.id) || [];
+
+      // Derive groups, galleries, studios from performer's scenes
+      const performerSceneIds = scenesByPerformer.get(performer.id) || new Set();
+
+      const performerGroupIds = new Set<string>();
+      const performerGalleryIds = new Set<string>();
+      const performerStudioIds = new Set<string>();
+
+      for (const sceneId of performerSceneIds) {
+        for (const gid of groupsByScene.get(sceneId) || []) performerGroupIds.add(gid);
+        for (const gid of galleriesByScene.get(sceneId) || []) performerGalleryIds.add(gid);
+        const sid = studioByScene.get(sceneId);
+        if (sid) performerStudioIds.add(sid);
+      }
+
+      (performer as any).groups = [...performerGroupIds].map((id) => groupsById.get(id)).filter(Boolean);
+      (performer as any).galleries = [...performerGalleryIds].map((id) => galleriesById.get(id)).filter(Boolean);
+      (performer as any).studios = [...performerStudioIds].map((id) => studiosById.get(id)).filter(Boolean);
     }
   }
 
