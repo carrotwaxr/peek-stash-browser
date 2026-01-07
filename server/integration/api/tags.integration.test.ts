@@ -5,7 +5,14 @@ import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 // Response type for /api/library/tags
 interface FindTagsResponse {
   findTags: {
-    tags: Array<{ id: string; name: string }>;
+    tags: Array<{
+      id: string;
+      name: string;
+      performers?: Array<{ id: string; name: string; image_path: string | null }>;
+      studios?: Array<{ id: string; name: string; image_path: string | null }>;
+      groups?: Array<{ id: string; name: string; front_image_path: string | null }>;
+      galleries?: Array<{ id: string; title: string; cover: string | null }>;
+    }>;
     count: number;
   };
 }
@@ -42,6 +49,47 @@ describe("Tag API", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findTags.tags).toHaveLength(1);
       expect(response.data.findTags.tags[0].id).toBe(TEST_ENTITIES.tagWithEntities);
+    });
+
+    it("returns tag with tooltip entity data (performers, studios, groups, galleries)", async () => {
+      const response = await adminClient.post<FindTagsResponse>("/api/library/tags", {
+        ids: [TEST_ENTITIES.tagWithEntities],
+      });
+
+      expect(response.ok).toBe(true);
+      const tag = response.data.findTags.tags[0];
+
+      // Performers should exist with tooltip data
+      expect(tag).toHaveProperty('performers');
+      if (tag.performers && tag.performers.length > 0) {
+        expect(tag.performers[0]).toHaveProperty('id');
+        expect(tag.performers[0]).toHaveProperty('name');
+        expect(tag.performers[0]).toHaveProperty('image_path');
+      }
+
+      // Studios should exist with tooltip data
+      expect(tag).toHaveProperty('studios');
+      if (tag.studios && tag.studios.length > 0) {
+        expect(tag.studios[0]).toHaveProperty('id');
+        expect(tag.studios[0]).toHaveProperty('name');
+        expect(tag.studios[0]).toHaveProperty('image_path');
+      }
+
+      // Groups should exist with tooltip data
+      expect(tag).toHaveProperty('groups');
+      if (tag.groups && tag.groups.length > 0) {
+        expect(tag.groups[0]).toHaveProperty('id');
+        expect(tag.groups[0]).toHaveProperty('name');
+        expect(tag.groups[0]).toHaveProperty('front_image_path');
+      }
+
+      // Galleries should exist with tooltip data
+      expect(tag).toHaveProperty('galleries');
+      if (tag.galleries && tag.galleries.length > 0) {
+        expect(tag.galleries[0]).toHaveProperty('id');
+        expect(tag.galleries[0]).toHaveProperty('title');
+        expect(tag.galleries[0]).toHaveProperty('cover');
+      }
     });
   });
 
