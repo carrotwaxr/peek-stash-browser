@@ -1138,6 +1138,11 @@ class StashSyncService extends EventEmitter {
             return 0;
         }
 
+        // Guard against missing count field (would cause infinite loop)
+        if (typeof count !== "number") {
+          throw new Error(`API response missing count field for ${entityType} cleanup`);
+        }
+
         totalCount = count;
         stashIds.push(...pageIds);
         fetchedCount += pageIds.length;
