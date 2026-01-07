@@ -677,9 +677,14 @@ class TagQueryBuilder {
     const tags = rows.map((row) => this.transformRow(row));
     const transformMs = Date.now() - transformStart;
 
+    // Populate relations for tooltip data
+    const relationsStart = Date.now();
+    await this.populateRelations(tags);
+    const relationsMs = Date.now() - relationsStart;
+
     logger.info("TagQueryBuilder.execute complete", {
       queryTimeMs: Date.now() - startTime,
-      breakdown: { queryMs, countMs, transformMs },
+      breakdown: { queryMs, countMs, transformMs, relationsMs },
       resultCount: tags.length,
       total,
     });
@@ -733,6 +738,128 @@ class TagQueryBuilder {
     };
 
     return tag as NormalizedTag;
+  }
+
+  /**
+   * Populate tag relations (performers, studios, groups, galleries)
+   * Includes minimal data for TooltipEntityGrid: id, name, image_path/cover
+   */
+  async populateRelations(tags: NormalizedTag[]): Promise<void> {
+    if (tags.length === 0) return;
+
+    const tagIds = tags.map((t) => t.id);
+
+    // Load all junctions in parallel
+    const [performerTags, studioTags, groupTags, galleryTags] = await Promise.all([
+      prisma.performerTag.findMany({
+        where: { tagId: { in: tagIds } },
+        select: { tagId: true, performerId: true },
+      }),
+      prisma.studioTag.findMany({
+        where: { tagId: { in: tagIds } },
+        select: { tagId: true, studioId: true },
+      }),
+      prisma.groupTag.findMany({
+        where: { tagId: { in: tagIds } },
+        select: { tagId: true, groupId: true },
+      }),
+      prisma.galleryTag.findMany({
+        where: { tagId: { in: tagIds } },
+        select: { tagId: true, galleryId: true },
+      }),
+    ]);
+
+    // Get unique entity IDs
+    const performerIds = [...new Set(performerTags.map((pt) => pt.performerId))];
+    const studioIds = [...new Set(studioTags.map((st) => st.studioId))];
+    const groupIds = [...new Set(groupTags.map((gt) => gt.groupId))];
+    const galleryIds = [...new Set(galleryTags.map((gt) => gt.galleryId))];
+
+    // Load all entities in parallel
+    const [performers, studios, groups, galleries] = await Promise.all([
+      performerIds.length > 0
+        ? prisma.stashPerformer.findMany({ where: { id: { in: performerIds } } })
+        : [],
+      studioIds.length > 0
+        ? prisma.stashStudio.findMany({ where: { id: { in: studioIds } } })
+        : [],
+      groupIds.length > 0
+        ? prisma.stashGroup.findMany({ where: { id: { in: groupIds } } })
+        : [],
+      galleryIds.length > 0
+        ? prisma.stashGallery.findMany({ where: { id: { in: galleryIds } } })
+        : [],
+    ]);
+
+    // Build lookup maps with minimal tooltip data
+    const performersById = new Map(performers.map((p) => [p.id, {
+      id: p.id,
+      name: p.name,
+      image_path: this.transformUrl(p.imagePath),
+    }]));
+
+    const studiosById = new Map(studios.map((s) => [s.id, {
+      id: s.id,
+      name: s.name,
+      image_path: this.transformUrl(s.imagePath),
+    }]));
+
+    const groupsById = new Map(groups.map((g) => [g.id, {
+      id: g.id,
+      name: g.name,
+      front_image_path: this.transformUrl(g.frontImagePath),
+    }]));
+
+    const galleriesById = new Map(galleries.map((g) => [g.id, {
+      id: g.id,
+      title: g.title,
+      cover: this.transformUrl(g.coverPath),
+    }]));
+
+    // Build tag -> entities maps
+    const performersByTag = new Map<string, any[]>();
+    for (const pt of performerTags) {
+      const performer = performersById.get(pt.performerId);
+      if (!performer) continue;
+      const list = performersByTag.get(pt.tagId) || [];
+      list.push(performer);
+      performersByTag.set(pt.tagId, list);
+    }
+
+    const studiosByTag = new Map<string, any[]>();
+    for (const st of studioTags) {
+      const studio = studiosById.get(st.studioId);
+      if (!studio) continue;
+      const list = studiosByTag.get(st.tagId) || [];
+      list.push(studio);
+      studiosByTag.set(st.tagId, list);
+    }
+
+    const groupsByTag = new Map<string, any[]>();
+    for (const gt of groupTags) {
+      const group = groupsById.get(gt.groupId);
+      if (!group) continue;
+      const list = groupsByTag.get(gt.tagId) || [];
+      list.push(group);
+      groupsByTag.set(gt.tagId, list);
+    }
+
+    const galleriesByTag = new Map<string, any[]>();
+    for (const gt of galleryTags) {
+      const gallery = galleriesById.get(gt.galleryId);
+      if (!gallery) continue;
+      const list = galleriesByTag.get(gt.tagId) || [];
+      list.push(gallery);
+      galleriesByTag.set(gt.tagId, list);
+    }
+
+    // Populate tags with all relations
+    for (const tag of tags) {
+      (tag as any).performers = performersByTag.get(tag.id) || [];
+      (tag as any).studios = studiosByTag.get(tag.id) || [];
+      (tag as any).groups = groupsByTag.get(tag.id) || [];
+      (tag as any).galleries = galleriesByTag.get(tag.id) || [];
+    }
   }
 
   /**
