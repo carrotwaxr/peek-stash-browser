@@ -3,7 +3,7 @@
 **Date**: 2026-01-06
 **Triggered by**: Discord user report - "Sync from Stash" feature crashed system with 500k scenes
 **Version**: 3.1.1
-**Updated**: 2026-01-06 (Phase 1 fixes implemented)
+**Updated**: 2026-01-07 (Phase 2 fixes implemented)
 
 ---
 
@@ -20,11 +20,12 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 | StashCacheManager refresh | ~~HIGH~~ **N/A** | ✅ DELETED | Dead code removed (~600 lines) |
 | INCLUDE mode restrictions | **HIGH** | ✅ FIXED | Database queries replace cache |
 | SearchableSelect (client) | **MEDIUM** | ✅ FIXED | Search-only mode (per_page=50) |
-| Performance logging gaps | **LOW** | ✅ FIXED | Added to 5 entity endpoints |
-| StashSyncService cleanup | **MEDIUM** | ⏳ DEFERRED | Future PR |
+| Performance logging gaps | **LOW** | ✅ FIXED | Added to all entity endpoints |
+| StashSyncService cleanup | **MEDIUM** | ✅ FIXED | PR #260 - Paginated ID fetching |
+| Tags endpoint - heavy computation | **MEDIUM** | ✅ FIXED | PR #260 - Pre-computed during sync |
+| Similar/Recommended scenes | **MEDIUM** | ✅ FIXED | PR #260 - SQL candidate filtering |
+| Entity Exclusion Helper | **LOW** | ⏳ DEFERRED | Already fast, low impact |
 | findXxxMinimal endpoints | **LOW** | ⏳ DEFERRED | Future PR |
-| Tags endpoint - heavy computation | **MEDIUM** | ⏳ DEFERRED | Future PR |
-| Similar/Recommended scenes | **MEDIUM** | ⏳ DEFERRED | Future PR |
 | Entity query builders | **MEDIUM** | ⏳ DEFERRED | Future PR |
 
 ---
@@ -110,41 +111,92 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ---
 
-## Phase 2: Future Optimizations (DEFERRED)
+## Phase 2: Performance Optimizations (COMPLETED)
 
-### ⏳ Issue #6: Tags Endpoint - Heavy Computation
+**PR**: #260
+**Commits**: `ca01038`, `7ca05a1`, `3d796d6`, `77fa1d5`, `16a967f`, `bf9f0ac`
 
-**File**: [server/controllers/library/tags.ts:128-288](../../server/controllers/library/tags.ts#L128)
+### ✅ Issue #6: Tags Endpoint - Heavy Computation - FIXED
 
-**Problem**: `enhanceTagsWithPerformerScenes()` loads ALL scenes + ALL performers to compute counts on EVERY tag list request.
+**File**: [server/controllers/library/tags.ts](../../server/controllers/library/tags.ts)
 
-**Recommended Fix**:
-1. Pre-compute `scene_count_via_performers` during sync
-2. Store in database column
-3. Update on sync, not on read
+**Problem (was)**: `enhanceTagsWithPerformerScenes()` loaded ALL scenes + ALL performers to compute counts on EVERY tag list request.
 
-**Effort**: Medium - requires schema change
+**Fix Applied**:
+1. Added `sceneCountViaPerformers` column to `StashTag` schema
+2. Created `computeTagSceneCountsViaPerformers()` in StashSyncService
+3. SQL query computes counts during sync: `SELECT COUNT(DISTINCT sceneId) FROM PerformerTag JOIN ScenePerformer...`
+4. `enhanceTagsWithPerformerScenes()` now uses pre-computed value (O(1) lookup)
+
+**Commits**: `3d796d6`
 
 ---
 
-### ⏳ Issue #7: Similar/Recommended Scenes - Full Table Scan
+### ✅ Issue #7: Similar/Recommended Scenes - Full Table Scan - FIXED
 
 **Files**:
-- [scenes.ts:1274-1408](../../server/controllers/library/scenes.ts#L1274) (Similar)
-- [scenes.ts:1418-1619](../../server/controllers/library/scenes.ts#L1418) (Recommended)
+- [StashEntityService.ts](../../server/services/StashEntityService.ts) - `getSimilarSceneCandidates()`
+- [scenes.ts](../../server/controllers/library/scenes.ts) - `findSimilarScenes`
 
-**Problem**: Scores ALL scenes in memory using `getScenesForScoring()`.
+**Problem (was)**: Scored ALL 500k scenes in memory using `getScenesForScoring()`.
 
-**Recommended Fix**:
-1. SQL-based candidate pre-filtering (scenes sharing performer/tag/studio)
-2. Inverted indexes for O(1) candidate lookup
-3. Move scoring to SQL aggregation
+**Fix Applied**:
+1. Added `getSimilarSceneCandidates()` SQL method
+2. Uses CTE with UNION ALL to find scenes sharing performers/tags/studio
+3. Weights: performers=3, studio=2, tags=1 (per match)
+4. Returns max 500 candidates sorted by weight DESC, date DESC
+5. Updated `findSimilarScenes` to use SQL candidates instead of full table scan
+6. Changed frontend from "Load More" to standard pagination
 
-**Effort**: High - complex optimization
+**Performance Impact**:
+- Before: Load 500k scenes (~1.5GB), score all in memory
+- After: SQL query returns max 500 candidates, fetch only paginated results
+
+**Commits**: `16a967f`
 
 ---
 
-### ⏳ Issue #8: Entity Query Builders
+### ✅ Issue #8: StashSyncService Cleanup - FIXED
+
+**File**: [server/services/StashSyncService.ts](../../server/services/StashSyncService.ts)
+
+**Problem (was)**: `cleanupDeletedEntities` fetched ALL IDs from Stash with `per_page: -1`.
+
+**Fix Applied**:
+1. Paginated ID fetching with `CLEANUP_PAGE_SIZE = 5000`
+2. Added infinite loop guard: throws if response lacks `count` field
+3. Accumulates IDs across pages, then compares with database
+
+**Commits**: `ca01038`, `7ca05a1`
+
+---
+
+### ✅ Issue #9: Performance Logging - Extended
+
+**Files**: Multiple controllers
+
+**Fix Applied**: Added performance logging to remaining endpoints:
+- `findSimilarScenes` - logs candidateCount, resultCount, totalTime
+- `getRecommendedScenes` - logs candidateCount, resultCount, totalTime
+- `syncFromStash` - logs entity counts and totalTime
+
+**Commits**: `77fa1d5`
+
+---
+
+### ⏳ Issue #10: Entity Exclusion Helper - DEFERRED
+
+**File**: [server/services/EntityExclusionHelper.ts](../../server/services/EntityExclusionHelper.ts)
+
+**Problem**: Queries database on EVERY call, no caching.
+
+**Decision**: Deferred - database queries are already fast (<5ms). The overhead of cache management (invalidation on hide/unhide) may not be worth the complexity for the minimal gain.
+
+---
+
+## Phase 3: Future Optimizations (DEFERRED)
+
+### ⏳ Issue #11: Entity Query Builders
 
 **Files**: performers.ts, studios.ts, tags.ts, galleries.ts, groups.ts
 
@@ -161,28 +213,11 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ---
 
-### ⏳ Issue #9: StashSyncService Cleanup
+### ⏳ Issue #12: findXxxMinimal Endpoints
 
-**File**: [server/services/StashSyncService.ts:1071-1150](../../server/services/StashSyncService.ts#L1071)
+**Problem**: Minimal endpoints still load full entities.
 
-**Problem**: `cleanupDeletedEntities` fetches ALL IDs from Stash with `per_page: -1`.
-
-**Recommended Fix**:
-1. Paginated ID fetching
-2. Chunked comparison
-3. Cursor-based deletion
-
-**Effort**: Medium
-
----
-
-### ⏳ Issue #10: Entity Exclusion Helper - Uncached
-
-**File**: [server/services/EntityExclusionHelper.ts](../../server/services/EntityExclusionHelper.ts)
-
-**Problem**: Queries database on EVERY call, no caching of exclusion sets.
-
-**Recommended Fix**: Cache exclusion sets per user/type with short TTL (30-60s).
+**Recommended Fix**: Create truly minimal queries returning only id/name.
 
 **Effort**: Low
 
@@ -212,16 +247,18 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 ## Verification Performed
 
 ### Automated Tests
-- ✅ Unit tests: 492 passed
-- ✅ Integration tests: All passed (including new INCLUDE mode test)
+- ✅ Unit tests: 493 passed (Phase 2)
+- ✅ Integration tests: 442 passed (Phase 2)
 - ✅ TypeScript compilation: No errors
-- ✅ Linting: No new issues
+- ✅ Linting: 0 errors (221 pre-existing warnings)
 
 ### Manual Verification Needed
 - [ ] Sync from Stash with 20k+ scenes
 - [ ] INCLUDE mode restriction filters correctly
 - [ ] SearchableSelect dropdowns don't freeze
 - [ ] Check Docker logs for new performance timing
+- [ ] Similar scenes endpoint with large library
+- [ ] Tags endpoint response time with 500k scenes
 
 ---
 
@@ -250,17 +287,18 @@ Both limits will be exceeded by loading all scenes at once - hence the paginated
 
 ### Performance Logging Coverage
 
-**Now Instrumented** (Phase 1 fix):
+**Now Instrumented** (Phase 1 + Phase 2):
 - `findPerformers` ✅
 - `findStudios` ✅
 - `findTags` ✅
 - `findGalleries` ✅
 - `findGroups` ✅
+- `findSimilarScenes` ✅ (Phase 2)
+- `getRecommendedScenes` ✅ (Phase 2)
+- `syncFromStash` ✅ (Phase 2)
 
-**Still Missing** (Phase 2):
-- `findSimilarScenes`
-- `getRecommendedScenes`
-- `findXxxMinimal` endpoints
+**Still Missing**:
+- `findXxxMinimal` endpoints (low priority)
 
 ---
 
