@@ -1275,6 +1275,7 @@ export const findSimilarScenes = async (
   req: TypedAuthRequest<unknown, FindSimilarScenesParams, FindSimilarScenesQuery>,
   res: TypedResponse<FindSimilarScenesResponse | ApiErrorResponse>
 ) => {
+  const startTime = Date.now();
   try {
     const { id } = req.params;
     const page = parseInt(req.query.page as string) || 1;
@@ -1395,6 +1396,14 @@ export const findSimilarScenes = async (
       .map(id => sceneMap.get(id))
       .filter((s): s is NormalizedScene => s !== undefined);
 
+    logger.info("findSimilarScenes completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      sceneId: id,
+      candidateCount: scoredScenes.length,
+      resultCount: orderedScenes.length,
+      page,
+    });
+
     res.json({
       scenes: orderedScenes,
       count: scoredScenes.length,
@@ -1419,6 +1428,7 @@ export const getRecommendedScenes = async (
   req: TypedAuthRequest<unknown, Record<string, string>, GetRecommendedScenesQuery>,
   res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>
 ) => {
+  const startTime = Date.now();
   try {
     const page = parseInt(req.query.page as string) || 1;
     const perPage = parseInt(req.query.per_page as string) || 24;
@@ -1664,6 +1674,14 @@ export const getRecommendedScenes = async (
     const orderedScenes = paginatedIds
       .map((id) => sceneMap.get(id))
       .filter((s): s is NormalizedScene => s !== undefined);
+
+    logger.info("getRecommendedScenes completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      userId,
+      candidateCount: cappedScenes.length,
+      resultCount: orderedScenes.length,
+      page,
+    });
 
     res.json({
       scenes: orderedScenes,
