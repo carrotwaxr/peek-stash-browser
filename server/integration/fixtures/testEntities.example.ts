@@ -12,6 +12,7 @@
  * - groupWithScenes: A group/collection containing scenes
  * - sceneInGroup: A scene that belongs to groupWithScenes
  * - galleryWithImages: A gallery containing images
+ * - galleryWithScenes: A gallery that has scenes linked to it (for scene filter tests)
  * - restrictableTag: A tag that can be used for content restriction tests
  * - galleryPerformerForInheritance: (Optional) A performer assigned to a gallery
  *   where the gallery's images do NOT have this performer directly assigned.
@@ -29,6 +30,7 @@ export const TEST_ENTITIES = {
   groupWithScenes: "REPLACE_WITH_GROUP_ID",
   sceneInGroup: "REPLACE_WITH_SCENE_ID_IN_GROUP",
   galleryWithImages: "REPLACE_WITH_GALLERY_ID",
+  galleryWithScenes: "REPLACE_WITH_GALLERY_ID_WITH_SCENES",
   restrictableTag: "REPLACE_WITH_TAG_ID_FOR_RESTRICTIONS",
   galleryPerformerForInheritance: "", // Optional - leave empty to skip inheritance test
   imageWithGalleryInheritance: "", // Optional - image that inherits from gallery

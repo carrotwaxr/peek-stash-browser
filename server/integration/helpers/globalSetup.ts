@@ -52,10 +52,10 @@ export async function setup() {
     fs.unlinkSync(TEST_CONFIG.databasePath);
   }
 
-  // Run prisma migrations
+  // Run prisma migrations (regenerates client to ensure schema is up to date)
   console.log("[Integration Tests] Running database migrations...");
   const { execSync } = await import("child_process");
-  execSync("npx prisma db push --skip-generate", {
+  execSync("npx prisma db push", {
     cwd: path.resolve(__dirname, "../.."),
     env: { ...process.env, DATABASE_URL: TEST_CONFIG.databaseUrl },
     stdio: "inherit",

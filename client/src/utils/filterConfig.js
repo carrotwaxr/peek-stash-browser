@@ -1390,6 +1390,22 @@ export const buildSceneFilter = (filters) => {
     };
   }
 
+  // Galleries: Merge permanent + UI filters
+  const galleryIds = [];
+  if (filters.galleries?.value) {
+    galleryIds.push(...filters.galleries.value);
+  }
+  if (filters.galleryIds && filters.galleryIds.length > 0) {
+    galleryIds.push(...filters.galleryIds);
+  }
+  if (galleryIds.length > 0) {
+    sceneFilter.galleries = {
+      value: [...new Set(galleryIds)], // Remove duplicates
+      modifier:
+        filters.galleryIdsModifier || filters.galleries?.modifier || "INCLUDES",
+    };
+  }
+
   // Boolean filters
   if (filters.favorite === true || filters.favorite === "TRUE") {
     sceneFilter.favorite = true;

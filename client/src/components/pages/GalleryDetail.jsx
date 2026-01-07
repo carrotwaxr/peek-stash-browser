@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
@@ -7,11 +7,11 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
+import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
   FavoriteButton,
   LazyImage,
-  LazyThumbnail,
   Lightbox,
   LoadingSpinner,
   PageHeader,
@@ -28,6 +28,7 @@ const GalleryDetail = () => {
   const { galleryId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [gallery, setGallery] = useState(null);
   const [images, setImages] = useState([]);
@@ -35,7 +36,9 @@ const GalleryDetail = () => {
   const [imagesLoading, setImagesLoading] = useState(true);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
-  const [activeTab, setActiveTab] = useState('images');
+
+  // Get active tab from URL or default to 'images'
+  const activeTab = searchParams.get('tab') || 'images';
 
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
@@ -317,8 +320,7 @@ const GalleryDetail = () => {
               { id: 'images', label: 'Images', count: totalCount || gallery.image_count || 0 },
               { id: 'scenes', label: 'Scenes', count: gallery.scenes?.length || 0 },
             ]}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
+            defaultTab="images"
           />
 
           {/* Images Tab */}
@@ -389,34 +391,20 @@ const GalleryDetail = () => {
 
           {/* Scenes Tab */}
           {activeTab === 'scenes' && (
-            <div className="mt-6">
-              {gallery.scenes && gallery.scenes.length > 0 ? (
-                <div className="flex gap-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: "thin" }}>
-                  {gallery.scenes.map((scene) => (
-                    <Link
-                      key={scene.id}
-                      to={`/scene/${scene.id}`}
-                      className="flex flex-col items-center flex-shrink-0 group w-[160px]"
-                    >
-                      <LazyThumbnail
-                        src={scene.paths?.screenshot}
-                        alt={scene.title || `Scene ${scene.id}`}
-                        fallback="🎬"
-                        className="aspect-video rounded-lg overflow-hidden mb-2 w-full border-2 border-transparent group-hover:border-[var(--accent-primary)] transition-all"
-                      />
-                      <span
-                        className="text-xs font-medium text-center w-full line-clamp-2 group-hover:underline"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        {scene.title || `Scene ${scene.id}`}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ color: "var(--text-muted)" }}>No scenes for this gallery</p>
-              )}
-            </div>
+            <SceneSearch
+              context="gallery_scenes"
+              permanentFilters={{
+                galleries: {
+                  value: [parseInt(galleryId, 10)],
+                  modifier: "INCLUDES"
+                }
+              }}
+              permanentFiltersMetadata={{
+                galleries: [{ id: galleryId, title: galleryTitle(gallery) }]
+              }}
+              title={`Scenes in ${galleryTitle(gallery)}`}
+              captureReferrer={false}
+            />
           )}
         </div>
       </div>

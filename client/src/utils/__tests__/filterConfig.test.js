@@ -174,6 +174,32 @@ describe("buildSceneFilter", () => {
         modifier: "INCLUDES",
       });
     });
+
+    it("should build galleries filter with INCLUDES modifier", () => {
+      const uiFilters = {
+        galleryIds: ["1"],
+        galleryIdsModifier: "INCLUDES",
+      };
+      const result = buildSceneFilter(uiFilters);
+      expect(result.galleries).toEqual({
+        value: ["1"],
+        modifier: "INCLUDES",
+      });
+    });
+
+    it("should build galleries filter from permanent filters", () => {
+      const uiFilters = {
+        galleries: {
+          value: ["123"],
+          modifier: "INCLUDES",
+        },
+      };
+      const result = buildSceneFilter(uiFilters);
+      expect(result.galleries).toEqual({
+        value: ["123"],
+        modifier: "INCLUDES",
+      });
+    });
   });
 
   describe("Range Filters", () => {

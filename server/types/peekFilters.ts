@@ -24,6 +24,8 @@ export type PeekSceneFilter = BaseSceneFilterType & {
   studio_favorite?: boolean;
   tag_favorite?: boolean;
   performer_favorite?: boolean;
+  groups?: { value: string[]; modifier?: string };
+  galleries?: { value: string[]; modifier?: string };
 };
 
 /**
