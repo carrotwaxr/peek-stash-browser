@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import {
   ScenePlayerProvider,
   useScenePlayer,
@@ -43,6 +44,7 @@ const SceneContent = ({ location }) => {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [sidebarHeight, setSidebarHeight] = useState(null);
   const [activeTab, setActiveTab] = useState('similar');
+  const [similarScenesCount, setSimilarScenesCount] = useState(0);
 
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
@@ -53,6 +55,26 @@ const SceneContent = ({ location }) => {
       })
     );
   }, []); // Run once on mount
+
+  // Fetch similar scenes count for tab badge
+  useEffect(() => {
+    if (!scene?.id) return;
+
+    const fetchSimilarCount = async () => {
+      try {
+        const response = await axios.get(
+          `/api/library/scenes/${scene.id}/similar?page=1`,
+          { withCredentials: true }
+        );
+        setSimilarScenesCount(response.data.count || 0);
+      } catch (err) {
+        console.error("Error fetching similar scenes count:", err);
+        setSimilarScenesCount(0);
+      }
+    };
+
+    fetchSimilarCount();
+  }, [scene?.id]);
 
   // Measure left column height and sync to sidebar
   useEffect(() => {
@@ -215,7 +237,20 @@ const SceneContent = ({ location }) => {
                   }}
                   disabled={activeTab === 'similar'}
                 >
-                  Similar Scenes
+                  <span className="flex items-center gap-2">
+                    <span>Similar Scenes</span>
+                    {similarScenesCount > 0 && (
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: activeTab === 'similar' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                          color: activeTab === 'similar' ? 'white' : 'var(--text-muted)',
+                        }}
+                      >
+                        {similarScenesCount}
+                      </span>
+                    )}
+                  </span>
                 </button>
                 {scene.groups && scene.groups.length > 0 && (
                   <button
