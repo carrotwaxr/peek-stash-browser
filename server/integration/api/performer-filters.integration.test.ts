@@ -175,6 +175,39 @@ describe("Performer Filters", () => {
     });
   });
 
+  describe("scenes filter", () => {
+    it("filters performers appearing in specific scene with INCLUDES", async () => {
+      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
+        filter: { per_page: 50 },
+        performer_filter: {
+          scenes: {
+            value: [TEST_ENTITIES.sceneWithRelations],
+            modifier: "INCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findPerformers).toBeDefined();
+      expect(response.data.findPerformers.count).toBeGreaterThan(0);
+    });
+
+    it("filters performers excluding specific scene with EXCLUDES", async () => {
+      const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {
+        filter: { per_page: 50 },
+        performer_filter: {
+          scenes: {
+            value: [TEST_ENTITIES.sceneWithRelations],
+            modifier: "EXCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findPerformers).toBeDefined();
+    });
+  });
+
   describe("studios filter", () => {
     it("filters performers who appear in scenes from studio", async () => {
       const response = await adminClient.post<FindPerformersResponse>("/api/library/performers", {

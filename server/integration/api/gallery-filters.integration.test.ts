@@ -212,6 +212,38 @@ describe("Gallery Filters", () => {
     });
   });
 
+  describe("scenes filter", () => {
+    it("filters galleries containing specific scene with INCLUDES", async () => {
+      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
+        filter: { per_page: 50 },
+        gallery_filter: {
+          scenes: {
+            value: [TEST_ENTITIES.sceneWithRelations],
+            modifier: "INCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findGalleries).toBeDefined();
+    });
+
+    it("filters galleries excluding specific scene with EXCLUDES", async () => {
+      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
+        filter: { per_page: 50 },
+        gallery_filter: {
+          scenes: {
+            value: [TEST_ENTITIES.sceneWithRelations],
+            modifier: "EXCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findGalleries).toBeDefined();
+    });
+  });
+
   describe("performers filter", () => {
     it("filters galleries by performer", async () => {
       const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {

@@ -175,6 +175,56 @@ class GalleryQueryBuilder {
   }
 
   /**
+   * Build scenes filter clause
+   * Filter galleries by scenes they contain
+   */
+  private buildScenesFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    // Galleries contain scenes via SceneGallery junction table
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `g.id IN (
+            SELECT sg.galleryId FROM SceneGallery sg
+            WHERE sg.sceneId IN (${placeholders})
+          )`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        return {
+          sql: `g.id IN (
+            SELECT sg.galleryId FROM SceneGallery sg
+            WHERE sg.sceneId IN (${placeholders})
+            GROUP BY sg.galleryId
+            HAVING COUNT(DISTINCT sg.sceneId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `g.id NOT IN (
+            SELECT sg.galleryId FROM SceneGallery sg
+            WHERE sg.sceneId IN (${placeholders})
+          )`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
    * Build performer filter clause
    */
   private buildPerformerFilter(
@@ -455,6 +505,14 @@ class GalleryQueryBuilder {
       const studioFilter = await this.buildStudioFilterWithHierarchy(filters.studios as any);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
+      }
+    }
+
+    // Scenes filter
+    if (filters?.scenes) {
+      const scenesFilter = this.buildScenesFilter(filters.scenes as any);
+      if (scenesFilter.sql) {
+        whereClauses.push(scenesFilter);
       }
     }
 

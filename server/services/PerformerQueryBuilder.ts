@@ -242,6 +242,56 @@ class PerformerQueryBuilder {
   }
 
   /**
+   * Build scenes filter clause
+   * Filter performers by specific scenes they appear in
+   */
+  private buildScenesFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    // Performers appear in scenes via ScenePerformer junction table
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `p.id IN (
+            SELECT sp.performerId FROM ScenePerformer sp
+            WHERE sp.sceneId IN (${placeholders})
+          )`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        return {
+          sql: `p.id IN (
+            SELECT sp.performerId FROM ScenePerformer sp
+            WHERE sp.sceneId IN (${placeholders})
+            GROUP BY sp.performerId
+            HAVING COUNT(DISTINCT sp.sceneId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `p.id NOT IN (
+            SELECT sp.performerId FROM ScenePerformer sp
+            WHERE sp.sceneId IN (${placeholders})
+          )`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
    * Build group filter clause
    * Performers appear in scenes from specific groups
    */
@@ -632,6 +682,14 @@ class PerformerQueryBuilder {
       const studioFilter = this.buildStudioFilter(filters.studios as any);
       if (studioFilter.sql) {
         whereClauses.push(studioFilter);
+      }
+    }
+
+    // Scenes filter
+    if (filters?.scenes) {
+      const scenesFilter = this.buildScenesFilter(filters.scenes as any);
+      if (scenesFilter.sql) {
+        whereClauses.push(scenesFilter);
       }
     }
 

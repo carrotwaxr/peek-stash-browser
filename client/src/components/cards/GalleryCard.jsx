@@ -97,7 +97,7 @@ const GalleryCard = forwardRef(
       <BaseCard
         ref={ref}
         entityType="gallery"
-        imagePath={gallery.paths?.cover}
+        imagePath={gallery.cover}
         title={galleryTitle(gallery)}
         subtitle={subtitle}
         description={gallery.description}
