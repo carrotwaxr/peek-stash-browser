@@ -46,6 +46,7 @@ const mockPrisma = {
     findFirst: vi.fn(),
   },
   $executeRawUnsafe: vi.fn(),
+  $executeRaw: vi.fn().mockResolvedValue(0),
 };
 
 vi.mock("../../prisma/singleton.js", () => ({

@@ -255,6 +255,9 @@ class StashSyncService extends EventEmitter {
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
 
+      // Compute tag scene counts via performers
+      await this.computeTagSceneCountsViaPerformers();
+
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
       await exclusionComputationService.recomputeAllUsers();
@@ -396,6 +399,9 @@ class StashSyncService extends EventEmitter {
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
+
+      // Compute tag scene counts via performers
+      await this.computeTagSceneCountsViaPerformers();
 
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
@@ -665,6 +671,9 @@ class StashSyncService extends EventEmitter {
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
+
+      // Compute tag scene counts via performers
+      await this.computeTagSceneCountsViaPerformers();
 
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
@@ -2770,6 +2779,42 @@ class StashSyncService extends EventEmitter {
       },
       inProgress: this.syncInProgress,
     };
+  }
+
+  /**
+   * Compute sceneCountViaPerformers for all tags using SQL.
+   * This counts scenes where a performer in the scene has this tag.
+   * Called after sync completes to pre-compute the value for fast retrieval.
+   */
+  async computeTagSceneCountsViaPerformers(): Promise<void> {
+    const startTime = Date.now();
+    logger.info("Computing tag scene counts via performers...");
+
+    try {
+      // SQL query that:
+      // 1. Finds all distinct scenes where a performer has a given tag
+      // 2. Groups by tagId to get counts
+      // 3. Updates all tags in one batch
+      await prisma.$executeRaw`
+        UPDATE StashTag
+        SET sceneCountViaPerformers = COALESCE((
+          SELECT COUNT(DISTINCT sp.sceneId)
+          FROM PerformerTag pt
+          JOIN ScenePerformer sp ON sp.performerId = pt.performerId
+          JOIN StashScene s ON s.id = sp.sceneId AND s.deletedAt IS NULL
+          WHERE pt.tagId = StashTag.id
+        ), 0)
+        WHERE StashTag.deletedAt IS NULL
+      `;
+
+      const duration = Date.now() - startTime;
+      logger.info(`Tag scene counts via performers computed in ${duration}ms`);
+    } catch (error) {
+      logger.error("Failed to compute tag scene counts via performers", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
+    }
   }
 }
 

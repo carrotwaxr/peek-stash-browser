@@ -22,51 +22,13 @@ import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
  * Enhance tags with scene counts from tagged performers
- * This adds scenes where performers have the tag, even if the scene itself doesn't
+ * Uses pre-computed sceneCountViaPerformers from the database (computed during sync)
+ * This is much faster than loading all scenes/performers on every request
  */
-async function enhanceTagsWithPerformerScenes(tags: NormalizedTag[]): Promise<NormalizedTag[]> {
-  // Get all scenes and performers from cache
-  const allScenes = await stashEntityService.getAllScenes();
-  const allPerformers = await stashEntityService.getAllPerformers();
-
-  // Build a map of performer ID -> set of tag IDs
-  const performerTagsMap = new Map<string, Set<string>>();
-  allPerformers.forEach((performer) => {
-    if (performer.tags && performer.tags.length > 0) {
-      performerTagsMap.set(
-        performer.id,
-        new Set(performer.tags.map((t) => t.id))
-      );
-    }
-  });
-
-  // Build a map of tag ID -> count of scenes with tagged performers
-  const tagPerformerSceneCount = new Map<string, number>();
-
-  allScenes.forEach((scene) => {
-    if (!scene.performers || scene.performers.length === 0) return;
-
-    // Get all unique tag IDs from this scene's performers
-    const performerTagIds = new Set<string>();
-    scene.performers.forEach((performer) => {
-      const performerTags = performerTagsMap.get(performer.id);
-      if (performerTags) {
-        performerTags.forEach((tagId) => performerTagIds.add(tagId));
-      }
-    });
-
-    // Increment count for each unique tag
-    performerTagIds.forEach((tagId) => {
-      tagPerformerSceneCount.set(
-        tagId,
-        (tagPerformerSceneCount.get(tagId) || 0) + 1
-      );
-    });
-  });
-
-  // Enhance tags with the calculated counts
+function enhanceTagsWithPerformerScenes(tags: NormalizedTag[]): NormalizedTag[] {
   return tags.map((tag) => {
-    const performerSceneCount = tagPerformerSceneCount.get(tag.id) || 0;
+    // Use pre-computed value from database
+    const performerSceneCount = tag.scene_count_via_performers || 0;
     const directSceneCount = tag.scene_count || 0;
 
     // Use the greater of direct scene count or performer scene count
@@ -166,9 +128,9 @@ export const findTags = async (
       );
     }
 
-    // Enhance tags with performer scene counts
+    // Enhance tags with performer scene counts (uses pre-computed values from sync)
     // This adds scenes where performers have the tag, even if the scene doesn't
-    tags = await enhanceTagsWithPerformerScenes(tags);
+    tags = enhanceTagsWithPerformerScenes(tags);
 
     // Add performer counts per tag
     const performerCountsQuery = await prisma.$queryRaw<Array<{tagId: string, count: bigint}>>`

@@ -1771,6 +1771,7 @@ class StashEntityService {
       studio_count: tag.studioCount ?? 0,
       group_count: tag.groupCount ?? 0,
       scene_marker_count: tag.sceneMarkerCount ?? 0,
+      scene_count_via_performers: tag.sceneCountViaPerformers ?? 0,
       description: tag.description,
       aliases: tag.aliases ? JSON.parse(tag.aliases) : [],
       parents: tag.parentIds ? JSON.parse(tag.parentIds).map((id: string) => ({ id })) : [],
