@@ -3,7 +3,7 @@
 **Date**: 2026-01-06
 **Triggered by**: Discord user report - "Sync from Stash" feature crashed system with 500k scenes
 **Version**: 3.1.1
-**Updated**: 2026-01-07 (Phase 2 fixes implemented)
+**Updated**: 2026-01-07 (Phase 3 completed)
 
 ---
 
@@ -25,8 +25,9 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 | Tags endpoint - heavy computation | **MEDIUM** | ✅ FIXED | PR #260 - Pre-computed during sync |
 | Similar/Recommended scenes | **MEDIUM** | ✅ FIXED | PR #260 - SQL candidate filtering |
 | Entity Exclusion Helper | **LOW** | ⏳ DEFERRED | Already fast, low impact |
-| findXxxMinimal endpoints | **LOW** | ⏳ DEFERRED | Future PR |
-| Entity query builders | **MEDIUM** | ⏳ DEFERRED | Future PR |
+| findXxxMinimal count filtering | **LOW** | ✅ FIXED | Phase 3 - `count_filter` param |
+| findXxxMinimal truly minimal | **LOW** | ⏳ DEFERRED | Direct SQL for id/name only |
+| Entity query builders | **MEDIUM** | ✅ FIXED | Phase 3 - SQL-based filtering |
 
 ---
 
@@ -34,7 +35,7 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ### ✅ Issue #1: "Sync from Stash" Feature - FIXED
 
-**File**: [server/controllers/user.ts](../../server/controllers/user.ts)
+**File**: `server/controllers/user.ts`
 
 **Problem (was)**: Fetched ALL entities with `per_page: -1`, then did N+1 individual upserts.
 
@@ -64,7 +65,7 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ### ✅ Issue #3: INCLUDE Mode Restrictions - FIXED
 
-**File**: [server/services/ExclusionComputationService.ts](../../server/services/ExclusionComputationService.ts)
+**File**: `server/services/ExclusionComputationService.ts`
 
 **Problem (was)**: `getAllEntityIds()` called never-initialized StashCacheManager, returning empty arrays. INCLUDE mode restrictions were silently non-functional.
 
@@ -82,7 +83,7 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ### ✅ Issue #4: SearchableSelect Client Loading - FIXED
 
-**File**: [client/src/components/ui/SearchableSelect.jsx](../../client/src/components/ui/SearchableSelect.jsx)
+**File**: `client/src/components/ui/SearchableSelect.jsx`
 
 **Problem (was)**: Fetched ALL entities with `per_page: -1` when opening dropdown.
 
@@ -118,7 +119,7 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ### ✅ Issue #6: Tags Endpoint - Heavy Computation - FIXED
 
-**File**: [server/controllers/library/tags.ts](../../server/controllers/library/tags.ts)
+**File**: `server/controllers/library/tags.ts`
 
 **Problem (was)**: `enhanceTagsWithPerformerScenes()` loaded ALL scenes + ALL performers to compute counts on EVERY tag list request.
 
@@ -135,8 +136,8 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 ### ✅ Issue #7: Similar/Recommended Scenes - Full Table Scan - FIXED
 
 **Files**:
-- [StashEntityService.ts](../../server/services/StashEntityService.ts) - `getSimilarSceneCandidates()`
-- [scenes.ts](../../server/controllers/library/scenes.ts) - `findSimilarScenes`
+- `server/services/StashEntityService.ts` - `getSimilarSceneCandidates()`
+- `server/controllers/library/scenes.ts` - `findSimilarScenes`
 
 **Problem (was)**: Scored ALL 500k scenes in memory using `getScenesForScoring()`.
 
@@ -158,7 +159,7 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ### ✅ Issue #8: StashSyncService Cleanup - FIXED
 
-**File**: [server/services/StashSyncService.ts](../../server/services/StashSyncService.ts)
+**File**: `server/services/StashSyncService.ts`
 
 **Problem (was)**: `cleanupDeletedEntities` fetched ALL IDs from Stash with `per_page: -1`.
 
@@ -186,7 +187,7 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ### ⏳ Issue #10: Entity Exclusion Helper - DEFERRED
 
-**File**: [server/services/EntityExclusionHelper.ts](../../server/services/EntityExclusionHelper.ts)
+**File**: `server/services/EntityExclusionHelper.ts`
 
 **Problem**: Queries database on EVERY call, no caching.
 
@@ -194,32 +195,70 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 
 ---
 
-## Phase 3: Future Optimizations (DEFERRED)
+## Phase 3: Scalability Improvements (COMPLETED)
 
-### ⏳ Issue #11: Entity Query Builders
+**Branch**: `feature/scalability-phase-3`
 
-**Files**: performers.ts, studios.ts, tags.ts, galleries.ts, groups.ts
+### ✅ Issue #11: findXxxMinimal Count Filtering - FIXED
 
-**Problem**: All use "load all then filter in memory" pattern.
+**Files**:
+- `server/types/api/common.ts` - `MinimalCountFilter` type
+- `server/controllers/library/*.ts` - All minimal endpoints
+- `client/src/components/ui/SearchableSelect.jsx`
+- `client/src/utils/filterConfig.js`
 
-**Recommended Fix**: Create SQL-based query builders like `SceneQueryBuilder`:
-- `PerformerQueryBuilder`
-- `StudioQueryBuilder`
-- `TagQueryBuilder`
-- `GalleryQueryBuilder`
-- `GroupQueryBuilder`
+**Problem (was)**: Filter dropdowns showed ALL entities regardless of relevance. Scene performer filter showed performers with 0 scenes.
 
-**Effort**: High - large refactor
+**Fix Applied**:
+1. Added `MinimalCountFilter` type with `min_scene_count`, `min_gallery_count`, etc.
+2. Updated all 5 minimal endpoints to accept `count_filter` param
+3. Added `countFilterContext` prop to SearchableSelect
+4. Configured all filter dropdowns with appropriate context
+
+**Usage**: Scene filter's performer dropdown now only shows performers with `scene_count >= 1`.
+
+**Commit**: `5eb930f`
 
 ---
 
-### ⏳ Issue #12: findXxxMinimal Endpoints
+### ✅ Issue #12: Entity Query Builders - FIXED
 
-**Problem**: Minimal endpoints still load full entities.
+**Files**:
+- `server/services/PerformerQueryBuilder.ts` (created)
+- `server/services/StudioQueryBuilder.ts` (created)
+- `server/services/TagQueryBuilder.ts` (created)
+- `server/services/GalleryQueryBuilder.ts` (created)
+- `server/services/GroupQueryBuilder.ts` (created)
+- `server/controllers/library/performers.ts` (updated)
+- `server/controllers/library/studios.ts` (updated)
+- `server/controllers/library/tags.ts` (updated)
+- `server/controllers/library/galleries.ts` (updated)
+- `server/controllers/library/groups.ts` (updated)
 
-**Recommended Fix**: Create truly minimal queries returning only id/name.
+**Problem (was)**: All used "load all then filter in memory" pattern. With 50k performers, every performer list request loaded ~50MB into memory.
 
-**Effort**: Low
+**Fix Applied**:
+1. Created SQL-based query builders following `SceneQueryBuilder` pattern
+2. Each builder handles: filtering, sorting, pagination, exclusions via SQL
+3. JOINs for user data (ratings, favorites) and exclusions
+4. Hierarchy expansion for tag/studio filters via `expandTagIds`/`expandStudioIds`
+5. Relations populated via batch queries after main query
+
+**Performance Impact**:
+- Before: Load all ~50k entities into memory, filter/sort/paginate in JS
+- After: SQL handles filtering/sorting/pagination, only paginated results loaded
+
+**Bug Fix (TagQueryBuilder)**: The `scene_count` filter and sort were using `t.sceneCount` (direct count only), but the returned `scene_count` field was computed as `MAX(directCount, performerSceneCount)`. Fixed to use `MAX(COALESCE(t.sceneCount, 0), COALESCE(t.sceneCountViaPerformers, 0))` for both filter and sort to match the returned value.
+
+---
+
+### ⏳ Issue #13: findXxxMinimal Truly Minimal Queries - DEFERRED
+
+**Problem**: Minimal endpoints still load full entities from cache, then map to `{ id, name }`.
+
+**Recommended Fix**: Direct SQL queries returning only `id` and `name` columns.
+
+**Effort**: Low, but requires integration with exclusion system
 
 ---
 
@@ -247,10 +286,10 @@ Despite significant scalability improvements in 3.x, **several critical paths re
 ## Verification Performed
 
 ### Automated Tests
-- ✅ Unit tests: 493 passed (Phase 2)
-- ✅ Integration tests: 442 passed (Phase 2)
+- ✅ Unit tests: 474 passed (Phase 3)
+- ✅ Integration tests: 456 passed (Phase 3)
 - ✅ TypeScript compilation: No errors
-- ✅ Linting: 0 errors (221 pre-existing warnings)
+- ✅ Linting: 0 errors (270 pre-existing warnings)
 
 ### Manual Verification Needed
 - [ ] Sync from Stash with 20k+ scenes
