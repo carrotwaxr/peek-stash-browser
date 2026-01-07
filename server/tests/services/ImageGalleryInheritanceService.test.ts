@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import prisma from "../../prisma/singleton.js";
-import { imageGalleryInheritanceService } from "../ImageGalleryInheritanceService.js";
+import prisma from "../../services/../prisma/singleton.js";
+import { imageGalleryInheritanceService } from "../../services/ImageGalleryInheritanceService.js";
 
 describe("ImageGalleryInheritanceService", () => {
   // Clean up test data

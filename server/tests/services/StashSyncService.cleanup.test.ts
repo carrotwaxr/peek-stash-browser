@@ -72,7 +72,7 @@ const mockFindGalleryIDs = vi.fn();
 const mockFindImageIDs = vi.fn();
 
 // Mock StashInstanceManager
-vi.mock("../StashInstanceManager.js", () => ({
+vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getDefault: vi.fn(() => ({
       findSceneIDs: mockFindSceneIDs,
@@ -88,31 +88,31 @@ vi.mock("../StashInstanceManager.js", () => ({
 }));
 
 // Mock other services that might be called during cleanup
-vi.mock("../EntityImageCountService.js", () => ({
+vi.mock("../../services/EntityImageCountService.js", () => ({
   entityImageCountService: {
     recomputeAllCounts: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../ImageGalleryInheritanceService.js", () => ({
+vi.mock("../../services/ImageGalleryInheritanceService.js", () => ({
   imageGalleryInheritanceService: {
     recomputeAllImages: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../SceneTagInheritanceService.js", () => ({
+vi.mock("../../services/SceneTagInheritanceService.js", () => ({
   sceneTagInheritanceService: {
     recomputeAllScenes: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../UserStatsService.js", () => ({
+vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../ExclusionComputationService.js", () => ({
+vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
   },
@@ -129,8 +129,8 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 // Import after mocking
-import { stashSyncService } from "../StashSyncService.js";
-import prisma from "../../prisma/singleton.js";
+import { stashSyncService } from "../../services/StashSyncService.js";
+import prisma from "../../services/../prisma/singleton.js";
 
 describe("StashSyncService Cleanup", () => {
   beforeEach(() => {

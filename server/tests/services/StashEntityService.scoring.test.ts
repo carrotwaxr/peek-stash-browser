@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import prisma from "../../prisma/singleton.js";
+import prisma from "../../services/../prisma/singleton.js";
 
 // Mock prisma before importing the service
 vi.mock("../../prisma/singleton.js", () => ({
@@ -9,7 +9,7 @@ vi.mock("../../prisma/singleton.js", () => ({
 }));
 
 // Import after mocking
-import { stashEntityService } from "../StashEntityService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 
 describe("StashEntityService.getScenesForScoring", () => {
   beforeEach(() => {

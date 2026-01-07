@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach, type Mock } from "vitest";
 
 // Mock StashInstanceManager to provide a default config for stream URL generation
-vi.mock("../StashInstanceManager.js", () => ({
+vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getDefaultConfig: () => ({
       id: "test-instance",
@@ -102,10 +102,10 @@ vi.mock("../../prisma/singleton.js", () => ({
 }));
 
 // Import mocked module
-import prisma from "../../prisma/singleton.js";
+import prisma from "../../services/../prisma/singleton.js";
 
 // Import service after mocking
-import { stashEntityService } from "../StashEntityService.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 
 // Type-safe mock access helper
 const getMock = (fn: unknown): Mock => fn as Mock;

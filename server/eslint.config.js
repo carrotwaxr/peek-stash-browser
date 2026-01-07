@@ -9,9 +9,12 @@ export default [
       "dist/**",
       "node_modules/**",
       "prisma/migrations/**",
+      // Unit test directories and files
       "tests/**",
       "**/*.test.ts",
       "**/__tests__/**",
+      // Integration test directory (has its own tsconfig excluded from main build)
+      "integration/**",
     ],
   },
   {

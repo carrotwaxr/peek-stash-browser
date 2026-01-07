@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { imageQueryBuilder } from "../ImageQueryBuilder.js";
-import prisma from "../../prisma/singleton.js";
+import { imageQueryBuilder } from "../../services/ImageQueryBuilder.js";
+import prisma from "../../services/../prisma/singleton.js";
 
 describe("ImageQueryBuilder", () => {
   const testUserId = 9999;

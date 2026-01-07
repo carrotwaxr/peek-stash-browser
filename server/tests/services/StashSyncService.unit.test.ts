@@ -54,7 +54,7 @@ vi.mock("../../prisma/singleton.js", () => ({
 }));
 
 // Mock the stash instance manager
-vi.mock("../StashInstanceManager.js", () => ({
+vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getDefault: vi.fn(() => ({
       findTags: vi.fn().mockResolvedValue({ findTags: { tags: [], count: 0 } }),
@@ -70,20 +70,20 @@ vi.mock("../StashInstanceManager.js", () => ({
 }));
 
 // Mock user stats service
-vi.mock("../UserStatsService.js", () => ({
+vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: {
     rebuildAllStats: vi.fn().mockResolvedValue(undefined),
   },
 }));
 // Mock entity image count service
-vi.mock("../EntityImageCountService.js", () => ({
+vi.mock("../../services/EntityImageCountService.js", () => ({
   entityImageCountService: {
     rebuildAllImageCounts: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
 // Mock exclusion computation service
-vi.mock("../ExclusionComputationService.js", () => ({
+vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
@@ -98,7 +98,7 @@ describe("StashSyncService", () => {
   describe("incrementalSync", () => {
     it("should use per-entity timestamps, not a single global timestamp", async () => {
       // Import after mocks are set up
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       // Set up different timestamps for different entity types (now stored as RFC3339 strings)
       const tagTimestamp = "2025-12-20T10:00:00-08:00";
@@ -138,7 +138,7 @@ describe("StashSyncService", () => {
     });
 
     it("should perform full sync for entity types that have never been synced", async () => {
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       // Tags have been synced, but performers have not
       mockPrisma.syncState.findFirst.mockImplementation(({ where }) => {
@@ -159,7 +159,7 @@ describe("StashSyncService", () => {
     });
 
     it("should use lastIncrementalSyncTimestamp when it is more recent than lastFullSyncTimestamp", async () => {
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       // Full sync happened on Dec 17, incremental sync happened on Dec 27
       const fullSyncTimestamp = "2025-12-17T08:00:00-08:00";
@@ -178,7 +178,7 @@ describe("StashSyncService", () => {
     });
 
     it("should use lastFullSyncTimestamp when it is more recent than lastIncrementalSyncTimestamp", async () => {
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       // Edge case: Full sync happened AFTER an incremental sync (user triggered manual full sync)
       const incrementalSyncTimestamp = "2025-12-20T10:00:00-08:00";
@@ -196,7 +196,7 @@ describe("StashSyncService", () => {
     });
 
     it("should use lastFullSyncTimestamp when lastIncrementalSyncTimestamp is null", async () => {
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       const fullSyncTimestamp = "2025-12-17T08:00:00-08:00";
 
@@ -211,7 +211,7 @@ describe("StashSyncService", () => {
     });
 
     it("should use lastIncrementalSyncTimestamp when lastFullSyncTimestamp is null", async () => {
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       const incrementalSyncTimestamp = "2025-12-27T16:00:00-08:00";
 
@@ -228,7 +228,7 @@ describe("StashSyncService", () => {
 
   describe("getMostRecentSyncTime logic", () => {
     it("should use the more recent timestamp in logs when both exist", async () => {
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       // This is the bug scenario: full sync on Dec 17, incremental on Dec 27
       // The system should use Dec 27, not Dec 17
@@ -252,7 +252,7 @@ describe("StashSyncService", () => {
     });
 
     it("should handle the reverse case: full sync more recent than incremental", async () => {
-      const { stashSyncService } = await import("../StashSyncService.js");
+      const { stashSyncService } = await import("../../services/StashSyncService.js");
 
       // User ran incremental sync, then later ran a full sync
       const olderIncrementalSync = "2025-12-17T08:00:00-08:00";
