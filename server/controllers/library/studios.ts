@@ -483,7 +483,7 @@ export const findStudiosMinimal = async (
   res: TypedResponse<FindStudiosMinimalResponse | ApiErrorResponse>
 ) => {
   try {
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
     const sortField = filter?.sort || "name";
     const sortDirection = filter?.direction || "ASC";
@@ -501,6 +501,20 @@ export const findStudiosMinimal = async (
         userId,
         "studio"
       );
+    }
+
+    // Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_scene_count, min_gallery_count, min_image_count, min_performer_count, min_group_count } = count_filter;
+      studios = studios.filter((s) => {
+        const conditions: boolean[] = [];
+        if (min_scene_count !== undefined) conditions.push(s.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined) conditions.push(s.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined) conditions.push(s.image_count >= min_image_count);
+        if (min_performer_count !== undefined) conditions.push(s.performer_count >= min_performer_count);
+        if (min_group_count !== undefined) conditions.push(s.group_count >= min_group_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Apply search query if provided

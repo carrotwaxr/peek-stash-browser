@@ -252,6 +252,7 @@ export const SCENE_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "performerIdsModifier",
     defaultModifier: "INCLUDES",
+    countFilterContext: "scenes",
   },
   {
     key: "studioId",
@@ -264,6 +265,7 @@ export const SCENE_FILTER_OPTIONS = [
     supportsHierarchy: true,
     hierarchyKey: "studioIdDepth",
     hierarchyLabel: "Include sub-studios",
+    countFilterContext: "scenes",
   },
   {
     key: "tagIds",
@@ -279,6 +281,7 @@ export const SCENE_FILTER_OPTIONS = [
     supportsHierarchy: true,
     hierarchyKey: "tagIdsDepth",
     hierarchyLabel: "Include sub-tags",
+    countFilterContext: "scenes",
   },
   {
     key: "groupIds",
@@ -291,6 +294,7 @@ export const SCENE_FILTER_OPTIONS = [
     modifierOptions: GROUP_MODIFIER_OPTIONS,
     modifierKey: "groupIdsModifier",
     defaultModifier: "INCLUDES",
+    countFilterContext: "scenes",
   },
   {
     key: "rating",
@@ -528,6 +532,7 @@ export const PERFORMER_FILTER_OPTIONS = [
     supportsHierarchy: true,
     hierarchyKey: "tagIdsDepth",
     hierarchyLabel: "Include sub-tags",
+    countFilterContext: "performers",
   },
   {
     key: "gender",
@@ -779,6 +784,7 @@ export const STUDIO_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
+    countFilterContext: "studios",
   },
   {
     key: "rating",
@@ -1013,6 +1019,7 @@ export const GROUP_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "performerIdsModifier",
     defaultModifier: "INCLUDES",
+    countFilterContext: "groups",
   },
   {
     key: "studioId",
@@ -1022,6 +1029,7 @@ export const GROUP_FILTER_OPTIONS = [
     multi: false,
     defaultValue: "",
     placeholder: "Select studio...",
+    countFilterContext: "groups",
   },
   {
     key: "tagIds",
@@ -1034,6 +1042,7 @@ export const GROUP_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "tagIdsModifier",
     defaultModifier: "INCLUDES_ALL",
+    countFilterContext: "groups",
   },
   {
     key: "rating",
@@ -1140,6 +1149,7 @@ export const GALLERY_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "performerIdsModifier",
     defaultModifier: "INCLUDES",
+    countFilterContext: "galleries",
   },
   {
     key: "studioIds",
@@ -1155,6 +1165,7 @@ export const GALLERY_FILTER_OPTIONS = [
     supportsHierarchy: true,
     hierarchyKey: "studioIdsDepth",
     hierarchyLabel: "Include sub-studios",
+    countFilterContext: "galleries",
   },
   {
     key: "tagIds",
@@ -1170,6 +1181,7 @@ export const GALLERY_FILTER_OPTIONS = [
     supportsHierarchy: true,
     hierarchyKey: "tagIdsDepth",
     hierarchyLabel: "Include sub-tags",
+    countFilterContext: "galleries",
   },
   {
     key: "rating",
@@ -1217,6 +1229,7 @@ export const IMAGE_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "performerIdsModifier",
     defaultModifier: "INCLUDES",
+    countFilterContext: "images",
   },
   {
     key: "studioIds",
@@ -1232,6 +1245,7 @@ export const IMAGE_FILTER_OPTIONS = [
     supportsHierarchy: true,
     hierarchyKey: "studioIdsDepth",
     hierarchyLabel: "Include sub-studios",
+    countFilterContext: "images",
   },
   {
     key: "tagIds",
@@ -1247,6 +1261,7 @@ export const IMAGE_FILTER_OPTIONS = [
     supportsHierarchy: true,
     hierarchyKey: "tagIdsDepth",
     hierarchyLabel: "Include sub-tags",
+    countFilterContext: "images",
   },
   {
     key: "galleryIds",
@@ -1259,6 +1274,7 @@ export const IMAGE_FILTER_OPTIONS = [
     modifierOptions: MULTI_MODIFIER_OPTIONS,
     modifierKey: "galleryIdsModifier",
     defaultModifier: "INCLUDES",
+    countFilterContext: "images",
   },
   {
     key: "rating",

@@ -621,7 +621,7 @@ export const findTagsMinimal = async (
   res: TypedResponse<FindTagsMinimalResponse | ApiErrorResponse>
 ) => {
   try {
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
     const sortField = filter?.sort || "name";
     const sortDirection = filter?.direction || "ASC";
@@ -640,6 +640,20 @@ export const findTagsMinimal = async (
         userId,
         "tag"
       );
+    }
+
+    // Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_scene_count, min_gallery_count, min_image_count, min_performer_count, min_group_count } = count_filter;
+      tags = tags.filter((t) => {
+        const conditions: boolean[] = [];
+        if (min_scene_count !== undefined) conditions.push(t.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined) conditions.push(t.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined) conditions.push(t.image_count >= min_image_count);
+        if (min_performer_count !== undefined) conditions.push(t.performer_count >= min_performer_count);
+        if (min_group_count !== undefined) conditions.push(t.group_count >= min_group_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Apply search query if provided

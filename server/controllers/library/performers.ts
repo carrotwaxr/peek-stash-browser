@@ -900,7 +900,7 @@ export const findPerformersMinimal = async (
   res: TypedResponse<FindPerformersMinimalResponse | ApiErrorResponse>
 ) => {
   try {
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
     const sortField = filter?.sort || "name";
     const sortDirection = filter?.direction || "ASC";
@@ -918,6 +918,19 @@ export const findPerformersMinimal = async (
         userId,
         "performer"
       );
+    }
+
+    // Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_scene_count, min_gallery_count, min_image_count, min_group_count } = count_filter;
+      performers = performers.filter((p) => {
+        const conditions: boolean[] = [];
+        if (min_scene_count !== undefined) conditions.push(p.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined) conditions.push(p.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined) conditions.push(p.image_count >= min_image_count);
+        if (min_group_count !== undefined) conditions.push(p.group_count >= min_group_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Apply search query if provided

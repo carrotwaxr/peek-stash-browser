@@ -19,7 +19,7 @@ import type {
   PeekGalleryFilter,
   PeekGroupFilter,
 } from "../index.js";
-import type { PaginationFilter } from "./common.js";
+import type { PaginationFilter, MinimalCountFilter } from "./common.js";
 
 // =============================================================================
 // SCENES
@@ -133,6 +133,7 @@ export interface FindPerformersResponse {
  */
 export interface FindPerformersMinimalRequest {
   filter?: PaginationFilter;
+  count_filter?: MinimalCountFilter;
 }
 
 export interface FindPerformersMinimalResponse {
@@ -182,6 +183,7 @@ export interface FindStudiosResponse {
  */
 export interface FindStudiosMinimalRequest {
   filter?: PaginationFilter;
+  count_filter?: MinimalCountFilter;
 }
 
 export interface FindStudiosMinimalResponse {
@@ -231,6 +233,7 @@ export interface FindTagsResponse {
  */
 export interface FindTagsMinimalRequest {
   filter?: PaginationFilter;
+  count_filter?: MinimalCountFilter;
 }
 
 export interface FindTagsMinimalResponse {
@@ -358,6 +361,7 @@ export interface GetGalleryImagesResponse {
  */
 export interface FindGalleriesMinimalRequest {
   filter?: PaginationFilter;
+  count_filter?: MinimalCountFilter;
 }
 
 export interface FindGalleriesMinimalResponse {
@@ -389,6 +393,7 @@ export interface FindGroupsResponse {
  */
 export interface FindGroupsMinimalRequest {
   filter?: PaginationFilter;
+  count_filter?: MinimalCountFilter;
 }
 
 export interface FindGroupsMinimalResponse {

@@ -511,7 +511,7 @@ export const findGalleriesMinimal = async (
 ) => {
   try {
     const userId = req.user?.id;
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
@@ -536,6 +536,16 @@ export const findGalleriesMinimal = async (
         userId,
         "gallery"
       );
+    }
+
+    // Step 2.6: Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_image_count } = count_filter;
+      galleries = galleries.filter((g) => {
+        const conditions: boolean[] = [];
+        if (min_image_count !== undefined) conditions.push(g.image_count >= min_image_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Step 3: Apply search query if provided

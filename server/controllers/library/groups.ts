@@ -363,7 +363,7 @@ export const findGroupsMinimal = async (
 ) => {
   try {
     const userId = req.user?.id;
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
@@ -388,6 +388,17 @@ export const findGroupsMinimal = async (
         userId,
         "group"
       );
+    }
+
+    // Step 2.6: Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_scene_count, min_performer_count } = count_filter;
+      groups = groups.filter((g) => {
+        const conditions: boolean[] = [];
+        if (min_scene_count !== undefined) conditions.push(g.scene_count >= min_scene_count);
+        if (min_performer_count !== undefined) conditions.push(g.performer_count >= min_performer_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Step 3: Apply search query if provided
