@@ -11,12 +11,13 @@ import type {
   ApiErrorResponse,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
-import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
+import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
-import { hydrateEntityTags, hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
+import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -61,7 +62,7 @@ export async function mergeStudiosWithUserData(
 }
 
 /**
- * Simplified findStudios using cache
+ * findStudios using SQL query builder
  */
 export const findStudios = async (
   req: TypedAuthRequest<FindStudiosRequest>,
@@ -70,83 +71,47 @@ export const findStudios = async (
   try {
     const startTime = Date.now();
     const userId = req.user?.id;
+    const requestingUser = req.user;
     const { filter, studio_filter, ids } = req.body;
 
     const sortField = filter?.sort || "name";
-    const sortDirection = filter?.direction || "ASC";
+    const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
-    // Step 1: Get all studios from cache
-    let studios = await stashEntityService.getAllStudios();
-
-    if (studios.length === 0) {
-      logger.warn("Cache not initialized, returning empty result");
-      return res.json({
-        findStudios: {
-          count: 0,
-          studios: [],
-        },
-      });
-    }
-
-    // Step 2: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    // Admins skip exclusions to see everything
-    const requestingUser = req.user;
-    if (requestingUser?.role !== "ADMIN") {
-      studios = await entityExclusionHelper.filterExcluded(
-        studios,
-        userId,
-        "studio"
-      );
-    }
-
-    // Step 3: Merge with FRESH user data (ratings, stats)
-    // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
-    studios = await mergeStudiosWithUserData(studios, userId);
-
-    // Step 4: Apply search query if provided
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      studios = studios.filter((s) => {
-        const name = s.name || "";
-        const details = s.details || "";
-        return (
-          name.toLowerCase().includes(lowerQuery) ||
-          details.toLowerCase().includes(lowerQuery)
-        );
-      });
-    }
-
-    // Step 5: Apply filters (merge root-level ids with studio_filter)
-    // Normalize ids to PeekStudioFilter format (ids is string[] in request, but filter expects { value, modifier })
+    // Merge root-level ids with studio_filter
     const normalizedIds = ids
       ? { value: ids, modifier: "INCLUDES" }
       : studio_filter?.ids;
-    const mergedFilter: PeekStudioFilter & Record<string, unknown> = {
+    const mergedFilter: PeekStudioFilter = {
       ...studio_filter,
       ids: normalizedIds,
     };
-    studios = applyStudioFilters(studios, mergedFilter);
 
-    // Step 6: Sort
-    studios = sortStudios(studios, sortField, sortDirection);
+    // Use SQL query builder - admins skip exclusions
+    const applyExclusions = requestingUser?.role !== "ADMIN";
 
-    // Step 7: Paginate
-    const total = studios.length;
-    const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    let paginatedStudios = studios.slice(startIndex, endIndex);
+    const { studios, total } = await studioQueryBuilder.execute({
+      userId,
+      filters: mergedFilter,
+      applyExclusions,
+      sort: sortField,
+      sortDirection,
+      page,
+      perPage,
+      searchQuery,
+    });
 
-    // Step 8: For single-entity requests (detail pages), get studio with computed counts
-    if (ids && ids.length === 1 && paginatedStudios.length === 1) {
+    // For single-entity requests (detail pages), get studio with computed counts
+    let resultStudios = studios;
+    if (ids && ids.length === 1 && resultStudios.length === 1) {
       // Get studio with computed counts from junction tables
       const studioWithCounts = await stashEntityService.getStudio(ids[0]);
       if (studioWithCounts) {
-        // Merge with the paginated studio data (which has user ratings/stats)
-        const existingStudio = paginatedStudios[0];
-        paginatedStudios = [
+        // Merge with the studio data (which has user ratings/stats)
+        const existingStudio = resultStudios[0];
+        resultStudios = [
           {
             ...existingStudio,
             scene_count: studioWithCounts.scene_count,
@@ -156,9 +121,6 @@ export const findStudios = async (
             group_count: studioWithCounts.group_count,
           },
         ];
-
-        // Hydrate tags with names
-        paginatedStudios = await hydrateEntityTags(paginatedStudios);
 
         logger.info("Computed counts for studio detail", {
           studioId: existingStudio.id,
@@ -172,24 +134,27 @@ export const findStudios = async (
       }
     }
 
-    // Step 9: Hydrate tags with names (for all requests)
-    paginatedStudios = await hydrateEntityTags(paginatedStudios);
-
-    // Step 10: Hydrate parent/child relationships with names
-    // For single-studio requests (detail pages), hydrate relationships using ALL studios for accurate lookup
-    // For multi-studio requests (grid pages), hydrate using paginated studios only (children will be incomplete but that's ok)
-    const hydratedStudios = await hydrateStudioRelationships(
-      ids && ids.length === 1 ? studios : paginatedStudios
-    );
-    // If we hydrated all studios, extract just the paginated ones
-    const finalStudios = ids && ids.length === 1
-      ? hydratedStudios.filter((s) => paginatedStudios.some((p) => p.id === s.id))
-      : hydratedStudios;
+    // Hydrate parent/child relationships with names
+    // For single-studio requests (detail pages), we need all studios for accurate parent/child lookup
+    let hydratedStudios: NormalizedStudio[];
+    if (ids && ids.length === 1) {
+      // Get all studios for hierarchy lookup, then hydrate
+      const allStudios = await stashEntityService.getAllStudios();
+      const allHydrated = await hydrateStudioRelationships(allStudios);
+      hydratedStudios = allHydrated.filter((s) => resultStudios.some((r) => r.id === s.id));
+      // Merge the computed counts back
+      hydratedStudios = hydratedStudios.map((h) => {
+        const result = resultStudios.find((r) => r.id === h.id);
+        return result ? { ...h, ...result } : h;
+      });
+    } else {
+      hydratedStudios = await hydrateStudioRelationships(resultStudios);
+    }
 
     // Add stashUrl to each studio
-    const studiosWithStashUrl = finalStudios.map(studio => ({
+    const studiosWithStashUrl = hydratedStudios.map((studio) => ({
       ...studio,
-      stashUrl: buildStashEntityUrl('studio', studio.id),
+      stashUrl: buildStashEntityUrl("studio", studio.id),
     }));
 
     logger.info("findStudios completed", {
@@ -414,68 +379,6 @@ export function applyStudioFilters(
 }
 
 /**
- * Sort studios
- */
-function sortStudios(
-  studios: NormalizedStudio[],
-  sortField: string,
-  direction: string
-): NormalizedStudio[] {
-  const sorted = [...studios];
-
-  sorted.sort((a, b) => {
-    const aValue = getStudioFieldValue(a, sortField);
-    const bValue = getStudioFieldValue(b, sortField);
-
-    let comparison = 0;
-    if (typeof aValue === "string" && typeof bValue === "string") {
-      comparison = aValue.localeCompare(bValue);
-    } else {
-      const aNum = aValue || 0;
-      const bNum = bValue || 0;
-      comparison = aNum > bNum ? 1 : aNum < bNum ? -1 : 0;
-    }
-
-    if (direction.toUpperCase() === "DESC") {
-      comparison = -comparison;
-    }
-
-    // Secondary sort by name
-    if (comparison === 0) {
-      const aName = a.name || "";
-      const bName = b.name || "";
-      return aName.localeCompare(bName);
-    }
-
-    return comparison;
-  });
-
-  return sorted;
-}
-
-/**
- * Get field value from studio for sorting
- */
-function getStudioFieldValue(
-  studio: NormalizedStudio,
-  field: string
-): number | string | boolean | null {
-  if (field === "rating") return studio.rating || 0;
-  if (field === "rating100") return studio.rating100 || 0;
-  if (field === "o_counter") return studio.o_counter || 0;
-  if (field === "play_count") return studio.play_count || 0;
-  if (field === "scene_count" || field === "scenes_count")
-    return studio.scene_count || 0;
-  if (field === "name") return studio.name || "";
-  if (field === "created_at") return studio.created_at || "";
-  if (field === "updated_at") return studio.updated_at || "";
-  if (field === "random") return Math.random();
-  // Fallback for dynamic field access (safe as function is only called with known fields)
-  const value = (studio as Record<string, unknown>)[field];
-  return typeof value === "string" || typeof value === "number" ? value : 0;
-}
-
-/**
  * Get minimal studios (id + name only) for filter dropdowns
  */
 export const findStudiosMinimal = async (
@@ -483,7 +386,7 @@ export const findStudiosMinimal = async (
   res: TypedResponse<FindStudiosMinimalResponse | ApiErrorResponse>
 ) => {
   try {
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
     const sortField = filter?.sort || "name";
     const sortDirection = filter?.direction || "ASC";
@@ -501,6 +404,20 @@ export const findStudiosMinimal = async (
         userId,
         "studio"
       );
+    }
+
+    // Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_scene_count, min_gallery_count, min_image_count, min_performer_count, min_group_count } = count_filter;
+      studios = studios.filter((s) => {
+        const conditions: boolean[] = [];
+        if (min_scene_count !== undefined) conditions.push(s.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined) conditions.push(s.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined) conditions.push(s.image_count >= min_image_count);
+        if (min_performer_count !== undefined) conditions.push(s.performer_count >= min_performer_count);
+        if (min_group_count !== undefined) conditions.push(s.group_count >= min_group_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Apply search query if provided

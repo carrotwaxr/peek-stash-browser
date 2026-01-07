@@ -10,6 +10,7 @@ import type {
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
@@ -140,65 +141,8 @@ export async function applyGroupFilters(
 }
 
 /**
- * Sort groups
- */
-function sortGroups(
-  groups: NormalizedGroup[],
-  sortField: string,
-  sortDirection: string
-): NormalizedGroup[] {
-  const sortedGroups = [...groups];
-
-  sortedGroups.sort((a, b) => {
-    let aVal: number | string | boolean | null;
-    let bVal: number | string | boolean | null;
-
-    switch (sortField) {
-      case "name":
-        aVal = (a.name || "").toLowerCase();
-        bVal = (b.name || "").toLowerCase();
-        break;
-      case "date":
-        aVal = a.date || "";
-        bVal = b.date || "";
-        break;
-      case "rating100":
-        aVal = a.rating100 || 0;
-        bVal = b.rating100 || 0;
-        break;
-      case "scene_count":
-        aVal = a.scene_count || 0;
-        bVal = b.scene_count || 0;
-        break;
-      case "duration":
-        aVal = a.duration || 0;
-        bVal = b.duration || 0;
-        break;
-      case "created_at":
-        aVal = a.created_at || "";
-        bVal = b.created_at || "";
-        break;
-      case "updated_at":
-        aVal = a.updated_at || "";
-        bVal = b.updated_at || "";
-        break;
-      default:
-        aVal = (a.name || "").toLowerCase();
-        bVal = (b.name || "").toLowerCase();
-    }
-
-    let comparison = 0;
-    if ((aVal as string | number) < (bVal as string | number)) comparison = -1;
-    if ((aVal as string | number) > (bVal as string | number)) comparison = 1;
-
-    return sortDirection === "DESC" ? -comparison : comparison;
-  });
-
-  return sortedGroups;
-}
-
-/**
- * Simplified findGroups using cache
+ * Find groups endpoint
+ * Uses GroupQueryBuilder for SQL-native filtering (Phase 3 scalability)
  */
 export const findGroups = async (
   req: TypedAuthRequest<FindGroupsRequest>,
@@ -210,53 +154,16 @@ export const findGroups = async (
     const { filter, group_filter, ids } = req.body;
 
     const sortField = filter?.sort || "name";
-    const sortDirection = filter?.direction || "ASC";
+    const sortDirection = (filter?.direction || "ASC") as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
-    // Step 1: Get all groups from cache
-    let groups = await stashEntityService.getAllGroups();
-
-    if (groups.length === 0) {
-      logger.warn("Cache not initialized, returning empty result");
-      return res.json({
-        findGroups: {
-          count: 0,
-          groups: [],
-        },
-      });
-    }
-
-    // Step 2: Merge with user data
-    groups = await mergeGroupsWithUserData(groups, userId);
-
-    // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
     // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    if (requestingUser?.role !== "ADMIN") {
-      groups = await entityExclusionHelper.filterExcluded(
-        groups,
-        userId,
-        "group"
-      );
-    }
+    const applyExclusions = requestingUser?.role !== "ADMIN";
 
-    // Step 3: Apply search query if provided
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      groups = groups.filter((g) => {
-        const name = g.name || "";
-        const synopsis = g.synopsis || "";
-        return (
-          name.toLowerCase().includes(lowerQuery) ||
-          synopsis.toLowerCase().includes(lowerQuery)
-        );
-      });
-    }
-
-    // Step 4: Apply filters (merge root-level ids with group_filter)
-    // Normalize ids to PeekGroupFilter format (ids is string[] in request, but filter expects { value, modifier })
+    // Merge root-level ids with group_filter
     const normalizedIds = ids
       ? { value: ids, modifier: "INCLUDES" }
       : group_filter?.ids;
@@ -264,18 +171,21 @@ export const findGroups = async (
       ...group_filter,
       ids: normalizedIds,
     };
-    groups = await applyGroupFilters(groups, mergedFilter);
 
-    // Step 5: Sort
-    groups = sortGroups(groups, sortField, sortDirection);
+    // Use SQL-native query builder
+    const { groups, total } = await groupQueryBuilder.execute({
+      userId,
+      filters: mergedFilter,
+      applyExclusions,
+      sort: sortField,
+      sortDirection,
+      page,
+      perPage,
+      searchQuery,
+    });
 
-    // Step 6: Paginate
-    const total = groups.length;
-    const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    let paginatedGroups = groups.slice(startIndex, endIndex);
-
-    // Step 7: For single-entity requests (detail pages), get group with computed counts
+    // For single-entity requests (detail pages), get group with computed counts
+    let paginatedGroups = groups;
     if (ids && ids.length === 1 && paginatedGroups.length === 1) {
       const groupWithCounts = await stashEntityService.getGroup(ids[0]);
       if (groupWithCounts) {
@@ -297,29 +207,6 @@ export const findGroups = async (
           sceneCount: groupWithCounts.scene_count,
           performerCount: groupWithCounts.performer_count,
         });
-      }
-    }
-
-    // Step 8: Hydrate studios with full data (name, etc.)
-    const studioIds = [
-      ...new Set(
-        paginatedGroups
-          .map((g) => g.studio?.id)
-          .filter((id): id is string => !!id)
-      ),
-    ];
-
-    if (studioIds.length > 0) {
-      const studios = await stashEntityService.getStudiosByIds(studioIds);
-      const studioMap = new Map(studios.map((s) => [s.id, s]));
-
-      for (const group of paginatedGroups) {
-        if (group.studio?.id) {
-          const fullStudio = studioMap.get(group.studio.id);
-          if (fullStudio) {
-            group.studio = fullStudio;
-          }
-        }
       }
     }
 
@@ -363,7 +250,7 @@ export const findGroupsMinimal = async (
 ) => {
   try {
     const userId = req.user?.id;
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all groups from cache
@@ -388,6 +275,17 @@ export const findGroupsMinimal = async (
         userId,
         "group"
       );
+    }
+
+    // Step 2.6: Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_scene_count, min_performer_count } = count_filter;
+      groups = groups.filter((g) => {
+        const conditions: boolean[] = [];
+        if (min_scene_count !== undefined) conditions.push(g.scene_count >= min_scene_count);
+        if (min_performer_count !== undefined) conditions.push(g.performer_count >= min_performer_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Step 3: Apply search query if provided

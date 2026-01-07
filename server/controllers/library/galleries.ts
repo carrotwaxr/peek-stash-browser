@@ -12,6 +12,7 @@ import type {
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
+import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
 import {
   NormalizedGallery,
   NormalizedPerformer,
@@ -196,63 +197,8 @@ export async function applyGalleryFilters(
 }
 
 /**
- * Sort galleries
- */
-function sortGalleries(
-  galleries: NormalizedGallery[],
-  sortField: string,
-  sortDirection: string
-): NormalizedGallery[] {
-  const direction = sortDirection === "DESC" ? -1 : 1;
-
-  return galleries.sort((a, b) => {
-    let aVal, bVal;
-
-    switch (sortField) {
-      case "title":
-        aVal = (a.title || "").toLowerCase();
-        bVal = (b.title || "").toLowerCase();
-        break;
-      case "date":
-        aVal = a.date || "";
-        bVal = b.date || "";
-        break;
-      case "rating":
-      case "rating100":
-        aVal = a.rating100 || 0;
-        bVal = b.rating100 || 0;
-        break;
-      case "image_count":
-        aVal = a.image_count || 0;
-        bVal = b.image_count || 0;
-        break;
-      case "created_at":
-        aVal = a.created_at || "";
-        bVal = b.created_at || "";
-        break;
-      case "updated_at":
-        aVal = a.updated_at || "";
-        bVal = b.updated_at || "";
-        break;
-      case "random":
-        return Math.random() - 0.5;
-      case "path":
-        aVal = (a.folder?.path || "").toLowerCase();
-        bVal = (b.folder?.path || "").toLowerCase();
-        break;
-      default:
-        aVal = (a.title || "").toLowerCase();
-        bVal = (b.title || "").toLowerCase();
-    }
-
-    if (aVal < bVal) return -1 * direction;
-    if (aVal > bVal) return 1 * direction;
-    return 0;
-  });
-}
-
-/**
  * Find galleries endpoint
+ * Uses GalleryQueryBuilder for SQL-native filtering (Phase 3 scalability)
  */
 export const findGalleries = async (
   req: TypedAuthRequest<FindGalleriesRequest>,
@@ -264,55 +210,16 @@ export const findGalleries = async (
     const { filter, gallery_filter, ids } = req.body;
 
     const sortField = filter?.sort || "title";
-    const sortDirection = filter?.direction || "ASC";
+    const sortDirection = (filter?.direction || "ASC") as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
-    // Step 1: Get all galleries from cache
-    let galleries = await stashEntityService.getAllGalleries();
-
-    if (galleries.length === 0) {
-      logger.warn("Gallery cache not initialized, returning empty result");
-      return res.json({
-        findGalleries: {
-          count: 0,
-          galleries: [],
-        },
-      });
-    }
-
-    // Step 2: Merge with user data
-    galleries = await mergeGalleriesWithUserData(galleries, userId);
-
-    // Step 2.5: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
     // Admins skip exclusions to see everything
     const requestingUser = req.user;
-    if (requestingUser?.role !== "ADMIN") {
-      galleries = await entityExclusionHelper.filterExcluded(
-        galleries,
-        userId,
-        "gallery"
-      );
-    }
+    const applyExclusions = requestingUser?.role !== "ADMIN";
 
-    // Step 3: Apply search query if provided
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      galleries = galleries.filter((g) => {
-        const title = g.title || "";
-        const details = g.details || "";
-        const photographer = g.photographer || "";
-        return (
-          title.toLowerCase().includes(lowerQuery) ||
-          details.toLowerCase().includes(lowerQuery) ||
-          photographer.toLowerCase().includes(lowerQuery)
-        );
-      });
-    }
-
-    // Step 4: Apply filters (merge root-level ids with gallery_filter)
-    // Normalize ids to PeekGalleryFilter format (ids is string[] in request, but filter expects { value, modifier })
+    // Merge root-level ids with gallery_filter
     const normalizedIds = ids
       ? { value: ids, modifier: "INCLUDES" }
       : gallery_filter?.ids;
@@ -320,18 +227,21 @@ export const findGalleries = async (
       ...gallery_filter,
       ids: normalizedIds,
     };
-    galleries = await applyGalleryFilters(galleries, mergedFilter);
 
-    // Step 5: Sort
-    galleries = sortGalleries(galleries, sortField, sortDirection);
+    // Use SQL-native query builder
+    const { galleries, total } = await galleryQueryBuilder.execute({
+      userId,
+      filters: mergedFilter,
+      applyExclusions,
+      sort: sortField,
+      sortDirection,
+      page,
+      perPage,
+      searchQuery,
+    });
 
-    // Step 6: Paginate
-    const total = galleries.length;
-    const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    let paginatedGalleries = galleries.slice(startIndex, endIndex);
-
-    // Step 6.5: For single-entity requests (detail pages), get gallery with computed counts
+    // For single-entity requests (detail pages), get gallery with computed counts
+    let paginatedGalleries = galleries;
     if (ids && ids.length === 1 && paginatedGalleries.length === 1) {
       const galleryWithCounts = await stashEntityService.getGallery(ids[0]);
       if (galleryWithCounts) {
@@ -347,29 +257,6 @@ export const findGalleries = async (
           galleryTitle: existingGallery.title,
           imageCount: galleryWithCounts.image_count,
         });
-      }
-    }
-
-    // Step 7: Hydrate studios with full data (name, etc.)
-    const studioIds = [
-      ...new Set(
-        paginatedGalleries
-          .map((g) => g.studio?.id)
-          .filter((id): id is string => !!id)
-      ),
-    ];
-
-    if (studioIds.length > 0) {
-      const studios = await stashEntityService.getStudiosByIds(studioIds);
-      const studioMap = new Map(studios.map((s) => [s.id, s]));
-
-      for (const gallery of paginatedGalleries) {
-        if (gallery.studio?.id) {
-          const fullStudio = studioMap.get(gallery.studio.id);
-          if (fullStudio) {
-            gallery.studio = fullStudio;
-          }
-        }
       }
     }
 
@@ -511,7 +398,7 @@ export const findGalleriesMinimal = async (
 ) => {
   try {
     const userId = req.user?.id;
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
 
     // Step 1: Get all galleries from cache
@@ -536,6 +423,16 @@ export const findGalleriesMinimal = async (
         userId,
         "gallery"
       );
+    }
+
+    // Step 2.6: Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_image_count } = count_filter;
+      galleries = galleries.filter((g) => {
+        const conditions: boolean[] = [];
+        if (min_image_count !== undefined) conditions.push(g.image_count >= min_image_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Step 3: Apply search query if provided

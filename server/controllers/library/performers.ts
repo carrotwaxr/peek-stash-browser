@@ -15,6 +15,7 @@ import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { userStatsService } from "../../services/UserStatsService.js";
+import { performerQueryBuilder } from "../../services/PerformerQueryBuilder.js";
 import type {
   NormalizedPerformer,
   PeekPerformerFilter,
@@ -135,7 +136,8 @@ export async function mergePerformersWithUserData(
 }
 
 /**
- * Simplified findPerformers using cache
+ * Find performers using SQL query builder
+ * Uses PerformerQueryBuilder for SQL-native filtering, sorting, and pagination.
  */
 export const findPerformers = async (
   req: TypedAuthRequest<FindPerformersRequest>,
@@ -144,108 +146,46 @@ export const findPerformers = async (
   try {
     const startTime = Date.now();
     const userId = req.user?.id;
+    const requestingUser = req.user;
     const { filter, performer_filter, ids } = req.body;
 
     const sortField = filter?.sort || "name";
-    const sortDirection = filter?.direction || "ASC";
+    const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
-    // Step 1: Get all performers from cache
-    let performers = await stashEntityService.getAllPerformers();
-
-    if (performers.length === 0) {
-      logger.warn("Cache not initialized, returning empty result");
-      return res.json({
-        findPerformers: {
-          count: 0,
-          performers: [],
-        },
-      });
-    }
-
-    // Step 2: Apply pre-computed exclusions (includes restrictions, hidden, cascade, and empty)
-    // Admins skip exclusions to see everything
-    const requestingUser = req.user;
-    if (requestingUser?.role !== "ADMIN") {
-      performers = await entityExclusionHelper.filterExcluded(
-        performers,
-        userId,
-        "performer"
-      );
-    }
-
-    // Step 3: Merge with FRESH user data (ratings, stats)
-    // IMPORTANT: Do this AFTER filtered cache to ensure stats are always current
-    performers = await mergePerformersWithUserData(performers, userId);
-
-    // Step 4: Apply search query if provided
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      performers = performers.filter((p) => {
-        const name = p.name || "";
-        const aliases = p.alias_list?.join(" ") || "";
-        return (
-          name.toLowerCase().includes(lowerQuery) ||
-          aliases.toLowerCase().includes(lowerQuery)
-        );
-      });
-    }
-
-    // Step 5: Apply filters (merge root-level ids with performer_filter)
-    // Normalize ids to PeekPerformerFilter format (ids is string[] in request, but filter expects { value, modifier })
+    // Merge root-level ids with performer_filter
     const normalizedIds = ids
       ? { value: ids, modifier: "INCLUDES" }
       : performer_filter?.ids;
-    const mergedFilter: PeekPerformerFilter & Record<string, unknown> = {
+    const mergedFilter: PeekPerformerFilter = {
       ...performer_filter,
       ids: normalizedIds,
     };
-    performers = await applyPerformerFilters(performers, mergedFilter);
 
-    // Step 6: Sort
-    performers = sortPerformers(performers, sortField, sortDirection);
+    // Use SQL query builder - admins skip exclusions
+    const applyExclusions = requestingUser?.role !== "ADMIN";
 
-    // Step 7: Paginate
-    const total = performers.length;
-    const startIndex = (page - 1) * perPage;
-    const endIndex = startIndex + perPage;
-    let paginatedPerformers = performers.slice(startIndex, endIndex);
+    const { performers, total } = await performerQueryBuilder.execute({
+      userId,
+      filters: mergedFilter,
+      applyExclusions,
+      sort: sortField,
+      sortDirection,
+      page,
+      perPage,
+      searchQuery,
+    });
 
-    // Step 8: For single-entity requests (detail pages), get performer with computed counts
-    if (ids && ids.length === 1 && paginatedPerformers.length === 1) {
-      // Get performer with computed counts from junction tables
-      const performerWithCounts = await stashEntityService.getPerformer(ids[0]);
-      if (performerWithCounts) {
-        // Merge with the paginated performer data (which has user ratings/stats)
-        const existingPerformer = paginatedPerformers[0];
-        paginatedPerformers = [
-          {
-            ...existingPerformer,
-            scene_count: performerWithCounts.scene_count,
-            image_count: performerWithCounts.image_count,
-            gallery_count: performerWithCounts.gallery_count,
-            group_count: performerWithCounts.group_count,
-          },
-        ];
-
-        // Hydrate tags with names
-        paginatedPerformers = await hydrateEntityTags(paginatedPerformers);
-
-        logger.info("Computed counts for performer detail", {
-          performerId: existingPerformer.id,
-          performerName: existingPerformer.name,
-          sceneCount: performerWithCounts.scene_count,
-          imageCount: performerWithCounts.image_count,
-          galleryCount: performerWithCounts.gallery_count,
-          groupCount: performerWithCounts.group_count,
-        });
-      }
+    // For single-entity requests (detail pages), hydrate tags
+    let resultPerformers = performers;
+    if (ids && ids.length === 1 && performers.length === 1) {
+      resultPerformers = await hydrateEntityTags(performers);
     }
 
     // Add stashUrl to each performer
-    const performersWithStashUrl = paginatedPerformers.map(performer => ({
+    const performersWithStashUrl = resultPerformers.map(performer => ({
       ...performer,
       stashUrl: buildStashEntityUrl('performer', performer.id),
     }));
@@ -809,90 +749,6 @@ export async function applyPerformerFilters(
 }
 
 /**
- * Sort performers
- */
-function sortPerformers(
-  performers: NormalizedPerformer[],
-  sortField: string,
-  direction: string
-): NormalizedPerformer[] {
-  const sorted = [...performers];
-
-  sorted.sort((a, b) => {
-    const aValue = getPerformerFieldValue(a, sortField);
-    const bValue = getPerformerFieldValue(b, sortField);
-
-    // Handle null values for timestamp fields
-    const isTimestampField =
-      sortField === "last_played_at" || sortField === "last_o_at";
-    if (isTimestampField) {
-      const aIsNull = aValue === null || aValue === undefined;
-      const bIsNull = bValue === null || bValue === undefined;
-
-      // Both null - equal
-      if (aIsNull && bIsNull) return 0;
-
-      // One is null - nulls go to end for DESC, start for ASC
-      if (aIsNull) return direction.toUpperCase() === "DESC" ? 1 : -1;
-      if (bIsNull) return direction.toUpperCase() === "DESC" ? -1 : 1;
-
-      // Both non-null - compare as strings (safely convert to string first)
-      const comparison = String(aValue).localeCompare(String(bValue));
-      return direction.toUpperCase() === "DESC" ? -comparison : comparison;
-    }
-
-    // Normal sorting for other fields
-    let comparison = 0;
-    if (typeof aValue === "string" && typeof bValue === "string") {
-      comparison = aValue.localeCompare(bValue);
-    } else {
-      const aNum = aValue || 0;
-      const bNum = bValue || 0;
-      comparison = aNum > bNum ? 1 : aNum < bNum ? -1 : 0;
-    }
-
-    if (direction.toUpperCase() === "DESC") {
-      comparison = -comparison;
-    }
-
-    // Secondary sort by name
-    if (comparison === 0) {
-      const aName = a.name || "";
-      const bName = b.name || "";
-      return aName.localeCompare(bName);
-    }
-
-    return comparison;
-  });
-
-  return sorted;
-}
-
-/**
- * Get field value from performer for sorting
- */
-function getPerformerFieldValue(
-  performer: NormalizedPerformer,
-  field: string
-): number | string | boolean | null {
-  if (field === "rating") return performer.rating || 0;
-  if (field === "rating100") return performer.rating100 || 0;
-  if (field === "o_counter") return performer.o_counter || 0;
-  if (field === "play_count") return performer.play_count || 0;
-  if (field === "scene_count" || field === "scenes_count")
-    return performer.scene_count || 0;
-  if (field === "name") return performer.name || "";
-  if (field === "created_at") return performer.created_at || "";
-  if (field === "updated_at") return performer.updated_at || "";
-  if (field === "last_played_at") return performer.last_played_at; // Return null as-is for timestamps
-  if (field === "last_o_at") return performer.last_o_at; // Return null as-is for timestamps
-  if (field === "random") return Math.random();
-  if (field === "height") return performer.height_cm || 0;
-  // Fallback for dynamic field access (safe as function is only called with known fields)
-  const value = (performer as Record<string, unknown>)[field];
-  return typeof value === "string" || typeof value === "number" ? value : 0;
-}
-/**
  * Get minimal performers (id + name only) for filter dropdowns
  */
 export const findPerformersMinimal = async (
@@ -900,7 +756,7 @@ export const findPerformersMinimal = async (
   res: TypedResponse<FindPerformersMinimalResponse | ApiErrorResponse>
 ) => {
   try {
-    const { filter } = req.body;
+    const { filter, count_filter } = req.body;
     const searchQuery = filter?.q || "";
     const sortField = filter?.sort || "name";
     const sortDirection = filter?.direction || "ASC";
@@ -918,6 +774,19 @@ export const findPerformersMinimal = async (
         userId,
         "performer"
       );
+    }
+
+    // Apply count filters (OR logic - pass if ANY condition is met)
+    if (count_filter) {
+      const { min_scene_count, min_gallery_count, min_image_count, min_group_count } = count_filter;
+      performers = performers.filter((p) => {
+        const conditions: boolean[] = [];
+        if (min_scene_count !== undefined) conditions.push(p.scene_count >= min_scene_count);
+        if (min_gallery_count !== undefined) conditions.push(p.gallery_count >= min_gallery_count);
+        if (min_image_count !== undefined) conditions.push(p.image_count >= min_image_count);
+        if (min_group_count !== undefined) conditions.push(p.group_count >= min_group_count);
+        return conditions.length === 0 || conditions.some((c) => c);
+      });
     }
 
     // Apply search query if provided

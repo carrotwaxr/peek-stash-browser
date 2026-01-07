@@ -17,6 +17,19 @@ export interface PaginationFilter {
 }
 
 /**
+ * Count-based filter for minimal endpoints.
+ * Used to filter entities by their content counts (e.g., only show performers with scenes).
+ * Multiple filters use OR logic - entity passes if ANY condition is met.
+ */
+export interface MinimalCountFilter {
+  min_scene_count?: number;
+  min_gallery_count?: number;
+  min_image_count?: number;
+  min_performer_count?: number;
+  min_group_count?: number;
+}
+
+/**
  * Standard error response
  */
 export interface ApiErrorResponse {

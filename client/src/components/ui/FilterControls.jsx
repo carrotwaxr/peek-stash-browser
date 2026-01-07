@@ -59,6 +59,7 @@ export const FilterControl = forwardRef(({
   max,
   entityType, // for searchable-select
   multi, // for searchable-select
+  countFilterContext, // for searchable-select - filter to entities with content in this context
   modifierOptions, // for multi-criterion modifiers
   modifierValue, // current modifier value
   onModifierChange, // modifier change handler
@@ -169,6 +170,7 @@ export const FilterControl = forwardRef(({
               onChange={onChange}
               multi={multi}
               placeholder={placeholder || `Select ${label}...`}
+              countFilterContext={countFilterContext}
             />
             {/* Hierarchy checkbox (for tags/studios) */}
             {supportsHierarchy && onHierarchyChange && (

@@ -11,6 +11,7 @@
 // Common types
 export type {
   PaginationFilter,
+  MinimalCountFilter,
   ApiErrorResponse,
   ApiSuccessResponse,
   CacheNotReadyResponse,
