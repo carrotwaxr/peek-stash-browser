@@ -6,7 +6,7 @@ describe("GalleryCard", () => {
   const mockGallery = {
     id: "1",
     title: "Test Gallery",
-    paths: { cover: "/cover.jpg" },
+    cover: "/cover.jpg",
     image_count: 25,
     studio: { name: "Test Studio" },
     date: "2024-01-15",

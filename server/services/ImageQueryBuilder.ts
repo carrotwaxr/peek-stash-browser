@@ -421,7 +421,7 @@ class ImageQueryBuilder {
       }
       galleriesByImage.get(ig.imageId)!.push({
         ...ig.gallery,
-        cover_path: this.transformUrl(ig.gallery.coverPath),
+        cover: this.transformUrl(ig.gallery.coverPath),
       });
     }
 

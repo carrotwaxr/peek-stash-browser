@@ -1952,9 +1952,8 @@ class StashEntityService {
       folder: gallery.folderPath ? { path: gallery.folderPath } : null,
       // Files array for frontend galleryTitle() fallback
       files,
-      cover: coverUrl ? { paths: { thumbnail: coverUrl } } : null,
-      // Frontend expects gallery.paths.cover for the cover image
-      paths: coverUrl ? { cover: coverUrl } : null,
+      // Cover as simple string URL for consistency
+      cover: coverUrl,
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
       // Performers from junction table
@@ -1989,7 +1988,7 @@ class StashEntityService {
       details: ig.gallery.details,
       photographer: ig.gallery.photographer,
       urls: ig.gallery.urls ? JSON.parse(ig.gallery.urls) : [],
-      cover_path: this.transformUrl(ig.gallery.coverPath),
+      cover: this.transformUrl(ig.gallery.coverPath),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
       studio: ig.gallery.studio ? {

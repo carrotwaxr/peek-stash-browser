@@ -1776,10 +1776,8 @@ class SceneQueryBuilder {
     return {
       id: g.id,
       title: g.title,
-      // Keep cover structure for compatibility
-      cover: coverUrl ? { paths: { thumbnail: coverUrl } } : null,
-      // Frontend expects gallery.paths.cover for the cover image (DRY - matches transformGallery)
-      paths: coverUrl ? { cover: coverUrl } : null,
+      // Cover as simple string URL for consistency
+      cover: coverUrl,
     };
   }
 
