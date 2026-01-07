@@ -318,9 +318,11 @@ const SceneContent = ({ location }) => {
               <div className="mt-6">
                 <GroupGrid
                   lockedFilters={{
-                    scenes: {
-                      value: [parseInt(scene.id, 10)],
-                      modifier: "INCLUDES"
+                    group_filter: {
+                      scenes: {
+                        value: [parseInt(scene.id, 10)],
+                        modifier: "INCLUDES"
+                      }
                     }
                   }}
                   hideLockedFilters
@@ -334,9 +336,11 @@ const SceneContent = ({ location }) => {
               <div className="mt-6">
                 <GalleryGrid
                   lockedFilters={{
-                    scenes: {
-                      value: [parseInt(scene.id, 10)],
-                      modifier: "INCLUDES"
+                    gallery_filter: {
+                      scenes: {
+                        value: [parseInt(scene.id, 10)],
+                        modifier: "INCLUDES"
+                      }
                     }
                   }}
                   hideLockedFilters
