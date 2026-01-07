@@ -285,7 +285,7 @@ const SceneContent = ({ location }) => {
                   lockedFilters={{
                     group_filter: {
                       scenes: {
-                        value: [parseInt(sceneId, 10)],
+                        value: [parseInt(scene.id, 10)],
                         modifier: "INCLUDES"
                       }
                     }
@@ -303,7 +303,7 @@ const SceneContent = ({ location }) => {
                   lockedFilters={{
                     gallery_filter: {
                       scenes: {
-                        value: [parseInt(sceneId, 10)],
+                        value: [parseInt(scene.id, 10)],
                         modifier: "INCLUDES"
                       }
                     }

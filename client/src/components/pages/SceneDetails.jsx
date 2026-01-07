@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
-import { galleryTitle } from "../../utils/gallery.js";
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";
