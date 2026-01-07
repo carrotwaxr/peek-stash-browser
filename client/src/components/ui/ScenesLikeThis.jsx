@@ -76,6 +76,21 @@ const ScenesLikeThis = ({ sceneId }) => {
 
   return (
     <>
+      {/* Pagination - Top */}
+      {!loading && totalPages > 1 && (
+        <div className="mb-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            perPage={perPage}
+            totalCount={totalCount}
+            showInfo={true}
+            showPerPageSelector={false}
+          />
+        </div>
+      )}
+
       {/* Scene Grid - reuse existing component */}
       <SceneGrid
         scenes={scenes}
@@ -90,17 +105,19 @@ const ScenesLikeThis = ({ sceneId }) => {
         emptyDescription=""
       />
 
-      {/* Pagination */}
+      {/* Pagination - Bottom */}
       {!loading && totalPages > 1 && (
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-          perPage={perPage}
-          totalCount={totalCount}
-          showInfo={true}
-          showPerPageSelector={false}
-        />
+        <div className="mt-4">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            perPage={perPage}
+            totalCount={totalCount}
+            showInfo={true}
+            showPerPageSelector={false}
+          />
+        </div>
       )}
     </>
   );
