@@ -1264,17 +1264,18 @@ export const updateScene = async (
 /**
  * Find similar scenes based on weighted scoring
  * Performers: 3 points each
+ * Studio: 2 points
  * Tags: 1 point each
- * Studio: 1 point
  *
- * Uses two-phase query:
- * 1. Lightweight scoring query to score all scenes
- * 2. SceneQueryBuilder to fetch final results with relations
+ * Uses SQL-based candidate selection (max 500 candidates) for scalability:
+ * 1. SQL query finds scenes sharing performers, tags, or studio with weights
+ * 2. SceneQueryBuilder fetches full scene data for paginated results
  */
 export const findSimilarScenes = async (
   req: TypedAuthRequest<unknown, FindSimilarScenesParams, FindSimilarScenesQuery>,
   res: TypedResponse<FindSimilarScenesResponse | ApiErrorResponse>
 ) => {
+  const startTime = Date.now();
   try {
     const { id } = req.params;
     const page = parseInt(req.query.page as string) || 1;
@@ -1288,27 +1289,16 @@ export const findSimilarScenes = async (
     // Get pre-computed scene exclusions for this user
     const excludedIds = await entityExclusionHelper.getExcludedIds(userId, 'scene');
 
-    // Phase 1: Get lightweight scoring data
-    const allScoringData = await stashEntityService.getScenesForScoring();
-
-    // Filter out excluded scenes and current scene
-    const scoringData = allScoringData.filter(
-      s => s.id !== id && !excludedIds.has(s.id)
+    // Use SQL-based candidate selection (max 500 candidates)
+    // This replaces loading ALL scenes and scoring in memory
+    const candidates = await stashEntityService.getSimilarSceneCandidates(
+      id,
+      excludedIds,
+      500 // Max candidates
     );
 
-    // Find the current scene's data
-    const currentScene = allScoringData.find(s => s.id === id);
-    if (!currentScene) {
-      return res.status(404).json({ error: "Scene not found" });
-    }
-
-    // Check if current scene has any metadata
-    const hasMetadata =
-      currentScene.performerIds.length > 0 ||
-      currentScene.studioId ||
-      currentScene.tagIds.length > 0;
-
-    if (!hasMetadata) {
+    // Empty result if no candidates found
+    if (candidates.length === 0) {
       return res.json({
         scenes: [],
         count: 0,
@@ -1317,73 +1307,22 @@ export const findSimilarScenes = async (
       });
     }
 
-    // Build sets for fast lookup
-    const currentPerformerIds = new Set(currentScene.performerIds);
-    const currentTagIds = new Set(currentScene.tagIds);
-    const currentStudioId = currentScene.studioId;
-
-    // Score all scenes
-    interface ScoredScene {
-      id: string;
-      score: number;
-      date: string | null;
-    }
-
-    const scoredScenes: ScoredScene[] = [];
-
-    for (const scene of scoringData) {
-      let score = 0;
-
-      // Score for matching performers (3 points each)
-      for (const performerId of scene.performerIds) {
-        if (currentPerformerIds.has(performerId)) {
-          score += 3;
-        }
-      }
-
-      // Score for matching studio (1 point)
-      if (currentStudioId && scene.studioId === currentStudioId) {
-        score += 1;
-      }
-
-      // Score for matching tags (1 point each)
-      for (const tagId of scene.tagIds) {
-        if (currentTagIds.has(tagId)) {
-          score += 1;
-        }
-      }
-
-      if (score > 0) {
-        scoredScenes.push({ id: scene.id, score, date: scene.date });
-      }
-    }
-
-    // Sort by score descending, then by date descending
-    scoredScenes.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      const dateA = a.date ? new Date(a.date).getTime() : 0;
-      const dateB = b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA;
-    });
-
-    // Paginate
+    // Paginate candidate IDs (already sorted by weight desc, date desc from SQL)
     const startIndex = (page - 1) * perPage;
-    const paginatedIds = scoredScenes
+    const paginatedIds = candidates
       .slice(startIndex, startIndex + perPage)
-      .map(s => s.id);
+      .map(c => c.sceneId);
 
     if (paginatedIds.length === 0) {
       return res.json({
         scenes: [],
-        count: scoredScenes.length,
+        count: candidates.length,
         page,
         perPage,
       });
     }
 
-    // Phase 2: Fetch full scene data via SceneQueryBuilder
+    // Fetch full scene data via SceneQueryBuilder
     const { scenes } = await sceneQueryBuilder.getByIds({
       userId,
       ids: paginatedIds,
@@ -1395,9 +1334,17 @@ export const findSimilarScenes = async (
       .map(id => sceneMap.get(id))
       .filter((s): s is NormalizedScene => s !== undefined);
 
+    logger.info("findSimilarScenes completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      sceneId: id,
+      candidateCount: candidates.length,
+      resultCount: orderedScenes.length,
+      page,
+    });
+
     res.json({
       scenes: orderedScenes,
-      count: scoredScenes.length,
+      count: candidates.length,
       page,
       perPage,
     });
@@ -1419,6 +1366,7 @@ export const getRecommendedScenes = async (
   req: TypedAuthRequest<unknown, Record<string, string>, GetRecommendedScenesQuery>,
   res: TypedResponse<GetRecommendedScenesResponse | ApiErrorResponse>
 ) => {
+  const startTime = Date.now();
   try {
     const page = parseInt(req.query.page as string) || 1;
     const perPage = parseInt(req.query.per_page as string) || 24;
@@ -1664,6 +1612,14 @@ export const getRecommendedScenes = async (
     const orderedScenes = paginatedIds
       .map((id) => sceneMap.get(id))
       .filter((s): s is NormalizedScene => s !== undefined);
+
+    logger.info("getRecommendedScenes completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      userId,
+      candidateCount: cappedScenes.length,
+      resultCount: orderedScenes.length,
+      page,
+    });
 
     res.json({
       scenes: orderedScenes,

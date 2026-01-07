@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import prisma from "../../prisma/singleton.js";
-import { sceneTagInheritanceService } from "../SceneTagInheritanceService.js";
+import prisma from "../../services/../prisma/singleton.js";
+import { sceneTagInheritanceService } from "../../services/SceneTagInheritanceService.js";
 
 describe("SceneTagInheritanceService", () => {
   // Clean up test data

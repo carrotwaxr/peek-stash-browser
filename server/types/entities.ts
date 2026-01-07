@@ -119,6 +119,7 @@ export type NormalizedStudio = Studio & {
  * - o_counter: Aggregated orgasm count from scenes with this tag
  * - play_count: Aggregated play count from scenes with this tag
  * - performer_count: Count of performers with this tag
+ * - scene_count_via_performers: Pre-computed count of scenes where a performer has this tag
  */
 export type NormalizedTag = Tag & {
   rating: number | null;
@@ -127,6 +128,7 @@ export type NormalizedTag = Tag & {
   o_counter: number;
   play_count: number;
   performer_count: number;
+  scene_count_via_performers: number;
 };
 
 /**

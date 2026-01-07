@@ -651,6 +651,9 @@ model StashTag {
   groupCount       Int @default(0)
   sceneMarkerCount Int @default(0)
 
+  // === Computed counts (calculated after sync) ===
+  sceneCountViaPerformers Int @default(0) // Scenes where a performer has this tag
+
   // === Extended fields ===
   description String? // Tag description
   aliases     String? // JSON array of alias strings

@@ -77,7 +77,7 @@ import {
   getWatchHistory,
   getAllWatchHistory,
   clearAllWatchHistory,
-} from "../watchHistory.js";
+} from "../../controllers/watchHistory.js";
 import prisma from "../../prisma/singleton.js";
 
 // Get mocked functions

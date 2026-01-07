@@ -224,6 +224,103 @@ class StashEntityService {
   }
 
   /**
+   * Get candidate scene IDs for similarity matching using SQL
+   * Returns up to maxCandidates scenes that share performers, tags, or studio
+   * with the given scene, weighted by relationship type.
+   *
+   * Weights:
+   * - Shared performer: 3 points
+   * - Same studio: 2 points
+   * - Shared tag: 1 point
+   *
+   * @param sceneId - The scene to find similar scenes for
+   * @param excludedIds - Set of scene IDs to exclude (e.g., user exclusions)
+   * @param maxCandidates - Maximum number of candidates to return (default 500)
+   * @returns Array of candidate scene IDs with weights and dates, sorted by weight desc then date desc
+   */
+  async getSimilarSceneCandidates(
+    sceneId: string,
+    excludedIds: Set<string>,
+    maxCandidates: number = 500
+  ): Promise<Array<{ sceneId: string; weight: number; date: string | null }>> {
+    const startTime = Date.now();
+
+    // Convert excludedIds to array for SQL IN clause
+    // If empty, use a dummy value that won't match any ID
+    const excludedArray = excludedIds.size > 0
+      ? Array.from(excludedIds)
+      : ['__NONE__'];
+
+    // SQL query to find candidate scenes sharing performers, tags, or studio
+    // Uses UNION ALL to combine weighted matches, then groups and sums weights
+    // Includes date for secondary sorting
+    const sql = `
+      WITH candidates AS (
+        -- Scenes sharing performers (weight: 3 per match)
+        SELECT sp2.sceneId, 3 as weight
+        FROM ScenePerformer sp1
+        JOIN ScenePerformer sp2 ON sp2.performerId = sp1.performerId
+        JOIN StashScene s ON s.id = sp2.sceneId AND s.deletedAt IS NULL
+        WHERE sp1.sceneId = ?
+          AND sp2.sceneId != ?
+
+        UNION ALL
+
+        -- Scenes from same studio (weight: 2)
+        SELECT s2.id as sceneId, 2 as weight
+        FROM StashScene s1
+        JOIN StashScene s2 ON s2.studioId = s1.studioId AND s2.deletedAt IS NULL
+        WHERE s1.id = ?
+          AND s2.id != ?
+          AND s1.studioId IS NOT NULL
+
+        UNION ALL
+
+        -- Scenes sharing tags (weight: 1 per match)
+        SELECT st2.sceneId, 1 as weight
+        FROM SceneTag st1
+        JOIN SceneTag st2 ON st2.tagId = st1.tagId
+        JOIN StashScene s ON s.id = st2.sceneId AND s.deletedAt IS NULL
+        WHERE st1.sceneId = ?
+          AND st2.sceneId != ?
+      )
+      SELECT c.sceneId, SUM(c.weight) as totalWeight, s.date
+      FROM candidates c
+      JOIN StashScene s ON s.id = c.sceneId
+      WHERE c.sceneId NOT IN (${excludedArray.map(() => '?').join(',')})
+      GROUP BY c.sceneId
+      ORDER BY totalWeight DESC, s.date DESC
+      LIMIT ?
+    `;
+
+    // Build params array: sceneId appears 6 times (for each WHERE clause),
+    // then excludedIds, then maxCandidates
+    const params = [
+      sceneId, sceneId,  // performers
+      sceneId, sceneId,  // studio
+      sceneId, sceneId,  // tags
+      ...excludedArray,
+      maxCandidates,
+    ];
+
+    const rows = await prisma.$queryRawUnsafe<Array<{
+      sceneId: string;
+      totalWeight: number;
+      date: string | null;
+    }>>(sql, ...params);
+
+    const result = rows.map(row => ({
+      sceneId: row.sceneId,
+      weight: Number(row.totalWeight),
+      date: row.date,
+    }));
+
+    logger.info(`getSimilarSceneCandidates: ${Date.now() - startTime}ms, candidates=${result.length}`);
+
+    return result;
+  }
+
+  /**
    * Get lightweight scene data for entity visibility filtering
    * Returns only IDs needed to determine which entities appear in scenes
    * Much more efficient than loading full scene objects
@@ -1771,6 +1868,7 @@ class StashEntityService {
       studio_count: tag.studioCount ?? 0,
       group_count: tag.groupCount ?? 0,
       scene_marker_count: tag.sceneMarkerCount ?? 0,
+      scene_count_via_performers: tag.sceneCountViaPerformers ?? 0,
       description: tag.description,
       aliases: tag.aliases ? JSON.parse(tag.aliases) : [],
       parents: tag.parentIds ? JSON.parse(tag.parentIds).map((id: string) => ({ id })) : [],

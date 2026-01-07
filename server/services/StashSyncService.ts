@@ -255,6 +255,9 @@ class StashSyncService extends EventEmitter {
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
 
+      // Compute tag scene counts via performers
+      await this.computeTagSceneCountsViaPerformers();
+
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
       await exclusionComputationService.recomputeAllUsers();
@@ -396,6 +399,9 @@ class StashSyncService extends EventEmitter {
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
+
+      // Compute tag scene counts via performers
+      await this.computeTagSceneCountsViaPerformers();
 
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
@@ -665,6 +671,9 @@ class StashSyncService extends EventEmitter {
       logger.info("Rebuilding user stats after sync...");
       await userStatsService.rebuildAllStats();
       logger.info("User stats rebuild complete");
+
+      // Compute tag scene counts via performers
+      await this.computeTagSceneCountsViaPerformers();
 
       // Recompute exclusions for all users after sync
       logger.info("Sync complete, recomputing user exclusions...");
@@ -1065,8 +1074,8 @@ class StashSyncService extends EventEmitter {
    * Cleanup entities that no longer exist in Stash.
    * Called during full sync after each entity type has been synced.
    *
-   * Fetches all entity IDs from Stash and soft-deletes any entities in Peek
-   * that are not present in Stash (due to deletion or merge operations).
+   * Fetches all entity IDs from Stash using pagination and soft-deletes any
+   * entities in Peek that are not present in Stash (due to deletion or merge).
    */
   private async cleanupDeletedEntities(entityType: EntityType, stashInstanceId?: string): Promise<number> {
     const plural = ENTITY_PLURALS[entityType];
@@ -1074,53 +1083,86 @@ class StashSyncService extends EventEmitter {
     const startTime = Date.now();
     const stash = stashInstanceManager.getDefault();
 
-    try {
-      // Fetch all IDs from Stash in one query
-      // per_page: -1 means return all results
-      let stashIds: string[];
+    // Larger page size for ID-only fetches (IDs are small strings)
+    const CLEANUP_PAGE_SIZE = 5000;
 
-      switch (entityType) {
-        case "scene": {
-          const result = await stash.findSceneIDs({ filter: { per_page: -1, page: 1 } });
-          stashIds = result.findScenes.scenes.map((s) => s.id);
+    try {
+      // Fetch all IDs from Stash using pagination
+      const stashIds: string[] = [];
+      let page = 1;
+      let totalCount = 0;
+      let fetchedCount = 0;
+
+      while (true) {
+        this.checkAbort();
+
+        let pageIds: string[];
+        let count: number;
+
+        switch (entityType) {
+          case "scene": {
+            const result = await stash.findSceneIDs({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findScenes.scenes.map((s) => s.id);
+            count = result.findScenes.count;
+            break;
+          }
+          case "performer": {
+            const result = await stash.findPerformerIDs({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findPerformers.performers.map((p) => p.id);
+            count = result.findPerformers.count;
+            break;
+          }
+          case "studio": {
+            const result = await stash.findStudioIDs({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findStudios.studios.map((s) => s.id);
+            count = result.findStudios.count;
+            break;
+          }
+          case "tag": {
+            const result = await stash.findTagIDs({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findTags.tags.map((t) => t.id);
+            count = result.findTags.count;
+            break;
+          }
+          case "group": {
+            const result = await stash.findGroupIDs({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findGroups.groups.map((g) => g.id);
+            count = result.findGroups.count;
+            break;
+          }
+          case "gallery": {
+            const result = await stash.findGalleryIDs({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findGalleries.galleries.map((g) => g.id);
+            count = result.findGalleries.count;
+            break;
+          }
+          case "image": {
+            const result = await stash.findImageIDs({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findImages.images.map((i) => i.id);
+            count = result.findImages.count;
+            break;
+          }
+          default:
+            logger.warn(`Unknown entity type for cleanup: ${entityType}`);
+            return 0;
+        }
+
+        // Guard against missing count field (would cause infinite loop)
+        if (typeof count !== "number") {
+          throw new Error(`API response missing count field for ${entityType} cleanup`);
+        }
+
+        totalCount = count;
+        stashIds.push(...pageIds);
+        fetchedCount += pageIds.length;
+
+        if (fetchedCount >= totalCount || pageIds.length === 0) {
           break;
         }
-        case "performer": {
-          const result = await stash.findPerformerIDs({ filter: { per_page: -1, page: 1 } });
-          stashIds = result.findPerformers.performers.map((p) => p.id);
-          break;
-        }
-        case "studio": {
-          const result = await stash.findStudioIDs({ filter: { per_page: -1, page: 1 } });
-          stashIds = result.findStudios.studios.map((s) => s.id);
-          break;
-        }
-        case "tag": {
-          const result = await stash.findTagIDs({ filter: { per_page: -1, page: 1 } });
-          stashIds = result.findTags.tags.map((t) => t.id);
-          break;
-        }
-        case "group": {
-          const result = await stash.findGroupIDs({ filter: { per_page: -1, page: 1 } });
-          stashIds = result.findGroups.groups.map((g) => g.id);
-          break;
-        }
-        case "gallery": {
-          const result = await stash.findGalleryIDs({ filter: { per_page: -1, page: 1 } });
-          stashIds = result.findGalleries.galleries.map((g) => g.id);
-          break;
-        }
-        case "image": {
-          const result = await stash.findImageIDs({ filter: { per_page: -1, page: 1 } });
-          stashIds = result.findImages.images.map((i) => i.id);
-          break;
-        }
-        default:
-          logger.warn(`Unknown entity type for cleanup: ${entityType}`);
-          return 0;
+        page++;
       }
 
-      logger.debug(`Found ${stashIds.length} ${plural} in Stash`);
+      logger.debug(`Found ${stashIds.length} ${plural} in Stash (fetched in ${page} pages)`);
 
       // Check for abort before proceeding with database updates
       this.checkAbort();
@@ -2737,6 +2779,42 @@ class StashSyncService extends EventEmitter {
       },
       inProgress: this.syncInProgress,
     };
+  }
+
+  /**
+   * Compute sceneCountViaPerformers for all tags using SQL.
+   * This counts scenes where a performer in the scene has this tag.
+   * Called after sync completes to pre-compute the value for fast retrieval.
+   */
+  async computeTagSceneCountsViaPerformers(): Promise<void> {
+    const startTime = Date.now();
+    logger.info("Computing tag scene counts via performers...");
+
+    try {
+      // SQL query that:
+      // 1. Finds all distinct scenes where a performer has a given tag
+      // 2. Groups by tagId to get counts
+      // 3. Updates all tags in one batch
+      await prisma.$executeRaw`
+        UPDATE StashTag
+        SET sceneCountViaPerformers = COALESCE((
+          SELECT COUNT(DISTINCT sp.sceneId)
+          FROM PerformerTag pt
+          JOIN ScenePerformer sp ON sp.performerId = pt.performerId
+          JOIN StashScene s ON s.id = sp.sceneId AND s.deletedAt IS NULL
+          WHERE pt.tagId = StashTag.id
+        ), 0)
+        WHERE StashTag.deletedAt IS NULL
+      `;
+
+      const duration = Date.now() - startTime;
+      logger.info(`Tag scene counts via performers computed in ${duration}ms`);
+    } catch (error) {
+      logger.error("Failed to compute tag scene counts via performers", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
+    }
   }
 }
 

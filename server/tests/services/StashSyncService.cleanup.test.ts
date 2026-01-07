@@ -72,7 +72,7 @@ const mockFindGalleryIDs = vi.fn();
 const mockFindImageIDs = vi.fn();
 
 // Mock StashInstanceManager
-vi.mock("../StashInstanceManager.js", () => ({
+vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getDefault: vi.fn(() => ({
       findSceneIDs: mockFindSceneIDs,
@@ -88,31 +88,31 @@ vi.mock("../StashInstanceManager.js", () => ({
 }));
 
 // Mock other services that might be called during cleanup
-vi.mock("../EntityImageCountService.js", () => ({
+vi.mock("../../services/EntityImageCountService.js", () => ({
   entityImageCountService: {
     recomputeAllCounts: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../ImageGalleryInheritanceService.js", () => ({
+vi.mock("../../services/ImageGalleryInheritanceService.js", () => ({
   imageGalleryInheritanceService: {
     recomputeAllImages: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../SceneTagInheritanceService.js", () => ({
+vi.mock("../../services/SceneTagInheritanceService.js", () => ({
   sceneTagInheritanceService: {
     recomputeAllScenes: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../UserStatsService.js", () => ({
+vi.mock("../../services/UserStatsService.js", () => ({
   userStatsService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
-vi.mock("../ExclusionComputationService.js", () => ({
+vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
   },
@@ -129,8 +129,8 @@ vi.mock("../../utils/logger.js", () => ({
 }));
 
 // Import after mocking
-import { stashSyncService } from "../StashSyncService.js";
-import prisma from "../../prisma/singleton.js";
+import { stashSyncService } from "../../services/StashSyncService.js";
+import prisma from "../../services/../prisma/singleton.js";
 
 describe("StashSyncService Cleanup", () => {
   beforeEach(() => {
@@ -141,89 +141,92 @@ describe("StashSyncService Cleanup", () => {
     vi.restoreAllMocks();
   });
 
+  // Page size used by cleanupDeletedEntities for paginated fetching
+  const CLEANUP_PAGE_SIZE = 5000;
+
   describe("ID-only query methods", () => {
     it("should use findSceneIDs for scene cleanup", async () => {
       mockFindSceneIDs.mockResolvedValue({
-        findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }] },
+        findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }], count: 3 },
       });
 
       // Access private method via any cast (for testing)
       await (stashSyncService as any).cleanupDeletedEntities("scene");
 
       expect(mockFindSceneIDs).toHaveBeenCalledWith({
-        filter: { per_page: -1, page: 1 },
+        filter: { per_page: CLEANUP_PAGE_SIZE, page: 1 },
       });
     });
 
     it("should use findPerformerIDs for performer cleanup", async () => {
       mockFindPerformerIDs.mockResolvedValue({
-        findPerformers: { performers: [{ id: "1" }] },
+        findPerformers: { performers: [{ id: "1" }], count: 1 },
       });
 
       await (stashSyncService as any).cleanupDeletedEntities("performer");
 
       expect(mockFindPerformerIDs).toHaveBeenCalledWith({
-        filter: { per_page: -1, page: 1 },
+        filter: { per_page: CLEANUP_PAGE_SIZE, page: 1 },
       });
     });
 
     it("should use findStudioIDs for studio cleanup", async () => {
       mockFindStudioIDs.mockResolvedValue({
-        findStudios: { studios: [{ id: "1" }] },
+        findStudios: { studios: [{ id: "1" }], count: 1 },
       });
 
       await (stashSyncService as any).cleanupDeletedEntities("studio");
 
       expect(mockFindStudioIDs).toHaveBeenCalledWith({
-        filter: { per_page: -1, page: 1 },
+        filter: { per_page: CLEANUP_PAGE_SIZE, page: 1 },
       });
     });
 
     it("should use findTagIDs for tag cleanup", async () => {
       mockFindTagIDs.mockResolvedValue({
-        findTags: { tags: [{ id: "1" }] },
+        findTags: { tags: [{ id: "1" }], count: 1 },
       });
 
       await (stashSyncService as any).cleanupDeletedEntities("tag");
 
       expect(mockFindTagIDs).toHaveBeenCalledWith({
-        filter: { per_page: -1, page: 1 },
+        filter: { per_page: CLEANUP_PAGE_SIZE, page: 1 },
       });
     });
 
     it("should use findGroupIDs for group cleanup", async () => {
       mockFindGroupIDs.mockResolvedValue({
-        findGroups: { groups: [{ id: "1" }] },
+        findGroups: { groups: [{ id: "1" }], count: 1 },
       });
 
       await (stashSyncService as any).cleanupDeletedEntities("group");
 
       expect(mockFindGroupIDs).toHaveBeenCalledWith({
-        filter: { per_page: -1, page: 1 },
+        filter: { per_page: CLEANUP_PAGE_SIZE, page: 1 },
       });
     });
 
     it("should use findGalleryIDs for gallery cleanup", async () => {
       mockFindGalleryIDs.mockResolvedValue({
-        findGalleries: { galleries: [{ id: "1" }] },
+        findGalleries: { galleries: [{ id: "1" }], count: 1 },
       });
 
       await (stashSyncService as any).cleanupDeletedEntities("gallery");
 
       expect(mockFindGalleryIDs).toHaveBeenCalledWith({
-        filter: { per_page: -1, page: 1 },
+        filter: { per_page: CLEANUP_PAGE_SIZE, page: 1 },
       });
     });
 
     it("should use findImageIDs for image cleanup", async () => {
       mockFindImageIDs.mockResolvedValue({
-        findImages: { images: [{ id: "1" }] },
+        findImages: { images: [{ id: "1" }], count: 1 },
       });
 
       await (stashSyncService as any).cleanupDeletedEntities("image");
 
       expect(mockFindImageIDs).toHaveBeenCalledWith({
-        filter: { per_page: -1, page: 1 },
+        filter: { per_page: CLEANUP_PAGE_SIZE, page: 1 },
       });
     });
   });
@@ -232,7 +235,7 @@ describe("StashSyncService Cleanup", () => {
     it("should soft-delete scenes not in Stash", async () => {
       // Stash only has scenes 1, 2, 3
       mockFindSceneIDs.mockResolvedValue({
-        findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }] },
+        findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }], count: 3 },
       });
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 2 });
 
@@ -247,7 +250,7 @@ describe("StashSyncService Cleanup", () => {
 
     it("should soft-delete performers not in Stash", async () => {
       mockFindPerformerIDs.mockResolvedValue({
-        findPerformers: { performers: [{ id: "p1" }, { id: "p2" }] },
+        findPerformers: { performers: [{ id: "p1" }, { id: "p2" }], count: 2 },
       });
       vi.mocked(prisma.stashPerformer.updateMany).mockResolvedValue({ count: 5 });
 
@@ -262,7 +265,7 @@ describe("StashSyncService Cleanup", () => {
 
     it("should return 0 when no entities need cleanup", async () => {
       mockFindSceneIDs.mockResolvedValue({
-        findScenes: { scenes: [{ id: "1" }] },
+        findScenes: { scenes: [{ id: "1" }], count: 1 },
       });
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 0 });
 
@@ -273,7 +276,7 @@ describe("StashSyncService Cleanup", () => {
 
     it("should only update entities where deletedAt is null", async () => {
       mockFindTagIDs.mockResolvedValue({
-        findTags: { tags: [{ id: "t1" }] },
+        findTags: { tags: [{ id: "t1" }], count: 1 },
       });
       vi.mocked(prisma.stashTag.updateMany).mockResolvedValue({ count: 3 });
 
@@ -302,13 +305,24 @@ describe("StashSyncService Cleanup", () => {
 
       expect(result).toBe(0);
     });
+
+    it("should return 0 when count field is missing (malformed API response)", async () => {
+      // Malformed response without count field
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [{ id: "1" }] },
+      });
+
+      const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
+
+      expect(result).toBe(0);
+    });
   });
 
   describe("Empty Stash scenario", () => {
     it("should handle empty Stash (all entities deleted)", async () => {
       // Stash returns no scenes - all should be soft-deleted
       mockFindSceneIDs.mockResolvedValue({
-        findScenes: { scenes: [] },
+        findScenes: { scenes: [], count: 0 },
       });
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 100 });
 

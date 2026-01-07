@@ -944,6 +944,7 @@ export const syncFromStash = async (
   req: AuthenticatedRequest,
   res: Response
 ) => {
+  const startTime = Date.now();
   try {
     const currentUser = req.user;
 
@@ -1605,7 +1606,16 @@ export const syncFromStash = async (
       }
     }
 
-    console.log("Stash sync completed", { targetUserId, stats });
+    logger.info("syncFromStash completed", {
+      totalTime: `${Date.now() - startTime}ms`,
+      targetUserId,
+      scenes: stats.scenes,
+      performers: stats.performers,
+      studios: stats.studios,
+      tags: stats.tags,
+      galleries: stats.galleries,
+      groups: stats.groups,
+    });
 
     res.json({
       success: true,
@@ -1613,7 +1623,7 @@ export const syncFromStash = async (
       stats,
     });
   } catch (error) {
-    console.error("Error syncing from Stash:", error);
+    logger.error("Error syncing from Stash:", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Failed to sync from Stash" });
   }
 };

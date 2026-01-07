@@ -494,7 +494,6 @@ class ExclusionComputationService {
     // Use a temporary table to avoid loading all relationships into memory
     // Create temp table with excluded image IDs
     if (excludedImageIds.size > 0) {
-      const excludedImageIdsList = Array.from(excludedImageIds).map(id => `'${id}'`).join(',');
       await (tx as any).$executeRaw`
         CREATE TEMP TABLE IF NOT EXISTS temp_excluded_images (imageId TEXT PRIMARY KEY)
       `;

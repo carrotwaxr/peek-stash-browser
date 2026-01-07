@@ -75,8 +75,8 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-import { exclusionComputationService } from "../ExclusionComputationService.js";
-import prisma from "../../prisma/singleton.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
+import prisma from "../../services/../prisma/singleton.js";
 
 const mockPrisma = prisma as any;
 

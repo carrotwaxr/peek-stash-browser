@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi, type Mock } from "vitest";
 
 // Mock StashInstanceManager
-vi.mock("../StashInstanceManager.js", () => ({
+vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getDefaultConfig: () => ({
       id: "test-instance",
@@ -31,8 +31,8 @@ vi.mock("../../prisma/singleton.js", () => ({
   },
 }));
 
-import prisma from "../../prisma/singleton.js";
-import { entityImageCountService } from "../EntityImageCountService.js";
+import prisma from "../../services/../prisma/singleton.js";
+import { entityImageCountService } from "../../services/EntityImageCountService.js";
 
 const getMock = (fn: unknown): Mock => fn as Mock;
 
