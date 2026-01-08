@@ -1,4 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { CardOverlay, CardImage, CardDescription } from "../CardComponents";
 
 describe("CardOverlay", () => {
@@ -86,6 +88,23 @@ describe("CardImage", () => {
     expect(funcString).toContain("aspectRatio");
     expect(funcString).toContain("entityType");
     expect(funcString).toContain("onClick");
+  });
+
+  it("calls onClickOverride when clicking Link", () => {
+    const onClickOverride = vi.fn((e) => e.preventDefault());
+
+    render(
+      <MemoryRouter>
+        <CardImage
+          src="/test.jpg"
+          linkTo="/scene/1"
+          onClickOverride={onClickOverride}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("link"));
+    expect(onClickOverride).toHaveBeenCalled();
   });
 });
 
