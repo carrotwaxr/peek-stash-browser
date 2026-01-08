@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import {
@@ -73,10 +73,6 @@ const SceneCard = forwardRef(
   ) => {
     const { isTVMode } = useTVMode();
     const navigate = useNavigate();
-    const longPressTimerRef = useRef(null);
-    const [isLongPressing, setIsLongPressing] = useState(false);
-    const startPosRef = useRef({ x: 0, y: 0 });
-    const hasMovedRef = useRef(false);
 
     const title = getSceneTitle(scene);
     const description = getSceneDescription(scene);
@@ -162,137 +158,6 @@ const SceneCard = forwardRef(
         },
       ];
     }, [scene, allTags, navigate]);
-
-    const handleClick = (e) => {
-      const target = e.target;
-      const closestButton = target.closest("button");
-      const isButton = closestButton && closestButton !== e.currentTarget;
-      const isLink = target.closest("a");
-      const isInput = target.closest("input");
-      const isInteractive = isButton || isLink || isInput;
-
-      if (isInteractive) {
-        return;
-      }
-
-      if (isLongPressing) {
-        setIsLongPressing(false);
-        return;
-      }
-
-      e.preventDefault();
-
-      if (selectionMode) {
-        onToggleSelect?.(scene);
-      } else {
-        onClick?.(scene) || navigate(`/scene/${scene.id}`);
-      }
-    };
-
-    const handleMouseDown = (e) => {
-      const target = e.target;
-      const closestButton = target.closest("button");
-      const isButton = closestButton && closestButton !== e.currentTarget;
-      const isLink = target.closest("a");
-      const isInput = target.closest("input");
-      const isInteractive = isButton || isLink || isInput;
-
-      if (isInteractive) {
-        return;
-      }
-
-      longPressTimerRef.current = setTimeout(() => {
-        setIsLongPressing(true);
-        onToggleSelect?.(scene);
-      }, 500);
-    };
-
-    const handleMouseUp = () => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
-    };
-
-    const handleTouchStart = (e) => {
-      const target = e.target;
-      const closestButton = target.closest("button");
-      const isButton = closestButton && closestButton !== e.currentTarget;
-      const isLink = target.closest("a");
-      const isInput = target.closest("input");
-      const isInteractive = isButton || isLink || isInput;
-
-      if (isInteractive) {
-        return;
-      }
-
-      const touch = e.touches[0];
-      startPosRef.current = { x: touch.clientX, y: touch.clientY };
-      hasMovedRef.current = false;
-
-      longPressTimerRef.current = setTimeout(() => {
-        if (!hasMovedRef.current) {
-          setIsLongPressing(true);
-          onToggleSelect?.(scene);
-        }
-      }, 500);
-    };
-
-    const handleTouchMove = (e) => {
-      if (longPressTimerRef.current && e.touches.length > 0) {
-        const touch = e.touches[0];
-        const deltaX = Math.abs(touch.clientX - startPosRef.current.x);
-        const deltaY = Math.abs(touch.clientY - startPosRef.current.y);
-        const moveThreshold = 10;
-
-        if (deltaX > moveThreshold || deltaY > moveThreshold) {
-          hasMovedRef.current = true;
-          clearTimeout(longPressTimerRef.current);
-          longPressTimerRef.current = null;
-        }
-      }
-    };
-
-    const handleTouchEnd = () => {
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-        longPressTimerRef.current = null;
-      }
-      hasMovedRef.current = false;
-    };
-
-    useEffect(() => {
-      return () => {
-        if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
-        }
-      };
-    }, []);
-
-    const handleKeyDown = (e) => {
-      // Only handle keyboard events if this card is actually the focused element
-      // This prevents handling events when focus is on other elements (like sidebar)
-      if (e.currentTarget !== document.activeElement && !e.currentTarget.contains(document.activeElement)) {
-        return;
-      }
-
-      const target = e.target;
-      const isInputField =
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "SELECT" ||
-        target.isContentEditable;
-
-      if (isInputField) {
-        return;
-      }
-
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        e.stopPropagation();
-        onClick?.(scene) || navigate(`/scene/${scene.id}`);
-      }
-    };
 
     const handleCheckboxClick = (e) => {
       e.stopPropagation();
@@ -384,6 +249,14 @@ const SceneCard = forwardRef(
       <BaseCard
         ref={ref}
         entityType="scene"
+        entity={scene}
+        linkTo={`/scene/${scene.id}`}
+        referrerUrl="/scenes"
+        // Selection mode - BaseCard handles all gesture/keyboard logic
+        selectionMode={selectionMode}
+        isSelected={isSelected}
+        onToggleSelect={onToggleSelect}
+        // Content
         imagePath={scene.paths?.screenshot}
         title={title}
         subtitle={subtitle}
@@ -398,27 +271,12 @@ const SceneCard = forwardRef(
           entityTitle: title,
           onHideSuccess,
         }}
-        // Render slots for scene-specific features
+        // Render slots
         renderOverlay={renderOverlay}
         renderImageContent={renderImageContent}
-        // Custom styling for selection
-        className={`${isSelected ? "scene-card-selected" : ""} ${className}`}
-        style={{
-          borderColor: isSelected
-            ? "var(--selection-color)"
-            : "var(--border-color)",
-          borderWidth: isSelected ? "2px" : "1px",
-        }}
-        // Event handlers for gestures and keyboard
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
-        onKeyDown={handleKeyDown}
+        // Standard props
+        className={className}
+        onClick={onClick}
         onFocus={onFocus}
         tabIndex={isTVMode ? tabIndex : -1}
       />
