@@ -666,6 +666,21 @@ class GalleryQueryBuilder {
   }
 
   /**
+   * Get fallback title from folder path or file basename
+   */
+  private getGalleryFallbackTitle(folderPath: string | null, fileBasename: string | null): string | null {
+    // Try file basename first (for zip galleries)
+    if (fileBasename) {
+      return fileBasename;
+    }
+    // Try folder path basename (for folder-based galleries)
+    if (folderPath) {
+      return folderPath.replace(/^.*[\\/]/, "");
+    }
+    return null;
+  }
+
+  /**
    * Transform a raw database row into a NormalizedGallery
    */
   private transformRow(row: any): NormalizedGallery {
@@ -681,7 +696,7 @@ class GalleryQueryBuilder {
 
     const gallery: any = {
       id: row.id,
-      title: row.title || null,
+      title: row.title || this.getGalleryFallbackTitle(row.folderPath, row.fileBasename),
       date: row.date || null,
       code: row.code || null,
       details: row.details || null,

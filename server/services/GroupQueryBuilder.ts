@@ -808,7 +808,7 @@ class GroupQueryBuilder {
 
     const galleriesById = new Map(galleries.map((g) => [g.id, {
       id: g.id,
-      title: g.title,
+      title: g.title || this.getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath),
     }]));
 
@@ -871,6 +871,19 @@ class GroupQueryBuilder {
       (group as any).performers = [...groupPerformerIds].map((id) => performersById.get(id)).filter(Boolean);
       (group as any).galleries = [...groupGalleryIds].map((id) => galleriesById.get(id)).filter(Boolean);
     }
+  }
+
+  /**
+   * Get fallback title from folder path or file basename
+   */
+  private getGalleryFallbackTitle(folderPath: string | null, fileBasename: string | null): string | null {
+    if (fileBasename) {
+      return fileBasename;
+    }
+    if (folderPath) {
+      return folderPath.replace(/^.*[\\/]/, "");
+    }
+    return null;
   }
 
   /**

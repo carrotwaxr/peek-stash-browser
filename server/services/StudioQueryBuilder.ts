@@ -643,7 +643,7 @@ class StudioQueryBuilder {
 
     const galleriesById = new Map(galleries.map((g) => [g.id, {
       id: g.id,
-      title: g.title,
+      title: g.title || this.getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath),
     }]));
 
@@ -696,6 +696,19 @@ class StudioQueryBuilder {
       (studio as any).groups = [...(groupsByStudio.get(studio.id) || [])].map((id) => groupsById.get(id)).filter(Boolean);
       (studio as any).galleries = [...(galleriesByStudio.get(studio.id) || [])].map((id) => galleriesById.get(id)).filter(Boolean);
     }
+  }
+
+  /**
+   * Get fallback title from folder path or file basename
+   */
+  private getGalleryFallbackTitle(folderPath: string | null, fileBasename: string | null): string | null {
+    if (fileBasename) {
+      return fileBasename;
+    }
+    if (folderPath) {
+      return folderPath.replace(/^.*[\\/]/, "");
+    }
+    return null;
   }
 
   /**

@@ -812,7 +812,7 @@ class TagQueryBuilder {
 
     const galleriesById = new Map(galleries.map((g) => [g.id, {
       id: g.id,
-      title: g.title,
+      title: g.title || this.getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath),
     }]));
 
@@ -873,6 +873,19 @@ class TagQueryBuilder {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Get fallback title from folder path or file basename
+   */
+  private getGalleryFallbackTitle(folderPath: string | null, fileBasename: string | null): string | null {
+    if (fileBasename) {
+      return fileBasename;
+    }
+    if (folderPath) {
+      return folderPath.replace(/^.*[\\/]/, "");
+    }
+    return null;
   }
 
   /**
