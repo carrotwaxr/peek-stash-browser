@@ -1,6 +1,8 @@
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard.jsx";
+import TooltipEntityGrid from "../ui/TooltipEntityGrid.jsx";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 
 /**
  * GroupCard - Card for displaying group/collection entities
@@ -21,40 +23,68 @@ const GroupCard = forwardRef(
       return null;
     })();
 
-    const indicators = [
-      {
-        type: "SCENES",
-        count: group.scene_count,
-        onClick:
-          group.scene_count > 0
-            ? () => navigate(`/scenes?groupIds=${group.id}`)
-            : undefined,
-      },
-      {
-        type: "GROUPS",
-        count: group.sub_group_count,
-        onClick:
-          group.sub_group_count > 0
-            ? () => navigate(`/collections?groupIds=${group.id}`)
-            : undefined,
-      },
-      {
-        type: "PERFORMERS",
-        count: group.performer_count,
-        onClick:
-          group.performer_count > 0
-            ? () => navigate(`/performers?groupIds=${group.id}`)
-            : undefined,
-      },
-      {
-        type: "TAGS",
-        count: group.tags?.length || 0,
-        onClick:
-          group.tags?.length > 0
-            ? () => navigate(`/tags?groupIds=${group.id}`)
-            : undefined,
-      },
-    ];
+    const indicators = useMemo(() => {
+      const tagsTooltip = getIndicatorBehavior('group', 'tags') === 'rich' &&
+        group.tags?.length > 0 && (
+          <TooltipEntityGrid entityType="tag" entities={group.tags} title="Tags" />
+        );
+
+      const performersTooltip = getIndicatorBehavior('group', 'performers') === 'rich' &&
+        group.performers?.length > 0 && (
+          <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" />
+        );
+
+      const galleriesTooltoip = getIndicatorBehavior('group', 'galleries') === 'rich' &&
+        group.galleries?.length > 0 && (
+          <TooltipEntityGrid entityType="gallery" entities={group.galleries} title="Galleries" />
+        );
+
+      return [
+        {
+          type: "SCENES",
+          count: group.scene_count,
+          onClick:
+            group.scene_count > 0
+              ? () => navigate(`/scenes?groupIds=${group.id}`)
+              : undefined,
+        },
+        {
+          type: "GROUPS",
+          count: group.sub_group_count,
+          onClick:
+            group.sub_group_count > 0
+              ? () => navigate(`/collections?groupIds=${group.id}`)
+              : undefined,
+        },
+        {
+          type: "PERFORMERS",
+          count: group.performers?.length || group.performer_count || 0,
+          tooltipContent: performersTooltip,
+          onClick:
+            (group.performers?.length || group.performer_count) > 0
+              ? () => navigate(`/performers?groupIds=${group.id}`)
+              : undefined,
+        },
+        {
+          type: "GALLERIES",
+          count: group.galleries?.length || 0,
+          tooltipContent: galleriesTooltoip,
+          onClick:
+            group.galleries?.length > 0
+              ? () => navigate(`/galleries?groupIds=${group.id}`)
+              : undefined,
+        },
+        {
+          type: "TAGS",
+          count: group.tags?.length || 0,
+          tooltipContent: tagsTooltip,
+          onClick:
+            group.tags?.length > 0
+              ? () => navigate(`/tags?groupIds=${group.id}`)
+              : undefined,
+        },
+      ];
+    }, [group, navigate]);
 
     return (
       <BaseCard
