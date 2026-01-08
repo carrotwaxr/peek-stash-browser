@@ -849,11 +849,11 @@ class GroupQueryBuilder {
     for (const group of groups) {
       group.tags = tagsByGroup.get(group.id) || [];
 
-      // Hydrate studio with full data
+      // Hydrate studio with tooltip data (id, name, image_path)
       if (group.studio?.id) {
-        const fullStudio = studiosById.get(group.studio.id);
-        if (fullStudio) {
-          group.studio = fullStudio;
+        const studioData = studiosById.get(group.studio.id);
+        if (studioData) {
+          (group as any).studio = studioData;
         }
       }
 
