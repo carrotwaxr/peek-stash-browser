@@ -148,9 +148,15 @@ const CardCountIndicator = ({
 
   // Use rich tooltipContent if provided, otherwise use simple label text
   const effectiveTooltip = tooltipContent || (label ? label(count) : null);
+  // Disable hover for rich tooltips (React elements), keep hover for simple text
+  const isRichTooltip = tooltipContent && typeof tooltipContent !== "string";
 
   return effectiveTooltip ? (
-    <Tooltip content={effectiveTooltip} clickable={!!tooltipContent}>
+    <Tooltip
+      content={effectiveTooltip}
+      clickable={!!tooltipContent}
+      hoverDisabled={isRichTooltip}
+    >
       {guts}
     </Tooltip>
   ) : (
