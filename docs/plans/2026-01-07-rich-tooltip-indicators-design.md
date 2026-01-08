@@ -112,7 +112,7 @@ export const INDICATOR_BEHAVIORS = {
 
   // StudioCard indicators
   studio: {
-    performers: 'rich',
+    performers: 'nav',    // Too many for tooltip preview
     tags: 'rich',
     studios: 'count',     // N/A - parent/child handled separately
     groups: 'rich',

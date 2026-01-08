@@ -24,7 +24,7 @@ const PerformerCard = forwardRef(
           <TooltipEntityGrid entityType="group" entities={performer.groups} title="Collections" />
         );
 
-      const galleriesTooltoip = getIndicatorBehavior('performer', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior('performer', 'galleries') === 'rich' &&
         performer.galleries?.length > 0 && (
           <TooltipEntityGrid entityType="gallery" entities={performer.galleries} title="Galleries" />
         );
@@ -55,7 +55,7 @@ const PerformerCard = forwardRef(
         {
           type: "GALLERIES",
           count: performer.galleries?.length || performer.gallery_count || 0,
-          tooltipContent: galleriesTooltoip,
+          tooltipContent: galleriesTooltip,
           onClick: (performer.galleries?.length || performer.gallery_count) > 0 ? () => navigate(`/galleries?performerId=${performer.id}`) : undefined,
         },
         {

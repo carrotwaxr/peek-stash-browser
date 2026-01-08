@@ -22,6 +22,37 @@ import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 import SceneDetails from "./SceneDetails.jsx";
+/**
+ * Tab button component for scene page relationship tabs
+ */
+const TabButton = ({ isActive, onClick, label, count }) => (
+  <button
+    onClick={onClick}
+    className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+    style={{
+      color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+      borderBottom: isActive ? '3px solid var(--accent-primary)' : '3px solid transparent',
+      backgroundColor: isActive ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+      cursor: isActive ? 'default' : 'pointer',
+    }}
+    disabled={isActive}
+  >
+    <span className="flex items-center gap-2">
+      <span>{label}</span>
+      {count > 0 && (
+        <span
+          className="text-xs font-semibold px-2 py-0.5 rounded-full"
+          style={{
+            backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+            color: isActive ? 'white' : 'var(--text-muted)',
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </span>
+  </button>
+);
 
 // Inner component that reads from context
 const SceneContent = ({ location }) => {
@@ -226,83 +257,27 @@ const SceneContent = ({ location }) => {
               }}
             >
               <div className="flex gap-1 min-w-full">
-                <button
+                <TabButton
+                  isActive={activeTab === 'similar'}
                   onClick={() => setActiveTab('similar')}
-                  className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                  style={{
-                    color: activeTab === 'similar' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                    borderBottom: activeTab === 'similar' ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                    backgroundColor: activeTab === 'similar' ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                    cursor: activeTab === 'similar' ? 'default' : 'pointer',
-                  }}
-                  disabled={activeTab === 'similar'}
-                >
-                  <span className="flex items-center gap-2">
-                    <span>Similar Scenes</span>
-                    {similarScenesCount > 0 && (
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: activeTab === 'similar' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                          color: activeTab === 'similar' ? 'white' : 'var(--text-muted)',
-                        }}
-                      >
-                        {similarScenesCount}
-                      </span>
-                    )}
-                  </span>
-                </button>
+                  label="Similar Scenes"
+                  count={similarScenesCount}
+                />
                 {scene.groups && scene.groups.length > 0 && (
-                  <button
+                  <TabButton
+                    isActive={activeTab === 'collections'}
                     onClick={() => setActiveTab('collections')}
-                    className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{
-                      color: activeTab === 'collections' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                      borderBottom: activeTab === 'collections' ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                      backgroundColor: activeTab === 'collections' ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                      cursor: activeTab === 'collections' ? 'default' : 'pointer',
-                    }}
-                    disabled={activeTab === 'collections'}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>Collections</span>
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: activeTab === 'collections' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                          color: activeTab === 'collections' ? 'white' : 'var(--text-muted)',
-                        }}
-                      >
-                        {scene.groups.length}
-                      </span>
-                    </span>
-                  </button>
+                    label="Collections"
+                    count={scene.groups.length}
+                  />
                 )}
                 {scene.galleries && scene.galleries.length > 0 && (
-                  <button
+                  <TabButton
+                    isActive={activeTab === 'galleries'}
                     onClick={() => setActiveTab('galleries')}
-                    className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{
-                      color: activeTab === 'galleries' ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                      borderBottom: activeTab === 'galleries' ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                      backgroundColor: activeTab === 'galleries' ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                      cursor: activeTab === 'galleries' ? 'default' : 'pointer',
-                    }}
-                    disabled={activeTab === 'galleries'}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>Galleries</span>
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{
-                          backgroundColor: activeTab === 'galleries' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                          color: activeTab === 'galleries' ? 'white' : 'var(--text-muted)',
-                        }}
-                      >
-                        {scene.galleries.length}
-                      </span>
-                    </span>
-                  </button>
+                    label="Galleries"
+                    count={scene.galleries.length}
+                  />
                 )}
               </div>
             </div>

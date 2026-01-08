@@ -34,7 +34,7 @@ const GroupCard = forwardRef(
           <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" />
         );
 
-      const galleriesTooltoip = getIndicatorBehavior('group', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior('group', 'galleries') === 'rich' &&
         group.galleries?.length > 0 && (
           <TooltipEntityGrid entityType="gallery" entities={group.galleries} title="Galleries" />
         );
@@ -68,7 +68,7 @@ const GroupCard = forwardRef(
         {
           type: "GALLERIES",
           count: group.galleries?.length || 0,
-          tooltipContent: galleriesTooltoip,
+          tooltipContent: galleriesTooltip,
           onClick:
             group.galleries?.length > 0
               ? () => navigate(`/galleries?groupIds=${group.id}`)

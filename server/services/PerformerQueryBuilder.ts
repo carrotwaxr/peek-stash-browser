@@ -8,6 +8,7 @@ import type { PeekPerformerFilter, NormalizedPerformer } from "../types/index.js
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
+import { getGalleryFallbackTitle } from "../utils/galleryUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -1112,7 +1113,7 @@ class PerformerQueryBuilder {
 
     const galleriesById = new Map(galleries.map((g) => [g.id, {
       id: g.id,
-      title: g.title || this.getGalleryFallbackTitle(g.folderPath, g.fileBasename),
+      title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath),
     }]));
 
@@ -1206,18 +1207,6 @@ class PerformerQueryBuilder {
     }
   }
 
-  /**
-   * Get fallback title from folder path or file basename
-   */
-  private getGalleryFallbackTitle(folderPath: string | null, fileBasename: string | null): string | null {
-    if (fileBasename) {
-      return fileBasename;
-    }
-    if (folderPath) {
-      return folderPath.replace(/^.*[\\/]/, "");
-    }
-    return null;
-  }
 
   /**
    * Transform a Stash URL/path to a proxy URL

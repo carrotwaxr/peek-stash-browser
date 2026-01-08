@@ -6,10 +6,14 @@
  *
  * Requirements:
  * - sceneWithRelations: A scene that has performers, tags, and a studio
- * - performerWithScenes: A performer that appears in multiple scenes
- * - studioWithScenes: A studio with multiple scenes
- * - tagWithEntities: A tag used on scenes, performers, or studios
- * - groupWithScenes: A group/collection containing scenes
+ * - performerWithScenes: A performer that appears in multiple scenes.
+ *   For rich tooltip tests, should also have tags, groups, galleries, and studios.
+ * - studioWithScenes: A studio with multiple scenes.
+ *   For rich tooltip tests, should also have tags, groups, galleries, and performers.
+ * - tagWithEntities: A tag used on scenes, performers, studios, groups, and galleries.
+ *   For rich tooltip tests, should have diverse entity associations.
+ * - groupWithScenes: A group/collection containing scenes.
+ *   For rich tooltip tests, should also have performers, tags, and galleries.
  * - sceneInGroup: A scene that belongs to groupWithScenes
  * - galleryWithImages: A gallery containing images
  * - galleryWithScenes: A gallery that has scenes linked to it (for scene filter tests)

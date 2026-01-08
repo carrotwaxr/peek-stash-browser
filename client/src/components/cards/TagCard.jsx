@@ -33,7 +33,7 @@ const TagCard = forwardRef(
           <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" />
         );
 
-      const galleriesTooltoip = getIndicatorBehavior('tag', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior('tag', 'galleries') === 'rich' &&
         tag.galleries?.length > 0 && (
           <TooltipEntityGrid entityType="gallery" entities={tag.galleries} title="Galleries" />
         );
@@ -59,7 +59,7 @@ const TagCard = forwardRef(
         {
           type: "GALLERIES",
           count: tag.galleries?.length || tag.gallery_count || 0,
-          tooltipContent: galleriesTooltoip,
+          tooltipContent: galleriesTooltip,
           onClick:
             (tag.galleries?.length || tag.gallery_count) > 0
               ? () => navigate(`/galleries?tagIds=${tag.id}`)

@@ -27,7 +27,7 @@ const StudioCard = forwardRef(
           <TooltipEntityGrid entityType="group" entities={studio.groups} title="Collections" />
         );
 
-      const galleriesTooltoip = getIndicatorBehavior('studio', 'galleries') === 'rich' &&
+      const galleriesTooltip = getIndicatorBehavior('studio', 'galleries') === 'rich' &&
         studio.galleries?.length > 0 && (
           <TooltipEntityGrid entityType="gallery" entities={studio.galleries} title="Galleries" />
         );
@@ -53,7 +53,7 @@ const StudioCard = forwardRef(
         {
           type: "GALLERIES",
           count: studio.galleries?.length || studio.gallery_count || 0,
-          tooltipContent: galleriesTooltoip,
+          tooltipContent: galleriesTooltip,
           onClick:
             (studio.galleries?.length || studio.gallery_count) > 0
               ? () => navigate(`/galleries?studioIds=${studio.id}`)
