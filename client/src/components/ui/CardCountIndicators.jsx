@@ -22,42 +22,52 @@ const CARD_COUNT_INDICATOR_TYPES = {
   O_COUNTER: {
     icon: LucideDroplets,
     iconColor: "var(--status-info)",
+    label: (count) => count === 1 ? "1 O" : `${count} O's`,
   },
   PLAY_COUNT: {
     icon: LucideEye,
     iconColor: hueify("var(--status-warning)", "lighter"),
+    label: (count) => count === 1 ? "Viewed 1 time" : `Viewed ${count} times`,
   },
   PERFORMERS: {
     icon: LucideUser,
     iconColor: "var(--accent-primary)",
+    label: (count) => count === 1 ? "1 performer" : `${count} performers`,
   },
   TAGS: {
     icon: LucideTag,
     iconColor: hueify("var(--status-info)", "darker"),
+    label: (count) => count === 1 ? "1 tag" : `${count} tags`,
   },
   SCENES: {
     icon: LucideClapperboard,
     iconColor: hueify("var(--accent-secondary)", "lighter"),
+    label: (count) => count === 1 ? "1 scene" : `${count} scenes`,
   },
   GROUPS: {
     icon: LucideFilm,
     iconColor: hueify("var(--accent-secondary)", "darker"),
+    label: (count) => count === 1 ? "1 collection" : `${count} collections`,
   },
   IMAGES: {
     icon: LucideImages,
     iconColor: hueify("var(--status-success)", "lighter"),
+    label: (count) => count === 1 ? "1 image" : `${count} images`,
   },
   GALLERIES: {
     icon: LucideGalleryVertical,
     iconColor: hueify("var(--status-success)", "darker"),
+    label: (count) => count === 1 ? "1 gallery" : `${count} galleries`,
   },
   PLAYLISTS: {
     icon: LucideList,
     iconColor: hueify("var(--status-warning)", "darker"),
+    label: (count) => count === 1 ? "1 playlist" : `${count} playlists`,
   },
   STUDIOS: {
     icon: LucideClapperboard,
     iconColor: hueify("var(--accent-secondary)", "lighter", 8),
+    label: (count) => count === 1 ? "1 studio" : `${count} studios`,
   },
 };
 
@@ -89,6 +99,7 @@ export const CardCountIndicators = ({
             iconSize={size}
             textSize={textSize}
             tooltipContent={indicator.tooltipContent}
+            label={knownIndicatorProps.label}
             onClick={indicator.onClick}
           />
         );
@@ -104,6 +115,7 @@ const CardCountIndicator = ({
   iconSize = 20,
   textSize = "sm",
   tooltipContent = null,
+  label = null,
   onClick = null,
 }) => {
   const Icon = icon;
@@ -134,8 +146,11 @@ const CardCountIndicator = ({
     </div>
   );
 
-  return tooltipContent ? (
-    <Tooltip content={tooltipContent} clickable={true}>
+  // Use rich tooltipContent if provided, otherwise use simple label text
+  const effectiveTooltip = tooltipContent || (label ? label(count) : null);
+
+  return effectiveTooltip ? (
+    <Tooltip content={effectiveTooltip} clickable={!!tooltipContent}>
       {guts}
     </Tooltip>
   ) : (

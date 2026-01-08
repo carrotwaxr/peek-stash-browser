@@ -57,7 +57,7 @@ export const INDICATOR_BEHAVIORS = {
     images: 'nav',
   },
   studio: {
-    performers: 'rich',
+    performers: 'nav',
     tags: 'rich',
     studios: 'count',
     groups: 'rich',
