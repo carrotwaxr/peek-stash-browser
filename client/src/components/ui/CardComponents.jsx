@@ -11,6 +11,7 @@ import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
 import Tooltip from "./Tooltip";
+import { ExpandableDescription } from "./ExpandableDescription.jsx";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard
@@ -353,44 +354,13 @@ export const CardTitle = ({
 };
 
 /**
- * Card description section with configurable line clamping and tooltips
+ * Card description section with expandable "more" link when truncated
  * @param {string} description - Description text
  * @param {number} maxLines - Maximum lines to display (default: 3)
  */
 export const CardDescription = ({ description, maxLines = 3 }) => {
-  const descriptionHeight = useMemo(() => {
-    return `${maxLines * 1.5}rem`; // ~1.5rem per line for text-sm with leading-relaxed
-  }, [maxLines]);
-
-  if (!description) {
-    // Return empty div with fixed height to preserve layout consistency
-    return (
-      <div
-        className="text-sm my-1 w-full"
-        style={{
-          height: descriptionHeight,
-        }}
-      />
-    );
-  }
-
   return (
-    <Tooltip content={description} disabled={description.length < 100}>
-      <p
-        className="text-sm my-1 w-full leading-relaxed"
-        style={{
-          color: "var(--text-muted)",
-          height: descriptionHeight,
-          display: "-webkit-box",
-          WebkitLineClamp: maxLines,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {description}
-      </p>
-    </Tooltip>
+    <ExpandableDescription description={description} maxLines={maxLines} />
   );
 };
 

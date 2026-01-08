@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CardOverlay, CardImage } from "../CardComponents";
+import { CardOverlay, CardImage, CardDescription } from "../CardComponents";
 
 describe("CardOverlay", () => {
   it("renders children in positioned overlay", () => {
@@ -86,5 +86,13 @@ describe("CardImage", () => {
     expect(funcString).toContain("aspectRatio");
     expect(funcString).toContain("entityType");
     expect(funcString).toContain("onClick");
+  });
+});
+
+describe("CardDescription", () => {
+  it("uses ExpandableDescription internally", () => {
+    // CardDescription should delegate to ExpandableDescription
+    const funcString = CardDescription.toString();
+    expect(funcString).toContain("ExpandableDescription");
   });
 });
