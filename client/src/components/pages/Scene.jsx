@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import {
   ScenePlayerProvider,
   useScenePlayer,
@@ -16,10 +17,42 @@ import {
   RecommendedSidebar,
   ScenesLikeThis,
 } from "../ui/index.js";
+import { GalleryGrid, GroupGrid } from "../grids/index.js";
 import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 import SceneDetails from "./SceneDetails.jsx";
+/**
+ * Tab button component for scene page relationship tabs
+ */
+const TabButton = ({ isActive, onClick, label, count }) => (
+  <button
+    onClick={onClick}
+    className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
+    style={{
+      color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
+      borderBottom: isActive ? '3px solid var(--accent-primary)' : '3px solid transparent',
+      backgroundColor: isActive ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+      cursor: isActive ? 'default' : 'pointer',
+    }}
+    disabled={isActive}
+  >
+    <span className="flex items-center gap-2">
+      <span>{label}</span>
+      {count > 0 && (
+        <span
+          className="text-xs font-semibold px-2 py-0.5 rounded-full"
+          style={{
+            backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+            color: isActive ? 'white' : 'var(--text-muted)',
+          }}
+        >
+          {count}
+        </span>
+      )}
+    </span>
+  </button>
+);
 
 // Inner component that reads from context
 const SceneContent = ({ location }) => {
@@ -41,6 +74,8 @@ const SceneContent = ({ location }) => {
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [sidebarHeight, setSidebarHeight] = useState(null);
+  const [activeTab, setActiveTab] = useState('similar');
+  const [similarScenesCount, setSimilarScenesCount] = useState(0);
 
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
@@ -51,6 +86,26 @@ const SceneContent = ({ location }) => {
       })
     );
   }, []); // Run once on mount
+
+  // Fetch similar scenes count for tab badge
+  useEffect(() => {
+    if (!scene?.id) return;
+
+    const fetchSimilarCount = async () => {
+      try {
+        const response = await axios.get(
+          `/api/library/scenes/${scene.id}/similar?page=1`,
+          { withCredentials: true }
+        );
+        setSimilarScenesCount(response.data.count || 0);
+      } catch (err) {
+        console.error("Error fetching similar scenes count:", err);
+        setSimilarScenesCount(0);
+      }
+    };
+
+    fetchSimilarCount();
+  }, [scene?.id]);
 
   // Measure left column height and sync to sidebar
   useEffect(() => {
@@ -190,8 +245,87 @@ const SceneContent = ({ location }) => {
           setShowTechnicalDetails={setShowTechnicalDetails}
         />
 
-        {/* Scenes Like This - lazy loaded */}
-        {scene && <ScenesLikeThis sceneId={scene.id} />}
+        {/* Tabbed Relationship Content */}
+        {scene && (
+          <div className="mt-6">
+            {/* Tab Navigation - Local state, no URL params */}
+            <div
+              className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-rounded"
+              style={{
+                borderBottom: '2px solid var(--bg-tertiary)',
+                marginBottom: '1.5rem',
+              }}
+            >
+              <div className="flex gap-1 min-w-full">
+                <TabButton
+                  isActive={activeTab === 'similar'}
+                  onClick={() => setActiveTab('similar')}
+                  label="Similar Scenes"
+                  count={similarScenesCount}
+                />
+                {scene.groups && scene.groups.length > 0 && (
+                  <TabButton
+                    isActive={activeTab === 'collections'}
+                    onClick={() => setActiveTab('collections')}
+                    label="Collections"
+                    count={scene.groups.length}
+                  />
+                )}
+                {scene.galleries && scene.galleries.length > 0 && (
+                  <TabButton
+                    isActive={activeTab === 'galleries'}
+                    onClick={() => setActiveTab('galleries')}
+                    label="Galleries"
+                    count={scene.galleries.length}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'similar' && (
+              <div className="mt-6">
+                <ScenesLikeThis sceneId={scene.id} />
+              </div>
+            )}
+
+            {activeTab === 'collections' && (
+              <div className="mt-6">
+                <GroupGrid
+                  lockedFilters={{
+                    group_filter: {
+                      scenes: {
+                        value: [parseInt(scene.id, 10)],
+                        modifier: "INCLUDES"
+                      }
+                    }
+                  }}
+                  hideLockedFilters
+                  syncToUrl={false}
+                  emptyMessage="No collections found for this scene"
+                />
+              </div>
+            )}
+
+            {activeTab === 'galleries' && (
+              <div className="mt-6">
+                <GalleryGrid
+                  lockedFilters={{
+                    gallery_filter: {
+                      scenes: {
+                        value: [parseInt(scene.id, 10)],
+                        modifier: "INCLUDES"
+                      }
+                    }
+                  }}
+                  hideLockedFilters
+                  syncToUrl={false}
+                  emptyMessage="No galleries found for this scene"
+                />
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

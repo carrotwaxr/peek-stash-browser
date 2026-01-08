@@ -116,6 +116,81 @@ describe("Scene API", () => {
       expect(response.data.findScenes.scenes.length).toBeGreaterThan(0);
     });
 
+    it("filters scenes by gallery with INCLUDES", async () => {
+      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
+        filter: {
+          per_page: 50,
+        },
+        scene_filter: {
+          galleries: {
+            value: [TEST_ENTITIES.galleryWithScenes],
+            modifier: "INCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes).toBeDefined();
+      // Verify the filter worked - should return scenes linked to this gallery
+      expect(response.data.findScenes.scenes.length).toBeGreaterThan(0);
+    });
+
+    it("filters scenes by gallery with EXCLUDES", async () => {
+      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
+        filter: {
+          per_page: 50,
+        },
+        scene_filter: {
+          galleries: {
+            value: [TEST_ENTITIES.galleryWithScenes],
+            modifier: "EXCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes).toBeDefined();
+      // Should return scenes NOT linked to this gallery
+    });
+
+    it("filters scenes by group/collection with INCLUDES", async () => {
+      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
+        filter: {
+          per_page: 50,
+        },
+        scene_filter: {
+          groups: {
+            value: [TEST_ENTITIES.groupWithScenes],
+            modifier: "INCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes).toBeDefined();
+      // Verify the filter worked - should return scenes linked to this group
+      expect(response.data.findScenes.scenes.length).toBeGreaterThan(0);
+    });
+
+    it("filters scenes by group/collection with EXCLUDES", async () => {
+      const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
+        filter: {
+          per_page: 50,
+        },
+        scene_filter: {
+          groups: {
+            value: [TEST_ENTITIES.groupWithScenes],
+            modifier: "EXCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findScenes).toBeDefined();
+      // Should return fewer scenes than total (excluding group scenes)
+      expect(response.data.findScenes.count).toBeLessThan(22282);
+    });
+
     it("respects per_page limit", async () => {
       const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
         filter: {

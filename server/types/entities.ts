@@ -135,12 +135,15 @@ export type NormalizedTag = Tag & {
  * Normalized Gallery
  *
  * Extends the base Gallery type from Stash with Peek-specific user data.
+ * Overrides cover to be a simple string URL (Peek proxies the cover image).
  *
- * Additional fields:
+ * Additional/modified fields:
+ * - cover: Proxied URL string (overrides base Image type)
  * - rating: User's 1-5 star rating (null if unrated)
  * - favorite: Whether user favorited this gallery
  */
-export type NormalizedGallery = Gallery & {
+export type NormalizedGallery = Omit<Gallery, "cover"> & {
+  cover: string | null;
   rating: number | null;
   favorite: boolean;
 };

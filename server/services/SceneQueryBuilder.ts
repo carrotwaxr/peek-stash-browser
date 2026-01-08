@@ -259,6 +259,48 @@ class SceneQueryBuilder {
   }
 
   /**
+   * Build galleries filter clause
+   */
+  private buildGalleriesFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `s.id IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        return {
+          sql: `s.id IN (
+            SELECT sceneId FROM SceneGallery
+            WHERE galleryId IN (${placeholders})
+            GROUP BY sceneId
+            HAVING COUNT(DISTINCT galleryId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `s.id NOT IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
    * Build favorite filter clause
    */
   private buildFavoriteFilter(favorite: boolean | undefined): FilterClause {
@@ -1158,9 +1200,16 @@ class SceneQueryBuilder {
     }
 
     if (filters?.groups) {
-      const groupFilter = this.buildGroupFilter(filters.groups);
+      const groupFilter = this.buildGroupFilter(filters.groups as any);
       if (groupFilter.sql) {
         whereClauses.push(groupFilter);
+      }
+    }
+
+    if (filters?.galleries) {
+      const galleriesFilter = this.buildGalleriesFilter(filters.galleries as any);
+      if (galleriesFilter.sql) {
+        whereClauses.push(galleriesFilter);
       }
     }
 
@@ -1723,10 +1772,12 @@ class SceneQueryBuilder {
   }
 
   private transformStashGallery(g: any): any {
+    const coverUrl = g.coverPath ? this.transformUrl(g.coverPath) : null;
     return {
       id: g.id,
       title: g.title,
-      cover: g.coverPath ? { paths: { thumbnail: this.transformUrl(g.coverPath) } } : null,
+      // Cover as simple string URL for consistency
+      cover: coverUrl,
     };
   }
 

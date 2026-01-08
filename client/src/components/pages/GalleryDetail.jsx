@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
@@ -7,6 +7,7 @@ import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
+import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
   FavoriteButton,
@@ -16,6 +17,7 @@ import {
   PageHeader,
   Pagination,
   RatingSlider,
+  TabNavigation,
   TagChips,
 } from "../ui/index.js";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
@@ -26,6 +28,7 @@ const GalleryDetail = () => {
   const { galleryId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [gallery, setGallery] = useState(null);
   const [images, setImages] = useState([]);
@@ -33,6 +36,9 @@ const GalleryDetail = () => {
   const [imagesLoading, setImagesLoading] = useState(true);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Get active tab from URL or default to 'images'
+  const activeTab = searchParams.get('tab') || 'images';
 
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
@@ -116,10 +122,7 @@ const GalleryDetail = () => {
     toggleFavorite,
   });
 
-  // Check if there's any sidebar content to display (tags moved to main content)
-  const hasSidebarContent =
-    gallery &&
-    ((gallery.scenes && gallery.scenes.length > 0) || gallery.details);
+  // No longer using sidebar - all content moved to main header area
 
   if (isLoading) {
     return (
@@ -224,7 +227,25 @@ const GalleryDetail = () => {
             />
           </div>
 
-          {/* Performers Row */}
+          {/* Details */}
+          {gallery.details && (
+            <div className="mt-6">
+              <h3
+                className="text-sm font-medium mb-3"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                Details
+              </h3>
+              <p
+                className="text-sm whitespace-pre-wrap"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {gallery.details}
+              </p>
+            </div>
+          )}
+
+          {/* Performers Row (kept for at-a-glance importance) */}
           {gallery.performers && gallery.performers.length > 0 && (
             <div className="mt-6">
               <h3
@@ -292,112 +313,98 @@ const GalleryDetail = () => {
           )}
         </div>
 
-        {/* Images Grid - Conditional sidebar layout */}
-        <div
-          className={
-            hasSidebarContent
-              ? "grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-6"
-              : "mb-6"
-          }
-        >
-          {/* Main Content - Images Grid (full width) */}
-          <div>
-            {/* Pagination - Top */}
-            {lightbox.totalPages > 1 && (
-              <div className="mb-4">
-                <Pagination
-                  currentPage={lightbox.currentPage}
-                  totalPages={lightbox.totalPages}
-                  onPageChange={lightbox.setCurrentPage}
-                />
-              </div>
-            )}
+        {/* Tabbed Content Section */}
+        <div className="mb-6">
+          <TabNavigation
+            tabs={[
+              { id: 'images', label: 'Images', count: totalCount || gallery.image_count || 0 },
+              { id: 'scenes', label: 'Scenes', count: gallery.scenes?.length || 0 },
+            ]}
+            defaultTab="images"
+          />
 
-            {imagesLoading ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                {[...Array(Math.min(PER_PAGE, gallery.image_count || 12))].map(
-                  (_, index) => (
-                    <div
-                      key={index}
-                      className="aspect-square rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                      }}
-                    />
-                  )
-                )}
-              </div>
-            ) : images.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                {images.map((image, index) => (
-                  <LazyImage
-                    key={image.id}
-                    src={image.paths?.thumbnail}
-                    alt={getImageTitle(image)}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      borderColor: "var(--border-color)",
-                    }}
-                    onClick={() => lightbox.openLightbox(index)}
+          {/* Images Tab */}
+          {activeTab === 'images' && (
+            <div className="mt-6">
+              {/* Pagination - Top */}
+              {lightbox.totalPages > 1 && (
+                <div className="mb-4">
+                  <Pagination
+                    currentPage={lightbox.currentPage}
+                    totalPages={lightbox.totalPages}
+                    onPageChange={lightbox.setCurrentPage}
                   />
-                ))}
-              </div>
-            ) : (
-              <div
-                className="text-center py-12"
-                style={{ color: "var(--text-muted)" }}
-              >
-                No images found in this gallery
-              </div>
-            )}
-
-            {/* Pagination - Bottom */}
-            {lightbox.totalPages > 1 && (
-              <div className="mt-4">
-                <Pagination
-                  currentPage={lightbox.currentPage}
-                  totalPages={lightbox.totalPages}
-                  onPageChange={lightbox.setCurrentPage}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Sidebar - Metadata (only render if there's content) */}
-          {hasSidebarContent && (
-            <aside className="space-y-4">
-              {/* Linked Scenes */}
-              {gallery.scenes && gallery.scenes.length > 0 && (
-                <Card title="Related Scenes">
-                  <div className="flex flex-col gap-2">
-                    {gallery.scenes.map((scene) => (
-                      <Button
-                        key={scene.id}
-                        variant="secondary"
-                        onClick={() => navigate(`/scene/${scene.id}`)}
-                        className="w-full text-left justify-start truncate"
-                        title={scene.title || `Scene ${scene.id}`}
-                      >
-                        {scene.title || `Scene ${scene.id}`}
-                      </Button>
-                    ))}
-                  </div>
-                </Card>
+                </div>
               )}
 
-              {/* Details */}
-              {gallery.details && (
-                <Card title="Details">
-                  <p
-                    className="text-sm whitespace-pre-wrap"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {gallery.details}
-                  </p>
-                </Card>
+              {imagesLoading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+                  {[...Array(Math.min(PER_PAGE, gallery.image_count || 12))].map(
+                    (_, index) => (
+                      <div
+                        key={index}
+                        className="aspect-square rounded-lg animate-pulse"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                        }}
+                      />
+                    )
+                  )}
+                </div>
+              ) : images.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
+                  {images.map((image, index) => (
+                    <LazyImage
+                      key={image.id}
+                      src={image.paths?.thumbnail}
+                      alt={getImageTitle(image)}
+                      className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        borderColor: "var(--border-color)",
+                      }}
+                      onClick={() => lightbox.openLightbox(index)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="text-center py-12"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  No images found in this gallery
+                </div>
               )}
-            </aside>
+
+              {/* Pagination - Bottom */}
+              {lightbox.totalPages > 1 && (
+                <div className="mt-4">
+                  <Pagination
+                    currentPage={lightbox.currentPage}
+                    totalPages={lightbox.totalPages}
+                    onPageChange={lightbox.setCurrentPage}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Scenes Tab */}
+          {activeTab === 'scenes' && (
+            <SceneSearch
+              context="gallery_scenes"
+              permanentFilters={{
+                galleries: {
+                  value: [parseInt(galleryId, 10)],
+                  modifier: "INCLUDES"
+                }
+              }}
+              permanentFiltersMetadata={{
+                galleries: [{ id: galleryId, title: galleryTitle(gallery) }]
+              }}
+              title={`Scenes in ${galleryTitle(gallery)}`}
+              captureReferrer={false}
+            />
           )}
         </div>
       </div>
@@ -416,29 +423,6 @@ const GalleryDetail = () => {
         onIndexChange={lightbox.onIndexChange}
         isPageTransitioning={lightbox.isPageTransitioning}
       />
-    </div>
-  );
-};
-
-// Reusable Card component
-const Card = ({ title, children }) => {
-  return (
-    <div
-      className="p-6 rounded-lg border"
-      style={{
-        backgroundColor: "var(--bg-card)",
-        borderColor: "var(--border-color)",
-      }}
-    >
-      {title && (
-        <h3
-          className="text-lg font-semibold mb-4"
-          style={{ color: "var(--text-primary)" }}
-        >
-          {title}
-        </h3>
-      )}
-      {children}
     </div>
   );
 };

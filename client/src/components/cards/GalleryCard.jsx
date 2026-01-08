@@ -47,12 +47,31 @@ const GalleryCard = forwardRef(
         />
       );
 
+    const scenesTooltip =
+      gallery.scenes &&
+      gallery.scenes.length > 0 && (
+        <TooltipEntityGrid
+          entityType="scene"
+          entities={gallery.scenes}
+          title="Scenes"
+        />
+      );
+
     const indicators = [
       {
         type: "IMAGES",
         count: gallery.image_count,
         tooltipContent:
           gallery.image_count === 1 ? "1 Image" : `${gallery.image_count} Images`,
+      },
+      {
+        type: "SCENES",
+        count: gallery.scenes?.length || 0,
+        tooltipContent: scenesTooltip,
+        onClick:
+          gallery.scenes?.length > 0
+            ? () => navigate(`/scenes?galleryId=${gallery.id}`)
+            : undefined,
       },
       {
         type: "PERFORMERS",
@@ -78,7 +97,7 @@ const GalleryCard = forwardRef(
       <BaseCard
         ref={ref}
         entityType="gallery"
-        imagePath={gallery.paths?.cover}
+        imagePath={gallery.cover}
         title={galleryTitle(gallery)}
         subtitle={subtitle}
         description={gallery.description}

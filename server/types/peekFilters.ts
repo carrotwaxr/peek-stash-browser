@@ -24,6 +24,8 @@ export type PeekSceneFilter = BaseSceneFilterType & {
   studio_favorite?: boolean;
   tag_favorite?: boolean;
   performer_favorite?: boolean;
+  groups?: { value: string[]; modifier?: string };
+  galleries?: { value: string[]; modifier?: string };
 };
 
 /**
@@ -51,6 +53,7 @@ export type PeekPerformerFilter = BasePerformerFilterType & {
   birthdate?: { value?: string; value2?: string; modifier?: string };
   death_date?: { value?: string; value2?: string; modifier?: string };
   penis_length?: { value?: number; value2?: number; modifier?: string };
+  scenes?: { value: string[]; modifier?: string };
 };
 
 /**
@@ -90,6 +93,7 @@ export type PeekTagFilter = BaseTagFilterType & {
 export type PeekGalleryFilter = BaseGalleryFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  scenes?: { value: string[]; modifier?: string };
 };
 
 /**
@@ -99,4 +103,5 @@ export type PeekGalleryFilter = BaseGalleryFilterType & {
 export type PeekGroupFilter = BaseGroupFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  scenes?: { value: string[]; modifier?: string };
 };

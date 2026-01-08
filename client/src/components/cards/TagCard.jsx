@@ -1,6 +1,8 @@
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard.jsx";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 
 /**
  * TagCard - Card for displaying tag entities
@@ -15,57 +17,83 @@ const TagCard = forwardRef(
         ? `${tag.child_count} subtag${tag.child_count !== 1 ? "s" : ""}`
         : null;
 
-    const indicators = [
-      { type: "PLAY_COUNT", count: tag.play_count },
-      {
-        type: "SCENES",
-        count: tag.scene_count,
-        onClick:
-          tag.scene_count > 0
-            ? () => navigate(`/scenes?tagIds=${tag.id}`)
-            : undefined,
-      },
-      {
-        type: "IMAGES",
-        count: tag.image_count,
-        onClick:
-          tag.image_count > 0
-            ? () => navigate(`/images?tagIds=${tag.id}`)
-            : undefined,
-      },
-      {
-        type: "GALLERIES",
-        count: tag.gallery_count,
-        onClick:
-          tag.gallery_count > 0
-            ? () => navigate(`/galleries?tagIds=${tag.id}`)
-            : undefined,
-      },
-      {
-        type: "GROUPS",
-        count: tag.group_count,
-        onClick:
-          tag.group_count > 0
-            ? () => navigate(`/collections?tagIds=${tag.id}`)
-            : undefined,
-      },
-      {
-        type: "STUDIOS",
-        count: tag.studio_count,
-        onClick:
-          tag.studio_count > 0
-            ? () => navigate(`/studios?tagIds=${tag.id}`)
-            : undefined,
-      },
-      {
-        type: "PERFORMERS",
-        count: tag.performer_count,
-        onClick:
-          tag.performer_count > 0
-            ? () => navigate(`/performers?tagIds=${tag.id}`)
-            : undefined,
-      },
-    ];
+    const indicators = useMemo(() => {
+      const performersTooltip = getIndicatorBehavior('tag', 'performers') === 'rich' &&
+        tag.performers?.length > 0 && (
+          <TooltipEntityGrid entityType="performer" entities={tag.performers} title="Performers" />
+        );
+
+      const studiosTooltip = getIndicatorBehavior('tag', 'studios') === 'rich' &&
+        tag.studios?.length > 0 && (
+          <TooltipEntityGrid entityType="studio" entities={tag.studios} title="Studios" />
+        );
+
+      const groupsTooltip = getIndicatorBehavior('tag', 'groups') === 'rich' &&
+        tag.groups?.length > 0 && (
+          <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" />
+        );
+
+      const galleriesTooltip = getIndicatorBehavior('tag', 'galleries') === 'rich' &&
+        tag.galleries?.length > 0 && (
+          <TooltipEntityGrid entityType="gallery" entities={tag.galleries} title="Galleries" />
+        );
+
+      return [
+        { type: "PLAY_COUNT", count: tag.play_count },
+        {
+          type: "SCENES",
+          count: tag.scene_count,
+          onClick:
+            tag.scene_count > 0
+              ? () => navigate(`/scenes?tagIds=${tag.id}`)
+              : undefined,
+        },
+        {
+          type: "IMAGES",
+          count: tag.image_count,
+          onClick:
+            tag.image_count > 0
+              ? () => navigate(`/images?tagIds=${tag.id}`)
+              : undefined,
+        },
+        {
+          type: "GALLERIES",
+          count: tag.galleries?.length || tag.gallery_count || 0,
+          tooltipContent: galleriesTooltip,
+          onClick:
+            (tag.galleries?.length || tag.gallery_count) > 0
+              ? () => navigate(`/galleries?tagIds=${tag.id}`)
+              : undefined,
+        },
+        {
+          type: "GROUPS",
+          count: tag.groups?.length || tag.group_count || 0,
+          tooltipContent: groupsTooltip,
+          onClick:
+            (tag.groups?.length || tag.group_count) > 0
+              ? () => navigate(`/collections?tagIds=${tag.id}`)
+              : undefined,
+        },
+        {
+          type: "STUDIOS",
+          count: tag.studios?.length || tag.studio_count || 0,
+          tooltipContent: studiosTooltip,
+          onClick:
+            (tag.studios?.length || tag.studio_count) > 0
+              ? () => navigate(`/studios?tagIds=${tag.id}`)
+              : undefined,
+        },
+        {
+          type: "PERFORMERS",
+          count: tag.performers?.length || tag.performer_count || 0,
+          tooltipContent: performersTooltip,
+          onClick:
+            (tag.performers?.length || tag.performer_count) > 0
+              ? () => navigate(`/performers?tagIds=${tag.id}`)
+              : undefined,
+        },
+      ];
+    }, [tag, navigate]);
 
     return (
       <BaseCard

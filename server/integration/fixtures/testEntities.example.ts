@@ -6,11 +6,17 @@
  *
  * Requirements:
  * - sceneWithRelations: A scene that has performers, tags, and a studio
- * - performerWithScenes: A performer that appears in multiple scenes
- * - studioWithScenes: A studio with multiple scenes
- * - tagWithEntities: A tag used on scenes, performers, or studios
- * - groupWithScenes: A group/collection containing scenes
+ * - performerWithScenes: A performer that appears in multiple scenes.
+ *   For rich tooltip tests, should also have tags, groups, galleries, and studios.
+ * - studioWithScenes: A studio with multiple scenes.
+ *   For rich tooltip tests, should also have tags, groups, galleries, and performers.
+ * - tagWithEntities: A tag used on scenes, performers, studios, groups, and galleries.
+ *   For rich tooltip tests, should have diverse entity associations.
+ * - groupWithScenes: A group/collection containing scenes.
+ *   For rich tooltip tests, should also have performers, tags, and galleries.
+ * - sceneInGroup: A scene that belongs to groupWithScenes
  * - galleryWithImages: A gallery containing images
+ * - galleryWithScenes: A gallery that has scenes linked to it (for scene filter tests)
  * - restrictableTag: A tag that can be used for content restriction tests
  * - galleryPerformerForInheritance: (Optional) A performer assigned to a gallery
  *   where the gallery's images do NOT have this performer directly assigned.
@@ -26,7 +32,9 @@ export const TEST_ENTITIES = {
   studioWithScenes: "REPLACE_WITH_STUDIO_ID",
   tagWithEntities: "REPLACE_WITH_TAG_ID",
   groupWithScenes: "REPLACE_WITH_GROUP_ID",
+  sceneInGroup: "REPLACE_WITH_SCENE_ID_IN_GROUP",
   galleryWithImages: "REPLACE_WITH_GALLERY_ID",
+  galleryWithScenes: "REPLACE_WITH_GALLERY_ID_WITH_SCENES",
   restrictableTag: "REPLACE_WITH_TAG_ID_FOR_RESTRICTIONS",
   galleryPerformerForInheritance: "", // Optional - leave empty to skip inheritance test
   imageWithGalleryInheritance: "", // Optional - image that inherits from gallery

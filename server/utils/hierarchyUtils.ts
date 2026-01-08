@@ -229,32 +229,40 @@ export async function hydrateTagRelationships<T extends { id: string; name?: str
 }
 
 /**
- * Hydrate entity tags with full tag data (id + name)
+ * Hydrate entity tags with full tag data (id, name, image_path)
  *
  * Entities store tagIds as JSON array of IDs. This function:
  * 1. Fetches all tags from cache
- * 2. Hydrates tag objects with names
+ * 2. Hydrates tag objects with names and image_path (preserving existing data)
  *
  * @param entities - Entities with tags array of {id} objects
- * @returns Entities with hydrated tags array of {id, name} objects
+ * @returns Entities with hydrated tags array of {id, name, image_path} objects
  */
-export async function hydrateEntityTags<T extends { tags?: { id: string; name?: string }[] }>(
+export async function hydrateEntityTags<T extends { tags?: { id: string; name?: string; image_path?: string | null }[] }>(
   entities: T[]
 ): Promise<T[]> {
-  // Get all tags to build name lookup
+  // Get all tags to build lookup
   const allTags = await stashEntityService.getAllTags();
-  const tagNameMap = new Map<string, string>();
+  const tagDataMap = new Map<string, { name: string; image_path: string | null }>();
   for (const tag of allTags) {
-    tagNameMap.set(tag.id, tag.name || "Unknown");
+    tagDataMap.set(tag.id, {
+      name: tag.name || "Unknown",
+      image_path: tag.image_path || null,
+    });
   }
 
-  // Hydrate each entity's tags
+  // Hydrate each entity's tags, preserving existing data
   return entities.map((entity) => ({
     ...entity,
-    tags: (entity.tags || []).map((t) => ({
-      id: t.id,
-      name: tagNameMap.get(t.id) || "Unknown",
-    })),
+    tags: (entity.tags || []).map((t) => {
+      const tagData = tagDataMap.get(t.id);
+      return {
+        ...t,
+        id: t.id,
+        name: tagData?.name || t.name || "Unknown",
+        image_path: t.image_path ?? tagData?.image_path ?? null,
+      };
+    }),
   }));
 }
 

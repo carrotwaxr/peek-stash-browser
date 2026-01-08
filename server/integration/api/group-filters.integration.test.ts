@@ -116,6 +116,46 @@ describe("Group Filters", () => {
     });
   });
 
+  describe("scenes filter", () => {
+    it("filters groups containing specific scene with INCLUDES", async () => {
+      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
+        filter: { per_page: 50 },
+        group_filter: {
+          scenes: {
+            value: [TEST_ENTITIES.sceneInGroup],
+            modifier: "INCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findGroups).toBeDefined();
+
+      // The group should be in the results
+      const groupIds = response.data.findGroups.groups.map(g => g.id);
+      expect(groupIds).toContain(TEST_ENTITIES.groupWithScenes);
+    });
+
+    it("filters groups excluding specific scene with EXCLUDES", async () => {
+      const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {
+        filter: { per_page: 50 },
+        group_filter: {
+          scenes: {
+            value: [TEST_ENTITIES.sceneInGroup],
+            modifier: "EXCLUDES",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findGroups).toBeDefined();
+
+      // The group should NOT be in the results
+      const groupIds = response.data.findGroups.groups.map(g => g.id);
+      expect(groupIds).not.toContain(TEST_ENTITIES.groupWithScenes);
+    });
+  });
+
   describe("performers filter", () => {
     it("filters groups containing scenes with performer", async () => {
       const response = await adminClient.post<FindGroupsResponse>("/api/library/groups", {

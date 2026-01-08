@@ -1140,6 +1140,7 @@ class StashEntityService {
       include: {
         performers: { include: { performer: true } },
         tags: { include: { tag: true } }, // Include full tag data
+        scenes: { include: { scene: true } },
       },
     });
 
@@ -1155,6 +1156,7 @@ class StashEntityService {
       include: {
         performers: { include: { performer: true } },
         tags: { include: { tag: true } },
+        scenes: { include: { scene: true } },
       },
     });
 
@@ -1186,6 +1188,7 @@ class StashEntityService {
       include: {
         performers: { include: { performer: true } },
         tags: { include: { tag: true } },
+        scenes: { include: { scene: true } },
       },
     });
 
@@ -1922,6 +1925,16 @@ class StashEntityService {
       image_path: this.transformUrl(gp.performer.imagePath),
     })) || [];
 
+    // Transform scenes from junction table
+    // Include minimal data for display (id, title, screenshot)
+    const scenes = gallery.scenes?.map((gs: any) => ({
+      id: gs.scene.id,
+      title: gs.scene.title,
+      paths: {
+        screenshot: this.transformUrl(gs.scene.pathScreenshot),
+      },
+    })) || [];
+
     // Build files array for frontend title fallback (zip galleries)
     const files = gallery.fileBasename ? [{ basename: gallery.fileBasename }] : [];
 
@@ -1939,13 +1952,14 @@ class StashEntityService {
       folder: gallery.folderPath ? { path: gallery.folderPath } : null,
       // Files array for frontend galleryTitle() fallback
       files,
-      cover: coverUrl ? { paths: { thumbnail: coverUrl } } : null,
-      // Frontend expects gallery.paths.cover for the cover image
-      paths: coverUrl ? { cover: coverUrl } : null,
+      // Cover as simple string URL for consistency
+      cover: coverUrl,
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
       // Performers from junction table
       performers,
+      // Scenes from junction table
+      scenes,
       created_at: gallery.stashCreatedAt?.toISOString() ?? null,
       updated_at: gallery.stashUpdatedAt?.toISOString() ?? null,
     } as unknown as NormalizedGallery;
@@ -1974,7 +1988,7 @@ class StashEntityService {
       details: ig.gallery.details,
       photographer: ig.gallery.photographer,
       urls: ig.gallery.urls ? JSON.parse(ig.gallery.urls) : [],
-      cover_path: this.transformUrl(ig.gallery.coverPath),
+      cover: this.transformUrl(ig.gallery.coverPath),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
       studio: ig.gallery.studio ? {

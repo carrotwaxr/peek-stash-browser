@@ -1,32 +1,7 @@
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
-import { Paper, SectionLink, TagChips, useLazyLoad } from "../ui/index.js";
+import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
-
-/**
- * LazyThumbnail - Lazy-loaded thumbnail for performer images
- */
-const LazyThumbnail = ({ src, alt, fallback, className }) => {
-  const [ref, shouldLoad] = useLazyLoad();
-
-  return (
-    <div
-      ref={ref}
-      className={className}
-      style={{ backgroundColor: "var(--bg-secondary)" }}
-    >
-      {shouldLoad && src ? (
-        <img src={src} alt={alt} className="w-full h-full object-cover" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <span className="text-2xl" style={{ color: "var(--text-muted)" }}>
-            {fallback}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";
@@ -210,7 +185,7 @@ const SceneDetails = ({
                   </p>
                 </div>
 
-                {/* Performers - Horizontal scrollable with 2/3 aspect ratio */}
+                {/* Performers - Horizontal scrollable with 2/3 aspect ratio (kept for at-a-glance importance) */}
                 {scene.performers && scene.performers.length > 0 && (
                   <div className="mb-6">
                     <h3
@@ -246,122 +221,47 @@ const SceneDetails = ({
                     </div>
                   </div>
                 )}
-
-                {/* Groups/Collections - Display as colored chips like tags */}
-                {scene.groups && scene.groups.length > 0 && (
-                  <div className="mb-6">
-                    <h3
-                      className="text-sm font-medium mb-3"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Collections
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {scene.groups.map((group) => {
-                        // Generate a color based on group ID for consistency
-                        const hue = (parseInt(group.id, 10) * 137.5) % 360;
-                        return (
-                          <div key={group.id} className="relative group/tooltip">
-                            <Link
-                              to={`/collection/${group.id}`}
-                              className="px-3 py-1 rounded-full text-sm transition-all duration-200 hover:opacity-80 font-medium inline-block"
-                              style={{
-                                backgroundColor: `hsl(${hue}, 70%, 45%)`,
-                                color: "white",
-                              }}
-                            >
-                              {group.name}
-                            </Link>
-                            {/* Tooltip with image and name on hover */}
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity duration-200 z-10">
-                              <div
-                                className="rounded-lg overflow-hidden shadow-lg"
-                                style={{
-                                  backgroundColor: "var(--bg-secondary)",
-                                  border: "1px solid var(--border-color)",
-                                  width: "120px",
-                                }}
-                              >
-                                <div
-                                  className="w-full overflow-hidden flex items-center justify-center"
-                                  style={{
-                                    backgroundColor: "var(--border-color)",
-                                    height: "180px",
-                                  }}
-                                >
-                                  {group.front_image_path || group.back_image_path ? (
-                                    <img
-                                      src={
-                                        group.front_image_path ||
-                                        group.back_image_path
-                                      }
-                                      alt={group.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <span
-                                      className="text-3xl"
-                                      style={{ color: "var(--text-secondary)" }}
-                                    >
-                                      🎬
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="px-2 py-2 text-center">
-                                  <span
-                                    className="text-xs font-medium line-clamp-2"
-                                    style={{ color: "var(--text-primary)" }}
-                                  >
-                                    {group.name}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Tags */}
-                {(() => {
-                  const allTags = mergeAllTags(scene);
-                  return (
-                    allTags.length > 0 && (
-                      <div>
-                        <h3
-                          className="text-sm font-medium mb-3"
-                          style={{ color: "var(--text-secondary)" }}
-                        >
-                          Tags
-                        </h3>
-                        <TagChips tags={allTags} />
-                      </div>
-                    )
-                  );
-                })()}
-
-                {/* URLs/Links */}
-                {scene.urls && scene.urls.length > 0 && (
-                  <div className="mt-6">
-                    <h3
-                      className="text-sm font-medium mb-3"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Links
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {scene.urls.map((url, index) => (
-                        <SectionLink key={index} url={url} />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </Paper.Body>
             )}
           </Paper>
         </div>
+
+        {/* Tags Section */}
+        <div>
+          <Paper>
+            <Paper.Header>
+              <Paper.Title>Tags</Paper.Title>
+            </Paper.Header>
+            <Paper.Body>
+              {(() => {
+                const allTags = mergeAllTags(scene);
+                return allTags.length > 0 ? (
+                  <TagChips tags={allTags} />
+                ) : (
+                  <p style={{ color: "var(--text-muted)" }}>No tags for this scene</p>
+                );
+              })()}
+            </Paper.Body>
+          </Paper>
+        </div>
+
+        {/* URLs/Links Section */}
+        {scene.urls && scene.urls.length > 0 && (
+          <div>
+            <Paper>
+              <Paper.Header>
+                <Paper.Title>Links</Paper.Title>
+              </Paper.Header>
+              <Paper.Body>
+                <div className="flex flex-wrap gap-2">
+                  {scene.urls.map((url, index) => (
+                    <SectionLink key={index} url={url} />
+                  ))}
+                </div>
+              </Paper.Body>
+            </Paper>
+          </div>
+        )}
 
         {/* Technical details - inline with primary details */}
         <div>

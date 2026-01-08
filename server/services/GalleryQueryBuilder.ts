@@ -8,6 +8,7 @@ import type { PeekGalleryFilter, NormalizedGallery } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
+import { getGalleryFallbackTitle } from "../utils/galleryUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -166,6 +167,56 @@ class GalleryQueryBuilder {
       case "EXCLUDES":
         return {
           sql: `(g.studioId IS NULL OR g.studioId NOT IN (${placeholders}))`,
+          params: ids,
+        };
+
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
+  /**
+   * Build scenes filter clause
+   * Filter galleries by scenes they contain
+   */
+  private buildScenesFilter(
+    filter: { value?: string[] | null; modifier?: string | null } | undefined | null
+  ): FilterClause {
+    if (!filter || !filter.value || filter.value.length === 0) {
+      return { sql: "", params: [] };
+    }
+
+    const { value: ids, modifier = "INCLUDES" } = filter;
+    const placeholders = ids.map(() => "?").join(", ");
+
+    // Galleries contain scenes via SceneGallery junction table
+    switch (modifier) {
+      case "INCLUDES":
+        return {
+          sql: `g.id IN (
+            SELECT sg.galleryId FROM SceneGallery sg
+            WHERE sg.sceneId IN (${placeholders})
+          )`,
+          params: ids,
+        };
+
+      case "INCLUDES_ALL":
+        return {
+          sql: `g.id IN (
+            SELECT sg.galleryId FROM SceneGallery sg
+            WHERE sg.sceneId IN (${placeholders})
+            GROUP BY sg.galleryId
+            HAVING COUNT(DISTINCT sg.sceneId) = ?
+          )`,
+          params: [...ids, ids.length],
+        };
+
+      case "EXCLUDES":
+        return {
+          sql: `g.id NOT IN (
+            SELECT sg.galleryId FROM SceneGallery sg
+            WHERE sg.sceneId IN (${placeholders})
+          )`,
           params: ids,
         };
 
@@ -458,6 +509,14 @@ class GalleryQueryBuilder {
       }
     }
 
+    // Scenes filter
+    if (filters?.scenes) {
+      const scenesFilter = this.buildScenesFilter(filters.scenes as any);
+      if (scenesFilter.sql) {
+        whereClauses.push(scenesFilter);
+      }
+    }
+
     // Performer filter
     if (filters?.performers) {
       const performerFilter = this.buildPerformerFilter(filters.performers as any);
@@ -607,6 +666,7 @@ class GalleryQueryBuilder {
     return { galleries, total };
   }
 
+
   /**
    * Transform a raw database row into a NormalizedGallery
    */
@@ -623,7 +683,7 @@ class GalleryQueryBuilder {
 
     const gallery: any = {
       id: row.id,
-      title: row.title || null,
+      title: row.title || getGalleryFallbackTitle(row.folderPath, row.fileBasename),
       date: row.date || null,
       code: row.code || null,
       details: row.details || null,

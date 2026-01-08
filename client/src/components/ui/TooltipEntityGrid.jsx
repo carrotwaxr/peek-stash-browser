@@ -50,7 +50,7 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
       return entity.front_image_path || entity.back_image_path;
     }
     if (entityType === "gallery") {
-      return entity.cover_path;
+      return entity.cover;
     }
     return entity.image_path;
   };
