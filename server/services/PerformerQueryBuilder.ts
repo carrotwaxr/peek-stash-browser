@@ -1029,14 +1029,19 @@ class PerformerQueryBuilder {
     const performerIds = performers.map((p) => p.id);
 
     // Load all junctions in parallel
-    const [tagJunctions, scenePerformers] = await Promise.all([
+    const [tagJunctions, scenePerformers, galleryPerformers] = await Promise.all([
       prisma.performerTag.findMany({
         where: { performerId: { in: performerIds } },
       }),
-      // Get scenes this performer appears in to derive groups, galleries, studios
+      // Get scenes this performer appears in to derive groups, studios
       prisma.scenePerformer.findMany({
         where: { performerId: { in: performerIds } },
         select: { performerId: true, sceneId: true },
+      }),
+      // Get galleries this performer appears in directly
+      prisma.galleryPerformer.findMany({
+        where: { performerId: { in: performerIds } },
+        select: { performerId: true, galleryId: true },
       }),
     ]);
 
@@ -1068,7 +1073,12 @@ class PerformerQueryBuilder {
     // Get unique entity IDs
     const tagIds = [...new Set(tagJunctions.map((j) => j.tagId))];
     const groupIds = [...new Set(sceneGroups.map((sg) => sg.groupId))];
-    const galleryIds = [...new Set(sceneGalleries.map((sg) => sg.galleryId))];
+    // Galleries come from direct performer-gallery association (galleryPerformers)
+    // plus any scene-gallery associations (sceneGalleries)
+    const galleryIds = [...new Set([
+      ...galleryPerformers.map((gp) => gp.galleryId),
+      ...sceneGalleries.map((sg) => sg.galleryId),
+    ])];
     const studioIds = [...new Set(scenes.map((s) => s.studioId).filter((id): id is string => !!id))];
 
     // Load all entities in parallel
@@ -1150,23 +1160,32 @@ class PerformerQueryBuilder {
       tagsByPerformer.set(junction.performerId, list);
     }
 
+    // Build performer -> galleries map from direct GalleryPerformer junction
+    const galleriesByPerformer = new Map<string, Set<string>>();
+    for (const gp of galleryPerformers) {
+      const set = galleriesByPerformer.get(gp.performerId) || new Set();
+      set.add(gp.galleryId);
+      galleriesByPerformer.set(gp.performerId, set);
+    }
+
     // Populate performers with all relations
     for (const performer of performers) {
       performer.tags = tagsByPerformer.get(performer.id) || [];
 
-      // Derive groups, galleries, studios from performer's scenes
+      // Derive groups and studios from performer's scenes
       const performerSceneIds = scenesByPerformer.get(performer.id) || new Set();
 
       const performerGroupIds = new Set<string>();
-      const performerGalleryIds = new Set<string>();
       const performerStudioIds = new Set<string>();
 
       for (const sceneId of performerSceneIds) {
         for (const gid of groupsByScene.get(sceneId) || []) performerGroupIds.add(gid);
-        for (const gid of galleriesByScene.get(sceneId) || []) performerGalleryIds.add(gid);
         const sid = studioByScene.get(sceneId);
         if (sid) performerStudioIds.add(sid);
       }
+
+      // Galleries come from direct GalleryPerformer association
+      const performerGalleryIds = galleriesByPerformer.get(performer.id) || new Set();
 
       (performer as any).groups = [...performerGroupIds].map((id) => groupsById.get(id)).filter(Boolean);
       (performer as any).galleries = [...performerGalleryIds].map((id) => galleriesById.get(id)).filter(Boolean);

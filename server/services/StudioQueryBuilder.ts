@@ -574,8 +574,8 @@ class StudioQueryBuilder {
 
     const studioIds = studios.map((s) => s.id);
 
-    // Load tag junctions and scenes for this studio
-    const [tagJunctions, scenes] = await Promise.all([
+    // Load tag junctions, scenes, and galleries for this studio
+    const [tagJunctions, scenes, studioGalleries] = await Promise.all([
       prisma.studioTag.findMany({
         where: { studioId: { in: studioIds } },
       }),
@@ -583,12 +583,17 @@ class StudioQueryBuilder {
         where: { studioId: { in: studioIds } },
         select: { id: true, studioId: true },
       }),
+      // Galleries have studioId directly
+      prisma.stashGallery.findMany({
+        where: { studioId: { in: studioIds } },
+        select: { id: true, studioId: true },
+      }),
     ]);
 
     const sceneIds = scenes.map((s) => s.id);
 
-    // Load scene relationships
-    const [scenePerformers, sceneGroups, sceneGalleries] = await Promise.all([
+    // Load scene relationships for performers and groups
+    const [scenePerformers, sceneGroups] = await Promise.all([
       sceneIds.length > 0
         ? prisma.scenePerformer.findMany({
             where: { sceneId: { in: sceneIds } },
@@ -601,19 +606,13 @@ class StudioQueryBuilder {
             select: { sceneId: true, groupId: true },
           })
         : [],
-      sceneIds.length > 0
-        ? prisma.sceneGallery.findMany({
-            where: { sceneId: { in: sceneIds } },
-            select: { sceneId: true, galleryId: true },
-          })
-        : [],
     ]);
 
     // Get unique entity IDs
     const tagIds = [...new Set(tagJunctions.map((j) => j.tagId))];
     const performerIds = [...new Set(scenePerformers.map((sp) => sp.performerId))];
     const groupIds = [...new Set(sceneGroups.map((sg) => sg.groupId))];
-    const galleryIds = [...new Set(sceneGalleries.map((sg) => sg.galleryId))];
+    const galleryIds = [...new Set(studioGalleries.map((sg) => sg.id))];
 
     // Load all entities in parallel
     const [tags, performers, groups, galleries] = await Promise.all([
@@ -664,7 +663,6 @@ class StudioQueryBuilder {
     // Build studio -> entities maps from scenes
     const performersByStudio = new Map<string, Set<string>>();
     const groupsByStudio = new Map<string, Set<string>>();
-    const galleriesByStudio = new Map<string, Set<string>>();
 
     for (const sp of scenePerformers) {
       const studioId = studioByScene.get(sp.sceneId);
@@ -682,12 +680,13 @@ class StudioQueryBuilder {
       groupsByStudio.set(studioId, set);
     }
 
-    for (const sg of sceneGalleries) {
-      const studioId = studioByScene.get(sg.sceneId);
-      if (!studioId) continue;
-      const set = galleriesByStudio.get(studioId) || new Set();
-      set.add(sg.galleryId);
-      galleriesByStudio.set(studioId, set);
+    // Build studio -> galleries map from direct studio-gallery relationship
+    const galleriesByStudio = new Map<string, Set<string>>();
+    for (const g of studioGalleries) {
+      if (!g.studioId) continue;
+      const set = galleriesByStudio.get(g.studioId) || new Set();
+      set.add(g.id);
+      galleriesByStudio.set(g.studioId, set);
     }
 
     // Populate studios
