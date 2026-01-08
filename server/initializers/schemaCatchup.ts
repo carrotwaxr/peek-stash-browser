@@ -30,18 +30,20 @@
  */
 
 import { exec } from "child_process";
-import { existsSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import path from "path";
 import { promisify } from "util";
 import { logger } from "../utils/logger.js";
 
 const execAsync = promisify(exec);
+const TMP_DIR = "/app/data/tmp";
 
 /**
  * Execute a SQLite query and return the result
  */
 async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
-  const tmpFile = path.join("/app/data/tmp", `sql_${Date.now()}.sql`);
+  mkdirSync(TMP_DIR, { recursive: true });
+  const tmpFile = path.join(TMP_DIR, `sql_${Date.now()}.sql`);
   try {
     writeFileSync(tmpFile, sql);
     const { stdout } = await execAsync(`sqlite3 "${dbPath}" < "${tmpFile}" 2>/dev/null || true`);
