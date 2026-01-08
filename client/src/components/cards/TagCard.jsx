@@ -1,7 +1,7 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard.jsx";
-import TooltipEntityGrid from "../ui/TooltipEntityGrid.jsx";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 
 /**
