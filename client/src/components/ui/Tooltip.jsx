@@ -208,6 +208,7 @@ const Tooltip = ({
   };
 
   const handleMouseLeave = () => {
+    if (hoverDisabled) return;
     // Delay hiding to allow mouse to enter tooltip
     hideTimeoutRef.current = setTimeout(() => {
       setIsVisible(false);
@@ -223,6 +224,7 @@ const Tooltip = ({
   };
 
   const handleTooltipMouseLeave = () => {
+    if (hoverDisabled) return;
     // Hide when mouse leaves tooltip
     setIsVisible(false);
   };
