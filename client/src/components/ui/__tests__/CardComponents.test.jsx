@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { CardOverlay, CardImage, CardDescription } from "../CardComponents";
+import { CardOverlay, CardImage, CardDescription, CardTitle } from "../CardComponents";
 
 describe("CardOverlay", () => {
   it("renders children in positioned overlay", () => {
@@ -113,5 +113,42 @@ describe("CardDescription", () => {
     // CardDescription should delegate to ExpandableDescription
     const funcString = CardDescription.toString();
     expect(funcString).toContain("ExpandableDescription");
+  });
+});
+
+describe("CardTitle", () => {
+  it("calls onClickOverride when clicking title Link", () => {
+    const onClickOverride = vi.fn((e) => e.preventDefault());
+
+    render(
+      <MemoryRouter>
+        <CardTitle
+          title="Test Title"
+          linkTo="/scene/1"
+          onClickOverride={onClickOverride}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByText("Test Title"));
+    expect(onClickOverride).toHaveBeenCalled();
+  });
+
+  it("calls onClickOverride when clicking subtitle Link", () => {
+    const onClickOverride = vi.fn((e) => e.preventDefault());
+
+    render(
+      <MemoryRouter>
+        <CardTitle
+          title="Test Title"
+          subtitle="Test Subtitle"
+          linkTo="/scene/1"
+          onClickOverride={onClickOverride}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByText("Test Subtitle"));
+    expect(onClickOverride).toHaveBeenCalled();
   });
 });

@@ -312,6 +312,7 @@ export const CardOverlay = ({ position = "bottom-left", children, className = ""
  * @param {number} maxTitleLines - Maximum lines for title (default: 1)
  * @param {string} [linkTo] - Navigation link URL
  * @param {string} [referrerUrl] - Referrer URL for navigation state
+ * @param {Function} [onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 export const CardTitle = ({
   title,
@@ -320,6 +321,7 @@ export const CardTitle = ({
   maxTitleLines = 1,
   linkTo,
   referrerUrl,
+  onClickOverride,
 }) => {
   // Calculate fixed height based on line count
   // Each line is approximately 1.25rem (20px) with leading-tight
@@ -353,6 +355,7 @@ export const CardTitle = ({
       to={linkTo}
       state={{ referrerUrl }}
       className="block hover:underline cursor-pointer"
+      onClick={onClickOverride}
     >
       {titleElement}
     </Link>
@@ -384,6 +387,7 @@ export const CardTitle = ({
       to={linkTo}
       state={{ referrerUrl }}
       className="block cursor-pointer"
+      onClick={onClickOverride}
     >
       {subtitleElement}
     </Link>
