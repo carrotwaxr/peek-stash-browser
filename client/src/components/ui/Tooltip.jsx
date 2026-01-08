@@ -12,7 +12,6 @@ const Tooltip = ({
   className = "",
   disabled = false,
   clickable = false, // Enable click-to-open mode for mobile
-  // eslint-disable-next-line no-unused-vars -- Will be implemented in Task 2
   hoverDisabled = false, // Disable hover trigger (useful when parent handles interaction)
 }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -199,6 +198,7 @@ const Tooltip = ({
   }
 
   const handleMouseEnter = () => {
+    if (hoverDisabled) return;
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);

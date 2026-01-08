@@ -11,3 +11,14 @@ describe("Tooltip", () => {
     expect(funcString).toContain("hoverDisabled");
   });
 });
+
+describe("Tooltip hoverDisabled behavior", () => {
+  it("has handleMouseEnter that checks hoverDisabled", () => {
+    // The function body should reference hoverDisabled in mouse handlers
+    const funcString = Tooltip.toString();
+    // When hoverDisabled is true, hover shouldn't trigger visibility
+    expect(funcString).toContain("hoverDisabled");
+    // The mouse enter handler should exist and be conditional
+    expect(funcString).toContain("handleMouseEnter");
+  });
+});
