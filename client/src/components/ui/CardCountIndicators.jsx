@@ -122,11 +122,11 @@ const CardCountIndicator = ({
 
   const guts = (
     <div
-      className={`flex items-center gap-1 ${onClick ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
+      className={`flex items-center gap-1 hover:scale-110 transition-transform ${onClick ? 'cursor-pointer' : ''}`}
       onClick={(e) => {
         if (onClick) {
-          e.stopPropagation(); // Prevent card click
-          e.preventDefault(); // Prevent link navigation
+          e.stopPropagation();
+          e.preventDefault();
           onClick(e);
         }
       }}

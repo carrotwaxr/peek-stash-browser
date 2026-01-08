@@ -5,6 +5,11 @@ import { useTruncationDetection } from "../../hooks/useTruncationDetection";
 /**
  * Description text with inline "...more" link when truncated
  * Clicking "more" opens a popover with full description
+ *
+ * Uses a float-based technique to position "more" inline with the last line of text:
+ * - A floated spacer element reserves space in the bottom-right corner
+ * - The "more" button is positioned absolutely over that reserved space
+ * - This ensures "more" appears at the end of the text regardless of line count
  */
 export const ExpandableDescription = ({ description, maxLines = 3 }) => {
   const [ref, isTruncated] = useTruncationDetection();
@@ -40,27 +45,45 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
     setIsExpanded(false);
   };
 
-  // Handle click outside
+  // Handle click outside - stop propagation to prevent card navigation
   const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      handleClose();
-    }
+    e.stopPropagation();
+    e.preventDefault();
+    handleClose();
   };
 
   return (
     <>
-      <div className="relative w-full my-1" style={{ height: descriptionHeight }}>
+      <div
+        className="relative w-full my-1 overflow-hidden"
+        style={{ height: descriptionHeight }}
+      >
+        {/*
+          Float-based inline "more" technique:
+          1. Floated spacer creates empty space at bottom-right
+          2. Text flows around it naturally
+          3. "more" button positioned over the spacer
+        */}
+        {isTruncated && (
+          <span
+            style={{
+              float: "right",
+              width: "4rem",
+              height: descriptionHeight,
+              // Shape-outside creates space only on the last line
+              shapeOutside: `inset(calc(${descriptionHeight} - 1.5rem) 0 0 0)`,
+            }}
+          />
+        )}
         <p
           ref={ref}
-          className="text-sm leading-relaxed"
+          className="text-sm leading-relaxed m-0"
           style={{
             color: "var(--text-muted)",
-            height: descriptionHeight,
             display: "-webkit-box",
             WebkitLineClamp: maxLines,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            textOverflow: "ellipsis",
           }}
         >
           {description}
@@ -68,10 +91,15 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
         {isTruncated && (
           <button
             onClick={handleMoreClick}
-            className="absolute bottom-0 right-0 text-sm px-1 hover:underline"
+            className="absolute text-sm hover:underline"
             style={{
               color: "var(--accent-primary)",
               backgroundColor: "var(--bg-card)",
+              bottom: 0,
+              right: 0,
+              paddingLeft: "0.5rem",
+              // Gradient fade from transparent to bg-card for smooth transition
+              background: "linear-gradient(to right, transparent, var(--bg-card) 30%)",
             }}
           >
             ...more
