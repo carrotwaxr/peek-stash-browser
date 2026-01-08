@@ -20,10 +20,7 @@ export const wereMigrationsApplied = (): boolean => migrationsApplied;
  * Execute a SQLite query and return the result
  */
 async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
-  const tmpFile = path.join(
-    process.env.TMP_DIR || "/tmp",
-    `sql_${Date.now()}.sql`
-  );
+  const tmpFile = path.join("/app/data/tmp", `sql_${Date.now()}.sql`);
   try {
     writeFileSync(tmpFile, sql);
     const { stdout } = await execAsync(
@@ -82,9 +79,8 @@ export const initializeDatabase = async (): Promise<void> => {
     "/app/data/peek-stash-browser.db";
 
   try {
-    // Generate Prisma client
-    logger.info("Generating Prisma client");
-    await execAsync("npx prisma generate");
+    // Prisma client is pre-generated in Docker build or by start.sh
+    // No need to regenerate here
 
     // Handle legacy databases that need schema catchup
     // See schemaCatchup.ts for details on why this is needed

@@ -42,7 +42,6 @@ These settings have sensible defaults but can be customized:
 | -------------------- | -------------------------- | -------------------------------------- | ---------------------------- |
 | `DATABASE_URL`       | SQLite database file       | `file:/app/data/peek-stash-browser.db` | Path inside container        |
 | `CONFIG_DIR`         | App data directory         | `/app/data`                            | Database + HLS cache         |
-| `TMP_DIR`            | Transcoding temp directory | `/app/tmp`                             | Needs fast I/O               |
 | `NODE_ENV`           | Environment mode           | `production`                           | `development` or `production`|
 | `PROXY_AUTH_HEADER`  | Proxy Auth Header          |                                        | Disabled by default          |
 
