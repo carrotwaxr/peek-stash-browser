@@ -1,5 +1,4 @@
 import { forwardRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { galleryTitle } from "../../utils/gallery.js";
@@ -9,7 +8,6 @@ import { galleryTitle } from "../../utils/gallery.js";
  */
 const GalleryCard = forwardRef(
   ({ gallery, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
-    const navigate = useNavigate();
 
     // Build subtitle from studio and date
     const galleryDate = gallery.date
@@ -68,28 +66,16 @@ const GalleryCard = forwardRef(
         type: "SCENES",
         count: gallery.scenes?.length || 0,
         tooltipContent: scenesTooltip,
-        onClick:
-          gallery.scenes?.length > 0
-            ? () => navigate(`/scenes?galleryId=${gallery.id}`)
-            : undefined,
       },
       {
         type: "PERFORMERS",
         count: gallery.performers?.length || 0,
         tooltipContent: performersTooltip,
-        onClick:
-          gallery.performers?.length > 0
-            ? () => navigate(`/performers?galleryId=${gallery.id}`)
-            : undefined,
       },
       {
         type: "TAGS",
         count: gallery.tags?.length || 0,
         tooltipContent: tagsTooltip,
-        onClick:
-          gallery.tags?.length > 0
-            ? () => navigate(`/tags?galleryId=${gallery.id}`)
-            : undefined,
       },
     ];
 

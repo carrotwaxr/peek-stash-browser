@@ -60,28 +60,16 @@ const GroupCard = forwardRef(
           type: "PERFORMERS",
           count: group.performers?.length || group.performer_count || 0,
           tooltipContent: performersTooltip,
-          onClick:
-            (group.performers?.length || group.performer_count) > 0
-              ? () => navigate(`/performers?groupIds=${group.id}`)
-              : undefined,
         },
         {
           type: "GALLERIES",
           count: group.galleries?.length || 0,
           tooltipContent: galleriesTooltip,
-          onClick:
-            group.galleries?.length > 0
-              ? () => navigate(`/galleries?groupIds=${group.id}`)
-              : undefined,
         },
         {
           type: "TAGS",
           count: group.tags?.length || 0,
           tooltipContent: tagsTooltip,
-          onClick:
-            group.tags?.length > 0
-              ? () => navigate(`/tags?groupIds=${group.id}`)
-              : undefined,
         },
       ];
     }, [group, navigate]);

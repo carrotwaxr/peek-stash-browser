@@ -60,37 +60,21 @@ const TagCard = forwardRef(
           type: "GALLERIES",
           count: tag.galleries?.length || tag.gallery_count || 0,
           tooltipContent: galleriesTooltip,
-          onClick:
-            (tag.galleries?.length || tag.gallery_count) > 0
-              ? () => navigate(`/galleries?tagIds=${tag.id}`)
-              : undefined,
         },
         {
           type: "GROUPS",
           count: tag.groups?.length || tag.group_count || 0,
           tooltipContent: groupsTooltip,
-          onClick:
-            (tag.groups?.length || tag.group_count) > 0
-              ? () => navigate(`/collections?tagIds=${tag.id}`)
-              : undefined,
         },
         {
           type: "STUDIOS",
           count: tag.studios?.length || tag.studio_count || 0,
           tooltipContent: studiosTooltip,
-          onClick:
-            (tag.studios?.length || tag.studio_count) > 0
-              ? () => navigate(`/studios?tagIds=${tag.id}`)
-              : undefined,
         },
         {
           type: "PERFORMERS",
           count: tag.performers?.length || tag.performer_count || 0,
           tooltipContent: performersTooltip,
-          onClick:
-            (tag.performers?.length || tag.performer_count) > 0
-              ? () => navigate(`/performers?tagIds=${tag.id}`)
-              : undefined,
         },
       ];
     }, [tag, navigate]);
