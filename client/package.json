@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "@testing-library/react": "^16.3.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.0",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
