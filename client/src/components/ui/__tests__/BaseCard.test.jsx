@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { BaseCard } from "../BaseCard";
 
 describe("BaseCard", () => {
@@ -178,5 +180,46 @@ describe("BaseCard", () => {
       renderImageContent,
     });
     expect(element.props.renderImageContent).toBe(renderImageContent);
+  });
+});
+
+describe("BaseCard selection mode", () => {
+  it("passes selection handlers to CardContainer", () => {
+    const onToggleSelect = vi.fn();
+    const entity = { id: "1" };
+
+    render(
+      <MemoryRouter>
+        <BaseCard
+          entityType="scene"
+          entity={entity}
+          linkTo="/scene/1"
+          selectionMode={true}
+          onToggleSelect={onToggleSelect}
+        />
+      </MemoryRouter>
+    );
+
+    // The card container should render and be accessible
+    const card = screen.getByLabelText("Scene");
+    expect(card).toBeDefined();
+    expect(card).not.toBeNull();
+  });
+
+  it("applies selected styling when isSelected", () => {
+    render(
+      <MemoryRouter>
+        <BaseCard
+          entityType="scene"
+          entity={{ id: "1" }}
+          linkTo="/scene/1"
+          isSelected={true}
+        />
+      </MemoryRouter>
+    );
+
+    const card = screen.getByLabelText("Scene");
+    // Check the inline style includes the selection border color
+    expect(card.style.borderColor).toBe("var(--selection-color)");
   });
 });

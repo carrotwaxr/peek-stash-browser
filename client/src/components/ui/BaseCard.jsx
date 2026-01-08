@@ -1,5 +1,7 @@
 import { forwardRef } from "react";
 import { useEntityImageAspectRatio } from "../../hooks/useEntityImageAspectRatio.js";
+import { useCardSelection } from "../../hooks/useCardSelection.js";
+import { useCardKeyboardNav } from "../../hooks/useCardKeyboardNav.js";
 import {
   CardContainer,
   CardDescription,
@@ -18,11 +20,17 @@ export const BaseCard = forwardRef(
     {
       // Data
       entityType,
+      entity, // NEW: for selection callbacks
       imagePath,
       title,
       subtitle,
       description,
       linkTo,
+
+      // Selection mode (NEW)
+      selectionMode = false,
+      isSelected = false,
+      onToggleSelect,
 
       // Indicators & Rating
       indicators = [],
@@ -49,11 +57,25 @@ export const BaseCard = forwardRef(
       referrerUrl,
       tabIndex,
       style,
+      onFocus,
       ...rest
     },
     ref
   ) => {
     const aspectRatio = useEntityImageAspectRatio(entityType);
+
+    // Selection hook
+    const { selectionHandlers, handleNavigationClick } = useCardSelection({
+      entity,
+      selectionMode,
+      onToggleSelect,
+    });
+
+    // Keyboard navigation hook
+    const { onKeyDown } = useCardKeyboardNav({
+      linkTo,
+      onCustomAction: selectionMode ? () => onToggleSelect?.(entity) : undefined,
+    });
 
     // Merge display preferences with explicit props (props take precedence)
     // When hideDescription is explicitly true, respect it
@@ -62,25 +84,37 @@ export const BaseCard = forwardRef(
       ? false
       : (displayPreferences.showDescription ?? true);
 
+    // Selection styling
+    const selectionStyle = isSelected
+      ? {
+          borderColor: "var(--selection-color)",
+          borderWidth: "2px",
+        }
+      : {};
+
     return (
       <CardContainer
         ref={ref}
         entityType={entityType}
-        linkTo={linkTo}
         onClick={onClick}
-        referrerUrl={referrerUrl}
         className={className}
         tabIndex={tabIndex}
-        style={style}
+        style={{ ...style, ...selectionStyle }}
+        onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        {...selectionHandlers}
         {...rest}
       >
-        {/* Image Section */}
+        {/* Image Section - navigable when linkTo provided */}
         <CardImage
           src={imagePath}
           alt={typeof title === "string" ? title : ""}
           aspectRatio={aspectRatio}
           entityType={entityType}
           objectFit={objectFit}
+          linkTo={linkTo}
+          referrerUrl={referrerUrl}
+          onClickOverride={handleNavigationClick}
         >
           {/* Custom image content (e.g., sprite preview) */}
           {renderImageContent?.()}
@@ -88,11 +122,14 @@ export const BaseCard = forwardRef(
           {renderOverlay?.()}
         </CardImage>
 
-        {/* Title Section */}
+        {/* Title Section - navigable when linkTo provided */}
         <CardTitle
           title={title}
           subtitle={hideSubtitle ? null : subtitle}
           maxTitleLines={maxTitleLines}
+          linkTo={linkTo}
+          referrerUrl={referrerUrl}
+          onClickOverride={handleNavigationClick}
         />
 
         {/* After Title Slot (e.g., gender icon) */}
