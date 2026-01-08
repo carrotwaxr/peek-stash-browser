@@ -41,7 +41,7 @@ const execAsync = promisify(exec);
  * Execute a SQLite query and return the result
  */
 async function sqliteQuery(dbPath: string, sql: string): Promise<string> {
-  const tmpFile = path.join(process.env.TMP_DIR || "/tmp", `sql_${Date.now()}.sql`);
+  const tmpFile = path.join("/app/data/tmp", `sql_${Date.now()}.sql`);
   try {
     writeFileSync(tmpFile, sql);
     const { stdout } = await execAsync(`sqlite3 "${dbPath}" < "${tmpFile}" 2>/dev/null || true`);
