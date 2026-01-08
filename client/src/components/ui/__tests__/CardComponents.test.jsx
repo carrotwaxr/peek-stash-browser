@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { CardOverlay, CardImage } from "../CardComponents";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { CardOverlay, CardImage, CardDescription, CardTitle } from "../CardComponents";
 
 describe("CardOverlay", () => {
   it("renders children in positioned overlay", () => {
@@ -86,5 +88,67 @@ describe("CardImage", () => {
     expect(funcString).toContain("aspectRatio");
     expect(funcString).toContain("entityType");
     expect(funcString).toContain("onClick");
+  });
+
+  it("calls onClickOverride when clicking Link", () => {
+    const onClickOverride = vi.fn((e) => e.preventDefault());
+
+    render(
+      <MemoryRouter>
+        <CardImage
+          src="/test.jpg"
+          linkTo="/scene/1"
+          onClickOverride={onClickOverride}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("link"));
+    expect(onClickOverride).toHaveBeenCalled();
+  });
+});
+
+describe("CardDescription", () => {
+  it("uses ExpandableDescription internally", () => {
+    // CardDescription should delegate to ExpandableDescription
+    const funcString = CardDescription.toString();
+    expect(funcString).toContain("ExpandableDescription");
+  });
+});
+
+describe("CardTitle", () => {
+  it("calls onClickOverride when clicking title Link", () => {
+    const onClickOverride = vi.fn((e) => e.preventDefault());
+
+    render(
+      <MemoryRouter>
+        <CardTitle
+          title="Test Title"
+          linkTo="/scene/1"
+          onClickOverride={onClickOverride}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByText("Test Title"));
+    expect(onClickOverride).toHaveBeenCalled();
+  });
+
+  it("calls onClickOverride when clicking subtitle Link", () => {
+    const onClickOverride = vi.fn((e) => e.preventDefault());
+
+    render(
+      <MemoryRouter>
+        <CardTitle
+          title="Test Title"
+          subtitle="Test Subtitle"
+          linkTo="/scene/1"
+          onClickOverride={onClickOverride}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByText("Test Subtitle"));
+    expect(onClickOverride).toHaveBeenCalled();
   });
 });

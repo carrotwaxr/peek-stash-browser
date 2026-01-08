@@ -11,6 +11,7 @@ import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
 import Tooltip from "./Tooltip";
+import { ExpandableDescription } from "./ExpandableDescription.jsx";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard
@@ -25,33 +26,20 @@ export const CardContainer = forwardRef(
       children,
       className = "",
       entityType = "card",
-      linkTo,
       onClick,
-      referrerUrl,
       style = {},
       ...others
     },
     ref
   ) => {
-    const WrapperElement = linkTo ? Link : "div";
     const entityDisplayType =
       entityType.charAt(0).toUpperCase() + entityType.slice(1);
 
-    const wrapperProps = linkTo
-      ? {
-          to: linkTo,
-          state: { referrerUrl },
-        }
-      : {
-          onClick,
-        };
-
     return (
-      <WrapperElement
+      <div
         aria-label={`${entityDisplayType}`}
-        className={`flex flex-col items-center justify-between rounded-lg border p-2 hover:shadow-lg hover:scale-[1.02] transition-all cursor-pointer focus:outline-none ${className}`}
+        className={`flex flex-col items-center justify-between rounded-lg border p-2 hover:shadow-lg hover:scale-[1.02] transition-all focus:outline-none ${className}`}
         ref={ref}
-        role="button"
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
@@ -59,11 +47,11 @@ export const CardContainer = forwardRef(
           maxHeight: "36rem", // 576px
           ...style,
         }}
-        {...wrapperProps}
+        onClick={onClick}
         {...others}
       >
         {children}
-      </WrapperElement>
+      </div>
     );
   }
 );
@@ -82,6 +70,9 @@ CardContainer.displayName = "CardContainer";
  * @param {string} [props.className] - Additional CSS classes
  * @param {Object} [props.style] - Additional inline styles
  * @param {Function} [props.onClick] - Click handler
+ * @param {string} [props.linkTo] - Navigation link URL
+ * @param {string} [props.referrerUrl] - Referrer URL for navigation state
+ * @param {Function} [props.onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 export const CardImage = ({
   src,
@@ -93,6 +84,9 @@ export const CardImage = ({
   className = "",
   style = {},
   onClick,
+  linkTo,
+  referrerUrl,
+  onClickOverride,
 }) => {
   const [ref, isVisible] = useLazyLoad();
   const [hasError, setHasError] = useState(false);
@@ -126,17 +120,8 @@ export const CardImage = ({
     return icons[entityType] || icons.default;
   };
 
-  return (
-    <div
-      ref={ref}
-      className={`w-full mb-3 overflow-hidden rounded-lg relative ${className}`}
-      style={{
-        aspectRatio,
-        backgroundColor: "var(--bg-secondary)",
-        ...style,
-      }}
-      onClick={onClick}
-    >
+  const imageContent = (
+    <>
       {showPlaceholder ? (
         <div
           className="absolute inset-0 flex items-center justify-center"
@@ -168,6 +153,42 @@ export const CardImage = ({
           )}
         </>
       )}
+    </>
+  );
+
+  const containerClasses = `w-full mb-3 overflow-hidden rounded-lg relative ${linkTo ? 'cursor-pointer' : ''} ${className}`;
+  const containerStyle = {
+    aspectRatio,
+    backgroundColor: "var(--bg-secondary)",
+    ...style,
+  };
+
+  // If linkTo provided, wrap in Link; otherwise use div with onClick
+  if (linkTo) {
+    return (
+      <Link
+        ref={ref}
+        to={linkTo}
+        state={{ referrerUrl }}
+        className={containerClasses}
+        style={containerStyle}
+        onClick={onClickOverride}
+      >
+        {imageContent}
+        {/* Children rendered as overlay */}
+        {children}
+      </Link>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={containerClasses}
+      style={containerStyle}
+      onClick={onClick}
+    >
+      {imageContent}
       {/* Children rendered as overlay */}
       {children}
     </div>
@@ -289,12 +310,18 @@ export const CardOverlay = ({ position = "bottom-left", children, className = ""
  * @param {string} subtitle - Optional subtitle
  * @param {boolean} hideSubtitle - Whether to hide subtitle (default: false)
  * @param {number} maxTitleLines - Maximum lines for title (default: 1)
+ * @param {string} [linkTo] - Navigation link URL
+ * @param {string} [referrerUrl] - Referrer URL for navigation state
+ * @param {Function} [onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 export const CardTitle = ({
   title,
   subtitle,
   hideSubtitle = false,
   maxTitleLines = 1,
+  linkTo,
+  referrerUrl,
+  onClickOverride,
 }) => {
   // Calculate fixed height based on line count
   // Each line is approximately 1.25rem (20px) with leading-tight
@@ -322,75 +349,74 @@ export const CardTitle = ({
     </h3>
   );
 
+  // Wrap in Link if linkTo provided
+  const titleContent = linkTo ? (
+    <Link
+      to={linkTo}
+      state={{ referrerUrl }}
+      className="block hover:underline cursor-pointer"
+      onClick={onClickOverride}
+    >
+      {titleElement}
+    </Link>
+  ) : (
+    titleElement
+  );
+
+  // Subtitle also becomes a link if linkTo provided
+  const subtitleElement = !hideSubtitle && (
+    <h4
+      className="text-sm leading-tight text-center"
+      style={{
+        color: "var(--text-muted)",
+        height: "1.25rem", // Always reserve space for subtitle
+        display: "-webkit-box",
+        WebkitLineClamp: 1,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+      }}
+      title={subtitle}
+    >
+      {subtitle}
+    </h4>
+  );
+
+  const subtitleContent = linkTo && subtitleElement ? (
+    <Link
+      to={linkTo}
+      state={{ referrerUrl }}
+      className="block cursor-pointer"
+      onClick={onClickOverride}
+    >
+      {subtitleElement}
+    </Link>
+  ) : (
+    subtitleElement
+  );
+
   return (
     <div className="w-full text-center mb-2">
       {titleIsString ? (
         <Tooltip content={title} disabled={!title || title.length < 30}>
-          {titleElement}
+          {titleContent}
         </Tooltip>
       ) : (
-        titleElement
+        titleContent
       )}
-      {!hideSubtitle && (
-        <h4
-          className="text-sm leading-tight text-center"
-          style={{
-            color: "var(--text-muted)",
-            height: "1.25rem", // Always reserve space for subtitle
-            display: "-webkit-box",
-            WebkitLineClamp: 1,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-          title={subtitle}
-        >
-          {subtitle}
-        </h4>
-      )}
+      {subtitleContent}
     </div>
   );
 };
 
 /**
- * Card description section with configurable line clamping and tooltips
+ * Card description section with expandable "more" link when truncated
  * @param {string} description - Description text
  * @param {number} maxLines - Maximum lines to display (default: 3)
  */
 export const CardDescription = ({ description, maxLines = 3 }) => {
-  const descriptionHeight = useMemo(() => {
-    return `${maxLines * 1.5}rem`; // ~1.5rem per line for text-sm with leading-relaxed
-  }, [maxLines]);
-
-  if (!description) {
-    // Return empty div with fixed height to preserve layout consistency
-    return (
-      <div
-        className="text-sm my-1 w-full"
-        style={{
-          height: descriptionHeight,
-        }}
-      />
-    );
-  }
-
   return (
-    <Tooltip content={description} disabled={description.length < 100}>
-      <p
-        className="text-sm my-1 w-full leading-relaxed"
-        style={{
-          color: "var(--text-muted)",
-          height: descriptionHeight,
-          display: "-webkit-box",
-          WebkitLineClamp: maxLines,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {description}
-      </p>
-    </Tooltip>
+    <ExpandableDescription description={description} maxLines={maxLines} />
   );
 };
 

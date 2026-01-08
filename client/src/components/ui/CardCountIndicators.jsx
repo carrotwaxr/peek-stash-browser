@@ -122,11 +122,11 @@ const CardCountIndicator = ({
 
   const guts = (
     <div
-      className={`flex items-center gap-1 ${onClick ? 'cursor-pointer hover:opacity-70 transition-opacity' : ''}`}
+      className={`flex items-center gap-1 hover:scale-110 transition-transform ${onClick ? 'cursor-pointer' : ''}`}
       onClick={(e) => {
         if (onClick) {
-          e.stopPropagation(); // Prevent card click
-          e.preventDefault(); // Prevent link navigation
+          e.stopPropagation();
+          e.preventDefault();
           onClick(e);
         }
       }}
@@ -148,9 +148,15 @@ const CardCountIndicator = ({
 
   // Use rich tooltipContent if provided, otherwise use simple label text
   const effectiveTooltip = tooltipContent || (label ? label(count) : null);
+  // Disable hover for rich tooltips (React elements), keep hover for simple text
+  const isRichTooltip = tooltipContent && typeof tooltipContent !== "string";
 
   return effectiveTooltip ? (
-    <Tooltip content={effectiveTooltip} clickable={!!tooltipContent}>
+    <Tooltip
+      content={effectiveTooltip}
+      clickable={!!tooltipContent}
+      hoverDisabled={isRichTooltip}
+    >
       {guts}
     </Tooltip>
   ) : (

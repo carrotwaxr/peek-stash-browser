@@ -54,37 +54,21 @@ const StudioCard = forwardRef(
           type: "GALLERIES",
           count: studio.galleries?.length || studio.gallery_count || 0,
           tooltipContent: galleriesTooltip,
-          onClick:
-            (studio.galleries?.length || studio.gallery_count) > 0
-              ? () => navigate(`/galleries?studioIds=${studio.id}`)
-              : undefined,
         },
         {
           type: "GROUPS",
           count: studio.groups?.length || studio.group_count || 0,
           tooltipContent: groupsTooltip,
-          onClick:
-            (studio.groups?.length || studio.group_count) > 0
-              ? () => navigate(`/collections?studioId=${studio.id}`)
-              : undefined,
         },
         {
           type: "PERFORMERS",
           count: studio.performers?.length || studio.performer_count || 0,
           tooltipContent: performersTooltip,
-          onClick:
-            (studio.performers?.length || studio.performer_count) > 0
-              ? () => navigate(`/performers?studioId=${studio.id}`)
-              : undefined,
         },
         {
           type: "TAGS",
           count: studio.tags?.length || 0,
           tooltipContent: tagsTooltip,
-          onClick:
-            studio.tags?.length > 0
-              ? () => navigate(`/tags?studioId=${studio.id}`)
-              : undefined,
         },
       ];
     }, [studio, navigate]);

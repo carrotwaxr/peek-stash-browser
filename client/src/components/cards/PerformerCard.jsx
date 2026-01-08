@@ -45,7 +45,6 @@ const PerformerCard = forwardRef(
           type: "GROUPS",
           count: performer.groups?.length || performer.group_count || 0,
           tooltipContent: groupsTooltip,
-          onClick: (performer.groups?.length || performer.group_count) > 0 ? () => navigate(`/collections?performerId=${performer.id}`) : undefined,
         },
         {
           type: "IMAGES",
@@ -56,19 +55,16 @@ const PerformerCard = forwardRef(
           type: "GALLERIES",
           count: performer.galleries?.length || performer.gallery_count || 0,
           tooltipContent: galleriesTooltip,
-          onClick: (performer.galleries?.length || performer.gallery_count) > 0 ? () => navigate(`/galleries?performerId=${performer.id}`) : undefined,
         },
         {
           type: "TAGS",
           count: performer.tags?.length || 0,
           tooltipContent: tagsTooltip,
-          onClick: performer.tags?.length > 0 ? () => navigate(`/tags?performerId=${performer.id}`) : undefined,
         },
         {
           type: "STUDIOS",
           count: performer.studios?.length || 0,
           tooltipContent: studiosTooltip,
-          onClick: performer.studios?.length > 0 ? () => navigate(`/studios?performerId=${performer.id}`) : undefined,
         },
       ];
     }, [performer, navigate]);

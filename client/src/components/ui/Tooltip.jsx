@@ -12,6 +12,7 @@ const Tooltip = ({
   className = "",
   disabled = false,
   clickable = false, // Enable click-to-open mode for mobile
+  hoverDisabled = false, // Disable hover trigger (useful when parent handles interaction)
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({
@@ -197,6 +198,7 @@ const Tooltip = ({
   }
 
   const handleMouseEnter = () => {
+    if (hoverDisabled) return;
     // Clear any pending hide timeout
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
@@ -206,6 +208,7 @@ const Tooltip = ({
   };
 
   const handleMouseLeave = () => {
+    if (hoverDisabled) return;
     // Delay hiding to allow mouse to enter tooltip
     hideTimeoutRef.current = setTimeout(() => {
       setIsVisible(false);
@@ -221,6 +224,7 @@ const Tooltip = ({
   };
 
   const handleTooltipMouseLeave = () => {
+    if (hoverDisabled) return;
     // Hide when mouse leaves tooltip
     setIsVisible(false);
   };
