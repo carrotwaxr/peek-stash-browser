@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
@@ -19,7 +19,6 @@ import {
 const Tags = () => {
   usePageTitle("Tags");
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
@@ -115,7 +114,7 @@ const Tags = () => {
                     <TagCard
                       key={tag.id}
                       tag={tag}
-                      referrerUrl={`${location.pathname}${location.search}`}
+                      fromPageTitle="Tags"
                       tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       {...itemProps}
                     />

@@ -27,7 +27,7 @@ describe("PerformerCard", () => {
   it("accepts expected props", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
-      referrerUrl: "/performers",
+      fromPageTitle: "Performers",
       tabIndex: 0,
     });
 
@@ -63,13 +63,13 @@ describe("PerformerCard", () => {
     expect(performer.play_count).toBe(15);
   });
 
-  it("accepts referrerUrl prop", () => {
+  it("accepts fromPageTitle prop", () => {
     const element = createElement(PerformerCard, {
       performer: mockPerformer,
-      referrerUrl: "/performers",
+      fromPageTitle: "Performers",
     });
 
-    expect(element.props.referrerUrl).toBe("/performers");
+    expect(element.props.fromPageTitle).toBe("Performers");
   });
 
   it("accepts tabIndex prop", () => {

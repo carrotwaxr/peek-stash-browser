@@ -24,7 +24,7 @@ describe("GalleryCard", () => {
   it("accepts expected props", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
-      referrerUrl: "/galleries",
+      fromPageTitle: "Galleries",
       tabIndex: 0,
     });
 
@@ -59,13 +59,13 @@ describe("GalleryCard", () => {
     expect(gallery.studio.name).toBe("Test Studio");
   });
 
-  it("accepts referrerUrl prop", () => {
+  it("accepts fromPageTitle prop", () => {
     const element = createElement(GalleryCard, {
       gallery: mockGallery,
-      referrerUrl: "/galleries",
+      fromPageTitle: "Galleries",
     });
 
-    expect(element.props.referrerUrl).toBe("/galleries");
+    expect(element.props.fromPageTitle).toBe("Galleries");
   });
 
   it("accepts tabIndex prop", () => {

@@ -25,7 +25,7 @@ describe("GroupCard", () => {
   it("accepts expected props", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
-      referrerUrl: "/collections",
+      fromPageTitle: "Collections",
       tabIndex: 0,
     });
 
@@ -60,13 +60,13 @@ describe("GroupCard", () => {
     expect(group.sub_group_count).toBe(3);
   });
 
-  it("accepts referrerUrl prop", () => {
+  it("accepts fromPageTitle prop", () => {
     const element = createElement(GroupCard, {
       group: mockGroup,
-      referrerUrl: "/collections",
+      fromPageTitle: "Collections",
     });
 
-    expect(element.props.referrerUrl).toBe("/collections");
+    expect(element.props.fromPageTitle).toBe("Collections");
   });
 
   it("accepts tabIndex prop", () => {

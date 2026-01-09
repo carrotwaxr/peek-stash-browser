@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
@@ -19,7 +19,6 @@ import {
 const Performers = () => {
   usePageTitle("Performers");
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
@@ -140,7 +139,7 @@ const Performers = () => {
                       key={performer.id}
                       performer={performer}
                       isTVMode={isTVMode}
-                      referrerUrl={`${location.pathname}${location.search}`}
+                      fromPageTitle="Performers"
                       {...itemProps}
                     />
                   );

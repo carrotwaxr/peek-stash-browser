@@ -22,7 +22,7 @@ describe("StudioCard", () => {
   it("accepts expected props", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
-      referrerUrl: "/studios",
+      fromPageTitle: "Studios",
       tabIndex: 0,
     });
 
@@ -57,13 +57,13 @@ describe("StudioCard", () => {
     expect(studio.details).toBe("Studio description");
   });
 
-  it("accepts referrerUrl prop", () => {
+  it("accepts fromPageTitle prop", () => {
     const element = createElement(StudioCard, {
       studio: mockStudio,
-      referrerUrl: "/studios",
+      fromPageTitle: "Studios",
     });
 
-    expect(element.props.referrerUrl).toBe("/studios");
+    expect(element.props.fromPageTitle).toBe("Studios");
   });
 
   it("accepts tabIndex prop", () => {

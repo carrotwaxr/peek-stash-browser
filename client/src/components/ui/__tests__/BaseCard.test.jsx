@@ -146,12 +146,12 @@ describe("BaseCard", () => {
     expect(element.props.maxDescriptionLines).toBe(5);
   });
 
-  it("accepts referrerUrl prop", () => {
+  it("accepts fromPageTitle prop", () => {
     const element = createElement(BaseCard, {
       ...defaultProps,
-      referrerUrl: "/previous-page",
+      fromPageTitle: "Galleries",
     });
-    expect(element.props.referrerUrl).toBe("/previous-page");
+    expect(element.props.fromPageTitle).toBe("Galleries");
   });
 
   it("accepts tabIndex prop", () => {
