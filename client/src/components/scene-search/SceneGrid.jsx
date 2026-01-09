@@ -22,6 +22,7 @@ const SceneGrid = ({
   onPageChange,
   onSceneClick,
   onHideSuccess,
+  fromPageTitle,
   emptyMessage = "No scenes found",
   emptyDescription = "Check your media library configuration",
   enableKeyboard = true, // eslint-disable-line no-unused-vars
@@ -144,6 +145,7 @@ const SceneGrid = ({
               scene={scene}
               onClick={onSceneClick}
               onHideSuccess={onHideSuccess}
+              fromPageTitle={fromPageTitle}
               isSelected={selectedScenes.some((s) => s.id === scene.id)}
               onToggleSelect={handleToggleSelect}
               selectionMode={selectedScenes.length > 0}

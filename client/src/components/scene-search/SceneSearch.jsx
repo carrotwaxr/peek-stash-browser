@@ -146,6 +146,7 @@ const SceneSearch = ({
           error={error}
           onSceneClick={handleSceneClick}
           onHideSuccess={handleHideSuccess}
+          fromPageTitle={fromPageTitle}
           emptyMessage="No scenes found"
           emptyDescription="Try adjusting your search filters"
           enableKeyboard={true}
