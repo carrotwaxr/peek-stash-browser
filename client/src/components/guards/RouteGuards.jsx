@@ -1,6 +1,7 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
+import { REDIRECT_STORAGE_KEY } from '../../services/api.js';
 
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -58,11 +59,12 @@ export const LoginGuard = ({ children, setupStatus, checkingSetup }) => {
 /**
  * ProtectedRoute - Wraps all authenticated app routes
  * - If setup is NOT complete → redirect to "/setup"
- * - If user is NOT authenticated → redirect to "/login"
+ * - If user is NOT authenticated → redirect to "/login" (saves current URL for redirect after login)
  * - Otherwise → render children
  */
 export const ProtectedRoute = ({ children, setupStatus, checkingSetup }) => {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading || checkingSetup) {
     return <LoadingSpinner />;
@@ -73,6 +75,9 @@ export const ProtectedRoute = ({ children, setupStatus, checkingSetup }) => {
   }
 
   if (!isAuthenticated) {
+    // Save current URL for redirect after login
+    const currentUrl = location.pathname + location.search;
+    sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
     return <Navigate to="/login" replace />;
   }
 

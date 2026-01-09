@@ -7,6 +7,11 @@ import { stashEntityService } from "../services/StashEntityService.js";
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
+// Token expires after 24 hours, but we refresh it if older than 20 hours
+// This gives users a 4-hour inactivity window before session expires
+const TOKEN_EXPIRY_HOURS = 24;
+const TOKEN_REFRESH_THRESHOLD_HOURS = 20;
+
 /**
  * User information attached to request by auth middleware
  */
@@ -35,7 +40,19 @@ export const generateToken = (user: {
   username: string;
   role: string;
 }) => {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: "24h" });
+  return jwt.sign(user, JWT_SECRET, { expiresIn: `${TOKEN_EXPIRY_HOURS}h` });
+};
+
+/**
+ * Set the auth token cookie on a response
+ */
+export const setTokenCookie = (res: Response, token: string) => {
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.SECURE_COOKIES === "true",
+    sameSite: "strict",
+    maxAge: TOKEN_EXPIRY_HOURS * 60 * 60 * 1000,
+  });
 };
 
 export const verifyToken = (token: string) => {
@@ -43,6 +60,7 @@ export const verifyToken = (token: string) => {
     id: number;
     username: string;
     role: string;
+    iat?: number;
   };
 };
 
@@ -117,6 +135,20 @@ export const authenticateToken = async (
     const user = await lookupUser({ id: decoded.id });
     if (!user) {
       return res.status(401).json({ error: "Invalid token. User not found." });
+    }
+
+    // Check if token needs refresh (older than threshold)
+    // Only refresh for cookie-based auth (not Bearer tokens from external clients)
+    if (req.cookies?.token && decoded.iat) {
+      const tokenAgeHours = (Date.now() / 1000 - decoded.iat) / 3600;
+      if (tokenAgeHours > TOKEN_REFRESH_THRESHOLD_HOURS) {
+        const newToken = generateToken({
+          id: user.id,
+          username: user.username,
+          role: user.role,
+        });
+        setTokenCookie(res, newToken);
+      }
     }
 
     // Cast to AuthenticatedRequest to set user property
