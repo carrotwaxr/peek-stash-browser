@@ -118,4 +118,39 @@ describe("useUrlState", () => {
       expect(result.current.values.b).toBe("2");
     });
   });
+
+  describe("hasUrlParams", () => {
+    it("returns true when URL has params beyond defaults", () => {
+      const { result } = renderHook(
+        () => useUrlState({
+          defaults: { page: 1 },
+          ignoreKeys: ["page", "per_page"]
+        }),
+        { wrapper: createWrapper(["/?page=1&tagIds=123"]) }
+      );
+
+      expect(result.current.hasUrlParams).toBe(true);
+    });
+
+    it("returns false when URL only has ignored params", () => {
+      const { result } = renderHook(
+        () => useUrlState({
+          defaults: { page: 1 },
+          ignoreKeys: ["page", "per_page"]
+        }),
+        { wrapper: createWrapper(["/?page=2"]) }
+      );
+
+      expect(result.current.hasUrlParams).toBe(false);
+    });
+
+    it("returns false when URL is empty", () => {
+      const { result } = renderHook(
+        () => useUrlState({ defaults: { page: 1 } }),
+        { wrapper: createWrapper(["/"]) }
+      );
+
+      expect(result.current.hasUrlParams).toBe(false);
+    });
+  });
 });

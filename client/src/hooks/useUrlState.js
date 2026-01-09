@@ -7,18 +7,27 @@ import { useSearchParams } from "react-router-dom";
  *
  * @param {Object} options
  * @param {Object} options.defaults - Default values when URL params missing
- * @returns {Object} { values, setValue, setValues }
+ * @param {string[]} options.ignoreKeys - Keys to ignore when computing hasUrlParams
+ * @returns {Object} { values, setValue, setValues, hasUrlParams }
  */
-export const useUrlState = ({ defaults = {} } = {}) => {
+export const useUrlState = ({ defaults = {}, ignoreKeys = [] } = {}) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedRef = useRef(false);
+  const hadUrlParamsRef = useRef(false);
 
   // Parse initial URL only once
   const getInitialValues = () => {
     const parsed = { ...defaults };
+    let hasNonIgnoredParams = false;
+
     for (const [key, value] of searchParams.entries()) {
       parsed[key] = value;
+      if (!ignoreKeys.includes(key)) {
+        hasNonIgnoredParams = true;
+      }
     }
+
+    hadUrlParamsRef.current = hasNonIgnoredParams;
     return parsed;
   };
 
@@ -76,5 +85,6 @@ export const useUrlState = ({ defaults = {} } = {}) => {
     values,
     setValue,
     setValues,
+    hasUrlParams: hadUrlParamsRef.current,
   };
 };
