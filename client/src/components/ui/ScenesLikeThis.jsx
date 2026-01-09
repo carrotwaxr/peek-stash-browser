@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import SceneGrid from "../scene-search/SceneGrid.jsx";
 import Pagination from "./Pagination.jsx";
 
 const ScenesLikeThis = ({ sceneId }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const perPage = 12;
+
+  // Get page from URL, default to 1
+  const page = parseInt(searchParams.get("page")) || 1;
 
   // Fetch similar scenes for a specific page
   const fetchSimilarScenes = async (pageNum) => {
@@ -41,14 +45,23 @@ const ScenesLikeThis = ({ sceneId }) => {
 
   // Reset to page 1 when sceneId changes
   useEffect(() => {
-    setPage(1);
+    if (page !== 1) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete("page");
+      setSearchParams(newParams);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sceneId]);
 
-  const handlePageChange = (newPage) => {
-    setPage(newPage);
-    // Scroll to top of section
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  const handlePageChange = useCallback((newPage) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      newParams.delete("page");
+    } else {
+      newParams.set("page", String(newPage));
+    }
+    setSearchParams(newParams);
+  }, [searchParams, setSearchParams]);
 
   // Handle successful hide - remove scene from state
   const handleHideSuccess = (hiddenSceneId) => {

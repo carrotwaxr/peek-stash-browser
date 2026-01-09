@@ -7,8 +7,9 @@ import { useSearchParams } from "react-router-dom";
  * @param {Array<{id: string, label: string, count: number}>} props.tabs - Array of tab objects
  * @param {string} props.defaultTab - Default tab ID if none specified in URL
  * @param {Function} [props.onTabChange] - Optional callback when tab changes (receives tabId)
+ * @param {boolean} [props.showSingleTab] - If true, show tab bar even when only one tab is visible
  */
-const TabNavigation = ({ tabs, defaultTab, onTabChange }) => {
+const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get active tab from URL or use default
@@ -49,8 +50,8 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange }) => {
     return null;
   }
 
-  // If only one visible tab, don't show tab navigation
-  if (visibleTabs.length === 1) {
+  // If only one visible tab, don't show tab navigation (unless showSingleTab is true)
+  if (visibleTabs.length === 1 && !showSingleTab) {
     return null;
   }
 

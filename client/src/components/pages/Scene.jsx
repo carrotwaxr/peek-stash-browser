@@ -230,6 +230,7 @@ const SceneContent = ({ location }) => {
                   : []),
               ]}
               defaultTab="similar"
+              showSingleTab
             />
 
             {/* Tab Content */}
