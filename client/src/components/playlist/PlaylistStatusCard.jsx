@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { useScrollToCurrentItem } from "../../hooks/useScrollToCurrentItem.js";
+import { getSceneTitle } from "../../utils/format.js";
 import { Button } from "../ui/index.js";
 
 /**
@@ -535,7 +536,7 @@ const PlaylistStatusCard = () => {
                         : "1px solid var(--border-color)",
                       opacity: isCurrent ? 1 : 0.6,
                     }}
-                    title={scene?.title || `Scene ${index + 1}`}
+                    title={getSceneTitle(scene)}
                   >
                     {scene?.paths?.screenshot ? (
                       <img
@@ -594,7 +595,7 @@ const PlaylistStatusCard = () => {
                         : "1px solid var(--border-color)",
                       opacity: isCurrent ? 1 : 0.6,
                     }}
-                    title={scene?.title || `Scene ${index + 1}`}
+                    title={getSceneTitle(scene)}
                   >
                     {scene?.paths?.screenshot ? (
                       <img

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { getSceneTitle } from "../../utils/format.js";
 import { useLazyLoad } from "./CardComponents.jsx";
 
 /**
@@ -118,7 +119,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
                 {/* Thumbnail with lazy loading */}
                 <SidebarThumbnail
                   thumbnail={thumbnail}
-                  alt={scene.title || "Scene"}
+                  alt={getSceneTitle(scene)}
                   duration={duration}
                 />
 
@@ -129,7 +130,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
                     className="text-sm font-medium line-clamp-2 mb-1 group-hover:underline"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    {scene.title || scene.files?.[0]?.basename || "Untitled"}
+                    {getSceneTitle(scene)}
                   </h4>
 
                   {/* Studio */}

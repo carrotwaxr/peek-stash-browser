@@ -8,6 +8,7 @@ import "videojs-seek-buttons/dist/videojs-seek-buttons.css";
 import axios from "axios";
 import videojs from "video.js";
 import { apiPost } from "../../services/api.js";
+import { getSceneTitle } from "../../utils/format.js";
 import { setupSubtitles, togglePlaybackRateControl } from "./videoPlayerUtils.js";
 import "./vtt-thumbnails.js";
 import "./plugins/big-buttons.js";
@@ -256,7 +257,7 @@ export function useVideoPlayer({
 
     // Set metadata for OS media controls
     mediaSessionPlugin.setMetadata(
-      scene.title || "Untitled Scene",
+      getSceneTitle(scene),
       performers,
       scene.paths?.screenshot || ""
     );
