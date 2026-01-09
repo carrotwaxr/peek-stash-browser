@@ -272,7 +272,7 @@ const TagDetail = () => {
                 tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
               }}
               title={`Scenes tagged with ${tag?.name || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
-              captureReferrer={false}
+              fromPageTitle={tag?.name || "Tag"}
             />
           )}
 

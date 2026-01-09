@@ -419,7 +419,7 @@ const GalleryDetail = () => {
                 galleries: [{ id: galleryId, title: galleryTitle(gallery) }]
               }}
               title={`Scenes in ${galleryTitle(gallery)}`}
-              captureReferrer={false}
+              fromPageTitle={galleryTitle(gallery) || "Gallery"}
             />
           )}
         </div>

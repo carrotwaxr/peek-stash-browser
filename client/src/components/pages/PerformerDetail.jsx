@@ -187,7 +187,7 @@ const PerformerDetail = () => {
               permanentFiltersMetadata={{
                 performers: [{ id: performerId, name: performer.name }] }}
               title={`Scenes featuring ${performer.name}`}
-              captureReferrer={false}
+              fromPageTitle={performer?.name || "Performer"}
             />
           )}
 

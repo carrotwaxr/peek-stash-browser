@@ -250,7 +250,7 @@ const StudioDetail = () => {
                   { id: studioId, name: studio?.name || "Unknown Studio" },
                 ] }}
               title={`Scenes from ${studio?.name || "this studio"}${includeSubStudios ? " (and sub-studios)" : ""}`}
-              captureReferrer={false}
+              fromPageTitle={studio?.name || "Studio"}
             />
           )}
 

@@ -188,7 +188,7 @@ const GroupDetail = () => {
                   { id: groupId, name: group?.name || "Unknown Collection" },
                 ] }}
               title={`Scenes in ${group?.name || "this collection"}`}
-              captureReferrer={false}
+              fromPageTitle={group?.name || "Collection"}
             />
           )}
 
