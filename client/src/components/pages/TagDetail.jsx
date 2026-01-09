@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
+import { useImagesPagination } from "../../hooks/useImagesPagination.js";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { useImagesPagination } from "../../hooks/useImagesPagination.js";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -21,13 +22,14 @@ import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const TagDetail = () => {
   const { tagId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [tag, setTag] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   // Include sub-tags toggle state (from URL param or default false)
   const includeSubTags = searchParams.get('includeSubTags') === 'true';
@@ -116,12 +118,12 @@ const TagDetail = () => {
         <div className="max-w-none">
           <div className="mt-6 mb-6">
             <Button
-              onClick={() => navigate(location.state?.referrerUrl || "/tags")}
+              onClick={goBack}
               variant="secondary"
               icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-              title="Back to Tags"
+              title={backButtonText}
             >
-              <span className="hidden sm:inline">Back to Tags</span>
+              <span className="hidden sm:inline">{backButtonText}</span>
             </Button>
           </div>
           <div className="flex flex-col items-center justify-center py-16">
@@ -150,12 +152,12 @@ const TagDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Button
-            onClick={() => navigate(location.state?.referrerUrl || "/tags")}
+            onClick={goBack}
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-            title="Back to Tags"
+            title={backButtonText}
           >
-            <span className="hidden sm:inline">Back to Tags</span>
+            <span className="hidden sm:inline">{backButtonText}</span>
           </Button>
         </div>
 

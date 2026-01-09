@@ -12,6 +12,7 @@ import {
   Shuffle,
   X,
 } from "lucide-react";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { getSceneTitle } from "../../utils/format.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
@@ -46,6 +47,9 @@ const PlaylistDetail = () => {
   const [reorderMode, setReorderMode] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   // Set page title to playlist name
   usePageTitle(playlist?.name || "Playlist");
@@ -316,12 +320,12 @@ const PlaylistDetail = () => {
           <div className="flex flex-wrap items-center gap-1 sm:gap-2 mb-4">
             {/* Back button */}
             <Button
-              onClick={() => navigate("/playlists")}
+              onClick={goBack}
               variant="secondary"
               icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-              title="Back to Playlists"
+              title={backButtonText}
             >
-              <span className="hidden sm:inline">Back to Playlists</span>
+              <span className="hidden sm:inline">{backButtonText}</span>
             </Button>
 
             {!isEditing && !reorderMode && (

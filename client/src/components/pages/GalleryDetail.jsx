@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
@@ -26,8 +27,6 @@ const PER_PAGE = 100;
 
 const GalleryDetail = () => {
   const { galleryId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [gallery, setGallery] = useState(null);
@@ -36,6 +35,9 @@ const GalleryDetail = () => {
   const [imagesLoading, setImagesLoading] = useState(true);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   // Get active tab from URL or default to 'images'
   const activeTab = searchParams.get('tab') || 'images';
@@ -164,14 +166,12 @@ const GalleryDetail = () => {
         {/* Back Button and Play Slideshow Button */}
         <div className="flex items-center justify-between mb-4">
           <Button
-            onClick={() =>
-              navigate(location.state?.referrerUrl || "/galleries")
-            }
+            onClick={goBack}
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-            title="Back to Galleries"
+            title={backButtonText}
           >
-            <span className="hidden sm:inline">Back to Galleries</span>
+            <span className="hidden sm:inline">{backButtonText}</span>
           </Button>
 
           <Button

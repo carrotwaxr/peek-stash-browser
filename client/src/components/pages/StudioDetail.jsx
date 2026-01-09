@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Link,
-  useLocation,
-  useNavigate,
   useParams,
   useSearchParams } from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
+import { useImagesPagination } from "../../hooks/useImagesPagination.js";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { useImagesPagination } from "../../hooks/useImagesPagination.js";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -27,13 +26,14 @@ import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const StudioDetail = () => {
   const { studioId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [studio, setStudio] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   // Include sub-studios toggle state (from URL param or default false)
   const includeSubStudios = searchParams.get("includeSubStudios") === "true";
@@ -120,12 +120,12 @@ const StudioDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Button
-            onClick={() => navigate(location.state?.referrerUrl || "/studios")}
+            onClick={goBack}
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-            title="Back to Studios"
+            title={backButtonText}
           >
-            <span className="hidden sm:inline">Back to Studios</span>
+            <span className="hidden sm:inline">{backButtonText}</span>
           </Button>
         </div>
 

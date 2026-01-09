@@ -5,6 +5,7 @@ import {
   useScenePlayer,
 } from "../../contexts/ScenePlayerContext.jsx";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { canDirectPlayVideo } from "../../utils/videoFormat.js";
 import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
@@ -24,13 +25,16 @@ import SceneDetails from "./SceneDetails.jsx";
 import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation.jsx";
 
 // Inner component that reads from context
-const SceneContent = ({ location }) => {
+const SceneContent = () => {
   const navigate = useNavigate();
   const pageRef = useRef(null);
   const leftColumnRef = useRef(null);
 
   // Read state from context
   const { scene, sceneLoading, sceneError, playlist } = useScenePlayer();
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   // Set page title to scene title (with fallback to filename)
   const displayTitle = scene?.title || scene?.files?.[0]?.basename || "Scene";
@@ -128,20 +132,12 @@ const SceneContent = ({ location }) => {
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex items-center gap-2 flex-shrink-0 self-start">
             <Button
-              onClick={() => {
-                // If we have a referrer URL with filters, navigate to it
-                // Otherwise use browser back
-                if (location.state?.referrerUrl) {
-                  navigate(location.state.referrerUrl);
-                } else {
-                  navigate(-1);
-                }
-              }}
+              onClick={goBack}
               variant="secondary"
               className="inline-flex items-center gap-2"
             >
               <span>←</span>
-              <span className="whitespace-nowrap">Back to Scenes</span>
+              <span className="whitespace-nowrap">{backButtonText}</span>
             </Button>
             <ExternalPlayerButton
               sceneId={scene?.id}
@@ -354,7 +350,7 @@ const Scene = () => {
       initialQuality={initialQuality}
       initialShouldAutoplay={shouldAutoplayFromState}
     >
-      <SceneContent location={{ ...location, state: stateToUse }} />
+      <SceneContent />
     </ScenePlayerProvider>
   );
 };
