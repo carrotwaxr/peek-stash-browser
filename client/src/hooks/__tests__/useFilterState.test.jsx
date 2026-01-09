@@ -1,5 +1,5 @@
 // client/src/hooks/__tests__/useFilterState.test.jsx
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook, waitFor, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { useFilterState } from "../useFilterState.js";
@@ -169,6 +169,100 @@ describe("useFilterState", () => {
       // URL sort wins over preset
       expect(result.current.sort.field).toBe("date");
       expect(result.current.sort.direction).toBe("DESC");
+    });
+  });
+
+  describe("actions", () => {
+    it("setPage updates pagination and pushes to history", async () => {
+      const { result } = renderHook(
+        () => useFilterState({ artifactType: "scene", filterOptions: [] }),
+        { wrapper: createWrapper(["/"]) }
+      );
+
+      await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+      act(() => {
+        result.current.setPage(3);
+      });
+
+      expect(result.current.pagination.page).toBe(3);
+    });
+
+    it("setSort updates sort and pushes to history", async () => {
+      const { result } = renderHook(
+        () => useFilterState({ artifactType: "scene", filterOptions: [] }),
+        { wrapper: createWrapper(["/"]) }
+      );
+
+      await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+      act(() => {
+        result.current.setSort("rating", "ASC");
+      });
+
+      expect(result.current.sort.field).toBe("rating");
+      expect(result.current.sort.direction).toBe("ASC");
+    });
+
+    it("setFilter updates filters and resets page to 1", async () => {
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "scene",
+          filterOptions: [{ key: "favorite", type: "checkbox" }],
+        }),
+        { wrapper: createWrapper(["/?page=3"]) }
+      );
+
+      await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+      act(() => {
+        result.current.setFilter("favorite", true);
+      });
+
+      expect(result.current.filters.favorite).toBe(true);
+      expect(result.current.pagination.page).toBe(1); // Reset to page 1
+    });
+
+    it("removeFilter removes filter and resets page to 1", async () => {
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "scene",
+          filterOptions: [{ key: "favorite", type: "checkbox" }],
+        }),
+        { wrapper: createWrapper(["/?favorite=true&page=3"]) }
+      );
+
+      await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+      act(() => {
+        result.current.removeFilter("favorite");
+      });
+
+      expect(result.current.filters.favorite).toBeUndefined();
+      expect(result.current.pagination.page).toBe(1);
+    });
+
+    it("clearFilters resets all filters but keeps permanent filters", async () => {
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "scene",
+          permanentFilters: { studioId: "456" },
+          filterOptions: [
+            { key: "favorite", type: "checkbox" },
+            { key: "studioId", type: "searchable-select" },
+          ],
+        }),
+        { wrapper: createWrapper(["/?favorite=true"]) }
+      );
+
+      await waitFor(() => expect(result.current.isInitialized).toBe(true));
+
+      act(() => {
+        result.current.clearFilters();
+      });
+
+      expect(result.current.filters.favorite).toBeUndefined();
+      expect(result.current.filters.studioId).toBe("456"); // Permanent kept
     });
   });
 });

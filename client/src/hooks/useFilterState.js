@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiGet } from "../services/api.js";
-import { parseSearchParams } from "../utils/urlParams.js";
+import { parseSearchParams, buildSearchParams } from "../utils/urlParams.js";
 
 /**
  * High-level hook for filter state management with URL sync and presets.
@@ -12,10 +12,10 @@ export const useFilterState = ({
   initialSort = "o_counter",
   permanentFilters = {},
   filterOptions = [],
-  // syncToUrl reserved for future use
+  syncToUrl = true,
 } = {}) => {
   const effectiveContext = context || artifactType;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initializedRef = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoadingPresets, setIsLoadingPresets] = useState(true);
@@ -130,6 +130,131 @@ export const useFilterState = ({
     initialize();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // URL sync helper - writes to URL without reading back
+  const syncToUrlParams = useCallback((state, options = {}) => {
+    if (!syncToUrl || !isInitialized) return;
+
+    const { replace = false } = options;
+    const params = buildSearchParams({
+      searchText: state.searchText,
+      sortField: state.sort.field,
+      sortDirection: state.sort.direction,
+      currentPage: state.pagination.page,
+      perPage: state.pagination.perPage,
+      filters: state.filters,
+      filterOptions,
+    });
+
+    setSearchParams(params, { replace });
+  }, [syncToUrl, isInitialized, filterOptions, setSearchParams]);
+
+  // Actions
+  const setPage = useCallback((page) => {
+    setPaginationState((prev) => ({ ...prev, page }));
+    syncToUrlParams({
+      filters,
+      sort,
+      pagination: { ...pagination, page },
+      searchText,
+    });
+  }, [filters, sort, pagination, searchText, syncToUrlParams]);
+
+  const setPerPage = useCallback((perPage) => {
+    setPaginationState({ page: 1, perPage });
+    syncToUrlParams({
+      filters,
+      sort,
+      pagination: { page: 1, perPage },
+      searchText,
+    });
+  }, [filters, sort, searchText, syncToUrlParams]);
+
+  const setSort = useCallback((field, direction) => {
+    const newDirection = direction || (sort.field === field && sort.direction === "DESC" ? "ASC" : "DESC");
+    setSortState({ field, direction: newDirection });
+    syncToUrlParams({
+      filters,
+      sort: { field, direction: newDirection },
+      pagination,
+      searchText,
+    });
+  }, [filters, sort, pagination, searchText, syncToUrlParams]);
+
+  const setFilter = useCallback((key, value) => {
+    const newFilters = { ...filters, [key]: value };
+    setFiltersState(newFilters);
+    setPaginationState((prev) => ({ ...prev, page: 1 }));
+    syncToUrlParams({
+      filters: newFilters,
+      sort,
+      pagination: { ...pagination, page: 1 },
+      searchText,
+    });
+  }, [filters, sort, pagination, searchText, syncToUrlParams]);
+
+  const setFilters = useCallback((newFilters) => {
+    setFiltersState(newFilters);
+    setPaginationState((prev) => ({ ...prev, page: 1 }));
+    syncToUrlParams({
+      filters: newFilters,
+      sort,
+      pagination: { ...pagination, page: 1 },
+      searchText,
+    });
+  }, [sort, pagination, searchText, syncToUrlParams]);
+
+  const removeFilter = useCallback((key) => {
+    const newFilters = { ...filters };
+    delete newFilters[key];
+    // Re-apply permanent filters
+    Object.assign(newFilters, permanentFilters);
+    setFiltersState(newFilters);
+    setPaginationState((prev) => ({ ...prev, page: 1 }));
+    syncToUrlParams({
+      filters: newFilters,
+      sort,
+      pagination: { ...pagination, page: 1 },
+      searchText,
+    });
+  }, [filters, permanentFilters, sort, pagination, searchText, syncToUrlParams]);
+
+  const clearFilters = useCallback(() => {
+    const newFilters = { ...permanentFilters };
+    setFiltersState(newFilters);
+    setPaginationState((prev) => ({ ...prev, page: 1 }));
+    syncToUrlParams({
+      filters: newFilters,
+      sort,
+      pagination: { ...pagination, page: 1 },
+      searchText,
+    });
+  }, [permanentFilters, sort, pagination, searchText, syncToUrlParams]);
+
+  const setSearchText = useCallback((text) => {
+    setSearchTextState(text);
+    setPaginationState((prev) => ({ ...prev, page: 1 }));
+    // Search text uses replace to avoid history pollution
+    syncToUrlParams({
+      filters,
+      sort,
+      pagination: { ...pagination, page: 1 },
+      searchText: text,
+    }, { replace: true });
+  }, [filters, sort, pagination, syncToUrlParams]);
+
+  const loadPreset = useCallback((preset) => {
+    const newFilters = { ...permanentFilters, ...preset.filters };
+    setFiltersState(newFilters);
+    setSortState({ field: preset.sort, direction: preset.direction });
+    setPaginationState((prev) => ({ ...prev, page: 1 }));
+    syncToUrlParams({
+      filters: newFilters,
+      sort: { field: preset.sort, direction: preset.direction },
+      pagination: { ...pagination, page: 1 },
+      searchText,
+    });
+  }, [permanentFilters, pagination, searchText, syncToUrlParams]);
+
   return {
     filters,
     sort,
@@ -137,15 +262,15 @@ export const useFilterState = ({
     searchText,
     isInitialized,
     isLoadingPresets,
-    // Actions (placeholders for now)
-    setFilter: () => {},
-    setFilters: () => {},
-    removeFilter: () => {},
-    clearFilters: () => {},
-    setSort: () => {},
-    setPage: () => {},
-    setPerPage: () => {},
-    setSearchText: () => {},
-    loadPreset: () => {},
+    // Actions
+    setFilter,
+    setFilters,
+    removeFilter,
+    clearFilters,
+    setSort,
+    setPage,
+    setPerPage,
+    setSearchText,
+    loadPreset,
   };
 };
