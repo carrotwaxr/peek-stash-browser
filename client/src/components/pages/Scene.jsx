@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import {
   ScenePlayerProvider,
@@ -22,37 +22,7 @@ import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 import SceneDetails from "./SceneDetails.jsx";
-/**
- * Tab button component for scene page relationship tabs
- */
-const TabButton = ({ isActive, onClick, label, count }) => (
-  <button
-    onClick={onClick}
-    className="px-6 py-3 font-medium whitespace-nowrap transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
-    style={{
-      color: isActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
-      borderBottom: isActive ? '3px solid var(--accent-primary)' : '3px solid transparent',
-      backgroundColor: isActive ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-      cursor: isActive ? 'default' : 'pointer',
-    }}
-    disabled={isActive}
-  >
-    <span className="flex items-center gap-2">
-      <span>{label}</span>
-      {count > 0 && (
-        <span
-          className="text-xs font-semibold px-2 py-0.5 rounded-full"
-          style={{
-            backgroundColor: isActive ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-            color: isActive ? 'white' : 'var(--text-muted)',
-          }}
-        >
-          {count}
-        </span>
-      )}
-    </span>
-  </button>
-);
+import TabNavigation from "../ui/TabNavigation.jsx";
 
 // Inner component that reads from context
 const SceneContent = ({ location }) => {
@@ -74,7 +44,8 @@ const SceneContent = ({ location }) => {
   const [showDetails, setShowDetails] = useState(true);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [sidebarHeight, setSidebarHeight] = useState(null);
-  const [activeTab, setActiveTab] = useState('similar');
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'similar';
   const [similarScenesCount, setSimilarScenesCount] = useState(0);
 
   // Dispatch zone change event to disable TV navigation on this page
@@ -248,39 +219,18 @@ const SceneContent = ({ location }) => {
         {/* Tabbed Relationship Content */}
         {scene && (
           <div className="mt-6">
-            {/* Tab Navigation - Local state, no URL params */}
-            <div
-              className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-rounded"
-              style={{
-                borderBottom: '2px solid var(--bg-tertiary)',
-                marginBottom: '1.5rem',
-              }}
-            >
-              <div className="flex gap-1 min-w-full">
-                <TabButton
-                  isActive={activeTab === 'similar'}
-                  onClick={() => setActiveTab('similar')}
-                  label="Similar Scenes"
-                  count={similarScenesCount}
-                />
-                {scene.groups && scene.groups.length > 0 && (
-                  <TabButton
-                    isActive={activeTab === 'collections'}
-                    onClick={() => setActiveTab('collections')}
-                    label="Collections"
-                    count={scene.groups.length}
-                  />
-                )}
-                {scene.galleries && scene.galleries.length > 0 && (
-                  <TabButton
-                    isActive={activeTab === 'galleries'}
-                    onClick={() => setActiveTab('galleries')}
-                    label="Galleries"
-                    count={scene.galleries.length}
-                  />
-                )}
-              </div>
-            </div>
+            <TabNavigation
+              tabs={[
+                { id: 'similar', label: 'Similar Scenes', count: similarScenesCount },
+                ...(scene.groups && scene.groups.length > 0
+                  ? [{ id: 'collections', label: 'Collections', count: scene.groups.length }]
+                  : []),
+                ...(scene.galleries && scene.galleries.length > 0
+                  ? [{ id: 'galleries', label: 'Galleries', count: scene.galleries.length }]
+                  : []),
+              ]}
+              defaultTab="similar"
+            />
 
             {/* Tab Content */}
             {activeTab === 'similar' && (
