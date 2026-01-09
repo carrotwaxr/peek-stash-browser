@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import axios from "axios";
 import {
   ScenePlayerProvider,
   useScenePlayer,
@@ -46,7 +45,8 @@ const SceneContent = ({ location }) => {
   const [sidebarHeight, setSidebarHeight] = useState(null);
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'similar';
-  const [similarScenesCount, setSimilarScenesCount] = useState(0);
+  // -1 means loading (show tab without count badge), updated by ScenesLikeThis onCountChange
+  const [similarScenesCount, setSimilarScenesCount] = useState(-1);
 
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
@@ -58,24 +58,9 @@ const SceneContent = ({ location }) => {
     );
   }, []); // Run once on mount
 
-  // Fetch similar scenes count for tab badge
+  // Reset similar scenes count when scene changes (back to loading state)
   useEffect(() => {
-    if (!scene?.id) return;
-
-    const fetchSimilarCount = async () => {
-      try {
-        const response = await axios.get(
-          `/api/library/scenes/${scene.id}/similar?page=1`,
-          { withCredentials: true }
-        );
-        setSimilarScenesCount(response.data.count || 0);
-      } catch (err) {
-        console.error("Error fetching similar scenes count:", err);
-        setSimilarScenesCount(0);
-      }
-    };
-
-    fetchSimilarCount();
+    setSimilarScenesCount(-1);
   }, [scene?.id]);
 
   // Measure left column height and sync to sidebar
@@ -236,7 +221,7 @@ const SceneContent = ({ location }) => {
             {/* Tab Content */}
             {activeTab === 'similar' && (
               <div className="mt-6">
-                <ScenesLikeThis sceneId={scene.id} />
+                <ScenesLikeThis sceneId={scene.id} onCountChange={setSimilarScenesCount} />
               </div>
             )}
 

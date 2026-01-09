@@ -4,7 +4,7 @@ import axios from "axios";
 import SceneGrid from "../scene-search/SceneGrid.jsx";
 import Pagination from "./Pagination.jsx";
 
-const ScenesLikeThis = ({ sceneId }) => {
+const ScenesLikeThis = ({ sceneId, onCountChange }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +29,10 @@ const ScenesLikeThis = ({ sceneId }) => {
       const { scenes: newScenes, count } = response.data;
       setScenes(newScenes);
       setTotalCount(count);
+      // Notify parent of count change for tab badge
+      if (onCountChange) {
+        onCountChange(count);
+      }
     } catch (err) {
       console.error("Error fetching similar scenes:", err);
       setError(err.response?.data?.error || "Failed to load similar scenes");

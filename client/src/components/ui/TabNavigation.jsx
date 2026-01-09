@@ -5,6 +5,9 @@ import { useSearchParams } from "react-router-dom";
  *
  * @param {Object} props
  * @param {Array<{id: string, label: string, count: number}>} props.tabs - Array of tab objects
+ *   - count > 0: Show tab with count badge
+ *   - count === 0: Hide tab (no content)
+ *   - count === -1: Show tab without count badge (loading state)
  * @param {string} props.defaultTab - Default tab ID if none specified in URL
  * @param {Function} [props.onTabChange] - Optional callback when tab changes (receives tabId)
  * @param {boolean} [props.showSingleTab] - If true, show tab bar even when only one tab is visible
@@ -15,8 +18,8 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false })
   // Get active tab from URL or use default
   const activeTab = searchParams.get('tab') || defaultTab;
 
-  // Filter out tabs with zero count
-  const visibleTabs = tabs.filter(tab => tab.count > 0);
+  // Filter out tabs with zero count (count === -1 means loading, show tab without badge)
+  const visibleTabs = tabs.filter(tab => tab.count > 0 || tab.count === -1);
 
   // Pagination/filter params that should be cleared when switching tabs
   // Each tab has its own pagination state, so these shouldn't carry over
@@ -83,7 +86,7 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false })
             >
               <span className="flex items-center gap-2">
                 <span>{tab.label}</span>
-                {tab.count !== undefined && (
+                {tab.count !== undefined && tab.count >= 0 && (
                   <span
                     className="text-xs font-semibold px-2 py-0.5 rounded-full"
                     style={{
