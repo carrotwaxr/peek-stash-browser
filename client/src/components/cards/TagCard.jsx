@@ -8,7 +8,7 @@ import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
  * TagCard - Card for displaying tag entities
  */
 const TagCard = forwardRef(
-  ({ tag, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ tag, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     // Build subtitle from child count
@@ -88,7 +88,7 @@ const TagCard = forwardRef(
         subtitle={subtitle}
         description={tag.description}
         linkTo={`/tag/${tag.id}`}
-        referrerUrl={referrerUrl}
+        fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}

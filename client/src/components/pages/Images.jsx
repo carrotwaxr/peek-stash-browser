@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
@@ -20,7 +20,6 @@ import Lightbox from "../ui/Lightbox.jsx";
 
 const Images = () => {
   usePageTitle("Images");
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
@@ -191,7 +190,7 @@ const Images = () => {
                       key={image.id}
                       image={image}
                       onClick={() => handleImageClick(image)}
-                      referrerUrl={`${location.pathname}${location.search}`}
+                      fromPageTitle="Images"
                       tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       onOCounterChange={handleOCounterChange}
                       onRatingChange={handleRatingChange}

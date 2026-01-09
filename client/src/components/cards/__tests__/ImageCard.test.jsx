@@ -17,7 +17,7 @@ describe("ImageCard", () => {
   it("accepts expected props", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
-      referrerUrl: "/images",
+      fromPageTitle: "Images",
       tabIndex: 0,
     });
 
@@ -60,13 +60,13 @@ describe("ImageCard", () => {
     expect(element.props.image.id).toBe("1");
   });
 
-  it("accepts referrerUrl prop", () => {
+  it("accepts fromPageTitle prop", () => {
     const element = createElement(ImageCard, {
       image: mockImage,
-      referrerUrl: "/images",
+      fromPageTitle: "Images",
     });
 
-    expect(element.props.referrerUrl).toBe("/images");
+    expect(element.props.fromPageTitle).toBe("Images");
   });
 
   it("accepts tabIndex prop", () => {

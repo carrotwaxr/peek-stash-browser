@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -18,7 +18,6 @@ import {
 const Studios = () => {
   usePageTitle("Studios");
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
@@ -52,7 +51,10 @@ const Studios = () => {
     items: currentStudios,
     columns,
     totalPages,
-    onItemSelect: (studio) => navigate(`/studio/${studio.id}`),
+    onItemSelect: (studio) =>
+      navigate(`/studio/${studio.id}`, {
+        state: { fromPageTitle: "Studios" },
+      }),
   });
 
   // Initial focus
@@ -114,7 +116,7 @@ const Studios = () => {
                     <StudioCard
                       key={studio.id}
                       studio={studio}
-                      referrerUrl={`${location.pathname}${location.search}`}
+                      fromPageTitle="Studios"
                       tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       {...itemProps}
                     />

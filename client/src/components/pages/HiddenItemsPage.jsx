@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { ArrowLeft, RotateCcw } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { getSceneTitle } from "../../utils/format.js";
 import {
   Button,
@@ -17,12 +17,14 @@ import {
  * HiddenItemsPage - View and restore hidden entities
  */
 const HiddenItemsPage = () => {
-  const navigate = useNavigate();
   const { getHiddenEntities, unhideEntity, unhideAll } = useHiddenEntities();
   const [activeTab, setActiveTab] = useState("all");
   const [hiddenItems, setHiddenItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [restoringAll, setRestoringAll] = useState(false);
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   const tabs = [
     { id: "all", label: "All" },
@@ -119,12 +121,12 @@ const HiddenItemsPage = () => {
       {/* Back Button */}
       <div className="mt-6 mb-4">
         <Button
-          onClick={() => navigate("/settings?section=user&tab=content")}
+          onClick={goBack}
           variant="secondary"
           icon={<ArrowLeft size={16} />}
-          title="Back to Settings"
+          title={backButtonText}
         >
-          <span className="hidden sm:inline">Back to Settings</span>
+          <span className="hidden sm:inline">{backButtonText}</span>
         </Button>
       </div>
 

@@ -69,6 +69,7 @@ const SceneCard = forwardRef(
       autoplayOnScroll = false,
       hideRatingControls = false,
       onHideSuccess,
+      fromPageTitle,
     },
     ref
   ) => {
@@ -257,7 +258,7 @@ const SceneCard = forwardRef(
         entityType="scene"
         entity={scene}
         linkTo={`/scene/${scene.id}`}
-        referrerUrl="/scenes"
+        fromPageTitle={fromPageTitle}
         // Selection mode - BaseCard handles all gesture/keyboard logic
         selectionMode={selectionMode}
         isSelected={isSelected}

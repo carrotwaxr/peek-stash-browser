@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
@@ -20,13 +21,14 @@ import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const GroupDetail = () => {
   const { groupId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [group, setGroup] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get('tab') || 'scenes';
@@ -96,14 +98,12 @@ const GroupDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Button
-            onClick={() =>
-              navigate(location.state?.referrerUrl || "/collections")
-            }
+            onClick={goBack}
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-            title="Back to Collections"
+            title={backButtonText}
           >
-            <span className="hidden sm:inline">Back to Collections</span>
+            <span className="hidden sm:inline">{backButtonText}</span>
           </Button>
         </div>
 
@@ -188,7 +188,7 @@ const GroupDetail = () => {
                   { id: groupId, name: group?.name || "Unknown Collection" },
                 ] }}
               title={`Scenes in ${group?.name || "this collection"}`}
-              captureReferrer={false}
+              fromPageTitle={group?.name || "Collection"}
             />
           )}
 

@@ -22,7 +22,7 @@ const formatResolution = (width, height) => {
  * Supports onClick for lightbox integration
  */
 const ImageCard = forwardRef(
-  ({ image, onClick, referrerUrl, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, displayPreferences, ...rest }, ref) => {
+  ({ image, onClick, fromPageTitle, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, displayPreferences, ...rest }, ref) => {
     // Get effective metadata (inherits from galleries if image doesn't have its own)
     const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
 
@@ -123,7 +123,7 @@ const ImageCard = forwardRef(
         subtitle={subtitle}
         onClick={handleClick}
         linkTo={onClick ? undefined : `/image/${image.id}`}
-        referrerUrl={referrerUrl}
+        fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}

@@ -17,6 +17,7 @@ const Scenes = () => {
         initialSort="created_at"
         subtitle="Browse your complete scene library"
         title="All Scenes"
+        fromPageTitle="Scenes"
       />
     </div>
   );

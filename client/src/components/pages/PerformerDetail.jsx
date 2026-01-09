@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, LucideStar } from "lucide-react";
+import { useImagesPagination } from "../../hooks/useImagesPagination.js";
+import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { useImagesPagination } from "../../hooks/useImagesPagination.js";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
 import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions.js";
 import { libraryApi } from "../../services/api.js";
@@ -26,13 +27,14 @@ import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 
 const PerformerDetail = () => {
   const { performerId } = useParams();
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [performer, setPerformer] = useState(null);
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
+
+  // Navigation state for back button
+  const { goBack, backButtonText } = useNavigationState();
 
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get('tab') || 'scenes';
@@ -102,14 +104,12 @@ const PerformerDetail = () => {
         {/* Back Button */}
         <div className="mt-6 mb-6">
           <Button
-            onClick={() =>
-              navigate(location.state?.referrerUrl || "/performers")
-            }
+            onClick={goBack}
             variant="secondary"
             icon={<ArrowLeft size={16} className="sm:w-4 sm:h-4" />}
-            title="Back to Performers"
+            title={backButtonText}
           >
-            <span className="hidden sm:inline">Back to Performers</span>
+            <span className="hidden sm:inline">{backButtonText}</span>
           </Button>
         </div>
 
@@ -187,7 +187,7 @@ const PerformerDetail = () => {
               permanentFiltersMetadata={{
                 performers: [{ id: performerId, name: performer.name }] }}
               title={`Scenes featuring ${performer.name}`}
-              captureReferrer={false}
+              fromPageTitle={performer?.name || "Performer"}
             />
           )}
 

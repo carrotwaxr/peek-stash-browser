@@ -22,7 +22,7 @@ describe("TagCard", () => {
   it("accepts expected props", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
-      referrerUrl: "/tags",
+      fromPageTitle: "Tags",
       tabIndex: 0,
     });
 
@@ -57,13 +57,13 @@ describe("TagCard", () => {
     expect(tag.description).toBe("Tag description");
   });
 
-  it("accepts referrerUrl prop", () => {
+  it("accepts fromPageTitle prop", () => {
     const element = createElement(TagCard, {
       tag: mockTag,
-      referrerUrl: "/tags",
+      fromPageTitle: "Tags",
     });
 
-    expect(element.props.referrerUrl).toBe("/tags");
+    expect(element.props.fromPageTitle).toBe("Tags");
   });
 
   it("accepts tabIndex prop", () => {

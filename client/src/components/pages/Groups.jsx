@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
@@ -19,7 +19,6 @@ import {
 const Groups = () => {
   usePageTitle("Collections");
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
@@ -53,7 +52,10 @@ const Groups = () => {
     items: currentGroups,
     columns,
     totalPages,
-    onItemSelect: (group) => navigate(`/collection/${group.id}`),
+    onItemSelect: (group) =>
+      navigate(`/collection/${group.id}`, {
+        state: { fromPageTitle: "Collections" },
+      }),
   });
 
   // Initial focus
@@ -115,7 +117,7 @@ const Groups = () => {
                     <GroupCard
                       key={group.id}
                       group={group}
-                      referrerUrl={`${location.pathname}${location.search}`}
+                      fromPageTitle="Collections"
                       tabIndex={isTVMode ? itemProps.tabIndex : -1}
                       {...itemProps}
                     />

@@ -9,7 +9,7 @@ import { galleryTitle } from "../../utils/gallery.js";
  * GalleryCard - Card for displaying gallery entities
  */
 const GalleryCard = forwardRef(
-  ({ gallery, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ gallery, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     // Build subtitle from studio and date
@@ -101,7 +101,7 @@ const GalleryCard = forwardRef(
         subtitle={subtitle}
         description={gallery.description}
         linkTo={`/gallery/${gallery.id}`}
-        referrerUrl={referrerUrl}
+        fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
