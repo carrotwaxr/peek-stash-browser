@@ -29,6 +29,7 @@ const SceneSearch = ({
   subtitle,
   title,
   captureReferrer = true,
+  syncToUrl = true, // Whether to sync pagination/filters to URL (separate from captureReferrer)
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -137,7 +138,7 @@ const SceneSearch = ({
         permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}
         totalCount={totalCount}
-        syncToUrl={captureReferrer}
+        syncToUrl={syncToUrl}
         {...searchControlsProps}
       >
         <SceneGrid
