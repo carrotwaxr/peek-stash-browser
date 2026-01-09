@@ -46,7 +46,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
     navigate(`/scene/${scene.id}`, {
       state: {
         scene,
-        referrerUrl: `/scene/${sceneId}`,
+        fromPageTitle: "Recommended",
       },
     });
     return true; // Prevent fallback navigation in SceneCard

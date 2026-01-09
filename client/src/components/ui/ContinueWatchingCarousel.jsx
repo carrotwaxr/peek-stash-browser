@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { PlayCircle } from "lucide-react";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory.js";
 import { libraryApi } from "../../services/api.js";
@@ -15,7 +15,6 @@ const ContinueWatchingCarousel = ({
   onInitializing,
 }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const {
     data: watchHistoryList,
     loading: loadingHistory,
@@ -133,13 +132,10 @@ const ContinueWatchingCarousel = ({
   const handleSceneClick = (scene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-    // Capture current URL with search params for Back button
-    const referrerUrl = `${location.pathname}${location.search}`;
-
     navigate(`/scene/${scene.id}`, {
       state: {
         scene,
-        referrerUrl, // Store current URL to preserve filters when going back
+        fromPageTitle: "Home",
         shouldResume: true, // Auto-resume from continue watching
         playlist: {
           id: "virtual-carousel",

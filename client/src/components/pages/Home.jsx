@@ -127,6 +127,7 @@ const Home = () => {
     navigate(`/scene/${scene.id}`, {
       state: {
         scene,
+        fromPageTitle: "Home",
         playlist: {
           id: "virtual-carousel",
           name: carouselTitle,
