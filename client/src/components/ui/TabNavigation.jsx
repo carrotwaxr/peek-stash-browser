@@ -1,5 +1,8 @@
 import { useSearchParams } from "react-router-dom";
 
+/** Use this value for tab count when data is still loading (shows tab without count badge) */
+export const TAB_COUNT_LOADING = -1;
+
 /**
  * TabNavigation - A reusable tab navigation component with URL query parameter support
  *
@@ -7,7 +10,7 @@ import { useSearchParams } from "react-router-dom";
  * @param {Array<{id: string, label: string, count: number}>} props.tabs - Array of tab objects
  *   - count > 0: Show tab with count badge
  *   - count === 0: Hide tab (no content)
- *   - count === -1: Show tab without count badge (loading state)
+ *   - count === TAB_COUNT_LOADING (-1): Show tab without count badge (loading state)
  * @param {string} props.defaultTab - Default tab ID if none specified in URL
  * @param {Function} [props.onTabChange] - Optional callback when tab changes (receives tabId)
  * @param {boolean} [props.showSingleTab] - If true, show tab bar even when only one tab is visible
@@ -18,8 +21,8 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false })
   // Get active tab from URL or use default
   const activeTab = searchParams.get('tab') || defaultTab;
 
-  // Filter out tabs with zero count (count === -1 means loading, show tab without badge)
-  const visibleTabs = tabs.filter(tab => tab.count > 0 || tab.count === -1);
+  // Filter out tabs with zero count (TAB_COUNT_LOADING means loading, show tab without badge)
+  const visibleTabs = tabs.filter(tab => tab.count > 0 || tab.count === TAB_COUNT_LOADING);
 
   // Pagination/filter params that should be cleared when switching tabs
   // Each tab has its own pagination state, so these shouldn't carry over

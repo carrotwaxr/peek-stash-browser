@@ -21,7 +21,7 @@ import PlaybackControls from "../video-player/PlaybackControls.jsx";
 import VideoPlayer from "../video-player/VideoPlayer.jsx";
 import ViewInStashButton from "../ui/ViewInStashButton.jsx";
 import SceneDetails from "./SceneDetails.jsx";
-import TabNavigation from "../ui/TabNavigation.jsx";
+import TabNavigation, { TAB_COUNT_LOADING } from "../ui/TabNavigation.jsx";
 
 // Inner component that reads from context
 const SceneContent = ({ location }) => {
@@ -45,8 +45,8 @@ const SceneContent = ({ location }) => {
   const [sidebarHeight, setSidebarHeight] = useState(null);
   const [searchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'similar';
-  // -1 means loading (show tab without count badge), updated by ScenesLikeThis onCountChange
-  const [similarScenesCount, setSimilarScenesCount] = useState(-1);
+  // TAB_COUNT_LOADING means loading (show tab without count badge), updated by ScenesLikeThis onCountChange
+  const [similarScenesCount, setSimilarScenesCount] = useState(TAB_COUNT_LOADING);
 
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
@@ -60,7 +60,7 @@ const SceneContent = ({ location }) => {
 
   // Reset similar scenes count when scene changes (back to loading state)
   useEffect(() => {
-    setSimilarScenesCount(-1);
+    setSimilarScenesCount(TAB_COUNT_LOADING);
   }, [scene?.id]);
 
   // Measure left column height and sync to sidebar

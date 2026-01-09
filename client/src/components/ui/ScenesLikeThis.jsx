@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axios from "axios";
 import SceneGrid from "../scene-search/SceneGrid.jsx";
@@ -11,18 +11,19 @@ const ScenesLikeThis = ({ sceneId, onCountChange }) => {
   const [error, setError] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
   const perPage = 12;
+  const prevSceneIdRef = useRef(sceneId);
 
   // Get page from URL, default to 1
   const page = parseInt(searchParams.get("page")) || 1;
 
-  // Fetch similar scenes for a specific page
-  const fetchSimilarScenes = async (pageNum) => {
+  // Memoized fetch function
+  const fetchSimilarScenes = useCallback(async (pageNum, currentSceneId) => {
     try {
       setLoading(true);
       setError(null);
 
       const response = await axios.get(
-        `/api/library/scenes/${sceneId}/similar?page=${pageNum}`,
+        `/api/library/scenes/${currentSceneId}/similar?page=${pageNum}`,
         { withCredentials: true }
       );
 
@@ -39,23 +40,26 @@ const ScenesLikeThis = ({ sceneId, onCountChange }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [onCountChange]);
 
-  // Fetch data when sceneId or page changes
+  // Combined effect: reset page on scene change, then fetch
+  // This prevents the race condition of two separate effects
   useEffect(() => {
-    fetchSimilarScenes(page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneId, page]);
+    const sceneChanged = prevSceneIdRef.current !== sceneId;
+    prevSceneIdRef.current = sceneId;
 
-  // Reset to page 1 when sceneId changes
-  useEffect(() => {
-    if (page !== 1) {
+    if (sceneChanged && page !== 1) {
+      // Scene changed and we're not on page 1 - reset to page 1
+      // This will trigger this effect again with page=1
       const newParams = new URLSearchParams(searchParams);
       newParams.delete("page");
       setSearchParams(newParams);
+      return; // Don't fetch yet, wait for page reset
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sceneId]);
+
+    // Either scene didn't change, or we're already on page 1
+    fetchSimilarScenes(page, sceneId);
+  }, [sceneId, page, searchParams, setSearchParams, fetchSimilarScenes]);
 
   const handlePageChange = useCallback((newPage) => {
     const newParams = new URLSearchParams(searchParams);
