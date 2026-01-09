@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 
 /**
  * Format resolution string from width/height
@@ -37,8 +38,8 @@ const ImageCard = forwardRef(
 
     const galleries = image.galleries || [];
 
-    // Build rich tooltip content for performers, tags, and galleries
-    const performersTooltip =
+    // Build rich tooltip content using centralized config
+    const performersTooltip = getIndicatorBehavior('image', 'performers') === 'rich' &&
       effectivePerformers.length > 0 && (
         <TooltipEntityGrid
           entityType="performer"
@@ -47,7 +48,7 @@ const ImageCard = forwardRef(
         />
       );
 
-    const tagsTooltip =
+    const tagsTooltip = getIndicatorBehavior('image', 'tags') === 'rich' &&
       effectiveTags.length > 0 && (
         <TooltipEntityGrid
           entityType="tag"
@@ -57,7 +58,7 @@ const ImageCard = forwardRef(
       );
 
     const galleriesCount = galleries.length;
-    const galleriesContent =
+    const galleriesContent = getIndicatorBehavior('image', 'galleries') === 'rich' &&
       galleriesCount > 0 && (
         <TooltipEntityGrid
           entityType="gallery"
