@@ -200,7 +200,6 @@ const GroupDetail = () => {
                     value: [parseInt(groupId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No performers found in "${group?.name}"`}
             />
           )}

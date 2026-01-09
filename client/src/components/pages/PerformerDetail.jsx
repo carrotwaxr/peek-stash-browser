@@ -199,7 +199,6 @@ const PerformerDetail = () => {
                     value: [parseInt(performerId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No galleries found for ${performer.name}`}
             />
           )}
@@ -216,7 +215,6 @@ const PerformerDetail = () => {
                     value: [parseInt(performerId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No collections found for ${performer.name}`}
             />
           )}

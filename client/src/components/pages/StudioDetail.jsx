@@ -264,7 +264,6 @@ const StudioDetail = () => {
                     modifier: "INCLUDES",
                     ...(includeSubStudios && { depth: -1 }) } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No galleries found for ${studio?.name}`}
             />
           )}
@@ -285,7 +284,6 @@ const StudioDetail = () => {
                     value: [parseInt(studioId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No performers found for ${studio?.name}`}
             />
           )}
@@ -298,7 +296,6 @@ const StudioDetail = () => {
                     value: [parseInt(studioId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No collections found for ${studio?.name}`}
             />
           )}

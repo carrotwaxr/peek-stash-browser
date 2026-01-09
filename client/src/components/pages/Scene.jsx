@@ -251,7 +251,6 @@ const SceneContent = ({ location }) => {
                     }
                   }}
                   hideLockedFilters
-                  syncToUrl={false}
                   emptyMessage="No collections found for this scene"
                 />
               </div>
@@ -269,7 +268,6 @@ const SceneContent = ({ location }) => {
                     }
                   }}
                   hideLockedFilters
-                  syncToUrl={false}
                   emptyMessage="No galleries found for this scene"
                 />
               </div>
