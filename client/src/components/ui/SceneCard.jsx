@@ -8,6 +8,7 @@ import {
   getSceneTitle,
 } from "../../utils/format.js";
 import { formatRelativeTime } from "../../utils/date.js";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import BaseCard from "./BaseCard.jsx";
 import { SceneCardPreview, TooltipEntityGrid } from "./index.js";
 
@@ -88,35 +89,39 @@ const SceneCard = forwardRef(
     // Combine direct tags with server-computed inherited tags
     const allTags = useMemo(() => computeAllTags(scene), [scene]);
 
-    // Build indicators with JSX tooltips
+    // Build indicators using centralized config
     const indicators = useMemo(() => {
-      const performersTooltip = scene.performers && scene.performers.length > 0 && (
-        <TooltipEntityGrid
-          entityType="performer"
-          entities={scene.performers}
-          title="Performers"
-        />
-      );
+      const performersTooltip = getIndicatorBehavior('scene', 'performers') === 'rich' &&
+        scene.performers?.length > 0 && (
+          <TooltipEntityGrid
+            entityType="performer"
+            entities={scene.performers}
+            title="Performers"
+          />
+        );
 
-      const groupsTooltip = scene.groups && scene.groups.length > 0 && (
-        <TooltipEntityGrid
-          entityType="group"
-          entities={scene.groups}
-          title="Collections"
-        />
-      );
+      const groupsTooltip = getIndicatorBehavior('scene', 'groups') === 'rich' &&
+        scene.groups?.length > 0 && (
+          <TooltipEntityGrid
+            entityType="group"
+            entities={scene.groups}
+            title="Collections"
+          />
+        );
 
-      const tagsTooltip = allTags && allTags.length > 0 && (
-        <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" />
-      );
+      const tagsTooltip = getIndicatorBehavior('scene', 'tags') === 'rich' &&
+        allTags?.length > 0 && (
+          <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" />
+        );
 
-      const galleriesTooltip = scene.galleries && scene.galleries.length > 0 && (
-        <TooltipEntityGrid
-          entityType="gallery"
-          entities={scene.galleries}
-          title="Galleries"
-        />
-      );
+      const galleriesTooltip = getIndicatorBehavior('scene', 'galleries') === 'rich' &&
+        scene.galleries?.length > 0 && (
+          <TooltipEntityGrid
+            entityType="gallery"
+            entities={scene.galleries}
+            title="Galleries"
+          />
+        );
 
       return [
         {
@@ -128,33 +133,34 @@ const SceneCard = forwardRef(
           type: "PERFORMERS",
           count: scene.performers?.length,
           tooltipContent: performersTooltip,
-          onClick: scene.performers?.length > 0 ? () => {
-            navigate(`/performers?sceneId=${scene.id}`);
-          } : undefined,
+          // 'rich' behavior: tooltip only, no onClick (users navigate via entities in tooltip)
+          onClick: getIndicatorBehavior('scene', 'performers') === 'nav' && scene.performers?.length > 0
+            ? () => navigate(`/performers?sceneId=${scene.id}`)
+            : undefined,
         },
         {
           type: "GROUPS",
           count: scene.groups?.length,
           tooltipContent: groupsTooltip,
-          onClick: scene.groups?.length > 0 ? () => {
-            navigate(`/collections?sceneId=${scene.id}`);
-          } : undefined,
+          onClick: getIndicatorBehavior('scene', 'groups') === 'nav' && scene.groups?.length > 0
+            ? () => navigate(`/collections?sceneId=${scene.id}`)
+            : undefined,
         },
         {
           type: "GALLERIES",
           count: scene.galleries?.length,
           tooltipContent: galleriesTooltip,
-          onClick: scene.galleries?.length > 0 ? () => {
-            navigate(`/galleries?sceneId=${scene.id}`);
-          } : undefined,
+          onClick: getIndicatorBehavior('scene', 'galleries') === 'nav' && scene.galleries?.length > 0
+            ? () => navigate(`/galleries?sceneId=${scene.id}`)
+            : undefined,
         },
         {
           type: "TAGS",
           count: allTags?.length,
           tooltipContent: tagsTooltip,
-          onClick: allTags?.length > 0 ? () => {
-            navigate(`/tags?sceneId=${scene.id}`);
-          } : undefined,
+          onClick: getIndicatorBehavior('scene', 'tags') === 'nav' && allTags?.length > 0
+            ? () => navigate(`/tags?sceneId=${scene.id}`)
+            : undefined,
         },
       ];
     }, [scene, allTags, navigate]);
