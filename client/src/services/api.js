@@ -6,7 +6,10 @@
 const API_BASE_URL = "/api";
 const REDIRECT_STORAGE_KEY = "peek_auth_redirect";
 
-// Flag to prevent multiple simultaneous redirects to login
+// Flag to prevent multiple simultaneous redirects to login.
+// This flag is never reset because the page does a full navigation (window.location.href),
+// which destroys the JavaScript context. If this ever changes to SPA-style navigation,
+// the flag would need to be reset after successful login.
 let isRedirectingToLogin = false;
 
 /**
