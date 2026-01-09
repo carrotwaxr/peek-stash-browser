@@ -46,6 +46,19 @@ const Lightbox = ({
     setImageLoaded(false);
   }, [initialIndex]);
 
+  // Track the current image ID to detect when images array changes during page transitions
+  const currentImageId = images[currentIndex]?.id;
+  const prevImageIdRef = useRef(currentImageId);
+
+  // Reset imageLoaded when the actual image changes (e.g., during page transitions)
+  // This handles the case where initialIndex stays the same (e.g., 0) but images array changes
+  useEffect(() => {
+    if (prevImageIdRef.current !== currentImageId) {
+      setImageLoaded(false);
+      prevImageIdRef.current = currentImageId;
+    }
+  }, [currentImageId]);
+
   // Notify parent of index changes (for syncing page on close)
   useEffect(() => {
     if (onIndexChange && isOpen) {
