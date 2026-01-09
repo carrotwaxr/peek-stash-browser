@@ -54,7 +54,7 @@ export const BaseCard = forwardRef(
       // Events & behavior
       onClick,
       className = "",
-      referrerUrl,
+      fromPageTitle,
       tabIndex,
       style,
       onFocus,
@@ -113,7 +113,7 @@ export const BaseCard = forwardRef(
           entityType={entityType}
           objectFit={objectFit}
           linkTo={linkTo}
-          referrerUrl={referrerUrl}
+          fromPageTitle={fromPageTitle}
           onClickOverride={handleNavigationClick}
         >
           {/* Custom image content (e.g., sprite preview) */}
@@ -128,7 +128,7 @@ export const BaseCard = forwardRef(
           subtitle={hideSubtitle ? null : subtitle}
           maxTitleLines={maxTitleLines}
           linkTo={linkTo}
-          referrerUrl={referrerUrl}
+          fromPageTitle={fromPageTitle}
           onClickOverride={handleNavigationClick}
         />
 
