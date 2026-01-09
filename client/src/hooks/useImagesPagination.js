@@ -9,12 +9,16 @@ import { usePaginatedLightbox } from "./usePaginatedLightbox.js";
  * @param {Function} options.fetchImages - Async function (page, perPage) => { images: [], count: number }
  * @param {Array} options.dependencies - Additional dependencies for re-fetching (besides page)
  * @param {number} options.perPage - Images per page (default: 100)
+ * @param {number} options.externalPage - External page number (from URL), makes hook use external state
+ * @param {Function} options.onExternalPageChange - Callback to change external page (required if externalPage provided)
  * @returns {Object} All state and handlers needed for PaginatedImageGrid
  */
 export function useImagesPagination({
   fetchImages,
   dependencies = [],
   perPage = 100,
+  externalPage,
+  onExternalPageChange,
 }) {
   const [images, setImages] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -31,6 +35,8 @@ export function useImagesPagination({
   const lightbox = usePaginatedLightbox({
     perPage,
     totalCount,
+    externalPage,
+    onExternalPageChange,
   });
 
   // Fetch images when page or dependencies change
