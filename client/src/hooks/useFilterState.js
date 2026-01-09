@@ -18,6 +18,7 @@ export const useFilterState = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedRef = useRef(false);
   const searchDebounceRef = useRef(null);
+  const stateRef = useRef(null); // For capturing current state in debounced callbacks
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoadingPresets, setIsLoadingPresets] = useState(true);
 
@@ -140,6 +141,11 @@ export const useFilterState = ({
     };
   }, []);
 
+  // Keep stateRef updated with current values for use in debounced callbacks
+  useEffect(() => {
+    stateRef.current = { filters, sort, pagination, searchText };
+  }, [filters, sort, pagination, searchText]);
+
   // URL sync helper - writes to URL without reading back
   const syncToUrlParams = useCallback((state, options = {}) => {
     if (!syncToUrl || !isInitialized) return;
@@ -250,15 +256,17 @@ export const useFilterState = ({
     }
 
     // Debounce URL update (500ms) to avoid history pollution while typing
+    // Uses stateRef to get current values at timeout execution time, avoiding stale closures
     searchDebounceRef.current = setTimeout(() => {
+      const current = stateRef.current;
       syncToUrlParams({
-        filters,
-        sort,
-        pagination: { ...pagination, page: 1 },
+        filters: current.filters,
+        sort: current.sort,
+        pagination: { ...current.pagination, page: 1 },
         searchText: text,
       }, { replace: true });
     }, 500);
-  }, [filters, sort, pagination, syncToUrlParams]);
+  }, [syncToUrlParams]);
 
   const loadPreset = useCallback((preset) => {
     const newFilters = { ...permanentFilters, ...preset.filters };
