@@ -17,11 +17,19 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange }) => {
   // Filter out tabs with zero count
   const visibleTabs = tabs.filter(tab => tab.count > 0);
 
+  // Pagination/filter params that should be cleared when switching tabs
+  // Each tab has its own pagination state, so these shouldn't carry over
+  const PAGINATION_PARAMS = ['page', 'per_page', 'sort', 'dir', 'q'];
+
   const handleTabClick = (tabId) => {
     if (tabId === activeTab) return; // Already on this tab
 
-    // Update URL query parameter
+    // Update URL query parameter and clear pagination params
     const newParams = new URLSearchParams(searchParams);
+
+    // Clear pagination params - each tab has independent pagination state
+    PAGINATION_PARAMS.forEach(param => newParams.delete(param));
+
     if (tabId === defaultTab) {
       // Remove tab param if switching to default
       newParams.delete('tab');
