@@ -66,4 +66,109 @@ describe("useFilterState", () => {
       expect(result.current.pagination.page).toBe(2);
     });
   });
+
+  describe("preset handling", () => {
+    it("applies full preset (sort + filters) when URL has no filter params", async () => {
+      apiGet.mockImplementation((url) => {
+        if (url === "/user/filter-presets") {
+          return Promise.resolve({
+            presets: {
+              scene: [{ id: "preset-1", sort: "rating", direction: "ASC", filters: { favorite: true } }],
+            },
+          });
+        }
+        if (url === "/user/default-presets") {
+          return Promise.resolve({ defaults: { scene: "preset-1" } });
+        }
+      });
+
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "scene",
+          initialSort: "o_counter",
+          filterOptions: [{ key: "favorite", type: "checkbox" }],
+        }),
+        { wrapper: createWrapper(["/"]) } // No URL params
+      );
+
+      await waitFor(() => {
+        expect(result.current.isInitialized).toBe(true);
+      });
+
+      // Should have preset sort AND filters
+      expect(result.current.sort.field).toBe("rating");
+      expect(result.current.sort.direction).toBe("ASC");
+      expect(result.current.filters.favorite).toBe(true);
+    });
+
+    it("applies preset sort ONLY when URL has filter params", async () => {
+      apiGet.mockImplementation((url) => {
+        if (url === "/user/filter-presets") {
+          return Promise.resolve({
+            presets: {
+              performer: [{ id: "preset-1", sort: "rating", direction: "ASC", filters: { favorite: true } }],
+            },
+          });
+        }
+        if (url === "/user/default-presets") {
+          return Promise.resolve({ defaults: { performer: "preset-1" } });
+        }
+      });
+
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "performer",
+          initialSort: "o_counter",
+          filterOptions: [
+            { key: "favorite", type: "checkbox" },
+            { key: "sceneId", type: "searchable-select" },
+          ],
+        }),
+        { wrapper: createWrapper(["/?sceneId=123"]) } // Has filter params
+      );
+
+      await waitFor(() => {
+        expect(result.current.isInitialized).toBe(true);
+      });
+
+      // Should have preset SORT only
+      expect(result.current.sort.field).toBe("rating");
+      expect(result.current.sort.direction).toBe("ASC");
+      // Should NOT have preset filters - only URL filter
+      expect(result.current.filters.favorite).toBeUndefined();
+      expect(result.current.filters.sceneId).toBe("123");
+    });
+
+    it("URL sort takes precedence over preset sort", async () => {
+      apiGet.mockImplementation((url) => {
+        if (url === "/user/filter-presets") {
+          return Promise.resolve({
+            presets: {
+              scene: [{ id: "preset-1", sort: "rating", direction: "ASC", filters: {} }],
+            },
+          });
+        }
+        if (url === "/user/default-presets") {
+          return Promise.resolve({ defaults: { scene: "preset-1" } });
+        }
+      });
+
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "scene",
+          initialSort: "o_counter",
+          filterOptions: [],
+        }),
+        { wrapper: createWrapper(["/?sort=date&dir=DESC"]) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isInitialized).toBe(true);
+      });
+
+      // URL sort wins over preset
+      expect(result.current.sort.field).toBe("date");
+      expect(result.current.sort.direction).toBe("DESC");
+    });
+  });
 });

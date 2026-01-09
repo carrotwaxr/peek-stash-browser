@@ -65,14 +65,18 @@ export const useFilterState = ({
           filters: { ...permanentFilters },
         });
 
+        // Check if URL explicitly has sort params
+        const hasUrlSort = searchParams.has("sort");
+        const hasUrlDirection = searchParams.has("dir");
+
         let finalState;
 
         if (hasFilterParams) {
-          // URL has filter params: use preset SORT only, URL filters
+          // URL has filter params: use URL sort if explicit, otherwise preset SORT, URL filters
           finalState = {
             filters: urlState.filters,
-            sortField: urlState.sortField || defaultPreset?.sort || initialSort,
-            sortDirection: urlState.sortDirection || defaultPreset?.direction || "DESC",
+            sortField: hasUrlSort ? urlState.sortField : (defaultPreset?.sort || initialSort),
+            sortDirection: hasUrlDirection ? urlState.sortDirection : (defaultPreset?.direction || "DESC"),
             currentPage: urlState.currentPage,
             perPage: urlState.perPage,
             searchText: urlState.searchText,
