@@ -289,7 +289,6 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No galleries found with tag "${tag?.name}"`}
             />
           )}
@@ -309,7 +308,6 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No performers found with tag "${tag?.name}"`}
             />
           )}
@@ -325,7 +323,6 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No studios found with tag "${tag?.name}"`}
             />
           )}
@@ -341,7 +338,6 @@ const TagDetail = () => {
                 },
               }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No collections found with tag "${tag?.name}"`}
             />
           )}
@@ -564,6 +560,22 @@ const TagDetails = ({ tag }) => {
 
 // Images Tab Component with Lightbox
 const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL-based page state for image pagination
+  const urlPage = parseInt(searchParams.get('page')) || 1;
+
+  const handleImagePageChange = useCallback((newPage) => {
+    const params = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(newPage));
+    }
+    // Preserve tab param
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
+
   const fetchImages = useCallback(
     async (page, perPage) => {
       const data = await libraryApi.findImages({
@@ -587,6 +599,8 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
   const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
     fetchImages,
     dependencies: [tagId, includeSubTags],
+    externalPage: urlPage,
+    onExternalPageChange: handleImagePageChange,
   });
 
   return (

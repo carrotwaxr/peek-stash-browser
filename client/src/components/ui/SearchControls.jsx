@@ -87,6 +87,7 @@ const SearchControls = ({
   children,
   initialSort = "o_counter",
   onQueryChange,
+  onPerPageStateChange, // Callback to notify parent of perPage state changes (fixes stale URL param bug)
   paginationHandlerRef, // Optional ref to expose handlePageChange for TV mode
   permanentFilters = {},
   permanentFiltersMetadata = {},
@@ -243,6 +244,13 @@ const SearchControls = ({
   const perPage = pagination.perPage;
   const sortField = sort.field;
   const sortDirection = sort.direction;
+
+  // Notify parent of perPage state changes (fixes stale URL param bug)
+  useEffect(() => {
+    if (onPerPageStateChange) {
+      onPerPageStateChange(perPage);
+    }
+  }, [perPage, onPerPageStateChange]);
 
   // Local filters state for filter panel editing (before submit)
   const [localFilters, setLocalFilters] = useState(filters);

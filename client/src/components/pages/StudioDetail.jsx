@@ -264,7 +264,6 @@ const StudioDetail = () => {
                     modifier: "INCLUDES",
                     ...(includeSubStudios && { depth: -1 }) } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No galleries found for ${studio?.name}`}
             />
           )}
@@ -285,7 +284,6 @@ const StudioDetail = () => {
                     value: [parseInt(studioId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No performers found for ${studio?.name}`}
             />
           )}
@@ -298,7 +296,6 @@ const StudioDetail = () => {
                     value: [parseInt(studioId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No collections found for ${studio?.name}`}
             />
           )}
@@ -643,6 +640,22 @@ const StudioDetails = ({ studio }) => {
 
 // Images Tab Component with Lightbox
 const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL-based page state for image pagination
+  const urlPage = parseInt(searchParams.get('page')) || 1;
+
+  const handleImagePageChange = useCallback((newPage) => {
+    const params = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(newPage));
+    }
+    // Preserve tab param
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
+
   const fetchImages = useCallback(
     async (page, perPage) => {
       const data = await libraryApi.findImages({
@@ -666,6 +679,8 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
   const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
     fetchImages,
     dependencies: [studioId, includeSubStudios],
+    externalPage: urlPage,
+    onExternalPageChange: handleImagePageChange,
   });
 
   return (

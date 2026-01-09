@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Play } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -28,7 +28,7 @@ const GalleryDetail = () => {
   const { galleryId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [gallery, setGallery] = useState(null);
   const [images, setImages] = useState([]);
@@ -40,10 +40,26 @@ const GalleryDetail = () => {
   // Get active tab from URL or default to 'images'
   const activeTab = searchParams.get('tab') || 'images';
 
+  // URL-based page state for image pagination
+  const urlPage = parseInt(searchParams.get('page')) || 1;
+
+  const handleImagePageChange = useCallback((newPage) => {
+    const params = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(newPage));
+    }
+    // Preserve tab param if present
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
+
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
     perPage: PER_PAGE,
     totalCount,
+    externalPage: urlPage,
+    onExternalPageChange: handleImagePageChange,
   });
 
   // Set page title to gallery name

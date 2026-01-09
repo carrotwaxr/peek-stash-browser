@@ -199,7 +199,6 @@ const PerformerDetail = () => {
                     value: [parseInt(performerId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No galleries found for ${performer.name}`}
             />
           )}
@@ -216,7 +215,6 @@ const PerformerDetail = () => {
                     value: [parseInt(performerId, 10)],
                     modifier: "INCLUDES" } } }}
               hideLockedFilters
-              syncToUrl={false}
               emptyMessage={`No collections found for ${performer.name}`}
             />
           )}
@@ -675,6 +673,22 @@ const PerformerLinks = ({ performer }) => {
 
 // Images Tab Component with Lightbox
 const ImagesTab = ({ performerId, performerName }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL-based page state for image pagination
+  const urlPage = parseInt(searchParams.get('page')) || 1;
+
+  const handleImagePageChange = useCallback((newPage) => {
+    const params = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      params.delete('page');
+    } else {
+      params.set('page', String(newPage));
+    }
+    // Preserve tab param
+    setSearchParams(params);
+  }, [searchParams, setSearchParams]);
+
   const fetchImages = useCallback(
     async (page, perPage) => {
       const data = await libraryApi.findImages({
@@ -697,6 +711,8 @@ const ImagesTab = ({ performerId, performerName }) => {
   const { images, totalCount, isLoading, lightbox, setImages } = useImagesPagination({
     fetchImages,
     dependencies: [performerId],
+    externalPage: urlPage,
+    onExternalPageChange: handleImagePageChange,
   });
 
   return (

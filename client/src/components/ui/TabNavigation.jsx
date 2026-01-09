@@ -1,27 +1,42 @@
 import { useSearchParams } from "react-router-dom";
 
+/** Use this value for tab count when data is still loading (shows tab without count badge) */
+export const TAB_COUNT_LOADING = -1;
+
 /**
  * TabNavigation - A reusable tab navigation component with URL query parameter support
  *
  * @param {Object} props
  * @param {Array<{id: string, label: string, count: number}>} props.tabs - Array of tab objects
+ *   - count > 0: Show tab with count badge
+ *   - count === 0: Hide tab (no content)
+ *   - count === TAB_COUNT_LOADING (-1): Show tab without count badge (loading state)
  * @param {string} props.defaultTab - Default tab ID if none specified in URL
  * @param {Function} [props.onTabChange] - Optional callback when tab changes (receives tabId)
+ * @param {boolean} [props.showSingleTab] - If true, show tab bar even when only one tab is visible
  */
-const TabNavigation = ({ tabs, defaultTab, onTabChange }) => {
+const TabNavigation = ({ tabs, defaultTab, onTabChange, showSingleTab = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get active tab from URL or use default
   const activeTab = searchParams.get('tab') || defaultTab;
 
-  // Filter out tabs with zero count
-  const visibleTabs = tabs.filter(tab => tab.count > 0);
+  // Filter out tabs with zero count (TAB_COUNT_LOADING means loading, show tab without badge)
+  const visibleTabs = tabs.filter(tab => tab.count > 0 || tab.count === TAB_COUNT_LOADING);
+
+  // Pagination/filter params that should be cleared when switching tabs
+  // Each tab has its own pagination state, so these shouldn't carry over
+  const PAGINATION_PARAMS = ['page', 'per_page', 'sort', 'dir', 'q'];
 
   const handleTabClick = (tabId) => {
     if (tabId === activeTab) return; // Already on this tab
 
-    // Update URL query parameter
+    // Update URL query parameter and clear pagination params
     const newParams = new URLSearchParams(searchParams);
+
+    // Clear pagination params - each tab has independent pagination state
+    PAGINATION_PARAMS.forEach(param => newParams.delete(param));
+
     if (tabId === defaultTab) {
       // Remove tab param if switching to default
       newParams.delete('tab');
@@ -41,8 +56,8 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange }) => {
     return null;
   }
 
-  // If only one visible tab, don't show tab navigation
-  if (visibleTabs.length === 1) {
+  // If only one visible tab, don't show tab navigation (unless showSingleTab is true)
+  if (visibleTabs.length === 1 && !showSingleTab) {
     return null;
   }
 
@@ -74,7 +89,7 @@ const TabNavigation = ({ tabs, defaultTab, onTabChange }) => {
             >
               <span className="flex items-center gap-2">
                 <span>{tab.label}</span>
-                {tab.count !== undefined && (
+                {tab.count !== undefined && tab.count >= 0 && (
                   <span
                     className="text-xs font-semibold px-2 py-0.5 rounded-full"
                     style={{
