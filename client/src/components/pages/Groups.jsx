@@ -53,7 +53,10 @@ const Groups = () => {
     items: currentGroups,
     columns,
     totalPages,
-    onItemSelect: (group) => navigate(`/collection/${group.id}`),
+    onItemSelect: (group) =>
+      navigate(`/collection/${group.id}`, {
+        state: { fromPageTitle: "Collections" },
+      }),
   });
 
   // Initial focus

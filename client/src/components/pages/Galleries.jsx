@@ -53,7 +53,10 @@ const Galleries = () => {
     items: currentGalleries,
     columns,
     totalPages,
-    onItemSelect: (gallery) => navigate(`/gallery/${gallery.id}`),
+    onItemSelect: (gallery) =>
+      navigate(`/gallery/${gallery.id}`, {
+        state: { fromPageTitle: "Galleries" },
+      }),
   });
 
   useInitialFocus(

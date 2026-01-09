@@ -52,7 +52,10 @@ const Studios = () => {
     items: currentStudios,
     columns,
     totalPages,
-    onItemSelect: (studio) => navigate(`/studio/${studio.id}`),
+    onItemSelect: (studio) =>
+      navigate(`/studio/${studio.id}`, {
+        state: { fromPageTitle: "Studios" },
+      }),
   });
 
   // Initial focus

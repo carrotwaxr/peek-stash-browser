@@ -53,7 +53,10 @@ const Tags = () => {
     items: currentTags,
     columns,
     totalPages,
-    onItemSelect: (tag) => navigate(`/tag/${tag.id}`),
+    onItemSelect: (tag) =>
+      navigate(`/tag/${tag.id}`, {
+        state: { fromPageTitle: "Tags" },
+      }),
   });
 
   // Initial focus

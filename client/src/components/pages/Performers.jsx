@@ -56,7 +56,7 @@ const Performers = () => {
     totalPages,
     onItemSelect: (performer) =>
       navigate(`/performer/${performer.id}`, {
-        state: { referrerUrl: `${location.pathname}${location.search}` },
+        state: { fromPageTitle: "Performers" },
       }),
   });
 
