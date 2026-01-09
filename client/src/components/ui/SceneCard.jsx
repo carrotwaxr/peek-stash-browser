@@ -257,7 +257,7 @@ const SceneCard = forwardRef(
         entityType="scene"
         entity={scene}
         linkTo={`/scene/${scene.id}`}
-        referrerUrl="/scenes"
+        fromPageTitle="/scenes"
         // Selection mode - BaseCard handles all gesture/keyboard logic
         selectionMode={selectionMode}
         isSelected={isSelected}

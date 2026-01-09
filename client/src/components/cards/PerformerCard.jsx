@@ -10,7 +10,7 @@ import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
  * Uses BaseCard with performer-specific configuration
  */
 const PerformerCard = forwardRef(
-  ({ performer, referrerUrl, isTVMode, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ performer, fromPageTitle, isTVMode, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     const indicators = useMemo(() => {
@@ -81,7 +81,7 @@ const PerformerCard = forwardRef(
           </div>
         }
         linkTo={`/performer/${performer.id}`}
-        referrerUrl={referrerUrl}
+        fromPageTitle={fromPageTitle}
         tabIndex={isTVMode ? tabIndex : -1}
         hideDescription
         hideSubtitle

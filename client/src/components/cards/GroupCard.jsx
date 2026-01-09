@@ -8,7 +8,7 @@ import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
  * GroupCard - Card for displaying group/collection entities
  */
 const GroupCard = forwardRef(
-  ({ group, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ group, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     // Build subtitle from studio and date
@@ -83,7 +83,7 @@ const GroupCard = forwardRef(
         subtitle={subtitle}
         description={group.description}
         linkTo={`/collection/${group.id}`}
-        referrerUrl={referrerUrl}
+        fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}

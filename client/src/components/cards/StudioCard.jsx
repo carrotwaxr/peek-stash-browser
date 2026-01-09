@@ -8,7 +8,7 @@ import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
  * StudioCard - Card for displaying studio entities
  */
 const StudioCard = forwardRef(
-  ({ studio, referrerUrl, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ studio, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
     const navigate = useNavigate();
 
     const indicators = useMemo(() => {
@@ -81,7 +81,7 @@ const StudioCard = forwardRef(
         title={studio.name}
         description={studio.details}
         linkTo={`/studio/${studio.id}`}
-        referrerUrl={referrerUrl}
+        fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
