@@ -1,6 +1,6 @@
 // client/src/hooks/__tests__/useImagesPagination.test.jsx
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { useImagesPagination } from "../useImagesPagination.js";
 
 describe("useImagesPagination", () => {
@@ -99,7 +99,7 @@ describe("useImagesPagination", () => {
       const fetchImages = createMockFetchImages([], 100);
       const onExternalPageChange = vi.fn();
 
-      const { result, rerender } = renderHook(
+      const { rerender } = renderHook(
         ({ externalPage }) =>
           useImagesPagination({
             fetchImages,
