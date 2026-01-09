@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
@@ -30,6 +30,9 @@ const Images = () => {
   const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
   const urlPage = parseInt(searchParams.get("page")) || 1;
 
+  // Track effective perPage from SearchControls state (fixes stale URL param bug)
+  const [effectivePerPage, setEffectivePerPage] = useState(urlPerPage);
+
   // Ref to expose SearchControls pagination handler for external use
   const paginationHandlerRef = useRef(null);
 
@@ -48,7 +51,7 @@ const Images = () => {
 
   const currentImages = useMemo(() => data?.images || [], [data?.images]);
   const totalCount = data?.count || 0;
-  const totalPages = Math.ceil(totalCount / urlPerPage);
+  const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
   const pageOffset = (urlPage - 1) * urlPerPage;
 
   // Paginated lightbox with external pagination (synced to URL)
@@ -159,6 +162,7 @@ const Images = () => {
           artifactType="image"
           initialSort="created_at"
           onQueryChange={handleQueryChange}
+          onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
           {...searchControlsProps}

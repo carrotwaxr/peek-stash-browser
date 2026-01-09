@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
@@ -92,11 +92,11 @@ const SceneSearch = ({
 
   const totalCount = data?.count || 0;
 
-  // Read pagination state from URL params
-  const currentPerPage = parseInt(searchParams.get("per_page")) || 24;
-
-  // Calculate totalPages based on currentPerPage from query
-  const totalPages = Math.ceil(totalCount / currentPerPage);
+  // Track effective perPage from SearchControls state (fixes stale URL param bug)
+  const [effectivePerPage, setEffectivePerPage] = useState(
+    parseInt(searchParams.get("per_page")) || 24
+  );
+  const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
   const {
@@ -132,6 +132,7 @@ const SceneSearch = ({
         context={context}
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
+        onPerPageStateChange={setEffectivePerPage}
         permanentFilters={permanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}

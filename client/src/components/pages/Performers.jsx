@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
@@ -37,9 +37,11 @@ const Performers = () => {
   const currentPerformers = data?.performers || [];
   const totalCount = data?.count || 0;
 
-  // Calculate totalPages based on URL params
-  const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
-  const totalPages = Math.ceil(totalCount / urlPerPage);
+  // Track effective perPage from SearchControls state (fixes stale URL param bug)
+  const [effectivePerPage, setEffectivePerPage] = useState(
+    parseInt(searchParams.get("per_page")) || 24
+  );
+  const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
   const {
@@ -110,6 +112,7 @@ const Performers = () => {
           artifactType="performer"
           initialSort="o_counter"
           onQueryChange={handleQueryChange}
+          onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
           {...searchControlsProps}
