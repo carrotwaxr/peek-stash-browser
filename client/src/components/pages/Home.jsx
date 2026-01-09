@@ -79,7 +79,7 @@ const buildCustomCarouselUrl = (rules, sort, direction) => {
 };
 
 const Home = () => {
-  usePageTitle(); // Sets "Peek"
+  usePageTitle("Home");
   const navigate = useNavigate();
   const location = useLocation();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
