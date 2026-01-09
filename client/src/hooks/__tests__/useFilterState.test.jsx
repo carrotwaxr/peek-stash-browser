@@ -1,6 +1,6 @@
 // client/src/hooks/__tests__/useFilterState.test.jsx
 import { renderHook, waitFor, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { useFilterState } from "../useFilterState.js";
 
@@ -263,6 +263,111 @@ describe("useFilterState", () => {
 
       expect(result.current.filters.favorite).toBeUndefined();
       expect(result.current.filters.studioId).toBe("456"); // Permanent kept
+    });
+  });
+
+  describe("search text debounce", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("debounces search text URL updates by 500ms", async () => {
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "scene",
+          filterOptions: [],
+          syncToUrl: true,
+        }),
+        { wrapper: createWrapper(["/"]) }
+      );
+
+      // Wait for initialization (run all pending promises/timers)
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      expect(result.current.isInitialized).toBe(true);
+
+      // Update search text
+      act(() => {
+        result.current.setSearchText("test");
+      });
+
+      // State updates immediately
+      expect(result.current.searchText).toBe("test");
+      // Page resets immediately
+      expect(result.current.pagination.page).toBe(1);
+
+      // Type more characters rapidly (simulating typing)
+      act(() => {
+        result.current.setSearchText("test2");
+      });
+      expect(result.current.searchText).toBe("test2");
+
+      act(() => {
+        result.current.setSearchText("test query");
+      });
+      expect(result.current.searchText).toBe("test query");
+
+      // Advance timers by 500ms to trigger debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+
+      // Final state should be the last typed value
+      expect(result.current.searchText).toBe("test query");
+    });
+
+    it("clears pending debounce when typing continues", async () => {
+      const { result } = renderHook(
+        () => useFilterState({
+          artifactType: "scene",
+          filterOptions: [],
+          syncToUrl: true,
+        }),
+        { wrapper: createWrapper(["/"]) }
+      );
+
+      // Wait for initialization
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+
+      expect(result.current.isInitialized).toBe(true);
+
+      // Type first character
+      act(() => {
+        result.current.setSearchText("a");
+      });
+
+      // Wait 300ms (less than 500ms debounce)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      // Type another character (should reset debounce timer)
+      act(() => {
+        result.current.setSearchText("ab");
+      });
+
+      // Wait another 300ms (total 600ms from first keystroke, but only 300ms from second)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+
+      // State should show latest value
+      expect(result.current.searchText).toBe("ab");
+
+      // Complete the debounce
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(result.current.searchText).toBe("ab");
     });
   });
 });

@@ -17,6 +17,7 @@ export const useFilterState = ({
   const effectiveContext = context || artifactType;
   const [searchParams, setSearchParams] = useSearchParams();
   const initializedRef = useRef(false);
+  const searchDebounceRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoadingPresets, setIsLoadingPresets] = useState(true);
 
@@ -130,6 +131,15 @@ export const useFilterState = ({
     initialize();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cleanup search debounce on unmount
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
+
   // URL sync helper - writes to URL without reading back
   const syncToUrlParams = useCallback((state, options = {}) => {
     if (!syncToUrl || !isInitialized) return;
@@ -233,13 +243,21 @@ export const useFilterState = ({
   const setSearchText = useCallback((text) => {
     setSearchTextState(text);
     setPaginationState((prev) => ({ ...prev, page: 1 }));
-    // Search text uses replace to avoid history pollution
-    syncToUrlParams({
-      filters,
-      sort,
-      pagination: { ...pagination, page: 1 },
-      searchText: text,
-    }, { replace: true });
+
+    // Clear any pending debounce
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    // Debounce URL update (500ms) to avoid history pollution while typing
+    searchDebounceRef.current = setTimeout(() => {
+      syncToUrlParams({
+        filters,
+        sort,
+        pagination: { ...pagination, page: 1 },
+        searchText: text,
+      }, { replace: true });
+    }, 500);
   }, [filters, sort, pagination, syncToUrlParams]);
 
   const loadPreset = useCallback((preset) => {
