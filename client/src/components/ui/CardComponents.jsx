@@ -71,7 +71,7 @@ CardContainer.displayName = "CardContainer";
  * @param {Object} [props.style] - Additional inline styles
  * @param {Function} [props.onClick] - Click handler
  * @param {string} [props.linkTo] - Navigation link URL
- * @param {string} [props.referrerUrl] - Referrer URL for navigation state
+  * @param {string} [props.fromPageTitle] - Page title for back navigation context
  * @param {Function} [props.onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 export const CardImage = ({
@@ -85,7 +85,7 @@ export const CardImage = ({
   style = {},
   onClick,
   linkTo,
-  referrerUrl,
+  fromPageTitle,
   onClickOverride,
 }) => {
   const [ref, isVisible] = useLazyLoad();
@@ -169,7 +169,7 @@ export const CardImage = ({
       <Link
         ref={ref}
         to={linkTo}
-        state={{ referrerUrl }}
+        state={{ fromPageTitle }}
         className={containerClasses}
         style={containerStyle}
         onClick={onClickOverride}
@@ -311,7 +311,7 @@ export const CardOverlay = ({ position = "bottom-left", children, className = ""
  * @param {boolean} hideSubtitle - Whether to hide subtitle (default: false)
  * @param {number} maxTitleLines - Maximum lines for title (default: 1)
  * @param {string} [linkTo] - Navigation link URL
- * @param {string} [referrerUrl] - Referrer URL for navigation state
+  * @param {string} [fromPageTitle] - Page title for back navigation context
  * @param {Function} [onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 export const CardTitle = ({
@@ -320,7 +320,7 @@ export const CardTitle = ({
   hideSubtitle = false,
   maxTitleLines = 1,
   linkTo,
-  referrerUrl,
+  fromPageTitle,
   onClickOverride,
 }) => {
   // Calculate fixed height based on line count
@@ -353,7 +353,7 @@ export const CardTitle = ({
   const titleContent = linkTo ? (
     <Link
       to={linkTo}
-      state={{ referrerUrl }}
+      state={{ fromPageTitle }}
       className="block hover:underline cursor-pointer"
       onClick={onClickOverride}
     >
@@ -385,7 +385,7 @@ export const CardTitle = ({
   const subtitleContent = linkTo && subtitleElement ? (
     <Link
       to={linkTo}
-      state={{ referrerUrl }}
+      state={{ fromPageTitle }}
       className="block cursor-pointer"
       onClick={onClickOverride}
     >
