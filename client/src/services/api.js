@@ -4,6 +4,13 @@
  */
 
 const API_BASE_URL = "/api";
+const REDIRECT_STORAGE_KEY = "peek_auth_redirect";
+
+// Flag to prevent multiple simultaneous redirects to login.
+// This flag is never reset because the page does a full navigation (window.location.href),
+// which destroys the JavaScript context. If this ever changes to SPA-style navigation,
+// the flag would need to be reset after successful login.
+let isRedirectingToLogin = false;
 
 /**
  * Base fetch wrapper with error handling
@@ -37,6 +44,21 @@ async function apiFetch(endpoint, options = {}) {
       errorData = await response.json();
     } catch {
       errorData = { error: `HTTP error! status: ${response.status}` };
+    }
+
+    // Handle auth failures (401/403) - redirect to login
+    // Exclude auth endpoints to avoid redirect loops
+    const isAuthEndpoint = endpoint.startsWith("/auth/");
+    if ((response.status === 401 || response.status === 403) && !isAuthEndpoint && !isRedirectingToLogin) {
+      isRedirectingToLogin = true;
+      // Save current URL for redirect after login
+      const currentUrl = window.location.pathname + window.location.search;
+      if (currentUrl !== "/login" && currentUrl !== "/setup") {
+        sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
+      }
+      window.location.href = "/login";
+      // Return a never-resolving promise to prevent further processing
+      return new Promise(() => {});
     }
 
     // Create error with additional metadata
@@ -94,6 +116,9 @@ async function apiDelete(endpoint) {
 
 // Export API helper functions
 export { apiGet, apiPost, apiPut, apiDelete };
+
+// Export redirect storage key for use by Login component
+export { REDIRECT_STORAGE_KEY };
 
 // New filtered search API endpoints
 export const libraryApi = {

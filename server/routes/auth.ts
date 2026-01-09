@@ -4,6 +4,7 @@ import {
   AuthenticatedRequest,
   authenticate,
   generateToken,
+  setTokenCookie,
 } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { authenticated } from "../utils/routeHelpers.js";
@@ -41,11 +42,7 @@ router.post("/login", async (req, res) => {
     });
 
     // Set HTTP-only cookie
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.SECURE_COOKIES === "true",
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    });
+    setTokenCookie(res, token);
 
     res.json({
       success: true,
