@@ -742,7 +742,7 @@ class TagQueryBuilder {
   }
 
   /**
-   * Populate tag relations (performers, studios, groups, galleries)
+   * Populate tag relations (performers, studios, groups, galleries, parent names)
    * Includes minimal data for TooltipEntityGrid: id, name, image_path/cover
    */
   async populateRelations(tags: NormalizedTag[]): Promise<void> {
@@ -750,8 +750,20 @@ class TagQueryBuilder {
 
     const tagIds = tags.map((t) => t.id);
 
-    // Load all junctions in parallel
-    const [performerTags, studioTags, groupTags, galleryTags] = await Promise.all([
+    // Collect all parent IDs that need name hydration
+    const parentIds = new Set<string>();
+    for (const tag of tags) {
+      if (tag.parents && Array.isArray(tag.parents)) {
+        for (const parent of tag.parents) {
+          if (parent.id) {
+            parentIds.add(parent.id);
+          }
+        }
+      }
+    }
+
+    // Load all junctions in parallel (include parent tags lookup)
+    const [performerTags, studioTags, groupTags, galleryTags, parentTagRecords] = await Promise.all([
       prisma.performerTag.findMany({
         where: { tagId: { in: tagIds } },
         select: { tagId: true, performerId: true },
@@ -768,7 +780,28 @@ class TagQueryBuilder {
         where: { tagId: { in: tagIds } },
         select: { tagId: true, galleryId: true },
       }),
+      // Fetch parent tag names
+      parentIds.size > 0
+        ? prisma.stashTag.findMany({
+            where: { id: { in: Array.from(parentIds) } },
+            select: { id: true, name: true },
+          })
+        : [],
     ]);
+
+    // Build parent name lookup map and hydrate parent names
+    const parentNameMap = new Map<string, string>();
+    for (const pt of parentTagRecords) {
+      parentNameMap.set(pt.id, pt.name || "Unknown");
+    }
+    for (const tag of tags) {
+      if (tag.parents && Array.isArray(tag.parents)) {
+        (tag as any).parents = tag.parents.map((p) => ({
+          id: p.id,
+          name: parentNameMap.get(p.id) || "Unknown",
+        }));
+      }
+    }
 
     // Get unique entity IDs
     const performerIds = [...new Set(performerTags.map((pt) => pt.performerId))];
