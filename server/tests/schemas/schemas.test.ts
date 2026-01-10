@@ -3,7 +3,8 @@
  *
  * Verify Zod schemas accept valid data and reject invalid data.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { z } from "zod";
 import {
   SceneSchema,
   PerformerSchema,
@@ -17,7 +18,17 @@ import {
   TagRefSchema,
   GroupRefSchema,
   GalleryRefSchema,
+  ApiErrorResponseSchema,
+  ApiSuccessResponseSchema,
+  CacheNotReadyResponseSchema,
+  PaginationMetaSchema,
 } from "../../schemas/index.js";
+import {
+  validateResponse,
+  safeValidateResponse,
+  validateArrayResponse,
+} from "../../utils/schemaValidation.js";
+import { logger } from "../../utils/logger.js";
 
 describe("Reference Schemas", () => {
   describe("PerformerRefSchema", () => {
@@ -792,5 +803,291 @@ describe("Type coercion", () => {
     expect(result.o_history).toHaveLength(2);
     expect(result.o_history[0]).toBeInstanceOf(Date);
     expect(result.o_history[1]).toBeInstanceOf(Date);
+  });
+});
+
+describe("API Response Schemas", () => {
+  describe("ApiErrorResponseSchema", () => {
+    it("validates error with required fields only", () => {
+      const valid = { error: "Something went wrong" };
+      expect(() => ApiErrorResponseSchema.parse(valid)).not.toThrow();
+    });
+
+    it("validates error with all optional fields", () => {
+      const valid = {
+        error: "Something went wrong",
+        message: "Detailed message",
+        details: "Stack trace or additional info",
+        errorType: "ValidationError",
+      };
+      expect(() => ApiErrorResponseSchema.parse(valid)).not.toThrow();
+    });
+
+    it("rejects missing error field", () => {
+      const invalid = { message: "Just a message" };
+      expect(() => ApiErrorResponseSchema.parse(invalid)).toThrow();
+    });
+  });
+
+  describe("ApiSuccessResponseSchema", () => {
+    it("validates success response without message", () => {
+      const valid = { success: true };
+      expect(() => ApiSuccessResponseSchema.parse(valid)).not.toThrow();
+    });
+
+    it("validates success response with message", () => {
+      const valid = { success: true, message: "Operation completed" };
+      expect(() => ApiSuccessResponseSchema.parse(valid)).not.toThrow();
+    });
+
+    it("rejects success: false (literal validation)", () => {
+      const invalid = { success: false };
+      expect(() => ApiSuccessResponseSchema.parse(invalid)).toThrow();
+    });
+
+    it("rejects missing success field", () => {
+      const invalid = { message: "No success field" };
+      expect(() => ApiSuccessResponseSchema.parse(invalid)).toThrow();
+    });
+  });
+
+  describe("CacheNotReadyResponseSchema", () => {
+    it("validates cache not ready response", () => {
+      const valid = {
+        error: "Cache not initialized",
+        message: "Please wait for cache to warm up",
+        ready: false,
+      };
+      expect(() => CacheNotReadyResponseSchema.parse(valid)).not.toThrow();
+    });
+
+    it("rejects ready: true (literal validation)", () => {
+      const invalid = {
+        error: "Cache ready",
+        message: "All good",
+        ready: true,
+      };
+      expect(() => CacheNotReadyResponseSchema.parse(invalid)).toThrow();
+    });
+
+    it("rejects missing required fields", () => {
+      const invalid = { ready: false };
+      expect(() => CacheNotReadyResponseSchema.parse(invalid)).toThrow();
+    });
+  });
+
+  describe("PaginationMetaSchema", () => {
+    it("validates pagination metadata", () => {
+      const valid = {
+        page: 1,
+        per_page: 25,
+        total: 100,
+        total_pages: 4,
+      };
+      expect(() => PaginationMetaSchema.parse(valid)).not.toThrow();
+    });
+
+    it("validates edge case with zero total", () => {
+      const valid = {
+        page: 1,
+        per_page: 25,
+        total: 0,
+        total_pages: 0,
+      };
+      expect(() => PaginationMetaSchema.parse(valid)).not.toThrow();
+    });
+
+    it("rejects missing fields", () => {
+      const invalid = { page: 1, per_page: 25 };
+      expect(() => PaginationMetaSchema.parse(invalid)).toThrow();
+    });
+
+    it("rejects non-numeric values", () => {
+      const invalid = {
+        page: "1",
+        per_page: 25,
+        total: 100,
+        total_pages: 4,
+      };
+      expect(() => PaginationMetaSchema.parse(invalid)).toThrow();
+    });
+  });
+});
+
+describe("Validation Utilities", () => {
+  // Simple test schema
+  const TestSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    value: z.number().optional(),
+  });
+
+  // Mock logger
+  beforeEach(() => {
+    vi.spyOn(logger, "error").mockImplementation(() => {});
+    vi.spyOn(logger, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("validateResponse", () => {
+    it("validates and returns correct data", () => {
+      const data = { id: "1", name: "Test", value: 42 };
+      const result = validateResponse(TestSchema, data, "test");
+      expect(result).toEqual(data);
+    });
+
+    it("strips extra fields from data", () => {
+      const data = { id: "1", name: "Test", extra: "should be removed" };
+      const result = validateResponse(TestSchema, data, "test");
+      expect(result).toEqual({ id: "1", name: "Test" });
+      expect(result).not.toHaveProperty("extra");
+    });
+
+    it("throws ZodError for invalid data", () => {
+      const data = { id: 123, name: "Test" }; // id should be string
+      expect(() => validateResponse(TestSchema, data, "test")).toThrow();
+    });
+
+    it("logs error details on validation failure", () => {
+      const data = { id: 123, name: "Test" };
+      try {
+        validateResponse(TestSchema, data, "test context");
+      } catch {
+        // Expected to throw
+      }
+      expect(logger.error).toHaveBeenCalledWith(
+        "Schema validation failed for test context",
+        expect.objectContaining({
+          issues: expect.arrayContaining([
+            expect.objectContaining({
+              path: "id",
+              code: expect.any(String),
+            }),
+          ]),
+        })
+      );
+    });
+
+    it("handles deeply nested validation errors", () => {
+      const NestedSchema = z.object({
+        user: z.object({
+          profile: z.object({
+            email: z.string().email(),
+          }),
+        }),
+      });
+      const data = { user: { profile: { email: "not-an-email" } } };
+      try {
+        validateResponse(NestedSchema, data, "nested");
+      } catch {
+        // Expected to throw
+      }
+      expect(logger.error).toHaveBeenCalledWith(
+        "Schema validation failed for nested",
+        expect.objectContaining({
+          issues: expect.arrayContaining([
+            expect.objectContaining({
+              path: "user.profile.email",
+            }),
+          ]),
+        })
+      );
+    });
+  });
+
+  describe("safeValidateResponse", () => {
+    it("returns validated data on success", () => {
+      const data = { id: "1", name: "Test" };
+      const result = safeValidateResponse(TestSchema, data, "test");
+      expect(result).toEqual(data);
+    });
+
+    it("returns null on validation failure", () => {
+      const data = { id: 123, name: "Test" }; // id should be string
+      const result = safeValidateResponse(TestSchema, data, "test");
+      expect(result).toBeNull();
+    });
+
+    it("strips extra fields from valid data", () => {
+      const data = { id: "1", name: "Test", secret: "hidden" };
+      const result = safeValidateResponse(TestSchema, data, "test");
+      expect(result).toEqual({ id: "1", name: "Test" });
+      expect(result).not.toHaveProperty("secret");
+    });
+
+    it("logs error on failure (via validateResponse)", () => {
+      const data = { id: 123 }; // Missing name, wrong id type
+      safeValidateResponse(TestSchema, data, "safe test");
+      expect(logger.error).toHaveBeenCalled();
+    });
+  });
+
+  describe("validateArrayResponse", () => {
+    it("validates array of valid items", () => {
+      const items = [
+        { id: "1", name: "Item 1" },
+        { id: "2", name: "Item 2" },
+        { id: "3", name: "Item 3" },
+      ];
+      const result = validateArrayResponse(TestSchema, items, "items");
+      expect(result).toHaveLength(3);
+      expect(result).toEqual(items);
+    });
+
+    it("filters out invalid items", () => {
+      const items = [
+        { id: "1", name: "Valid 1" },
+        { id: 123, name: "Invalid - wrong id type" }, // invalid
+        { id: "3", name: "Valid 2" },
+      ];
+      const result = validateArrayResponse(TestSchema, items, "mixed items");
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ id: "1", name: "Valid 1" });
+      expect(result[1]).toEqual({ id: "3", name: "Valid 2" });
+    });
+
+    it("logs warning for each invalid item", () => {
+      const items = [
+        { id: 1 }, // invalid - missing name, wrong id type
+        { name: "No ID" }, // invalid - missing id
+      ];
+      validateArrayResponse(TestSchema, items, "all invalid");
+      expect(logger.warn).toHaveBeenCalledTimes(2);
+      expect(logger.warn).toHaveBeenCalledWith(
+        "Invalid item at index 0 in all invalid",
+        expect.any(Object)
+      );
+      expect(logger.warn).toHaveBeenCalledWith(
+        "Invalid item at index 1 in all invalid",
+        expect.any(Object)
+      );
+    });
+
+    it("strips extra fields from valid items", () => {
+      const items = [
+        { id: "1", name: "Item 1", extra: "remove me" },
+        { id: "2", name: "Item 2", secret: "hidden" },
+      ];
+      const result = validateArrayResponse(TestSchema, items, "strip test");
+      expect(result[0]).not.toHaveProperty("extra");
+      expect(result[1]).not.toHaveProperty("secret");
+    });
+
+    it("returns empty array when all items invalid", () => {
+      const items = [
+        { id: 1 }, // invalid
+        { id: 2 }, // invalid
+      ];
+      const result = validateArrayResponse(TestSchema, items, "all invalid");
+      expect(result).toEqual([]);
+    });
+
+    it("handles empty array", () => {
+      const result = validateArrayResponse(TestSchema, [], "empty");
+      expect(result).toEqual([]);
+    });
   });
 });
