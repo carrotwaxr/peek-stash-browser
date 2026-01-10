@@ -21,6 +21,7 @@ import type {
   SceneScoringData,
 } from "../types/index.js";
 import { logger } from "../utils/logger.js";
+import { getSceneFallbackTitle, getGalleryFallbackTitle, getImageFallbackTitle } from "../utils/titleUtils.js";
 
 /**
  * Default user fields for scenes (when no user data is merged)
@@ -1595,7 +1596,7 @@ class StashEntityService {
       ...DEFAULT_SCENE_USER_FIELDS,
 
       id: scene.id,
-      title: scene.title,
+      title: scene.title || getSceneFallbackTitle(scene.filePath),
       code: scene.code,
       date: scene.date,
       details: scene.details,
@@ -1662,7 +1663,7 @@ class StashEntityService {
       ...DEFAULT_SCENE_USER_FIELDS,
 
       id: scene.id,
-      title: scene.title,
+      title: scene.title || getSceneFallbackTitle(scene.filePath),
       code: scene.code,
       date: scene.date,
       details: scene.details,
@@ -1941,7 +1942,7 @@ class StashEntityService {
     return {
       ...DEFAULT_GALLERY_USER_FIELDS,
       id: gallery.id,
-      title: gallery.title,
+      title: gallery.title || getGalleryFallbackTitle(gallery.folderPath, gallery.fileBasename),
       date: gallery.date,
       studio: gallery.studioId ? { id: gallery.studioId } : null,
       rating100: gallery.rating100,
@@ -2015,7 +2016,7 @@ class StashEntityService {
 
     return {
       id: image.id,
-      title: image.title,
+      title: image.title || getImageFallbackTitle(image.filePath),
       code: image.code,
       details: image.details,
       photographer: image.photographer,
