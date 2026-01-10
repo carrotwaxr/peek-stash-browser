@@ -21,3 +21,9 @@ export * from "./tag.js";
 
 // Studio schemas
 export * from "./studio.js";
+
+// Gallery schemas
+export * from "./gallery.js";
+
+// Image schemas
+export * from "./image.js";
