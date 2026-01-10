@@ -27,3 +27,6 @@ export * from "./gallery.js";
 
 // Image schemas
 export * from "./image.js";
+
+// Group schemas
+export * from "./group.js";
