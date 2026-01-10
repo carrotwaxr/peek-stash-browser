@@ -6,6 +6,7 @@
  */
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { getImageFallbackTitle } from "../utils/titleUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -344,7 +345,7 @@ class ImageQueryBuilder {
     randomSeed?: number
   ): string {
     const sortMap: Record<string, string> = {
-      title: `COALESCE(i.title, i.filePath) ${dir}`,
+      title: `COALESCE(NULLIF(i.title, ''), i.filePath) COLLATE NOCASE ${dir}`,
       date: `i.date ${dir}`,
       rating: `COALESCE(r.rating, i.rating100, 0) ${dir}`,
       rating100: `COALESCE(r.rating, i.rating100, 0) ${dir}`,
@@ -542,6 +543,7 @@ class ImageQueryBuilder {
     // Convert BigInt fields to Number and transform URLs to proxy paths
     const transformedRows = rows.map((row) => ({
       ...row,
+      title: row.title || getImageFallbackTitle(row.filePath),
       fileSize: row.fileSize != null ? Number(row.fileSize) : null,
       pathThumbnail: this.transformUrl(row.pathThumbnail),
       pathPreview: this.transformUrl(row.pathPreview),
