@@ -8,6 +8,7 @@ import type { PeekSceneFilter, NormalizedScene } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
+import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -1108,7 +1109,7 @@ class SceneQueryBuilder {
       created_at: `s.stashCreatedAt ${dir}`,
       updated_at: `s.stashUpdatedAt ${dir}`,
       date: `s.date ${dir}`,
-      title: `s.title ${dir}`,
+      title: `COALESCE(NULLIF(s.title, ''), s.filePath) COLLATE NOCASE ${dir}`,
       duration: `s.duration ${dir}`,
       filesize: `s.fileSize ${dir}`,
       bitrate: `s.fileBitRate ${dir}`,
@@ -1492,7 +1493,7 @@ class SceneQueryBuilder {
     // Create scene object with studioId preserved for population
     const scene: any = {
       id: row.id,
-      title: row.title || null,
+      title: row.title || getSceneFallbackTitle(row.filePath),
       code: row.code || null,
       date: row.date || null,
       details: row.details || null,
