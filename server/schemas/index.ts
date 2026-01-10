@@ -12,3 +12,6 @@ export * from "./refs.js";
 
 // Scene schemas
 export * from "./scene.js";
+
+// Performer schemas
+export * from "./performer.js";
