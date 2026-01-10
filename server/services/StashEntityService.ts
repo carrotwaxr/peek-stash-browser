@@ -510,8 +510,12 @@ class StashEntityService {
     if (!cached) return null;
     const scene = this.transformSceneWithRelations(cached);
 
-    // Hydrate inherited tags
-    const tagNames = await this.getTagNameMap();
+    // Hydrate studio names and inherited tags
+    const [studioNames, tagNames] = await Promise.all([
+      this.getStudioNameMap(),
+      this.getTagNameMap(),
+    ]);
+    this.hydrateStudioNames([scene], studioNames);
     this.hydrateInheritedTags([scene], tagNames);
 
     return scene;
@@ -554,8 +558,12 @@ class StashEntityService {
 
     const scenes = cached.map((c) => this.transformSceneWithRelations(c));
 
-    // Hydrate inherited tags
-    const tagNames = await this.getTagNameMap();
+    // Hydrate studio names and inherited tags
+    const [studioNames, tagNames] = await Promise.all([
+      this.getStudioNameMap(),
+      this.getTagNameMap(),
+    ]);
+    this.hydrateStudioNames(scenes, studioNames);
     this.hydrateInheritedTags(scenes, tagNames);
 
     return scenes;
