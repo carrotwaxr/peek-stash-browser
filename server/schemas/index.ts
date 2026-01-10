@@ -15,3 +15,9 @@ export * from "./scene.js";
 
 // Performer schemas
 export * from "./performer.js";
+
+// Tag schemas
+export * from "./tag.js";
+
+// Studio schemas
+export * from "./studio.js";
