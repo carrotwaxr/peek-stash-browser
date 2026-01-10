@@ -30,3 +30,6 @@ export * from "./image.js";
 
 // Group schemas
 export * from "./group.js";
+
+// API response schemas
+export * from "./api/index.js";
