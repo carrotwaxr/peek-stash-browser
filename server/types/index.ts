@@ -7,8 +7,8 @@
  *   import { NormalizedScene, NormalizedPerformer } from "../types/index.js";
  *   import type { SceneFilterType, PerformerFilterType } from "../types/index.js";
  *
- * Note: For base types from stashapp-api (Scene, Performer, etc.), import directly:
- *   import type { Scene, Performer } from "stashapp-api";
+ * Note: For base types from Stash (Scene, Performer, etc.), import from graphql/types.js:
+ *   import type { Scene, Performer } from "../graphql/types.js";
  */
 
 // Normalized entity types (Stash types + Peek user data)
@@ -23,7 +23,7 @@ export type {
   SceneScoringData,
 } from "./entities.js";
 
-// Base filter types from stashapp-api
+// Base filter types from Stash GraphQL
 export type {
   PerformerFilterType,
   SceneFilterType,
