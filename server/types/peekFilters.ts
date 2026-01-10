@@ -1,7 +1,7 @@
 /**
  * Peek Extended Filter Types
  *
- * These types extend the base filter types from stashapp-api
+ * These types extend the base filter types from the internal graphql module
  * to include Peek-specific filter fields.
  */
 import type {
@@ -11,7 +11,7 @@ import type {
   SceneFilterType as BaseSceneFilterType,
   StudioFilterType as BaseStudioFilterType,
   TagFilterType as BaseTagFilterType,
-} from "stashapp-api";
+} from "../graphql/types.js";
 
 /**
  * Peek Scene Filter

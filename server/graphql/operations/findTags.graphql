@@ -1,0 +1,37 @@
+query FindTags(
+  $filter: FindFilterType
+  $ids: [ID!]
+  $tag_filter: TagFilterType
+) {
+  findTags(filter: $filter, ids: $ids, tag_filter: $tag_filter) {
+    count
+    tags {
+      aliases
+      child_count
+      children {
+        id
+        name
+      }
+      created_at
+      description
+      favorite
+      gallery_count
+      group_count
+      id
+      image_count
+      image_path
+      movie_count
+      name
+      parent_count
+      parents {
+        id
+        name
+      }
+      performer_count
+      scene_count
+      scene_marker_count
+      studio_count
+      updated_at
+    }
+  }
+}

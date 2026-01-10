@@ -1,0 +1,51 @@
+query FindStudios(
+  $filter: FindFilterType
+  $ids: [ID!]
+  $studio_filter: StudioFilterType
+) {
+  findStudios(filter: $filter, ids: $ids, studio_filter: $studio_filter) {
+    count
+    studios {
+      aliases
+      child_studios {
+        id
+        name
+      }
+      created_at
+      details
+      favorite
+      gallery_count
+      group_count
+      groups {
+        id
+        name
+      }
+      id
+      image_count
+      image_path
+      movie_count
+      movies {
+        id
+        name
+      }
+      name
+      parent_studio {
+        id
+        name
+        image_path
+      }
+      performer_count
+      rating100
+      scene_count
+      tags {
+        description
+        id
+        name
+        image_path
+        favorite
+      }
+      updated_at
+      url
+    }
+  }
+}

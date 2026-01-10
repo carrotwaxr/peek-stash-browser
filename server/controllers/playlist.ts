@@ -1,4 +1,4 @@
-import { Scene } from "stashapp-api";
+import type { Scene } from "../graphql/types.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
 import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";

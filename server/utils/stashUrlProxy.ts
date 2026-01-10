@@ -12,7 +12,7 @@ import type {
   Scene,
   Studio,
   Tag,
-} from "stashapp-api";
+} from "../graphql/types.js";
 import { logger } from "./logger.js";
 
 /**

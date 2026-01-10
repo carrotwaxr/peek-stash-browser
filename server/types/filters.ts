@@ -1,7 +1,7 @@
 /**
  * Filter Type Definitions
  *
- * Re-exports filter types from stashapp-api for use in Peek queries.
+ * Re-exports filter types from internal graphql module for use in Peek queries.
  * These types are used when filtering entities via the Stash GraphQL API.
  */
 
@@ -13,6 +13,6 @@ export type {
   GalleryFilterType,
   ImageFilterType,
   GroupFilterType,
-} from "stashapp-api";
+} from "../graphql/types.js";
 
-export { CriterionModifier, GenderEnum } from "stashapp-api";
+export { CriterionModifier, GenderEnum } from "../graphql/types.js";

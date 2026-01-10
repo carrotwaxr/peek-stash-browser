@@ -4,11 +4,11 @@
  * This file defines the Peek-specific entity types used throughout the server.
  *
  * Type Hierarchy:
- * 1. Base Types (from stashapp-api): Raw GraphQL types from Stash server - import directly from stashapp-api
+ * 1. Base Types (from graphql/types.js): Raw GraphQL types from Stash server
  * 2. Normalized Types (defined here): Base types + Peek user data (ratings, favorites, watch history, etc.)
  *
  * Usage:
- * - Import base types from stashapp-api when working with raw Stash GraphQL responses
+ * - Import base types from ../graphql/types.js when working with raw Stash GraphQL responses
  * - Import Normalized types from here when working with cached data or API responses to clients
  */
 import type {
@@ -19,7 +19,7 @@ import type {
   Scene,
   Studio,
   Tag,
-} from "stashapp-api";
+} from "../graphql/types.js";
 
 /**
  * Normalized Scene

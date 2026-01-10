@@ -1,0 +1,141 @@
+query FindScenes(
+  $filter: FindFilterType
+  $ids: [ID!]
+  $scene_filter: SceneFilterType
+  $scene_ids: [Int!]
+) {
+  findScenes(
+    filter: $filter
+    ids: $ids
+    scene_filter: $scene_filter
+    scene_ids: $scene_ids
+  ) {
+    count
+    duration
+    filesize
+    scenes {
+      created_at
+      code
+      date
+      details
+      director
+      id
+      o_counter
+      organized
+      play_count
+      play_duration
+      rating100
+      resume_time
+      title
+      updated_at
+      studio {
+        aliases
+        created_at
+        details
+        favorite
+        id
+        ignore_auto_tag
+        name
+        parent_studio {
+          id
+          name
+        }
+        rating100
+        updated_at
+        url
+        tags {
+          id
+          name
+          image_path
+          favorite
+        }
+      }
+      performers {
+        alias_list
+        birthdate
+        career_length
+        circumcised
+        country
+        created_at
+        death_date
+        details
+        disambiguation
+        ethnicity
+        eye_color
+        fake_tits
+        favorite
+        gender
+        hair_color
+        height_cm
+        id
+        image_path
+        measurements
+        name
+        penis_length
+        piercings
+        rating100
+        tattoos
+        updated_at
+        tags {
+          id
+          name
+          image_path
+          favorite
+        }
+      }
+      tags {
+        aliases
+        child_count
+        created_at
+        description
+        favorite
+        id
+        ignore_auto_tag
+        image_path
+        name
+        parent_count
+        updated_at
+      }
+      files {
+        audio_codec
+        basename
+        bit_rate
+        created_at
+        duration
+        format
+        frame_rate
+        height
+        path
+        size
+        updated_at
+        video_codec
+        width
+      }
+      paths {
+        preview
+        screenshot
+        sprite
+        vtt
+        webp
+      }
+      sceneStreams {
+        url
+        mime_type
+        label
+      }
+      galleries {
+        id
+        title
+      }
+      groups {
+        scene_index
+        group {
+          id
+          name
+        }
+      }
+      created_at
+      updated_at
+    }
+  }
+}

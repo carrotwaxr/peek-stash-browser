@@ -115,14 +115,14 @@ vi.mock("../../prisma/singleton.js", () => ({
 }));
 
 // Import after mocking
-import { StashApp } from "stashapp-api";
+import { StashClient } from "../../graphql/StashClient.js";
 
 describe.skipIf(!hasStashConfig)("StashSyncService Integration Tests", () => {
-  let stash: ReturnType<typeof StashApp.init>;
+  let stash: StashClient;
 
   beforeAll(() => {
     // Initialize Stash client directly for testing
-    stash = StashApp.init({
+    stash = new StashClient({
       url: process.env.STASH_URL!,
       apiKey: process.env.STASH_API_KEY!,
     });

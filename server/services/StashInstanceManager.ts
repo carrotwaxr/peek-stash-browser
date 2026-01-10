@@ -1,5 +1,5 @@
 import { PrismaClient, StashInstance } from "@prisma/client";
-import { StashApp } from "stashapp-api";
+import { StashClient } from "../graphql/StashClient.js";
 import { logger } from "../utils/logger.js";
 
 const prisma = new PrismaClient();
@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
  * Future commits will enable multi-instance support.
  */
 class StashInstanceManager {
-  private instances = new Map<string, StashApp>();
+  private instances = new Map<string, StashClient>();
   private configs = new Map<string, StashInstance>();
   private initialized = false;
 
@@ -47,7 +47,7 @@ class StashInstanceManager {
       return;
     }
 
-    // Initialize StashApp connections
+    // Initialize StashClient connections
     for (const config of configs) {
       try {
         logger.info(`Initializing Stash instance: ${config.name}`, {
@@ -55,7 +55,7 @@ class StashInstanceManager {
           url: config.url,
         });
 
-        const stash = StashApp.init({
+        const stash = new StashClient({
           url: config.url,
           apiKey: config.apiKey,
         });
@@ -96,7 +96,7 @@ class StashInstanceManager {
    * Get the default (first/only) Stash instance.
    * For Commit 1: This is the only way to get an instance.
    */
-  getDefault(): StashApp {
+  getDefault(): StashClient {
     const first = this.instances.values().next().value;
     if (!first) {
       throw new Error(
@@ -121,7 +121,7 @@ class StashInstanceManager {
    * Get a Stash instance by ID.
    * For Commit 1: Only one instance exists, but this prepares for multi-instance.
    */
-  get(instanceId: string): StashApp | undefined {
+  get(instanceId: string): StashClient | undefined {
     return this.instances.get(instanceId);
   }
 

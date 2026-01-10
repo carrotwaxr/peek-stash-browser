@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Request } from "express";
-import { StashApp } from "stashapp-api";
+import { StashClient } from "../graphql/StashClient.js";
 import { stashSyncService } from "../services/StashSyncService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import type {
@@ -189,7 +189,7 @@ export const testStashConnection = async (
 
     // Try to connect to Stash
     logger.debug("Initializing StashApp with provided credentials");
-    const testStash = StashApp.init({ url, apiKey });
+    const testStash = new StashClient({ url, apiKey });
     logger.debug("StashApp initialized, calling configuration()");
 
     try {
@@ -292,7 +292,7 @@ export const createFirstStashInstance = async (
     }
 
     // Test connection before saving
-    const testStash = StashApp.init({ url, apiKey });
+    const testStash = new StashClient({ url, apiKey });
     try {
       await testStash.configuration();
     } catch (error) {
