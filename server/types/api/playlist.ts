@@ -4,7 +4,7 @@
  *
  * Request and response types for /api/playlists/* endpoints.
  */
-import type { Scene } from "stashapp-api";
+import type { Scene } from "../../graphql/types.js";
 import type { NormalizedScene } from "../index.js";
 
 // =============================================================================
