@@ -1,0 +1,24 @@
+schema: ./schema.json
+documents: graphql/operations/**/*.graphql
+generates:
+  ./graphql/generated/graphql.ts:
+    plugins:
+      - typescript
+      - typescript-operations
+      - typescript-graphql-request
+    config:
+      # Use string for ID scalars (Stash uses string IDs)
+      scalars:
+        ID: string
+        Time: string
+        Timestamp: string
+        Int64: number
+        Any: any
+        Map: Record<string, any>
+        BoolMap: Record<string, boolean>
+        PluginConfigMap: Record<string, any>
+        Upload: File
+      # Generate lean types
+      skipTypename: true
+      # Use type imports
+      useTypeImports: true
