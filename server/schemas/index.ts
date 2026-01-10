@@ -9,3 +9,6 @@ export * from "./base.js";
 
 // Reference schemas
 export * from "./refs.js";
+
+// Scene schemas
+export * from "./scene.js";
