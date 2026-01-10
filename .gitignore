@@ -84,3 +84,6 @@ screenshots/config.json
 server/integration/fixtures/testEntities.ts
 server/integration/*.db
 server/integration/.env.integration
+
+# Git worktrees
+.worktrees/
