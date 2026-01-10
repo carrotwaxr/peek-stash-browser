@@ -13,7 +13,7 @@
  */
 
 import { EventEmitter } from "events";
-import type { Gallery, Group, Performer, Scene, Studio, Tag } from "stashapp-api";
+import type { Gallery, Group, Performer, Scene, Studio, Tag } from "../graphql/types.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 // Transform functions no longer needed - URLs transformed at read time
