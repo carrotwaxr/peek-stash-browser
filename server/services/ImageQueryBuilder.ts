@@ -344,8 +344,12 @@ class ImageQueryBuilder {
     dir: "ASC" | "DESC",
     randomSeed?: number
   ): string {
+    // Extract filename from path: '/images/My Image.jpg' -> 'My Image.jpg'
+    // This matches the display logic in getImageFallbackTitle which uses basename
+    const filenameExpr = `REPLACE(i.filePath, RTRIM(i.filePath, REPLACE(i.filePath, '/', '')), '')`;
+
     const sortMap: Record<string, string> = {
-      title: `COALESCE(NULLIF(i.title, ''), i.filePath) COLLATE NOCASE ${dir}`,
+      title: `COALESCE(NULLIF(i.title, ''), ${filenameExpr}) COLLATE NOCASE ${dir}`,
       date: `i.date ${dir}`,
       rating: `COALESCE(r.rating, i.rating100, 0) ${dir}`,
       rating100: `COALESCE(r.rating, i.rating100, 0) ${dir}`,

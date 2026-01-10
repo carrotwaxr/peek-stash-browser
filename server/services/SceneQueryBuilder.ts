@@ -1103,13 +1103,18 @@ class SceneQueryBuilder {
   ): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
 
+    // Extract filename from path: '/videos/My Scene.mp4' -> 'My Scene.mp4'
+    // This matches the display logic in getSceneFallbackTitle which uses basename
+    // Note: handles forward slashes; backslashes are uncommon in Stash paths
+    const filenameExpr = `REPLACE(s.filePath, RTRIM(s.filePath, REPLACE(s.filePath, '/', '')), '')`;
+
     // Map sort field names to SQL expressions
     const sortMap: Record<string, string> = {
       // Scene metadata
       created_at: `s.stashCreatedAt ${dir}`,
       updated_at: `s.stashUpdatedAt ${dir}`,
       date: `s.date ${dir}`,
-      title: `COALESCE(NULLIF(s.title, ''), s.filePath) COLLATE NOCASE ${dir}`,
+      title: `COALESCE(NULLIF(s.title, ''), ${filenameExpr}) COLLATE NOCASE ${dir}`,
       duration: `s.duration ${dir}`,
       filesize: `s.fileSize ${dir}`,
       bitrate: `s.fileBitRate ${dir}`,
