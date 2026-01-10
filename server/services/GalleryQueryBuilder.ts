@@ -8,7 +8,7 @@ import type { PeekGalleryFilter, NormalizedGallery } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
-import { getGalleryFallbackTitle } from "../utils/galleryUtils.js";
+import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -443,9 +443,13 @@ class GalleryQueryBuilder {
   private buildSortClause(sort: string, direction: "ASC" | "DESC"): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
 
+    // Extract folder name from path: '/images/My Gallery' -> 'My Gallery'
+    const folderNameExpr = `REPLACE(REPLACE(g.folderPath, RTRIM(g.folderPath, REPLACE(g.folderPath, '/', '')), ''), '/', '')`;
+
     const sortMap: Record<string, string> = {
-      // Gallery metadata - use COLLATE NOCASE for case-insensitive sorting
-      title: `g.title COLLATE NOCASE ${dir}`,
+      // Gallery metadata - use COALESCE for fallback title, COLLATE NOCASE for case-insensitive sorting
+      // NULLIF handles empty string titles (762 galleries have '' instead of NULL)
+      title: `COALESCE(NULLIF(g.title, ''), g.fileBasename, ${folderNameExpr}) COLLATE NOCASE ${dir}`,
       date: `g.date ${dir}`,
       created_at: `g.stashCreatedAt ${dir}`,
       updated_at: `g.stashUpdatedAt ${dir}`,
@@ -464,9 +468,9 @@ class GalleryQueryBuilder {
 
     const sortExpr = sortMap[sort] || sortMap["title"];
 
-    // Add secondary sort by title for stable ordering
+    // Add secondary sort by title for stable ordering (use same fallback as primary title sort)
     if (sort !== "title") {
-      return `${sortExpr}, g.title COLLATE NOCASE ASC`;
+      return `${sortExpr}, COALESCE(NULLIF(g.title, ''), g.fileBasename, ${folderNameExpr}) COLLATE NOCASE ASC`;
     }
     return `${sortExpr}, g.id ${dir}`;
   }

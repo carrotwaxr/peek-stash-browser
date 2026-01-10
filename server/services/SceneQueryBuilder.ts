@@ -8,6 +8,7 @@ import type { PeekSceneFilter, NormalizedScene } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
+import { getSceneFallbackTitle } from "../utils/titleUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -1102,13 +1103,18 @@ class SceneQueryBuilder {
   ): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
 
+    // Extract filename from path: '/videos/My Scene.mp4' -> 'My Scene.mp4'
+    // This matches the display logic in getSceneFallbackTitle which uses basename
+    // Note: handles forward slashes; backslashes are uncommon in Stash paths
+    const filenameExpr = `REPLACE(s.filePath, RTRIM(s.filePath, REPLACE(s.filePath, '/', '')), '')`;
+
     // Map sort field names to SQL expressions
     const sortMap: Record<string, string> = {
       // Scene metadata
       created_at: `s.stashCreatedAt ${dir}`,
       updated_at: `s.stashUpdatedAt ${dir}`,
       date: `s.date ${dir}`,
-      title: `s.title ${dir}`,
+      title: `COALESCE(NULLIF(s.title, ''), ${filenameExpr}) COLLATE NOCASE ${dir}`,
       duration: `s.duration ${dir}`,
       filesize: `s.fileSize ${dir}`,
       bitrate: `s.fileBitRate ${dir}`,
@@ -1492,7 +1498,7 @@ class SceneQueryBuilder {
     // Create scene object with studioId preserved for population
     const scene: any = {
       id: row.id,
-      title: row.title || null,
+      title: row.title || getSceneFallbackTitle(row.filePath),
       code: row.code || null,
       date: row.date || null,
       details: row.details || null,

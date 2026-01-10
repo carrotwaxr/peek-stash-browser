@@ -8,7 +8,7 @@ import type { PeekGroupFilter, NormalizedGroup } from "../types/index.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds, expandStudioIds } from "../utils/hierarchyUtils.js";
-import { getGalleryFallbackTitle } from "../utils/galleryUtils.js";
+import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
 
 // Filter clause builder result
 interface FilterClause {
