@@ -1,0 +1,56 @@
+query FindImages(
+  $filter: FindFilterType
+  $image_filter: ImageFilterType
+  $image_ids: [Int!]
+) {
+  findImages(
+    filter: $filter
+    image_filter: $image_filter
+    image_ids: $image_ids
+  ) {
+    count
+    images {
+      id
+      title
+      code
+      rating100
+      urls
+      date
+      details
+      photographer
+      organized
+      created_at
+      updated_at
+      o_counter
+      files {
+        id
+        basename
+        path
+        size
+        width
+        height
+      }
+      paths {
+        thumbnail
+        preview
+        image
+      }
+      galleries {
+        id
+        title
+      }
+      studio {
+        id
+        name
+      }
+      tags {
+        id
+        name
+      }
+      performers {
+        id
+        name
+      }
+    }
+  }
+}
