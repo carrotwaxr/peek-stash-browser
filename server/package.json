@@ -66,6 +66,7 @@
     "express": "^5.1.0",
     "graphql": "^16.12.0",
     "graphql-request": "^6.1.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^4.3.5"
   }
 }
