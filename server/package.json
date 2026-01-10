@@ -22,7 +22,9 @@
     "generate-api-docs": "npx tsx scripts/generate-api-docs.ts",
     "test:integration": "vitest run --config integration/vitest.integration.config.ts",
     "test:integration:watch": "vitest --config integration/vitest.integration.config.ts",
-    "test:integration:fresh": "FRESH_DB=true npm run test:integration"
+    "test:integration:fresh": "FRESH_DB=true npm run test:integration",
+    "stash:codegen": "graphql-codegen --config codegen.yml",
+    "stash:refresh": "echo 'Copy schema.json from stashapp-api or run introspection, then run npm run stash:codegen'"
   },
   "prisma": {
     "seed": "node --loader ts-node/esm prisma/seed.ts"
