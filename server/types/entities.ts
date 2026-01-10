@@ -19,7 +19,7 @@ import type {
   Scene,
   Studio,
   Tag,
-} from "stashapp-api";
+} from "../graphql/types.js";
 
 /**
  * Normalized Scene
