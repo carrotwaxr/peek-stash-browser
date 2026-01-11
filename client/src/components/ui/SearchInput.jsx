@@ -2,6 +2,7 @@
  * Reusable search input component with debouncing
  */
 import { useEffect, useState } from "react";
+import { useDebouncedValue } from "../../hooks/useDebounce.js";
 import Button from "./Button.jsx";
 
 const SearchInput = ({
@@ -14,6 +15,7 @@ const SearchInput = ({
   clearOnSearch = false,
 }) => {
   const [query, setQuery] = useState(value || "");
+  const debouncedQuery = useDebouncedValue(query, debounceMs);
 
   // Sync internal state when external value changes
   useEffect(() => {
@@ -24,20 +26,11 @@ const SearchInput = ({
   }, [value]); // Only sync when external value changes, not when query changes (would cause loop)
 
   useEffect(() => {
-    if (!query.trim()) {
-      onSearch?.("");
-      return;
+    onSearch?.(debouncedQuery);
+    if (clearOnSearch && debouncedQuery) {
+      setQuery("");
     }
-
-    const timeoutId = setTimeout(() => {
-      onSearch?.(query);
-      if (clearOnSearch) {
-        setQuery("");
-      }
-    }, debounceMs);
-
-    return () => clearTimeout(timeoutId);
-  }, [query, onSearch, debounceMs, clearOnSearch]);
+  }, [debouncedQuery, onSearch, clearOnSearch]);
 
   const handleClear = () => {
     setQuery("");
