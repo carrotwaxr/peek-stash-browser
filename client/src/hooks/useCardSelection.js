@@ -30,9 +30,11 @@ export const useCardSelection = ({
   const isInteractiveElement = useCallback((target, currentTarget) => {
     const closestButton = target.closest("button");
     const isButton = closestButton && closestButton !== currentTarget;
-    const isLink = target.closest("a");
+    const closestLink = target.closest("a");
+    // Only count as interactive if it's a NESTED link (different from currentTarget)
+    const isNestedLink = closestLink && closestLink !== currentTarget;
     const isInput = target.closest("input");
-    return isButton || isLink || isInput;
+    return isButton || isNestedLink || isInput;
   }, []);
 
   const handleMouseDown = useCallback(
@@ -96,7 +98,7 @@ export const useCardSelection = ({
   }, []);
 
   // Click handler for navigation elements (CardImage, CardTitle)
-  // Returns a function to pass as onClick, or undefined if not needed
+  // Always attached to intercept clicks from interactive elements (like checkboxes)
   const handleNavigationClick = useCallback(
     (e) => {
       // If long-press just fired, block the click
@@ -110,10 +112,18 @@ export const useCardSelection = ({
       if (selectionMode) {
         e.preventDefault();
         onToggleSelect?.(entity);
+        return;
+      }
+
+      // If click originated from an interactive element (button, nested link, input),
+      // prevent navigation - the interactive element handles its own action
+      if (isInteractiveElement(e.target, e.currentTarget)) {
+        e.preventDefault();
+        return;
       }
       // Otherwise, let the Link navigate normally
     },
-    [isLongPressing, selectionMode, entity, onToggleSelect]
+    [isLongPressing, selectionMode, entity, onToggleSelect, isInteractiveElement]
   );
 
   return {
@@ -127,6 +137,7 @@ export const useCardSelection = ({
       onTouchEnd: handleTouchEnd,
       onTouchCancel: handleTouchEnd,
     },
-    handleNavigationClick: selectionMode || isLongPressing ? handleNavigationClick : undefined,
+    // Always return handler to intercept clicks from interactive elements
+    handleNavigationClick,
   };
 };
