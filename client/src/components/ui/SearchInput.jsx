@@ -1,7 +1,7 @@
 /**
  * Reusable search input component with debouncing
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDebouncedValue } from "../../hooks/useDebounce.js";
 import Button from "./Button.jsx";
 
@@ -16,9 +16,24 @@ const SearchInput = ({
 }) => {
   const [query, setQuery] = useState(value || "");
   const debouncedQuery = useDebouncedValue(query, debounceMs);
+  // Track if user explicitly cleared - ignore stale callbacks until debounce catches up
+  const userClearedRef = useRef(false);
+  // Track last value we sent to onSearch to avoid duplicate calls
+  const lastSearchedRef = useRef(value || "");
+  // Store onSearch in ref to avoid effect re-running when callback changes
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
 
   // Sync internal state when external value changes
   useEffect(() => {
+    // If user cleared and incoming value is not empty, it's a stale update - ignore it
+    if (userClearedRef.current && value !== "") {
+      return;
+    }
+    // Reset the flag when value syncs to empty (debounce caught up)
+    if (value === "") {
+      userClearedRef.current = false;
+    }
     if (value !== undefined && value !== query) {
       setQuery(value);
     }
@@ -26,15 +41,26 @@ const SearchInput = ({
   }, [value]); // Only sync when external value changes, not when query changes (would cause loop)
 
   useEffect(() => {
-    onSearch?.(debouncedQuery);
+    // Skip if user cleared and debounce hasn't caught up yet
+    if (userClearedRef.current && debouncedQuery !== "") {
+      return;
+    }
+    // Skip if we already sent this value (prevents duplicate calls when onSearch changes)
+    if (debouncedQuery === lastSearchedRef.current) {
+      return;
+    }
+    lastSearchedRef.current = debouncedQuery;
+    onSearchRef.current?.(debouncedQuery);
     if (clearOnSearch && debouncedQuery) {
       setQuery("");
     }
-  }, [debouncedQuery, onSearch, clearOnSearch]);
+  }, [debouncedQuery, clearOnSearch]);
 
   const handleClear = () => {
+    userClearedRef.current = true;
+    lastSearchedRef.current = "";
     setQuery("");
-    onSearch?.("");
+    onSearchRef.current?.("");
   };
 
   return (

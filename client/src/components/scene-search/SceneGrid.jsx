@@ -143,7 +143,7 @@ const SceneGrid = ({
             <SceneCard
               key={scene.id}
               scene={scene}
-              onClick={onSceneClick}
+              onClick={selectedScenes.length === 0 && onSceneClick ? () => onSceneClick(scene) : undefined}
               onHideSuccess={onHideSuccess}
               fromPageTitle={fromPageTitle}
               isSelected={selectedScenes.some((s) => s.id === scene.id)}

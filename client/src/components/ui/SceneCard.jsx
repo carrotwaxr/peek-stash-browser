@@ -167,6 +167,7 @@ const SceneCard = forwardRef(
     }, [scene, allTags, navigate]);
 
     const handleCheckboxClick = (e) => {
+      e.preventDefault();
       e.stopPropagation();
       onToggleSelect?.(scene);
     };
