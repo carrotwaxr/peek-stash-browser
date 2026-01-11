@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideChevronDown, LucideSearch, LucideX } from "lucide-react";
+import { useDebouncedValue } from "../../hooks/useDebounce.js";
 import { libraryApi } from "../../services/api.js";
 import { getCache, setCache } from "../../utils/filterCache.js";
 import Button from "./Button.jsx";
@@ -41,7 +42,7 @@ const SearchableSelect = ({
 
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
-  const debounceTimerRef = useRef(null);
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   // Fetch items by specific IDs (use full endpoints which support ID filtering)
   const fetchItemsByIds = useCallback(
@@ -218,25 +219,10 @@ const SearchableSelect = ({
     [entityType, countFilterContext, getCountFilter]
   );
 
-  // Debounced search
+  // Debounced search - triggers loadOptions after 300ms of no typing
   useEffect(() => {
-    // Clear existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Set new timer
-    debounceTimerRef.current = setTimeout(() => {
-      loadOptions(searchTerm);
-    }, 300);
-
-    // Cleanup
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [searchTerm, loadOptions]);
+    loadOptions(debouncedSearchTerm);
+  }, [debouncedSearchTerm, loadOptions]);
 
   // Load initial options when dropdown opens
   useEffect(() => {
