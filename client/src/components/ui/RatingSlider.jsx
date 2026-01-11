@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useDebouncedCallback } from "../../hooks/useDebounce.js";
 
 /**
  * Inline slider for rating on detail pages
@@ -15,20 +16,15 @@ const RatingSlider = ({
   const [value, setValue] = useState(
     rating === null || rating === undefined ? null : rating / 10
   );
-  const debounceTimerRef = useRef(null);
 
   useEffect(() => {
     setValue(rating === null || rating === undefined ? null : rating / 10);
   }, [rating]);
 
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
+  const debouncedOnChange = useDebouncedCallback((newValue) => {
+    const ratingValue = Math.round(newValue * 10);
+    onChange(ratingValue === 0 ? null : ratingValue);
+  }, 300);
 
   const getRatingGradient = (val) => {
     // Unrated: neutral gray
@@ -48,18 +44,7 @@ const RatingSlider = ({
   const handleChange = (e) => {
     const newValue = parseFloat(e.target.value);
     setValue(newValue);
-
-    // Clear existing timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    // Set new timer to call onChange after 300ms of no changes
-    debounceTimerRef.current = setTimeout(() => {
-      const ratingValue = Math.round(newValue * 10); // Convert back to 0-100
-      // If user drags to 0, treat as clearing the rating
-      onChange(ratingValue === 0 ? null : ratingValue);
-    }, 300);
+    debouncedOnChange(newValue);
   };
 
   const handleClear = () => {
