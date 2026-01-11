@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDebouncedCallback } from "../../hooks/useDebounce.js";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
@@ -28,7 +29,6 @@ const RatingSliderDialog = ({
     transformY: "-100%",
   });
   const popoverRef = useRef(null);
-  const debounceTimerRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -82,6 +82,11 @@ const RatingSliderDialog = ({
     }
   }, [isOpen, anchorEl]);
 
+  const debouncedOnSave = useDebouncedCallback((newValue) => {
+    const ratingValue = Math.round(newValue * 10);
+    onSave(ratingValue === 0 ? null : ratingValue);
+  }, 300);
+
   // Click outside or scroll to close
   useEffect(() => {
     if (!isOpen) return;
@@ -114,15 +119,6 @@ const RatingSliderDialog = ({
     };
   }, [isOpen, onClose, anchorEl]);
 
-  // Cleanup debounce timer
-  useEffect(() => {
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, []);
-
   if (!isOpen) return null;
 
   const getRatingGradient = (val) => {
@@ -143,17 +139,7 @@ const RatingSliderDialog = ({
   const handleChange = (e) => {
     const newValue = parseFloat(e.target.value);
     setValue(newValue);
-
-    // Debounced auto-save
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      const ratingValue = Math.round(newValue * 10); // Convert back to 0-100
-      // If user drags to 0, treat as clearing the rating
-      onSave(ratingValue === 0 ? null : ratingValue);
-    }, 300);
+    debouncedOnSave(newValue);
   };
 
   const handleClear = (e) => {
