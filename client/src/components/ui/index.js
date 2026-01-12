@@ -73,3 +73,4 @@ export { default as TopBar } from "./TopBar.jsx";
 export { default as UserMenu } from "./UserMenu.jsx";
 export { default as ViewModeToggle } from "./ViewModeToggle.jsx";
 export { default as WarningMessage } from "./WarningMessage.jsx";
+export { default as ZoomSlider } from "./ZoomSlider.jsx";
