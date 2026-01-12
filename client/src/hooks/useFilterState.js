@@ -27,6 +27,8 @@ export const useFilterState = ({
   const [sort, setSortState] = useState({ field: initialSort, direction: "DESC" });
   const [pagination, setPaginationState] = useState({ page: 1, perPage: 24 });
   const [searchText, setSearchTextState] = useState("");
+  const [viewMode, setViewModeState] = useState("grid");
+  const [zoomLevel, setZoomLevelState] = useState("medium");
 
   // Initialize on mount
   useEffect(() => {
@@ -82,6 +84,8 @@ export const useFilterState = ({
             currentPage: urlState.currentPage,
             perPage: urlState.perPage,
             searchText: urlState.searchText,
+            viewMode: urlState.viewMode,
+            zoomLevel: urlState.zoomLevel,
           };
         } else if (defaultPreset) {
           // No URL params: use full preset
@@ -92,6 +96,8 @@ export const useFilterState = ({
             currentPage: 1,
             perPage: urlState.perPage,
             searchText: "",
+            viewMode: defaultPreset.viewMode || "grid",
+            zoomLevel: defaultPreset.zoomLevel || "medium",
           };
         } else {
           // No URL params, no preset: use defaults
@@ -102,6 +108,8 @@ export const useFilterState = ({
             currentPage: 1,
             perPage: urlState.perPage,
             searchText: "",
+            viewMode: "grid",
+            zoomLevel: "medium",
           };
         }
 
@@ -110,6 +118,8 @@ export const useFilterState = ({
         setSortState({ field: finalState.sortField, direction: finalState.sortDirection });
         setPaginationState({ page: finalState.currentPage, perPage: finalState.perPage });
         setSearchTextState(finalState.searchText);
+        setViewModeState(finalState.viewMode);
+        setZoomLevelState(finalState.zoomLevel);
 
       } catch (err) {
         console.error("Error loading presets:", err);
@@ -123,6 +133,8 @@ export const useFilterState = ({
         setSortState({ field: urlState.sortField, direction: urlState.sortDirection });
         setPaginationState({ page: urlState.currentPage, perPage: urlState.perPage });
         setSearchTextState(urlState.searchText);
+        setViewModeState(urlState.viewMode);
+        setZoomLevelState(urlState.zoomLevel);
       } finally {
         setIsLoadingPresets(false);
         setIsInitialized(true);
@@ -143,8 +155,8 @@ export const useFilterState = ({
 
   // Keep stateRef updated with current values for use in debounced callbacks
   useEffect(() => {
-    stateRef.current = { filters, sort, pagination, searchText };
-  }, [filters, sort, pagination, searchText]);
+    stateRef.current = { filters, sort, pagination, searchText, viewMode, zoomLevel };
+  }, [filters, sort, pagination, searchText, viewMode, zoomLevel]);
 
   // URL sync helper - writes to URL without reading back
   const syncToUrlParams = useCallback((state, options = {}) => {
@@ -159,6 +171,8 @@ export const useFilterState = ({
       perPage: state.pagination.perPage,
       filters: state.filters,
       filterOptions,
+      viewMode: state.viewMode,
+      zoomLevel: state.zoomLevel,
     });
 
     setSearchParams(params, { replace });
@@ -172,8 +186,10 @@ export const useFilterState = ({
       sort,
       pagination: { ...pagination, page },
       searchText,
+      viewMode,
+      zoomLevel,
     });
-  }, [filters, sort, pagination, searchText, syncToUrlParams]);
+  }, [filters, sort, pagination, searchText, viewMode, zoomLevel, syncToUrlParams]);
 
   const setPerPage = useCallback((perPage) => {
     setPaginationState({ page: 1, perPage });
@@ -182,8 +198,10 @@ export const useFilterState = ({
       sort,
       pagination: { page: 1, perPage },
       searchText,
+      viewMode,
+      zoomLevel,
     });
-  }, [filters, sort, searchText, syncToUrlParams]);
+  }, [filters, sort, searchText, viewMode, zoomLevel, syncToUrlParams]);
 
   const setSort = useCallback((field, direction) => {
     const newDirection = direction || (sort.field === field && sort.direction === "DESC" ? "ASC" : "DESC");
@@ -193,8 +211,10 @@ export const useFilterState = ({
       sort: { field, direction: newDirection },
       pagination,
       searchText,
+      viewMode,
+      zoomLevel,
     });
-  }, [filters, sort, pagination, searchText, syncToUrlParams]);
+  }, [filters, sort, pagination, searchText, viewMode, zoomLevel, syncToUrlParams]);
 
   const setFilter = useCallback((key, value) => {
     const newFilters = { ...filters, [key]: value };
@@ -205,8 +225,10 @@ export const useFilterState = ({
       sort,
       pagination: { ...pagination, page: 1 },
       searchText,
+      viewMode,
+      zoomLevel,
     });
-  }, [filters, sort, pagination, searchText, syncToUrlParams]);
+  }, [filters, sort, pagination, searchText, viewMode, zoomLevel, syncToUrlParams]);
 
   const setFilters = useCallback((newFilters) => {
     setFiltersState(newFilters);
@@ -216,8 +238,10 @@ export const useFilterState = ({
       sort,
       pagination: { ...pagination, page: 1 },
       searchText,
+      viewMode,
+      zoomLevel,
     });
-  }, [sort, pagination, searchText, syncToUrlParams]);
+  }, [sort, pagination, searchText, viewMode, zoomLevel, syncToUrlParams]);
 
   const removeFilter = useCallback((key) => {
     const newFilters = { ...filters };
@@ -231,8 +255,10 @@ export const useFilterState = ({
       sort,
       pagination: { ...pagination, page: 1 },
       searchText,
+      viewMode,
+      zoomLevel,
     });
-  }, [filters, permanentFilters, sort, pagination, searchText, syncToUrlParams]);
+  }, [filters, permanentFilters, sort, pagination, searchText, viewMode, zoomLevel, syncToUrlParams]);
 
   const clearFilters = useCallback(() => {
     const newFilters = { ...permanentFilters };
@@ -243,8 +269,10 @@ export const useFilterState = ({
       sort,
       pagination: { ...pagination, page: 1 },
       searchText,
+      viewMode,
+      zoomLevel,
     });
-  }, [permanentFilters, sort, pagination, searchText, syncToUrlParams]);
+  }, [permanentFilters, sort, pagination, searchText, viewMode, zoomLevel, syncToUrlParams]);
 
   const setSearchText = useCallback((text) => {
     setSearchTextState(text);
@@ -264,28 +292,62 @@ export const useFilterState = ({
         sort: current.sort,
         pagination: { ...current.pagination, page: 1 },
         searchText: text,
+        viewMode: current.viewMode,
+        zoomLevel: current.zoomLevel,
       }, { replace: true });
     }, 500);
   }, [syncToUrlParams]);
 
   const loadPreset = useCallback((preset) => {
     const newFilters = { ...permanentFilters, ...preset.filters };
+    const newViewMode = preset.viewMode || "grid";
+    const newZoomLevel = preset.zoomLevel || "medium";
     setFiltersState(newFilters);
     setSortState({ field: preset.sort, direction: preset.direction });
     setPaginationState((prev) => ({ ...prev, page: 1 }));
+    setViewModeState(newViewMode);
+    setZoomLevelState(newZoomLevel);
     syncToUrlParams({
       filters: newFilters,
       sort: { field: preset.sort, direction: preset.direction },
       pagination: { ...pagination, page: 1 },
       searchText,
+      viewMode: newViewMode,
+      zoomLevel: newZoomLevel,
     });
   }, [permanentFilters, pagination, searchText, syncToUrlParams]);
+
+  const setViewMode = useCallback((mode) => {
+    setViewModeState(mode);
+    syncToUrlParams({
+      filters,
+      sort,
+      pagination,
+      searchText,
+      viewMode: mode,
+      zoomLevel,
+    });
+  }, [filters, sort, pagination, searchText, zoomLevel, syncToUrlParams]);
+
+  const setZoomLevel = useCallback((level) => {
+    setZoomLevelState(level);
+    syncToUrlParams({
+      filters,
+      sort,
+      pagination,
+      searchText,
+      viewMode,
+      zoomLevel: level,
+    });
+  }, [filters, sort, pagination, searchText, viewMode, syncToUrlParams]);
 
   return {
     filters,
     sort,
     pagination,
     searchText,
+    viewMode,
+    zoomLevel,
     isInitialized,
     isLoadingPresets,
     // Actions
@@ -297,6 +359,8 @@ export const useFilterState = ({
     setPage,
     setPerPage,
     setSearchText,
+    setViewMode,
+    setZoomLevel,
     loadPreset,
   };
 };

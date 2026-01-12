@@ -17,21 +17,21 @@ const ViewModeToggle = ({ value = "grid", onChange, className = "" }) => {
         border: "1px solid var(--border-color)",
       }}
     >
-      {modes.map(({ id, icon: Icon, label }) => (
+      {modes.map((mode) => (
         <button
-          key={id}
+          key={mode.id}
           type="button"
-          onClick={() => onChange(id)}
+          onClick={() => onChange(mode.id)}
           className="px-3 py-1.5 transition-colors"
           style={{
-            backgroundColor: value === id ? "var(--accent-primary)" : "transparent",
-            color: value === id ? "white" : "var(--text-secondary)",
+            backgroundColor: value === mode.id ? "var(--accent-primary)" : "transparent",
+            color: value === mode.id ? "white" : "var(--text-secondary)",
           }}
-          title={label}
-          aria-label={label}
-          aria-pressed={value === id}
+          title={mode.label}
+          aria-label={mode.label}
+          aria-pressed={value === mode.id}
         >
-          <Icon size={18} />
+          <mode.icon size={18} />
         </button>
       ))}
     </div>
