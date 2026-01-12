@@ -121,6 +121,7 @@ export const getUserSettings = async (
         syncToStash: true,
         hideConfirmationDisabled: true,
         unitPreference: true,
+        wallPlayback: true,
       },
     });
 
@@ -142,6 +143,7 @@ export const getUserSettings = async (
         syncToStash: user.syncToStash,
         hideConfirmationDisabled: user.hideConfirmationDisabled,
         unitPreference: user.unitPreference || "metric",
+        wallPlayback: user.wallPlayback || "autoplay",
       },
     });
   } catch (error) {
@@ -190,6 +192,7 @@ export const updateUserSettings = async (
       minimumPlayPercent,
       syncToStash,
       unitPreference,
+      wallPlayback,
     } = req.body;
 
     // Validate values
@@ -240,6 +243,16 @@ export const updateUserSettings = async (
         return res
           .status(400)
           .json({ error: "Unit preference must be 'metric' or 'imperial'" });
+      }
+    }
+
+    // Validate wallPlayback if provided
+    if (wallPlayback !== undefined) {
+      const validWallPlayback = ["autoplay", "hover", "static"];
+      if (!validWallPlayback.includes(wallPlayback)) {
+        return res
+          .status(400)
+          .json({ error: "Wall playback must be 'autoplay', 'hover', or 'static'" });
       }
     }
 
@@ -302,6 +315,7 @@ export const updateUserSettings = async (
         ...(minimumPlayPercent !== undefined && { minimumPlayPercent }),
         ...(syncToStash !== undefined && { syncToStash }),
         ...(unitPreference !== undefined && { unitPreference }),
+        ...(wallPlayback !== undefined && { wallPlayback }),
       },
       select: {
         id: true,
@@ -315,6 +329,7 @@ export const updateUserSettings = async (
         navPreferences: true,
         minimumPlayPercent: true,
         syncToStash: true,
+        wallPlayback: true,
       },
     });
 
@@ -329,6 +344,7 @@ export const updateUserSettings = async (
         navPreferences: updatedUser.navPreferences || null,
         minimumPlayPercent: updatedUser.minimumPlayPercent,
         syncToStash: updatedUser.syncToStash,
+        wallPlayback: updatedUser.wallPlayback || "autoplay",
       },
     });
   } catch (error) {
