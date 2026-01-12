@@ -16,6 +16,7 @@ const PlaybackTab = () => {
   const [preferredPreviewQuality, setPreferredPreviewQuality] = useState("sprite");
   const [enableCast, setEnableCast] = useState(true);
   const [minimumPlayPercent, setMinimumPlayPercent] = useState(20);
+  const [wallPlayback, setWallPlayback] = useState("autoplay");
 
   // Load settings on mount
   useEffect(() => {
@@ -30,6 +31,7 @@ const PlaybackTab = () => {
         setPreferredPreviewQuality(settings.preferredPreviewQuality || "sprite");
         setEnableCast(settings.enableCast !== false);
         setMinimumPlayPercent(settings.minimumPlayPercent ?? 20);
+        setWallPlayback(settings.wallPlayback || "autoplay");
       } catch {
         showError("Failed to load playback settings");
       } finally {
@@ -51,6 +53,7 @@ const PlaybackTab = () => {
         preferredPreviewQuality,
         enableCast,
         minimumPlayPercent,
+        wallPlayback,
       });
 
       showSuccess("Playback settings saved successfully!");
@@ -141,6 +144,37 @@ const PlaybackTab = () => {
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
               Quality of preview animations shown when hovering over scene cards. Low
               quality (sprite) uses less bandwidth.
+            </p>
+          </div>
+
+          {/* Wall View Playback */}
+          <div>
+            <label
+              htmlFor="wallPlayback"
+              className="block text-sm font-medium mb-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Wall View Preview Behavior
+            </label>
+            <select
+              id="wallPlayback"
+              value={wallPlayback}
+              onChange={(e) => setWallPlayback(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+              }}
+            >
+              <option value="autoplay">Autoplay All (Default)</option>
+              <option value="hover">Play on Hover Only</option>
+              <option value="static">Static Thumbnails</option>
+            </select>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Controls how scene previews behave in Wall view. Autoplay plays all visible
+              previews simultaneously. Hover only plays when you mouse over. Static shows
+              thumbnails only.
             </p>
           </div>
 
