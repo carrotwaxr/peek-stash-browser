@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { libraryApi } from "../../services/api.js";
 import {
   SyncProgressBanner,
@@ -12,6 +13,7 @@ import {
   SearchControls,
 } from "../ui/index.js";
 import SceneGrid from "./SceneGrid.jsx";
+import WallView from "../wall/WallView.jsx";
 
 /**
  * SceneSearch is one of the more core Components of the app. It appears on most pages, and utilizes the
@@ -35,6 +37,7 @@ const SceneSearch = ({
   const [searchParams] = useSearchParams();
 
   const columns = useGridColumns("scenes");
+  const { wallPlayback } = useWallPlayback();
 
   const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery();
 
@@ -138,23 +141,39 @@ const SceneSearch = ({
         totalPages={totalPages}
         totalCount={totalCount}
         syncToUrl={syncToUrl}
+        supportsWallView={true}
+        wallPlayback={wallPlayback}
         {...searchControlsProps}
       >
-        <SceneGrid
-          scenes={currentScenes || []}
-          loading={isLoading}
-          error={error}
-          onSceneClick={handleSceneClick}
-          onHideSuccess={handleHideSuccess}
-          fromPageTitle={fromPageTitle}
-          emptyMessage="No scenes found"
-          emptyDescription="Try adjusting your search filters"
-          enableKeyboard={true}
-          isTVMode={isTVMode}
-          tvGridZoneActive={isTVMode && tvNavigation.isZoneActive("grid")}
-          gridNavigation={gridNavigation}
-          gridItemProps={gridItemProps}
-        />
+        {({ viewMode, zoomLevel }) =>
+          viewMode === "wall" ? (
+            <WallView
+              items={currentScenes}
+              entityType="scene"
+              zoomLevel={zoomLevel}
+              playbackMode={wallPlayback}
+              onItemClick={handleSceneClick}
+              loading={isLoading}
+              emptyMessage="No scenes found"
+            />
+          ) : (
+            <SceneGrid
+              scenes={currentScenes || []}
+              loading={isLoading}
+              error={error}
+              onSceneClick={handleSceneClick}
+              onHideSuccess={handleHideSuccess}
+              fromPageTitle={fromPageTitle}
+              emptyMessage="No scenes found"
+              emptyDescription="Try adjusting your search filters"
+              enableKeyboard={true}
+              isTVMode={isTVMode}
+              tvGridZoneActive={isTVMode && tvNavigation.isZoneActive("grid")}
+              gridNavigation={gridNavigation}
+              gridItemProps={gridItemProps}
+            />
+          )
+        }
       </SearchControls>
     </PageLayout>
   );

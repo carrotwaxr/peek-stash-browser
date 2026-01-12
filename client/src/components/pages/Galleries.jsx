@@ -6,6 +6,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { libraryApi } from "../../services/api.js";
 import { GalleryCard } from "../cards/index.js";
 import {
@@ -15,6 +16,7 @@ import {
   PageLayout,
   SearchControls,
 } from "../ui/index.js";
+import WallView from "../wall/WallView.jsx";
 
 const Galleries = () => {
   usePageTitle("Galleries");
@@ -23,6 +25,7 @@ const Galleries = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = useGridColumns("galleries");
+  const { wallPlayback } = useWallPlayback();
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
@@ -31,6 +34,15 @@ const Galleries = () => {
       execute((signal) => getGalleries(newQuery, signal));
     },
     [execute]
+  );
+
+  const handleGalleryClick = useCallback(
+    (gallery) => {
+      navigate(`/gallery/${gallery.id}`, {
+        state: { fromPageTitle: "Galleries" },
+      });
+    },
+    [navigate]
   );
 
   const currentGalleries = data?.galleries || [];
@@ -52,10 +64,7 @@ const Galleries = () => {
     items: currentGalleries,
     columns,
     totalPages,
-    onItemSelect: (gallery) =>
-      navigate(`/gallery/${gallery.id}`, {
-        state: { fromPageTitle: "Galleries" },
-      }),
+    onItemSelect: handleGalleryClick,
   });
 
   useInitialFocus(
@@ -90,23 +99,35 @@ const Galleries = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
+          supportsWallView={true}
+          wallPlayback={wallPlayback}
           {...searchControlsProps}
         >
-          {isLoading ? (
-            <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
-              {[...Array(24)].map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg animate-pulse"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    height: "20rem",
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <>
+          {({ viewMode, zoomLevel }) =>
+            isLoading ? (
+              <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      height: "20rem",
+                    }}
+                  />
+                ))}
+              </div>
+            ) : viewMode === "wall" ? (
+              <WallView
+                items={currentGalleries}
+                entityType="gallery"
+                zoomLevel={zoomLevel}
+                playbackMode={wallPlayback}
+                onItemClick={handleGalleryClick}
+                loading={isLoading}
+                emptyMessage="No galleries found"
+              />
+            ) : (
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
                 {currentGalleries.map((gallery, index) => {
                   const itemProps = gridItemProps(index);
@@ -121,8 +142,8 @@ const Galleries = () => {
                   );
                 })}
               </div>
-            </>
-          )}
+            )
+          }
         </SearchControls>
       </div>
     </PageLayout>

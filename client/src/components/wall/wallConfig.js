@@ -42,14 +42,15 @@ export const wallConfig = {
   },
 
   gallery: {
-    getImageUrl: (item) => item.cover?.paths?.thumbnail,
+    // gallery.cover is a direct URL string (proxy URL)
+    getImageUrl: (item) => item.cover || null,
     getPreviewUrl: () => null,
     getAspectRatio: (item) => {
-      const cover = item.cover;
-      if (cover?.width && cover?.height) {
-        return cover.width / cover.height;
+      // Use cover image dimensions if available (from coverImageId -> StashImage)
+      if (item.coverWidth && item.coverHeight) {
+        return item.coverWidth / item.coverHeight;
       }
-      return 4 / 3; // Default for galleries
+      return 1; // Default square if no dimensions
     },
     getTitle: (item) => item.title || "Untitled Gallery",
     getSubtitle: (item) => `${item.image_count || 0} images`,

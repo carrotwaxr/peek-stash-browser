@@ -78,7 +78,7 @@ const WallView = ({
         rowConstraints={{ maxPhotos: 8 }}
         spacing={4}
         render={{
-          photo: ({ photo, width, height }) => (
+          photo: (_, { photo, width, height }) => (
             <WallItem
               key={photo.key}
               item={photo._item}

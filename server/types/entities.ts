@@ -139,11 +139,15 @@ export type NormalizedTag = Tag & {
  *
  * Additional/modified fields:
  * - cover: Proxied URL string (overrides base Image type)
+ * - coverWidth: Width of cover image in pixels (from StashImage via coverImageId)
+ * - coverHeight: Height of cover image in pixels (from StashImage via coverImageId)
  * - rating: User's 1-5 star rating (null if unrated)
  * - favorite: Whether user favorited this gallery
  */
 export type NormalizedGallery = Omit<Gallery, "cover"> & {
   cover: string | null;
+  coverWidth: number | null;
+  coverHeight: number | null;
   rating: number | null;
   favorite: boolean;
 };

@@ -17,6 +17,7 @@ const WallItem = ({
   const [isHovering, setIsHovering] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const overlayTimeoutRef = useRef(null);
 
   const imageUrl = config.getImageUrl(item);
@@ -95,17 +96,34 @@ const WallItem = ({
       to={linkPath}
       onClick={handleClick}
       className="wall-item relative block overflow-hidden"
-      style={{ width, height }}
+      style={{ width, height, backgroundColor: "var(--bg-tertiary)" }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
+      {/* Loading spinner */}
+      {!imageLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="animate-spin rounded-full border-2 border-t-transparent"
+            style={{
+              width: "24px",
+              height: "24px",
+              borderColor: "var(--text-muted)",
+              borderTopColor: "transparent",
+            }}
+          />
+        </div>
+      )}
+
       {/* Background image */}
       {imageUrl && (
         <img
           src={imageUrl}
           alt={title}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
+          style={{ opacity: imageLoaded ? 1 : 0 }}
           loading="lazy"
+          onLoad={() => setImageLoaded(true)}
         />
       )}
 

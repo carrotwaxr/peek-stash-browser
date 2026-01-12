@@ -730,10 +730,11 @@ model StashGallery {
   stashInstanceId String?
 
   // === Core fields ===
-  title     String?
-  date      String?
-  studioId  String?
-  rating100 Int?
+  title        String?
+  date         String?
+  studioId     String?
+  rating100    Int?
+  coverImageId String? // Stash image ID of the cover image (for dimension lookup)
 
   // === Counts (synced from Stash) ===
   imageCount Int @default(0)
@@ -771,6 +772,7 @@ model StashGallery {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@index([coverImageId])
 }
 
 model StashImage {

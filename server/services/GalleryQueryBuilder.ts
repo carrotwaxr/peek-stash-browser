@@ -41,11 +41,12 @@ class GalleryQueryBuilder {
   // Column list for SELECT - all StashGallery fields plus user data
   private readonly SELECT_COLUMNS = `
     g.id, g.title, g.date, g.studioId, g.rating100 AS stashRating100,
-    g.imageCount,
+    g.imageCount, g.coverImageId,
     g.details, g.url, g.code, g.photographer, g.urls,
     g.folderPath, g.fileBasename, g.coverPath,
     g.stashCreatedAt, g.stashUpdatedAt,
-    r.rating AS userRating, r.favorite AS userFavorite
+    r.rating AS userRating, r.favorite AS userFavorite,
+    ci.width AS coverWidth, ci.height AS coverHeight
   `.trim();
 
   // Base FROM clause with user data JOINs
@@ -56,6 +57,7 @@ class GalleryQueryBuilder {
     const baseJoins = `
         FROM StashGallery g
         LEFT JOIN GalleryRating r ON g.id = r.galleryId AND r.userId = ?
+        LEFT JOIN StashImage ci ON g.coverImageId = ci.id
     `.trim();
 
     if (applyExclusions) {
@@ -703,6 +705,10 @@ class GalleryQueryBuilder {
 
       // Cover path - transform to proxy URL
       cover: this.transformUrl(row.coverPath),
+
+      // Cover dimensions (from StashImage via coverImageId)
+      coverWidth: row.coverWidth || null,
+      coverHeight: row.coverHeight || null,
 
       // Timestamps
       created_at: row.stashCreatedAt?.toISOString?.() || row.stashCreatedAt || null,
