@@ -24,6 +24,8 @@ interface FilterPreset {
   filters: unknown;
   sort?: string;
   direction?: string;
+  viewMode?: string;
+  zoomLevel?: string;
   createdAt?: string;
   [key: string]: unknown;
 }
@@ -671,6 +673,8 @@ export const saveFilterPreset = async (
       filters,
       sort,
       direction,
+      viewMode,
+      zoomLevel,
       setAsDefault,
     } = req.body;
 
@@ -728,6 +732,8 @@ export const saveFilterPreset = async (
       filters,
       sort,
       direction,
+      viewMode: viewMode || "grid",
+      zoomLevel: zoomLevel || "medium",
       createdAt: new Date().toISOString(),
     };
 
