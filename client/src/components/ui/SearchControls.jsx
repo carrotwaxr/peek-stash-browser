@@ -39,6 +39,8 @@ import {
   Pagination,
   SearchInput,
   SortControl,
+  ViewModeToggle,
+  ZoomSlider,
 } from "./index.js";
 
 const buildFilter = (artifactType, filters, unitPreference) => {
@@ -94,6 +96,9 @@ const SearchControls = ({
   totalPages,
   totalCount,
   syncToUrl = true,
+  // View mode props
+  supportsWallView = false,
+  wallPlayback = "autoplay",
   // TV Mode props
   tvSearchZoneActive = false,
   tvTopPaginationZoneActive = false,
@@ -113,13 +118,15 @@ const SearchControls = ({
   // Unit preference for filter conversions
   const { unitPreference } = useUnitPreference();
 
-  // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets
+  // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom
   const searchZoneItems = useMemo(() => [
     { id: "search-input", name: "Search" },
     { id: "sort-control", name: "Sort" },
     { id: "sort-direction", name: "Direction" },
     { id: "filters-button", name: "Filters" },
     { id: "filter-presets", name: "Presets" },
+    { id: "view-mode", name: "View" },
+    { id: "zoom-level", name: "Zoom" },
   ], []);
 
   // Horizontal navigation for search zone
@@ -220,6 +227,8 @@ const SearchControls = ({
     sort,
     pagination,
     searchText,
+    viewMode,
+    zoomLevel,
     isInitialized,
     isLoadingPresets,
     setFilters: setFiltersAction,
@@ -229,6 +238,8 @@ const SearchControls = ({
     setPage,
     setPerPage: setPerPageAction,
     setSearchText: setSearchTextAction,
+    setViewMode,
+    setZoomLevel,
     loadPreset,
   } = useFilterState({
     artifactType,
@@ -736,10 +747,34 @@ const SearchControls = ({
               currentFilters={filters}
               currentSort={sortField}
               currentDirection={sortDirection}
+              currentViewMode={viewMode}
+              currentZoomLevel={zoomLevel}
               permanentFilters={permanentFilters}
               onLoadPreset={handleLoadPreset}
             />
           </div>
+
+          {/* View Mode Toggle - Only for supported artifact types */}
+          {supportsWallView && (
+            <div
+              data-tv-search-item="view-mode"
+              ref={(el) => searchZoneNav.setItemRef(5, el)}
+              className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
+            >
+              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+          )}
+
+          {/* Zoom Slider - Only shown in wall mode */}
+          {supportsWallView && viewMode === "wall" && (
+            <div
+              data-tv-search-item="zoom-level"
+              ref={(el) => searchZoneNav.setItemRef(6, el)}
+              className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
+            >
+              <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -902,7 +937,10 @@ const SearchControls = ({
           );
         })}
       </FilterPanel>
-      {children}
+      {/* Children: render prop or direct children */}
+      {typeof children === "function"
+        ? children({ viewMode, zoomLevel, wallPlayback })
+        : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (
         <div className="mt-4">
