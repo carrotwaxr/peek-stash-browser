@@ -2063,6 +2063,8 @@ class StashSyncService extends EventEmitter {
         const folder = gallery.folder;
         // Get first file's basename for zip gallery title fallback
         const fileBasename = gallery.files?.[0]?.basename || null;
+        // Cover image ID for dimension lookup
+        const coverImageId = (gallery as any).cover?.id || null;
         return `(
       '${this.escape(gallery.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
@@ -2070,6 +2072,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(gallery.date)},
       ${gallery.studio?.id ? `'${this.escape(gallery.studio.id)}'` : "NULL"},
       ${gallery.rating100 ?? "NULL"},
+      ${coverImageId ? `'${this.escape(coverImageId)}'` : "NULL"},
       ${gallery.image_count ?? 0},
       ${this.escapeNullable(gallery.details)},
       ${this.escapeNullable(gallery.url)},
@@ -2089,7 +2092,7 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashGallery (
-      id, stashInstanceId, title, date, studioId, rating100, imageCount,
+      id, stashInstanceId, title, date, studioId, rating100, coverImageId, imageCount,
       details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
@@ -2098,6 +2101,7 @@ class StashSyncService extends EventEmitter {
       date = excluded.date,
       studioId = excluded.studioId,
       rating100 = excluded.rating100,
+      coverImageId = excluded.coverImageId,
       imageCount = excluded.imageCount,
       details = excluded.details,
       url = excluded.url,

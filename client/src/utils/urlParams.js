@@ -155,6 +155,8 @@ const urlParamsToFilters = (searchParams, filterOptions) => {
  * @param {number} state.perPage - Items per page
  * @param {Object} state.filters - Filter state object
  * @param {Array} state.filterOptions - Filter configuration
+ * @param {string} state.viewMode - View mode (grid/wall)
+ * @param {string} state.zoomLevel - Zoom level for wall view
  * @returns {URLSearchParams}
  */
 export const buildSearchParams = ({
@@ -165,6 +167,8 @@ export const buildSearchParams = ({
   perPage,
   filters,
   filterOptions,
+  viewMode,
+  zoomLevel,
 }) => {
   const params = filtersToUrlParams(filters, filterOptions);
 
@@ -173,6 +177,8 @@ export const buildSearchParams = ({
   if (sortDirection) params.set("dir", sortDirection);
   if (currentPage > 1) params.set("page", currentPage.toString());
   if (perPage !== 24) params.set("per_page", perPage.toString());
+  if (viewMode && viewMode !== "grid") params.set("view", viewMode);
+  if (zoomLevel && zoomLevel !== "medium") params.set("zoom", zoomLevel);
 
   return params;
 };
@@ -196,6 +202,8 @@ export const parseSearchParams = (
     sortDirection: searchParams.get("dir") || defaults.sortDirection || "DESC",
     currentPage: parseInt(searchParams.get("page") || "1", 10),
     perPage: parseInt(searchParams.get("per_page") || "24", 10),
+    viewMode: searchParams.get("view") || defaults.viewMode || "grid",
+    zoomLevel: searchParams.get("zoom") || defaults.zoomLevel || "medium",
     filters: {
       ...defaults.filters,
       ...urlParamsToFilters(searchParams, filterOptions),

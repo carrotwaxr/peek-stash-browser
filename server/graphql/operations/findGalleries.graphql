@@ -93,6 +93,9 @@ query FindGalleries(
       folder {
         path
       }
+      cover {
+        id
+      }
       paths {
         cover
         preview

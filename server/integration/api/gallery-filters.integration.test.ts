@@ -23,6 +23,9 @@ interface FindGalleriesResponse {
       favorite?: boolean;
       rating100?: number | null;
       image_count?: number;
+      cover?: string | null;
+      coverWidth?: number | null;
+      coverHeight?: number | null;
       studio?: { id: string; name: string } | null;
       performers?: Array<{ id: string; name: string }>;
       tags?: Array<{ id: string; name?: string }>;
@@ -433,6 +436,84 @@ describe("Gallery Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findGalleries.galleries).toHaveLength(1);
       expect(response.data.findGalleries.galleries[0].id).toBe(TEST_ENTITIES.galleryWithImages);
+    });
+  });
+
+  describe("cover dimensions", () => {
+    it("returns cover URL and dimensions when available", async () => {
+      // Fetch galleries that have images (so they have cover images)
+      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
+        filter: { per_page: 20 },
+        gallery_filter: {
+          image_count: {
+            value: 1,
+            modifier: "GREATER_THAN",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findGalleries).toBeDefined();
+      expect(response.data.findGalleries.galleries.length).toBeGreaterThan(0);
+
+      // Check that galleries have cover field (may be null if no cover set)
+      const galleries = response.data.findGalleries.galleries;
+      for (const gallery of galleries) {
+        // Cover should be a string URL or null
+        expect(typeof gallery.cover === "string" || gallery.cover === null).toBe(true);
+        // coverWidth and coverHeight should be numbers or null
+        expect(typeof gallery.coverWidth === "number" || gallery.coverWidth === null).toBe(true);
+        expect(typeof gallery.coverHeight === "number" || gallery.coverHeight === null).toBe(true);
+      }
+    });
+
+    it("returns valid dimensions for galleries with cover images", async () => {
+      // Fetch galleries
+      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
+        filter: { per_page: 50 },
+        gallery_filter: {
+          image_count: {
+            value: 1,
+            modifier: "GREATER_THAN",
+          },
+        },
+      });
+
+      expect(response.ok).toBe(true);
+
+      // Find galleries that have cover dimensions
+      const galleriesWithDimensions = response.data.findGalleries.galleries.filter(
+        (g) => g.coverWidth !== null && g.coverHeight !== null
+      );
+
+      // If any galleries have dimensions, verify they're positive
+      for (const gallery of galleriesWithDimensions) {
+        expect(gallery.coverWidth).toBeGreaterThan(0);
+        expect(gallery.coverHeight).toBeGreaterThan(0);
+      }
+    });
+
+    it("returns consistent aspect ratio calculation data", async () => {
+      const response = await adminClient.post<FindGalleriesResponse>("/api/library/galleries", {
+        ids: [TEST_ENTITIES.galleryWithImages],
+      });
+
+      expect(response.ok).toBe(true);
+      expect(response.data.findGalleries.galleries).toHaveLength(1);
+
+      const gallery = response.data.findGalleries.galleries[0];
+
+      // Gallery should have cover field
+      expect("cover" in gallery).toBe(true);
+      expect("coverWidth" in gallery).toBe(true);
+      expect("coverHeight" in gallery).toBe(true);
+
+      // If both dimensions exist, they should allow aspect ratio calculation
+      if (gallery.coverWidth !== null && gallery.coverHeight !== null) {
+        const aspectRatio = gallery.coverWidth / gallery.coverHeight;
+        expect(aspectRatio).toBeGreaterThan(0);
+        expect(Number.isFinite(aspectRatio)).toBe(true);
+      }
     });
   });
 });

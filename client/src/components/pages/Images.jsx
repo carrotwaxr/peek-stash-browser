@@ -7,6 +7,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
+import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { libraryApi } from "../../services/api.js";
 import { ImageCard } from "../cards/index.js";
 import {
@@ -17,6 +18,7 @@ import {
   SearchControls,
 } from "../ui/index.js";
 import Lightbox from "../ui/Lightbox.jsx";
+import WallView from "../wall/WallView.jsx";
 
 const Images = () => {
   usePageTitle("Images");
@@ -24,6 +26,7 @@ const Images = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = useGridColumns("images");
+  const { wallPlayback } = useWallPlayback();
 
   // Extract URL pagination params early (needed for hooks)
   const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
@@ -164,24 +167,36 @@ const Images = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
+          supportsWallView={true}
+          wallPlayback={wallPlayback}
           {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
-          {isLoading ? (
-            <div className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
-              {[...Array(24)].map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg animate-pulse"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    height: "16rem",
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <>
+          {({ viewMode, zoomLevel }) =>
+            isLoading ? (
+              <div className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      height: "16rem",
+                    }}
+                  />
+                ))}
+              </div>
+            ) : viewMode === "wall" ? (
+              <WallView
+                items={currentImages}
+                entityType="image"
+                zoomLevel={zoomLevel}
+                playbackMode={wallPlayback}
+                onItemClick={handleImageClick}
+                loading={isLoading}
+                emptyMessage="No images found"
+              />
+            ) : (
               <div ref={gridRef} className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
                 {currentImages.map((image, index) => {
                   const itemProps = gridItemProps(index);
@@ -200,8 +215,8 @@ const Images = () => {
                   );
                 })}
               </div>
-            </>
-          )}
+            )
+          }
         </SearchControls>
 
         {/* Lightbox for viewing images */}
