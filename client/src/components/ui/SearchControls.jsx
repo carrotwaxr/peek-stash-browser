@@ -98,6 +98,8 @@ const SearchControls = ({
   syncToUrl = true,
   // View mode props
   supportsWallView = false,
+  viewModes, // Array of mode configs for ViewModeToggle (optional, overrides supportsWallView)
+  onViewModeChange, // Callback when view mode changes (optional)
   wallPlayback = "autoplay",
   // TV Mode props
   tvSearchZoneActive = false,
@@ -262,6 +264,13 @@ const SearchControls = ({
       onPerPageStateChange(perPage);
     }
   }, [perPage, onPerPageStateChange]);
+
+  // Notify parent of view mode changes
+  useEffect(() => {
+    if (onViewModeChange) {
+      onViewModeChange(viewMode);
+    }
+  }, [viewMode, onViewModeChange]);
 
   // Local filters state for filter panel editing (before submit)
   const [localFilters, setLocalFilters] = useState(filters);
@@ -754,19 +763,23 @@ const SearchControls = ({
             />
           </div>
 
-          {/* View Mode Toggle - Only for supported artifact types */}
-          {supportsWallView && (
+          {/* View Mode Toggle - Show if supportsWallView or viewModes provided */}
+          {(supportsWallView || viewModes) && (
             <div
               data-tv-search-item="view-mode"
               ref={(el) => searchZoneNav.setItemRef(5, el)}
               className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
             >
-              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+              <ViewModeToggle
+                modes={viewModes}
+                value={viewMode}
+                onChange={setViewMode}
+              />
             </div>
           )}
 
           {/* Zoom Slider - Only shown in wall mode */}
-          {supportsWallView && viewMode === "wall" && (
+          {(supportsWallView || viewModes?.some(m => m.id === "wall")) && viewMode === "wall" && (
             <div
               data-tv-search-item="zoom-level"
               ref={(el) => searchZoneNav.setItemRef(6, el)}
@@ -939,7 +952,7 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? children({ viewMode, zoomLevel, wallPlayback })
+        ? children({ viewMode, zoomLevel, wallPlayback, sortField, sortDirection })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (
