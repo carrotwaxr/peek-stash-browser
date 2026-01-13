@@ -137,38 +137,43 @@ const ContextSettings = ({
           <div className="p-3 space-y-3">
             {settings.map((setting) => (
               <div key={setting.key}>
-                <label
-                  htmlFor={`context-${setting.key}`}
-                  className="block text-xs font-medium mb-1"
-                  style={{ color: "var(--text-secondary)" }}
-                >
-                  {setting.label}
-                </label>
-
                 {setting.type === "select" && (
-                  <select
-                    id={`context-${setting.key}`}
-                    value={currentValues[setting.key] || ""}
-                    onChange={(e) => handleSettingChange(setting.key, e.target.value)}
-                    disabled={saving}
-                    className="w-full px-2 py-1.5 rounded text-sm"
-                    style={{
-                      backgroundColor: "var(--bg-secondary)",
-                      border: "1px solid var(--border-color)",
-                      color: "var(--text-primary)",
-                    }}
-                  >
-                    {setting.options.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <label
+                      htmlFor={`context-${setting.key}`}
+                      className="block text-xs font-medium mb-1"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      {setting.label}
+                    </label>
+                    <select
+                      id={`context-${setting.key}`}
+                      value={currentValues[setting.key] || ""}
+                      onChange={(e) => handleSettingChange(setting.key, e.target.value)}
+                      disabled={saving}
+                      className="w-full px-2 py-1.5 rounded text-sm"
+                      style={{
+                        backgroundColor: "var(--bg-secondary)",
+                        border: "1px solid var(--border-color)",
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {setting.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </>
                 )}
 
                 {setting.type === "toggle" && (
-                  <label className="flex items-center cursor-pointer">
+                  <label
+                    htmlFor={`context-${setting.key}`}
+                    className="flex items-center cursor-pointer"
+                  >
                     <input
+                      id={`context-${setting.key}`}
                       type="checkbox"
                       checked={currentValues[setting.key] || false}
                       onChange={(e) => handleSettingChange(setting.key, e.target.checked)}
@@ -180,7 +185,12 @@ const ContextSettings = ({
                       className="ml-2 text-sm"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      {setting.toggleLabel || "Enabled"}
+                      {setting.label}
+                      {setting.toggleLabel && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          {" "}({setting.toggleLabel})
+                        </span>
+                      )}
                     </span>
                   </label>
                 )}
