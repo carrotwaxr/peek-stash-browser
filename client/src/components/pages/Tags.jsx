@@ -1,3 +1,4 @@
+// client/src/components/pages/Tags.jsx
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
@@ -8,6 +9,7 @@ import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js"
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { libraryApi } from "../../services/api.js";
 import { TagCard } from "../cards/index.js";
+import { TagHierarchyView } from "../tags/index.js";
 import {
   SyncProgressBanner,
   ErrorMessage,
@@ -15,6 +17,12 @@ import {
   PageLayout,
   SearchControls,
 } from "../ui/index.js";
+
+// View modes for Tags page (no wall view - doesn't make sense for tags)
+const TAG_VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "hierarchy", label: "Hierarchy view" },
+];
 
 const Tags = () => {
   usePageTitle("Tags");
@@ -90,23 +98,40 @@ const Tags = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
+          viewModes={TAG_VIEW_MODES}
           {...searchControlsProps}
         >
-          {isLoading ? (
-            <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
-              {[...Array(12)].map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg animate-pulse"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    height: "18rem",
-                  }}
+          {({ viewMode }) => {
+            // Hierarchy view
+            if (viewMode === "hierarchy") {
+              return (
+                <TagHierarchyView
+                  tags={currentTags}
+                  isLoading={isLoading}
+                  searchQuery={searchParams.get("q") || ""}
                 />
-              ))}
-            </div>
-          ) : (
-            <>
+              );
+            }
+
+            // Grid view (default)
+            if (isLoading) {
+              return (
+                <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+                  {[...Array(12)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg animate-pulse"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        height: "18rem",
+                      }}
+                    />
+                  ))}
+                </div>
+              );
+            }
+
+            return (
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
                 {currentTags.map((tag, index) => {
                   const itemProps = gridItemProps(index);
@@ -121,8 +146,8 @@ const Tags = () => {
                   );
                 })}
               </div>
-            </>
-          )}
+            );
+          }}
         </SearchControls>
       </div>
     </PageLayout>
