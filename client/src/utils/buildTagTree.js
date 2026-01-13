@@ -75,8 +75,11 @@ export function buildTagTree(tags, filterQuery = "") {
     const node = {
       ...tag,
       children: [],
-      isAncestorOnly: filterQuery && ancestorIds.has(tagId) ? true : undefined,
     };
+    // Only add isAncestorOnly when true (for ancestors of matches, not matches themselves)
+    if (filterQuery && ancestorIds.has(tagId)) {
+      node.isAncestorOnly = true;
+    }
 
     // Build children
     const originalTag = tags.find((t) => t.id === tagId);
