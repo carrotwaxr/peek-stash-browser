@@ -1,6 +1,50 @@
 import { forwardRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { LucideChevronRight, LucideStar, LucideExternalLink } from "lucide-react";
+import {
+  LucideChevronRight,
+  LucideStar,
+  LucideExternalLink,
+  LucideClapperboard,
+  LucideImages,
+  LucideUser,
+  LucideDroplets,
+} from "lucide-react";
+
+// Color utilities matching CardCountIndicators
+const hueify = (color, direction = "lighter", amount = 12) => {
+  return `lch(from ${color} calc(l ${
+    direction === "lighter" ? "+" : "-"
+  } ${Math.abs(amount)}) c h)`;
+};
+
+// Rating badge gradient matching RatingBadge component
+const getRatingStyle = (rating100) => {
+  if (rating100 === null || rating100 === undefined) return null;
+  const value = rating100 / 10; // 0-10 scale
+
+  if (value < 3.5) {
+    // Bronze
+    return {
+      background:
+        "linear-gradient(135deg, #C77B30 0%, #965A1E 30%, #C77B30 50%, #8B4513 70%, #965A1E 100%)",
+      color: "#FFF",
+    };
+  } else if (value < 7.0) {
+    // Silver
+    return {
+      background:
+        "linear-gradient(135deg, #E8E8E8 0%, #A8A8A8 30%, #D0D0D0 50%, #909090 70%, #C0C0C0 100%)",
+      color: "#333",
+    };
+  } else {
+    // Gold
+    return {
+      background:
+        "linear-gradient(135deg, #FFE87C 0%, #D4AF37 30%, #FFD700 50%, #B8860B 70%, #DAA520 100%)",
+      color: "#333",
+    };
+  }
+};
 
 /**
  * Individual tree node for tag hierarchy view.
@@ -12,6 +56,7 @@ const TagTreeNode = forwardRef(
       tag,
       depth = 0,
       isExpanded = false,
+      expandedIds, // Set of expanded node IDs (passed down for children)
       onToggle,
       isAncestorOnly = false,
       focusedId,
@@ -141,32 +186,87 @@ const TagTreeNode = forwardRef(
             )}
           </div>
 
-          {/* Right side: counts, favorite, navigate */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Scene count badge */}
+          {/* Right side: counts, rating, o-counter, favorite, navigate */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Scene count - clapperboard icon */}
             {tag.scene_count > 0 && (
-              <span
-                className="text-xs px-2 py-0.5 rounded"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                  color: "var(--text-muted)",
-                }}
+              <div
+                className="flex items-center gap-1"
+                title={`${tag.scene_count} scene${tag.scene_count !== 1 ? "s" : ""}`}
               >
-                {tag.scene_count} scenes
-              </span>
+                <LucideClapperboard
+                  size={16}
+                  style={{ color: hueify("var(--accent-secondary)", "lighter") }}
+                />
+                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  {tag.scene_count}
+                </span>
+              </div>
             )}
 
-            {/* Performer count badge */}
-            {tag.performer_count > 0 && (
-              <span
-                className="text-xs px-2 py-0.5 rounded"
-                style={{
-                  backgroundColor: "var(--bg-tertiary)",
-                  color: "var(--text-muted)",
-                }}
+            {/* Image count - images icon */}
+            {tag.image_count > 0 && (
+              <div
+                className="flex items-center gap-1"
+                title={`${tag.image_count} image${tag.image_count !== 1 ? "s" : ""}`}
               >
-                {tag.performer_count} performers
-              </span>
+                <LucideImages
+                  size={16}
+                  style={{ color: hueify("var(--status-success)", "lighter") }}
+                />
+                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  {tag.image_count}
+                </span>
+              </div>
+            )}
+
+            {/* Performer count - user icon */}
+            {tag.performer_count > 0 && (
+              <div
+                className="flex items-center gap-1"
+                title={`${tag.performer_count} performer${tag.performer_count !== 1 ? "s" : ""}`}
+              >
+                <LucideUser
+                  size={16}
+                  style={{ color: "var(--accent-primary)" }}
+                />
+                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  {tag.performer_count}
+                </span>
+              </div>
+            )}
+
+            {/* Rating badge - metallic medal style */}
+            {tag.rating100 > 0 && (() => {
+              const ratingStyle = getRatingStyle(tag.rating100);
+              return (
+                <span
+                  className="text-xs px-2 py-0.5 rounded font-bold"
+                  style={{
+                    background: ratingStyle.background,
+                    color: ratingStyle.color,
+                  }}
+                  title={`Rating: ${(tag.rating100 / 10).toFixed(1)}`}
+                >
+                  {(tag.rating100 / 10).toFixed(1)}
+                </span>
+              );
+            })()}
+
+            {/* O-Counter - droplets icon with info color */}
+            {tag.o_counter > 0 && (
+              <div
+                className="flex items-center gap-1"
+                title={`O-Counter: ${tag.o_counter}`}
+              >
+                <LucideDroplets
+                  size={16}
+                  style={{ color: "var(--status-info)" }}
+                />
+                <span className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  {tag.o_counter}
+                </span>
+              </div>
             )}
 
             {/* Favorite star */}
@@ -175,6 +275,7 @@ const TagTreeNode = forwardRef(
                 size={16}
                 fill="var(--accent-primary)"
                 style={{ color: "var(--accent-primary)" }}
+                title="Favorite"
               />
             )}
 
@@ -203,7 +304,8 @@ const TagTreeNode = forwardRef(
                 key={`${tag.id}-${child.id}`}
                 tag={child}
                 depth={depth + 1}
-                isExpanded={false}
+                isExpanded={expandedIds?.has(child.id) || false}
+                expandedIds={expandedIds}
                 onToggle={onToggle}
                 isAncestorOnly={isAncestorOnly}
                 focusedId={focusedId}

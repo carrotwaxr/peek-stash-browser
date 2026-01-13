@@ -70,7 +70,7 @@ describe("buildTagTree with filter", () => {
     const tags = [
       { id: "1", name: "Action", parents: [], children: [] },
     ];
-    const result = buildTagTree(tags, "xyz");
+    const result = buildTagTree(tags, { filterQuery: "xyz" });
     expect(result).toEqual([]);
   });
 
@@ -79,7 +79,7 @@ describe("buildTagTree with filter", () => {
       { id: "1", name: "Genre", parents: [], children: [{ id: "2", name: "Action" }] },
       { id: "2", name: "Action", parents: [{ id: "1", name: "Genre" }], children: [] },
     ];
-    const result = buildTagTree(tags, "action");
+    const result = buildTagTree(tags, { filterQuery: "action" });
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe("1"); // Genre (ancestor)
     expect(result[0].isAncestorOnly).toBe(true);
@@ -93,9 +93,56 @@ describe("buildTagTree with filter", () => {
       { id: "2", name: "Middle", parents: [{ id: "1", name: "Root" }], children: [{ id: "3", name: "Leaf" }] },
       { id: "3", name: "Leaf", parents: [{ id: "2", name: "Middle" }], children: [] },
     ];
-    const result = buildTagTree(tags, "leaf");
+    const result = buildTagTree(tags, { filterQuery: "leaf" });
     expect(result[0].isAncestorOnly).toBe(true); // Root
     expect(result[0].children[0].isAncestorOnly).toBe(true); // Middle
     expect(result[0].children[0].children[0].isAncestorOnly).toBeUndefined(); // Leaf (match)
+  });
+});
+
+describe("buildTagTree with sorting", () => {
+  it("sorts roots alphabetically by name (ASC)", () => {
+    const tags = [
+      { id: "1", name: "Zebra", parents: [], children: [] },
+      { id: "2", name: "Apple", parents: [], children: [] },
+      { id: "3", name: "Mango", parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "name", sortDirection: "ASC" });
+    expect(result[0].name).toBe("Apple");
+    expect(result[1].name).toBe("Mango");
+    expect(result[2].name).toBe("Zebra");
+  });
+
+  it("sorts roots by name DESC", () => {
+    const tags = [
+      { id: "1", name: "Apple", parents: [], children: [] },
+      { id: "2", name: "Zebra", parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "name", sortDirection: "DESC" });
+    expect(result[0].name).toBe("Zebra");
+    expect(result[1].name).toBe("Apple");
+  });
+
+  it("sorts by scene_count", () => {
+    const tags = [
+      { id: "1", name: "A", scene_count: 10, parents: [], children: [] },
+      { id: "2", name: "B", scene_count: 5, parents: [], children: [] },
+      { id: "3", name: "C", scene_count: 20, parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "scenes_count", sortDirection: "DESC" });
+    expect(result[0].scene_count).toBe(20);
+    expect(result[1].scene_count).toBe(10);
+    expect(result[2].scene_count).toBe(5);
+  });
+
+  it("sorts children at each level", () => {
+    const tags = [
+      { id: "1", name: "Parent", parents: [], children: [{ id: "2" }, { id: "3" }] },
+      { id: "2", name: "Zebra", parents: [{ id: "1" }], children: [] },
+      { id: "3", name: "Apple", parents: [{ id: "1" }], children: [] },
+    ];
+    const result = buildTagTree(tags, { sortField: "name", sortDirection: "ASC" });
+    expect(result[0].children[0].name).toBe("Apple");
+    expect(result[0].children[1].name).toBe("Zebra");
   });
 });

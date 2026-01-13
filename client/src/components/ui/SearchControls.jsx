@@ -99,6 +99,7 @@ const SearchControls = ({
   // View mode props
   supportsWallView = false,
   viewModes, // Array of mode configs for ViewModeToggle (optional, overrides supportsWallView)
+  onViewModeChange, // Callback when view mode changes (optional)
   wallPlayback = "autoplay",
   // TV Mode props
   tvSearchZoneActive = false,
@@ -263,6 +264,13 @@ const SearchControls = ({
       onPerPageStateChange(perPage);
     }
   }, [perPage, onPerPageStateChange]);
+
+  // Notify parent of view mode changes
+  useEffect(() => {
+    if (onViewModeChange) {
+      onViewModeChange(viewMode);
+    }
+  }, [viewMode, onViewModeChange]);
 
   // Local filters state for filter panel editing (before submit)
   const [localFilters, setLocalFilters] = useState(filters);
@@ -944,7 +952,7 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? children({ viewMode, zoomLevel, wallPlayback })
+        ? children({ viewMode, zoomLevel, wallPlayback, sortField, sortDirection })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (

@@ -1,13 +1,64 @@
 // client/src/utils/buildTagTree.js
+
+/**
+ * Get sort compare function for a given field and direction
+ */
+const getSortFn = (sortField, sortDirection) => {
+  const dir = sortDirection === "ASC" ? 1 : -1;
+
+  return (a, b) => {
+    let valA, valB;
+
+    switch (sortField) {
+      case "name":
+        valA = (a.name || "").toLowerCase();
+        valB = (b.name || "").toLowerCase();
+        return valA.localeCompare(valB) * dir;
+
+      case "scenes_count":
+      case "scene_count":
+        valA = a.scene_count || 0;
+        valB = b.scene_count || 0;
+        return (valA - valB) * dir;
+
+      case "performer_count":
+        valA = a.performer_count || 0;
+        valB = b.performer_count || 0;
+        return (valA - valB) * dir;
+
+      case "created_at":
+        valA = a.created_at || "";
+        valB = b.created_at || "";
+        return valA.localeCompare(valB) * dir;
+
+      case "updated_at":
+        valA = a.updated_at || "";
+        valB = b.updated_at || "";
+        return valA.localeCompare(valB) * dir;
+
+      default:
+        // Default to name sort
+        valA = (a.name || "").toLowerCase();
+        valB = (b.name || "").toLowerCase();
+        return valA.localeCompare(valB) * dir;
+    }
+  };
+};
+
 /**
  * Builds a tree structure from a flat array of tags with parent/child relationships.
  * Tags with multiple parents will appear under each parent (duplicated in tree).
+ * Each level is sorted according to the specified sort field and direction.
  *
  * @param {Array} tags - Flat array of tag objects with `parents` and `children` arrays
- * @param {string} filterQuery - Optional search query to filter tags (shows matches + ancestors)
+ * @param {Object} options - Options object
+ * @param {string} options.filterQuery - Optional search query to filter tags (shows matches + ancestors)
+ * @param {string} options.sortField - Field to sort by (name, scenes_count, etc.)
+ * @param {string} options.sortDirection - Sort direction (ASC or DESC)
  * @returns {Array} Array of root tree nodes, each with nested `children` array
  */
-export function buildTagTree(tags, filterQuery = "") {
+export function buildTagTree(tags, options = {}) {
+  const { filterQuery = "", sortField = "name", sortDirection = "ASC" } = options;
   if (!tags || tags.length === 0) {
     return [];
   }
@@ -58,6 +109,7 @@ export function buildTagTree(tags, filterQuery = "") {
 
   // Build tree by nesting children under parents
   const roots = [];
+  const sortFn = getSortFn(sortField, sortDirection);
 
   // Recursive function to build tree node with children
   const buildNode = (tagId, visitedPath = new Set()) => {
@@ -89,7 +141,8 @@ export function buildTagTree(tags, filterQuery = "") {
 
       node.children = originalTag.children
         .map((childRef) => buildNode(childRef.id, newPath))
-        .filter(Boolean);
+        .filter(Boolean)
+        .sort(sortFn);
     }
 
     return node;
@@ -105,5 +158,6 @@ export function buildTagTree(tags, filterQuery = "") {
     }
   });
 
-  return roots;
+  // Sort roots as well
+  return roots.sort(sortFn);
 }

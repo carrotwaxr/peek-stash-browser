@@ -32,8 +32,10 @@ const Tags = () => {
   const gridRef = useRef(null);
   const columns = useGridColumns("tags");
 
-  // Track current view mode from URL for fetching logic
-  const currentViewMode = searchParams.get("view_mode") || "grid";
+  // Track active view mode - synced from SearchControls via callback
+  const [activeViewMode, setActiveViewMode] = useState(
+    searchParams.get("view_mode") || "grid"
+  );
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
@@ -53,10 +55,10 @@ const Tags = () => {
 
   // Fetch all tags when switching to hierarchy view
   useEffect(() => {
-    if (currentViewMode === "hierarchy" && !hierarchyData) {
+    if (activeViewMode === "hierarchy" && !hierarchyData) {
       executeHierarchy((signal) => getAllTags(signal));
     }
-  }, [currentViewMode, executeHierarchy, hierarchyData]);
+  }, [activeViewMode, executeHierarchy, hierarchyData]);
 
   const currentTags = data?.tags || [];
   const totalCount = data?.count || 0;
@@ -114,21 +116,24 @@ const Tags = () => {
           initialSort="scenes_count"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
-          totalPages={currentViewMode === "hierarchy" ? 0 : totalPages}
-          totalCount={currentViewMode === "hierarchy" ? 0 : totalCount}
+          onViewModeChange={setActiveViewMode}
+          totalPages={activeViewMode === "hierarchy" ? 0 : totalPages}
+          totalCount={activeViewMode === "hierarchy" ? 0 : totalCount}
           viewModes={TAG_VIEW_MODES}
           {...searchControlsProps}
         >
-          {({ viewMode }) => {
+          {({ viewMode, sortField, sortDirection }) => {
             // Hierarchy view
             if (viewMode === "hierarchy") {
               // Show loading if we don't have hierarchy data yet
-              const showLoading = hierarchyLoading || (!hierarchyData && currentViewMode === "hierarchy");
+              const showLoading = hierarchyLoading || !hierarchyData;
               return (
                 <TagHierarchyView
                   tags={hierarchyTags}
                   isLoading={showLoading}
                   searchQuery={searchParams.get("q") || ""}
+                  sortField={sortField}
+                  sortDirection={sortDirection}
                 />
               );
             }

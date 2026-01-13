@@ -6,17 +6,17 @@ import TagTreeNode from "./TagTreeNode.jsx";
 /**
  * Hierarchy view for tags - displays tags as an expandable tree.
  */
-const TagHierarchyView = ({ tags, isLoading, searchQuery }) => {
+const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", sortDirection = "ASC" }) => {
   // Track which nodes are expanded (by tag id)
   const [expandedIds, setExpandedIds] = useState(new Set());
   // Track focused node for keyboard navigation
   const [focusedId, setFocusedId] = useState(null);
   const containerRef = useRef(null);
 
-  // Build tree structure from flat tags, filtered by search query
+  // Build tree structure from flat tags, filtered by search query and sorted
   const tree = useMemo(
-    () => buildTagTree(tags, searchQuery),
-    [tags, searchQuery]
+    () => buildTagTree(tags, { filterQuery: searchQuery, sortField, sortDirection }),
+    [tags, searchQuery, sortField, sortDirection]
   );
 
   // Get all visible nodes (for keyboard nav)
@@ -196,6 +196,7 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery }) => {
           tag={rootTag}
           depth={0}
           isExpanded={expandedIds.has(rootTag.id)}
+          expandedIds={expandedIds}
           onToggle={handleToggle}
           focusedId={focusedId}
           onFocus={handleFocus}
