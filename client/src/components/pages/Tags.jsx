@@ -1,5 +1,5 @@
 // client/src/components/pages/Tags.jsx
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
@@ -32,7 +32,17 @@ const Tags = () => {
   const gridRef = useRef(null);
   const columns = useGridColumns("tags");
 
+  // Track current view mode from URL
+  const currentViewMode = searchParams.get("view_mode") || "grid";
+
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+
+  // Separate query for hierarchy view (fetches all tags)
+  const {
+    data: hierarchyData,
+    isLoading: hierarchyLoading,
+    execute: executeHierarchy,
+  } = useCancellableQuery();
 
   const handleQueryChange = useCallback(
     (newQuery) => {
@@ -41,14 +51,23 @@ const Tags = () => {
     [execute]
   );
 
+  // Fetch all tags when switching to hierarchy view
+  useEffect(() => {
+    if (currentViewMode === "hierarchy") {
+      executeHierarchy((signal) => getAllTags(signal));
+    }
+  }, [currentViewMode, executeHierarchy]);
+
   const currentTags = data?.tags || [];
   const totalCount = data?.count || 0;
+  const hierarchyTags = hierarchyData?.tags || [];
 
   // Track effective perPage from SearchControls state (fixes stale URL param bug)
   const [effectivePerPage, setEffectivePerPage] = useState(
     parseInt(searchParams.get("per_page")) || 24
   );
-  const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
+  // Hide pagination in hierarchy view
+  const totalPages = currentViewMode === "hierarchy" ? 0 : (totalCount ? Math.ceil(totalCount / effectivePerPage) : 0);
 
   // TV Navigation - use shared hook for all grid pages
   const {
@@ -106,8 +125,8 @@ const Tags = () => {
             if (viewMode === "hierarchy") {
               return (
                 <TagHierarchyView
-                  tags={currentTags}
-                  isLoading={isLoading}
+                  tags={hierarchyTags}
+                  isLoading={hierarchyLoading}
                   searchQuery={searchParams.get("q") || ""}
                 />
               );
@@ -164,6 +183,23 @@ const getTags = async (query, signal) => {
     count: findTags?.count || 0,
   };
   return result;
+};
+
+// Fetch all tags for hierarchy view (no pagination)
+const getAllTags = async (signal) => {
+  const query = {
+    filter: {
+      per_page: -1, // Fetch all
+      sort: "name",
+      direction: "ASC",
+    },
+  };
+  const response = await libraryApi.findTags(query, signal);
+  const findTags = response?.findTags;
+  return {
+    tags: findTags?.tags || [],
+    count: findTags?.count || 0,
+  };
 };
 
 export default Tags;
