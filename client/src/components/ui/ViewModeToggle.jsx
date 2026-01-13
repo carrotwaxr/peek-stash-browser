@@ -1,13 +1,34 @@
-import { LucideGrid2X2, LucideSquare } from "lucide-react";
+import { LucideGrid2X2, LucideSquare, LucideNetwork } from "lucide-react";
+
+// Default modes for backward compatibility
+const DEFAULT_MODES = [
+  { id: "grid", icon: LucideGrid2X2, label: "Grid view" },
+  { id: "wall", icon: LucideSquare, label: "Wall view" },
+];
+
+// Icon mapping for custom mode definitions
+const MODE_ICONS = {
+  grid: LucideGrid2X2,
+  wall: LucideSquare,
+  hierarchy: LucideNetwork,
+};
 
 /**
- * Toggle between Grid and Wall view modes.
+ * Toggle between view modes.
+ *
+ * @param {Array} modes - Optional custom modes array [{id, label, icon?}]
+ *                        If not provided, defaults to grid/wall
+ * @param {string} value - Currently selected mode id
+ * @param {function} onChange - Called with mode id when selection changes
  */
-const ViewModeToggle = ({ value = "grid", onChange, className = "" }) => {
-  const modes = [
-    { id: "grid", icon: LucideGrid2X2, label: "Grid view" },
-    { id: "wall", icon: LucideSquare, label: "Wall view" },
-  ];
+const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => {
+  // Use custom modes or fall back to defaults
+  const effectiveModes = modes
+    ? modes.map((mode) => ({
+        ...mode,
+        icon: mode.icon || MODE_ICONS[mode.id] || LucideGrid2X2,
+      }))
+    : DEFAULT_MODES;
 
   return (
     <div
@@ -17,7 +38,7 @@ const ViewModeToggle = ({ value = "grid", onChange, className = "" }) => {
         border: "1px solid var(--border-color)",
       }}
     >
-      {modes.map((mode) => (
+      {effectiveModes.map((mode) => (
         <button
           key={mode.id}
           type="button"
