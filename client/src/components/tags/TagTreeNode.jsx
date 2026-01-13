@@ -307,7 +307,7 @@ const TagTreeNode = forwardRef(
                 isExpanded={expandedIds?.has(child.id) || false}
                 expandedIds={expandedIds}
                 onToggle={onToggle}
-                isAncestorOnly={isAncestorOnly}
+                isAncestorOnly={child.isAncestorOnly || false}
                 focusedId={focusedId}
                 onFocus={onFocus}
               />
