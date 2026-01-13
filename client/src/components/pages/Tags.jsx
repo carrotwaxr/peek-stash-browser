@@ -32,17 +32,17 @@ const Tags = () => {
   const gridRef = useRef(null);
   const columns = useGridColumns("tags");
 
-  // Track current view mode from URL
+  // Track current view mode from URL for fetching logic
   const currentViewMode = searchParams.get("view_mode") || "grid";
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
-  // Separate query for hierarchy view (fetches all tags)
+  // Separate query for hierarchy view (fetches all tags, starts not loading)
   const {
     data: hierarchyData,
     isLoading: hierarchyLoading,
     execute: executeHierarchy,
-  } = useCancellableQuery();
+  } = useCancellableQuery({ initialLoading: false });
 
   const handleQueryChange = useCallback(
     (newQuery) => {
@@ -53,10 +53,10 @@ const Tags = () => {
 
   // Fetch all tags when switching to hierarchy view
   useEffect(() => {
-    if (currentViewMode === "hierarchy") {
+    if (currentViewMode === "hierarchy" && !hierarchyData) {
       executeHierarchy((signal) => getAllTags(signal));
     }
-  }, [currentViewMode, executeHierarchy]);
+  }, [currentViewMode, executeHierarchy, hierarchyData]);
 
   const currentTags = data?.tags || [];
   const totalCount = data?.count || 0;
@@ -66,8 +66,7 @@ const Tags = () => {
   const [effectivePerPage, setEffectivePerPage] = useState(
     parseInt(searchParams.get("per_page")) || 24
   );
-  // Hide pagination in hierarchy view
-  const totalPages = currentViewMode === "hierarchy" ? 0 : (totalCount ? Math.ceil(totalCount / effectivePerPage) : 0);
+  const totalPages = totalCount ? Math.ceil(totalCount / effectivePerPage) : 0;
 
   // TV Navigation - use shared hook for all grid pages
   const {
@@ -115,18 +114,20 @@ const Tags = () => {
           initialSort="scenes_count"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
-          totalPages={totalPages}
-          totalCount={totalCount}
+          totalPages={currentViewMode === "hierarchy" ? 0 : totalPages}
+          totalCount={currentViewMode === "hierarchy" ? 0 : totalCount}
           viewModes={TAG_VIEW_MODES}
           {...searchControlsProps}
         >
           {({ viewMode }) => {
             // Hierarchy view
             if (viewMode === "hierarchy") {
+              // Show loading if we don't have hierarchy data yet
+              const showLoading = hierarchyLoading || (!hierarchyData && currentViewMode === "hierarchy");
               return (
                 <TagHierarchyView
                   tags={hierarchyTags}
-                  isLoading={hierarchyLoading}
+                  isLoading={showLoading}
                   searchQuery={searchParams.get("q") || ""}
                 />
               );
