@@ -32,7 +32,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => 
 
   return (
     <div
-      className={`inline-flex items-center rounded-lg overflow-hidden ${className}`}
+      className={`inline-flex items-center rounded-lg overflow-hidden h-[34px] ${className}`}
       style={{
         backgroundColor: "var(--bg-secondary)",
         border: "1px solid var(--border-color)",
@@ -43,7 +43,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => 
           key={mode.id}
           type="button"
           onClick={() => onChange(mode.id)}
-          className="px-2 py-1.5 transition-colors flex items-center justify-center"
+          className="px-2.5 h-full transition-colors flex items-center justify-center"
           style={{
             backgroundColor: value === mode.id ? "var(--accent-primary)" : "transparent",
             color: value === mode.id ? "white" : "var(--text-secondary)",
@@ -52,7 +52,7 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => 
           aria-label={mode.label}
           aria-pressed={value === mode.id}
         >
-          <mode.icon size={16} />
+          <mode.icon size={18} />
         </button>
       ))}
     </div>

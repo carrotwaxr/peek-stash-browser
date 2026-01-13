@@ -752,7 +752,7 @@ const SearchControls = ({
       </div>
 
       {/* Row 2: Presets, View Mode, Zoom, Settings - "How to show it" */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 mb-4">
         {/* Filter Presets */}
         <div
           data-tv-search-item="filter-presets"

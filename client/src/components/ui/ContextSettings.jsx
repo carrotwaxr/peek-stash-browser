@@ -93,7 +93,7 @@ const ContextSettings = ({
         type="button"
         onClick={togglePopover}
         disabled={!hasSettings}
-        className="px-2 py-1.5 rounded-lg transition-colors flex items-center justify-center"
+        className="px-2.5 h-[34px] rounded-lg transition-colors flex items-center justify-center"
         style={{
           backgroundColor: isOpen ? "var(--accent-primary)" : "var(--bg-secondary)",
           border: "1px solid var(--border-color)",
@@ -106,7 +106,7 @@ const ContextSettings = ({
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <LucideSettings size={16} />
+        <LucideSettings size={18} />
       </button>
 
       {/* Popover */}
