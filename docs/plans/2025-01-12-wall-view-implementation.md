@@ -1,5 +1,7 @@
 # Wall View Implementation Plan
 
+> **Status:** ✅ **COMPLETE** - PR #281 created 2026-01-12
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add a justified gallery "Wall" view mode for Scenes, Galleries, and Images that mirrors Stash's SceneWallPanel behavior.

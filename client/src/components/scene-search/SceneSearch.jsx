@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
@@ -14,6 +14,20 @@ import {
 } from "../ui/index.js";
 import SceneGrid from "./SceneGrid.jsx";
 import WallView from "../wall/WallView.jsx";
+
+// Context settings for wall view preview behavior
+const WALL_VIEW_SETTINGS = [
+  {
+    key: "wallPlayback",
+    label: "Preview Behavior",
+    type: "select",
+    options: [
+      { value: "autoplay", label: "Autoplay All" },
+      { value: "hover", label: "Play on Hover" },
+      { value: "static", label: "Static Thumbnails" },
+    ],
+  },
+];
 
 /**
  * SceneSearch is one of the more core Components of the app. It appears on most pages, and utilizes the
@@ -37,9 +51,17 @@ const SceneSearch = ({
   const [searchParams] = useSearchParams();
 
   const columns = useGridColumns("scenes");
-  const { wallPlayback } = useWallPlayback();
+  const { wallPlayback, updateWallPlayback } = useWallPlayback();
 
   const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery();
+
+  // Track current view mode for context settings
+  const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Context settings only shown in wall view
+  const contextSettings = useMemo(() => {
+    return currentViewMode === "wall" ? WALL_VIEW_SETTINGS : [];
+  }, [currentViewMode]);
 
   // Handle successful hide - remove scene from state
   const handleHideSuccess = (sceneId) => {
@@ -143,6 +165,9 @@ const SceneSearch = ({
         syncToUrl={syncToUrl}
         supportsWallView={true}
         wallPlayback={wallPlayback}
+        onWallPlaybackChange={updateWallPlayback}
+        contextSettings={contextSettings}
+        onViewModeChange={setCurrentViewMode}
         {...searchControlsProps}
       >
         {({ viewMode, zoomLevel }) =>
