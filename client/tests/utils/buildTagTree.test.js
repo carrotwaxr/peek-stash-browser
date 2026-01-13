@@ -64,3 +64,38 @@ describe("buildTagTree", () => {
     expect(result[0].favorite).toBe(true);
   });
 });
+
+describe("buildTagTree with filter", () => {
+  it("returns empty array when no matches", () => {
+    const tags = [
+      { id: "1", name: "Action", parents: [], children: [] },
+    ];
+    const result = buildTagTree(tags, "xyz");
+    expect(result).toEqual([]);
+  });
+
+  it("returns matching tags and their ancestors", () => {
+    const tags = [
+      { id: "1", name: "Genre", parents: [], children: [{ id: "2", name: "Action" }] },
+      { id: "2", name: "Action", parents: [{ id: "1", name: "Genre" }], children: [] },
+    ];
+    const result = buildTagTree(tags, "action");
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("1"); // Genre (ancestor)
+    expect(result[0].isAncestorOnly).toBe(true);
+    expect(result[0].children[0].id).toBe("2"); // Action (match)
+    expect(result[0].children[0].isAncestorOnly).toBeUndefined();
+  });
+
+  it("marks ancestors as isAncestorOnly", () => {
+    const tags = [
+      { id: "1", name: "Root", parents: [], children: [{ id: "2", name: "Middle" }] },
+      { id: "2", name: "Middle", parents: [{ id: "1", name: "Root" }], children: [{ id: "3", name: "Leaf" }] },
+      { id: "3", name: "Leaf", parents: [{ id: "2", name: "Middle" }], children: [] },
+    ];
+    const result = buildTagTree(tags, "leaf");
+    expect(result[0].isAncestorOnly).toBe(true); // Root
+    expect(result[0].children[0].isAncestorOnly).toBe(true); // Middle
+    expect(result[0].children[0].children[0].isAncestorOnly).toBeUndefined(); // Leaf (match)
+  });
+});

@@ -1,11 +1,13 @@
+// client/src/utils/buildTagTree.js
 /**
  * Builds a tree structure from a flat array of tags with parent/child relationships.
  * Tags with multiple parents will appear under each parent (duplicated in tree).
  *
  * @param {Array} tags - Flat array of tag objects with `parents` and `children` arrays
+ * @param {string} filterQuery - Optional search query to filter tags (shows matches + ancestors)
  * @returns {Array} Array of root tree nodes, each with nested `children` array
  */
-export function buildTagTree(tags) {
+export function buildTagTree(tags, filterQuery = "") {
   if (!tags || tags.length === 0) {
     return [];
   }
@@ -16,47 +18,89 @@ export function buildTagTree(tags) {
     tagMap.set(tag.id, { ...tag, children: [] });
   });
 
+  // If filtering, determine which tags match and which are ancestors of matches
+  let matchingIds = new Set();
+  let ancestorIds = new Set();
+
+  if (filterQuery) {
+    const query = filterQuery.toLowerCase();
+
+    // Find all matching tags
+    tags.forEach((tag) => {
+      if (tag.name?.toLowerCase().includes(query)) {
+        matchingIds.add(tag.id);
+      }
+    });
+
+    // If no matches, return empty
+    if (matchingIds.size === 0) {
+      return [];
+    }
+
+    // Find all ancestors of matching tags
+    const findAncestors = (tagId, visited = new Set()) => {
+      if (visited.has(tagId)) return;
+      visited.add(tagId);
+
+      const tag = tags.find((t) => t.id === tagId);
+      if (tag?.parents) {
+        tag.parents.forEach((parent) => {
+          if (!matchingIds.has(parent.id)) {
+            ancestorIds.add(parent.id);
+          }
+          findAncestors(parent.id, visited);
+        });
+      }
+    };
+
+    matchingIds.forEach((id) => findAncestors(id));
+  }
+
   // Build tree by nesting children under parents
   const roots = [];
 
-  tags.forEach((tag) => {
-    const treeNode = tagMap.get(tag.id);
+  // Recursive function to build tree node with children
+  const buildNode = (tagId, visitedPath = new Set()) => {
+    // Prevent infinite loops from circular references
+    if (visitedPath.has(tagId)) return null;
 
-    if (!tag.parents || tag.parents.length === 0) {
-      // No parents = root node
-      roots.push(treeNode);
-    } else {
-      // Add to each parent's children (handles multi-parent)
-      tag.parents.forEach((parentRef) => {
-        const parentNode = tagMap.get(parentRef.id);
-        if (parentNode) {
-          // Create a copy for each parent to avoid shared references
-          const childCopy = { ...treeNode, children: [] };
-          parentNode.children.push(childCopy);
-        }
-      });
+    const tag = tagMap.get(tagId);
+    if (!tag) return null;
+
+    // When filtering, skip tags that aren't matches or ancestors
+    if (filterQuery && !matchingIds.has(tagId) && !ancestorIds.has(tagId)) {
+      return null;
     }
-  });
 
-  // Recursively populate children for non-root nodes
-  function populateChildren(node) {
-    const originalTag = tags.find((t) => t.id === node.id);
+    const node = {
+      ...tag,
+      children: [],
+      isAncestorOnly: filterQuery && ancestorIds.has(tagId) ? true : undefined,
+    };
+
+    // Build children
+    const originalTag = tags.find((t) => t.id === tagId);
     if (originalTag?.children) {
+      const newPath = new Set(visitedPath);
+      newPath.add(tagId);
+
       node.children = originalTag.children
-        .map((childRef) => {
-          const childTag = tagMap.get(childRef.id);
-          if (childTag) {
-            const childCopy = { ...childTag, children: [] };
-            populateChildren(childCopy);
-            return childCopy;
-          }
-          return null;
-        })
+        .map((childRef) => buildNode(childRef.id, newPath))
         .filter(Boolean);
     }
-  }
 
-  roots.forEach(populateChildren);
+    return node;
+  };
+
+  // Find root tags and build tree
+  tags.forEach((tag) => {
+    if (!tag.parents || tag.parents.length === 0) {
+      const node = buildNode(tag.id);
+      if (node) {
+        roots.push(node);
+      }
+    }
+  });
 
   return roots;
 }

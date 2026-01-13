@@ -13,8 +13,11 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery }) => {
   const [focusedId, setFocusedId] = useState(null);
   const containerRef = useRef(null);
 
-  // Build tree structure from flat tags
-  const tree = useMemo(() => buildTagTree(tags), [tags]);
+  // Build tree structure from flat tags, filtered by search query
+  const tree = useMemo(
+    () => buildTagTree(tags, searchQuery),
+    [tags, searchQuery]
+  );
 
   // Get all visible nodes (for keyboard nav)
   const visibleNodes = useMemo(() => {
