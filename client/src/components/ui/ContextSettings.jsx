@@ -35,6 +35,8 @@ const ContextSettings = ({
   const hasSettings = settings.length > 0;
 
   // Close popover when clicking outside
+  // Use mouseup instead of mousedown to avoid closing when interacting with
+  // native select dropdowns (their options render outside our container)
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
@@ -43,8 +45,8 @@ const ContextSettings = ({
     };
 
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mouseup", handleClickOutside);
+      return () => document.removeEventListener("mouseup", handleClickOutside);
     }
   }, [isOpen]);
 

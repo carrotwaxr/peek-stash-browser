@@ -650,7 +650,7 @@ const SearchControls = ({
   return (
     <div>
       {/* Row 1: Search, Sort, Filters - "What to show" */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-center gap-3 mb-3">
         {/* Search Input - Flexible width with min-width */}
         <div
           data-tv-search-item="search-input"
