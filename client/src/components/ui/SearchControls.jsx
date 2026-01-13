@@ -33,6 +33,7 @@ import {
 import {
   ActiveFilterChips,
   Button,
+  ContextSettings,
   FilterControl,
   FilterPanel,
   FilterPresets,
@@ -101,6 +102,9 @@ const SearchControls = ({
   viewModes, // Array of mode configs for ViewModeToggle (optional, overrides supportsWallView)
   onViewModeChange, // Callback when view mode changes (optional)
   wallPlayback = "autoplay",
+  onWallPlaybackChange, // Callback when wall playback setting changes
+  // Context settings - config array for the settings cog
+  contextSettings = [], // Array of setting configs: [{key, label, type, options}]
   // TV Mode props
   tvSearchZoneActive = false,
   tvTopPaginationZoneActive = false,
@@ -120,7 +124,7 @@ const SearchControls = ({
   // Unit preference for filter conversions
   const { unitPreference } = useUnitPreference();
 
-  // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom
+  // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom, ContextSettings
   const searchZoneItems = useMemo(() => [
     { id: "search-input", name: "Search" },
     { id: "sort-control", name: "Sort" },
@@ -129,6 +133,7 @@ const SearchControls = ({
     { id: "filter-presets", name: "Presets" },
     { id: "view-mode", name: "View" },
     { id: "zoom-level", name: "Zoom" },
+    { id: "context-settings", name: "Settings" },
   ], []);
 
   // Horizontal navigation for search zone
@@ -644,8 +649,8 @@ const SearchControls = ({
 
   return (
     <div>
-      {/* Mobile-responsive controls - optimized for minimal vertical space */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+      {/* Row 1: Search, Sort, Filters - "What to show" */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-3">
         {/* Search Input - Flexible width with min-width */}
         <div
           data-tv-search-item="search-input"
@@ -662,7 +667,7 @@ const SearchControls = ({
           />
         </div>
 
-        {/* Sort, Filter, Presets - Wrap on narrow widths */}
+        {/* Sort, Filter */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:flex-nowrap">
           {/* Sort Control - No label, just dropdown + direction button */}
           <div className="flex items-center gap-1">
@@ -743,51 +748,71 @@ const SearchControls = ({
               )}
             </Button>
           </div>
+        </div>
+      </div>
 
-          {/* Filter Presets */}
+      {/* Row 2: Presets, View Mode, Zoom, Settings - "How to show it" */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4">
+        {/* Filter Presets */}
+        <div
+          data-tv-search-item="filter-presets"
+          ref={(el) => searchZoneNav.setItemRef(4, el)}
+          className={searchZoneNav.isFocused(4) ? "keyboard-focus" : ""}
+        >
+          <FilterPresets
+            artifactType={artifactType}
+            context={effectiveContext}
+            currentFilters={filters}
+            currentSort={sortField}
+            currentDirection={sortDirection}
+            currentViewMode={viewMode}
+            currentZoomLevel={zoomLevel}
+            permanentFilters={permanentFilters}
+            onLoadPreset={handleLoadPreset}
+          />
+        </div>
+
+        {/* View Mode Toggle - Show if supportsWallView or viewModes provided */}
+        {(supportsWallView || viewModes) && (
           <div
-            data-tv-search-item="filter-presets"
-            ref={(el) => searchZoneNav.setItemRef(4, el)}
-            className={searchZoneNav.isFocused(4) ? "keyboard-focus" : ""}
+            data-tv-search-item="view-mode"
+            ref={(el) => searchZoneNav.setItemRef(5, el)}
+            className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
           >
-            <FilterPresets
-              artifactType={artifactType}
-              context={effectiveContext}
-              currentFilters={filters}
-              currentSort={sortField}
-              currentDirection={sortDirection}
-              currentViewMode={viewMode}
-              currentZoomLevel={zoomLevel}
-              permanentFilters={permanentFilters}
-              onLoadPreset={handleLoadPreset}
+            <ViewModeToggle
+              modes={viewModes}
+              value={viewMode}
+              onChange={setViewMode}
             />
           </div>
+        )}
 
-          {/* View Mode Toggle - Show if supportsWallView or viewModes provided */}
-          {(supportsWallView || viewModes) && (
-            <div
-              data-tv-search-item="view-mode"
-              ref={(el) => searchZoneNav.setItemRef(5, el)}
-              className={searchZoneNav.isFocused(5) ? "keyboard-focus" : ""}
-            >
-              <ViewModeToggle
-                modes={viewModes}
-                value={viewMode}
-                onChange={setViewMode}
-              />
-            </div>
-          )}
+        {/* Zoom Slider - Only shown in wall mode */}
+        {(supportsWallView || viewModes?.some(m => m.id === "wall")) && viewMode === "wall" && (
+          <div
+            data-tv-search-item="zoom-level"
+            ref={(el) => searchZoneNav.setItemRef(6, el)}
+            className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
+          >
+            <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
+          </div>
+        )}
 
-          {/* Zoom Slider - Only shown in wall mode */}
-          {(supportsWallView || viewModes?.some(m => m.id === "wall")) && viewMode === "wall" && (
-            <div
-              data-tv-search-item="zoom-level"
-              ref={(el) => searchZoneNav.setItemRef(6, el)}
-              className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
-            >
-              <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
-            </div>
-          )}
+        {/* Context Settings Cog */}
+        <div
+          data-tv-search-item="context-settings"
+          ref={(el) => searchZoneNav.setItemRef(7, el)}
+          className={searchZoneNav.isFocused(7) ? "keyboard-focus" : ""}
+        >
+          <ContextSettings
+            settings={contextSettings}
+            currentValues={{ wallPlayback }}
+            onSettingChange={(key, value) => {
+              if (key === "wallPlayback" && onWallPlaybackChange) {
+                onWallPlaybackChange(value);
+              }
+            }}
+          />
         </div>
       </div>
 

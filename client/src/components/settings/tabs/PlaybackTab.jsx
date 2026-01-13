@@ -191,7 +191,7 @@ const PlaybackTab = () => {
               onChange={(e) => setMinimumPlayPercent(parseInt(e.target.value))}
               className="range-slider w-full"
               style={{
-                background: \`linear-gradient(to right, var(--status-info) 0%, var(--status-info) \${minimumPlayPercent}%, var(--border-color) \${minimumPlayPercent}%, var(--border-color) 100%)\`,
+                background: `linear-gradient(to right, var(--status-info) 0%, var(--status-info) ${minimumPlayPercent}%, var(--border-color) ${minimumPlayPercent}%, var(--border-color) 100%)`,
               }}
             />
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
