@@ -133,6 +133,7 @@ export const getUserSettings = async (
         hideConfirmationDisabled: true,
         unitPreference: true,
         wallPlayback: true,
+        tableColumnDefaults: true,
       },
     });
 
@@ -155,6 +156,7 @@ export const getUserSettings = async (
         hideConfirmationDisabled: user.hideConfirmationDisabled,
         unitPreference: user.unitPreference || "metric",
         wallPlayback: user.wallPlayback || "autoplay",
+        tableColumnDefaults: user.tableColumnDefaults || null,
       },
     });
   } catch (error) {
@@ -204,6 +206,7 @@ export const updateUserSettings = async (
       syncToStash,
       unitPreference,
       wallPlayback,
+      tableColumnDefaults,
     } = req.body;
 
     // Validate values
@@ -327,6 +330,7 @@ export const updateUserSettings = async (
         ...(syncToStash !== undefined && { syncToStash }),
         ...(unitPreference !== undefined && { unitPreference }),
         ...(wallPlayback !== undefined && { wallPlayback }),
+        ...(tableColumnDefaults !== undefined && { tableColumnDefaults }),
       },
       select: {
         id: true,
@@ -341,6 +345,7 @@ export const updateUserSettings = async (
         minimumPlayPercent: true,
         syncToStash: true,
         wallPlayback: true,
+        tableColumnDefaults: true,
       },
     });
 
@@ -356,6 +361,7 @@ export const updateUserSettings = async (
         minimumPlayPercent: updatedUser.minimumPlayPercent,
         syncToStash: updatedUser.syncToStash,
         wallPlayback: updatedUser.wallPlayback || "autoplay",
+        tableColumnDefaults: updatedUser.tableColumnDefaults || null,
       },
     });
   } catch (error) {

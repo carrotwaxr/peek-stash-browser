@@ -27,6 +27,7 @@ model User {
   filterPresets           Json? // Object with keys: scene, performer, studio, tag, group, gallery - each containing array of saved presets
   defaultFilterPresets    Json? // Object with keys: scene, performer, studio, tag, group, gallery - values are preset IDs
   unitPreference          String? @default("metric") // "metric" or "imperial" for measurement display
+  tableColumnDefaults     Json? // Object with keys: scene, performer, studio, tag, group, gallery, image - each containing {visible: string[], order: string[]}
 
   // Watch history settings
   minimumPlayPercent Int     @default(20) // Percent of video to watch before incrementing play_count (0-100)
