@@ -146,6 +146,9 @@ describe("FilterPresets", () => {
         filters: { favorite: true },
         sort: "rating",
         direction: "DESC",
+        viewMode: "grid",
+        zoomLevel: "medium",
+        tableColumns: null,
       });
     });
 
@@ -180,6 +183,9 @@ describe("FilterPresets", () => {
         filters: { favorite: true, studioId: "studio-123" },
         sort: "rating",
         direction: "DESC",
+        viewMode: "grid",
+        zoomLevel: "medium",
+        tableColumns: null,
       });
     });
 
@@ -264,6 +270,9 @@ describe("FilterPresets", () => {
           filters: { favorite: true },
           sort: "o_counter",
           direction: "DESC",
+          viewMode: "grid",
+          zoomLevel: "medium",
+          tableColumns: null,
           setAsDefault: false,
         });
       });

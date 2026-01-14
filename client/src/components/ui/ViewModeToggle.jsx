@@ -1,4 +1,4 @@
-import { LucideGrid2X2, LucideSquare, LucideNetwork } from "lucide-react";
+import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList } from "lucide-react";
 
 // Default modes for backward compatibility
 const DEFAULT_MODES = [
@@ -11,6 +11,7 @@ const MODE_ICONS = {
   grid: LucideGrid2X2,
   wall: LucideSquare,
   hierarchy: LucideNetwork,
+  table: LucideList,
 };
 
 /**

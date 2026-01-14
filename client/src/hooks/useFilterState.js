@@ -29,6 +29,7 @@ export const useFilterState = ({
   const [searchText, setSearchTextState] = useState("");
   const [viewMode, setViewModeState] = useState("grid");
   const [zoomLevel, setZoomLevelState] = useState("medium");
+  const [tableColumns, setTableColumnsState] = useState(null);
 
   // Initialize on mount
   useEffect(() => {
@@ -302,11 +303,13 @@ export const useFilterState = ({
     const newFilters = { ...permanentFilters, ...preset.filters };
     const newViewMode = preset.viewMode || "grid";
     const newZoomLevel = preset.zoomLevel || "medium";
+    const newTableColumns = preset.tableColumns || null;
     setFiltersState(newFilters);
     setSortState({ field: preset.sort, direction: preset.direction });
     setPaginationState((prev) => ({ ...prev, page: 1 }));
     setViewModeState(newViewMode);
     setZoomLevelState(newZoomLevel);
+    setTableColumnsState(newTableColumns);
     syncToUrlParams({
       filters: newFilters,
       sort: { field: preset.sort, direction: preset.direction },
@@ -316,6 +319,10 @@ export const useFilterState = ({
       zoomLevel: newZoomLevel,
     });
   }, [permanentFilters, pagination, searchText, syncToUrlParams]);
+
+  const setTableColumns = useCallback((columns) => {
+    setTableColumnsState(columns);
+  }, []);
 
   const setViewMode = useCallback((mode) => {
     setViewModeState(mode);
@@ -348,6 +355,7 @@ export const useFilterState = ({
     searchText,
     viewMode,
     zoomLevel,
+    tableColumns,
     isInitialized,
     isLoadingPresets,
     // Actions
@@ -361,6 +369,7 @@ export const useFilterState = ({
     setSearchText,
     setViewMode,
     setZoomLevel,
+    setTableColumns,
     loadPreset,
   };
 };

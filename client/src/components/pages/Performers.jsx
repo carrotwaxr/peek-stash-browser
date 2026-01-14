@@ -6,6 +6,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { libraryApi } from "../../services/api.js";
 import {
   SyncProgressBanner,
@@ -15,6 +16,13 @@ import {
   PerformerCard,
   SearchControls,
 } from "../ui/index.js";
+import { TableView, ColumnConfigPopover } from "../table/index.js";
+
+// View modes available for performers page
+const VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "table", label: "Table view" },
+];
 
 const Performers = () => {
   usePageTitle("Performers");
@@ -23,6 +31,18 @@ const Performers = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = useGridColumns("performers");
+
+  // Table columns hook for table view
+  const {
+    allColumns,
+    visibleColumns,
+    visibleColumnIds,
+    columnOrder,
+    toggleColumn,
+    hideColumn,
+    moveColumn,
+    getColumnConfig,
+  } = useTableColumns("performer");
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
@@ -114,23 +134,56 @@ const Performers = () => {
           onPerPageStateChange={setEffectivePerPage}
           totalPages={totalPages}
           totalCount={totalCount}
+          viewModes={VIEW_MODES}
+          currentTableColumns={getColumnConfig()}
+          tableColumnsPopover={
+            <ColumnConfigPopover
+              allColumns={allColumns}
+              visibleColumnIds={visibleColumnIds}
+              columnOrder={columnOrder}
+              onToggleColumn={toggleColumn}
+              onMoveColumn={moveColumn}
+            />
+          }
           {...searchControlsProps}
         >
-          {isLoading ? (
-            <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
-              {[...Array(24)].map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg animate-pulse"
-                  style={{
-                    backgroundColor: "var(--bg-tertiary)",
-                    height: "20rem",
-                  }}
+          {({ viewMode, sortField, sortDirection, onSort }) =>
+            isLoading ? (
+              viewMode === "table" ? (
+                <TableView
+                  items={[]}
+                  columns={visibleColumns}
+                  sort={{ field: sortField, direction: sortDirection }}
+                  onSort={onSort}
+                  onHideColumn={hideColumn}
+                  entityType="performer"
+                  isLoading={true}
                 />
-              ))}
-            </div>
-          ) : (
-            <>
+              ) : (
+                <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+                  {[...Array(24)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg animate-pulse"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        height: "20rem",
+                      }}
+                    />
+                  ))}
+                </div>
+              )
+            ) : viewMode === "table" ? (
+              <TableView
+                items={currentPerformers}
+                columns={visibleColumns}
+                sort={{ field: sortField, direction: sortDirection }}
+                onSort={onSort}
+                onHideColumn={hideColumn}
+                entityType="performer"
+                isLoading={false}
+              />
+            ) : (
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
                 {currentPerformers.map((performer, index) => {
                   const itemProps = gridItemProps(index);
@@ -145,8 +198,8 @@ const Performers = () => {
                   );
                 })}
               </div>
-            </>
-          )}
+            )
+          }
         </SearchControls>
       </div>
     </PageLayout>

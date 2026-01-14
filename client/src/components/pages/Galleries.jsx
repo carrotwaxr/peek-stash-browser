@@ -6,6 +6,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { libraryApi } from "../../services/api.js";
 import { GalleryCard } from "../cards/index.js";
@@ -16,7 +17,14 @@ import {
   PageLayout,
   SearchControls,
 } from "../ui/index.js";
+import { TableView, ColumnConfigPopover } from "../table/index.js";
 import WallView from "../wall/WallView.jsx";
+
+// View modes available for galleries page
+const VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "table", label: "Table view" },
+];
 
 const Galleries = () => {
   usePageTitle("Galleries");
@@ -26,6 +34,18 @@ const Galleries = () => {
   const gridRef = useRef(null);
   const columns = useGridColumns("galleries");
   const { wallPlayback } = useWallPlayback();
+
+  // Table columns hook for table view
+  const {
+    allColumns,
+    visibleColumns,
+    visibleColumnIds,
+    columnOrder,
+    toggleColumn,
+    hideColumn,
+    moveColumn,
+    getColumnConfig,
+  } = useTableColumns("gallery");
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
@@ -101,22 +121,55 @@ const Galleries = () => {
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
+          viewModes={VIEW_MODES}
+          currentTableColumns={getColumnConfig()}
+          tableColumnsPopover={
+            <ColumnConfigPopover
+              allColumns={allColumns}
+              visibleColumnIds={visibleColumnIds}
+              columnOrder={columnOrder}
+              onToggleColumn={toggleColumn}
+              onMoveColumn={moveColumn}
+            />
+          }
           {...searchControlsProps}
         >
-          {({ viewMode, zoomLevel }) =>
+          {({ viewMode, zoomLevel, sortField, sortDirection, onSort }) =>
             isLoading ? (
-              <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
-                {[...Array(24)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-lg animate-pulse"
-                    style={{
-                      backgroundColor: "var(--bg-tertiary)",
-                      height: "20rem",
-                    }}
-                  />
-                ))}
-              </div>
+              viewMode === "table" ? (
+                <TableView
+                  items={[]}
+                  columns={visibleColumns}
+                  sort={{ field: sortField, direction: sortDirection }}
+                  onSort={onSort}
+                  onHideColumn={hideColumn}
+                  entityType="gallery"
+                  isLoading={true}
+                />
+              ) : (
+                <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+                  {[...Array(24)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="rounded-lg animate-pulse"
+                      style={{
+                        backgroundColor: "var(--bg-tertiary)",
+                        height: "20rem",
+                      }}
+                    />
+                  ))}
+                </div>
+              )
+            ) : viewMode === "table" ? (
+              <TableView
+                items={currentGalleries}
+                columns={visibleColumns}
+                sort={{ field: sortField, direction: sortDirection }}
+                onSort={onSort}
+                onHideColumn={hideColumn}
+                entityType="gallery"
+                isLoading={false}
+              />
             ) : viewMode === "wall" ? (
               <WallView
                 items={currentGalleries}

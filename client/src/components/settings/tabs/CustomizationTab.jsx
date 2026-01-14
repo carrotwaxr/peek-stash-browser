@@ -6,6 +6,7 @@ import { migrateNavPreferences } from "../../../constants/navigation.js";
 import { showError, showSuccess } from "../../../utils/toast.jsx";
 import CarouselSettings from "../CarouselSettings.jsx";
 import NavigationSettings from "../NavigationSettings.jsx";
+import TableColumnSettings from "../TableColumnSettings.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -19,6 +20,7 @@ const CustomizationTab = () => {
   const [navPreferences, setNavPreferences] = useState([]);
   const [preferredPreviewQuality, setPreferredPreviewQuality] = useState("sprite");
   const [wallPlayback, setWallPlayback] = useState("autoplay");
+  const [tableColumnDefaults, setTableColumnDefaults] = useState({});
 
   // Load settings on mount
   useEffect(() => {
@@ -38,6 +40,7 @@ const CustomizationTab = () => {
 
         setPreferredPreviewQuality(settings.preferredPreviewQuality || "sprite");
         setWallPlayback(settings.wallPlayback || "autoplay");
+        setTableColumnDefaults(settings.tableColumnDefaults || {});
       } catch {
         showError("Failed to load customization settings");
       } finally {
@@ -91,6 +94,20 @@ const CustomizationTab = () => {
       showSuccess("View preference saved!");
     } catch (err) {
       showError(err.response?.data?.error || "Failed to save view preference");
+    }
+  };
+
+  const saveTableColumnDefaults = async (newDefaults) => {
+    try {
+      await api.put("/user/settings", {
+        tableColumnDefaults: newDefaults,
+      });
+      setTableColumnDefaults(newDefaults);
+      showSuccess("Table column defaults saved!");
+    } catch (err) {
+      showError(
+        err.response?.data?.error || "Failed to save table column defaults"
+      );
     }
   };
 
@@ -183,6 +200,20 @@ const CustomizationTab = () => {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Table Column Defaults */}
+      <div
+        className="p-6 rounded-lg border"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <TableColumnSettings
+          tableColumnDefaults={tableColumnDefaults}
+          onSave={saveTableColumnDefaults}
+        />
       </div>
 
       {/* Measurement Units */}
