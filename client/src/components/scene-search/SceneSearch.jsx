@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { libraryApi } from "../../services/api.js";
 import {
@@ -12,8 +13,15 @@ import {
   PageLayout,
   SearchControls,
 } from "../ui/index.js";
+import { TableView, ColumnConfigPopover } from "../table/index.js";
 import SceneGrid from "./SceneGrid.jsx";
 import WallView from "../wall/WallView.jsx";
+
+// View modes available for scene search
+const VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "table", label: "Table view" },
+];
 
 // Context settings for wall view preview behavior
 const WALL_VIEW_SETTINGS = [
@@ -52,6 +60,18 @@ const SceneSearch = ({
 
   const columns = useGridColumns("scenes");
   const { wallPlayback, updateWallPlayback } = useWallPlayback();
+
+  // Table columns hook for table view
+  const {
+    allColumns,
+    visibleColumns,
+    visibleColumnIds,
+    columnOrder,
+    toggleColumn,
+    hideColumn,
+    moveColumn,
+    getColumnConfig,
+  } = useTableColumns("scene");
 
   const { data, isLoading, error, initMessage, execute, setData } = useCancellableQuery();
 
@@ -166,12 +186,33 @@ const SceneSearch = ({
         supportsWallView={true}
         wallPlayback={wallPlayback}
         onWallPlaybackChange={updateWallPlayback}
+        viewModes={VIEW_MODES}
+        currentTableColumns={getColumnConfig()}
+        tableColumnsPopover={
+          <ColumnConfigPopover
+            allColumns={allColumns}
+            visibleColumnIds={visibleColumnIds}
+            columnOrder={columnOrder}
+            onToggleColumn={toggleColumn}
+            onMoveColumn={moveColumn}
+          />
+        }
         contextSettings={contextSettings}
         onViewModeChange={setCurrentViewMode}
         {...searchControlsProps}
       >
-        {({ viewMode, zoomLevel }) =>
-          viewMode === "wall" ? (
+        {({ viewMode, zoomLevel, sortField, sortDirection }) =>
+          viewMode === "table" ? (
+            <TableView
+              items={currentScenes}
+              columns={visibleColumns}
+              sort={{ field: sortField, direction: sortDirection }}
+              onSort={() => {}}
+              onHideColumn={hideColumn}
+              entityType="scene"
+              isLoading={isLoading}
+            />
+          ) : viewMode === "wall" ? (
             <WallView
               items={currentScenes}
               entityType="scene"
