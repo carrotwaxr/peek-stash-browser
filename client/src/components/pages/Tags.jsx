@@ -7,6 +7,7 @@ import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { libraryApi } from "../../services/api.js";
 import { TagCard } from "../cards/index.js";
 import { TagHierarchyView } from "../tags/index.js";
@@ -17,10 +18,12 @@ import {
   PageLayout,
   SearchControls,
 } from "../ui/index.js";
+import { TableView, ColumnConfigPopover } from "../table/index.js";
 
-// View modes for Tags page (no wall view - doesn't make sense for tags)
-const TAG_VIEW_MODES = [
+// View modes for Tags page
+const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
+  { id: "table", label: "Table view" },
   { id: "hierarchy", label: "Hierarchy view" },
 ];
 
@@ -31,6 +34,18 @@ const Tags = () => {
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = useGridColumns("tags");
+
+  // Table columns hook for table view
+  const {
+    allColumns,
+    visibleColumns,
+    visibleColumnIds,
+    columnOrder,
+    toggleColumn,
+    hideColumn,
+    moveColumn,
+    getColumnConfig,
+  } = useTableColumns("tag");
 
   // Track active view mode - synced from SearchControls via callback
   const [activeViewMode, setActiveViewMode] = useState(
@@ -119,7 +134,17 @@ const Tags = () => {
           onViewModeChange={setActiveViewMode}
           totalPages={activeViewMode === "hierarchy" ? 0 : totalPages}
           totalCount={activeViewMode === "hierarchy" ? 0 : totalCount}
-          viewModes={TAG_VIEW_MODES}
+          viewModes={VIEW_MODES}
+          currentTableColumns={getColumnConfig()}
+          tableColumnsPopover={
+            <ColumnConfigPopover
+              allColumns={allColumns}
+              visibleColumnIds={visibleColumnIds}
+              columnOrder={columnOrder}
+              onToggleColumn={toggleColumn}
+              onMoveColumn={moveColumn}
+            />
+          }
           {...searchControlsProps}
         >
           {({ viewMode, sortField, sortDirection }) => {
@@ -134,6 +159,21 @@ const Tags = () => {
                   searchQuery={searchParams.get("q") || ""}
                   sortField={sortField}
                   sortDirection={sortDirection}
+                />
+              );
+            }
+
+            // Table view
+            if (viewMode === "table") {
+              return (
+                <TableView
+                  items={currentTags}
+                  columns={visibleColumns}
+                  sort={{ field: sortField, direction: sortDirection }}
+                  onSort={() => {}}
+                  onHideColumn={hideColumn}
+                  entityType="tag"
+                  isLoading={isLoading}
                 />
               );
             }
