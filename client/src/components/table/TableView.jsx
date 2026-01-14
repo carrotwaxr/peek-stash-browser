@@ -113,13 +113,16 @@ const TableView = ({
       >
         {columns.map((column) => {
           const renderer = getCellRenderer(column.id, entityType);
+          const hasMaxWidth = column.width?.startsWith("max-w");
           return (
             <td
               key={column.id}
-              className={`${column.width} px-3 py-2`}
+              className={`${column.width} px-3 py-2 ${hasMaxWidth ? "overflow-hidden" : ""}`}
               style={{ color: "var(--text-primary)" }}
             >
-              {renderer(item)}
+              <div className={hasMaxWidth ? "truncate" : ""}>
+                {renderer(item)}
+              </div>
             </td>
           );
         })}
@@ -128,8 +131,8 @@ const TableView = ({
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-max w-full">
+    <div className="w-full">
+      <table className="w-full table-fixed">
         <TableHeader
           columns={columns}
           sort={sort}

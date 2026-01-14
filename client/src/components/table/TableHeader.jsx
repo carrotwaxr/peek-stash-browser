@@ -90,7 +90,7 @@ const TableHeader = ({
               }`}
               style={{
                 color: isSorted
-                  ? "var(--accent-primary)"
+                  ? "var(--accent-secondary)"
                   : "var(--text-primary)",
                 opacity: isSortable ? 1 : 0.7,
               }}

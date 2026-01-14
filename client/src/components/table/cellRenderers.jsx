@@ -70,17 +70,40 @@ export const FavoriteCell = ({ favorite }) => {
 };
 
 /**
+ * Get thumbnail dimensions based on entity type
+ * @param {string} entityType - The entity type
+ * @returns {{ width: string, height: string }} Tailwind classes for width and height
+ */
+const getThumbnailDimensions = (entityType) => {
+  const normalizedType = entityType?.toLowerCase();
+  // Portrait entities (2/3 aspect ratio)
+  if (["performer", "performers", "gallery", "galleries", "group", "groups"].includes(normalizedType)) {
+    return { width: "w-10", height: "h-14" };
+  }
+  // Square for images (variable aspect ratio)
+  if (["image", "images"].includes(normalizedType)) {
+    return { width: "w-10", height: "h-10" };
+  }
+  // Landscape (16/9) for scenes, studios, tags (default)
+  return { width: "w-16", height: "h-10" };
+};
+
+/**
  * ThumbnailCell - Small image thumbnail with optional link
  * @param {Object} props
  * @param {string} props.src - Image source URL
  * @param {string} props.alt - Alt text for image
  * @param {string} props.linkTo - Optional link destination
+ * @param {string} props.entityType - Entity type for aspect ratio (optional)
  */
-export const ThumbnailCell = ({ src, alt = "", linkTo }) => {
+export const ThumbnailCell = ({ src, alt = "", linkTo, entityType }) => {
+  const { width, height } = getThumbnailDimensions(entityType);
+  const sizeClasses = `${width} ${height}`;
+
   if (!src) {
     return (
       <div
-        className="w-16 h-10 rounded flex items-center justify-center"
+        className={`${sizeClasses} rounded flex items-center justify-center`}
         style={{ backgroundColor: "var(--bg-secondary)" }}
       >
         <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>No image</span>
@@ -92,7 +115,7 @@ export const ThumbnailCell = ({ src, alt = "", linkTo }) => {
     <img
       src={src}
       alt={alt}
-      className="w-16 h-10 object-cover rounded"
+      className={`${sizeClasses} object-cover rounded`}
       loading="lazy"
       onError={(e) => {
         e.target.style.display = "none";
@@ -185,15 +208,16 @@ const sceneRenderers = {
   title: (scene) => (
     <LinkCell text={scene.title || `Scene ${scene.id}`} linkTo={`/scene/${scene.id}`} />
   ),
-  thumbnail: (scene) => (
+  preview: (scene) => (
     <ThumbnailCell
       src={scene.paths?.screenshot || scene.image_path}
       alt={scene.title}
       linkTo={`/scene/${scene.id}`}
+      entityType="scene"
     />
   ),
   date: (scene) => formatDate(scene.date),
-  duration: (scene) => formatDuration(scene.file?.duration || scene.duration),
+  duration: (scene) => formatDuration(scene.files?.[0]?.duration || scene.file?.duration || scene.duration),
   rating: (scene) => <RatingCell rating={scene.rating100 ?? scene.rating} />,
   studio: (scene) => {
     if (!scene.studio) {
@@ -228,6 +252,7 @@ const sceneRenderers = {
     const path = scene.path || scene.file?.path || scene.files?.[0]?.path;
     return <TruncatedTextCell text={path} />;
   },
+  created_at: (scene) => formatDate(scene.created_at),
 };
 
 /**
@@ -242,6 +267,7 @@ const performerRenderers = {
       src={performer.image_path}
       alt={performer.name}
       linkTo={`/performer/${performer.id}`}
+      entityType="performer"
     />
   ),
   aliases: (performer) => {
@@ -270,6 +296,7 @@ const studioRenderers = {
       src={studio.image_path}
       alt={studio.name}
       linkTo={`/studio/${studio.id}`}
+      entityType="studio"
     />
   ),
   rating: (studio) => <RatingCell rating={studio.rating100 ?? studio.rating} />,
@@ -298,10 +325,13 @@ const tagRenderers = {
       src={tag.image_path}
       alt={tag.name}
       linkTo={`/tag/${tag.id}`}
+      entityType="tag"
     />
   ),
   scenes_count: (tag) => <SimpleValueCell value={tag.scene_count} />,
   performer_count: (tag) => <SimpleValueCell value={tag.performer_count} />,
+  studio_count: (tag) => <SimpleValueCell value={tag.studio_count} />,
+  image_count: (tag) => <SimpleValueCell value={tag.image_count} />,
   description: (tag) => <TruncatedTextCell text={tag.description} />,
 };
 
@@ -315,11 +345,12 @@ const galleryRenderers = {
       linkTo={`/gallery/${gallery.id}`}
     />
   ),
-  thumbnail: (gallery) => (
+  cover: (gallery) => (
     <ThumbnailCell
       src={gallery.cover?.paths?.thumbnail || gallery.image_path}
       alt={gallery.title}
       linkTo={`/gallery/${gallery.id}`}
+      entityType="gallery"
     />
   ),
   date: (gallery) => formatDate(gallery.date),
@@ -363,11 +394,12 @@ const imageRenderers = {
       linkTo={`/image/${image.id}`}
     />
   ),
-  thumbnail: (image) => (
+  image: (image) => (
     <ThumbnailCell
       src={image.paths?.thumbnail || image.image_path}
       alt={image.title}
       linkTo={`/image/${image.id}`}
+      entityType="image"
     />
   ),
   rating: (image) => <RatingCell rating={image.rating100 ?? image.rating} />,
@@ -420,6 +452,7 @@ const groupRenderers = {
       src={group.front_image_path}
       alt={group.name}
       linkTo={`/collection/${group.id}`}
+      entityType="group"
     />
   ),
   rating: (group) => <RatingCell rating={group.rating100 ?? group.rating} />,
@@ -432,6 +465,24 @@ const groupRenderers = {
   date: (group) => formatDate(group.date),
   duration: (group) => formatDuration(group.duration),
   scene_count: (group) => <SimpleValueCell value={group.scene_count} />,
+  performers: (group) => {
+    // Groups don't have performers directly, but scenes in group do
+    // This would need API support to aggregate performers across scenes
+    const items = (group.performers || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      linkTo: `/performer/${p.id}`,
+    }));
+    return <MultiValueCell items={items} />;
+  },
+  tags: (group) => {
+    const items = (group.tags || []).map((t) => ({
+      id: t.id,
+      name: t.name,
+      linkTo: `/tag/${t.id}`,
+    }));
+    return <MultiValueCell items={items} />;
+  },
 };
 
 // ============================================================================
