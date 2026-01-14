@@ -16,6 +16,14 @@ interface CarouselPreference {
 }
 
 /**
+ * Table column configuration for a preset
+ */
+interface TableColumnsConfig {
+  visible: string[];
+  order: string[];
+}
+
+/**
  * Filter preset for scene/performer/studio/tag filtering
  */
 interface FilterPreset {
@@ -26,6 +34,7 @@ interface FilterPreset {
   direction?: string;
   viewMode?: string;
   zoomLevel?: string;
+  tableColumns?: TableColumnsConfig | null;
   createdAt?: string;
   [key: string]: unknown;
 }
@@ -675,6 +684,7 @@ export const saveFilterPreset = async (
       direction,
       viewMode,
       zoomLevel,
+      tableColumns,
       setAsDefault,
     } = req.body;
 
@@ -734,6 +744,7 @@ export const saveFilterPreset = async (
       direction,
       viewMode: viewMode || "grid",
       zoomLevel: zoomLevel || "medium",
+      tableColumns: tableColumns || null,
       createdAt: new Date().toISOString(),
     };
 
