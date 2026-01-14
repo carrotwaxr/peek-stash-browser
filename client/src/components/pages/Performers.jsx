@@ -147,14 +147,14 @@ const Performers = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, sortField, sortDirection }) =>
+          {({ viewMode, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
                   columns={visibleColumns}
                   sort={{ field: sortField, direction: sortDirection }}
-                  onSort={() => {}}
+                  onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="performer"
                   isLoading={true}
@@ -178,7 +178,7 @@ const Performers = () => {
                 items={currentPerformers}
                 columns={visibleColumns}
                 sort={{ field: sortField, direction: sortDirection }}
-                onSort={() => {}}
+                onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="performer"
                 isLoading={false}

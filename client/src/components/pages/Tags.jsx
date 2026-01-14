@@ -147,7 +147,7 @@ const Tags = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, sortField, sortDirection }) => {
+          {({ viewMode, sortField, sortDirection, onSort }) => {
             // Hierarchy view
             if (viewMode === "hierarchy") {
               // Show loading if we don't have hierarchy data yet
@@ -170,7 +170,7 @@ const Tags = () => {
                   items={currentTags}
                   columns={visibleColumns}
                   sort={{ field: sortField, direction: sortDirection }}
-                  onSort={() => {}}
+                  onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="tag"
                   isLoading={isLoading}

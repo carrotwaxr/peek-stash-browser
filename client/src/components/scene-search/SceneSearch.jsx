@@ -201,13 +201,13 @@ const SceneSearch = ({
         onViewModeChange={setCurrentViewMode}
         {...searchControlsProps}
       >
-        {({ viewMode, zoomLevel, sortField, sortDirection }) =>
+        {({ viewMode, zoomLevel, sortField, sortDirection, onSort }) =>
           viewMode === "table" ? (
             <TableView
               items={currentScenes}
               columns={visibleColumns}
               sort={{ field: sortField, direction: sortDirection }}
-              onSort={() => {}}
+              onSort={onSort}
               onHideColumn={hideColumn}
               entityType="scene"
               isLoading={isLoading}

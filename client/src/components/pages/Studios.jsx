@@ -125,14 +125,14 @@ const Studios = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, sortField, sortDirection }) =>
+          {({ viewMode, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
                   columns={visibleColumns}
                   sort={{ field: sortField, direction: sortDirection }}
-                  onSort={() => {}}
+                  onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="studio"
                   isLoading={true}
@@ -156,7 +156,7 @@ const Studios = () => {
                 items={currentStudios}
                 columns={visibleColumns}
                 sort={{ field: sortField, direction: sortDirection }}
-                onSort={() => {}}
+                onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="studio"
                 isLoading={false}

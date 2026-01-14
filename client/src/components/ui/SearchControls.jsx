@@ -986,7 +986,7 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? children({ viewMode, zoomLevel, wallPlayback, sortField, sortDirection })
+        ? children({ viewMode, zoomLevel, wallPlayback, sortField, sortDirection, onSort: handleSortChange })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (

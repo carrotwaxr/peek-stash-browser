@@ -314,6 +314,58 @@ export const updateUserSettings = async (
       }
     }
 
+    // Validate table column defaults if provided
+    if (tableColumnDefaults !== undefined) {
+      if (tableColumnDefaults !== null && typeof tableColumnDefaults !== "object") {
+        return res
+          .status(400)
+          .json({ error: "Table column defaults must be an object or null" });
+      }
+
+      if (tableColumnDefaults !== null) {
+        const validEntityTypes = [
+          "scene",
+          "performer",
+          "studio",
+          "tag",
+          "group",
+          "gallery",
+          "image",
+        ];
+
+        for (const [entityType, config] of Object.entries(tableColumnDefaults)) {
+          if (!validEntityTypes.includes(entityType)) {
+            return res
+              .status(400)
+              .json({ error: `Invalid entity type in table column defaults: ${entityType}` });
+          }
+
+          const typedConfig = config as TableColumnsConfig;
+          if (
+            !typedConfig ||
+            !Array.isArray(typedConfig.visible) ||
+            !Array.isArray(typedConfig.order)
+          ) {
+            return res
+              .status(400)
+              .json({ error: `Invalid table column config for ${entityType}: must have visible and order arrays` });
+          }
+
+          // Validate that arrays contain strings
+          if (!typedConfig.visible.every((v: unknown) => typeof v === "string")) {
+            return res
+              .status(400)
+              .json({ error: `Invalid visible columns for ${entityType}: must be string array` });
+          }
+          if (!typedConfig.order.every((v: unknown) => typeof v === "string")) {
+            return res
+              .status(400)
+              .json({ error: `Invalid column order for ${entityType}: must be string array` });
+          }
+        }
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: {

@@ -203,14 +203,14 @@ const Images = () => {
           {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
-          {({ viewMode, zoomLevel, sortField, sortDirection }) =>
+          {({ viewMode, zoomLevel, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
                   columns={visibleColumns}
                   sort={{ field: sortField, direction: sortDirection }}
-                  onSort={() => {}}
+                  onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="image"
                   isLoading={true}
@@ -234,7 +234,7 @@ const Images = () => {
                 items={currentImages}
                 columns={visibleColumns}
                 sort={{ field: sortField, direction: sortDirection }}
-                onSort={() => {}}
+                onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="image"
                 isLoading={false}

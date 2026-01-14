@@ -134,14 +134,14 @@ const Galleries = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, zoomLevel, sortField, sortDirection }) =>
+          {({ viewMode, zoomLevel, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
                   columns={visibleColumns}
                   sort={{ field: sortField, direction: sortDirection }}
-                  onSort={() => {}}
+                  onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="gallery"
                   isLoading={true}
@@ -165,7 +165,7 @@ const Galleries = () => {
                 items={currentGalleries}
                 columns={visibleColumns}
                 sort={{ field: sortField, direction: sortDirection }}
-                onSort={() => {}}
+                onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="gallery"
                 isLoading={false}

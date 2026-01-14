@@ -126,14 +126,14 @@ const Groups = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, sortField, sortDirection }) =>
+          {({ viewMode, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
                   items={[]}
                   columns={visibleColumns}
                   sort={{ field: sortField, direction: sortDirection }}
-                  onSort={() => {}}
+                  onSort={onSort}
                   onHideColumn={hideColumn}
                   entityType="group"
                   isLoading={true}
@@ -157,7 +157,7 @@ const Groups = () => {
                 items={currentGroups}
                 columns={visibleColumns}
                 sort={{ field: sortField, direction: sortDirection }}
-                onSort={() => {}}
+                onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="group"
                 isLoading={false}
