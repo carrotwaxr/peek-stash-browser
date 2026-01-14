@@ -103,6 +103,9 @@ const SearchControls = ({
   onViewModeChange, // Callback when view mode changes (optional)
   wallPlayback = "autoplay",
   onWallPlaybackChange, // Callback when wall playback setting changes
+  // Table view props
+  currentTableColumns = null, // Current table columns config for saving to presets
+  tableColumnsPopover = null, // ColumnConfigPopover component to render in toolbar
   // Context settings - config array for the settings cog
   contextSettings = [], // Array of setting configs: [{key, label, type, options}]
   // TV Mode props
@@ -767,6 +770,7 @@ const SearchControls = ({
             currentDirection={sortDirection}
             currentViewMode={viewMode}
             currentZoomLevel={zoomLevel}
+            currentTableColumns={currentTableColumns}
             permanentFilters={permanentFilters}
             onLoadPreset={handleLoadPreset}
           />
@@ -785,6 +789,11 @@ const SearchControls = ({
               onChange={setViewMode}
             />
           </div>
+        )}
+
+        {/* Table Columns Popover - Only shown in table mode */}
+        {viewMode === "table" && tableColumnsPopover && (
+          <div>{tableColumnsPopover}</div>
         )}
 
         {/* Zoom Slider - Only shown in wall mode */}
