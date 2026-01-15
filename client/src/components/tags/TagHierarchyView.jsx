@@ -17,6 +17,8 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
   // Track focused node for keyboard navigation
   const [focusedId, setFocusedId] = useState(null);
   const containerRef = useRef(null);
+  // Track if initial expansion has happened (prevents re-expanding after Collapse All)
+  const hasInitializedRef = useRef(false);
 
   // Build tree structure from flat tags, filtered by search query and sorted
   const tree = useMemo(
@@ -50,9 +52,10 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
     return nodes;
   }, [tree, expandedIds]);
 
-  // Initialize: expand first level
+  // Initialize: expand first level (only on first load, not after Collapse All)
   useEffect(() => {
-    if (tree.length > 0 && expandedIds.size === 0) {
+    if (tree.length > 0 && expandedIds.size === 0 && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       const rootIds = new Set(tree.map((t) => t.id));
       setExpandedIds(rootIds);
     }
