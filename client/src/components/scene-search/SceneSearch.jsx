@@ -20,6 +20,7 @@ import WallView from "../wall/WallView.jsx";
 // View modes available for scene search
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
+  { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
 ];
 
@@ -211,6 +212,15 @@ const SceneSearch = ({
               onHideColumn={hideColumn}
               entityType="scene"
               isLoading={isLoading}
+              columnsPopover={
+                <ColumnConfigPopover
+                  allColumns={allColumns}
+                  visibleColumnIds={visibleColumnIds}
+                  columnOrder={columnOrder}
+                  onToggleColumn={toggleColumn}
+                  onMoveColumn={moveColumn}
+                />
+              }
             />
           ) : viewMode === "wall" ? (
             <WallView

@@ -1,7 +1,12 @@
 // client/src/components/tags/TagHierarchyView.jsx
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import {
+  ChevronsDownUp as LucideChevronsDownUp,
+  ChevronsUpDown as LucideChevronsUpDown,
+} from "lucide-react";
 import { buildTagTree } from "../../utils/buildTagTree.js";
 import TagTreeNode from "./TagTreeNode.jsx";
+import Button from "../ui/Button.jsx";
 
 /**
  * Hierarchy view for tags - displays tags as an expandable tree.
@@ -12,12 +17,27 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
   // Track focused node for keyboard navigation
   const [focusedId, setFocusedId] = useState(null);
   const containerRef = useRef(null);
+  // Track if initial expansion has happened (prevents re-expanding after Collapse All)
+  const hasInitializedRef = useRef(false);
 
   // Build tree structure from flat tags, filtered by search query and sorted
   const tree = useMemo(
     () => buildTagTree(tags, { filterQuery: searchQuery, sortField, sortDirection }),
     [tags, searchQuery, sortField, sortDirection]
   );
+
+  // Get all IDs of nodes that have children (expandable nodes)
+  const allExpandableIds = useMemo(() => {
+    const ids = new Set();
+    const traverse = (node) => {
+      if (node.children?.length > 0) {
+        ids.add(node.id);
+        node.children.forEach(traverse);
+      }
+    };
+    tree.forEach(traverse);
+    return ids;
+  }, [tree]);
 
   // Get all visible nodes (for keyboard nav)
   const visibleNodes = useMemo(() => {
@@ -32,9 +52,10 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
     return nodes;
   }, [tree, expandedIds]);
 
-  // Initialize: expand first level
+  // Initialize: expand first level (only on first load, not after Collapse All)
   useEffect(() => {
-    if (tree.length > 0 && expandedIds.size === 0) {
+    if (tree.length > 0 && expandedIds.size === 0 && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       const rootIds = new Set(tree.map((t) => t.id));
       setExpandedIds(rootIds);
     }
@@ -74,6 +95,14 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
       }
       return next;
     });
+  }, []);
+
+  const handleExpandAll = useCallback(() => {
+    setExpandedIds(new Set(allExpandableIds));
+  }, [allExpandableIds]);
+
+  const handleCollapseAll = useCallback(() => {
+    setExpandedIds(new Set());
   }, []);
 
   const handleFocus = useCallback((id) => {
@@ -183,25 +212,50 @@ const TagHierarchyView = ({ tags, isLoading, searchQuery, sortField = "name", so
   }
 
   return (
-    <div
-      ref={containerRef}
-      role="tree"
-      aria-label="Tag hierarchy"
-      onKeyDown={handleKeyDown}
-      className="space-y-1"
-    >
-      {tree.map((rootTag) => (
-        <TagTreeNode
-          key={rootTag.id}
-          tag={rootTag}
-          depth={0}
-          isExpanded={expandedIds.has(rootTag.id)}
-          expandedIds={expandedIds}
-          onToggle={handleToggle}
-          focusedId={focusedId}
-          onFocus={handleFocus}
-        />
-      ))}
+    <div className="space-y-2">
+      {/* Expand/Collapse All buttons */}
+      {allExpandableIds.size > 0 && (
+        <div className="flex gap-2 mb-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<LucideChevronsUpDown size={16} />}
+            onClick={handleExpandAll}
+          >
+            Expand All
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<LucideChevronsDownUp size={16} />}
+            onClick={handleCollapseAll}
+          >
+            Collapse All
+          </Button>
+        </div>
+      )}
+
+      {/* Tree content */}
+      <div
+        ref={containerRef}
+        role="tree"
+        aria-label="Tag hierarchy"
+        onKeyDown={handleKeyDown}
+        className="space-y-1"
+      >
+        {tree.map((rootTag) => (
+          <TagTreeNode
+            key={rootTag.id}
+            tag={rootTag}
+            depth={0}
+            isExpanded={expandedIds.has(rootTag.id)}
+            expandedIds={expandedIds}
+            onToggle={handleToggle}
+            focusedId={focusedId}
+            onFocus={handleFocus}
+          />
+        ))}
+      </div>
     </div>
   );
 };

@@ -10,6 +10,7 @@ import { getColumnSortField } from "../../config/tableColumns.js";
  * @param {Function} props.onSort - Called when sortable header clicked (field, direction)
  * @param {Function} props.onColumnContextMenu - Called on right-click for non-mandatory columns (columnId, event)
  * @param {string} props.entityType - Entity type for sort field mapping
+ * @param {React.ReactNode} props.columnsPopover - Optional columns config popover to render in first header cell
  */
 const TableHeader = ({
   columns,
@@ -17,6 +18,7 @@ const TableHeader = ({
   onSort,
   onColumnContextMenu,
   entityType,
+  columnsPopover,
 }) => {
   /**
    * Handle click on a sortable column header
@@ -67,7 +69,7 @@ const TableHeader = ({
     if (!column.sortable || !isCurrentSortColumn(column)) return null;
 
     const Icon = sort.direction === "ASC" ? ArrowUp : ArrowDown;
-    return <Icon size={14} className="ml-1 inline-block" />;
+    return <Icon size={14} className="ml-1.5 inline-block flex-shrink-0" />;
   };
 
   return (
@@ -78,6 +80,15 @@ const TableHeader = ({
           borderBottom: "1px solid var(--border-color)",
         }}
       >
+        {/* Columns config button - always first cell */}
+        {columnsPopover && (
+          <th
+            className="w-10 px-2 py-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {columnsPopover}
+          </th>
+        )}
         {columns.map((column) => {
           const isSortable = column.sortable;
           const isSorted = isCurrentSortColumn(column);
@@ -85,7 +96,7 @@ const TableHeader = ({
           return (
             <th
               key={column.id}
-              className={`${column.width} px-3 py-2 text-left text-sm font-medium select-none ${
+              className={`${column.width} px-4 py-2 text-left text-sm font-medium select-none ${
                 isSortable ? "cursor-pointer hover:opacity-80" : ""
               }`}
               style={{

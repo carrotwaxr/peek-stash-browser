@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import {
   ArrowLeft,
   ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUp,
+  ChevronsDown,
   Edit2,
+  MoreVertical,
   Play,
   Repeat,
   Repeat1,
@@ -17,6 +22,7 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { getSceneTitle } from "../../utils/format.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
 import {
+  AddToPlaylistButton,
   Button,
   ConfirmDialog,
   PageHeader,
@@ -42,8 +48,6 @@ const PlaylistDetail = () => {
   const [editDescription, setEditDescription] = useState("");
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
   const [sceneToRemove, setSceneToRemove] = useState(null);
-  const [draggedIndex, setDraggedIndex] = useState(null);
-  const [touchStartY, setTouchStartY] = useState(null);
   const [reorderMode, setReorderMode] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
@@ -127,78 +131,43 @@ const PlaylistDetail = () => {
     }
   };
 
-  // Drag and drop handlers
-  const handleDragStart = (e, index) => {
-    setDraggedIndex(index);
-    e.dataTransfer.effectAllowed = "move";
-  };
+  // Position control handlers for reordering
+  const moveItem = useCallback((fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= scenes.length) return;
+    if (fromIndex === toIndex) return;
 
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    if (draggedIndex === null || draggedIndex === index) return;
-
-    // Reorder the scenes array
     const newScenes = [...scenes];
-    const draggedItem = newScenes[draggedIndex];
-    newScenes.splice(draggedIndex, 1);
-    newScenes.splice(index, 0, draggedItem);
-
+    const item = newScenes.splice(fromIndex, 1)[0];
+    newScenes.splice(toIndex, 0, item);
     setScenes(newScenes);
-    setDraggedIndex(index);
-  };
+  }, [scenes]);
 
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-  };
+  const handleMoveTop = useCallback((index) => {
+    moveItem(index, 0);
+  }, [moveItem]);
 
-  // Touch event handlers for mobile support
-  const handleTouchStart = (e, index) => {
-    e.preventDefault(); // Prevent scrolling during drag
-    setDraggedIndex(index);
-    setTouchStartY(e.touches[0].clientY);
-  };
+  const handleMoveUp = useCallback((index) => {
+    moveItem(index, index - 1);
+  }, [moveItem]);
 
-  const handleTouchMove = (e, index) => {
-    e.preventDefault(); // Prevent scrolling - must be first
+  const handleMoveDown = useCallback((index) => {
+    moveItem(index, index + 1);
+  }, [moveItem]);
 
-    if (draggedIndex === null || touchStartY === null) {
-      return;
-    }
+  const handleMoveBottom = useCallback((index) => {
+    moveItem(index, scenes.length - 1);
+  }, [moveItem, scenes.length]);
 
-    const currentY = e.touches[0].clientY;
-    const deltaY = currentY - touchStartY;
+  const handleSetPosition = useCallback((fromIndex, newPosition) => {
+    // Convert 1-indexed input to 0-indexed
+    let targetIndex = newPosition - 1;
 
-    // Minimum threshold to trigger reorder
-    if (Math.abs(deltaY) < 50) {
-      return;
-    }
+    // Clamp to valid range
+    if (targetIndex < 0) targetIndex = 0;
+    if (targetIndex >= scenes.length) targetIndex = scenes.length - 1;
 
-    const targetIndex = deltaY < 0 ? draggedIndex - 1 : draggedIndex + 1;
-
-    // Ensure target index is within bounds
-    if (targetIndex < 0 || targetIndex >= scenes.length) {
-      return;
-    }
-
-    if (targetIndex === index) {
-      return; // Already at target position
-    }
-
-    // Reorder the scenes array
-    const newScenes = [...scenes];
-    const draggedItem = newScenes[draggedIndex];
-    newScenes.splice(draggedIndex, 1);
-    newScenes.splice(targetIndex, 0, draggedItem);
-
-    setScenes(newScenes);
-    setDraggedIndex(targetIndex);
-    setTouchStartY(currentY);
-  };
-
-  const handleTouchEnd = () => {
-    setDraggedIndex(null);
-    setTouchStartY(null);
-  };
+    moveItem(fromIndex, targetIndex);
+  }, [moveItem, scenes.length]);
 
   const saveReorder = async () => {
     try {
@@ -561,8 +530,7 @@ const PlaylistDetail = () => {
                   color: "rgb(59, 130, 246)",
                 }}
               >
-                Drag and drop scenes to reorder them. Click "Save Order" when
-                done.
+                Use the position controls to reorder scenes. Click &quot;Save Order&quot; when done.
               </div>
             )}
             {scenes.map((item, index) => (
@@ -571,13 +539,6 @@ const PlaylistDetail = () => {
                 scene={item.scene}
                 exists={item.exists}
                 sceneId={item.sceneId}
-                draggable={reorderMode}
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragEnd={handleDragEnd}
-                onTouchStart={(e) => handleTouchStart(e, index)}
-                onTouchMove={(e) => handleTouchMove(e, index)}
-                onTouchEnd={handleTouchEnd}
                 linkState={{
                   scene: item.scene,
                   playlist: {
@@ -599,28 +560,91 @@ const PlaylistDetail = () => {
                 }}
                 dragHandle={
                   reorderMode && (
-                    <div
-                      className="flex-shrink-0 flex flex-col items-center justify-center"
-                      style={{
-                        width: "24px",
-                        color: "var(--text-muted)",
-                        cursor: "move",
-                      }}
-                    >
-                      <div className="text-xs font-mono">⋮⋮</div>
-                      <div className="text-xs mt-1">{index + 1}</div>
+                    <div className="flex-shrink-0 flex items-center gap-1">
+                      {/* Position input */}
+                      <input
+                        type="number"
+                        min={1}
+                        max={scenes.length}
+                        value={index + 1}
+                        onChange={(e) => {
+                          const newPos = parseInt(e.target.value, 10);
+                          if (!isNaN(newPos)) {
+                            handleSetPosition(index, newPos);
+                          }
+                        }}
+                        className="w-12 px-1 py-1 text-center text-sm rounded"
+                        style={{
+                          backgroundColor: "var(--bg-secondary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      {/* Move buttons */}
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveTop(index); }}
+                          disabled={index === 0}
+                          className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+                          style={{ color: "var(--text-secondary)" }}
+                          title="Move to top"
+                        >
+                          <ChevronsUp size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveUp(index); }}
+                          disabled={index === 0}
+                          className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+                          style={{ color: "var(--text-secondary)" }}
+                          title="Move up"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveDown(index); }}
+                          disabled={index === scenes.length - 1}
+                          className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+                          style={{ color: "var(--text-secondary)" }}
+                          title="Move down"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleMoveBottom(index); }}
+                          disabled={index === scenes.length - 1}
+                          className="p-1 rounded hover:opacity-80 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"
+                          style={{ color: "var(--text-secondary)" }}
+                          title="Move to bottom"
+                        >
+                          <ChevronsDown size={16} />
+                        </button>
+                      </div>
                     </div>
                   )
                 }
                 actionButtons={
-                  <Button
-                    onClick={() => handleRemoveClick(item)}
-                    variant="destructive"
-                    size="sm"
-                    className="px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm flex-shrink-0"
-                  >
-                    Remove
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => handleRemoveClick(item)}
+                      variant="destructive"
+                      size="sm"
+                      className="px-2 py-1 sm:px-3 sm:py-1.5 text-xs sm:text-sm flex-shrink-0"
+                    >
+                      Remove
+                    </Button>
+                    {item.exists && item.scene && (
+                      <AddToPlaylistButton
+                        sceneId={item.sceneId}
+                        compact
+                        buttonText=""
+                        icon={<MoreVertical size={16} />}
+                        variant="secondary"
+                        excludePlaylistIds={[parseInt(playlistId, 10)]}
+                        dropdownPosition="above"
+                      />
+                    )}
+                  </div>
                 }
               />
             ))}

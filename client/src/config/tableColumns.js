@@ -17,7 +17,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "title",
@@ -33,7 +33,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-24",
+    width: "w-28",
   },
   {
     id: "studio",
@@ -65,7 +65,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "rating",
@@ -73,7 +73,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "resolution",
@@ -81,7 +81,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: false,
-    width: "w-20",
+    width: "w-28",
   },
   {
     id: "filesize",
@@ -89,7 +89,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "play_count",
@@ -97,7 +97,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-28",
   },
   {
     id: "o_counter",
@@ -105,7 +105,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "path",
@@ -121,7 +121,7 @@ export const SCENE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-28",
+    width: "w-32",
   },
 ];
 
@@ -132,7 +132,7 @@ export const PERFORMER_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-14",
+    width: "w-20",
   },
   {
     id: "name",
@@ -156,7 +156,7 @@ export const PERFORMER_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-16",
+    width: "w-20",
   },
   {
     id: "country",
@@ -180,7 +180,7 @@ export const PERFORMER_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "aliases",
@@ -196,7 +196,7 @@ export const PERFORMER_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "favorite",
@@ -204,7 +204,7 @@ export const PERFORMER_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: false,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "o_counter",
@@ -212,7 +212,7 @@ export const PERFORMER_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
 ];
 
@@ -223,7 +223,7 @@ export const STUDIO_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-20",
+    width: "w-32",
   },
   {
     id: "name",
@@ -239,7 +239,7 @@ export const STUDIO_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "max-w-32",
+    width: "max-w-36",
   },
   {
     id: "scenes_count",
@@ -247,7 +247,7 @@ export const STUDIO_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "rating",
@@ -255,7 +255,7 @@ export const STUDIO_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "child_count",
@@ -263,7 +263,7 @@ export const STUDIO_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: false,
-    width: "w-24",
+    width: "w-32",
   },
 ];
 
@@ -290,7 +290,7 @@ export const TAG_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-16",
+    width: "w-24",
   },
   {
     id: "performer_count",
@@ -298,7 +298,7 @@ export const TAG_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-20",
+    width: "w-28",
   },
   {
     id: "studio_count",
@@ -306,7 +306,7 @@ export const TAG_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "image_count",
@@ -314,7 +314,7 @@ export const TAG_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "description",
@@ -333,7 +333,7 @@ export const GALLERY_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-14",
+    width: "w-20",
   },
   {
     id: "title",
@@ -349,7 +349,7 @@ export const GALLERY_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-24",
+    width: "w-28",
   },
   {
     id: "studio",
@@ -365,7 +365,7 @@ export const GALLERY_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-16",
+    width: "w-24",
   },
   {
     id: "rating",
@@ -373,7 +373,7 @@ export const GALLERY_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "performers",
@@ -408,7 +408,7 @@ export const IMAGE_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-14",
+    width: "w-20",
   },
   {
     id: "title",
@@ -448,7 +448,7 @@ export const IMAGE_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-24",
+    width: "w-28",
   },
   {
     id: "rating",
@@ -456,7 +456,7 @@ export const IMAGE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "filesize",
@@ -464,7 +464,7 @@ export const IMAGE_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "path",
@@ -483,7 +483,7 @@ export const GROUP_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-14",
+    width: "w-20",
   },
   {
     id: "name",
@@ -499,7 +499,7 @@ export const GROUP_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-24",
+    width: "w-28",
   },
   {
     id: "scene_count",
@@ -507,7 +507,7 @@ export const GROUP_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: true,
-    width: "w-16",
+    width: "w-24",
   },
   {
     id: "performers",
@@ -531,7 +531,7 @@ export const GROUP_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
   {
     id: "studio",
@@ -547,7 +547,7 @@ export const GROUP_COLUMNS = [
     mandatory: false,
     defaultVisible: false,
     sortable: true,
-    width: "w-20",
+    width: "w-24",
   },
 ];
 

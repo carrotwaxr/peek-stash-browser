@@ -174,6 +174,15 @@ const Tags = () => {
                   onHideColumn={hideColumn}
                   entityType="tag"
                   isLoading={isLoading}
+                  columnsPopover={
+                    <ColumnConfigPopover
+                      allColumns={allColumns}
+                      visibleColumnIds={visibleColumnIds}
+                      columnOrder={columnOrder}
+                      onToggleColumn={toggleColumn}
+                      onMoveColumn={moveColumn}
+                    />
+                  }
                 />
               );
             }

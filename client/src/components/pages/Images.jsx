@@ -25,6 +25,7 @@ import { TableView, ColumnConfigPopover } from "../table/index.js";
 // View modes available for images page
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
+  { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
 ];
 
@@ -214,6 +215,15 @@ const Images = () => {
                   onHideColumn={hideColumn}
                   entityType="image"
                   isLoading={true}
+                  columnsPopover={
+                    <ColumnConfigPopover
+                      allColumns={allColumns}
+                      visibleColumnIds={visibleColumnIds}
+                      columnOrder={columnOrder}
+                      onToggleColumn={toggleColumn}
+                      onMoveColumn={moveColumn}
+                    />
+                  }
                 />
               ) : (
                 <div className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
@@ -238,6 +248,15 @@ const Images = () => {
                 onHideColumn={hideColumn}
                 entityType="image"
                 isLoading={false}
+                columnsPopover={
+                  <ColumnConfigPopover
+                    allColumns={allColumns}
+                    visibleColumnIds={visibleColumnIds}
+                    columnOrder={columnOrder}
+                    onToggleColumn={toggleColumn}
+                    onMoveColumn={moveColumn}
+                  />
+                }
               />
             ) : viewMode === "wall" ? (
               <WallView
