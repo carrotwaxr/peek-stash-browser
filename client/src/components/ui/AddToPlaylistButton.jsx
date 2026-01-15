@@ -17,6 +17,8 @@ const AddToPlaylistButton = ({
   icon,
   dropdownPosition = "below", // "below" or "above"
   onSuccess, // Optional callback called after successful add
+  excludePlaylistIds = [], // Playlist IDs to exclude from the list
+  variant = "primary", // Button variant
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [playlists, setPlaylists] = useState([]);
@@ -159,7 +161,7 @@ const AddToPlaylistButton = ({
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
-        variant="primary"
+        variant={variant}
         className={compact ? "p-2" : ""}
         size={compact ? "sm" : "md"}
         icon={icon || null}
@@ -234,35 +236,37 @@ const AddToPlaylistButton = ({
                     </p>
                   </div>
                 ) : (
-                  playlists.map((playlist) => (
-                    <Button
-                      key={playlist.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addToPlaylist(playlist.id);
-                      }}
-                      variant="tertiary"
-                      fullWidth
-                      className="text-left px-4 py-2 text-sm"
-                      style={{
-                        color: "var(--text-primary)",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.target.style.backgroundColor = "var(--bg-secondary)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.target.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      <div>{playlist.name}</div>
-                      <div
-                        className="text-xs"
-                        style={{ color: "var(--text-muted)" }}
+                  playlists
+                    .filter((playlist) => !excludePlaylistIds.includes(playlist.id))
+                    .map((playlist) => (
+                      <Button
+                        key={playlist.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToPlaylist(playlist.id);
+                        }}
+                        variant="tertiary"
+                        fullWidth
+                        className="text-left px-4 py-2 text-sm"
+                        style={{
+                          color: "var(--text-primary)",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = "var(--bg-secondary)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = "transparent";
+                        }}
                       >
-                        {playlist._count?.items || 0} videos
-                      </div>
-                    </Button>
-                  ))
+                        <div>{playlist.name}</div>
+                        <div
+                          className="text-xs"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          {playlist._count?.items || 0} videos
+                        </div>
+                      </Button>
+                    ))
                 )}
               </div>
             )}

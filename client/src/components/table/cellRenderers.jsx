@@ -285,6 +285,53 @@ const performerRenderers = {
 };
 
 /**
+ * StudioLogoCell - Studio logo with object-contain (no cropping)
+ * @param {Object} props
+ * @param {string} props.src - Image source URL
+ * @param {string} props.alt - Alt text for image
+ * @param {string} props.linkTo - Optional link destination
+ */
+const StudioLogoCell = ({ src, alt = "", linkTo }) => {
+  if (!src) {
+    return (
+      <div
+        className="w-28 h-12 rounded flex items-center justify-center"
+        style={{ backgroundColor: "var(--bg-secondary)" }}
+      >
+        <span style={{ color: "var(--text-muted)", fontSize: "10px" }}>No image</span>
+      </div>
+    );
+  }
+
+  const image = (
+    <div
+      className="w-28 h-12 rounded flex items-center justify-center"
+      style={{ backgroundColor: "var(--bg-secondary)" }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="max-w-full max-h-full object-contain"
+        loading="lazy"
+        onError={(e) => {
+          e.target.style.display = "none";
+        }}
+      />
+    </div>
+  );
+
+  if (linkTo) {
+    return (
+      <Link to={linkTo} className="block hover:opacity-80 transition-opacity">
+        {image}
+      </Link>
+    );
+  }
+
+  return image;
+};
+
+/**
  * Studio cell renderers
  */
 const studioRenderers = {
@@ -292,11 +339,10 @@ const studioRenderers = {
     <LinkCell text={studio.name} linkTo={`/studio/${studio.id}`} />
   ),
   image: (studio) => (
-    <ThumbnailCell
+    <StudioLogoCell
       src={studio.image_path}
       alt={studio.name}
       linkTo={`/studio/${studio.id}`}
-      entityType="studio"
     />
   ),
   rating: (studio) => <RatingCell rating={studio.rating100 ?? studio.rating} />,

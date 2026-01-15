@@ -16,7 +16,7 @@ import {
  * @param {Object} scene - Scene object
  * @param {Object} watchHistory - Optional watch history data {resumeTime, playCount, playDuration, lastPlayedAt, oCount}
  * @param {React.ReactNode} actionButtons - Optional action buttons (e.g., Remove button)
- * @param {React.ReactNode} dragHandle - Optional drag handle for reorder mode
+ * @param {React.ReactNode} dragHandle - Optional content to show before the thumbnail (e.g., position controls)
  * @param {Object} linkState - Optional state to pass to Link component
  * @param {boolean} exists - Whether the scene exists (for deleted scenes)
  * @param {string} sceneId - Scene ID (for when scene is deleted)
@@ -29,10 +29,6 @@ const SceneListItem = ({
   linkState,
   exists = true,
   sceneId,
-  draggable = false,
-  onDragStart,
-  onDragOver,
-  onDragEnd,
   showSessionOIndicator = false, // Show if O was clicked in the last session
 }) => {
   const navigate = useNavigate();
@@ -134,17 +130,13 @@ const SceneListItem = ({
 
   return (
     <div
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
       onClick={handleClick}
       className="rounded-lg border transition-all hover:shadow-lg"
       style={{
         backgroundColor: "var(--bg-card)",
         border: "1px solid var(--border-color)",
         opacity: exists ? 1 : 0.6,
-        cursor: draggable ? "move" : exists ? "pointer" : "default",
+        cursor: exists ? "pointer" : "default",
       }}
     >
       <div className="pt-2 px-2 pb-1 md:pt-4 md:px-4 md:pb-2">

@@ -223,7 +223,7 @@ export const STUDIO_COLUMNS = [
     mandatory: false,
     defaultVisible: true,
     sortable: false,
-    width: "w-20",
+    width: "w-32",
   },
   {
     id: "name",

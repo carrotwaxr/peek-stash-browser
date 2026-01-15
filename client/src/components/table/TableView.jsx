@@ -13,6 +13,7 @@ import { getCellRenderer } from "./cellRenderers.jsx";
  * @param {Function} props.onHideColumn - Called from context menu to hide a column (columnId)
  * @param {string} props.entityType - Entity type for cell rendering
  * @param {boolean} props.isLoading - Whether data is loading (default: false)
+ * @param {React.ReactNode} props.columnsPopover - Optional columns config popover to render in table header
  */
 const TableView = ({
   items,
@@ -22,6 +23,7 @@ const TableView = ({
   onHideColumn,
   entityType,
   isLoading = false,
+  columnsPopover,
 }) => {
   // Context menu state: { columnId, x, y } or null
   const [contextMenu, setContextMenu] = useState(null);
@@ -70,8 +72,9 @@ const TableView = ({
             borderBottom: "1px solid var(--border-color)",
           }}
         >
+          {columnsPopover && <td className="w-10 px-2 py-3" />}
           {columns.map((column) => (
-            <td key={column.id} className={`${column.width} px-3 py-3`}>
+            <td key={column.id} className={`${column.width} px-4 py-3`}>
               <div
                 className="h-4 rounded animate-pulse"
                 style={{ backgroundColor: "var(--bg-secondary)" }}
@@ -92,7 +95,7 @@ const TableView = ({
       return (
         <tr>
           <td
-            colSpan={columns.length}
+            colSpan={columns.length + (columnsPopover ? 1 : 0)}
             className="px-3 py-8 text-center"
             style={{ color: "var(--text-muted)" }}
           >
@@ -111,13 +114,14 @@ const TableView = ({
           borderBottom: "1px solid var(--border-color)",
         }}
       >
+        {columnsPopover && <td className="w-10 px-2 py-2" />}
         {columns.map((column) => {
           const renderer = getCellRenderer(column.id, entityType);
           const hasMaxWidth = column.width?.startsWith("max-w");
           return (
             <td
               key={column.id}
-              className={`${column.width} px-3 py-2 ${hasMaxWidth ? "overflow-hidden" : ""}`}
+              className={`${column.width} px-4 py-2 ${hasMaxWidth ? "overflow-hidden" : ""}`}
               style={{ color: "var(--text-primary)" }}
             >
               <div className={hasMaxWidth ? "truncate" : ""}>
@@ -139,6 +143,7 @@ const TableView = ({
           onSort={onSort}
           onColumnContextMenu={handleColumnContextMenu}
           entityType={entityType}
+          columnsPopover={columnsPopover}
         />
         <tbody>
           {isLoading ? renderSkeletonRows() : renderRows()}

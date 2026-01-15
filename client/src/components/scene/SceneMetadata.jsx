@@ -39,11 +39,11 @@ const SceneMetadata = ({ scene }) => {
               <img
                 src={performer.image_path}
                 alt={performer.name}
-                className="w-16 h-16 rounded-full object-cover flex-shrink-0"
+                className="w-12 h-16 rounded-md object-cover flex-shrink-0"
               />
             ) : (
               <div
-                className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
+                className="w-12 h-16 rounded-md flex items-center justify-center flex-shrink-0"
                 style={{ backgroundColor: "var(--bg-secondary)" }}
               >
                 <span className="text-2xl">👤</span>

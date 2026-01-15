@@ -23,6 +23,7 @@ import WallView from "../wall/WallView.jsx";
 // View modes available for galleries page
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
+  { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
 ];
 
@@ -145,6 +146,15 @@ const Galleries = () => {
                   onHideColumn={hideColumn}
                   entityType="gallery"
                   isLoading={true}
+                  columnsPopover={
+                    <ColumnConfigPopover
+                      allColumns={allColumns}
+                      visibleColumnIds={visibleColumnIds}
+                      columnOrder={columnOrder}
+                      onToggleColumn={toggleColumn}
+                      onMoveColumn={moveColumn}
+                    />
+                  }
                 />
               ) : (
                 <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
@@ -169,6 +179,15 @@ const Galleries = () => {
                 onHideColumn={hideColumn}
                 entityType="gallery"
                 isLoading={false}
+                columnsPopover={
+                  <ColumnConfigPopover
+                    allColumns={allColumns}
+                    visibleColumnIds={visibleColumnIds}
+                    columnOrder={columnOrder}
+                    onToggleColumn={toggleColumn}
+                    onMoveColumn={moveColumn}
+                  />
+                }
               />
             ) : viewMode === "wall" ? (
               <WallView

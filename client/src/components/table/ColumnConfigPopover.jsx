@@ -89,13 +89,12 @@ const ColumnConfigPopover = ({
         variant="secondary"
         size="sm"
         icon={<LucideColumns3 size={16} />}
+        aria-label="Columns"
         style={{
           backgroundColor: isOpen ? "var(--bg-card)" : "var(--bg-secondary)",
           borderColor: isOpen ? "var(--accent-primary)" : "var(--border-color)",
         }}
-      >
-        Columns
-      </Button>
+      />
 
       {/* Popover */}
       {isOpen && (

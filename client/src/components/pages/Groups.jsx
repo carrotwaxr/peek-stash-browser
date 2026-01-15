@@ -137,6 +137,15 @@ const Groups = () => {
                   onHideColumn={hideColumn}
                   entityType="group"
                   isLoading={true}
+                  columnsPopover={
+                    <ColumnConfigPopover
+                      allColumns={allColumns}
+                      visibleColumnIds={visibleColumnIds}
+                      columnOrder={columnOrder}
+                      onToggleColumn={toggleColumn}
+                      onMoveColumn={moveColumn}
+                    />
+                  }
                 />
               ) : (
                 <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
@@ -161,6 +170,15 @@ const Groups = () => {
                 onHideColumn={hideColumn}
                 entityType="group"
                 isLoading={false}
+                columnsPopover={
+                  <ColumnConfigPopover
+                    allColumns={allColumns}
+                    visibleColumnIds={visibleColumnIds}
+                    columnOrder={columnOrder}
+                    onToggleColumn={toggleColumn}
+                    onMoveColumn={moveColumn}
+                  />
+                }
               />
             ) : (
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>

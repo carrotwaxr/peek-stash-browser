@@ -158,6 +158,15 @@ const Performers = () => {
                   onHideColumn={hideColumn}
                   entityType="performer"
                   isLoading={true}
+                  columnsPopover={
+                    <ColumnConfigPopover
+                      allColumns={allColumns}
+                      visibleColumnIds={visibleColumnIds}
+                      columnOrder={columnOrder}
+                      onToggleColumn={toggleColumn}
+                      onMoveColumn={moveColumn}
+                    />
+                  }
                 />
               ) : (
                 <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
@@ -182,6 +191,15 @@ const Performers = () => {
                 onHideColumn={hideColumn}
                 entityType="performer"
                 isLoading={false}
+                columnsPopover={
+                  <ColumnConfigPopover
+                    allColumns={allColumns}
+                    visibleColumnIds={visibleColumnIds}
+                    columnOrder={columnOrder}
+                    onToggleColumn={toggleColumn}
+                    onMoveColumn={moveColumn}
+                  />
+                }
               />
             ) : (
               <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
