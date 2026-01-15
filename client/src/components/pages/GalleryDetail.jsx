@@ -56,12 +56,22 @@ const GalleryDetail = () => {
     setSearchParams(params);
   }, [searchParams, setSearchParams]);
 
+  // Fetch function for prefetching adjacent pages
+  const fetchPage = useCallback(async (page) => {
+    const data = await libraryApi.getGalleryImages(galleryId, {
+      page,
+      per_page: PER_PAGE,
+    });
+    return { images: data.images || [] };
+  }, [galleryId]);
+
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
     perPage: PER_PAGE,
     totalCount,
     externalPage: urlPage,
     onExternalPageChange: handleImagePageChange,
+    fetchPage,
   });
 
   // Set page title to gallery name
@@ -438,6 +448,7 @@ const GalleryDetail = () => {
         pageOffset={lightbox.pageOffset}
         onIndexChange={lightbox.onIndexChange}
         isPageTransitioning={lightbox.isPageTransitioning}
+        prefetchImages={lightbox.prefetchImages}
       />
     </div>
   );

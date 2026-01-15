@@ -48,8 +48,17 @@ export default defineConfig({
     port: 5173,
     host: true,
     watch: {
+      // Polling is needed for Docker on Windows, but we can optimize it
       usePolling: true,
-      interval: 2000,
+      interval: 1000,
+      // Only watch src files, ignore everything else
+      ignored: [
+        "**/node_modules/**",
+        "**/dist/**",
+        "**/coverage/**",
+        "**/.git/**",
+        "**/stats.html",
+      ],
     },
     proxy: {
       "/api": {
