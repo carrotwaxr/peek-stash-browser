@@ -79,47 +79,47 @@ class UserStatsAggregationService {
    * Get engagement totals with exclusion filtering
    */
   private async getEngagementStats(userId: number): Promise<EngagementStats> {
-    // Scene engagement (filtered by exclusions)
-    const sceneStats = await prisma.$queryRaw<
-      Array<{
-        totalWatchTime: number | null;
-        totalPlayCount: number | null;
-        totalOCount: number | null;
-        uniqueScenesWatched: number | null;
-      }>
-    >`
-      SELECT
-        COALESCE(SUM(w.playDuration), 0) as totalWatchTime,
-        COALESCE(SUM(w.playCount), 0) as totalPlayCount,
-        COALESCE(SUM(w.oCount), 0) as totalOCount,
-        COUNT(DISTINCT w.sceneId) as uniqueScenesWatched
-      FROM WatchHistory w
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'scene'
-        AND e.entityId = w.sceneId
-      WHERE w.userId = ${userId}
-        AND e.id IS NULL
-    `;
-
-    // Image engagement (filtered by exclusions)
-    const imageStats = await prisma.$queryRaw<
-      Array<{
-        totalImagesViewed: number | null;
-        imageOCount: number | null;
-      }>
-    >`
-      SELECT
-        COUNT(DISTINCT iv.imageId) as totalImagesViewed,
-        COALESCE(SUM(iv.oCount), 0) as imageOCount
-      FROM ImageViewHistory iv
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'image'
-        AND e.entityId = iv.imageId
-      WHERE iv.userId = ${userId}
-        AND e.id IS NULL
-    `;
+    // Run scene and image engagement queries in parallel (both filtered by exclusions)
+    const [sceneStats, imageStats] = await Promise.all([
+      prisma.$queryRaw<
+        Array<{
+          totalWatchTime: number | null;
+          totalPlayCount: number | null;
+          totalOCount: number | null;
+          uniqueScenesWatched: number | null;
+        }>
+      >`
+        SELECT
+          COALESCE(SUM(w.playDuration), 0) as totalWatchTime,
+          COALESCE(SUM(w.playCount), 0) as totalPlayCount,
+          COALESCE(SUM(w.oCount), 0) as totalOCount,
+          COUNT(DISTINCT w.sceneId) as uniqueScenesWatched
+        FROM WatchHistory w
+        LEFT JOIN UserExcludedEntity e
+          ON e.userId = ${userId}
+          AND e.entityType = 'scene'
+          AND e.entityId = w.sceneId
+        WHERE w.userId = ${userId}
+          AND e.id IS NULL
+      `,
+      prisma.$queryRaw<
+        Array<{
+          totalImagesViewed: number | null;
+          imageOCount: number | null;
+        }>
+      >`
+        SELECT
+          COUNT(DISTINCT iv.imageId) as totalImagesViewed,
+          COALESCE(SUM(iv.oCount), 0) as imageOCount
+        FROM ImageViewHistory iv
+        LEFT JOIN UserExcludedEntity e
+          ON e.userId = ${userId}
+          AND e.entityType = 'image'
+          AND e.entityId = iv.imageId
+        WHERE iv.userId = ${userId}
+          AND e.id IS NULL
+      `,
+    ]);
 
     const scene = sceneStats[0] || {};
     const image = imageStats[0] || {};
