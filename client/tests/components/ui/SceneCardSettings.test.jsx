@@ -180,7 +180,7 @@ describe("SceneCard respects card display settings", () => {
     });
 
     it("passes showOCounter to BaseCard ratingControlsProps", () => {
-      const { container } = render(<SceneCard scene={mockScene} />, { wrapper });
+      render(<SceneCard scene={mockScene} />, { wrapper });
 
       // When showOCounter is true, the O counter should be present
       // The component shows the count
@@ -204,7 +204,7 @@ describe("SceneCard respects card display settings", () => {
     });
 
     it("always renders indicators", () => {
-      const { container } = render(<SceneCard scene={mockScene} />, { wrapper });
+      render(<SceneCard scene={mockScene} />, { wrapper });
 
       // Play count indicator should be visible
       expect(screen.getByText("10")).toBeInTheDocument();

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Mock for CardDisplaySettingsContext
  * Provides controllable settings for testing card display customization
