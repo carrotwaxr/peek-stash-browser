@@ -18,7 +18,7 @@ import type {
  * Transform a Stash URL/path to a proxy URL
  * All Stash URLs must be proxied to avoid leaking the API key to clients
  */
-function transformUrl(urlOrPath: string | null): string | null {
+export function transformUrl(urlOrPath: string | null): string | null {
   if (!urlOrPath) return null;
 
   // If it's already a proxy URL, return as-is

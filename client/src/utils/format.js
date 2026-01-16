@@ -98,6 +98,52 @@ export function formatDurationCompact(seconds) {
 }
 
 /**
+ * Format duration in seconds to human readable format (Xd Xh Xm)
+ * Used for displaying total watch time and engagement stats
+ * @param {number} seconds - Duration in seconds
+ * @param {Object} options - Formatting options
+ * @param {boolean} options.includeDays - Include days in output (default true)
+ * @returns {string} Formatted duration string (e.g., "2d 5h 30m", "3h 45m", "12m")
+ */
+export function formatDurationHumanReadable(seconds, options = {}) {
+  const { includeDays = true } = options;
+
+  if (!seconds || seconds === 0) return "0m";
+
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  const parts = [];
+
+  if (includeDays && days > 0) {
+    parts.push(`${days}d`);
+  } else if (!includeDays && days > 0) {
+    // Add days as hours when not including days
+    const totalHours = days * 24 + hours;
+    if (totalHours > 0) parts.push(`${totalHours}h`);
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+    return parts.join(" ");
+  }
+
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+  return parts.join(" ");
+}
+
+/**
+ * Extract filename from file path (basename without extension)
+ * @param {string} filePath - Full file path
+ * @returns {string|null} Filename without extension, or null if no path
+ */
+export function getFilenameFromPath(filePath) {
+  if (!filePath) return null;
+  const basename = filePath.split(/[\\/]/).pop() || filePath;
+  return basename.replace(/\.[^/.]+$/, ""); // Remove extension
+}
+
+/**
  * Format video resolution to compact display format (e.g., "1080p", "720p", "4K")
  * @param {number} width - Video width in pixels
  * @param {number} height - Video height in pixels

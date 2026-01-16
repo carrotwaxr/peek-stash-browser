@@ -2,15 +2,7 @@
 
 import { Link } from "react-router-dom";
 import { Paper } from "../../../ui/index.js";
-
-/**
- * Extract filename from path (basename without extension)
- */
-const getFilenameFromPath = (filePath) => {
-  if (!filePath) return null;
-  const basename = filePath.split(/[\\/]/).pop() || filePath;
-  return basename.replace(/\.[^/.]+$/, ""); // Remove extension
-};
+import { getFilenameFromPath } from "../../../../utils/format.js";
 
 /**
  * Get display name for highlight item
@@ -67,13 +59,7 @@ const HighlightCard = ({ title, item, linkPrefix, statLabel, statValue, entityTy
       </div>
       <Link
         to={`${linkPrefix}/${item.id}`}
-        className="block transition-colors"
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "transparent";
-        }}
+        className="block transition-colors hover:bg-[var(--bg-secondary)]"
       >
         {/* Consistent 16/9 container for all cards - portrait images pillarboxed */}
         <div

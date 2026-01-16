@@ -2,24 +2,7 @@
 
 import { Clock, Play, Heart, Image, Film } from "lucide-react";
 import StatCard from "./StatCard.jsx";
-
-/**
- * Format seconds as human-readable duration
- */
-function formatDuration(seconds) {
-  if (!seconds || seconds === 0) return "0m";
-
-  const days = Math.floor(seconds / 86400);
-  const hours = Math.floor((seconds % 86400) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
-
-  return parts.join(" ");
-}
+import { formatDurationHumanReadable } from "../../../../utils/format.js";
 
 /**
  * Hero section with engagement totals
@@ -33,7 +16,7 @@ const EngagementTotals = ({ engagement, librarySceneCount }) => {
   const stats = [
     {
       label: "Watch Time",
-      value: formatDuration(engagement.totalWatchTime),
+      value: formatDurationHumanReadable(engagement.totalWatchTime),
       icon: <Clock size={24} />,
     },
     {

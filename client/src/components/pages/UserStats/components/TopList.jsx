@@ -2,16 +2,10 @@
 
 import { Link } from "react-router-dom";
 import { Paper } from "../../../ui/index.js";
-
-/**
- * Get aspect ratio for entity type (matches useEntityImageAspectRatio)
- */
-const getAspectRatio = (entityType) => {
-  if (["performer", "gallery", "group"].includes(entityType)) {
-    return "2/3"; // Portrait
-  }
-  return "16/9"; // Landscape (scenes, tags, studios)
-};
+import {
+  formatDurationHumanReadable,
+  getFilenameFromPath,
+} from "../../../../utils/format.js";
 
 /**
  * Get fallback icon for entity type
@@ -24,30 +18,6 @@ const getFallbackIcon = (entityType) => {
     scene: "🎬",
   };
   return icons[entityType] || "?";
-};
-
-/**
- * Format duration in seconds to human readable
- */
-const formatDuration = (seconds) => {
-  if (!seconds || seconds === 0) return null;
-
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-};
-
-/**
- * Extract filename from path (basename without extension)
- */
-const getFilenameFromPath = (filePath) => {
-  if (!filePath) return null;
-  const basename = filePath.split(/[\\/]/).pop() || filePath;
-  return basename.replace(/\.[^/.]+$/, ""); // Remove extension
 };
 
 /**
@@ -88,21 +58,20 @@ const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage
       </div>
       <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
         {items.map((item, index) => {
-          const duration = formatDuration(item.playDuration);
+          const duration =
+            item.playDuration > 0
+              ? formatDurationHumanReadable(item.playDuration, {
+                  includeDays: false,
+                })
+              : null;
           const displayName = getDisplayName(item);
 
           return (
             <Link
               key={item.id}
               to={`${linkPrefix}/${item.id}`}
-              className="flex items-center gap-4 px-4 py-4 transition-colors"
+              className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-[var(--bg-secondary)]"
               style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
             >
               <span
                 className="w-8 text-center text-lg font-bold flex-shrink-0"
