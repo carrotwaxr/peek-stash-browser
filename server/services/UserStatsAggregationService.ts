@@ -1,7 +1,6 @@
 // server/services/UserStatsAggregationService.ts
 
 import prisma from "../prisma/singleton.js";
-import { logger } from "../utils/logger.js";
 import type {
   UserStatsResponse,
   LibraryStats,
