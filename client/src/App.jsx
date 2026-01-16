@@ -39,6 +39,7 @@ const PlaylistDetail = lazy(
 );
 const SettingsPage = lazy(() => import("./components/pages/SettingsPage.jsx"));
 const WatchHistory = lazy(() => import("./components/pages/WatchHistory.jsx"));
+const UserStats = lazy(() => import("./components/pages/UserStats/index.js"));
 const HiddenItemsPage = lazy(
   () => import("./components/pages/HiddenItemsPage.jsx")
 );
@@ -264,6 +265,16 @@ const AppContent = () => {
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
                   <WatchHistory />
+                </GlobalLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user-stats"
+            element={
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <UserStats />
                 </GlobalLayout>
               </ProtectedRoute>
             }
