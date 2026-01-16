@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 
 /**
  * GroupCard - Card for displaying group/collection entities
  */
 const GroupCard = forwardRef(
-  ({ group, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ group, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
+    const { getSettings } = useCardDisplaySettings();
+    const groupSettings = getSettings("group");
 
     // Build subtitle from studio and date
     const subtitle = (() => {
@@ -87,7 +90,7 @@ const GroupCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
-        displayPreferences={displayPreferences}
+        displayPreferences={{ showDescription: groupSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: group.id,
           initialRating: group.rating100,

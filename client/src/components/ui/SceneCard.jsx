@@ -276,6 +276,7 @@ const SceneCard = forwardRef(
         subtitle={subtitle}
         description={description}
         indicators={indicators}
+        displayPreferences={{ showDescription: sceneSettings.showDescriptionOnCard }}
         ratingControlsProps={!hideRatingControls && {
           entityType: "scene",
           entityId: scene.id,
