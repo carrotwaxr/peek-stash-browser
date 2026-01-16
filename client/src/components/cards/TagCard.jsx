@@ -104,6 +104,9 @@ const TagCard = forwardRef(
                 initialFavorite: tag.favorite || false,
                 initialOCounter: tag.o_counter,
                 onHideSuccess,
+                showRating: tagSettings.showRating,
+                showFavorite: tagSettings.showFavorite,
+                showOCounter: tagSettings.showOCounter,
               }
             : undefined
         }

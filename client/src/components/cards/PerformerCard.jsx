@@ -96,6 +96,9 @@ const PerformerCard = forwardRef(
           initialFavorite: performer.favorite || false,
           initialOCounter: performer.o_counter,
           onHideSuccess,
+          showRating: performerSettings.showRating,
+          showFavorite: performerSettings.showFavorite,
+          showOCounter: performerSettings.showOCounter,
         }}
         {...rest}
       />

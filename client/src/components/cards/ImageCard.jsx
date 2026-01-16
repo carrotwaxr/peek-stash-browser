@@ -143,6 +143,9 @@ const ImageCard = forwardRef(
                 onOCounterChange,
                 onRatingChange,
                 onFavoriteChange,
+                showRating: imageSettings.showRating,
+                showFavorite: imageSettings.showFavorite,
+                showOCounter: imageSettings.showOCounter,
               }
             : undefined
         }

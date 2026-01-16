@@ -95,6 +95,9 @@ const StudioCard = forwardRef(
           initialFavorite: studio.favorite || false,
           initialOCounter: studio.o_counter,
           onHideSuccess,
+          showRating: studioSettings.showRating,
+          showFavorite: studioSettings.showFavorite,
+          showOCounter: studioSettings.showOCounter,
         }}
         {...rest}
       />
