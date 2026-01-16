@@ -13,7 +13,7 @@ const SectionSelector = ({ activeSection, onSectionChange, isAdmin }) => {
         role="radiogroup"
         aria-label="Settings section"
       >
-        {/* User Settings Button */}
+        {/* User Preferences Button */}
         <button
           onClick={() => onSectionChange("user")}
           className="px-6 py-2 rounded-md text-sm font-medium transition-all duration-200"
@@ -25,7 +25,7 @@ const SectionSelector = ({ activeSection, onSectionChange, isAdmin }) => {
           role="radio"
           aria-checked={activeSection === "user"}
         >
-          User Settings
+          User Preferences
         </button>
 
         {/* Server Settings Button (admin only) */}

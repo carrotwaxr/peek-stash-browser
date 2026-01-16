@@ -10,6 +10,7 @@ import PlaybackTab from "../settings/tabs/PlaybackTab.jsx";
 import CustomizationTab from "../settings/tabs/CustomizationTab.jsx";
 import ContentTab from "../settings/tabs/ContentTab.jsx";
 import AccountTab from "../settings/tabs/AccountTab.jsx";
+import NavigationTab from "../settings/tabs/NavigationTab.jsx";
 import UserManagementTab from "../settings/tabs/UserManagementTab.jsx";
 import ServerConfigTab from "../settings/tabs/ServerConfigTab.jsx";
 
@@ -18,13 +19,14 @@ const USER_TABS = [
   { id: "theme", label: "Theme" },
   { id: "playback", label: "Playback" },
   { id: "customization", label: "Customization" },
+  { id: "navigation", label: "Navigation" },
   { id: "content", label: "Content" },
   { id: "account", label: "Account" },
 ];
 
 const SERVER_TABS = [
-  { id: "user-management", label: "User Management" },
   { id: "server-config", label: "Server Configuration" },
+  { id: "user-management", label: "User Management" },
 ];
 
 const SettingsPage = () => {
@@ -106,13 +108,14 @@ const SettingsPage = () => {
               {activeTab === "customization" && <CustomizationTab />}
               {activeTab === "content" && <ContentTab />}
               {activeTab === "account" && <AccountTab />}
+              {activeTab === "navigation" && <NavigationTab />}
             </>
           )}
 
           {activeSection === "server" && (
             <>
-              {activeTab === "user-management" && <UserManagementTab />}
               {activeTab === "server-config" && <ServerConfigTab />}
+              {activeTab === "user-management" && <UserManagementTab />}
             </>
           )}
         </SettingsLayout>
