@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { LucideSettings } from "lucide-react";
 import axios from "axios";
 import { showError, showSuccess } from "../../utils/toast.jsx";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -27,12 +28,17 @@ const ContextSettings = ({
   currentValues = {},
   onSettingChange,
   className = "",
+  entityType = null,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const containerRef = useRef(null);
 
-  const hasSettings = settings.length > 0;
+  // Card display settings
+  const { getSettings, updateSettings } = useCardDisplaySettings();
+  const cardSettings = entityType ? getSettings(entityType) : null;
+
+  const hasSettings = settings.length > 0 || entityType;
 
   // Close popover when clicking outside
   // Use mouseup instead of mousedown to avoid closing when interacting with
@@ -80,6 +86,18 @@ const ContextSettings = ({
       }
     },
     [onSettingChange]
+  );
+
+  const handleCardSettingChange = useCallback(
+    async (key, value) => {
+      try {
+        await updateSettings(entityType, key, value);
+        showSuccess("Setting saved");
+      } catch {
+        showError("Failed to save setting");
+      }
+    },
+    [entityType, updateSettings]
   );
 
   const togglePopover = () => {
@@ -196,6 +214,85 @@ const ContextSettings = ({
                 )}
               </div>
             ))}
+
+            {/* Card Display Section - shown when entityType is provided */}
+            {entityType && (
+              <div
+                className="border-t pt-3 mt-3"
+                style={{ borderColor: "var(--border-color)" }}
+              >
+                <h4
+                  className="text-xs font-medium mb-2"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Card Display
+                </h4>
+                <div className="space-y-2">
+                  {entityType === "scene" && (
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={cardSettings?.showCodeOnCard ?? true}
+                        onChange={(e) => handleCardSettingChange("showCodeOnCard", e.target.checked)}
+                        className="w-4 h-4"
+                        style={{ accentColor: "var(--accent-primary)" }}
+                      />
+                      <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                        Show code
+                      </span>
+                    </label>
+                  )}
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cardSettings?.showDescriptionOnCard ?? true}
+                      onChange={(e) => handleCardSettingChange("showDescriptionOnCard", e.target.checked)}
+                      className="w-4 h-4"
+                      style={{ accentColor: "var(--accent-primary)" }}
+                    />
+                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                      Show description
+                    </span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cardSettings?.showRating ?? true}
+                      onChange={(e) => handleCardSettingChange("showRating", e.target.checked)}
+                      className="w-4 h-4"
+                      style={{ accentColor: "var(--accent-primary)" }}
+                    />
+                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                      Show rating
+                    </span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cardSettings?.showFavorite ?? true}
+                      onChange={(e) => handleCardSettingChange("showFavorite", e.target.checked)}
+                      className="w-4 h-4"
+                      style={{ accentColor: "var(--accent-primary)" }}
+                    />
+                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                      Show favorite
+                    </span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={cardSettings?.showOCounter ?? true}
+                      onChange={(e) => handleCardSettingChange("showOCounter", e.target.checked)}
+                      className="w-4 h-4"
+                      style={{ accentColor: "var(--accent-primary)" }}
+                    />
+                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                      Show O counter
+                    </span>
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
