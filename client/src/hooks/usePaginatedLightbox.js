@@ -1,4 +1,7 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+// Number of images to prefetch ahead and behind current position
+export const PREFETCH_COUNT = 3;
 
 /**
  * Hook for managing paginated image grids with lightbox support.
@@ -11,6 +14,7 @@ import { useCallback, useRef, useState } from "react";
  * @param {Function} options.onPageChange - Callback when page changes (receives new page number)
  * @param {number} options.externalPage - External page number (from URL), makes hook use external state
  * @param {Function} options.onExternalPageChange - Callback to change external page (required if externalPage provided)
+ * @param {Function} options.fetchPage - (page: number) => Promise<{ images: Image[] }> - fetches a page of images for prefetching
  * @returns {Object} Lightbox and pagination state/handlers
  */
 export function usePaginatedLightbox({
@@ -19,6 +23,7 @@ export function usePaginatedLightbox({
   onPageChange,
   externalPage,
   onExternalPageChange,
+  fetchPage,
 }) {
   // Internal page state - only used when externalPage is not provided
   const [internalPage, setInternalPage] = useState(1);
@@ -31,11 +36,17 @@ export function usePaginatedLightbox({
   const [lightboxAutoPlay, setLightboxAutoPlay] = useState(false);
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
 
+  // Prefetch state for adjacent pages
+  const [prevPageImages, setPrevPageImages] = useState([]);
+  const [nextPageImages, setNextPageImages] = useState([]);
+  const prefetchingRef = useRef({ prev: null, next: null }); // Track which pages are being fetched
+
   // Track pending page load for lightbox cross-page navigation
   const pendingLightboxNav = useRef(null);
 
-  // Track current lightbox index for page sync on close
-  const currentLightboxIndex = useRef(0);
+  // Track current lightbox index reported by Lightbox component (for prefetch triggering)
+  // This is separate from lightboxIndex which is used as initialIndex prop
+  const [trackedIndex, setTrackedIndex] = useState(0);
 
   const totalPages = Math.ceil(totalCount / perPage);
 
@@ -84,9 +95,9 @@ export function usePaginatedLightbox({
     [currentPage, totalPages, perPage, handlePageChange]
   );
 
-  // Handle lightbox index change (for tracking current position)
+  // Handle lightbox index change (for tracking current position for prefetching)
   const handleLightboxIndexChange = useCallback((index) => {
-    currentLightboxIndex.current = index;
+    setTrackedIndex(index);
   }, []);
 
   // Handle lightbox close
@@ -114,6 +125,63 @@ export function usePaginatedLightbox({
     return null;
   }, []);
 
+  // Clear prefetched pages when current page changes (they're no longer adjacent)
+  useEffect(() => {
+    setPrevPageImages([]);
+    setNextPageImages([]);
+    prefetchingRef.current = { prev: null, next: null };
+  }, [currentPage]);
+
+  // Prefetch adjacent pages when near page boundaries
+  useEffect(() => {
+    if (!lightboxOpen || !fetchPage) return;
+
+    // Near end of page - prefetch next page
+    if (
+      trackedIndex >= perPage - PREFETCH_COUNT &&
+      currentPage < totalPages &&
+      prefetchingRef.current.next !== currentPage + 1 &&
+      nextPageImages.length === 0
+    ) {
+      prefetchingRef.current.next = currentPage + 1;
+      fetchPage(currentPage + 1)
+        .then(({ images }) => {
+          // Only update if we're still on the same page
+          if (prefetchingRef.current.next === currentPage + 1) {
+            setNextPageImages(images.slice(0, PREFETCH_COUNT));
+          }
+        })
+        .catch(() => {
+          // Silently fail - prefetching is best-effort
+          prefetchingRef.current.next = null;
+        });
+    }
+
+    // Near start of page - prefetch previous page
+    if (
+      trackedIndex < PREFETCH_COUNT &&
+      currentPage > 1 &&
+      prefetchingRef.current.prev !== currentPage - 1 &&
+      prevPageImages.length === 0
+    ) {
+      prefetchingRef.current.prev = currentPage - 1;
+      fetchPage(currentPage - 1)
+        .then(({ images }) => {
+          // Only update if we're still on the same page
+          if (prefetchingRef.current.prev === currentPage - 1) {
+            setPrevPageImages(images.slice(-PREFETCH_COUNT));
+          }
+        })
+        .catch(() => {
+          // Silently fail - prefetching is best-effort
+          prefetchingRef.current.prev = null;
+        });
+    }
+  }, [lightboxOpen, trackedIndex, currentPage, totalPages, perPage, fetchPage, nextPageImages.length, prevPageImages.length]);
+
+  // Compute prefetch images from adjacent pages
+  const prefetchImages = [...prevPageImages, ...nextPageImages];
+
   return {
     // Pagination state
     currentPage,
@@ -135,6 +203,9 @@ export function usePaginatedLightbox({
 
     // For consuming pending navigation after page load
     consumePendingLightboxIndex,
+
+    // Images to prefetch (from adjacent pages)
+    prefetchImages,
   };
 }
 

@@ -320,6 +320,7 @@ const Images = () => {
             onPageBoundary={lightbox.onPageBoundary}
             totalCount={totalCount}
             pageOffset={pageOffset}
+            onIndexChange={lightbox.onIndexChange}
             isPageTransitioning={lightbox.isPageTransitioning}
           />
         )}

@@ -30,7 +30,7 @@ const httpsAgent = new https.Agent({
 // Limits concurrent outbound requests to Stash to prevent overwhelming it.
 // Requests beyond the limit are queued and processed in order.
 
-const MAX_CONCURRENT_REQUESTS = 4;
+const MAX_CONCURRENT_REQUESTS = 6;
 let activeRequests = 0;
 const requestQueue: Array<() => void> = [];
 

@@ -31,12 +31,19 @@ export function useImagesPagination({
     fetchImagesRef.current = fetchImages;
   }, [fetchImages]);
 
+  // Fetch function for prefetching adjacent pages
+  const fetchPage = useCallback(async (page) => {
+    const result = await fetchImagesRef.current(page, perPage);
+    return { images: result.images || [] };
+  }, [perPage]);
+
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
     perPage,
     totalCount,
     externalPage,
     onExternalPageChange,
+    fetchPage,
   });
 
   // Fetch images when page or dependencies change

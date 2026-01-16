@@ -1,9 +1,9 @@
 # Windows development override
 # Usage: docker-compose -f docker-compose.yml -f docker-compose.windows.yml up
 #
-# Fixes slow SQLite performance on Windows Docker Desktop by using a named volume
-# instead of a bind mount. Bind mounts on Windows go through WSL2's 9P filesystem
-# which has poor I/O performance for database workloads.
+# Fixes two Windows Docker Desktop issues:
+# 1. Slow SQLite: Uses named volume instead of bind mount (WSL2's 9P has poor I/O)
+# 2. HMR not working: Enables polling for file watching (WSL2 doesn't propagate fs events)
 #
 # Note: Uses /peek-data instead of /app/data because /app is bind-mounted for hot reload
 #
@@ -20,6 +20,11 @@ services:
     volumes:
       # Named volume mounted outside /app to avoid being shadowed by source bind mount
       - peek-data:/peek-data
+
+  peek-client:
+    environment:
+      # Enable polling for file watching - WSL2 doesn't propagate fs events from Windows
+      CHOKIDAR_USEPOLLING: "true"
 
 volumes:
   peek-data:

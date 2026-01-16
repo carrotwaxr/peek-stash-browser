@@ -7,6 +7,9 @@ import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
 import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import MetadataDrawer from "./MetadataDrawer.jsx";
 
+// Percentage of screen width on each side that triggers navigation on click
+const EDGE_ZONE_PERCENT = 0.15;
+
 const Lightbox = ({
   images,
   initialIndex = 0,
@@ -20,6 +23,7 @@ const Lightbox = ({
   pageOffset = 0, // Offset of current page (e.g., page 2 with 100/page = 100)
   onIndexChange, // (index: number) => void - called when current index changes (for syncing with parent)
   isPageTransitioning = false, // Whether we're loading a new page (show loading state, hide current image)
+  prefetchImages = [], // Images from adjacent pages to prefetch into browser cache
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -49,6 +53,22 @@ const Lightbox = ({
   // Track the current image ID to detect when images array changes during page transitions
   const currentImageId = images[currentIndex]?.id;
   const prevImageIdRef = useRef(currentImageId);
+
+  // Track "stale" image ID when crossing page boundaries
+  // When we navigate across a page boundary, we store the current image ID as stale.
+  // We refuse to show any image with this ID, preventing the flash of the wrong image
+  // while waiting for the new page's data to arrive.
+  const staleImageIdRef = useRef(null);
+
+  // Check if current image is stale (should not be displayed)
+  const isShowingStaleImage = staleImageIdRef.current !== null && currentImageId === staleImageIdRef.current;
+
+  // Clear stale ref when we get a new (non-stale) image
+  useEffect(() => {
+    if (staleImageIdRef.current !== null && currentImageId !== staleImageIdRef.current) {
+      staleImageIdRef.current = null;
+    }
+  }, [currentImageId]);
 
   // Reset imageLoaded when the actual image changes (e.g., during page transitions)
   // This handles the case where initialIndex stays the same (e.g., 0) but images array changes
@@ -85,14 +105,44 @@ const Lightbox = ({
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  // Prefetch images from adjacent pages into browser cache
+  useEffect(() => {
+    if (!isOpen || prefetchImages.length === 0) return;
+
+    // Use fetch with low priority to avoid blocking the main image request
+    // AbortController lets us cancel prefetches if component unmounts or images change
+    const controller = new AbortController();
+
+    prefetchImages.forEach((img) => {
+      const url = img?.paths?.image || img?.paths?.preview;
+      if (url) {
+        fetch(url, {
+          signal: controller.signal,
+          priority: "low",
+        }).catch(() => {
+          // Silently ignore - prefetch is best-effort
+        });
+      }
+    });
+
+    return () => controller.abort();
+  }, [isOpen, prefetchImages]);
+
   // Navigation functions with cross-page support
   const goToPrevious = useCallback(() => {
     if (currentIndex === 0) {
       // At first image - check for previous page
-      if (onPageBoundary && onPageBoundary("prev")) {
-        // Page change handled by parent, index will be set via initialIndex prop
-        setImageLoaded(false);
-        return;
+      if (onPageBoundary) {
+        // Mark current image as stale BEFORE triggering page change
+        // This prevents showing the wrong image while new page loads
+        staleImageIdRef.current = images[currentIndex]?.id;
+        if (onPageBoundary("prev")) {
+          // Page change handled by parent, index will be set via initialIndex prop
+          setImageLoaded(false);
+          return;
+        }
+        // No previous page available - clear stale marker
+        staleImageIdRef.current = null;
       }
       // No previous page or no handler - wrap to end
       setCurrentIndex(images.length - 1);
@@ -100,15 +150,22 @@ const Lightbox = ({
       setCurrentIndex((prev) => prev - 1);
     }
     setImageLoaded(false);
-  }, [currentIndex, images.length, onPageBoundary]);
+  }, [currentIndex, images, onPageBoundary]);
 
   const goToNext = useCallback(() => {
     if (currentIndex === images.length - 1) {
       // At last image - check for next page
-      if (onPageBoundary && onPageBoundary("next")) {
-        // Page change handled by parent, index will be set via initialIndex prop
-        setImageLoaded(false);
-        return;
+      if (onPageBoundary) {
+        // Mark current image as stale BEFORE triggering page change
+        // This prevents showing the wrong image while new page loads
+        staleImageIdRef.current = images[currentIndex]?.id;
+        if (onPageBoundary("next")) {
+          // Page change handled by parent, index will be set via initialIndex prop
+          setImageLoaded(false);
+          return;
+        }
+        // No next page available - clear stale marker
+        staleImageIdRef.current = null;
       }
       // No next page or no handler - wrap to start
       setCurrentIndex(0);
@@ -116,7 +173,7 @@ const Lightbox = ({
       setCurrentIndex((prev) => prev + 1);
     }
     setImageLoaded(false);
-  }, [currentIndex, images.length, onPageBoundary]);
+  }, [currentIndex, images, onPageBoundary]);
 
   // Slideshow control
   const toggleSlideshow = useCallback(() => {
@@ -400,13 +457,26 @@ const Lightbox = ({
   const imageSrc = currentImage?.paths?.image || currentImage?.paths?.preview;
   const imageTitle = getImageTitle(currentImage);
 
-  // Handle backdrop click - close drawer if open, otherwise close lightbox
-  const handleBackdropClick = () => {
+  // Handle backdrop click - edge zones navigate, center does nothing
+  // Left 15% = previous, right 15% = next, center = no action
+  const handleBackdropClick = (e) => {
+    // Close drawer if open
     if (drawerOpen) {
       setDrawerOpen(false);
-    } else {
-      onClose();
+      return;
     }
+
+    // Calculate click position as percentage of screen width
+    const clickX = e.clientX;
+    const screenWidth = window.innerWidth;
+    const clickPercent = clickX / screenWidth;
+
+    if (clickPercent < EDGE_ZONE_PERCENT) {
+      goToPrevious();
+    } else if (clickPercent > 1 - EDGE_ZONE_PERCENT) {
+      goToNext();
+    }
+    // Center clicks do nothing - user must use X button or Esc to close
   };
 
   return (
@@ -585,8 +655,8 @@ const Lightbox = ({
         </button>
       )}
 
-      {/* Loading spinner - show when image loading OR page transitioning */}
-      {(!imageLoaded || isPageTransitioning) && (
+      {/* Loading spinner - show when image loading, page transitioning, or showing stale image */}
+      {(!imageLoaded || isPageTransitioning || isShowingStaleImage) && (
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           style={{ color: "var(--text-primary)" }}
@@ -595,12 +665,12 @@ const Lightbox = ({
         </div>
       )}
 
-      {/* Image container - hide during page transition to prevent showing stale image */}
+      {/* Image container - hide during page transition or when showing stale image */}
       <div
         className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
         style={{
-          visibility: isPageTransitioning ? "hidden" : "visible",
+          visibility: isPageTransitioning || isShowingStaleImage ? "hidden" : "visible",
         }}
       >
         {/* Image */}
@@ -617,8 +687,8 @@ const Lightbox = ({
         />
       </div>
 
-      {/* Image title - hide during page transition to prevent showing stale title */}
-      {imageTitle && !isPageTransitioning && (
+      {/* Image title - hide during page transition or stale image to prevent showing wrong title */}
+      {imageTitle && !isPageTransitioning && !isShowingStaleImage && (
         <div
           className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-center max-w-[80vw] transition-opacity duration-300 ${
             controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
