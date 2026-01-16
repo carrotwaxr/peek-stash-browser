@@ -41,7 +41,10 @@ const Lightbox = ({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [hasHoverCapability, setHasHoverCapability] = useState(true);
-  const { isFullscreen, toggleFullscreen, supportsFullscreen } = useFullscreen();
+  const { isFullscreen, toggleFullscreen, supportsFullscreen } = useFullscreen({
+    autoOnLandscape: true,
+    enabled: isOpen,
+  });
   const controlsTimeoutRef = useRef(null);
 
   // Reset index when initialIndex changes
@@ -481,7 +484,6 @@ const Lightbox = ({
 
   return (
     <div
-      {...swipeHandlers}
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{
         backgroundColor: "rgba(0, 0, 0, 0.95)",
@@ -665,8 +667,9 @@ const Lightbox = ({
         </div>
       )}
 
-      {/* Image container - hide during page transition or when showing stale image */}
+      {/* Image container - swipe handlers here so they don't block button taps on letterbox areas */}
       <div
+        {...swipeHandlers}
         className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
         style={{
