@@ -121,6 +121,7 @@ const ImageCard = forwardRef(
         imagePath={image.paths?.thumbnail || image.paths?.image}
         title={getImageTitle(image)}
         subtitle={subtitle}
+        description={image.details}
         onClick={handleClick}
         linkTo={onClick ? undefined : `/image/${image.id}`}
         fromPageTitle={fromPageTitle}
