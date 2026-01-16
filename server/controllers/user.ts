@@ -134,6 +134,7 @@ export const getUserSettings = async (
         unitPreference: true,
         wallPlayback: true,
         tableColumnDefaults: true,
+        cardDisplaySettings: true,
       },
     });
 
@@ -157,6 +158,7 @@ export const getUserSettings = async (
         unitPreference: user.unitPreference || "metric",
         wallPlayback: user.wallPlayback || "autoplay",
         tableColumnDefaults: user.tableColumnDefaults || null,
+        cardDisplaySettings: user.cardDisplaySettings || null,
       },
     });
   } catch (error) {
@@ -207,6 +209,7 @@ export const updateUserSettings = async (
       unitPreference,
       wallPlayback,
       tableColumnDefaults,
+      cardDisplaySettings,
     } = req.body;
 
     // Validate values
@@ -366,6 +369,15 @@ export const updateUserSettings = async (
       }
     }
 
+    // Validate card display settings if provided
+    if (cardDisplaySettings !== undefined) {
+      if (cardDisplaySettings !== null && typeof cardDisplaySettings !== "object") {
+        return res
+          .status(400)
+          .json({ error: "Card display settings must be an object or null" });
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: {
@@ -383,6 +395,7 @@ export const updateUserSettings = async (
         ...(unitPreference !== undefined && { unitPreference }),
         ...(wallPlayback !== undefined && { wallPlayback }),
         ...(tableColumnDefaults !== undefined && { tableColumnDefaults }),
+        ...(cardDisplaySettings !== undefined && { cardDisplaySettings }),
       },
       select: {
         id: true,
@@ -398,6 +411,7 @@ export const updateUserSettings = async (
         syncToStash: true,
         wallPlayback: true,
         tableColumnDefaults: true,
+        cardDisplaySettings: true,
       },
     });
 
@@ -414,6 +428,7 @@ export const updateUserSettings = async (
         syncToStash: updatedUser.syncToStash,
         wallPlayback: updatedUser.wallPlayback || "autoplay",
         tableColumnDefaults: updatedUser.tableColumnDefaults || null,
+        cardDisplaySettings: updatedUser.cardDisplaySettings || null,
       },
     });
   } catch (error) {
