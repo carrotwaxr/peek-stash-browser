@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import { formatDuration } from "../../utils/format.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
@@ -29,6 +30,10 @@ const GroupDetail = () => {
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
+
+  // Card display settings
+  const { getSettings } = useCardDisplaySettings();
+  const settings = getSettings("group");
 
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get('tab') || 'scenes';
@@ -113,11 +118,13 @@ const GroupDetail = () => {
             title={
               <div className="flex gap-4 items-center">
                 <span>{group?.name || `Collection ${groupId}`}</span>
-                <FavoriteButton
-                  isFavorite={isFavorite}
-                  onChange={handleFavoriteChange}
-                  size="large"
-                />
+                {settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={handleFavoriteChange}
+                    size="large"
+                  />
+                )}
                 <ViewInStashButton stashUrl={group?.stashUrl} size={24} />
               </div>
             }
@@ -129,13 +136,15 @@ const GroupDetail = () => {
           />
 
           {/* Rating Slider */}
-          <div className="mt-4 max-w-md">
-            <RatingSlider
-              rating={rating}
-              onChange={handleRatingChange}
-              showClearButton={true}
-            />
-          </div>
+          {settings.showRating && (
+            <div className="mt-4 max-w-md">
+              <RatingSlider
+                rating={rating}
+                onChange={handleRatingChange}
+                showClearButton={true}
+              />
+            </div>
+          )}
         </div>
 
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
@@ -146,8 +155,8 @@ const GroupDetail = () => {
           </div>
 
           {/* Right Column: Details (scrollable, matches image height) */}
-          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
-            {group?.synopsis && (
+          {settings.showDescriptionOnDetail && group?.synopsis && (
+            <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
               <Card title="Details">
                 <p
                   className="text-sm whitespace-pre-wrap"
@@ -156,8 +165,8 @@ const GroupDetail = () => {
                   {group.synopsis}
                 </p>
               </Card>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Full Width Sections - Statistics, Studio, Tags, Parent/Sub Collections */}

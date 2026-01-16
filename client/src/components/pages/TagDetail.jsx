@@ -5,6 +5,7 @@ import { useImagesPagination } from "../../hooks/useImagesPagination.js";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -30,6 +31,10 @@ const TagDetail = () => {
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
+
+  // Card display settings
+  const { getSettings } = useCardDisplaySettings();
+  const settings = getSettings("tag");
 
   // Include sub-tags toggle state (from URL param or default false)
   const includeSubTags = searchParams.get('includeSubTags') === 'true';
@@ -167,11 +172,13 @@ const TagDetail = () => {
             title={
               <div className="flex gap-4 items-center">
                 <span>{tag?.name || `Tag ${tagId}`}</span>
-                <FavoriteButton
-                  isFavorite={isFavorite}
-                  onChange={handleFavoriteChange}
-                  size="large"
-                />
+                {settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={handleFavoriteChange}
+                    size="large"
+                  />
+                )}
                 <ViewInStashButton stashUrl={tag?.stashUrl} size={24} />
               </div>
             }
@@ -183,13 +190,15 @@ const TagDetail = () => {
           />
 
           {/* Rating Slider */}
-          <div className="mt-4 max-w-md">
-            <RatingSlider
-              rating={rating}
-              onChange={handleRatingChange}
-              showClearButton={true}
-            />
-          </div>
+          {settings.showRating && (
+            <div className="mt-4 max-w-md">
+              <RatingSlider
+                rating={rating}
+                onChange={handleRatingChange}
+                showClearButton={true}
+              />
+            </div>
+          )}
         </div>
 
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
@@ -200,8 +209,8 @@ const TagDetail = () => {
           </div>
 
           {/* Right Column: Details (scrollable, matches image height) */}
-          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
-            {tag?.description && (
+          {settings.showDescriptionOnDetail && tag?.description && (
+            <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
               <Card title="Details">
                 <p
                   className="text-sm whitespace-pre-wrap"
@@ -210,8 +219,8 @@ const TagDetail = () => {
                   {tag.description}
                 </p>
               </Card>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Full Width Sections - Statistics, Parents, Children, Aliases */}

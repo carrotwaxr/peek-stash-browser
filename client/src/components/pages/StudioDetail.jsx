@@ -8,6 +8,7 @@ import { useImagesPagination } from "../../hooks/useImagesPagination.js";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
@@ -34,6 +35,10 @@ const StudioDetail = () => {
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
+
+  // Card display settings
+  const { getSettings } = useCardDisplaySettings();
+  const settings = getSettings("studio");
 
   // Include sub-studios toggle state (from URL param or default false)
   const includeSubStudios = searchParams.get("includeSubStudios") === "true";
@@ -135,11 +140,13 @@ const StudioDetail = () => {
             title={
               <div className="flex gap-4 items-center">
                 <span>{studio?.name || `Studio ${studioId}`}</span>
-                <FavoriteButton
-                  isFavorite={isFavorite}
-                  onChange={handleFavoriteChange}
-                  size="large"
-                />
+                {settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={handleFavoriteChange}
+                    size="large"
+                  />
+                )}
                 <ViewInStashButton stashUrl={studio?.stashUrl} size={24} />
               </div>
             }
@@ -151,13 +158,15 @@ const StudioDetail = () => {
           />
 
           {/* Rating Slider */}
-          <div className="mt-4 max-w-md">
-            <RatingSlider
-              rating={rating}
-              onChange={handleRatingChange}
-              showClearButton={true}
-            />
-          </div>
+          {settings.showRating && (
+            <div className="mt-4 max-w-md">
+              <RatingSlider
+                rating={rating}
+                onChange={handleRatingChange}
+                showClearButton={true}
+              />
+            </div>
+          )}
         </div>
 
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
@@ -168,8 +177,8 @@ const StudioDetail = () => {
           </div>
 
           {/* Right Column: Details (scrollable, matches image height) */}
-          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
-            {studio?.details && (
+          {settings.showDescriptionOnDetail && studio?.details && (
+            <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
               <Card title="Details">
                 <p
                   className="text-sm whitespace-pre-wrap"
@@ -178,14 +187,14 @@ const StudioDetail = () => {
                   {studio.details}
                 </p>
               </Card>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Full Width Sections - Statistics, Parent Studio, Tags, Website */}
         <div className="space-y-6 mb-8">
           <StudioStats studio={studio} studioId={studioId} />
-          <StudioDetails studio={studio} />
+          <StudioDetails studio={studio} settings={settings} />
         </div>
 
         {/* Tabbed Content Section */}
@@ -487,7 +496,9 @@ const StudioStats = ({ studio, studioId: _studioId }) => { // eslint-disable-lin
 };
 
 // Studio Details Component
-const StudioDetails = ({ studio }) => {
+const StudioDetails = ({ studio, settings }) => {
+  const showDetails = settings?.showDescriptionOnDetail !== false;
+
   return (
     <>
       {studio?.url && (
@@ -517,7 +528,7 @@ const StudioDetails = ({ studio }) => {
         </Card>
       )}
 
-      {studio?.details && (
+      {showDetails && studio?.details && (
         <Card title="Details">
           <p
             className="text-sm whitespace-pre-wrap"

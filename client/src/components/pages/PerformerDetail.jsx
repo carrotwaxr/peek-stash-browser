@@ -6,6 +6,7 @@ import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { formatHeight, formatWeight, formatLength } from "../../utils/unitConversions.js";
 import { libraryApi } from "../../services/api.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
@@ -35,6 +36,10 @@ const PerformerDetail = () => {
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
+
+  // Card display settings
+  const { getSettings } = useCardDisplaySettings();
+  const settings = getSettings("performer");
 
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get('tab') || 'scenes';
@@ -120,11 +125,13 @@ const PerformerDetail = () => {
               <div className="flex gap-4 items-center">
                 <span>{performer.name}</span>
                 <GenderIcon gender={performer.gender} size={32} />
-                <FavoriteButton
-                  isFavorite={isFavorite}
-                  onChange={handleFavoriteChange}
-                  size="large"
-                />
+                {settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={handleFavoriteChange}
+                    size="large"
+                  />
+                )}
                 <ViewInStashButton stashUrl={performer?.stashUrl} size={24} />
               </div>
             }
@@ -136,13 +143,15 @@ const PerformerDetail = () => {
           />
 
           {/* Rating Slider */}
-          <div className="mt-4 max-w-md">
-            <RatingSlider
-              rating={rating}
-              onChange={handleRatingChange}
-              showClearButton={true}
-            />
-          </div>
+          {settings.showRating && (
+            <div className="mt-4 max-w-md">
+              <RatingSlider
+                rating={rating}
+                onChange={handleRatingChange}
+                showClearButton={true}
+              />
+            </div>
+          )}
         </div>
 
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
@@ -153,15 +162,17 @@ const PerformerDetail = () => {
           </div>
 
           {/* Right Column: Details (scrollable, matches image height) */}
-          <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
-            <PerformerDetails performer={performer} />
-          </div>
+          {settings.showDescriptionOnDetail && (
+            <div className="flex-1 lg:overflow-y-auto lg:max-h-[80vh]">
+              <PerformerDetails performer={performer} />
+            </div>
+          )}
         </div>
 
         {/* Full Width Sections - Statistics, Tags, Links */}
         <div className="space-y-6 mb-8">
           <PerformerStats performer={performer} performerId={performerId} />
-          <PerformerLinks performer={performer} />
+          <PerformerLinks performer={performer} settings={settings} />
         </div>
 
         {/* Tabbed Content Section */}
@@ -617,15 +628,16 @@ const PerformerImage = ({ performer }) => {
   );
 };
 
-const PerformerLinks = ({ performer }) => {
+const PerformerLinks = ({ performer, settings }) => {
   const hasLinks =
     performer?.twitter ||
     performer?.instagram ||
     performer?.url ||
     performer?.urls?.length > 0;
   const hasTags = performer?.tags?.length > 0;
+  const showDetails = settings?.showDescriptionOnDetail !== false;
 
-  if (!hasLinks && !hasTags && !performer?.details) return null;
+  if (!hasLinks && !hasTags && !(performer?.details && showDetails)) return null;
 
   return (
     <>
@@ -657,7 +669,7 @@ const PerformerLinks = ({ performer }) => {
       )}
 
       {/* Details Section */}
-      {performer?.details && (
+      {showDetails && performer?.details && (
         <Card title="Details">
           <p
             className="text-sm whitespace-pre-wrap"
