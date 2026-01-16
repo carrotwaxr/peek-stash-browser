@@ -5,6 +5,7 @@ import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
@@ -38,6 +39,10 @@ const GalleryDetail = () => {
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
+
+  // Card display settings
+  const { getSettings } = useCardDisplaySettings();
+  const settings = getSettings("gallery");
 
   // Get active tab from URL or default to 'images'
   const activeTab = searchParams.get('tab') || 'images';
@@ -201,11 +206,13 @@ const GalleryDetail = () => {
             title={
               <div className="flex flex-wrap gap-3 items-center">
                 <span>{galleryTitle(gallery)}</span>
-                <FavoriteButton
-                  isFavorite={isFavorite}
-                  onChange={handleFavoriteChange}
-                  size="large"
-                />
+                {settings.showFavorite && (
+                  <FavoriteButton
+                    isFavorite={isFavorite}
+                    onChange={handleFavoriteChange}
+                    size="large"
+                  />
+                )}
                 <ViewInStashButton stashUrl={gallery?.stashUrl} size={24} />
               </div>
             }
@@ -245,16 +252,18 @@ const GalleryDetail = () => {
           />
 
           {/* Rating Slider */}
-          <div className="mt-4 max-w-md">
-            <RatingSlider
-              rating={rating}
-              onChange={handleRatingChange}
-              showClearButton={true}
-            />
-          </div>
+          {settings.showRating && (
+            <div className="mt-4 max-w-md">
+              <RatingSlider
+                rating={rating}
+                onChange={handleRatingChange}
+                showClearButton={true}
+              />
+            </div>
+          )}
 
           {/* Details */}
-          {gallery.details && (
+          {settings.showDescriptionOnDetail && gallery.details && (
             <div className="mt-6">
               <h3
                 className="text-sm font-medium mb-3"

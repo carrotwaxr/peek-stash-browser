@@ -4,14 +4,17 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import GenderIcon from "../ui/GenderIcon.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 
 /**
  * PerformerCard - Card for displaying performer entities
  * Uses BaseCard with performer-specific configuration
  */
 const PerformerCard = forwardRef(
-  ({ performer, fromPageTitle, isTVMode, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ performer, fromPageTitle, isTVMode, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
+    const { getSettings } = useCardDisplaySettings();
+    const performerSettings = getSettings("performer");
 
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('performer', 'tags') === 'rich' &&
@@ -83,16 +86,19 @@ const PerformerCard = forwardRef(
         linkTo={`/performer/${performer.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={isTVMode ? tabIndex : -1}
-        hideDescription
+        description={performer.details}
         hideSubtitle
         indicators={indicators}
-        displayPreferences={displayPreferences}
+        displayPreferences={{ showDescription: performerSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: performer.id,
           initialRating: performer.rating,
           initialFavorite: performer.favorite || false,
           initialOCounter: performer.o_counter,
           onHideSuccess,
+          showRating: performerSettings.showRating,
+          showFavorite: performerSettings.showFavorite,
+          showOCounter: performerSettings.showOCounter,
         }}
         {...rest}
       />

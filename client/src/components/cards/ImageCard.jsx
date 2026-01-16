@@ -3,6 +3,7 @@ import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalle
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 
 /**
  * Format resolution string from width/height
@@ -22,7 +23,9 @@ const formatResolution = (width, height) => {
  * Supports onClick for lightbox integration
  */
 const ImageCard = forwardRef(
-  ({ image, onClick, fromPageTitle, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, displayPreferences, ...rest }, ref) => {
+  ({ image, onClick, fromPageTitle, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, ...rest }, ref) => {
+    const { getSettings } = useCardDisplaySettings();
+    const imageSettings = getSettings("image");
     // Get effective metadata (inherits from galleries if image doesn't have its own)
     const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
 
@@ -121,13 +124,14 @@ const ImageCard = forwardRef(
         imagePath={image.paths?.thumbnail || image.paths?.image}
         title={getImageTitle(image)}
         subtitle={subtitle}
+        description={image.details}
         onClick={handleClick}
         linkTo={onClick ? undefined : `/image/${image.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
-        displayPreferences={displayPreferences}
+        displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard }}
         ratingControlsProps={
           image.rating100 !== undefined || image.favorite !== undefined || image.oCounter !== undefined
             ? {
@@ -139,6 +143,9 @@ const ImageCard = forwardRef(
                 onOCounterChange,
                 onRatingChange,
                 onFavoriteChange,
+                showRating: imageSettings.showRating,
+                showFavorite: imageSettings.showFavorite,
+                showOCounter: imageSettings.showOCounter,
               }
             : undefined
         }

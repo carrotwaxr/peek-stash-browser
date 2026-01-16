@@ -7,6 +7,7 @@ import { GlobalLayout } from "./components/ui/index.js";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
 import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
 import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider.jsx";
+import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext.jsx";
 import { SetupGuard, LoginGuard, ProtectedRoute } from "./components/guards/RouteGuards.jsx";
 import { setupApi } from "./services/api.js";
 import { ThemeProvider } from "./themes/ThemeProvider.jsx";
@@ -361,16 +362,18 @@ function App() {
       <AuthProvider>
         <UnitPreferenceProvider>
           <TVModeProvider>
-            <AppContent />
-            <Toaster
-              position="bottom-center"
-              toastOptions={{
-                duration: 3000,
-                style: {
-                  padding: "0",
-                },
-              }}
-            />
+            <CardDisplaySettingsProvider>
+              <AppContent />
+              <Toaster
+                position="bottom-center"
+                toastOptions={{
+                  duration: 3000,
+                  style: {
+                    padding: "0",
+                  },
+                }}
+              />
+            </CardDisplaySettingsProvider>
           </TVModeProvider>
         </UnitPreferenceProvider>
       </AuthProvider>

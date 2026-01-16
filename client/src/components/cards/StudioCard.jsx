@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 
 /**
  * StudioCard - Card for displaying studio entities
  */
 const StudioCard = forwardRef(
-  ({ studio, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ studio, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
+    const { getSettings } = useCardDisplaySettings();
+    const studioSettings = getSettings("studio");
 
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('studio', 'tags') === 'rich' &&
@@ -85,13 +88,16 @@ const StudioCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
-        displayPreferences={displayPreferences}
+        displayPreferences={{ showDescription: studioSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: studio.id,
           initialRating: studio.rating100,
           initialFavorite: studio.favorite || false,
           initialOCounter: studio.o_counter,
           onHideSuccess,
+          showRating: studioSettings.showRating,
+          showFavorite: studioSettings.showFavorite,
+          showOCounter: studioSettings.showOCounter,
         }}
         {...rest}
       />

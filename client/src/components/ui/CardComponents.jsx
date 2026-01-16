@@ -439,6 +439,9 @@ export const CardIndicators = ({ indicators }) => {
  * @param {Function} onOCounterChange - Callback when O counter changes (for parent to update state)
  * @param {Function} onRatingChange - Callback when rating changes (for parent to update state)
  * @param {Function} onFavoriteChange - Callback when favorite changes (for parent to update state)
+ * @param {boolean} showRating - Whether to show the rating badge (default: true)
+ * @param {boolean} showFavorite - Whether to show the favorite button (default: true)
+ * @param {boolean} showOCounter - Whether to show the O counter (default: true)
  */
 export const CardRatingRow = ({
   entityType,
@@ -451,6 +454,9 @@ export const CardRatingRow = ({
   onOCounterChange,
   onRatingChange,
   onFavoriteChange,
+  showRating = true,
+  showFavorite = true,
+  showOCounter = true,
 }) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
@@ -556,30 +562,36 @@ export const CardRatingRow = ({
       >
         {/* Left side: Rating badge */}
         <div ref={badgeRef}>
-          <RatingBadge
-            rating={rating}
-            onClick={() => setDialogOpen(true)}
-            size="small"
-          />
+          {showRating && (
+            <RatingBadge
+              rating={rating}
+              onClick={() => setDialogOpen(true)}
+              size="small"
+            />
+          )}
         </div>
 
         {/* Right side: O Counter + Favorite + EntityMenu */}
         <div className="flex items-center gap-2">
-          <OCounterButton
-            sceneId={entityType === "scene" ? entityId : null}
-            imageId={entityType === "image" ? entityId : null}
-            initialCount={oCounter ?? 0}
-            onChange={handleOCounterChange}
-            size="small"
-            variant="card"
-            interactive={isSceneOrImage}
-          />
-          <FavoriteButton
-            isFavorite={isFavorite}
-            onChange={handleFavoriteChange}
-            size="small"
-            variant="card"
-          />
+          {showOCounter && (
+            <OCounterButton
+              sceneId={entityType === "scene" ? entityId : null}
+              imageId={entityType === "image" ? entityId : null}
+              initialCount={oCounter ?? 0}
+              onChange={handleOCounterChange}
+              size="small"
+              variant="card"
+              interactive={isSceneOrImage}
+            />
+          )}
+          {showFavorite && (
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onChange={handleFavoriteChange}
+              size="small"
+              variant="card"
+            />
+          )}
           <EntityMenu
             entityType={entityType}
             entityId={entityId}

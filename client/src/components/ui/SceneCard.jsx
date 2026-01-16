@@ -1,6 +1,7 @@
 import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import {
   formatDurationCompact,
   formatResolution,
@@ -14,15 +15,18 @@ import { SceneCardPreview, TooltipEntityGrid } from "./index.js";
 
 /**
  * Build scene subtitle with studio, code, and date
+ * @param {Object} scene - The scene object
+ * @param {Object} options - Display options
+ * @param {boolean} options.showCodeOnCard - Whether to show scene code in subtitle
  */
-const buildSceneSubtitle = (scene) => {
+const buildSceneSubtitle = (scene, { showCodeOnCard = true } = {}) => {
   const parts = [];
 
   if (scene.studio) {
     parts.push(scene.studio.name);
   }
 
-  if (scene.code) {
+  if (showCodeOnCard && scene.code) {
     parts.push(scene.code);
   }
 
@@ -75,10 +79,12 @@ const SceneCard = forwardRef(
   ) => {
     const { isTVMode } = useTVMode();
     const navigate = useNavigate();
+    const { getSettings } = useCardDisplaySettings();
+    const sceneSettings = getSettings("scene");
 
     const title = getSceneTitle(scene);
     const description = getSceneDescription(scene);
-    const subtitle = buildSceneSubtitle(scene);
+    const subtitle = buildSceneSubtitle(scene, { showCodeOnCard: sceneSettings.showCodeOnCard });
     const duration = scene.files?.[0]?.duration
       ? formatDurationCompact(scene.files[0].duration)
       : null;
@@ -270,6 +276,7 @@ const SceneCard = forwardRef(
         subtitle={subtitle}
         description={description}
         indicators={indicators}
+        displayPreferences={{ showDescription: sceneSettings.showDescriptionOnCard }}
         ratingControlsProps={!hideRatingControls && {
           entityType: "scene",
           entityId: scene.id,
@@ -278,6 +285,9 @@ const SceneCard = forwardRef(
           initialOCounter: scene.o_counter,
           entityTitle: title,
           onHideSuccess,
+          showRating: sceneSettings.showRating,
+          showFavorite: sceneSettings.showFavorite,
+          showOCounter: sceneSettings.showOCounter,
         }}
         // Render slots
         renderOverlay={renderOverlay}

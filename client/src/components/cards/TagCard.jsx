@@ -3,13 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 
 /**
  * TagCard - Card for displaying tag entities
  */
 const TagCard = forwardRef(
-  ({ tag, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ tag, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
+    const { getSettings } = useCardDisplaySettings();
+    const tagSettings = getSettings("tag");
 
     // Build subtitle from child count
     const subtitle =
@@ -92,7 +95,7 @@ const TagCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
-        displayPreferences={displayPreferences}
+        displayPreferences={{ showDescription: tagSettings.showDescriptionOnCard }}
         ratingControlsProps={
           tag.rating100 !== undefined
             ? {
@@ -101,6 +104,9 @@ const TagCard = forwardRef(
                 initialFavorite: tag.favorite || false,
                 initialOCounter: tag.o_counter,
                 onHideSuccess,
+                showRating: tagSettings.showRating,
+                showFavorite: tagSettings.showFavorite,
+                showOCounter: tagSettings.showOCounter,
               }
             : undefined
         }

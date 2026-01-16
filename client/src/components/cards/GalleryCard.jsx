@@ -4,13 +4,16 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { galleryTitle } from "../../utils/gallery.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 
 /**
  * GalleryCard - Card for displaying gallery entities
  */
 const GalleryCard = forwardRef(
-  ({ gallery, fromPageTitle, tabIndex, onHideSuccess, displayPreferences, ...rest }, ref) => {
+  ({ gallery, fromPageTitle, tabIndex, onHideSuccess, ...rest }, ref) => {
     const navigate = useNavigate();
+    const { getSettings } = useCardDisplaySettings();
+    const gallerySettings = getSettings("gallery");
 
     // Build subtitle from studio and date
     const galleryDate = gallery.date
@@ -105,12 +108,15 @@ const GalleryCard = forwardRef(
         tabIndex={tabIndex}
         indicators={indicators}
         maxTitleLines={2}
-        displayPreferences={displayPreferences}
+        displayPreferences={{ showDescription: gallerySettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: gallery.id,
           initialRating: gallery.rating100,
           initialFavorite: gallery.favorite || false,
           onHideSuccess,
+          showRating: gallerySettings.showRating,
+          showFavorite: gallerySettings.showFavorite,
+          showOCounter: gallerySettings.showOCounter,
         }}
         {...rest}
       />
