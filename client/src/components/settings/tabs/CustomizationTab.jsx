@@ -4,6 +4,7 @@ import { useUnitPreference } from "../../../contexts/UnitPreferenceContext.js";
 import { migrateCarouselPreferences } from "../../../constants/carousels.js";
 import { migrateNavPreferences } from "../../../constants/navigation.js";
 import { showError, showSuccess } from "../../../utils/toast.jsx";
+import CardDisplaySettings from "../CardDisplaySettings.jsx";
 import CarouselSettings from "../CarouselSettings.jsx";
 import NavigationSettings from "../NavigationSettings.jsx";
 import TableColumnSettings from "../TableColumnSettings.jsx";
@@ -200,6 +201,17 @@ const CustomizationTab = () => {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Card Display Settings */}
+      <div
+        className="p-6 rounded-lg border"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <CardDisplaySettings />
       </div>
 
       {/* Table Column Defaults */}
