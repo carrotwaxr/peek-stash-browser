@@ -83,7 +83,7 @@ const PerformerCard = forwardRef(
         linkTo={`/performer/${performer.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={isTVMode ? tabIndex : -1}
-        hideDescription
+        description={performer.details}
         hideSubtitle
         indicators={indicators}
         displayPreferences={displayPreferences}
