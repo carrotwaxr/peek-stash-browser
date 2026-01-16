@@ -44,8 +44,9 @@ export function usePaginatedLightbox({
   // Track pending page load for lightbox cross-page navigation
   const pendingLightboxNav = useRef(null);
 
-  // Track current lightbox index for page sync on close
-  const currentLightboxIndex = useRef(0);
+  // Track current lightbox index reported by Lightbox component (for prefetch triggering)
+  // This is separate from lightboxIndex which is used as initialIndex prop
+  const [trackedIndex, setTrackedIndex] = useState(0);
 
   const totalPages = Math.ceil(totalCount / perPage);
 
@@ -94,9 +95,9 @@ export function usePaginatedLightbox({
     [currentPage, totalPages, perPage, handlePageChange]
   );
 
-  // Handle lightbox index change (for tracking current position)
+  // Handle lightbox index change (for tracking current position for prefetching)
   const handleLightboxIndexChange = useCallback((index) => {
-    currentLightboxIndex.current = index;
+    setTrackedIndex(index);
   }, []);
 
   // Handle lightbox close
@@ -135,11 +136,9 @@ export function usePaginatedLightbox({
   useEffect(() => {
     if (!lightboxOpen || !fetchPage) return;
 
-    const index = currentLightboxIndex.current;
-
     // Near end of page - prefetch next page
     if (
-      index >= perPage - PREFETCH_COUNT &&
+      trackedIndex >= perPage - PREFETCH_COUNT &&
       currentPage < totalPages &&
       prefetchingRef.current.next !== currentPage + 1 &&
       nextPageImages.length === 0
@@ -160,7 +159,7 @@ export function usePaginatedLightbox({
 
     // Near start of page - prefetch previous page
     if (
-      index < PREFETCH_COUNT &&
+      trackedIndex < PREFETCH_COUNT &&
       currentPage > 1 &&
       prefetchingRef.current.prev !== currentPage - 1 &&
       prevPageImages.length === 0
@@ -178,7 +177,7 @@ export function usePaginatedLightbox({
           prefetchingRef.current.prev = null;
         });
     }
-  }, [lightboxOpen, lightboxIndex, currentPage, totalPages, perPage, fetchPage, nextPageImages.length, prevPageImages.length]);
+  }, [lightboxOpen, trackedIndex, currentPage, totalPages, perPage, fetchPage, nextPageImages.length, prevPageImages.length]);
 
   // Compute prefetch images from adjacent pages
   const prefetchImages = [...prevPageImages, ...nextPageImages];

@@ -7,6 +7,9 @@ import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
 import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import MetadataDrawer from "./MetadataDrawer.jsx";
 
+// Percentage of screen width on each side that triggers navigation on click
+const EDGE_ZONE_PERCENT = 0.15;
+
 const Lightbox = ({
   images,
   initialIndex = 0,
@@ -106,13 +109,23 @@ const Lightbox = ({
   useEffect(() => {
     if (!isOpen || prefetchImages.length === 0) return;
 
+    // Use fetch with low priority to avoid blocking the main image request
+    // AbortController lets us cancel prefetches if component unmounts or images change
+    const controller = new AbortController();
+
     prefetchImages.forEach((img) => {
       const url = img?.paths?.image || img?.paths?.preview;
       if (url) {
-        const prefetcher = new Image();
-        prefetcher.src = url;
+        fetch(url, {
+          signal: controller.signal,
+          priority: "low",
+        }).catch(() => {
+          // Silently ignore - prefetch is best-effort
+        });
       }
     });
+
+    return () => controller.abort();
   }, [isOpen, prefetchImages]);
 
   // Navigation functions with cross-page support
@@ -458,12 +471,9 @@ const Lightbox = ({
     const screenWidth = window.innerWidth;
     const clickPercent = clickX / screenWidth;
 
-    // Edge zones for navigation (15% on each side)
-    const edgeZone = 0.15;
-
-    if (clickPercent < edgeZone) {
+    if (clickPercent < EDGE_ZONE_PERCENT) {
       goToPrevious();
-    } else if (clickPercent > 1 - edgeZone) {
+    } else if (clickPercent > 1 - EDGE_ZONE_PERCENT) {
       goToNext();
     }
     // Center clicks do nothing - user must use X button or Esc to close
