@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import useRatingHotkeys from "../../hooks/useRatingHotkeys.js";
 import { libraryApi } from "../../services/api.js";
 import {
@@ -12,6 +13,8 @@ import {
 const PlaybackControls = () => {
   const { scene, sceneLoading, videoLoading, oCounter, dispatch } =
     useScenePlayer();
+  const { getSettings } = useCardDisplaySettings();
+  const sceneSettings = getSettings("scene");
 
   // Rating and favorite state
   const [rating, setRating] = useState(null);
@@ -85,43 +88,7 @@ const PlaybackControls = () => {
 
         {/* XL+ Layout: Single row */}
         <div className="hidden xl:flex xl:items-center xl:gap-4">
-          <div
-            className="flex-1 max-w-md"
-            style={{ opacity: isLoading ? 0.6 : 1 }}
-          >
-            <RatingSlider
-              rating={rating}
-              onChange={handleRatingChange}
-              label="Rating"
-              showClearButton={true}
-            />
-          </div>
-
-          <div
-            className="flex items-center gap-4 ml-auto"
-            style={{ opacity: isLoading ? 0.6 : 1 }}
-          >
-            <OCounterButton
-              sceneId={scene?.id}
-              initialCount={oCounter}
-              onChange={(newCount) =>
-                dispatch({ type: "SET_O_COUNTER", payload: newCount })
-              }
-              disabled={isLoading}
-            />
-            <FavoriteButton
-              isFavorite={isFavorite}
-              onChange={handleFavoriteChange}
-              size="medium"
-            />
-            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
-          </div>
-        </div>
-
-        {/* SM to XL Layout: Two rows */}
-        <div className="hidden sm:flex sm:flex-col xl:hidden gap-4">
-          {/* Row 1: Rating (50%) + space + O Counter + Favorite */}
-          <div className="flex items-center justify-between gap-4">
+          {sceneSettings.showRating && (
             <div
               className="flex-1 max-w-md"
               style={{ opacity: isLoading ? 0.6 : 1 }}
@@ -133,11 +100,13 @@ const PlaybackControls = () => {
                 showClearButton={true}
               />
             </div>
+          )}
 
-            <div
-              className="flex items-center gap-4"
-              style={{ opacity: isLoading ? 0.6 : 1 }}
-            >
+          <div
+            className="flex items-center gap-4 ml-auto"
+            style={{ opacity: isLoading ? 0.6 : 1 }}
+          >
+            {sceneSettings.showOCounter && (
               <OCounterButton
                 sceneId={scene?.id}
                 initialCount={oCounter}
@@ -146,11 +115,57 @@ const PlaybackControls = () => {
                 }
                 disabled={isLoading}
               />
+            )}
+            {sceneSettings.showFavorite && (
               <FavoriteButton
                 isFavorite={isFavorite}
                 onChange={handleFavoriteChange}
                 size="medium"
               />
+            )}
+            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
+          </div>
+        </div>
+
+        {/* SM to XL Layout: Two rows */}
+        <div className="hidden sm:flex sm:flex-col xl:hidden gap-4">
+          {/* Row 1: Rating (50%) + space + O Counter + Favorite */}
+          <div className="flex items-center justify-between gap-4">
+            {sceneSettings.showRating && (
+              <div
+                className="flex-1 max-w-md"
+                style={{ opacity: isLoading ? 0.6 : 1 }}
+              >
+                <RatingSlider
+                  rating={rating}
+                  onChange={handleRatingChange}
+                  label="Rating"
+                  showClearButton={true}
+                />
+              </div>
+            )}
+
+            <div
+              className="flex items-center gap-4"
+              style={{ opacity: isLoading ? 0.6 : 1 }}
+            >
+              {sceneSettings.showOCounter && (
+                <OCounterButton
+                  sceneId={scene?.id}
+                  initialCount={oCounter}
+                  onChange={(newCount) =>
+                    dispatch({ type: "SET_O_COUNTER", payload: newCount })
+                  }
+                  disabled={isLoading}
+                />
+              )}
+              {sceneSettings.showFavorite && (
+                <FavoriteButton
+                  isFavorite={isFavorite}
+                  onChange={handleFavoriteChange}
+                  size="medium"
+                />
+              )}
             </div>
           </div>
 
@@ -167,30 +182,36 @@ const PlaybackControls = () => {
             className="flex items-center justify-center gap-4"
             style={{ opacity: isLoading ? 0.6 : 1 }}
           >
-            <OCounterButton
-              sceneId={scene?.id}
-              initialCount={oCounter}
-              onChange={(newCount) =>
-                dispatch({ type: "SET_O_COUNTER", payload: newCount })
-              }
-              disabled={isLoading}
-            />
-            <FavoriteButton
-              isFavorite={isFavorite}
-              onChange={handleFavoriteChange}
-              size="medium"
-            />
+            {sceneSettings.showOCounter && (
+              <OCounterButton
+                sceneId={scene?.id}
+                initialCount={oCounter}
+                onChange={(newCount) =>
+                  dispatch({ type: "SET_O_COUNTER", payload: newCount })
+                }
+                disabled={isLoading}
+              />
+            )}
+            {sceneSettings.showFavorite && (
+              <FavoriteButton
+                isFavorite={isFavorite}
+                onChange={handleFavoriteChange}
+                size="medium"
+              />
+            )}
           </div>
 
           {/* Row 2: Rating (full width) */}
-          <div style={{ opacity: isLoading ? 0.6 : 1 }}>
-            <RatingSlider
-              rating={rating}
-              onChange={handleRatingChange}
-              label="Rating"
-              showClearButton={true}
-            />
-          </div>
+          {sceneSettings.showRating && (
+            <div style={{ opacity: isLoading ? 0.6 : 1 }}>
+              <RatingSlider
+                rating={rating}
+                onChange={handleRatingChange}
+                label="Rating"
+                showClearButton={true}
+              />
+            </div>
+          )}
 
           {/* Row 3: Add to Playlist */}
           <div className="flex items-center justify-center">

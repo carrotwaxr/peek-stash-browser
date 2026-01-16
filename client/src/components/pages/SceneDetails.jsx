@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
 
@@ -44,6 +45,8 @@ const SceneDetails = ({
   setShowTechnicalDetails,
 }) => {
   const { scene, sceneLoading, compatibility } = useScenePlayer();
+  const { getSettings } = useCardDisplaySettings();
+  const sceneSettings = getSettings("scene");
 
   // Don't render if no scene data yet
   if (!scene) {
@@ -152,7 +155,7 @@ const SceneDetails = ({
                 )}
 
                 {/* Description - Full Width */}
-                {scene.details && (
+                {sceneSettings.showDescriptionOnDetail && scene.details && (
                   <div className="mb-6">
                     <h3
                       className="text-sm font-medium mb-2"
