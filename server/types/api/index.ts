@@ -205,6 +205,7 @@ export type {
 export type {
   LibraryStats,
   EngagementStats,
+  TopScene,
   TopPerformer,
   TopStudio,
   TopTag,

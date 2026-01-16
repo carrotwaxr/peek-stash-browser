@@ -4,14 +4,53 @@ import { Link } from "react-router-dom";
 import { Paper } from "../../../ui/index.js";
 
 /**
- * Feature card for highlight stats (most watched, etc.)
+ * Extract filename from path (basename without extension)
  */
-const HighlightCard = ({ title, item, linkPrefix, statLabel, statValue }) => {
+const getFilenameFromPath = (filePath) => {
+  if (!filePath) return null;
+  const basename = filePath.split(/[\\/]/).pop() || filePath;
+  return basename.replace(/\.[^/.]+$/, ""); // Remove extension
+};
+
+/**
+ * Get display name for highlight item
+ * For scenes/images: title -> filePath basename -> "Unknown"
+ * For performers: name -> "Unknown"
+ */
+const getDisplayName = (item) => {
+  // Performers have name
+  if (item.name) return item.name;
+  // Scenes/images have title
+  if (item.title) return item.title;
+  // Fallback to file path basename for scenes/images
+  if (item.filePath) return getFilenameFromPath(item.filePath);
+  return "Unknown";
+};
+
+/**
+ * Get fallback icon for entity type
+ */
+const getFallbackIcon = (entityType) => {
+  const icons = {
+    scene: "🎬",
+    image: "🖼️",
+    performer: "👤",
+  };
+  return icons[entityType] || "📁";
+};
+
+/**
+ * Feature card for highlight stats (most watched, etc.)
+ * All cards use consistent 16/9 container height - portrait images are pillarboxed
+ * @param {string} entityType - Type of entity for fallback icon (scene, image, performer)
+ */
+const HighlightCard = ({ title, item, linkPrefix, statLabel, statValue, entityType = "scene" }) => {
   if (!item) {
     return null;
   }
 
-  const displayName = item.name || item.title || "Unknown";
+  const displayName = getDisplayName(item);
+  const fallbackIcon = getFallbackIcon(entityType);
 
   return (
     <Paper padding="none" className="overflow-hidden">
@@ -28,21 +67,34 @@ const HighlightCard = ({ title, item, linkPrefix, statLabel, statValue }) => {
       </div>
       <Link
         to={`${linkPrefix}/${item.id}`}
-        className="block hover:bg-[var(--bg-secondary)] transition-colors"
+        className="block transition-colors"
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--bg-secondary)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
       >
-        <div className="aspect-video relative overflow-hidden">
+        {/* Consistent 16/9 container for all cards - portrait images pillarboxed */}
+        <div
+          className="relative overflow-hidden flex items-center justify-center"
+          style={{
+            aspectRatio: "16/9",
+            backgroundColor: "var(--bg-secondary)",
+          }}
+        >
           {item.imageUrl ? (
             <img
-              src={`/api/proxy/stash?url=${encodeURIComponent(item.imageUrl)}`}
+              src={item.imageUrl}
               alt={displayName}
-              className="w-full h-full object-cover"
+              className="max-w-full max-h-full object-contain"
             />
           ) : (
             <div
               className="w-full h-full flex items-center justify-center"
-              style={{ backgroundColor: "var(--bg-secondary)" }}
+              style={{ color: "var(--text-muted)" }}
             >
-              <span style={{ color: "var(--text-muted)" }}>No image</span>
+              <span className="text-3xl">{fallbackIcon}</span>
             </div>
           )}
         </div>

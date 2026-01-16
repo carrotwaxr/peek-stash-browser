@@ -92,22 +92,30 @@ const UserStats = () => {
               >
                 Top Content
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <TopList
+                  title="Top Scenes"
+                  items={data.topScenes}
+                  linkPrefix="/scene"
+                  entityType="scene"
+                />
                 <TopList
                   title="Top Performers"
                   items={data.topPerformers}
                   linkPrefix="/performer"
+                  entityType="performer"
                 />
                 <TopList
                   title="Top Studios"
                   items={data.topStudios}
                   linkPrefix="/studio"
+                  entityType="studio"
                 />
                 <TopList
                   title="Top Tags"
                   items={data.topTags}
                   linkPrefix="/tag"
-                  showImage={false}
+                  entityType="tag"
                 />
               </div>
             </section>
@@ -125,6 +133,7 @@ const UserStats = () => {
                   title="Most Watched Scene"
                   item={data.mostWatchedScene}
                   linkPrefix="/scene"
+                  entityType="scene"
                   statLabel="plays"
                   statValue={data.mostWatchedScene?.playCount || 0}
                 />
@@ -132,6 +141,7 @@ const UserStats = () => {
                   title="Most Viewed Image"
                   item={data.mostViewedImage}
                   linkPrefix="/image"
+                  entityType="image"
                   statLabel="views"
                   statValue={data.mostViewedImage?.viewCount || 0}
                 />
@@ -139,6 +149,7 @@ const UserStats = () => {
                   title="Most O'd Scene"
                   item={data.mostOdScene}
                   linkPrefix="/scene"
+                  entityType="scene"
                   statLabel="Os"
                   statValue={data.mostOdScene?.oCount || 0}
                 />
@@ -146,6 +157,7 @@ const UserStats = () => {
                   title="Most O'd Performer"
                   item={data.mostOdPerformer}
                   linkPrefix="/performer"
+                  entityType="performer"
                   statLabel="Os"
                   statValue={data.mostOdPerformer?.oCount || 0}
                 />

@@ -5,6 +5,7 @@ import type {
   UserStatsResponse,
   LibraryStats,
   EngagementStats,
+  TopScene,
   TopPerformer,
   TopStudio,
   TopTag,
@@ -12,6 +13,34 @@ import type {
   HighlightImage,
   HighlightPerformer,
 } from "../types/api/index.js";
+
+/**
+ * Transform a Stash URL/path to a proxy URL
+ * All Stash URLs must be proxied to avoid leaking the API key to clients
+ */
+function transformUrl(urlOrPath: string | null): string | null {
+  if (!urlOrPath) return null;
+
+  // If it's already a proxy URL, return as-is
+  if (urlOrPath.startsWith("/api/proxy/stash")) {
+    return urlOrPath;
+  }
+
+  // If it's a full URL (http://...), extract path + query
+  if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
+    try {
+      const url = new URL(urlOrPath);
+      const pathWithQuery = url.pathname + url.search;
+      return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+    } catch {
+      // If URL parsing fails, treat as path
+      return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    }
+  }
+
+  // Otherwise treat as path and encode it
+  return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+}
 
 class UserStatsAggregationService {
   /**
@@ -22,6 +51,7 @@ class UserStatsAggregationService {
     const [
       library,
       engagement,
+      topScenes,
       topPerformers,
       topStudios,
       topTags,
@@ -32,6 +62,7 @@ class UserStatsAggregationService {
     ] = await Promise.all([
       this.getLibraryStats(userId),
       this.getEngagementStats(userId),
+      this.getTopScenes(userId, 5),
       this.getTopPerformers(userId, 5),
       this.getTopStudios(userId, 5),
       this.getTopTags(userId, 5),
@@ -44,6 +75,7 @@ class UserStatsAggregationService {
     return {
       library,
       engagement,
+      topScenes,
       topPerformers,
       topStudios,
       topTags,
@@ -135,28 +167,94 @@ class UserStatsAggregationService {
   }
 
   /**
+   * Get top scenes by play count (exclusion-aware)
+   */
+  private async getTopScenes(
+    userId: number,
+    limit: number
+  ): Promise<TopScene[]> {
+    const stats = await prisma.$queryRaw<
+      Array<{
+        sceneId: string;
+        playCount: number;
+        playDuration: number;
+        oCount: number;
+      }>
+    >`
+      SELECT
+        w.sceneId,
+        w.playCount,
+        w.playDuration,
+        w.oCount
+      FROM WatchHistory w
+      LEFT JOIN UserExcludedEntity e
+        ON e.userId = ${userId}
+        AND e.entityType = 'scene'
+        AND e.entityId = w.sceneId
+      WHERE w.userId = ${userId}
+        AND e.id IS NULL
+        AND w.playCount > 0
+      ORDER BY w.playCount DESC
+      LIMIT ${limit}
+    `;
+
+    if (stats.length === 0) return [];
+
+    // Fetch scene details
+    const scenes = await prisma.stashScene.findMany({
+      where: { id: { in: stats.map((s) => s.sceneId) } },
+      select: { id: true, title: true, filePath: true, pathScreenshot: true },
+    });
+
+    const sceneMap = new Map(scenes.map((s) => [s.id, s]));
+
+    return stats.map((s) => {
+      const scene = sceneMap.get(s.sceneId);
+      return {
+        id: s.sceneId,
+        title: scene?.title ?? null,
+        filePath: scene?.filePath ?? null,
+        imageUrl: transformUrl(scene?.pathScreenshot ?? null),
+        playCount: s.playCount,
+        playDuration: Math.round(s.playDuration),
+        oCount: s.oCount,
+      };
+    });
+  }
+
+  /**
    * Get top performers by play count (exclusion-aware)
+   * Aggregates playDuration from WatchHistory via ScenePerformer join
    */
   private async getTopPerformers(
     userId: number,
     limit: number
   ): Promise<TopPerformer[]> {
+    // Get top performers with aggregated playDuration from WatchHistory
     const stats = await prisma.$queryRaw<
       Array<{
         performerId: string;
         playCount: number;
         oCounter: number;
+        playDuration: number;
       }>
     >`
       SELECT
         ups.performerId,
         ups.playCount,
-        ups.oCounter
+        ups.oCounter,
+        COALESCE(dur.totalDuration, 0) as playDuration
       FROM UserPerformerStats ups
       LEFT JOIN UserExcludedEntity e
         ON e.userId = ${userId}
         AND e.entityType = 'performer'
         AND e.entityId = ups.performerId
+      LEFT JOIN (
+        SELECT sp.performerId, SUM(w.playDuration) as totalDuration
+        FROM ScenePerformer sp
+        JOIN WatchHistory w ON w.sceneId = sp.sceneId AND w.userId = ${userId}
+        GROUP BY sp.performerId
+      ) dur ON dur.performerId = ups.performerId
       WHERE ups.userId = ${userId}
         AND e.id IS NULL
         AND ups.playCount > 0
@@ -179,8 +277,9 @@ class UserStatsAggregationService {
       return {
         id: s.performerId,
         name: performer?.name ?? "Unknown",
-        imageUrl: performer?.imagePath ?? null,
+        imageUrl: transformUrl(performer?.imagePath ?? null),
         playCount: s.playCount,
+        playDuration: Math.round(Number(s.playDuration) || 0),
         oCount: s.oCounter,
       };
     });
@@ -188,6 +287,7 @@ class UserStatsAggregationService {
 
   /**
    * Get top studios by play count (exclusion-aware)
+   * Aggregates playDuration from WatchHistory via StashScene.studioId
    */
   private async getTopStudios(
     userId: number,
@@ -198,17 +298,26 @@ class UserStatsAggregationService {
         studioId: string;
         playCount: number;
         oCounter: number;
+        playDuration: number;
       }>
     >`
       SELECT
         uss.studioId,
         uss.playCount,
-        uss.oCounter
+        uss.oCounter,
+        COALESCE(dur.totalDuration, 0) as playDuration
       FROM UserStudioStats uss
       LEFT JOIN UserExcludedEntity e
         ON e.userId = ${userId}
         AND e.entityType = 'studio'
         AND e.entityId = uss.studioId
+      LEFT JOIN (
+        SELECT s.studioId, SUM(w.playDuration) as totalDuration
+        FROM StashScene s
+        JOIN WatchHistory w ON w.sceneId = s.id AND w.userId = ${userId}
+        WHERE s.studioId IS NOT NULL
+        GROUP BY s.studioId
+      ) dur ON dur.studioId = uss.studioId
       WHERE uss.userId = ${userId}
         AND e.id IS NULL
         AND uss.playCount > 0
@@ -231,8 +340,9 @@ class UserStatsAggregationService {
       return {
         id: s.studioId,
         name: studio?.name ?? "Unknown",
-        imageUrl: studio?.imagePath ?? null,
+        imageUrl: transformUrl(studio?.imagePath ?? null),
         playCount: s.playCount,
+        playDuration: Math.round(Number(s.playDuration) || 0),
         oCount: s.oCounter,
       };
     });
@@ -240,6 +350,7 @@ class UserStatsAggregationService {
 
   /**
    * Get top tags by play count (exclusion-aware)
+   * Aggregates playDuration from WatchHistory via SceneTag join
    */
   private async getTopTags(userId: number, limit: number): Promise<TopTag[]> {
     const stats = await prisma.$queryRaw<
@@ -247,17 +358,25 @@ class UserStatsAggregationService {
         tagId: string;
         playCount: number;
         oCounter: number;
+        playDuration: number;
       }>
     >`
       SELECT
         uts.tagId,
         uts.playCount,
-        uts.oCounter
+        uts.oCounter,
+        COALESCE(dur.totalDuration, 0) as playDuration
       FROM UserTagStats uts
       LEFT JOIN UserExcludedEntity e
         ON e.userId = ${userId}
         AND e.entityType = 'tag'
         AND e.entityId = uts.tagId
+      LEFT JOIN (
+        SELECT st.tagId, SUM(w.playDuration) as totalDuration
+        FROM SceneTag st
+        JOIN WatchHistory w ON w.sceneId = st.sceneId AND w.userId = ${userId}
+        GROUP BY st.tagId
+      ) dur ON dur.tagId = uts.tagId
       WHERE uts.userId = ${userId}
         AND e.id IS NULL
         AND uts.playCount > 0
@@ -270,7 +389,7 @@ class UserStatsAggregationService {
     // Fetch tag details
     const tags = await prisma.stashTag.findMany({
       where: { id: { in: stats.map((s) => s.tagId) } },
-      select: { id: true, name: true },
+      select: { id: true, name: true, imagePath: true },
     });
 
     const tagMap = new Map(tags.map((t) => [t.id, t]));
@@ -280,7 +399,9 @@ class UserStatsAggregationService {
       return {
         id: s.tagId,
         name: tag?.name ?? "Unknown",
+        imageUrl: transformUrl(tag?.imagePath ?? null),
         playCount: s.playCount,
+        playDuration: Math.round(Number(s.playDuration) || 0),
         oCount: s.oCounter,
       };
     });
@@ -317,15 +438,16 @@ class UserStatsAggregationService {
 
     const scene = await prisma.stashScene.findUnique({
       where: { id: result[0].sceneId },
-      select: { id: true, title: true, pathScreenshot: true },
+      select: { id: true, title: true, filePath: true, pathScreenshot: true },
     });
 
     if (!scene) return null;
 
     return {
       id: scene.id,
-      title: scene.title ?? "Untitled",
-      imageUrl: scene.pathScreenshot ?? null,
+      title: scene.title ?? null,
+      filePath: scene.filePath ?? null,
+      imageUrl: transformUrl(scene.pathScreenshot),
       playCount: result[0].playCount,
     };
   }
@@ -361,7 +483,7 @@ class UserStatsAggregationService {
 
     const image = await prisma.stashImage.findUnique({
       where: { id: result[0].imageId },
-      select: { id: true, title: true, pathThumbnail: true },
+      select: { id: true, title: true, filePath: true, pathThumbnail: true },
     });
 
     if (!image) return null;
@@ -369,7 +491,8 @@ class UserStatsAggregationService {
     return {
       id: image.id,
       title: image.title ?? null,
-      imageUrl: image.pathThumbnail ?? null,
+      filePath: image.filePath ?? null,
+      imageUrl: transformUrl(image.pathThumbnail),
       viewCount: result[0].viewCount,
     };
   }
@@ -403,15 +526,16 @@ class UserStatsAggregationService {
 
     const scene = await prisma.stashScene.findUnique({
       where: { id: result[0].sceneId },
-      select: { id: true, title: true, pathScreenshot: true },
+      select: { id: true, title: true, filePath: true, pathScreenshot: true },
     });
 
     if (!scene) return null;
 
     return {
       id: scene.id,
-      title: scene.title ?? "Untitled",
-      imageUrl: scene.pathScreenshot ?? null,
+      title: scene.title ?? null,
+      filePath: scene.filePath ?? null,
+      imageUrl: transformUrl(scene.pathScreenshot),
       oCount: result[0].oCount,
     };
   }
@@ -455,7 +579,7 @@ class UserStatsAggregationService {
     return {
       id: performer.id,
       name: performer.name ?? "Unknown",
-      imageUrl: performer.imagePath ?? null,
+      imageUrl: transformUrl(performer.imagePath),
       oCount: result[0].oCounter,
     };
   }

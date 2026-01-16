@@ -41,6 +41,19 @@ export interface EngagementStats {
 // =============================================================================
 
 /**
+ * A scene ranked by engagement
+ */
+export interface TopScene {
+  id: string;
+  title: string | null;
+  filePath: string | null; // For title fallback (basename)
+  imageUrl: string | null;
+  playCount: number;
+  playDuration: number; // seconds
+  oCount: number;
+}
+
+/**
  * A performer ranked by engagement
  */
 export interface TopPerformer {
@@ -48,6 +61,7 @@ export interface TopPerformer {
   name: string;
   imageUrl: string | null;
   playCount: number;
+  playDuration: number; // seconds
   oCount: number;
 }
 
@@ -59,6 +73,7 @@ export interface TopStudio {
   name: string;
   imageUrl: string | null;
   playCount: number;
+  playDuration: number; // seconds
   oCount: number;
 }
 
@@ -68,7 +83,9 @@ export interface TopStudio {
 export interface TopTag {
   id: string;
   name: string;
+  imageUrl: string | null;
   playCount: number;
+  playDuration: number; // seconds
   oCount: number;
 }
 
@@ -81,7 +98,8 @@ export interface TopTag {
  */
 export interface HighlightScene {
   id: string;
-  title: string;
+  title: string | null;
+  filePath: string | null; // For title fallback (basename)
   imageUrl: string | null;
   playCount?: number;
   oCount?: number;
@@ -93,6 +111,7 @@ export interface HighlightScene {
 export interface HighlightImage {
   id: string;
   title: string | null;
+  filePath: string | null; // For title fallback (basename)
   imageUrl: string | null;
   viewCount: number;
 }
@@ -118,6 +137,7 @@ export interface HighlightPerformer {
 export interface UserStatsResponse {
   library: LibraryStats;
   engagement: EngagementStats;
+  topScenes: TopScene[];
   topPerformers: TopPerformer[];
   topStudios: TopStudio[];
   topTags: TopTag[];
