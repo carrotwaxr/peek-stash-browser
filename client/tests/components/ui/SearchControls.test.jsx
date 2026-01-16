@@ -32,6 +32,21 @@ vi.mock("../../../src/contexts/UnitPreferenceContext.js", () => ({
   useUnitPreference: () => ({ unitPreference: "metric" }),
 }));
 
+vi.mock("../../../src/contexts/CardDisplaySettingsContext.jsx", () => ({
+  useCardDisplaySettings: () => ({
+    getSettings: () => ({
+      showCodeOnCard: true,
+      showDescriptionOnCard: true,
+      showDescriptionOnDetail: true,
+      showRating: true,
+      showFavorite: true,
+      showOCounter: true,
+    }),
+    updateSettings: vi.fn(),
+    isLoading: false,
+  }),
+}));
+
 // Mock useFilterState to provide controllable state
 vi.mock("../../../src/hooks/useFilterState.js", () => ({
   useFilterState: () => mockFilterState,
