@@ -1,8 +1,13 @@
 /**
- * Skeleton loading card that matches SceneCard structure
+ * Skeleton loading card that matches BaseCard structure
  * Used in carousels and grids while data is loading
  */
-const SkeletonSceneCard = () => {
+const SkeletonSceneCard = ({ entityType = "scene" }) => {
+  // Match aspect ratio logic from useEntityImageAspectRatio
+  const aspectRatio = ["performer", "gallery", "group"].includes(entityType)
+    ? "2/3"
+    : "16/9";
+
   return (
     <div
       className="relative rounded-lg border overflow-hidden"
@@ -12,33 +17,17 @@ const SkeletonSceneCard = () => {
         borderWidth: "1px",
       }}
     >
-      {/* Thumbnail skeleton */}
+      {/* Image skeleton */}
       <div
-        className="relative aspect-video animate-pulse"
-        style={{ backgroundColor: "var(--bg-tertiary)" }}
-      >
-        {/* Checkbox placeholder */}
-        <div
-          className="absolute top-2 left-2 w-6 h-6 rounded border-2 animate-pulse"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.3)",
-            borderColor: "rgba(255, 255, 255, 0.3)",
-          }}
-        />
-
-        {/* Play duration badge placeholder */}
-        <div
-          className="absolute bottom-2 right-2 px-2 py-1 rounded animate-pulse"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            width: "4rem",
-            height: "1.5rem",
-          }}
-        />
-      </div>
+        className="relative animate-pulse"
+        style={{
+          aspectRatio,
+          backgroundColor: "var(--bg-tertiary)",
+        }}
+      />
 
       {/* Card content */}
-      <div className="p-3 space-y-3">
+      <div className="p-3 space-y-2">
         {/* Title skeleton */}
         <div
           className="h-5 rounded animate-pulse"
@@ -48,151 +37,88 @@ const SkeletonSceneCard = () => {
           }}
         />
 
-        {/* Stats row skeleton */}
-        <div className="flex items-center gap-3">
-          {/* Rating skeleton */}
-          <div
-            className="h-4 rounded animate-pulse"
-            style={{
-              backgroundColor: "var(--bg-tertiary)",
-              width: "3rem",
-            }}
-          />
+        {/* Subtitle skeleton */}
+        <div
+          className="h-4 rounded animate-pulse"
+          style={{
+            backgroundColor: "var(--bg-tertiary)",
+            width: "60%",
+          }}
+        />
 
-          {/* Dot separator */}
-          <div
-            className="w-1 h-1 rounded-full"
-            style={{ backgroundColor: "var(--text-muted)" }}
-          />
-
-          {/* Duration skeleton */}
-          <div
-            className="h-4 rounded animate-pulse"
-            style={{
-              backgroundColor: "var(--bg-tertiary)",
-              width: "4rem",
-            }}
-          />
-
-          {/* Dot separator */}
-          <div
-            className="w-1 h-1 rounded-full"
-            style={{ backgroundColor: "var(--text-muted)" }}
-          />
-
-          {/* Date skeleton */}
-          <div
-            className="h-4 rounded animate-pulse"
-            style={{
-              backgroundColor: "var(--bg-tertiary)",
-              width: "5rem",
-            }}
-          />
-        </div>
-
-        {/* Metadata rows skeleton (performers, studio, tags) */}
-        <div className="space-y-2">
-          {/* Performers */}
-          <div className="flex gap-2">
-            <div
-              className="h-3 rounded animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                width: "4rem",
-              }}
-            />
-            <div
-              className="h-3 rounded animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                width: "5rem",
-              }}
-            />
-          </div>
-
-          {/* Studio */}
+        {/* Description skeleton (2 lines) */}
+        <div className="space-y-1">
           <div
             className="h-3 rounded animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "6rem",
+              width: "100%",
             }}
           />
-
-          {/* Tags */}
-          <div className="flex gap-2">
-            <div
-              className="h-3 rounded animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                width: "3rem",
-              }}
-            />
-            <div
-              className="h-3 rounded animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                width: "4rem",
-              }}
-            />
-            <div
-              className="h-3 rounded animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-                width: "3.5rem",
-              }}
-            />
-          </div>
+          <div
+            className="h-3 rounded animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              width: "75%",
+            }}
+          />
         </div>
 
-        {/* Quality badges skeleton */}
-        <div className="flex gap-2 pt-1">
+        {/* Indicators skeleton - matches CardIndicators height */}
+        <div
+          className="flex items-center gap-2"
+          style={{ height: "3.5rem" }}
+        >
           <div
-            className="h-5 rounded animate-pulse"
+            className="h-6 rounded-full animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
               width: "3rem",
             }}
           />
           <div
-            className="h-5 rounded animate-pulse"
+            className="h-6 rounded-full animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "2.5rem",
+              width: "3rem",
+            }}
+          />
+          <div
+            className="h-6 rounded-full animate-pulse"
+            style={{
+              backgroundColor: "var(--bg-tertiary)",
+              width: "3rem",
             }}
           />
         </div>
 
-        {/* Rating controls row skeleton (Rating Badge + O Counter + Favorite) */}
+        {/* Rating controls row skeleton - matches CardRatingRow height */}
         <div
-          className="flex justify-between items-center w-full my-1"
+          className="flex justify-between items-center w-full"
           style={{ height: "2rem" }}
         >
-          {/* Rating badge placeholder (left) */}
+          {/* Rating badge placeholder */}
           <div
-            className="h-7 rounded-full px-3 animate-pulse"
+            className="h-6 rounded-full animate-pulse"
             style={{
               backgroundColor: "var(--bg-tertiary)",
-              width: "4rem",
+              width: "3.5rem",
             }}
           />
 
-          {/* Right side: O Counter + Favorite */}
+          {/* Right side: O Counter + Favorite + Menu */}
           <div className="flex items-center gap-2">
-            {/* O Counter button placeholder */}
             <div
-              className="h-7 w-7 rounded-full animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-              }}
+              className="h-6 w-6 rounded-full animate-pulse"
+              style={{ backgroundColor: "var(--bg-tertiary)" }}
             />
-
-            {/* Favorite heart placeholder */}
             <div
-              className="h-7 w-7 rounded-full animate-pulse"
-              style={{
-                backgroundColor: "var(--bg-tertiary)",
-              }}
+              className="h-6 w-6 rounded-full animate-pulse"
+              style={{ backgroundColor: "var(--bg-tertiary)" }}
+            />
+            <div
+              className="h-6 w-6 rounded-full animate-pulse"
+              style={{ backgroundColor: "var(--bg-tertiary)" }}
             />
           </div>
         </div>
