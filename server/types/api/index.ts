@@ -200,3 +200,17 @@ export type {
   ResetSetupRequest,
   ResetSetupResponse,
 } from "./setup.js";
+
+// User Stats endpoint types
+export type {
+  LibraryStats,
+  EngagementStats,
+  TopScene,
+  TopPerformer,
+  TopStudio,
+  TopTag,
+  HighlightScene,
+  HighlightImage,
+  HighlightPerformer,
+  UserStatsResponse,
+} from "./userStats.js";
