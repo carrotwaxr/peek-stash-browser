@@ -31,6 +31,7 @@ import exclusionsRoutes from "../routes/exclusions.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
+import userStatsRoutes from "../routes/userStats.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -125,6 +126,9 @@ export const setupAPI = () => {
 
   // Watch history routes (protected)
   app.use("/api/watch-history", watchHistoryRoutes);
+
+  // User stats routes (protected)
+  app.use("/api/user-stats", userStatsRoutes);
 
   // Image view history routes (protected)
   app.use("/api/image-view-history", imageViewHistoryRoutes);
