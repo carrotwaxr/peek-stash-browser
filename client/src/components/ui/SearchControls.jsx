@@ -814,6 +814,7 @@ const SearchControls = ({
           className={searchZoneNav.isFocused(7) ? "keyboard-focus" : ""}
         >
           <ContextSettings
+            entityType={artifactType}
             settings={contextSettings}
             currentValues={{ wallPlayback }}
             onSettingChange={(key, value) => {
