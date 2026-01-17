@@ -7,9 +7,9 @@ import { useEffect, useRef, useState } from "react";
  * Triggered by hover (desktop) or scroll into view (mobile).
  *
  * Animation timing (based on UX best practices):
- * - Speed: ~40 pixels/second for comfortable reading
- * - Initial delay: 0.5s before scrolling starts
- * - End pause: 0.5s before resetting
+ * - Speed: ~30 pixels/second for relaxed reading
+ * - Initial pause: ~15% of animation duration
+ * - End pause: ~20% of animation duration
  *
  * Accessibility:
  * - Respects prefers-reduced-motion
@@ -18,14 +18,12 @@ import { useEffect, useRef, useState } from "react";
  * @param {string} children - Text content to display
  * @param {string} className - Additional CSS classes for the text element
  * @param {Object} style - Additional inline styles for the text element
- * @param {string} as - HTML element to render (default: "span")
  * @param {boolean} autoplayOnScroll - Enable scroll-based autoplay for mobile (default: true)
  */
 const MarqueeText = ({
   children,
   className = "",
   style = {},
-  as: Component = "span",
   autoplayOnScroll = true,
 }) => {
   const containerRef = useRef(null);
@@ -115,14 +113,14 @@ const MarqueeText = ({
   }, [isHovering, isInView, isOverflowing, hasHoverCapability, autoplayOnScroll, prefersReducedMotion]);
 
   // Calculate animation duration based on overflow amount
-  // Target: ~40 pixels/second for comfortable reading
-  const pixelsPerSecond = 40;
+  // Target: ~30 pixels/second for comfortable, relaxed reading
+  const pixelsPerSecond = 30;
   const scrollDuration = overflowAmount / pixelsPerSecond;
-  // Add delays: 0.5s initial + 0.5s at end
-  const totalDuration = scrollDuration + 1;
+  // Add delays: 1s initial pause + 1s end pause
+  const totalDuration = scrollDuration + 2;
 
-  // Animation keyframes as inline style
-  // Scroll left by overflow amount, pause at each end
+  // Animation uses keyframes defined in index.css
+  // CSS variable --marquee-distance is set per-instance for the scroll amount
   const animationStyle = isAnimating && isOverflowing ? {
     animation: `marquee-scroll ${totalDuration}s ease-in-out infinite`,
     "--marquee-distance": `-${overflowAmount}px`,
@@ -135,7 +133,7 @@ const MarqueeText = ({
       onMouseEnter={() => hasHoverCapability && setIsHovering(true)}
       onMouseLeave={() => hasHoverCapability && setIsHovering(false)}
     >
-      <Component
+      <span
         ref={textRef}
         className={`inline-block ${className}`}
         style={{
@@ -144,22 +142,7 @@ const MarqueeText = ({
         }}
       >
         {children}
-      </Component>
-
-      {/* CSS keyframes injected via style tag */}
-      <style>{`
-        @keyframes marquee-scroll {
-          0%, 10% {
-            transform: translate3d(0, 0, 0);
-          }
-          45%, 55% {
-            transform: translate3d(var(--marquee-distance), 0, 0);
-          }
-          90%, 100% {
-            transform: translate3d(0, 0, 0);
-          }
-        }
-      `}</style>
+      </span>
     </div>
   );
 };
