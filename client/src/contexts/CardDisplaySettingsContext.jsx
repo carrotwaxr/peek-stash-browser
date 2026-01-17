@@ -1,32 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { getDefaultSettings } from "../config/entityDisplayConfig.js";
 
 const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
-
-// Default settings - all features ON
-const DEFAULT_ENTITY_SETTINGS = {
-  showDescriptionOnCard: true,
-  showDescriptionOnDetail: true,
-  showRating: true,
-  showFavorite: true,
-  showOCounter: true,
-};
-
-const DEFAULT_SCENE_SETTINGS = {
-  ...DEFAULT_ENTITY_SETTINGS,
-  showCodeOnCard: true,
-};
-
-const getDefaultSettings = (entityType) => {
-  if (entityType === "scene") {
-    return DEFAULT_SCENE_SETTINGS;
-  }
-  return DEFAULT_ENTITY_SETTINGS;
-};
 
 const CardDisplaySettingsContext = createContext(null);
 
@@ -49,7 +29,7 @@ export const CardDisplaySettingsProvider = ({ children }) => {
     loadSettings();
   }, []);
 
-  // Get settings for a specific entity type (with defaults)
+  // Get settings for a specific entity type (with defaults from shared config)
   const getSettings = useCallback((entityType) => {
     const defaults = getDefaultSettings(entityType);
     const entitySettings = settings[entityType] || {};
