@@ -49,6 +49,9 @@ model User {
   imageRatings     ImageRating[]
   imageViewHistory ImageViewHistory[]
 
+  // Merge reconciliation audit records
+  mergeRecords MergeRecord[]
+
   // Content restrictions
   contentRestrictions UserContentRestriction[]
 
@@ -987,4 +990,37 @@ model SyncSettings {
   enablePluginWebhook    Boolean @default(false) // Accept webhook from Stash plugin
 
   updatedAt DateTime @updatedAt
+}
+
+// ============================================================================
+// Merge Reconciliation
+// ============================================================================
+
+model MergeRecord {
+  id              String   @id @default(uuid())
+  sourceSceneId   String // The scene that was merged away (soft-deleted)
+  targetSceneId   String // The scene it was merged into (survivor)
+  matchedByPhash  String? // The phash that linked them (null if manual)
+
+  // User data that was transferred
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Transfer details
+  playCountTransferred    Int     @default(0)
+  playDurationTransferred Float   @default(0)
+  oCountTransferred       Int     @default(0)
+  ratingTransferred       Int?
+  favoriteTransferred     Boolean @default(false)
+
+  // Audit
+  reconciledAt DateTime @default(now())
+  reconciledBy Int? // Admin user ID (null if automatic)
+  automatic    Boolean  @default(true) // true = sync-time, false = manual
+
+  createdAt DateTime @default(now())
+
+  @@index([sourceSceneId])
+  @@index([targetSceneId])
+  @@index([userId])
 }
