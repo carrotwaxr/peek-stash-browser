@@ -513,6 +513,10 @@ model StashScene {
   // === Inherited tags (denormalized for filtering) ===
   inheritedTagIds String? // JSON array of tag IDs from performers, studio, groups
 
+  // === Fingerprint data (for merge detection) ===
+  phash   String? // Primary perceptual hash (from first file)
+  phashes String? // JSON array of all phashes if scene has multiple files
+
   // === Junction table relations ===
   performers ScenePerformer[]
   tags       SceneTag[]
@@ -528,6 +532,7 @@ model StashScene {
   @@index([deletedAt])
   @@index([oCounter])
   @@index([playCount])
+  @@index([phash])
   // Compound indexes for efficient browse queries (deletedAt filter + sort)
   @@index([deletedAt, stashCreatedAt(sort: Desc)], map: "StashScene_browse_idx")
   @@index([deletedAt, stashUpdatedAt(sort: Desc)], map: "StashScene_browse_updated_idx")
