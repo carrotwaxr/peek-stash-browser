@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList } from "lucide-react";
 
 // Default modes for backward compatibility
@@ -23,6 +24,19 @@ const MODE_ICONS = {
  * @param {function} onChange - Called with mode id when selection changes
  */
 const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => {
+  // Local state for immediate visual feedback (optimistic update)
+  const [localValue, setLocalValue] = useState(value);
+
+  // Sync local state when parent value changes (authoritative)
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleClick = (modeId) => {
+    setLocalValue(modeId); // Immediate visual feedback
+    onChange(modeId);       // Trigger parent update
+  };
+
   // Use custom modes or fall back to defaults
   const effectiveModes = modes
     ? modes.map((mode) => ({
@@ -43,15 +57,15 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => 
         <button
           key={mode.id}
           type="button"
-          onClick={() => onChange(mode.id)}
+          onClick={() => handleClick(mode.id)}
           className="px-2.5 h-full transition-colors flex items-center justify-center"
           style={{
-            backgroundColor: value === mode.id ? "var(--accent-primary)" : "transparent",
-            color: value === mode.id ? "white" : "var(--text-secondary)",
+            backgroundColor: localValue === mode.id ? "var(--accent-primary)" : "transparent",
+            color: localValue === mode.id ? "white" : "var(--text-secondary)",
           }}
           title={mode.label}
           aria-label={mode.label}
-          aria-pressed={value === mode.id}
+          aria-pressed={localValue === mode.id}
         >
           <mode.icon size={18} />
         </button>
