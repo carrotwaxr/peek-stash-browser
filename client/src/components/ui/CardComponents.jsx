@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
 import { libraryApi } from "../../services/api";
@@ -10,8 +10,8 @@ import HideConfirmationDialog from "./HideConfirmationDialog.jsx";
 import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
-import Tooltip from "./Tooltip";
 import { ExpandableDescription } from "./ExpandableDescription.jsx";
+import MarqueeText from "./MarqueeText.jsx";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard
@@ -43,8 +43,6 @@ export const CardContainer = forwardRef(
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
-          minHeight: "20rem", // 320px
-          maxHeight: "36rem", // 576px
           ...style,
         }}
         onClick={onClick}
@@ -305,48 +303,43 @@ export const CardOverlay = ({ position = "bottom-left", children, className = ""
 };
 
 /**
- * Card title section with configurable line clamping and tooltips
- * @param {string|ReactNode} title - Title content (if ReactNode, tooltip won't be added)
+ * Card title section with auto-scrolling marquee for overflowing text
+ * Single line titles that scroll horizontally when text overflows.
+ * Replaces tooltip hover behavior with animated reveal.
+ *
+ * @param {string|ReactNode} title - Title content (if ReactNode, marquee won't apply)
  * @param {string} subtitle - Optional subtitle
  * @param {boolean} hideSubtitle - Whether to hide subtitle (default: false)
- * @param {number} maxTitleLines - Maximum lines for title (default: 1)
  * @param {string} [linkTo] - Navigation link URL
-  * @param {string} [fromPageTitle] - Page title for back navigation context
+ * @param {string} [fromPageTitle] - Page title for back navigation context
  * @param {Function} [onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 export const CardTitle = ({
   title,
   subtitle,
   hideSubtitle = false,
-  maxTitleLines = 1,
   linkTo,
   fromPageTitle,
   onClickOverride,
 }) => {
-  // Calculate fixed height based on line count
-  // Each line is approximately 1.25rem (20px) with leading-tight
-  const titleHeight = useMemo(() => {
-    return `${maxTitleLines * 1.25}rem`;
-  }, [maxTitleLines]);
-
   const titleIsString = typeof title === "string";
 
-  const titleElement = (
-    <h3
-      className="font-semibold leading-tight text-center"
-      style={{
-        color: "var(--text-primary)",
-        height: titleHeight,
-        display: "-webkit-box",
-        WebkitLineClamp: maxTitleLines,
-        WebkitBoxOrient: "vertical",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        overflowWrap: "break-word",
-      }}
+  // String titles use MarqueeText for auto-scroll on overflow
+  const titleElement = titleIsString ? (
+    <MarqueeText
+      className="font-semibold leading-tight"
+      style={{ color: "var(--text-primary)" }}
     >
       {title}
-    </h3>
+    </MarqueeText>
+  ) : (
+    // ReactNode titles (like PerformerCard with gender icon) render as-is
+    <div
+      className="font-semibold leading-tight text-center overflow-hidden whitespace-nowrap text-ellipsis"
+      style={{ color: "var(--text-primary)" }}
+    >
+      {title}
+    </div>
   );
 
   // Wrap in Link if linkTo provided
@@ -363,24 +356,18 @@ export const CardTitle = ({
     titleElement
   );
 
-  // Subtitle also becomes a link if linkTo provided
-  const subtitleElement = !hideSubtitle && (
-    <h4
-      className="text-sm leading-tight text-center"
-      style={{
-        color: "var(--text-muted)",
-        height: "1.25rem", // Always reserve space for subtitle
-        display: "-webkit-box",
-        WebkitLineClamp: 1,
-        WebkitBoxOrient: "vertical",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-      }}
-      title={subtitle}
+  // Only render subtitle when it has content and isn't hidden
+  const shouldShowSubtitle = !hideSubtitle && subtitle;
+
+  // Subtitle also uses MarqueeText for consistency
+  const subtitleElement = shouldShowSubtitle ? (
+    <MarqueeText
+      className="text-sm leading-tight"
+      style={{ color: "var(--text-muted)" }}
     >
       {subtitle}
-    </h4>
-  );
+    </MarqueeText>
+  ) : null;
 
   const subtitleContent = linkTo && subtitleElement ? (
     <Link
@@ -397,13 +384,7 @@ export const CardTitle = ({
 
   return (
     <div className="w-full text-center mb-2">
-      {titleIsString ? (
-        <Tooltip content={title} disabled={!title || title.length < 30}>
-          {titleContent}
-        </Tooltip>
-      ) : (
-        titleContent
-      )}
+      {titleContent}
       {subtitleContent}
     </div>
   );
@@ -421,18 +402,98 @@ export const CardDescription = ({ description, maxLines = 3 }) => {
 };
 
 /**
- * Card indicators section (always fixed height for consistency)
+ * Card indicators section - renders indicators with optional menu on the right
+ * @param {Array} indicators - Array of indicator objects
+ * @param {React.ReactNode} menuComponent - Optional menu component to render on the right
  */
-export const CardIndicators = ({ indicators }) => {
+export const CardIndicators = ({ indicators, menuComponent }) => {
+  const hasIndicators = indicators && indicators.length > 0;
+
+  // Don't render anything if no indicators and no menu
+  if (!hasIndicators && !menuComponent) {
+    return null;
+  }
+
   return (
-    <div className="my-2 w-full" style={{ height: "3.5rem" }}>
-      {indicators && <CardCountIndicators indicators={indicators} />}
+    <div className="my-2 w-full flex items-center">
+      <div className="flex-1">
+        {hasIndicators && <CardCountIndicators indicators={indicators} />}
+      </div>
+      {menuComponent && (
+        <div className="flex-shrink-0 ml-2">
+          {menuComponent}
+        </div>
+      )}
     </div>
   );
 };
 
 /**
- * Card rating and favorite row (always fixed height for consistency)
+ * Standalone menu row - used when menu should appear without rating controls
+ * Renders just the ellipsis menu on its own row
+ */
+export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }) => {
+  const [hideDialogOpen, setHideDialogOpen] = useState(false);
+  const [pendingHide, setPendingHide] = useState(null);
+  const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
+
+  const handleHideClick = async (hideInfo) => {
+    if (hideConfirmationDisabled) {
+      const success = await hideEntity({
+        ...hideInfo,
+        skipConfirmation: true,
+      });
+      if (success) {
+        onHideSuccess?.(entityId, entityType);
+      }
+    } else {
+      setPendingHide(hideInfo);
+      setHideDialogOpen(true);
+    }
+  };
+
+  const handleHideConfirm = async (dontAskAgain) => {
+    if (!pendingHide) return;
+    const success = await hideEntity({
+      ...pendingHide,
+      skipConfirmation: dontAskAgain,
+    });
+    setHideDialogOpen(false);
+    setPendingHide(null);
+    if (success) {
+      onHideSuccess?.(entityId, entityType);
+    }
+  };
+
+  return (
+    <>
+      <div
+        className="flex justify-end items-center w-full my-1"
+        style={{ height: "1.5rem" }}
+      >
+        <EntityMenu
+          entityType={entityType}
+          entityId={entityId}
+          entityName={entityTitle}
+          onHide={handleHideClick}
+        />
+      </div>
+      <HideConfirmationDialog
+        isOpen={hideDialogOpen}
+        onClose={() => {
+          setHideDialogOpen(false);
+          setPendingHide(null);
+        }}
+        onConfirm={handleHideConfirm}
+        entityType={pendingHide?.entityType}
+        entityName={pendingHide?.entityName}
+      />
+    </>
+  );
+};
+
+/**
+ * Card rating and favorite row - uses compact height when only menu is visible
  * Shows rating badge (left), O counter (center-right), and favorite button (right)
  * O Counter is interactive for scenes and images, display-only for other entities
  * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
@@ -442,6 +503,7 @@ export const CardIndicators = ({ indicators }) => {
  * @param {boolean} showRating - Whether to show the rating badge (default: true)
  * @param {boolean} showFavorite - Whether to show the favorite button (default: true)
  * @param {boolean} showOCounter - Whether to show the O counter (default: true)
+ * @param {boolean} showMenu - Whether to show the menu in this row (default: true)
  */
 export const CardRatingRow = ({
   entityType,
@@ -457,6 +519,7 @@ export const CardRatingRow = ({
   showRating = true,
   showFavorite = true,
   showOCounter = true,
+  showMenu = true,
 }) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
@@ -554,11 +617,38 @@ export const CardRatingRow = ({
   // Check if this is a scene or image (both allow interactive O counter)
   const isSceneOrImage = entityType === "scene" || entityType === "image";
 
+  // Check if any controls (besides menu) are visible
+  const hasVisibleControls = showRating || showFavorite || showOCounter;
+
+  // Don't render the row at all if nothing is visible
+  if (!hasVisibleControls && !showMenu) {
+    return (
+      <>
+        <RatingSliderDialog
+          isOpen={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          initialRating={rating}
+          onSave={handleRatingSave}
+          entityType={entityType}
+          entityTitle={entityTitle}
+          anchorEl={badgeRef.current}
+        />
+        <HideConfirmationDialog
+          isOpen={hideDialogOpen}
+          onClose={handleHideCancel}
+          onConfirm={handleHideConfirm}
+          entityType={pendingHide?.entityType}
+          entityName={pendingHide?.entityName}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <div
         className="flex justify-between items-center w-full my-1"
-        style={{ height: "2rem" }}
+        style={{ height: hasVisibleControls ? "2rem" : "1.5rem" }}
       >
         {/* Left side: Rating badge */}
         <div ref={badgeRef}>
@@ -592,12 +682,14 @@ export const CardRatingRow = ({
               variant="card"
             />
           )}
-          <EntityMenu
-            entityType={entityType}
-            entityId={entityId}
-            entityName={entityTitle}
-            onHide={handleHideClick}
-          />
+          {showMenu && (
+            <EntityMenu
+              entityType={entityType}
+              entityId={entityId}
+              entityName={entityTitle}
+              onHide={handleHideClick}
+            />
+          )}
         </div>
       </div>
 

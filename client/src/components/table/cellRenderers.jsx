@@ -393,7 +393,7 @@ const galleryRenderers = {
   ),
   cover: (gallery) => (
     <ThumbnailCell
-      src={gallery.cover?.paths?.thumbnail || gallery.image_path}
+      src={gallery.cover}
       alt={gallery.title}
       linkTo={`/gallery/${gallery.id}`}
       entityType="gallery"

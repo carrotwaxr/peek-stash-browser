@@ -139,3 +139,22 @@ a:focus-visible,
   animation: filter-highlight-pulse 1.5s ease-out;
   border-radius: 0.375rem;
 }
+
+/* Marquee text scroll animation - for overflowing card titles */
+@keyframes marquee-scroll {
+  /* Pause at start (0-15%) */
+  0%,
+  15% {
+    transform: translate3d(0, 0, 0);
+  }
+  /* Scroll to end and pause (40-60%) */
+  40%,
+  60% {
+    transform: translate3d(var(--marquee-distance), 0, 0);
+  }
+  /* Scroll back and pause at start (85-100%) */
+  85%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}

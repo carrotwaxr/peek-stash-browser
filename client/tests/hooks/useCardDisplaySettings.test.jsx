@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
+import { getDefaultSettings } from "../../src/config/entityDisplayConfig.js";
 
 // Use vi.hoisted to create mock functions that can be accessed in vi.mock
 const { mockGet, mockPut } = vi.hoisted(() => {
@@ -97,14 +98,8 @@ describe("useCardDisplaySettings", () => {
 
       const settings = result.current.getSettings("scene");
 
-      expect(settings).toEqual({
-        showCodeOnCard: true,
-        showDescriptionOnCard: true,
-        showDescriptionOnDetail: true,
-        showRating: true,
-        showFavorite: true,
-        showOCounter: true,
-      });
+      // Should match defaults from shared config
+      expect(settings).toEqual(getDefaultSettings("scene"));
     });
 
     it("returns default settings for performer entity type (no showCodeOnCard)", async () => {
@@ -116,13 +111,9 @@ describe("useCardDisplaySettings", () => {
 
       const settings = result.current.getSettings("performer");
 
-      expect(settings).toEqual({
-        showDescriptionOnCard: true,
-        showDescriptionOnDetail: true,
-        showRating: true,
-        showFavorite: true,
-        showOCounter: true,
-      });
+      // Should match defaults from shared config
+      expect(settings).toEqual(getDefaultSettings("performer"));
+      // Performer doesn't have showCodeOnCard setting
       expect(settings.showCodeOnCard).toBeUndefined();
     });
 

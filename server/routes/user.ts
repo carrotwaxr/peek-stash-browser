@@ -12,6 +12,7 @@ import {
   getHiddenEntityIds,
   getUserRestrictions,
   getUserSettings,
+  hideEntities,
   hideEntity,
   saveFilterPreset,
   setDefaultFilterPreset,
@@ -83,6 +84,7 @@ router.delete(
 
 // Hidden entity routes (authenticated users only)
 router.post("/hidden-entities", authenticated(hideEntity)); // Hide an entity
+router.post("/hidden-entities/bulk", authenticated(hideEntities)); // Hide multiple entities
 router.delete("/hidden-entities/all", authenticated(unhideAllEntities)); // Unhide all entities (optionally filtered by type) - must be before :entityType/:entityId route
 router.delete(
   "/hidden-entities/:entityType/:entityId",

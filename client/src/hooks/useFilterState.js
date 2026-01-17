@@ -13,6 +13,7 @@ export const useFilterState = ({
   permanentFilters = {},
   filterOptions = [],
   syncToUrl = true,
+  defaultViewMode = "grid",
 } = {}) => {
   const effectiveContext = context || artifactType;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,7 +28,7 @@ export const useFilterState = ({
   const [sort, setSortState] = useState({ field: initialSort, direction: "DESC" });
   const [pagination, setPaginationState] = useState({ page: 1, perPage: 24 });
   const [searchText, setSearchTextState] = useState("");
-  const [viewMode, setViewModeState] = useState("grid");
+  const [viewMode, setViewModeState] = useState(defaultViewMode);
   const [zoomLevel, setZoomLevelState] = useState("medium");
   const [tableColumns, setTableColumnsState] = useState(null);
 
@@ -97,7 +98,7 @@ export const useFilterState = ({
             currentPage: 1,
             perPage: urlState.perPage,
             searchText: "",
-            viewMode: defaultPreset.viewMode || "grid",
+            viewMode: defaultPreset.viewMode || defaultViewMode,
             zoomLevel: defaultPreset.zoomLevel || "medium",
           };
         } else {
@@ -109,7 +110,7 @@ export const useFilterState = ({
             currentPage: 1,
             perPage: urlState.perPage,
             searchText: "",
-            viewMode: "grid",
+            viewMode: defaultViewMode,
             zoomLevel: "medium",
           };
         }
@@ -301,7 +302,7 @@ export const useFilterState = ({
 
   const loadPreset = useCallback((preset) => {
     const newFilters = { ...permanentFilters, ...preset.filters };
-    const newViewMode = preset.viewMode || "grid";
+    const newViewMode = preset.viewMode || defaultViewMode;
     const newZoomLevel = preset.zoomLevel || "medium";
     const newTableColumns = preset.tableColumns || null;
     setFiltersState(newFilters);
@@ -318,7 +319,7 @@ export const useFilterState = ({
       viewMode: newViewMode,
       zoomLevel: newZoomLevel,
     });
-  }, [permanentFilters, pagination, searchText, syncToUrlParams]);
+  }, [permanentFilters, pagination, searchText, syncToUrlParams, defaultViewMode]);
 
   const setTableColumns = useCallback((columns) => {
     setTableColumnsState(columns);

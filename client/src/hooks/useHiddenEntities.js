@@ -53,6 +53,48 @@ export const useHiddenEntities = () => {
   );
 
   /**
+   * Hide multiple entities at once
+   * @param {Object} params - Hide parameters
+   * @param {Array} params.entities - Array of {entityType, entityId} objects
+   * @param {boolean} params.skipConfirmation - Skip confirmation dialog
+   * @returns {Object} Result with successCount and failCount
+   */
+  const hideEntities = useCallback(
+    async ({ entities, skipConfirmation = false }) => {
+      setIsHiding(true);
+      try {
+        const response = await apiPost("/user/hidden-entities/bulk", {
+          entities,
+        });
+
+        // If "don't ask again" was checked, update user preference
+        if (skipConfirmation && !user?.hideConfirmationDisabled) {
+          await apiPut("/user/hide-confirmation", {
+            hideConfirmationDisabled: true,
+          });
+          updateUser?.({ hideConfirmationDisabled: true });
+        }
+
+        return {
+          success: true,
+          successCount: response.successCount,
+          failCount: response.failCount,
+        };
+      } catch (error) {
+        console.error("Failed to hide entities:", error);
+        return {
+          success: false,
+          successCount: 0,
+          failCount: entities.length,
+        };
+      } finally {
+        setIsHiding(false);
+      }
+    },
+    [user, updateUser]
+  );
+
+  /**
    * Unhide (restore) an entity
    */
   const unhideEntity = useCallback(
@@ -132,6 +174,7 @@ export const useHiddenEntities = () => {
 
   return {
     hideEntity,
+    hideEntities,
     unhideEntity,
     unhideAll,
     getHiddenEntities,

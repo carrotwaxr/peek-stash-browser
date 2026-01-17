@@ -3,6 +3,7 @@ import { LucideArrowDown, LucideArrowUp } from "lucide-react";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation.js";
 import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useFilterState } from "../../hooks/useFilterState.js";
 import {
   GALLERY_FILTER_OPTIONS,
@@ -126,6 +127,11 @@ const SearchControls = ({
 
   // Unit preference for filter conversions
   const { unitPreference } = useUnitPreference();
+
+  // Get default view mode from card display settings
+  const { getSettings } = useCardDisplaySettings();
+  const entitySettings = getSettings(artifactType);
+  const defaultViewMode = entitySettings.defaultViewMode || "grid";
 
   // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom, ContextSettings
   const searchZoneItems = useMemo(() => [
@@ -258,6 +264,7 @@ const SearchControls = ({
     permanentFilters,
     filterOptions,
     syncToUrl,
+    defaultViewMode,
   });
 
   // Extract values for compatibility with existing code

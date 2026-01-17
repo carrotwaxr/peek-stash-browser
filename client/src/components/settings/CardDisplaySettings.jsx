@@ -1,16 +1,14 @@
 import { useState } from "react";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import {
+  ENTITY_DISPLAY_CONFIG,
+  getEntityTypes,
+  getAvailableSettings,
+  getViewModes,
+  SETTING_LABELS,
+  SETTING_DESCRIPTIONS,
+} from "../../config/entityDisplayConfig.js";
 import { showSuccess, showError } from "../../utils/toast.jsx";
-
-const ENTITY_TYPES = [
-  { id: "scene", label: "Scene", hasCode: true },
-  { id: "performer", label: "Performer", hasCode: false },
-  { id: "studio", label: "Studio", hasCode: false },
-  { id: "gallery", label: "Gallery", hasCode: false },
-  { id: "group", label: "Group", hasCode: false },
-  { id: "tag", label: "Tag", hasCode: false },
-  { id: "image", label: "Image", hasCode: false },
-];
 
 const Toggle = ({ label, checked, onChange, description }) => (
   <label className="flex items-start gap-3 cursor-pointer">
@@ -34,9 +32,42 @@ const Toggle = ({ label, checked, onChange, description }) => (
   </label>
 );
 
-const EntitySettingsSection = ({ entityType, hasCode }) => {
+const Dropdown = ({ label, value, options, onChange, description }) => (
+  <div className="flex flex-col gap-1">
+    <label className="flex items-center justify-between gap-3">
+      <div>
+        <span style={{ color: "var(--text-primary)" }}>{label}</span>
+        {description && (
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            {description}
+          </p>
+        )}
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="px-3 py-1.5 rounded border"
+        style={{
+          backgroundColor: "var(--bg-primary)",
+          borderColor: "var(--border-color)",
+          color: "var(--text-primary)",
+        }}
+      >
+        {options.map((opt) => (
+          <option key={opt.id} value={opt.id}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  </div>
+);
+
+const EntitySettingsSection = ({ entityType }) => {
   const { getSettings, updateSettings } = useCardDisplaySettings();
   const settings = getSettings(entityType);
+  const availableSettings = getAvailableSettings(entityType);
+  const viewModes = getViewModes(entityType);
 
   const handleChange = async (key, value) => {
     try {
@@ -50,39 +81,28 @@ const EntitySettingsSection = ({ entityType, hasCode }) => {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        {hasCode && (
-          <Toggle
-            label="Show studio code on cards"
-            checked={settings.showCodeOnCard}
-            onChange={(v) => handleChange("showCodeOnCard", v)}
-            description="Display scene codes (e.g., JAV codes) in card subtitles"
+        {/* Default View Mode - always first if available */}
+        {availableSettings.includes("defaultViewMode") && (
+          <Dropdown
+            label={SETTING_LABELS.defaultViewMode}
+            value={settings.defaultViewMode}
+            options={viewModes}
+            onChange={(v) => handleChange("defaultViewMode", v)}
           />
         )}
-        <Toggle
-          label="Show description on cards"
-          checked={settings.showDescriptionOnCard}
-          onChange={(v) => handleChange("showDescriptionOnCard", v)}
-        />
-        <Toggle
-          label="Show description on detail page"
-          checked={settings.showDescriptionOnDetail}
-          onChange={(v) => handleChange("showDescriptionOnDetail", v)}
-        />
-        <Toggle
-          label="Show rating"
-          checked={settings.showRating}
-          onChange={(v) => handleChange("showRating", v)}
-        />
-        <Toggle
-          label="Show favorite"
-          checked={settings.showFavorite}
-          onChange={(v) => handleChange("showFavorite", v)}
-        />
-        <Toggle
-          label="Show O counter"
-          checked={settings.showOCounter}
-          onChange={(v) => handleChange("showOCounter", v)}
-        />
+
+        {/* Toggle settings */}
+        {availableSettings
+          .filter((key) => key !== "defaultViewMode")
+          .map((settingKey) => (
+            <Toggle
+              key={settingKey}
+              label={SETTING_LABELS[settingKey]}
+              checked={settings[settingKey]}
+              onChange={(v) => handleChange(settingKey, v)}
+              description={SETTING_DESCRIPTIONS[settingKey]}
+            />
+          ))}
       </div>
     </div>
   );
@@ -90,6 +110,7 @@ const EntitySettingsSection = ({ entityType, hasCode }) => {
 
 const CardDisplaySettings = () => {
   const [expandedEntity, setExpandedEntity] = useState("scene");
+  const entityTypes = getEntityTypes();
 
   return (
     <div>
@@ -105,33 +126,35 @@ const CardDisplaySettings = () => {
 
       {/* Accordion-style entity sections */}
       <div className="space-y-2">
-        {ENTITY_TYPES.map(({ id, label, hasCode }) => (
-          <div
-            key={id}
-            className="rounded-lg border"
-            style={{
-              backgroundColor: "var(--bg-secondary)",
-              borderColor: "var(--border-color)",
-            }}
-          >
-            <button
-              onClick={() => setExpandedEntity(expandedEntity === id ? null : id)}
-              className="w-full px-4 py-3 flex justify-between items-center"
-              style={{ color: "var(--text-primary)" }}
+        {entityTypes.map((entityType) => {
+          const config = ENTITY_DISPLAY_CONFIG[entityType];
+          return (
+            <div
+              key={entityType}
+              className="rounded-lg border"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                borderColor: "var(--border-color)",
+              }}
             >
-              <span className="font-medium">{label}</span>
-              <span>{expandedEntity === id ? "−" : "+"}</span>
-            </button>
-            {expandedEntity === id && (
-              <div className="px-4 pb-4">
-                <EntitySettingsSection
-                  entityType={id}
-                  hasCode={hasCode}
-                />
-              </div>
-            )}
-          </div>
-        ))}
+              <button
+                onClick={() =>
+                  setExpandedEntity(expandedEntity === entityType ? null : entityType)
+                }
+                className="w-full px-4 py-3 flex justify-between items-center"
+                style={{ color: "var(--text-primary)" }}
+              >
+                <span className="font-medium">{config.label}</span>
+                <span>{expandedEntity === entityType ? "−" : "+"}</span>
+              </button>
+              {expandedEntity === entityType && (
+                <div className="px-4 pb-4">
+                  <EntitySettingsSection entityType={entityType} />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

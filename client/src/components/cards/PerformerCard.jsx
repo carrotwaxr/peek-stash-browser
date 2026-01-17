@@ -72,6 +72,9 @@ const PerformerCard = forwardRef(
       ];
     }, [performer, navigate]);
 
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = performerSettings.showRelationshipIndicators ? indicators : [];
+
     return (
       <BaseCard
         ref={ref}
@@ -88,7 +91,7 @@ const PerformerCard = forwardRef(
         tabIndex={isTVMode ? tabIndex : -1}
         description={performer.details}
         hideSubtitle
-        indicators={indicators}
+        indicators={indicatorsToShow}
         displayPreferences={{ showDescription: performerSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: performer.id,
@@ -99,6 +102,7 @@ const PerformerCard = forwardRef(
           showRating: performerSettings.showRating,
           showFavorite: performerSettings.showFavorite,
           showOCounter: performerSettings.showOCounter,
+          showMenu: performerSettings.showMenu,
         }}
         {...rest}
       />

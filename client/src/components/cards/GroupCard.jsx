@@ -14,16 +14,19 @@ const GroupCard = forwardRef(
     const { getSettings } = useCardDisplaySettings();
     const groupSettings = getSettings("group");
 
-    // Build subtitle from studio and date
+    // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
-      if (group.studio && group.date) {
-        return `${group.studio.name} • ${group.date}`;
-      } else if (group.studio) {
-        return group.studio.name;
-      } else if (group.date) {
-        return group.date;
+      const parts = [];
+
+      if (groupSettings.showStudio && group.studio) {
+        parts.push(group.studio.name);
       }
-      return null;
+
+      if (groupSettings.showDate && group.date) {
+        parts.push(group.date);
+      }
+
+      return parts.length > 0 ? parts.join(' • ') : null;
     })();
 
     const indicators = useMemo(() => {
@@ -77,6 +80,9 @@ const GroupCard = forwardRef(
       ];
     }, [group, navigate]);
 
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = groupSettings.showRelationshipIndicators ? indicators : [];
+
     return (
       <BaseCard
         ref={ref}
@@ -88,8 +94,7 @@ const GroupCard = forwardRef(
         linkTo={`/collection/${group.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
-        indicators={indicators}
-        maxTitleLines={2}
+        indicators={indicatorsToShow}
         displayPreferences={{ showDescription: groupSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: group.id,
@@ -99,6 +104,7 @@ const GroupCard = forwardRef(
           showRating: groupSettings.showRating,
           showFavorite: groupSettings.showFavorite,
           showOCounter: groupSettings.showOCounter,
+          showMenu: groupSettings.showMenu,
         }}
         {...rest}
       />

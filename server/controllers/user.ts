@@ -2132,6 +2132,87 @@ export const getHiddenEntityIds = async (
 };
 
 /**
+ * Hide multiple entities in a single request
+ */
+export const hideEntities = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { entities } = req.body;
+
+    if (!Array.isArray(entities) || entities.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "entities must be a non-empty array" });
+    }
+
+    // Validate entity types
+    const validTypes = [
+      "scene",
+      "performer",
+      "studio",
+      "tag",
+      "group",
+      "gallery",
+      "image",
+    ];
+
+    for (const entity of entities) {
+      if (!entity.entityType || !entity.entityId) {
+        return res
+          .status(400)
+          .json({ error: "Each entity must have entityType and entityId" });
+      }
+      if (!validTypes.includes(entity.entityType)) {
+        return res
+          .status(400)
+          .json({ error: `Invalid entity type: ${entity.entityType}` });
+      }
+    }
+
+    // Import service
+    const { userHiddenEntityService } = await import(
+      "../services/UserHiddenEntityService.js"
+    );
+
+    // Hide all entities
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const entity of entities) {
+      try {
+        await userHiddenEntityService.hideEntity(
+          userId,
+          entity.entityType,
+          entity.entityId
+        );
+        successCount++;
+      } catch (error) {
+        failCount++;
+        console.error(`Failed to hide ${entity.entityType} ${entity.entityId}:`, error);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${successCount} entities hidden successfully`,
+      successCount,
+      failCount,
+    });
+  } catch (error) {
+    console.error("Error hiding entities:", error);
+    res.status(500).json({ error: "Failed to hide entities" });
+  }
+};
+
+/**
  * Update hide confirmation preference
  */
 export const updateHideConfirmation = async (

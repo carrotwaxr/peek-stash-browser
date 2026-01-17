@@ -18,11 +18,13 @@ import { SceneCardPreview, TooltipEntityGrid } from "./index.js";
  * @param {Object} scene - The scene object
  * @param {Object} options - Display options
  * @param {boolean} options.showCodeOnCard - Whether to show scene code in subtitle
+ * @param {boolean} options.showStudio - Whether to show studio name in subtitle
+ * @param {boolean} options.showDate - Whether to show date in subtitle
  */
-const buildSceneSubtitle = (scene, { showCodeOnCard = true } = {}) => {
+const buildSceneSubtitle = (scene, { showCodeOnCard = true, showStudio = true, showDate = true } = {}) => {
   const parts = [];
 
-  if (scene.studio) {
+  if (showStudio && scene.studio) {
     parts.push(scene.studio.name);
   }
 
@@ -30,9 +32,11 @@ const buildSceneSubtitle = (scene, { showCodeOnCard = true } = {}) => {
     parts.push(scene.code);
   }
 
-  const date = scene.date ? formatRelativeTime(scene.date) : null;
-  if (date) {
-    parts.push(date);
+  if (showDate) {
+    const date = scene.date ? formatRelativeTime(scene.date) : null;
+    if (date) {
+      parts.push(date);
+    }
   }
 
   return parts.length > 0 ? parts.join(' • ') : null;
@@ -84,7 +88,11 @@ const SceneCard = forwardRef(
 
     const title = getSceneTitle(scene);
     const description = getSceneDescription(scene);
-    const subtitle = buildSceneSubtitle(scene, { showCodeOnCard: sceneSettings.showCodeOnCard });
+    const subtitle = buildSceneSubtitle(scene, {
+      showCodeOnCard: sceneSettings.showCodeOnCard,
+      showStudio: sceneSettings.showStudio,
+      showDate: sceneSettings.showDate,
+    });
     const duration = scene.files?.[0]?.duration
       ? formatDurationCompact(scene.files[0].duration)
       : null;
@@ -171,6 +179,9 @@ const SceneCard = forwardRef(
         },
       ];
     }, [scene, allTags, navigate]);
+
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = sceneSettings.showRelationshipIndicators ? indicators : [];
 
     const handleCheckboxClick = (e) => {
       e.preventDefault();
@@ -275,7 +286,7 @@ const SceneCard = forwardRef(
         title={title}
         subtitle={subtitle}
         description={description}
-        indicators={indicators}
+        indicators={indicatorsToShow}
         displayPreferences={{ showDescription: sceneSettings.showDescriptionOnCard }}
         ratingControlsProps={!hideRatingControls && {
           entityType: "scene",
@@ -288,6 +299,7 @@ const SceneCard = forwardRef(
           showRating: sceneSettings.showRating,
           showFavorite: sceneSettings.showFavorite,
           showOCounter: sceneSettings.showOCounter,
+          showMenu: sceneSettings.showMenu,
         }}
         // Render slots
         renderOverlay={renderOverlay}
