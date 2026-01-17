@@ -33,7 +33,7 @@
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/getting-started/docker-basics/</loc>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/getting-started/faq/</loc>
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
@@ -42,6 +42,10 @@
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/getting-started/quick-start/</loc>
+         <lastmod>2026-01-17</lastmod>
+    </url>
+    <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/getting-started/troubleshooting/</loc>
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
@@ -417,15 +421,15 @@
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/api-reference/</loc>
+         <lastmod>2026-01-17</lastmod>
+    </url>
+    <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/docker-basics/</loc>
+         <lastmod>2026-01-17</lastmod>
+    </url>
+    <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/entity-relationships/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/faq/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/troubleshooting/</loc>
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
