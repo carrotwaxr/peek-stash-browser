@@ -5454,7 +5454,7 @@ export type FindScenesCompactQueryVariables = Exact<{
 }>;
 
 
-export type FindScenesCompactQuery = { findScenes: { count: number, duration: number, filesize: number, scenes: Array<{ created_at: string, code?: string | null, date?: string | null, details?: string | null, director?: string | null, id: string, o_counter?: number | null, organized: boolean, play_count?: number | null, play_duration?: number | null, rating100?: number | null, resume_time?: number | null, title?: string | null, updated_at: string, urls: Array<string>, studio?: { id: string, name: string, tags: Array<{ id: string, name: string, image_path?: string | null, favorite: boolean }> } | null, performers: Array<{ id: string, name: string, image_path?: string | null, gender?: GenderEnum | null, tags: Array<{ id: string, name: string, image_path?: string | null, favorite: boolean }> }>, tags: Array<{ id: string, name: string, image_path?: string | null, favorite: boolean }>, files: Array<{ audio_codec: string, basename: string, bit_rate: number, created_at: string, duration: number, format: string, frame_rate: number, height: number, path: string, size: number, updated_at: string, video_codec: string, width: number }>, paths: { preview?: string | null, screenshot?: string | null, sprite?: string | null, vtt?: string | null, webp?: string | null, caption?: string | null }, sceneStreams: Array<{ url: string, mime_type?: string | null, label?: string | null }>, captions?: Array<{ language_code: string, caption_type: string }> | null, galleries: Array<{ id: string, title?: string | null }>, groups: Array<{ scene_index?: number | null, group: { id: string, name: string } }> }> } };
+export type FindScenesCompactQuery = { findScenes: { count: number, duration: number, filesize: number, scenes: Array<{ created_at: string, code?: string | null, date?: string | null, details?: string | null, director?: string | null, id: string, o_counter?: number | null, organized: boolean, play_count?: number | null, play_duration?: number | null, rating100?: number | null, resume_time?: number | null, title?: string | null, updated_at: string, urls: Array<string>, studio?: { id: string, name: string, tags: Array<{ id: string, name: string, image_path?: string | null, favorite: boolean }> } | null, performers: Array<{ id: string, name: string, image_path?: string | null, gender?: GenderEnum | null, tags: Array<{ id: string, name: string, image_path?: string | null, favorite: boolean }> }>, tags: Array<{ id: string, name: string, image_path?: string | null, favorite: boolean }>, files: Array<{ audio_codec: string, basename: string, bit_rate: number, created_at: string, duration: number, format: string, frame_rate: number, height: number, path: string, size: number, updated_at: string, video_codec: string, width: number, fingerprints: Array<{ type: string, value: string }> }>, paths: { preview?: string | null, screenshot?: string | null, sprite?: string | null, vtt?: string | null, webp?: string | null, caption?: string | null }, sceneStreams: Array<{ url: string, mime_type?: string | null, label?: string | null }>, captions?: Array<{ language_code: string, caption_type: string }> | null, galleries: Array<{ id: string, title?: string | null }>, groups: Array<{ scene_index?: number | null, group: { id: string, name: string } }> }> } };
 
 export type FindStudioIDsQueryVariables = Exact<{
   filter?: InputMaybe<FindFilterType>;
@@ -6289,6 +6289,10 @@ export const FindScenesCompactDocument = gql`
         updated_at
         video_codec
         width
+        fingerprints {
+          type
+          value
+        }
       }
       paths {
         preview

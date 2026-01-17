@@ -71,6 +71,10 @@ query FindScenesCompact(
         updated_at
         video_codec
         width
+        fingerprints {
+          type
+          value
+        }
       }
       paths {
         preview
