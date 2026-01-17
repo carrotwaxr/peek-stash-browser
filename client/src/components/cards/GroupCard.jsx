@@ -95,7 +95,6 @@ const GroupCard = forwardRef(
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        maxTitleLines={2}
         displayPreferences={{ showDescription: groupSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: group.id,

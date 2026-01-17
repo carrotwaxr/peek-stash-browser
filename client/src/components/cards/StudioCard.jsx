@@ -90,7 +90,6 @@ const StudioCard = forwardRef(
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        maxTitleLines={2}
         displayPreferences={{ showDescription: studioSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: studio.id,

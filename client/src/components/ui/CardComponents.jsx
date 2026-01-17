@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
 import { libraryApi } from "../../services/api";
@@ -10,8 +10,8 @@ import HideConfirmationDialog from "./HideConfirmationDialog.jsx";
 import OCounterButton from "./OCounterButton";
 import RatingBadge from "./RatingBadge";
 import RatingSliderDialog from "./RatingSliderDialog";
-import Tooltip from "./Tooltip";
 import { ExpandableDescription } from "./ExpandableDescription.jsx";
+import MarqueeText from "./MarqueeText.jsx";
 
 /**
  * Shared card components for visual consistency across GridCard and SceneCard
@@ -303,48 +303,43 @@ export const CardOverlay = ({ position = "bottom-left", children, className = ""
 };
 
 /**
- * Card title section with configurable line clamping and tooltips
- * @param {string|ReactNode} title - Title content (if ReactNode, tooltip won't be added)
+ * Card title section with auto-scrolling marquee for overflowing text
+ * Single line titles that scroll horizontally when text overflows.
+ * Replaces tooltip hover behavior with animated reveal.
+ *
+ * @param {string|ReactNode} title - Title content (if ReactNode, marquee won't apply)
  * @param {string} subtitle - Optional subtitle
  * @param {boolean} hideSubtitle - Whether to hide subtitle (default: false)
- * @param {number} maxTitleLines - Maximum lines for title (default: 1)
  * @param {string} [linkTo] - Navigation link URL
-  * @param {string} [fromPageTitle] - Page title for back navigation context
+ * @param {string} [fromPageTitle] - Page title for back navigation context
  * @param {Function} [onClickOverride] - Intercepts clicks on Link before navigation (call e.preventDefault() to block)
  */
 export const CardTitle = ({
   title,
   subtitle,
   hideSubtitle = false,
-  maxTitleLines = 1,
   linkTo,
   fromPageTitle,
   onClickOverride,
 }) => {
-  // Calculate fixed height based on line count
-  // Each line is approximately 1.25rem (20px) with leading-tight
-  const titleHeight = useMemo(() => {
-    return `${maxTitleLines * 1.25}rem`;
-  }, [maxTitleLines]);
-
   const titleIsString = typeof title === "string";
 
-  const titleElement = (
-    <h3
-      className="font-semibold leading-tight text-center"
-      style={{
-        color: "var(--text-primary)",
-        height: titleHeight,
-        display: "-webkit-box",
-        WebkitLineClamp: maxTitleLines,
-        WebkitBoxOrient: "vertical",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        overflowWrap: "break-word",
-      }}
+  // String titles use MarqueeText for auto-scroll on overflow
+  const titleElement = titleIsString ? (
+    <MarqueeText
+      className="font-semibold leading-tight"
+      style={{ color: "var(--text-primary)" }}
     >
       {title}
-    </h3>
+    </MarqueeText>
+  ) : (
+    // ReactNode titles (like PerformerCard with gender icon) render as-is
+    <div
+      className="font-semibold leading-tight text-center overflow-hidden whitespace-nowrap text-ellipsis"
+      style={{ color: "var(--text-primary)" }}
+    >
+      {title}
+    </div>
   );
 
   // Wrap in Link if linkTo provided
@@ -364,22 +359,14 @@ export const CardTitle = ({
   // Only render subtitle when it has content and isn't hidden
   const shouldShowSubtitle = !hideSubtitle && subtitle;
 
-  // Subtitle also becomes a link if linkTo provided
+  // Subtitle also uses MarqueeText for consistency
   const subtitleElement = shouldShowSubtitle ? (
-    <h4
-      className="text-sm leading-tight text-center"
-      style={{
-        color: "var(--text-muted)",
-        display: "-webkit-box",
-        WebkitLineClamp: 1,
-        WebkitBoxOrient: "vertical",
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-      }}
-      title={subtitle}
+    <MarqueeText
+      className="text-sm leading-tight"
+      style={{ color: "var(--text-muted)" }}
     >
       {subtitle}
-    </h4>
+    </MarqueeText>
   ) : null;
 
   const subtitleContent = linkTo && subtitleElement ? (
@@ -397,13 +384,7 @@ export const CardTitle = ({
 
   return (
     <div className="w-full text-center mb-2">
-      {titleIsString ? (
-        <Tooltip content={title} disabled={!title || title.length < 30}>
-          {titleContent}
-        </Tooltip>
-      ) : (
-        titleContent
-      )}
+      {titleContent}
       {subtitleContent}
     </div>
   );

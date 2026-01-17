@@ -110,7 +110,6 @@ const GalleryCard = forwardRef(
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        maxTitleLines={2}
         displayPreferences={{ showDescription: gallerySettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: gallery.id,

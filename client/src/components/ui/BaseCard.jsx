@@ -42,7 +42,6 @@ export const BaseCard = forwardRef(
       // Display options
       hideDescription = false,
       hideSubtitle = false,
-      maxTitleLines = 2,
       maxDescriptionLines = 3,
       objectFit = "contain",
 
@@ -126,7 +125,6 @@ export const BaseCard = forwardRef(
         <CardTitle
           title={title}
           subtitle={hideSubtitle ? null : subtitle}
-          maxTitleLines={maxTitleLines}
           linkTo={linkTo}
           fromPageTitle={fromPageTitle}
           onClickOverride={handleNavigationClick}

@@ -141,7 +141,6 @@ const ImageCard = forwardRef(
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        maxTitleLines={2}
         displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard }}
         ratingControlsProps={
           image.rating100 !== undefined || image.favorite !== undefined || image.oCounter !== undefined

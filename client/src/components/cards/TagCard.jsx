@@ -97,7 +97,6 @@ const TagCard = forwardRef(
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
-        maxTitleLines={2}
         displayPreferences={{ showDescription: tagSettings.showDescriptionOnCard }}
         ratingControlsProps={
           tag.rating100 !== undefined
