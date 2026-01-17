@@ -5,6 +5,7 @@ import { showError, showSuccess } from "../../utils/toast.jsx";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import {
   getAvailableSettings,
+  getViewModes,
   SETTING_LABELS,
 } from "../../config/entityDisplayConfig.js";
 
@@ -232,7 +233,36 @@ const ContextSettings = ({
                   Card Display
                 </h4>
                 <div className="space-y-2">
-                  {/* Dynamically render settings based on entity config */}
+                  {/* Default View Mode dropdown */}
+                  {getAvailableSettings(entityType).includes("defaultViewMode") && (
+                    <div>
+                      <label
+                        htmlFor="context-defaultViewMode"
+                        className="block text-xs font-medium mb-1"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {SETTING_LABELS.defaultViewMode}
+                      </label>
+                      <select
+                        id="context-defaultViewMode"
+                        value={cardSettings?.defaultViewMode || "grid"}
+                        onChange={(e) => handleCardSettingChange("defaultViewMode", e.target.value)}
+                        className="w-full px-2 py-1.5 rounded text-sm"
+                        style={{
+                          backgroundColor: "var(--bg-secondary)",
+                          border: "1px solid var(--border-color)",
+                          color: "var(--text-primary)",
+                        }}
+                      >
+                        {getViewModes(entityType).map((mode) => (
+                          <option key={mode.id} value={mode.id}>
+                            {mode.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {/* Toggle settings */}
                   {getAvailableSettings(entityType)
                     .filter((key) => key !== "defaultViewMode" && key !== "showDescriptionOnDetail")
                     .map((settingKey) => (
