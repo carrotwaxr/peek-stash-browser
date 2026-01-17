@@ -26,6 +26,7 @@ Peek provides three sync strategies, each optimized for different use cases:
 - Initial setup (first sync)
 - Manual "Full Sync" button in UI
 - Recovery from corrupted state
+- **Database schema migrations** (automatic on startup when upgrading versions)
 
 **Process:**
 1. Sync all entity types in dependency order: studios, tags, performers, groups, galleries, scenes, images

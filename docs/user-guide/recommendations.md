@@ -7,11 +7,11 @@ Get personalized scene suggestions based on your favorites and ratings.
 Peek learns your preferences from your activity:
 
 - **Favorited performers** - Scenes featuring performers you've favorited
-- **Highly-rated performers** - Scenes with performers you've rated 7.0+
+- **Highly-rated performers** - Scenes with performers you've rated 4+ stars
 - **Favorited studios** - Scenes from studios you've favorited
-- **Highly-rated studios** - Scenes from studios you've rated 7.0+
+- **Highly-rated studios** - Scenes from studios you've rated 4+ stars
 - **Favorited tags** - Scenes with tags you've favorited
-- **Highly-rated tags** - Scenes with tags you've rated 7.0+
+- **Highly-rated tags** - Scenes with tags you've rated 4+ stars
 - **Scene ratings** - Similar scenes to ones you've rated highly
 
 The more you rate and favorite, the better your recommendations become!
@@ -43,7 +43,7 @@ When viewing a scene, the sidebar shows related recommendations:
 If you're new to Peek, you'll see a message explaining how to get recommendations:
 
 1. **Favorite performers** you enjoy
-2. **Rate scenes** you watch (especially 7.0+)
+2. **Rate scenes** you watch (especially 4+ stars)
 3. **Favorite studios** that consistently produce content you like
 4. **Favorite tags** for your preferred categories
 
@@ -67,7 +67,7 @@ This helps you understand what's driving your recommendations.
 
 Rate scenes you watch, even if just quickly:
 
-- **7.0+** = Scenes similar to this will be recommended
+- **4+ stars** = Scenes similar to this will be recommended
 - **Below 7.0** = Won't negatively affect recommendations, but won't boost similar content
 
 ### Favorite Strategically
@@ -126,7 +126,7 @@ Use **Recommendations** when you want curated content. Use **Random** when you w
 
 This appears when you haven't rated or favorited enough content:
 
-1. Browse scenes and rate some 7.0+
+1. Browse scenes and rate some 4+ stars
 2. Favorite a few performers you enjoy
 3. Return to Recommendations
 
@@ -144,7 +144,7 @@ Your recommendation profile might need tuning:
 
 1. Review your favorites (Settings > remove any accidental favorites)
 2. Rate more scenes to give the algorithm more data
-3. Remember: ratings 7.0+ strongly influence results
+3. Remember: ratings 4+ stars strongly influence results
 
 ## Next Steps
 

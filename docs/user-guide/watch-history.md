@@ -212,8 +212,10 @@ While watching a video:
 
 | Key | Action |
 |-----|--------|
-| `←` | Seek backward 10s |
-| `→` | Seek forward 10s |
+| `←` | Seek backward 5s |
+| `→` | Seek forward 5s |
+| `J` | Seek backward 10s |
+| `L` | Seek forward 10s |
 | `Space` | Play/Pause |
 | `F` | Toggle fullscreen |
 | `M` | Mute/unmute |

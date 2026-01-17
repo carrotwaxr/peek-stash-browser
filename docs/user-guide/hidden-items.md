@@ -1,12 +1,15 @@
 # Hidden Items
 
+Hide specific content from your personal view without affecting other users.
+
 ## Overview
 
-The Hidden Items feature allows you to hide specific content from your personal view without affecting other users. Unlike Content Restrictions (which are admin-controlled), Hidden Items are entirely user-controlled and work for all users including admins.
+Hidden Items let you personally hide content you don't want to see. Unlike [Content Restrictions](content-restrictions.md) (admin-controlled), Hidden Items are entirely user-controlled.
 
-**Key Difference from Content Restrictions:**
-- **Content Restrictions**: Set by admins, restrict what a user CAN see (e.g., exclude certain tags/studios)
-- **Hidden Items**: Set by users themselves, hide individual items they don't want to see
+| Feature | Who Controls | Scope |
+|---------|--------------|-------|
+| **Hidden Items** | You | Only your view |
+| **[Content Restrictions](content-restrictions.md)** | Admins | Per-user access control |
 
 ## How to Hide Items
 
@@ -94,5 +97,7 @@ Hidden items remain hidden even if the underlying content is modified in Stash. 
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-01-21
+## Related
+
+- [Content Restrictions](content-restrictions.md) — Admin-controlled access restrictions
+- [User Management](user-management.md) — Full user administration guide

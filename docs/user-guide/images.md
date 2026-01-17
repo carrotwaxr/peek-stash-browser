@@ -62,14 +62,15 @@ Start an automatic slideshow:
 4. Click **Pause** or press **Space** to stop
 
 !!! tip "Slideshow Timer"
-    Click the clock icon to adjust slideshow duration (3, 5, 10, or 15 seconds).
+    Click the clock icon to adjust slideshow duration (2, 3, 5, 10, or 15 seconds).
 
 ### Rating & Favorites
 
 Rate images directly in the lightbox:
 
-- **Number keys 1-5**: Set star rating (1-5 stars)
-- **0**: Clear rating
+- **R key**: Enter rating mode, then:
+    - **1-5**: Set rating (1=20%, 2=40%, 3=60%, 4=80%, 5=100%)
+    - **0**: Clear rating
 - **F key**: Toggle favorite
 
 Your ratings and favorites are saved to Peek (separate from Stash ratings).

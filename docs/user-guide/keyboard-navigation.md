@@ -1,10 +1,13 @@
 # Keyboard Navigation & TV Mode
 
-Peek provides complete keyboard navigation, making it perfect for TV remotes, wireless keyboards, or couch browsing.
+Peek supports keyboard navigation for remotes, wireless keyboards, or couch browsing.
+
+!!! warning "TV Mode Status"
+    TV Mode is a work-in-progress. Grid navigation works on most pages (Scenes, Performers, Studios, Tags), but some features and pages don't have full TV navigation yet. Best experience is currently with a wireless keyboard.
 
 ## Why Keyboard Navigation?
 
-- **TV Mode** - Use Peek on your TV with just a remote
+- **TV Mode** - Navigate Peek with a remote (partial support)
 - **Accessibility** - Full keyboard support for users who prefer or require it
 - **Efficiency** - Navigate faster without reaching for the mouse
 - **Couch Browsing** - Control everything from your couch with a wireless keyboard
@@ -77,10 +80,10 @@ Arrow keys navigate through grid layouts and lists:
 | Key | Action |
 |-----|--------|
 | `Space` or `K` | Play/Pause |
-| `←` | Seek backward 10 seconds |
-| `→` | Seek forward 10 seconds |
-| `Shift+←` | Seek backward 5 seconds |
-| `Shift+→` | Seek forward 5 seconds |
+| `←` | Seek backward 5 seconds |
+| `→` | Seek forward 5 seconds |
+| `J` | Seek backward 10 seconds |
+| `L` | Seek forward 10 seconds |
 | `Home` | Jump to beginning |
 | `End` | Jump to end |
 | `0-9` | Jump to 0%-90% of video |
@@ -167,14 +170,22 @@ Arrow keys navigate through grid layouts and lists:
 
 ## TV Mode
 
+!!! note "Work in Progress"
+    TV Mode is being actively developed. Grid navigation works on most browse pages, but full remote-only navigation isn't complete yet.
+
 ### What is TV Mode?
 
-TV Mode is Peek's interface optimized for TV remotes and couch browsing:
+TV Mode enables enhanced keyboard/remote navigation:
 
 - **Large Focus Indicators** - Easy to see what's selected from across the room
-- **Remote-Friendly Navigation** - Arrow keys and Enter are all you need
+- **Remote-Friendly Navigation** - Arrow keys and Enter for grid navigation
 - **Auto-Scroll** - Page scrolls to keep focused element visible
-- **Simplified Controls** - Reduced clutter, bigger buttons
+
+**Current limitations:**
+
+- Some pages (Settings, modals) still require mouse or Tab navigation
+- Search/filter controls need Tab to navigate
+- Best paired with a wireless keyboard for full functionality
 
 ### Using Peek on TV
 
@@ -182,13 +193,13 @@ TV Mode is Peek's interface optimized for TV remotes and couch browsing:
 
 1. Connect a computer to your TV (HDMI)
 2. Access Peek via web browser on that computer
-3. Use a wireless keyboard or TV remote (with keyboard features)
-4. Navigate entirely with arrow keys and Enter
+3. Use a **wireless keyboard** (e.g., Logitech K400) - recommended for best experience
+4. Enable TV Mode from the user menu
+5. Use arrow keys to navigate grids, Enter to select
 
-**Popular remote options:**
-- Amazon Fire TV remote (with Alexa)
+**Alternative remotes** (limited support):
+
 - Android TV remote apps
-- Wireless keyboards (Logitech K400, etc.)
 - Smart TV keyboards
 - Game controllers (via browser support)
 
@@ -198,7 +209,7 @@ TV Mode is Peek's interface optimized for TV remotes and couch browsing:
 2. **Enable auto-hide cursor** in your OS settings
 3. **Increase font size** in browser settings (Ctrl +)
 4. **Use dark theme** for better viewing in dark rooms
-5. **Disable screen saver** on your PC/TV
+5. **Keep a mouse nearby** for features not yet TV-navigable
 
 ## Settings Navigation
 

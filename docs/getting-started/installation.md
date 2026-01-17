@@ -277,6 +277,13 @@ Peek uses a single port for production deployments:
 !!! tip "Development Ports"
     For development setup with hot reloading, see [Local Development Setup](../development/local-setup.md).
 
+!!! warning "Port Conflict with Whisparr"
+    Peek's default port (6969) is the same as Whisparr's default port. If you're running Whisparr, change Peek's port mapping:
+
+    ```bash
+    -p 6970:80   # Use 6970 instead of 6969
+    ```
+
 ## Hardware Recommendations
 
 Peek is lightweight - it proxies streams through Stash rather than transcoding locally.

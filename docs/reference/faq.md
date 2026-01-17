@@ -22,6 +22,23 @@ Peek is a browser/player focused on video playback and discovery, while Stash is
 
 Peek can optionally sync ratings, favorites, and O-counter back to Stash (configurable). It never modifies your files or core metadata.
 
+### How does Peek sync with Stash?
+
+Peek maintains a local cache of your Stash library for fast queries. Three sync mechanisms keep it updated:
+
+- **Smart Sync** (automatic) - Runs on startup and periodically, only syncing what changed
+- **Incremental Sync** - Manual option to sync recent changes since a specific time
+- **Full Sync** - Complete refresh, runs automatically when upgrading Peek versions
+
+**Key points:**
+
+- Syncing happens in the background - you can browse while it runs
+- Large libraries (100k+ scenes) may take several minutes for full sync
+- Changes made in Stash appear in Peek after the next sync
+- User data (watch history, playlists, ratings) is stored separately and never affected by sync
+
+See [Sync Architecture](../development/sync-architecture.md) for technical details.
+
 ## Installation
 
 ### What platforms are supported?
@@ -99,9 +116,19 @@ See the [Watch History Guide](../user-guide/watch-history.md) for details.
 
 ### Can I use keyboard navigation?
 
-Yes! Peek supports complete keyboard navigation, including arrow keys, Enter to select, and video player shortcuts. Perfect for TV remotes.
+Yes! Peek supports keyboard navigation including arrow keys, Enter to select, and video player shortcuts.
 
 See the [Keyboard Navigation Guide](../user-guide/keyboard-navigation.md) for all shortcuts.
+
+### What about TV Mode?
+
+TV Mode is a work-in-progress feature for couch/remote browsing. You can enable it from the user menu, but:
+
+- Grid navigation works on most pages (Scenes, Performers, etc.)
+- Some pages don't have full TV navigation yet
+- Best experience is with a wireless keyboard
+
+TV Mode will be improved in future updates.
 
 ### Can I use Peek on mobile?
 

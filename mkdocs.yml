@@ -111,23 +111,27 @@ nav:
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
       - Upgrading: getting-started/upgrading.md
-      - Docker Basics: getting-started/docker-basics.md
       - Troubleshooting: reference/troubleshooting.md
       - FAQ: reference/faq.md
   - User Guide:
-      - Images: user-guide/images.md
-      - Recommendations: user-guide/recommendations.md
+      - Content Restrictions: user-guide/content-restrictions.md
       - Custom Carousels: user-guide/custom-carousels.md
-      - Watch History: user-guide/watch-history.md
+      - External Player: user-guide/external-player.md
+      - Hidden Items: user-guide/hidden-items.md
+      - Images: user-guide/images.md
       - Keyboard Navigation: user-guide/keyboard-navigation.md
       - Playlists: user-guide/playlists.md
-      - Hidden Items: user-guide/hidden-items.md
-      - External Player: user-guide/external-player.md
+      - Recommendations: user-guide/recommendations.md
+      - User Management: user-guide/user-management.md
+      - Watch History: user-guide/watch-history.md
+  - Reference:
+      - Docker Basics: getting-started/docker-basics.md
+      - API Reference: development/api-reference.md
+      - Entity Relationships: reference/entity-relationships.md
   - Development:
       - Local Setup: development/local-setup.md
       - Technical Overview: development/technical-overview.md
       - Sync Architecture: development/sync-architecture.md
-      - API Reference: development/api-reference.md
       - Regression Testing Guide: development/regression-testing.md
 
 # Social links

@@ -250,6 +250,9 @@ volumes:
 !!! tip "Stash Connection"
     Stash URL and API key are configured via the Setup Wizard on first access and stored in the database.
 
+!!! warning "Port Conflict with Whisparr"
+    Peek's default port (6969) is the same as Whisparr's default port. If you're running Whisparr, change the port mapping to `"6970:80"` or another available port.
+
 ## Troubleshooting Configuration Issues
 
 ### Cannot Connect to Stash

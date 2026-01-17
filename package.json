@@ -5,7 +5,8 @@
   "description": "Peek Stash Browser - Workspace root",
   "scripts": {
     "screenshots": "node screenshots/capture.js",
-    "screenshots:publish": "node screenshots/publish.js"
+    "screenshots:publish": "node screenshots/publish.js",
+    "docs": ".venv/bin/mkdocs serve --livereload -a localhost:8001"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",

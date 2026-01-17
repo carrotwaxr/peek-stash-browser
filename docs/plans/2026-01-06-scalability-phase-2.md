@@ -6,8 +6,6 @@
 
 **Branch:** `feature/scalability-phase-2`
 
-**Reference:** [scalability-audit-500k-scenes.md](../design/scalability-audit-500k-scenes.md)
-
 ---
 
 ## Task Order
