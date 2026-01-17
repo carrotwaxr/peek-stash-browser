@@ -5,35 +5,7 @@
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/CHANGES_SINCE_3.1.1/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/audits/2026-01-04-frontend-api-usage-audit/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/audits/2026-01-04-security-audit-unauthenticated-routes/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/design/cache-scalability-brainstorm/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/design/cache-scalability-plan/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/design/json-blob-elimination-plan/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/design/scalability-audit-500k-scenes/</loc>
-         <lastmod>2026-01-17</lastmod>
-    </url>
-    <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/design/sqlite-cache-schema/</loc>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/audits/2026-01-17-documentation-audit/</loc>
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
@@ -445,6 +417,10 @@
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/entity-relationships/</loc>
+         <lastmod>2026-01-17</lastmod>
+    </url>
+    <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/reference/faq/</loc>
          <lastmod>2026-01-17</lastmod>
     </url>
@@ -453,7 +429,11 @@
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
-         <loc>https://carrotwaxr.github.io/peek-stash-browser/releases/3.1.0-testing-checklist/</loc>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/user-guide/browse-and-display/</loc>
+         <lastmod>2026-01-17</lastmod>
+    </url>
+    <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/user-guide/content-restrictions/</loc>
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
@@ -482,6 +462,10 @@
     </url>
     <url>
          <loc>https://carrotwaxr.github.io/peek-stash-browser/user-guide/recommendations/</loc>
+         <lastmod>2026-01-17</lastmod>
+    </url>
+    <url>
+         <loc>https://carrotwaxr.github.io/peek-stash-browser/user-guide/user-management/</loc>
          <lastmod>2026-01-17</lastmod>
     </url>
     <url>
