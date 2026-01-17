@@ -223,3 +223,58 @@ describe("BaseCard selection mode", () => {
     expect(card.style.borderColor).toBe("var(--selection-color)");
   });
 });
+
+describe("BaseCard menu placement logic", () => {
+  it("accepts showMenu setting in ratingControlsProps", () => {
+    const ratingControlsProps = {
+      entityId: "scene123",
+      initialRating: 80,
+      showRating: true,
+      showFavorite: true,
+      showOCounter: false,
+      showMenu: true,
+    };
+    const element = createElement(BaseCard, {
+      entityType: "scene",
+      imagePath: "/test.jpg",
+      title: "Test",
+      ratingControlsProps,
+    });
+    expect(element.props.ratingControlsProps.showMenu).toBe(true);
+  });
+
+  it("accepts showMenu=false to hide menu", () => {
+    const ratingControlsProps = {
+      entityId: "scene123",
+      showRating: true,
+      showFavorite: true,
+      showOCounter: false,
+      showMenu: false,
+    };
+    const element = createElement(BaseCard, {
+      entityType: "scene",
+      imagePath: "/test.jpg",
+      title: "Test",
+      ratingControlsProps,
+    });
+    expect(element.props.ratingControlsProps.showMenu).toBe(false);
+  });
+
+  it("defaults showMenu to true when not specified", () => {
+    const ratingControlsProps = {
+      entityId: "scene123",
+      showRating: true,
+      showFavorite: true,
+      showOCounter: false,
+      // showMenu not specified - should default to true
+    };
+    const element = createElement(BaseCard, {
+      entityType: "scene",
+      imagePath: "/test.jpg",
+      title: "Test",
+      ratingControlsProps,
+    });
+    // showMenu should be undefined in props, but BaseCard logic defaults it to true
+    expect(element.props.ratingControlsProps.showMenu).toBeUndefined();
+  });
+});

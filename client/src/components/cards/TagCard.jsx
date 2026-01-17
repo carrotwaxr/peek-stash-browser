@@ -109,6 +109,7 @@ const TagCard = forwardRef(
                 showRating: tagSettings.showRating,
                 showFavorite: tagSettings.showFavorite,
                 showOCounter: tagSettings.showOCounter,
+                showMenu: tagSettings.showMenu,
               }
             : undefined
         }

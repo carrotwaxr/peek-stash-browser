@@ -23,18 +23,21 @@ export const ENTITY_DISPLAY_CONFIG = {
       showRating: true,
       showFavorite: true,
       showOCounter: true,
+      showMenu: true,
     },
+    // Order: View mode, subtitle parts, descriptions, indicators, rating row controls
     availableSettings: [
       "defaultViewMode",
-      "showCodeOnCard",
       "showStudio",
       "showDate",
+      "showCodeOnCard",
       "showDescriptionOnCard",
       "showDescriptionOnDetail",
       "showRelationshipIndicators",
       "showRating",
       "showFavorite",
       "showOCounter",
+      "showMenu",
     ],
   },
   gallery: {
@@ -54,7 +57,9 @@ export const ENTITY_DISPLAY_CONFIG = {
       showRating: true,
       showFavorite: true,
       showOCounter: true,
+      showMenu: true,
     },
+    // Order: View mode, subtitle parts, descriptions, indicators, rating row controls
     availableSettings: [
       "defaultViewMode",
       "showStudio",
@@ -65,6 +70,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       "showRating",
       "showFavorite",
       "showOCounter",
+      "showMenu",
     ],
   },
   image: {
@@ -83,7 +89,9 @@ export const ENTITY_DISPLAY_CONFIG = {
       showRating: true,
       showFavorite: true,
       showOCounter: true,
+      showMenu: true,
     },
+    // Order: View mode, subtitle parts, descriptions, indicators, rating row controls
     availableSettings: [
       "defaultViewMode",
       "showStudio",
@@ -94,6 +102,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       "showRating",
       "showFavorite",
       "showOCounter",
+      "showMenu",
     ],
   },
   performer: {
@@ -111,6 +120,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       showRating: true,
       showFavorite: true,
       showOCounter: true,
+      showMenu: true,
     },
     availableSettings: [
       "defaultViewMode",
@@ -120,6 +130,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       "showRating",
       "showFavorite",
       "showOCounter",
+      "showMenu",
     ],
   },
   studio: {
@@ -137,6 +148,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       showRating: true,
       showFavorite: true,
       showOCounter: true,
+      showMenu: true,
     },
     availableSettings: [
       "defaultViewMode",
@@ -146,6 +158,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       "showRating",
       "showFavorite",
       "showOCounter",
+      "showMenu",
     ],
   },
   tag: {
@@ -160,12 +173,14 @@ export const ENTITY_DISPLAY_CONFIG = {
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showRelationshipIndicators: true,
+      showMenu: true,
     },
     availableSettings: [
       "defaultViewMode",
       "showDescriptionOnCard",
       "showDescriptionOnDetail",
       "showRelationshipIndicators",
+      "showMenu",
     ],
   },
   group: {
@@ -185,6 +200,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       showRating: true,
       showFavorite: true,
       showOCounter: true,
+      showMenu: true,
     },
     availableSettings: [
       "defaultViewMode",
@@ -196,6 +212,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       "showRating",
       "showFavorite",
       "showOCounter",
+      "showMenu",
     ],
   },
 };
@@ -240,6 +257,7 @@ export const SETTING_LABELS = {
   showRating: "Show rating",
   showFavorite: "Show favorite",
   showOCounter: "Show O counter",
+  showMenu: "Show menu",
 };
 
 /**

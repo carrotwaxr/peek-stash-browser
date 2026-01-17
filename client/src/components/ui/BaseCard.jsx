@@ -7,9 +7,11 @@ import {
   CardDescription,
   CardImage,
   CardIndicators,
+  CardMenuRow,
   CardRatingRow,
   CardTitle,
 } from "./CardComponents.jsx";
+import EntityMenu from "./EntityMenu.jsx";
 
 /**
  * BaseCard - Composable card component that assembles primitives
@@ -141,13 +143,60 @@ export const BaseCard = forwardRef(
           />
         )}
 
-        {/* Indicators */}
-        {indicators.length > 0 && <CardIndicators indicators={indicators} />}
+        {/* Indicators and Rating/Menu Controls
+            Menu placement logic:
+            1. If rating controls visible → menu in rating row
+            2. If rating controls hidden but indicators visible → menu in indicators row
+            3. If indicators hidden but showMenu enabled → standalone CardMenuRow
+            4. If everything hidden → no extra row
+        */}
+        {(() => {
+          // Extract settings from ratingControlsProps
+          const hasRatingControls = ratingControlsProps && (
+            ratingControlsProps.showRating ||
+            ratingControlsProps.showFavorite ||
+            ratingControlsProps.showOCounter
+          );
+          const showMenu = ratingControlsProps?.showMenu ?? true;
+          const hasIndicators = indicators.length > 0;
 
-        {/* Rating Controls */}
-        {ratingControlsProps && (
-          <CardRatingRow entityType={entityType} {...ratingControlsProps} />
-        )}
+          // Build menu component for indicators row (when needed)
+          const menuForIndicators = !hasRatingControls && showMenu && ratingControlsProps ? (
+            <EntityMenu
+              entityType={ratingControlsProps.entityType || entityType}
+              entityId={ratingControlsProps.entityId}
+              entityName={ratingControlsProps.entityTitle}
+              onHide={ratingControlsProps.onHideClick}
+            />
+          ) : null;
+
+          return (
+            <>
+              {/* Indicators - pass menu if rating controls are hidden */}
+              {(hasIndicators || menuForIndicators) && (
+                <CardIndicators
+                  indicators={indicators}
+                  menuComponent={menuForIndicators}
+                />
+              )}
+
+              {/* Rating Controls - only render if has visible controls */}
+              {ratingControlsProps && hasRatingControls && (
+                <CardRatingRow entityType={entityType} {...ratingControlsProps} />
+              )}
+
+              {/* Standalone menu row - only if no indicators and no rating controls but menu enabled */}
+              {!hasIndicators && !hasRatingControls && showMenu && ratingControlsProps && (
+                <CardMenuRow
+                  entityType={ratingControlsProps.entityType || entityType}
+                  entityId={ratingControlsProps.entityId}
+                  entityTitle={ratingControlsProps.entityTitle}
+                  onHideSuccess={ratingControlsProps.onHideSuccess}
+                />
+              )}
+            </>
+          );
+        })()}
       </CardContainer>
     );
   }

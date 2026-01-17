@@ -100,6 +100,7 @@ const StudioCard = forwardRef(
           showRating: studioSettings.showRating,
           showFavorite: studioSettings.showFavorite,
           showOCounter: studioSettings.showOCounter,
+          showMenu: studioSettings.showMenu,
         }}
         {...rest}
       />

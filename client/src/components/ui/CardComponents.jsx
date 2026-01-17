@@ -402,18 +402,93 @@ export const CardDescription = ({ description, maxLines = 3 }) => {
 };
 
 /**
- * Card indicators section - only renders when there are indicators
+ * Card indicators section - renders indicators with optional menu on the right
+ * @param {Array} indicators - Array of indicator objects
+ * @param {React.ReactNode} menuComponent - Optional menu component to render on the right
  */
-export const CardIndicators = ({ indicators }) => {
-  // Don't render anything if no indicators
-  if (!indicators || indicators.length === 0) {
+export const CardIndicators = ({ indicators, menuComponent }) => {
+  const hasIndicators = indicators && indicators.length > 0;
+
+  // Don't render anything if no indicators and no menu
+  if (!hasIndicators && !menuComponent) {
     return null;
   }
 
   return (
-    <div className="my-2 w-full">
-      <CardCountIndicators indicators={indicators} />
+    <div className="my-2 w-full flex items-center">
+      <div className="flex-1">
+        {hasIndicators && <CardCountIndicators indicators={indicators} />}
+      </div>
+      {menuComponent && (
+        <div className="flex-shrink-0 ml-2">
+          {menuComponent}
+        </div>
+      )}
     </div>
+  );
+};
+
+/**
+ * Standalone menu row - used when menu should appear without rating controls
+ * Renders just the ellipsis menu on its own row
+ */
+export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }) => {
+  const [hideDialogOpen, setHideDialogOpen] = useState(false);
+  const [pendingHide, setPendingHide] = useState(null);
+  const { hideEntity, hideConfirmationDisabled } = useHiddenEntities();
+
+  const handleHideClick = async (hideInfo) => {
+    if (hideConfirmationDisabled) {
+      const success = await hideEntity({
+        ...hideInfo,
+        skipConfirmation: true,
+      });
+      if (success) {
+        onHideSuccess?.(entityId, entityType);
+      }
+    } else {
+      setPendingHide(hideInfo);
+      setHideDialogOpen(true);
+    }
+  };
+
+  const handleHideConfirm = async (dontAskAgain) => {
+    if (!pendingHide) return;
+    const success = await hideEntity({
+      ...pendingHide,
+      skipConfirmation: dontAskAgain,
+    });
+    setHideDialogOpen(false);
+    setPendingHide(null);
+    if (success) {
+      onHideSuccess?.(entityId, entityType);
+    }
+  };
+
+  return (
+    <>
+      <div
+        className="flex justify-end items-center w-full my-1"
+        style={{ height: "1.5rem" }}
+      >
+        <EntityMenu
+          entityType={entityType}
+          entityId={entityId}
+          entityName={entityTitle}
+          onHide={handleHideClick}
+        />
+      </div>
+      <HideConfirmationDialog
+        isOpen={hideDialogOpen}
+        onClose={() => {
+          setHideDialogOpen(false);
+          setPendingHide(null);
+        }}
+        onConfirm={handleHideConfirm}
+        entityType={pendingHide?.entityType}
+        entityName={pendingHide?.entityName}
+      />
+    </>
   );
 };
 
@@ -428,6 +503,7 @@ export const CardIndicators = ({ indicators }) => {
  * @param {boolean} showRating - Whether to show the rating badge (default: true)
  * @param {boolean} showFavorite - Whether to show the favorite button (default: true)
  * @param {boolean} showOCounter - Whether to show the O counter (default: true)
+ * @param {boolean} showMenu - Whether to show the menu in this row (default: true)
  */
 export const CardRatingRow = ({
   entityType,
@@ -443,6 +519,7 @@ export const CardRatingRow = ({
   showRating = true,
   showFavorite = true,
   showOCounter = true,
+  showMenu = true,
 }) => {
   const [rating, setRating] = useState(initialRating);
   const [isFavorite, setIsFavorite] = useState(initialFavorite);
@@ -540,8 +617,32 @@ export const CardRatingRow = ({
   // Check if this is a scene or image (both allow interactive O counter)
   const isSceneOrImage = entityType === "scene" || entityType === "image";
 
-  // Use compact height when only menu is visible
+  // Check if any controls (besides menu) are visible
   const hasVisibleControls = showRating || showFavorite || showOCounter;
+
+  // Don't render the row at all if nothing is visible
+  if (!hasVisibleControls && !showMenu) {
+    return (
+      <>
+        <RatingSliderDialog
+          isOpen={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          initialRating={rating}
+          onSave={handleRatingSave}
+          entityType={entityType}
+          entityTitle={entityTitle}
+          anchorEl={badgeRef.current}
+        />
+        <HideConfirmationDialog
+          isOpen={hideDialogOpen}
+          onClose={handleHideCancel}
+          onConfirm={handleHideConfirm}
+          entityType={pendingHide?.entityType}
+          entityName={pendingHide?.entityName}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -581,12 +682,14 @@ export const CardRatingRow = ({
               variant="card"
             />
           )}
-          <EntityMenu
-            entityType={entityType}
-            entityId={entityId}
-            entityName={entityTitle}
-            onHide={handleHideClick}
-          />
+          {showMenu && (
+            <EntityMenu
+              entityType={entityType}
+              entityId={entityId}
+              entityName={entityTitle}
+              onHide={handleHideClick}
+            />
+          )}
         </div>
       </div>
 

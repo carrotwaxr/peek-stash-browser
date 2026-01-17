@@ -299,6 +299,7 @@ const SceneCard = forwardRef(
           showRating: sceneSettings.showRating,
           showFavorite: sceneSettings.showFavorite,
           showOCounter: sceneSettings.showOCounter,
+          showMenu: sceneSettings.showMenu,
         }}
         // Render slots
         renderOverlay={renderOverlay}

@@ -119,6 +119,7 @@ const GalleryCard = forwardRef(
           showRating: gallerySettings.showRating,
           showFavorite: gallerySettings.showFavorite,
           showOCounter: gallerySettings.showOCounter,
+          showMenu: gallerySettings.showMenu,
         }}
         {...rest}
       />

@@ -102,6 +102,7 @@ const PerformerCard = forwardRef(
           showRating: performerSettings.showRating,
           showFavorite: performerSettings.showFavorite,
           showOCounter: performerSettings.showOCounter,
+          showMenu: performerSettings.showMenu,
         }}
         {...rest}
       />

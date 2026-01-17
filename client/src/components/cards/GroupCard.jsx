@@ -104,6 +104,7 @@ const GroupCard = forwardRef(
           showRating: groupSettings.showRating,
           showFavorite: groupSettings.showFavorite,
           showOCounter: groupSettings.showOCounter,
+          showMenu: groupSettings.showMenu,
         }}
         {...rest}
       />
