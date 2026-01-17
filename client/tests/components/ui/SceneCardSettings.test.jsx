@@ -74,6 +74,9 @@ describe("SceneCard respects card display settings", () => {
       showRating: true,
       showFavorite: true,
       showOCounter: true,
+      showStudio: true,
+      showDate: true,
+      showRelationshipIndicators: true,
     });
   });
 
@@ -93,6 +96,9 @@ describe("SceneCard respects card display settings", () => {
         showRating: true,
         showFavorite: true,
         showOCounter: true,
+        showStudio: true,
+        showDate: true,
+        showRelationshipIndicators: true,
       });
 
       render(<SceneCard scene={mockScene} />, { wrapper });
@@ -121,6 +127,9 @@ describe("SceneCard respects card display settings", () => {
         showRating: true,
         showFavorite: true,
         showOCounter: true,
+        showStudio: true,
+        showDate: true,
+        showRelationshipIndicators: true,
       });
 
       render(<SceneCard scene={mockScene} />, { wrapper });
@@ -153,6 +162,9 @@ describe("SceneCard respects card display settings", () => {
         showRating: true,
         showFavorite: true,
         showOCounter: true,
+        showStudio: true,
+        showDate: true,
+        showRelationshipIndicators: true,
       });
 
       render(<SceneCard scene={mockScene} />, { wrapper });
@@ -240,6 +252,9 @@ describe("SceneCard respects card display settings", () => {
         showRating: true,
         showFavorite: true,
         showOCounter: true,
+        showStudio: true,
+        showDate: true,
+        showRelationshipIndicators: true,
       });
 
       render(<SceneCard scene={sceneWithoutDetails} />, { wrapper });

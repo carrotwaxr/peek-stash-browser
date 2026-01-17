@@ -15,19 +15,19 @@ const GalleryCard = forwardRef(
     const { getSettings } = useCardDisplaySettings();
     const gallerySettings = getSettings("gallery");
 
-    // Build subtitle from studio and date
-    const galleryDate = gallery.date
-      ? new Date(gallery.date).toLocaleDateString()
-      : null;
+    // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
-      if (gallery.studio && galleryDate) {
-        return `${gallery.studio.name} • ${galleryDate}`;
-      } else if (gallery.studio) {
-        return gallery.studio.name;
-      } else if (galleryDate) {
-        return galleryDate;
+      const parts = [];
+
+      if (gallerySettings.showStudio && gallery.studio) {
+        parts.push(gallery.studio.name);
       }
-      return null;
+
+      if (gallerySettings.showDate && gallery.date) {
+        parts.push(new Date(gallery.date).toLocaleDateString());
+      }
+
+      return parts.length > 0 ? parts.join(' • ') : null;
     })();
 
     // Build rich tooltip content for performers and tags (using centralized config)
@@ -95,6 +95,9 @@ const GalleryCard = forwardRef(
       },
     ];
 
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = gallerySettings.showRelationshipIndicators ? indicators : [];
+
     return (
       <BaseCard
         ref={ref}
@@ -106,7 +109,7 @@ const GalleryCard = forwardRef(
         linkTo={`/gallery/${gallery.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
-        indicators={indicators}
+        indicators={indicatorsToShow}
         maxTitleLines={2}
         displayPreferences={{ showDescription: gallerySettings.showDescriptionOnCard }}
         ratingControlsProps={{

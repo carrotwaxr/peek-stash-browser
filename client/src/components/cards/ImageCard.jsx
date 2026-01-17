@@ -29,12 +29,20 @@ const ImageCard = forwardRef(
     // Get effective metadata (inherits from galleries if image doesn't have its own)
     const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
 
-    // Build subtitle from studio and date (gallery shown in indicators)
-    const imageDate = effectiveDate
-      ? new Date(effectiveDate).toLocaleDateString()
-      : null;
-    const studioName = effectiveStudio?.name;
-    const subtitle = [studioName, imageDate].filter(Boolean).join(" • ") || null;
+    // Build subtitle from studio and date (respecting settings)
+    const subtitle = (() => {
+      const parts = [];
+
+      if (imageSettings.showStudio && effectiveStudio?.name) {
+        parts.push(effectiveStudio.name);
+      }
+
+      if (imageSettings.showDate && effectiveDate) {
+        parts.push(new Date(effectiveDate).toLocaleDateString());
+      }
+
+      return parts.length > 0 ? parts.join(' • ') : null;
+    })();
 
     // Resolution badge
     const resolution = formatResolution(image.width, image.height);
@@ -109,6 +117,9 @@ const ImageCard = forwardRef(
         : []),
     ];
 
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = imageSettings.showRelationshipIndicators ? indicators : [];
+
     // Handle click - if onClick provided, use it (for lightbox), otherwise navigate
     const handleClick = onClick
       ? (e) => {
@@ -129,7 +140,7 @@ const ImageCard = forwardRef(
         linkTo={onClick ? undefined : `/image/${image.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
-        indicators={indicators}
+        indicators={indicatorsToShow}
         maxTitleLines={2}
         displayPreferences={{ showDescription: imageSettings.showDescriptionOnCard }}
         ratingControlsProps={
