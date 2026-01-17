@@ -288,6 +288,17 @@ const Lightbox = ({
     }, 3000);
   }, [drawerOpen]);
 
+  // Exit fullscreen before closing lightbox (for all close triggers)
+  const handleCloseWithFullscreenExit = useCallback(() => {
+    // Exit browser fullscreen if active
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {
+        // Ignore errors (e.g., if already exiting)
+      });
+    }
+    onClose();
+  }, [onClose]);
+
   // Reset auto-hide on mouse movement (desktop)
   const handleMouseMove = useCallback(() => {
     showControls();
@@ -307,7 +318,7 @@ const Lightbox = ({
       if (drawerOpen) {
         setDrawerOpen(false);
       } else {
-        onClose();
+        handleCloseWithFullscreenExit();
       }
     },
     onTap: handleTap,
@@ -398,10 +409,8 @@ const Lightbox = ({
         case "Escape":
           if (drawerOpen) {
             setDrawerOpen(false);
-          } else if (isFullscreen) {
-            // Browser handles fullscreen exit, but we track state
           } else {
-            onClose();
+            handleCloseWithFullscreenExit();
           }
           break;
         case "ArrowLeft":
@@ -430,7 +439,7 @@ const Lightbox = ({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, goToPrevious, goToNext, toggleSlideshow, drawerOpen, isFullscreen, toggleFullscreen, showControls]);
+  }, [isOpen, handleCloseWithFullscreenExit, goToPrevious, goToNext, toggleSlideshow, drawerOpen, isFullscreen, toggleFullscreen, showControls]);
 
   // Cleanup controls timeout
   useEffect(() => {
@@ -586,7 +595,7 @@ const Lightbox = ({
 
           {/* Close button */}
           <button
-            onClick={onClose}
+            onClick={handleCloseWithFullscreenExit}
             className="p-2 rounded-full transition-colors"
             style={{
               backgroundColor: "rgba(0, 0, 0, 0.5)",

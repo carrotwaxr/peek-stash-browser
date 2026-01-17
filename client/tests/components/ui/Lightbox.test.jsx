@@ -501,4 +501,32 @@ describe("Lightbox", () => {
       expect(img.style.opacity).toBe("1");
     });
   });
+
+  describe("fullscreen exit behavior", () => {
+    it("exits fullscreen when close button is clicked", async () => {
+      const exitFullscreen = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(document, "fullscreenElement", {
+        value: document.body,
+        writable: true,
+        configurable: true,
+      });
+      document.exitFullscreen = exitFullscreen;
+
+      const onClose = vi.fn();
+      render(
+        <Lightbox
+          images={[{ id: "1", paths: { image: "/test.jpg" } }]}
+          isOpen={true}
+          onClose={onClose}
+          supportsFullscreen={true}
+        />
+      );
+
+      const closeButton = screen.getByLabelText("Close lightbox");
+      fireEvent.click(closeButton);
+
+      expect(exitFullscreen).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
+  });
 });
