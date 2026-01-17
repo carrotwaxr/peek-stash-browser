@@ -44,8 +44,8 @@
   </Overview>
   <Category>MediaApp:Video MediaServer:Video</Category>
   <WebUI>http://[IP]:[PORT:80]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-template.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/client/public/branding/logos/peek-logo.png</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/client/public/branding/logos/peek-logo.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>
@@ -53,7 +53,7 @@
   <DonateText/>
   <DonateLink/>
   <Description>
-    Modern web interface for Stash with real-time HLS transcoding, adaptive bitrate streaming, and advanced media browsing capabilities.
+    Modern web interface for Stash with multi-user support, playlists, recommendations, and watch history.
   </Description>
   <Networking>
     <Mode>bridge</Mode>
@@ -116,7 +116,7 @@
   <Config Name="Stash GraphQL URL (Legacy)" Target="STASH_URL" Default="" Mode="" Description="MIGRATION ONLY: Leave blank for new installs - configured via Setup Wizard. Existing v1.x installs: keep your value, it will auto-migrate to database on first start." Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
   <Config Name="Stash API Key (Legacy)" Target="STASH_API_KEY" Default="" Mode="" Description="MIGRATION ONLY: Leave blank for new installs - configured via Setup Wizard. Existing v1.x installs: keep your value, it will auto-migrate to database on first start." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
   <Config Name="Database URL" Target="DATABASE_URL" Default="file:/app/data/peek-db.db" Mode="" Description="SQLite database file path. Leave as default unless you know what you're doing." Type="Variable" Display="advanced" Required="false" Mask="false">file:/app/data/peek-db.db</Config>
-  <Config Name="Config Directory" Target="CONFIG_DIR" Default="/app/data" Mode="" Description="Directory for config and HLS cache. Should match App Data Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/data</Config>
+  <Config Name="Config Directory" Target="CONFIG_DIR" Default="/app/data" Mode="" Description="Directory for config and database. Should match App Data Directory container path." Type="Variable" Display="advanced" Required="false" Mask="false">/app/data</Config>
   <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment mode. Leave as 'production' for normal use." Type="Variable" Display="advanced" Required="false" Mask="false">production</Config>
   <Config Name="Secure Cookies" Target="SECURE_COOKIES" Default="false" Mode="" Description="Enable secure cookies (HTTPS only). Set to 'true' only if you use HTTPS with a reverse proxy." Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
 </Container>

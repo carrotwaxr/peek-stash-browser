@@ -31,10 +31,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // Enhance external links
+  // Enhance external links (open in new tab)
   const externalLinks = document.querySelectorAll('a[href^="http"]');
   externalLinks.forEach(link => {
-    if (!link.hostname.includes('carrotwaxr.github.io')) {
+    const isInternal = link.hostname.includes('carrotwaxr.github.io') ||
+                       link.hostname === 'localhost' ||
+                       link.hostname === '127.0.0.1';
+    if (!isInternal) {
       link.setAttribute('target', '_blank');
       link.setAttribute('rel', 'noopener noreferrer');
     }
