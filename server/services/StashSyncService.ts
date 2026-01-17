@@ -23,6 +23,7 @@ import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { userStatsService } from "./UserStatsService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
+import { mergeReconciliationService } from "./MergeReconciliationService.js";
 
 export interface SyncProgress {
   entityType: string;
@@ -1211,12 +1212,37 @@ class StashSyncService extends EventEmitter {
       let deletedCount = 0;
 
       switch (entityType) {
-        case "scene":
+        case "scene": {
+          // Before soft-deleting, check for merges and reconcile user data
+          const scenesToDelete = await prisma.stashScene.findMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            select: { id: true, phash: true },
+          });
+
+          for (const scene of scenesToDelete) {
+            if (scene.phash) {
+              // Try to find a merge target
+              const matches = await mergeReconciliationService.findPhashMatches(scene.id);
+              if (matches.length > 0) {
+                const target = matches[0]; // Use the recommended match
+                logger.info(`Detected merge: scene ${scene.id} -> ${target.sceneId}`);
+                await mergeReconciliationService.reconcileScene(
+                  scene.id,
+                  target.sceneId,
+                  scene.phash,
+                  null // automatic
+                );
+              }
+            }
+          }
+
+          // Now soft-delete all the scenes
           deletedCount = (await prisma.stashScene.updateMany({
             where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
+        }
         case "performer":
           deletedCount = (await prisma.stashPerformer.updateMany({
             where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
