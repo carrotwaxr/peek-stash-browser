@@ -28,6 +28,7 @@ import ratingsRoutes from "../routes/ratings.js";
 import setupRoutes from "../routes/setup.js";
 import syncRoutes from "../routes/sync.js";
 import exclusionsRoutes from "../routes/exclusions.js";
+import mergeReconciliationRoutes from "../routes/mergeReconciliation.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
@@ -114,6 +115,9 @@ export const setupAPI = () => {
 
   // Exclusion routes (protected - admin only for recomputing exclusions)
   app.use("/api/exclusions", exclusionsRoutes);
+
+  // Merge reconciliation routes (admin only)
+  app.use("/api/admin", mergeReconciliationRoutes);
 
   // User settings routes (protected)
   app.use("/api/user", userRoutes);
