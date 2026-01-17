@@ -13,6 +13,7 @@ import AccountTab from "../settings/tabs/AccountTab.jsx";
 import NavigationTab from "../settings/tabs/NavigationTab.jsx";
 import UserManagementTab from "../settings/tabs/UserManagementTab.jsx";
 import ServerConfigTab from "../settings/tabs/ServerConfigTab.jsx";
+import MergeRecoveryTab from "../settings/tabs/MergeRecoveryTab.jsx";
 
 // Tab definitions
 const USER_TABS = [
@@ -27,6 +28,7 @@ const USER_TABS = [
 const SERVER_TABS = [
   { id: "server-config", label: "Server Configuration" },
   { id: "user-management", label: "User Management" },
+  { id: "merge-recovery", label: "Merge Recovery" },
 ];
 
 const SettingsPage = () => {
@@ -116,6 +118,7 @@ const SettingsPage = () => {
             <>
               {activeTab === "server-config" && <ServerConfigTab />}
               {activeTab === "user-management" && <UserManagementTab />}
+              {activeTab === "merge-recovery" && <MergeRecoveryTab />}
             </>
           )}
         </SettingsLayout>
