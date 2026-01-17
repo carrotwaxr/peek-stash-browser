@@ -76,6 +76,9 @@ const StudioCard = forwardRef(
       ];
     }, [studio, navigate]);
 
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = studioSettings.showRelationshipIndicators ? indicators : [];
+
     return (
       <BaseCard
         ref={ref}
@@ -86,7 +89,7 @@ const StudioCard = forwardRef(
         linkTo={`/studio/${studio.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
-        indicators={indicators}
+        indicators={indicatorsToShow}
         maxTitleLines={2}
         displayPreferences={{ showDescription: studioSettings.showDescriptionOnCard }}
         ratingControlsProps={{

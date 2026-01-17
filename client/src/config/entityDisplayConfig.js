@@ -179,6 +179,8 @@ export const ENTITY_DISPLAY_CONFIG = {
       defaultViewMode: "grid",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
+      showStudio: true,
+      showDate: true,
       showRelationshipIndicators: true,
       showRating: true,
       showFavorite: true,
@@ -186,6 +188,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     },
     availableSettings: [
       "defaultViewMode",
+      "showStudio",
+      "showDate",
       "showDescriptionOnCard",
       "showDescriptionOnDetail",
       "showRelationshipIndicators",

@@ -82,6 +82,9 @@ const TagCard = forwardRef(
       ];
     }, [tag, navigate]);
 
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = tagSettings.showRelationshipIndicators ? indicators : [];
+
     return (
       <BaseCard
         ref={ref}
@@ -93,7 +96,7 @@ const TagCard = forwardRef(
         linkTo={`/tag/${tag.id}`}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
-        indicators={indicators}
+        indicators={indicatorsToShow}
         maxTitleLines={2}
         displayPreferences={{ showDescription: tagSettings.showDescriptionOnCard }}
         ratingControlsProps={
