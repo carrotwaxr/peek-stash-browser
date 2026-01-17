@@ -9,6 +9,20 @@ describe("ImageQueryBuilder", () => {
   const testImageIds = ["999001", "999002", "999003"];
 
   beforeEach(async () => {
+    // Clean up any leftover data from previous failed runs
+    await prisma.imageRating.deleteMany({ where: { userId: testUserId } });
+    await prisma.imageViewHistory.deleteMany({ where: { userId: testUserId } });
+    await prisma.userExcludedEntity.deleteMany({ where: { userId: testUserId } });
+    await prisma.imageGallery.deleteMany({ where: { imageId: { in: testImageIds } } });
+    await prisma.imagePerformer.deleteMany({ where: { imageId: { in: testImageIds } } });
+    await prisma.imageTag.deleteMany({ where: { imageId: { in: testImageIds } } });
+    await prisma.stashImage.deleteMany({ where: { id: { in: testImageIds } } });
+    await prisma.stashGallery.deleteMany({ where: { id: "gallery-1" } });
+    await prisma.stashStudio.deleteMany({ where: { id: "studio-1" } });
+    await prisma.stashTag.deleteMany({ where: { id: { startsWith: "tag-" } } });
+    await prisma.stashPerformer.deleteMany({ where: { id: { startsWith: "perf-" } } });
+    await prisma.user.deleteMany({ where: { id: testUserId } });
+
     // Create test user
     await prisma.user.create({
       data: { id: testUserId, username: "test-iqb", password: "test" },

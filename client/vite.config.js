@@ -51,7 +51,7 @@ export default defineConfig({
       // Polling is only needed for Docker on Windows (WSL2 doesn't propagate fs events).
       // On Linux, native inotify works fine - no polling needed.
       // Set CHOKIDAR_USEPOLLING=true in environment for Windows dev (see docker-compose.windows.yml)
-      usePolling: process.env.CHOKIDAR_USEPOLLING === "true",
+      usePolling: globalThis.process?.env?.CHOKIDAR_USEPOLLING === "true",
       interval: 1000,
       // Only watch src files, ignore everything else
       ignored: [

@@ -1,23 +1,23 @@
 // client/tests/components/ui/MarqueeText.test.jsx
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import MarqueeText from "../../../src/components/ui/MarqueeText.jsx";
 
 // Mock ResizeObserver
-const mockResizeObserver = vi.fn((callback) => ({
+const mockResizeObserver = vi.fn(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 }));
-global.ResizeObserver = mockResizeObserver;
+globalThis.ResizeObserver = mockResizeObserver;
 
 // Mock IntersectionObserver
-const mockIntersectionObserver = vi.fn((callback) => ({
+const mockIntersectionObserver = vi.fn(() => ({
   observe: vi.fn(),
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 }));
-global.IntersectionObserver = mockIntersectionObserver;
+globalThis.IntersectionObserver = mockIntersectionObserver;
 
 describe("MarqueeText", () => {
   let matchMediaMock;
@@ -31,7 +31,7 @@ describe("MarqueeText", () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
-    global.matchMedia = matchMediaMock;
+    globalThis.matchMedia = matchMediaMock;
   });
 
   afterEach(() => {
