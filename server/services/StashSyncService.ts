@@ -134,6 +134,39 @@ function validateEntityId(id: string): boolean {
   return /^[a-zA-Z0-9_-]+$/.test(id);
 }
 
+/**
+ * Extract PHASH fingerprints from scene files.
+ * Returns primary phash and array of all phashes.
+ */
+function extractPhashes(files: Array<{ fingerprints?: Array<{ type: string; value: string }> }> | undefined): {
+  phash: string | null;
+  phashes: string | null;
+} {
+  if (!files || files.length === 0) {
+    return { phash: null, phashes: null };
+  }
+
+  const allPhashes: string[] = [];
+  for (const file of files) {
+    if (file.fingerprints) {
+      for (const fp of file.fingerprints) {
+        if (fp.type === "phash" && fp.value) {
+          allPhashes.push(fp.value);
+        }
+      }
+    }
+  }
+
+  if (allPhashes.length === 0) {
+    return { phash: null, phashes: null };
+  }
+
+  return {
+    phash: allPhashes[0],
+    phashes: allPhashes.length > 1 ? JSON.stringify(allPhashes) : null,
+  };
+}
+
 class StashSyncService extends EventEmitter {
   private syncInProgress = false;
   private readonly PAGE_SIZE = BATCH_SIZE;
@@ -911,6 +944,8 @@ class StashSyncService extends EventEmitter {
       .map((scene) => {
         const file = scene.files?.[0];
         const paths = scene.paths as any; // Cast to any to access optional chapters_vtt
+        // Extract phashes from files
+        const { phash, phashes } = extractPhashes(scene.files);
 
         return `(
       '${this.escape(scene.id)}',
@@ -947,7 +982,9 @@ class StashSyncService extends EventEmitter {
       ${scene.created_at ? `'${scene.created_at}'` : "NULL"},
       ${scene.updated_at ? `'${scene.updated_at}'` : "NULL"},
       datetime('now'),
-      NULL
+      NULL,
+      ${this.escapeNullable(phash)},
+      ${this.escapeNullable(phashes)}
     )`;
       })
       .join(",\n");
@@ -959,7 +996,7 @@ class StashSyncService extends EventEmitter {
       fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
       pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption,
       streams, oCounter, playCount, playDuration, stashCreatedAt, stashUpdatedAt,
-      syncedAt, deletedAt
+      syncedAt, deletedAt, phash, phashes
     ) VALUES ${sceneValues}
     ON CONFLICT(id) DO UPDATE SET
       title = excluded.title,
@@ -994,7 +1031,9 @@ class StashSyncService extends EventEmitter {
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
       syncedAt = excluded.syncedAt,
-      deletedAt = NULL
+      deletedAt = NULL,
+      phash = excluded.phash,
+      phashes = excluded.phashes
   `);
 
     // Collect all junction records (validate related entity IDs too)
