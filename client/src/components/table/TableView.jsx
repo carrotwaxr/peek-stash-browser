@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import TableHeader from "./TableHeader.jsx";
 import { getCellRenderer } from "./cellRenderers.jsx";
 
@@ -27,6 +27,32 @@ const TableView = ({
 }) => {
   // Context menu state: { columnId, x, y } or null
   const [contextMenu, setContextMenu] = useState(null);
+
+  // Scroll state for showing/hiding the scroll hint
+  const scrollContainerRef = useRef(null);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScrollState = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (el) {
+      const hasMoreToScroll = el.scrollWidth > el.clientWidth &&
+        el.scrollLeft < el.scrollWidth - el.clientWidth - 1;
+      setCanScrollRight(hasMoreToScroll);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkScrollState();
+    const el = scrollContainerRef.current;
+    if (el) {
+      el.addEventListener("scroll", checkScrollState);
+      window.addEventListener("resize", checkScrollState);
+      return () => {
+        el.removeEventListener("scroll", checkScrollState);
+        window.removeEventListener("resize", checkScrollState);
+      };
+    }
+  }, [checkScrollState, columns]);
 
   /**
    * Handle right-click on column header
@@ -135,8 +161,24 @@ const TableView = ({
   };
 
   return (
-    <div className="w-full">
-      <table className="w-full table-fixed">
+    <div className="relative w-full">
+      {/* Scroll shadow hint on right edge - only shown when more content to scroll */}
+      {canScrollRight && (
+        <div
+          className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10"
+          style={{
+            background:
+              "linear-gradient(to right, transparent, var(--bg-primary))",
+            opacity: 0.7,
+          }}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        ref={scrollContainerRef}
+        className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]"
+      >
+        <table className="table-fixed min-w-full">
         <TableHeader
           columns={columns}
           sort={sort}
@@ -148,9 +190,10 @@ const TableView = ({
         <tbody>
           {isLoading ? renderSkeletonRows() : renderRows()}
         </tbody>
-      </table>
+        </table>
+      </div>
 
-      {/* Context Menu */}
+      {/* Context Menu - outside scroll container since it's fixed-positioned */}
       {contextMenu && (
         <>
           {/* Backdrop to close menu on click */}
