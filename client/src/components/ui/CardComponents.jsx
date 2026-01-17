@@ -43,8 +43,6 @@ export const CardContainer = forwardRef(
         style={{
           backgroundColor: "var(--bg-card)",
           borderColor: "var(--border-color)",
-          minHeight: "20rem", // 320px
-          maxHeight: "36rem", // 576px
           ...style,
         }}
         onClick={onClick}
@@ -363,13 +361,15 @@ export const CardTitle = ({
     titleElement
   );
 
+  // Only render subtitle when it has content and isn't hidden
+  const shouldShowSubtitle = !hideSubtitle && subtitle;
+
   // Subtitle also becomes a link if linkTo provided
-  const subtitleElement = !hideSubtitle && (
+  const subtitleElement = shouldShowSubtitle ? (
     <h4
       className="text-sm leading-tight text-center"
       style={{
         color: "var(--text-muted)",
-        height: "1.25rem", // Always reserve space for subtitle
         display: "-webkit-box",
         WebkitLineClamp: 1,
         WebkitBoxOrient: "vertical",
@@ -380,7 +380,7 @@ export const CardTitle = ({
     >
       {subtitle}
     </h4>
-  );
+  ) : null;
 
   const subtitleContent = linkTo && subtitleElement ? (
     <Link
@@ -421,18 +421,23 @@ export const CardDescription = ({ description, maxLines = 3 }) => {
 };
 
 /**
- * Card indicators section (always fixed height for consistency)
+ * Card indicators section - only renders when there are indicators
  */
 export const CardIndicators = ({ indicators }) => {
+  // Don't render anything if no indicators
+  if (!indicators || indicators.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="my-2 w-full" style={{ height: "3.5rem" }}>
-      {indicators && <CardCountIndicators indicators={indicators} />}
+    <div className="my-2 w-full">
+      <CardCountIndicators indicators={indicators} />
     </div>
   );
 };
 
 /**
- * Card rating and favorite row (always fixed height for consistency)
+ * Card rating and favorite row - uses compact height when only menu is visible
  * Shows rating badge (left), O counter (center-right), and favorite button (right)
  * O Counter is interactive for scenes and images, display-only for other entities
  * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
@@ -554,11 +559,14 @@ export const CardRatingRow = ({
   // Check if this is a scene or image (both allow interactive O counter)
   const isSceneOrImage = entityType === "scene" || entityType === "image";
 
+  // Use compact height when only menu is visible
+  const hasVisibleControls = showRating || showFavorite || showOCounter;
+
   return (
     <>
       <div
         className="flex justify-between items-center w-full my-1"
-        style={{ height: "2rem" }}
+        style={{ height: hasVisibleControls ? "2rem" : "1.5rem" }}
       >
         {/* Left side: Rating badge */}
         <div ref={badgeRef}>
