@@ -8,8 +8,6 @@
 
 **Tech Stack:** TypeScript, Prisma with SQLite, React
 
-**Reference:** [scalability-audit-500k-scenes.md](../design/scalability-audit-500k-scenes.md)
-
 ---
 
 ## Phase 1: Critical Fixes (Blocks 500k Users)

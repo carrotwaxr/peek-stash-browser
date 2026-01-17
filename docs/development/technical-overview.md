@@ -1,152 +1,6 @@
 # Peek Technical Overview
 
-This document serves as a reference for entity types, relationships, and content filtering architecture in Peek. It's designed to be consulted when working on features that interact with the data model.
-
----
-
-## Entity Types
-
-Peek mirrors Stash's entity model, caching entities locally in SQLite. This enables:
-- **Performant queries** — No network round-trips to Stash for library browsing
-- **Per-user features** — Content restrictions, hidden items, ratings, favorites, watch history
-- **Offline resilience** — Library remains accessible if Stash is temporarily unavailable
-
-| Entity | Stash Source | Peek Cache Table | Notes |
-|--------|--------------|------------------|-------|
-| Scene | ✓ | `StashScene` | Primary content type |
-| Performer | ✓ | `StashPerformer` | |
-| Studio | ✓ | `StashStudio` | Has parent/child hierarchy |
-| Tag | ✓ | `StashTag` | Has parent/child DAG |
-| Group | ✓ | `StashGroup` | Has parent/child hierarchy (containing_groups/sub_groups) |
-| Gallery | ✓ | `StashGallery` | Contains Images |
-| Image | ✓ | `StashImage` | |
-| Playlist | Peek-only | `Playlist` | User-created scene collections |
-| SceneMarker | ✓ | Not cached | Clips from Scenes (future feature) |
-
----
-
-## Entity Relationships
-
-### Scene Relationships
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Studio | Many-to-One | — | `StashScene.studioId` |
-| Performer | Many-to-Many | `ScenePerformer` | |
-| Tag | Many-to-Many | `SceneTag` | |
-| Group | Many-to-Many | `SceneGroup` | Includes `sceneIndex` for ordering |
-| Gallery | Many-to-Many | `SceneGallery` | |
-
-### Performer Relationships
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Scene | Many-to-Many | `ScenePerformer` | Inverse of Scene→Performer |
-| Tag | Many-to-Many | `PerformerTag` | |
-| Image | Many-to-Many | `ImagePerformer` | |
-| Gallery | Many-to-Many | `GalleryPerformer` | |
-| Group | — | — | Computed by Stash (performers appearing in group's scenes) |
-
-### Studio Relationships
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Scene | One-to-Many | — | Inverse of Scene→Studio |
-| Tag | Many-to-Many | `StudioTag` | |
-| Image | One-to-Many | — | `StashImage.studioId` |
-| Gallery | One-to-Many | — | `StashGallery.studioId` |
-| Parent Studio | Many-to-One | — | `StashStudio.parentId` |
-| Child Studios | One-to-Many | — | Inverse of parentId |
-| Group | — | — | Computed by Stash (groups with this studio) |
-
-### Tag Relationships
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Scene | Many-to-Many | `SceneTag` | Inverse of Scene→Tag |
-| Performer | Many-to-Many | `PerformerTag` | Inverse of Performer→Tag |
-| Studio | Many-to-Many | `StudioTag` | Inverse of Studio→Tag |
-| Group | Many-to-Many | `GroupTag` | Inverse of Group→Tag |
-| Gallery | Many-to-Many | `GalleryTag` | Inverse of Gallery→Tag |
-| Image | Many-to-Many | `ImageTag` | Inverse of Image→Tag |
-| Parent Tags | Many-to-Many | — | `StashTag.parentIds` (JSON array) |
-| Child Tags | Many-to-Many | — | Inverse, resolved at runtime |
-
-**Note:** Tag hierarchies form a DAG (directed acyclic graph), not a tree. Tags can have multiple parents.
-
-### Group Relationships
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Scene | Many-to-Many | `SceneGroup` | Includes `sceneIndex` for ordering |
-| Tag | Many-to-Many | `GroupTag` | |
-| Studio | Many-to-One | — | `StashGroup.studioId` |
-| Containing Groups | Many-to-Many | — | Via Stash `containing_groups` |
-| Sub Groups | Many-to-Many | — | Via Stash `sub_groups` |
-
-### Gallery Relationships
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Scene | Many-to-Many | `SceneGallery` | Inverse of Scene→Gallery |
-| Performer | Many-to-Many | `GalleryPerformer` | |
-| Tag | Many-to-Many | `GalleryTag` | |
-| Studio | Many-to-One | — | `StashGallery.studioId` |
-| Image | One-to-Many | `ImageGallery` | |
-
-### Image Relationships
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Gallery | Many-to-Many | `ImageGallery` | |
-| Performer | Many-to-Many | `ImagePerformer` | |
-| Tag | Many-to-Many | `ImageTag` | |
-| Studio | Many-to-One | — | `StashImage.studioId` |
-
-### Playlist Relationships (Peek-only)
-
-| Related Entity | Cardinality | Junction Table | Notes |
-|----------------|-------------|----------------|-------|
-| Scene | Many-to-Many | `PlaylistItem` | Includes `position` for ordering |
-| User | Many-to-One | — | `Playlist.userId` |
-
----
-
-## Pseudo-Relationships (Inheritance)
-
-Some relationships are "inherited" for display/search/filtering purposes.
-
-### Scene Tag Inheritance
-
-When filtering Scenes (e.g., for content restrictions), Tags are collected from multiple sources:
-
-| Source | Description |
-|--------|-------------|
-| Direct Scene Tags | Explicitly assigned to the scene |
-| Performer Tags | Tags on any Performer in the scene |
-| Studio Tags | Tags on the scene's Studio |
-| Group Tags | Tags on any Group the scene belongs to |
-
-**Implementation:** `UserRestrictionService.getSceneEntityIds()` collects tags from all sources.
-
-**Rationale:** If a Tag represents content that should be restricted (e.g., "explicit"), that restriction should apply whether the tag is on the scene directly, on a performer in the scene, on the studio, or on a thematic group/series.
-
-### Image Gallery Inheritance
-
-Images can inherit metadata from their parent Gallery during sync. This denormalization enables simpler queries and consistent filtering.
-
-| Field | Inheritance Behavior |
-|-------|---------------------|
-| Performers | Inherit from Gallery if Image has none |
-| Tags | Inherit from Gallery if Image has none |
-| Studio | Inherit from Gallery if Image has none |
-| Date | Inherit from Gallery if Image has none |
-| Photographer | Inherit from Gallery if Image has none |
-| Details | Inherit from Gallery if Image has none |
-
-**Note:** Image `title` is NOT inherited — each image keeps its own name.
-
-**Status:** Not yet implemented. Currently Images only have their directly-assigned metadata.
+This document covers Peek's architecture, content filtering system, and implementation details. For entity relationships and the data model, see [Entity Relationships](../reference/entity-relationships.md).
 
 ---
 
@@ -506,77 +360,64 @@ GET  /api/admin/exclusion-stats
 
 ## Implementation Notes
 
-### Service Files (Current)
+### Service Architecture
+
+The backend uses SQL-based query builders with pre-computed exclusions for efficient filtering at scale.
+
+#### Core Services
 
 | Service | Purpose |
 |---------|---------|
-| `UserRestrictionService.ts` | Applies INCLUDE/EXCLUDE rules, hidden entity cascade |
-| `UserHiddenEntityService.ts` | CRUD for user hidden entities |
-| `EmptyEntityFilterService.ts` | Removes empty organizational entities |
-| `FilteredEntityCacheService.ts` | Per-user in-memory cache of filtered results |
-| `StashCacheManager.ts` | Server-wide entity cache from Stash |
-
-### Service Files (Proposed)
-
-| Service | Purpose |
-|---------|---------|
+| `StashEntityService.ts` | Database queries for Stash entities (replaces in-memory cache) |
+| `StashSyncService.ts` | Syncs data from Stash GraphQL API to local database |
+| `UserHiddenEntityService.ts` | CRUD for user-hidden entities |
 | `ExclusionComputationService.ts` | Computes and maintains `UserExcludedEntity` table |
-| `ExclusionQueryService.ts` | Provides query builders with exclusion JOINs |
+| `EntityExclusionHelper.ts` | Helper functions for exclusion logic |
 
-### Controller Patterns (Current)
+#### Query Builders
 
-Library controllers follow this pattern:
+Each entity type has a dedicated query builder that handles filtering, sorting, pagination, and exclusion JOINs:
+
+| Query Builder | Entity |
+|---------------|--------|
+| `SceneQueryBuilder.ts` | Scenes |
+| `PerformerQueryBuilder.ts` | Performers |
+| `StudioQueryBuilder.ts` | Studios |
+| `TagQueryBuilder.ts` | Tags |
+| `GroupQueryBuilder.ts` | Groups |
+| `GalleryQueryBuilder.ts` | Galleries |
+| `ImageQueryBuilder.ts` | Images |
+
+#### Other Services
+
+| Service | Purpose |
+|---------|---------|
+| `RecommendationScoringService.ts` | Personalized scene recommendations |
+| `UserStatsService.ts` | User activity statistics |
+| `UserStatsAggregationService.ts` | Aggregated stats computation |
+| `SceneTagInheritanceService.ts` | Computes inherited tags for scenes |
+| `ImageGalleryInheritanceService.ts` | Propagates gallery metadata to images |
+
+### Query Pattern
+
+Library controllers use query builders for efficient SQL-based filtering:
+
 ```typescript
-// 1. Get all entities from cache
-let scenes = stashCacheManager.getAllScenes();
+// Query with exclusion JOIN — filtering, pagination, and count in one query
+const result = await sceneQueryBuilder
+  .forUser(userId)
+  .withFilters(filters)
+  .withSort(sort)
+  .paginate(offset, limit)
+  .execute();
 
-// 2. Apply user restrictions (if not admin)
-if (user.role !== 'ADMIN') {
-  scenes = await userRestrictionService.filterScenesForUser(scenes, userId);
-}
-
-// 3. Apply empty filtering (if not admin)
-if (user.role !== 'ADMIN') {
-  scenes = emptyEntityFilterService.filterEmptyScenes(scenes, ...);
-}
-
-// 4. Apply search/filter/sort
-scenes = applyFilters(scenes, filters);
-
-// 5. Paginate
-const page = scenes.slice(offset, offset + limit);
+// Returns { items: Scene[], total: number }
+// Already filtered by user exclusions, already paginated
 ```
 
-### Future Pattern (With Pre-Computed Exclusions)
-
-```typescript
-// 1. Query with exclusion JOIN — filtering, pagination, and count in one query
-const { scenes, total } = await exclusionQueryService.findScenes(userId, {
-  filters,
-  sort,
-  offset,
-  limit,
-});
-
-// Already filtered, already paginated, already counted
-```
+This replaces the old pattern of loading all entities into memory and filtering in JavaScript.
 
 ---
 
-## Appendix: Stash GraphQL Schema Reference
-
-Key entity types from Stash for reference:
-
-- **Scene**: `id`, `title`, `date`, `studio`, `performers[]`, `tags[]`, `groups[]`, `galleries[]`, `files[]` (contains `duration`)
-- **Performer**: `id`, `name`, `tags[]`, `scene_count`, `image_count`, `gallery_count`, `group_count`
-- **Studio**: `id`, `name`, `parent_studio`, `child_studios[]`, `tags[]`, `groups[]`
-- **Tag**: `id`, `name`, `parents[]`, `children[]`, various `*_count` fields
-- **Group**: `id`, `name`, `studio`, `tags[]`, `containing_groups[]`, `sub_groups[]`, `scenes[]`
-- **Gallery**: `id`, `title`, `date`, `studio`, `performers[]`, `tags[]`, `scenes[]`, `image_count`, `photographer`, `details`
-- **Image**: `id`, `title`, `date`, `studio`, `performers[]`, `tags[]`, `galleries[]`, `photographer`, `details`
-- **SceneMarker**: `id`, `scene`, `primary_tag`, `tags[]`, `seconds`, `end_seconds`
-
----
-
-*Document Version: 3.0*
-*Last Updated: 2025-01-02*
+*Document Version: 3.2*
+*Last Updated: 2026-01-17*

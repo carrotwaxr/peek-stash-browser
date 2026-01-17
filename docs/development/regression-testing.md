@@ -752,4 +752,4 @@ As new features are added, update this regression testing guide:
 4. Keep test steps concise and actionable
 5. Include preconditions and expected results for clarity
 
-**Last Updated**: 2025-01-21 (Version 1.6.0)
+**Last Updated**: 2026-01-17 (Version 3.2)
