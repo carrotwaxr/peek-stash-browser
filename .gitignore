@@ -73,6 +73,9 @@ server/*.sqlite3
 # MkDocs build output
 site/
 
+# Python virtual environment (for mkdocs)
+.venv/
+
 # Claude Code local settings (user-specific)
 .claude/settings.local.json
 

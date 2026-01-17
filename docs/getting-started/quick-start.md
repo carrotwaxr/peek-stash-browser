@@ -17,44 +17,30 @@ Get Peek up and running in 5 minutes!
     docker run -d \
       --name peek-stash-browser \
       -p 6969:80 \
-      -v /path/to/media:/app/media:ro \
       -v peek-data:/app/data \
-      -e STASH_URL="http://your-stash:9999/graphql" \
-      -e STASH_API_KEY="your_api_key" \
       -e JWT_SECRET="${JWT_SECRET}" \
       carrotwaxr/peek-stash-browser:latest
     ```
 
 === "unRAID"
 
-    1. Search "Peek Stash Browser" in Community Applications
-    2. Click Install
-    3. Configure Stash URL and API key
+    1. Download the [unRAID template](https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml)
+    2. Copy to `/boot/config/plugins/dockerMan/templates-user/`
+    3. Go to Docker → Add Container → Select "Peek" from User Templates
     4. Generate JWT secret: `openssl rand -hex 32`
     5. Click Apply
 
-=== "Docker Compose"
-
-    ```bash
-    git clone https://github.com/carrotwaxr/peek-stash-browser.git
-    cd peek-stash-browser
-    cp .env.example .env
-    # Edit .env with your settings
-    docker-compose up -d
-    ```
+!!! tip "For Developers"
+    Want to contribute or run with hot reloading? See [Local Development Setup](../development/local-setup.md).
 
 ## Step 2: Setup Wizard
 
 1. Open browser: `http://localhost:6969` (or your server IP)
-2. Complete the 5-step setup wizard:
+2. Complete the 4-step setup wizard:
    - **Welcome** - Introduction to Peek
-   - **Discover Libraries** - Auto-discover your Stash library paths
-   - **Configure Paths** - Map Stash paths to Peek container paths
    - **Create Admin** - Set your admin username and password
+   - **Connect to Stash** - Enter your Stash URL and API key
    - **Complete** - Setup finished!
-
-!!! tip "Path Mapping Made Easy"
-    The wizard automatically discovers your Stash libraries and helps you configure path mappings correctly!
 
 ## Step 3: Browse Your Library
 
@@ -148,8 +134,8 @@ Organize your favorite scenes into custom playlists:
 
 ### No Scenes Showing
 
-- Check `STASH_URL` is correct
-- Verify `STASH_API_KEY` is valid
+- Check your Stash connection in Settings → Server Settings
+- Verify your Stash API key is valid in Stash → Settings → Security
 - Test Stash connectivity from container:
   ```bash
   docker exec peek-stash-browser curl http://your-stash:9999/graphql
@@ -157,12 +143,9 @@ Organize your favorite scenes into custom playlists:
 
 ### Videos Won't Play
 
-- Verify media path is mounted correctly:
-  ```bash
-  docker exec peek-stash-browser ls /app/media
-  ```
-- Check path mapping configuration
-- Ensure FFmpeg is installed (included in official image)
+- Check container logs: `docker logs peek-stash-browser`
+- Verify Stash is accessible and streaming is working in Stash itself
+- Check browser console for errors
 
 ## Next Steps
 

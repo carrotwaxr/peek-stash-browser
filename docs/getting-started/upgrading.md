@@ -1,235 +1,138 @@
 # Upgrading Peek
 
-This guide covers upgrading Peek to new versions, including database migration procedures and backup strategies.
+Most upgrades are automatic - just pull the latest image and restart. This page covers backup procedures and version-specific notes.
 
-## Version 3.0.0 - SQLite Entity Cache
+## Standard Update Procedure
 
-**Release Type:** Stable
+See [Installation - Update Procedure](installation.md#update-procedure) for step-by-step instructions on updating your container.
 
-Version 3.0.0 introduces a major architectural change: Stash entity data is now stored in SQLite tables instead of being held in memory. This provides:
+## Backup Procedure
 
-- **Scalability**: Support for 100k+ scenes without memory exhaustion
-- **Performance**: Sub-100ms query times with proper indexing
-- **Persistence**: Library data survives container restarts
+Before major upgrades, back up your database. Your Peek database is a single SQLite file.
 
-### What's Changed
+=== "unRAID"
 
-| Before (v2.1.x) | After (v3.0.0) |
-|-----------------|----------------|
-| In-memory cache | SQLite tables |
-| ~3.6 hour sync for 22k scenes | ~3 minute sync |
-| Memory-limited (~50k scenes max) | Disk-limited (tested to 100k+) |
-| Data lost on restart | Data persists |
+    1. Navigate to your Peek appdata folder (typically `/mnt/user/appdata/peek-stash-browser/`)
+    2. Copy `peek-stash-browser.db` to a safe location
+    3. Also copy `peek-stash-browser.db-wal` and `peek-stash-browser.db-shm` if they exist
 
-### Database Changes Summary
+=== "Docker (Named Volume)"
 
-The migration adds **new tables only** - it does NOT modify your existing user data tables:
+    ```bash
+    # Stop Peek for a clean backup
+    docker stop peek-stash-browser
 
-**New Tables (23 total):**
-- 7 entity tables: `StashScene`, `StashPerformer`, `StashStudio`, `StashTag`, `StashGroup`, `StashGallery`, `StashImage`
-- 14 junction tables for relationships (e.g., `ScenePerformer`, `SceneTag`, `PerformerTag`)
-- 2 sync management tables: `SyncState`, `SyncSettings`
+    # Copy from named volume
+    docker run --rm -v peek-data:/data -v $(pwd):/backup alpine \
+      cp /data/peek-stash-browser.db /backup/peek-stash-browser.db.backup
 
-**Preserved Data:**
-- User accounts and passwords
-- Watch history and resume positions
-- Playlists and playlist items
-- Scene/performer/studio/tag ratings and favorites
-- Filter presets and carousel preferences
-- Content restrictions and hidden entities
-- Custom themes
+    # Restart
+    docker start peek-stash-browser
+    ```
 
-### Pre-Upgrade Checklist
+=== "Docker (Bind Mount)"
 
-1. **Back up your database** (see [Backup Procedure](#backup-procedure) below)
-2. Note your current Peek version: Settings > Server Statistics
-3. Ensure Docker has sufficient disk space (~500MB for 100k scenes)
+    ```bash
+    # Stop Peek for a clean backup
+    docker stop peek-stash-browser
 
-### Backup Procedure
+    # Copy the database file
+    cp /path/to/your/data/peek-stash-browser.db ./peek-stash-browser.db.backup
 
-Your Peek database is a single SQLite file. Back it up before upgrading:
+    # Restart
+    docker start peek-stash-browser
+    ```
 
-#### Option 1: Docker Compose (Recommended)
+!!! tip "Hot Backup (While Running)"
+    If you can't stop the container:
+    ```bash
+    docker exec peek-stash-browser sqlite3 /app/data/peek-stash-browser.db ".backup '/app/data/backup.db'"
+    docker cp peek-stash-browser:/app/data/backup.db ./peek-stash-browser.db.backup
+    ```
 
-```bash
-# Stop Peek to ensure clean backup
-docker-compose stop peek-server
-
-# Find your data directory (check your docker-compose.yml volumes)
-# Default is ./data or a named volume
-
-# Copy the database file
-cp ./data/peek.db ./data/peek.db.backup-$(date +%Y%m%d)
-
-# Or if using a named volume:
-docker run --rm -v peek_data:/data -v $(pwd):/backup alpine \
-  cp /data/peek.db /backup/peek.db.backup-$(date +%Y%m%d)
-
-# Restart Peek
-docker-compose start peek-server
-```
-
-#### Option 2: unRAID Users
-
-1. Navigate to your Peek appdata folder (typically `/mnt/user/appdata/peek/`)
-2. Copy `peek.db` to a safe location outside the container
-3. Also copy `peek.db-wal` and `peek.db-shm` if they exist (WAL mode files)
-
-#### Option 3: While Running (Less Safe)
-
-SQLite supports hot backups, but stopping the container is safer:
-
-```bash
-# If you can't stop the container
-docker exec peek-server sqlite3 /app/data/peek.db ".backup '/app/data/peek-backup.db'"
-docker cp peek-server:/app/data/peek-backup.db ./peek.db.backup
-```
-
-### Upgrade Steps
-
-#### Step 1: Pull the New Image
-
-```bash
-# For docker-compose users
-docker-compose pull
-
-# For manual docker users
-docker pull carrotwaxr/peek-stash-browser:3.0.0
-# or for latest
-docker pull carrotwaxr/peek-stash-browser:latest
-```
-
-#### Step 2: Restart the Container
-
-```bash
-# Docker Compose
-docker-compose down
-docker-compose up -d
-
-# Manual Docker
-docker stop peek-server
-docker rm peek-server
-docker run -d --name peek-server ... carrotwaxr/peek-stash-browser:3.0.0
-```
-
-#### Step 3: Wait for Migration
-
-On first startup, Prisma will automatically apply the migration:
-- Check logs: `docker-compose logs -f peek-server`
-- Look for: `Applied migration: 20251211000000_stash_entities`
-- Migration typically completes in under 5 seconds
-
-#### Step 4: Wait for Initial Sync
-
-The sync starts **automatically** on first startup after migration. Watch the logs or the sync progress banner in the UI.
-
-Sync times depend on your library size:
-| Library Size | Expected Time |
-|--------------|---------------|
-| 1,000 scenes | ~15 seconds |
-| 10,000 scenes | ~1-2 minutes |
-| 50,000 scenes | ~5-8 minutes |
-| 100,000 scenes | ~15-20 minutes |
-
-### Upgrading from 3.0.0 Beta Versions
-
-If you're upgrading from any v3.0.0-beta.x version, **we recommend running a full sync** after upgrading to ensure your database has all the latest fields populated correctly.
-
-**Why a full sync is recommended:**
-- beta.6 added `fileBasename` for gallery display
-- beta.9 added `fakeTits` for performer filtering
-
-**How to run a full sync:**
-1. Go to **Settings > Server Settings**
-2. Click **Sync from Stash**
-3. Select **Full Sync** (not incremental)
-4. Wait for completion
-
-This ensures all new fields are populated for existing data.
-
-### Rollback Procedure
-
-If something goes wrong, you can restore your backup:
+## Restore from Backup
 
 ```bash
 # Stop Peek
-docker-compose stop peek-server
+docker stop peek-stash-browser
 
-# Restore the backup
-cp ./data/peek.db.backup-YYYYMMDD ./data/peek.db
+# Replace database with backup
+# (adjust paths for your setup)
+cp ./peek-stash-browser.db.backup /path/to/data/peek-stash-browser.db
 
-# Restart with old image
-docker-compose up -d
+# Restart
+docker start peek-stash-browser
 ```
-
-Note: If you need to downgrade the Docker image version, you may need to delete the migration record:
-
-```bash
-# Only if downgrading AND experiencing migration errors
-docker exec peek-server sqlite3 /app/data/peek.db \
-  "DELETE FROM _prisma_migrations WHERE migration_name = '20251211000000_stash_entities'"
-```
-
-### Troubleshooting
-
-#### "Library is empty after upgrade"
-
-The sync should start automatically on first startup. If your library appears empty after waiting several minutes, check the logs for errors. You can also manually trigger a sync from Settings > Sync.
-
-#### "Migration failed"
-
-Check the logs for the specific error:
-```bash
-docker-compose logs peek-server | grep -i migration
-```
-
-Common issues:
-- **Disk full**: Free up space and restart
-- **Permission denied**: Check volume mount permissions
-- **Database locked**: Stop other processes accessing the DB
-
-#### "Sync is very slow"
-
-The initial sync after upgrade fetches all data from Stash. Subsequent syncs are incremental and much faster (typically <30 seconds).
-
-#### "Can't connect to Stash"
-
-Verify your Stash configuration in Settings. The upgrade doesn't change your Stash connection settings.
-
-#### "Performer filters not working correctly"
-
-If performer filters (like career length, ethnicity, eye color) aren't working as expected, run a full sync to ensure all performer fields are populated.
-
-### Reporting Issues
-
-Found a bug? Please report it:
-- GitHub: [github.com/carrotwaxr/peek-stash-browser/issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-- Discourse: [discourse.stashapp.cc](https://discourse.stashapp.cc/t/peek-stash-browser/4018)
-
-Include:
-1. Your Peek version (Settings > Server Statistics)
-2. Your Stash version
-3. Library size (scene count)
-4. Relevant log output
-5. Steps to reproduce
 
 ---
 
-## Previous Version Upgrades
+## Version Notes
 
-### v2.0.0 - Stash Proxy Streaming
-
-Version 2.0 removed local transcoding in favor of proxying streams directly through Stash.
-
-**Key Changes:**
-- Removed FFmpeg transcoding system
-- Removed path mapping configuration
-- Added StashInstance table for connection storage
+### Version 3.1.0
 
 **Migration:** Automatic. No user action required.
 
-### v1.x to v2.x
+- New `UserExcludedEntity` table for pre-computed exclusions
+- New indexes on image junction tables
+- A full sync is triggered automatically to populate inherited tags on scenes
 
-Users upgrading from v1.x will have their schema automatically updated via the schemaCatchup system. All user data is preserved.
+### Version 3.0.0
 
-**Migration:** Automatic. The system detects legacy databases and applies necessary schema updates before running Prisma migrations.
+**Migration:** Automatic. No user action required.
+
+Major architectural change: Stash entity data is now stored in SQLite instead of memory.
+
+- **Scalability**: Support for 100k+ scenes
+- **Performance**: Sub-100ms query times
+- **Persistence**: Library data survives restarts
+
+The initial sync after upgrading may take several minutes depending on library size.
+
+!!! note "Upgrading from 3.0.0 Beta"
+    If upgrading from any v3.0.0-beta.x, run a **Full Sync** (Settings → Server Settings → Sync from Stash) to ensure all fields are populated.
+
+### Version 2.0.0
+
+**Migration:** Automatic. No user action required.
+
+- Removed local FFmpeg transcoding - videos now stream directly through Stash
+- Removed path mapping configuration
+- STASH_URL and STASH_API_KEY environment variables auto-migrate to database
+
+### Version 1.x to 2.x
+
+**Migration:** Automatic. Schema updates are applied automatically on first start.
+
+---
+
+## Troubleshooting Upgrades
+
+### Library empty after upgrade
+
+The sync should start automatically. If empty after several minutes:
+1. Check logs: `docker logs peek-stash-browser`
+2. Manually trigger sync: Settings → Server Settings → Sync from Stash
+
+### Migration failed
+
+Check logs for the specific error:
+```bash
+docker logs peek-stash-browser | grep -i migration
+```
+
+Common causes:
+- **Disk full**: Free up space and restart
+- **Permission denied**: Check volume mount permissions
+
+### Sync is slow
+
+The first sync after a major upgrade fetches all data from Stash. Subsequent syncs are incremental and much faster.
+
+## Reporting Issues
+
+Found an upgrade bug? Report it:
+
+- [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
+- [Stash Discourse](https://discourse.stashapp.cc/t/peek-stash-browser/4018)
+
+Include: Peek version, Stash version, library size, and relevant logs.

@@ -6,27 +6,28 @@ Common questions about Peek Stash Browser.
 
 ### What is Peek?
 
-Peek is a modern web application for browsing and streaming Stash media content with real-time HLS transcoding. It provides a fast, responsive interface with adaptive quality streaming.
+Peek is a modern web application for browsing and streaming your Stash media library. It provides a mobile-friendly interface with multi-user support, playlists, recommendations, and watch history.
 
 ### How is Peek different from Stash?
 
-Peek is a browser/player focused on video playback, while Stash is a comprehensive media organizer. Peek:
+Peek is a browser/player focused on video playback and discovery, while Stash is a comprehensive media organizer. Peek:
 
-- Focuses on smooth video playback with adaptive streaming
-- Provides a simplified, browsing-focused interface
-- Uses real-time transcoding for universal compatibility
+- Provides a mobile-friendly, browsing-focused interface
+- Supports multiple users with separate preferences and restrictions
+- Includes playlists, recommendations, and watch history
+- Proxies video streams through Stash (no local media access needed)
 - Complements Stash rather than replacing it
 
 ### Does Peek modify my Stash library?
 
-No. Peek is read-only. It connects to Stash's GraphQL API to read data but never modifies your library, files, or metadata.
+Peek can optionally sync ratings, favorites, and O-counter back to Stash (configurable). It never modifies your files or core metadata.
 
 ## Installation
 
 ### What platforms are supported?
 
-- **unRAID**: Community Applications or manual Docker install
-- **Docker**: Any platform supporting Docker
+- **unRAID**: Manual Docker template installation
+- **Docker**: Any platform supporting Docker (AMD64 and ARM64)
 - **Development**: Node.js 18+ on Windows/Mac/Linux
 
 ### Do I need a separate database server?
@@ -35,250 +36,107 @@ No. Peek uses embedded SQLite. No PostgreSQL, MySQL, or other database server ne
 
 ### Can I run Peek and Stash on the same server?
 
-Yes. They run as separate containers and don't conflict.
+Yes, and this is recommended for best performance. They run as separate containers and don't conflict.
 
 ## Video Playback
 
-### Why does transcoding take so long?
+### How does video streaming work?
 
-Transcoding is CPU-intensive. Performance depends on:
+Peek proxies video streams directly through Stash. When you play a video in Peek, it fetches the stream from Stash's API and delivers it to your browser. This means:
 
-- Server CPU power
-- Storage I/O speed (SSD vs HDD vs network)
-- Original video codec and resolution
-- Target quality selected
+- No local media access or path mapping needed
+- Uses Stash's transcoding capabilities
+- Quality options come from Stash
 
-For best performance, use local SSD storage and allocate 2-4 CPU cores.
+### Why are videos loading slowly?
 
-### Can I play videos directly without transcoding?
+Since Peek proxies streams from Stash, performance depends on:
 
-Yes! Direct play is available when your browser supports the video codec. Use the quality selector and choose **Direct** to play the original file without transcoding.
+- Network speed between Peek and Stash (same machine/LAN is best)
+- Stash server's transcoding performance
+- Your browser's network connection
 
-**When to use Direct:**
-- Fastest playback (no transcoding delay)
-- Highest quality (original file)
-- Browser supports the video format
-
-**When to use transcoding:**
-- Browser doesn't support the format
-- Want adaptive quality (switch between 720p/480p/360p)
-- Slower network connections
-
-### Can I download the original video file?
-
-Not yet. Video downloads are planned for a future release. Currently, you can only stream videos through Peek's player.
+If videos are slow in Peek, check if they're also slow in Stash directly.
 
 ## Configuration
 
 ### Where are my settings stored?
 
-- **User preferences**: SQLite database in `/app/data/peek-db.db`
+- **User data**: SQLite database in `/app/data/peek-stash-browser.db`
 - **Server config**: Environment variables
-- **Temp files**: `/app/data/hls-cache/` (auto-cleaned)
+- **Stash connection**: Stored in database (configured via Setup Wizard)
 
 ### How do I backup my data?
 
-```bash
-# Backup SQLite database
-docker exec peek-stash-browser sqlite3 /app/data/peek-db.db ".backup /app/data/backup.db"
-
-# Copy backup out of container
-docker cp peek-stash-browser:/app/data/backup.db ./peek-backup.db
-```
+See [Upgrading - Backup Procedure](../getting-started/upgrading.md#backup-procedure) for detailed instructions.
 
 ### Can I customize the theme?
 
-Yes! Peek includes several built-in themes and a custom theme editor.
-
-**Built-in Themes:**
-- Light Mode
-- Dark Mode (default)
-- Deep Purple
-- The Hub
-
-**Custom Theme Editor:**
-1. Go to **Settings** → **My Settings**
-2. Scroll to **Custom Themes** section
-3. Create your own theme by choosing colors
-4. Customize fonts, backgrounds, text colors, and more
-5. Save and apply your custom theme
-
-Toggle between themes using the theme icon in the navigation bar.
-
-## Performance
-
-### How many concurrent streams can Peek handle?
-
-Depends on server CPU:
-
-- **2 CPU cores**: 1-2 streams at 720p
-- **4 CPU cores**: 3-4 streams at 720p
-- **6+ CPU cores**: 5+ streams at 720p
-
-Lower qualities (480p, 360p) require less CPU and support more concurrent streams.
-
-### Why is my media loading slowly?
-
-Check storage speed:
-
-```bash
-docker exec peek-stash-browser dd if=/app/media/test.mp4 of=/dev/null bs=1M count=100
-```
-
-If < 50 MB/s, media is likely on:
-- Network share (SMB/NFS) - Move to local storage
-- Slow HDD - Upgrade to SSD
-- USB drive - Use internal storage
-
-### How much disk space does Peek need?
-
-- **App data**: ~100 MB (database, config)
-- **Temp files**: ~50-100 MB per quality per minute of video
-- **Recommendation**: 5-10 GB for temp storage on busy servers
-
-Temp files are automatically cleaned up after 30 minutes.
-
-## Troubleshooting
-
-### Videos won't play
-
-1. Check FFmpeg is installed: `docker exec peek-stash-browser ffmpeg -version`
-2. Verify path mapping is correct
-3. Check file permissions on media
-4. Review backend logs for errors
-
-See: [Troubleshooting Guide](troubleshooting.md)
-
-### Can't connect to Stash
-
-1. Verify `STASH_URL` is correct and accessible from container
-2. Check Stash API key is valid
-3. Test connectivity: `docker exec peek-stash-browser curl http://stash:9999/graphql`
-
-### Login doesn't work
-
-- Check cookies are enabled
-- Verify `JWT_SECRET` is set
-- Try incognito mode
-- Clear browser cache
+Yes! Peek includes built-in themes (Light, Dark, Deep Purple, The Hub) and a custom theme editor where you can create your own color schemes.
 
 ## Features
 
 ### How do playlists work?
 
-Playlists are fully available! Create custom playlists of your favorite scenes.
+Create custom playlists of your favorite scenes:
 
-**Creating a Playlist:**
 1. Click **Playlists** in the navigation
 2. Click **Create Playlist**
-3. Enter a name and description
-4. Click **Create**
+3. Add scenes using the **+** icon on scene cards
 
-**Adding Scenes:**
-- Click the **+** icon on any scene card
-- Select the playlist to add it to
-- Or go to a scene's detail page and click **Add to Playlist**
-
-**Playing Playlists:**
-- Click a playlist to view its scenes
-- Click **Play** to start from the beginning
-- Use **Shuffle** to randomize playback order
-- Use **Repeat** (all or one) for continuous playback
-- Reorder scenes by dragging them in edit mode
-
-!!! tip "Learn More"
-    See the [Complete Playlists Guide](../user-guide/playlists.md) for detailed instructions on managing and playing playlists.
+See the [Playlists Guide](../user-guide/playlists.md) for details.
 
 ### Does Peek track watch history?
 
-Yes! Peek automatically tracks your viewing progress and lets you resume playback from where you left off.
+Yes! Peek automatically tracks your viewing progress and lets you resume playback. Features include:
 
-**Features:**
-- Automatic progress tracking during playback
-- Resume from any device (synced to your user account)
-- "Continue Watching" section on home page
+- Automatic progress tracking
+- Resume from any device
+- "Continue Watching" section
 - Progress bars on scene cards
-- Clear history for individual scenes or all at once
 
-!!! tip "Learn More"
-    See the [Watch History Guide](../user-guide/watch-history.md) for complete details on managing your watch history.
+See the [Watch History Guide](../user-guide/watch-history.md) for details.
 
 ### Can I use keyboard navigation?
 
-Yes! Peek supports complete keyboard navigation, perfect for TV remotes or wireless keyboards.
+Yes! Peek supports complete keyboard navigation, including arrow keys, Enter to select, and video player shortcuts. Perfect for TV remotes.
 
-**Key features:**
-- Arrow keys navigate scene grids and lists
-- Enter to select/play
-- Video player keyboard shortcuts (Space, arrows, F for fullscreen)
-- Playlist controls (N for next, P for previous)
-- TV Mode optimized for couch browsing
-
-!!! tip "Learn More"
-    See the [Keyboard Navigation Guide](../user-guide/keyboard-navigation.md) for all keyboard shortcuts and TV mode setup.
+See the [Keyboard Navigation Guide](../user-guide/keyboard-navigation.md) for all shortcuts.
 
 ### Can I use Peek on mobile?
 
-Yes. The web interface is responsive and works on mobile browsers. A dedicated mobile app is not currently planned.
-
-### Does Peek support hardware transcoding?
-
-Not yet. Hardware-accelerated transcoding (GPU) is planned for a future release to improve performance and reduce CPU usage.
+Yes. The web interface is responsive and works on mobile browsers.
 
 ### Can I use Peek without Stash?
 
-No. Peek requires a Stash server for media library management and metadata. Peek is designed as a companion to Stash, not a replacement.
+No. Peek requires a Stash server for media library management and streaming.
 
 ## Security
 
 ### Is Peek secure?
 
-Peek includes:
-- JWT authentication
-- Bcrypt password hashing
-- Read-only media access
-- Session management
+Peek includes JWT authentication, bcrypt password hashing, and session management.
 
-**Important**: Change the default admin password immediately!
+**Important**: Change the default admin password immediately after setup!
 
 ### Should I expose Peek to the internet?
 
-No. Peek is designed for local network use. For remote access:
-- Use VPN
-- Use reverse proxy with authentication layer
-- Don't expose directly to internet
+Not recommended without additional protection. For remote access:
+
+- Use a VPN
+- Use a reverse proxy with authentication (see [Proxy Authentication](../getting-started/configuration.md#proxy-authentication))
+- Don't expose directly to the internet
 
 ## Support
 
 ### Where can I get help?
 
-- **Documentation**: https://carrotwaxr.github.io/peek-stash-browser
-- **GitHub Issues**: Bug reports and feature requests
-- **Stash Discord**: #third-party-integrations channel
+- [Troubleshooting Guide](troubleshooting.md)
+- [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
+- [Stash Discord](https://discord.gg/2TsNFKt) - #third-party-integrations channel
 
 ### How do I report a bug?
 
-1. Search existing issues first
-2. Gather logs and error messages
-3. Create detailed issue on GitHub
-4. Include: version, platform, steps to reproduce
-
-See: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-
-### Can I contribute?
-
-Yes! Contributions are welcome:
-- Code improvements
-- Bug fixes
-- Documentation
-- Translations (future)
-
-See: [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
-
-## Next Steps
-
-- [Installation](../getting-started/installation.md) - Install Peek
-- [Watch History](../user-guide/watch-history.md) - Resume playback from where you left off
-- [Keyboard Navigation](../user-guide/keyboard-navigation.md) - Complete keyboard shortcuts and TV mode
-- [Playlists](../user-guide/playlists.md) - Create and manage custom playlists
-- [Troubleshooting](troubleshooting.md) - Fix common issues
+1. Check the [Troubleshooting Guide](troubleshooting.md) first
+2. Search [existing issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
+3. Create a new issue with: Peek version, Stash version, logs, and steps to reproduce

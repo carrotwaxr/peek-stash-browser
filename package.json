@@ -9,7 +9,9 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "form-data": "^4.0.5",
-    "playwright": "^1.56.1"
+    "playwright": "^1.56.1",
+    "prettier": "^3.8.0"
   }
 }

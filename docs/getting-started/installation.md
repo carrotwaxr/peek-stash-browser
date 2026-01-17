@@ -2,67 +2,53 @@
 
 Peek Stash Browser can be deployed in several ways depending on your needs and environment.
 
-## Prerequisites
+## Requirements
 
-Before installing Peek, ensure you have:
-
-- **Stash Server** running with GraphQL API enabled
-- **Docker** installed (Docker Compose only needed for development)
-- **Network access** from container to Stash server
-
-### Stash Configuration
-
-1. **Enable API** in Stash settings
-2. **Generate API key** in Settings → Security
-3. **Note GraphQL endpoint** (usually `http://stash-ip:9999/graphql`)
-4. **Ensure network access** from your Docker host to Stash
-
-> **Note**: As of v2.0, Peek streams video directly through Stash - no media volume mounts required!
+- Stash server with GraphQL API enabled and an API key configured (Settings → Security)
+- Docker (or Docker on unRAID)
+- Network access between Peek and Stash
 
 ## Installation Methods
 
 ### Option 1: unRAID
 
-#### Community Applications (Recommended)
-
-!!! tip "Easiest Installation Method"
-This is the recommended method for unRAID users - everything is pre-configured!
-
-1. **Install from Community Applications**:
-   - Search for "Peek Stash Browser" in unRAID's Community Applications
-   - Click install and configure your settings
-   - Access at `http://your-unraid-ip:6969`
-
-#### Manual Template Installation
-
-If Peek isn't available in Community Applications yet, or if you want to install the latest template manually:
+#### Template Installation
 
 **Step 1: Download the template file**
 
 Get the template from GitHub:
 
 ```
-https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-template.xml
+https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml
 ```
 
 **Step 2: Install the template**
 
-=== "USB/Boot Share Exported (Easier)" 1. Copy `unraid-template.xml` to your network share at:
-`       \\your.server.ip.address\flash\config\plugins\dockerMan\templates-user
-      ` 2. The template will be available immediately in Docker tab → Add Container → User Templates
+=== "USB/Boot Share Exported (Easier)"
 
-=== "USB/Boot Share NOT Exported" 1. Copy `unraid-template.xml` to any accessible share (e.g., `\\your.server.ip.address\downloads`) 2. SSH into your unRAID server 3. Move the template file:
-`bash
+    1. Copy `unraid-template.xml` to your network share at:
+       ```
+       \\your.server.ip.address\flash\config\plugins\dockerMan\templates-user
+       ```
+    2. The template will be available immediately in Docker tab → Add Container → User Templates
+
+=== "USB/Boot Share NOT Exported"
+
+    1. Copy `unraid-template.xml` to any accessible share (e.g., `\\your.server.ip.address\downloads`)
+    2. SSH into your unRAID server
+    3. Move the template file:
+       ```bash
        cp /mnt/user/downloads/unraid-template.xml /boot/config/plugins/dockerMan/templates-user/
-       ` 4. The template will be available immediately in Docker tab → Add Container → User Templates
+       ```
+    4. The template will be available immediately in Docker tab → Add Container → User Templates
 
 !!! info "No Restart Required"
-You do NOT need to restart Docker or unRAID - the template is picked up automatically.
+    You do NOT need to restart Docker or unRAID - the template is picked up automatically.
 
 **Step 3: Configure the container**
 
 1. Go to Docker tab → Add Container
-2. Select "peek-stash-browser" from User Templates dropdown
+2. Select "Peek" from User Templates dropdown
 3. Configure required settings:
    - **JWT Secret**: Generate with `openssl rand -hex 32` in unRAID terminal
    - **App Data Directory**: Path for Peek data (e.g., `/mnt/user/appdata/peek-stash-browser`)
@@ -70,10 +56,13 @@ You do NOT need to restart Docker or unRAID - the template is picked up automati
 5. Access at `http://your-unraid-ip:6969`
 6. Complete the Setup Wizard to connect to your Stash server
 
+!!! note "Stash URL and API Key"
+    Leave the "Stash GraphQL URL" and "Stash API Key" fields blank for new installs - you'll configure these in the Setup Wizard. These fields are only shown for users migrating from v1.x.
+
 ### Option 2: Docker (Single Container)
 
 !!! success "Recommended for Production"
-Single container includes everything - frontend, backend, and database
+    Single container includes everything - frontend, backend, and database. Multi-architecture images are available for both AMD64 and ARM64 (Raspberry Pi, Apple Silicon, etc.).
 
 ```bash
 # Pull the latest image
@@ -147,7 +136,7 @@ docker pull carrotwaxr/peek-stash-browser:latest
 ```
 
 !!! success "Data persists across updates!"
-Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
+    Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
 
 #### Linux/macOS Examples
 
@@ -193,35 +182,7 @@ docker pull carrotwaxr/peek-stash-browser:latest
 ```
 
 !!! success "Data persists across updates!"
-Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
-
-### Option 3: Docker Compose (Development)
-
-!!! info "For Development Only"
-This method is for development with hot reloading enabled
-
-1. **Clone and setup**:
-
-   ```bash
-   git clone https://github.com/carrotwaxr/peek-stash-browser.git
-   cd peek-stash-browser
-   cp .env.example .env
-   ```
-
-2. **Configure environment** (edit `.env`):
-
-   ```bash
-   JWT_SECRET=your-dev-secret-here
-   DATABASE_URL=file:./data/peek-stash-browser.db
-   ```
-
-3. **Start services**:
-
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Access the app**: Open `http://localhost:6969`
+    Your database and configuration are saved in the `peek-data` volume and won't be lost when updating.
 
 ## First Access & Setup Wizard
 
@@ -291,7 +252,7 @@ To update your Docker container to the latest version:
     ```
 
 !!! success "Your data persists across updates"
-    Database, user settings, Stash configuration, and playlists are stored in the `peek-data` volume and will not be lost.
+    Database, user settings, Stash configuration, and playlists are stored in the `peek-data` volume and will not be lost. For backup procedures and version-specific notes, see [Upgrading Peek](upgrading.md).
 
 ### Version Pinning
 
@@ -307,23 +268,25 @@ Available versions: [GitHub Releases](https://github.com/carrotwaxr/peek-stash-b
 
 ## Port Configuration
 
-| Environment     | Port   | Service      | Description                              |
-| --------------- | ------ | ------------ | ---------------------------------------- |
-| **Production**  | `6969` | Complete App | nginx serves frontend + proxies API      |
-| **Development** | `6969` | Frontend UI  | Vite dev server with hot reloading       |
-| **Development** | `8000` | Backend API  | Express server (internal Docker network) |
+Peek uses a single port for production deployments:
 
-!!! success "Production uses only one port!"
-Production deployment exposes only port `6969` - nginx handles everything internally
+| Port   | Service      | Description                         |
+| ------ | ------------ | ----------------------------------- |
+| `6969` | Complete App | nginx serves frontend + proxies API |
+
+!!! tip "Development Ports"
+    For development setup with hot reloading, see [Local Development Setup](../development/local-setup.md).
 
 ## Hardware Recommendations
 
-| Component   | Minimum          | Recommended                                 |
-| ----------- | ---------------- | ------------------------------------------- |
-| **CPU**     | 2 cores          | 4+ cores (for multiple transcoding streams) |
-| **RAM**     | 2GB              | 4GB+                                        |
-| **Storage** | SSD for database | SSD for database, network storage for media |
-| **Network** | 100 Mbps         | Gigabit (for 4K content)                    |
+Peek is lightweight - it proxies streams through Stash rather than transcoding locally.
+
+| Component   | Minimum   | Recommended                                 |
+| ----------- | --------- | ------------------------------------------- |
+| **CPU**     | 1 core    | 2+ cores                                    |
+| **RAM**     | 512MB     | 1GB+ (for large libraries)                  |
+| **Storage** | 100MB     | SSD for database (faster queries)           |
+| **Network** | 100 Mbps  | Gigabit (for 4K content)                    |
 
 ## Next Steps
 

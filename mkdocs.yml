@@ -1,13 +1,13 @@
 # Project information
 site_name: Peek Stash Browser
-site_description: Modern web application for browsing and streaming Stash media content with real-time HLS transcoding
+site_description: Modern web application for browsing and streaming your Stash media library
 site_author: carrotwaxr
 site_url: https://carrotwaxr.github.io/peek-stash-browser
 
 # Repository
 repo_name: carrotwaxr/peek-stash-browser
 repo_url: https://github.com/carrotwaxr/peek-stash-browser
-edit_uri: edit/master/docs/
+edit_uri: edit/main/docs/
 
 # Copyright
 copyright: Copyright &copy; 2025 carrotwaxr
@@ -35,7 +35,6 @@ theme:
   features:
     - navigation.instant
     - navigation.tracking
-    - navigation.tabs
     - navigation.sections
     - navigation.expand
     - navigation.top
@@ -112,6 +111,9 @@ nav:
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
       - Upgrading: getting-started/upgrading.md
+      - Docker Basics: getting-started/docker-basics.md
+      - Troubleshooting: reference/troubleshooting.md
+      - FAQ: reference/faq.md
   - User Guide:
       - Images: user-guide/images.md
       - Recommendations: user-guide/recommendations.md
@@ -122,15 +124,11 @@ nav:
       - Hidden Items: user-guide/hidden-items.md
       - External Player: user-guide/external-player.md
   - Development:
+      - Local Setup: development/local-setup.md
       - Technical Overview: development/technical-overview.md
       - Sync Architecture: development/sync-architecture.md
       - API Reference: development/api-reference.md
       - Regression Testing Guide: development/regression-testing.md
-  - Reference:
-      - Troubleshooting: reference/troubleshooting.md
-      - FAQ: reference/faq.md
-  - Releases:
-      - v3.1.0: releases/v3.1.0.md
 
 # Social links
 extra:
