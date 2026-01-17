@@ -11,6 +11,7 @@ vi.mock("../../prisma/singleton.js", () => ({
   default: {
     stashScene: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     stashPerformer: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -115,6 +116,13 @@ vi.mock("../../services/UserStatsService.js", () => ({
 vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock("../../services/MergeReconciliationService.js", () => ({
+  mergeReconciliationService: {
+    findPhashMatches: vi.fn().mockResolvedValue([]),
+    reconcileScene: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -237,6 +245,11 @@ describe("StashSyncService Cleanup", () => {
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }], count: 3 },
       });
+      // Mock findMany to return 2 scenes that should be deleted (not in Stash)
+      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
+        { id: "4", phash: null },
+        { id: "5", phash: null },
+      ] as any);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 2 });
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
@@ -324,6 +337,12 @@ describe("StashSyncService Cleanup", () => {
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [], count: 0 },
       });
+      // Mock findMany to return 100 scenes that should all be deleted
+      const scenesToDelete = Array.from({ length: 100 }, (_, i) => ({
+        id: String(i + 1),
+        phash: null,
+      }));
+      vi.mocked(prisma.stashScene.findMany).mockResolvedValue(scenesToDelete as any);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 100 });
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
