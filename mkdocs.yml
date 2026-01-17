@@ -54,6 +54,13 @@ theme:
 plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  - redirects:
+      redirect_maps:
+        # Files moved in v3.2.1
+        'getting-started/docker-basics.md': 'reference/docker-basics.md'
+        'development/api-reference.md': 'reference/api-reference.md'
+        'reference/troubleshooting.md': 'getting-started/troubleshooting.md'
+        'reference/faq.md': 'getting-started/faq.md'
   - minify:
       minify_html: true
 
@@ -111,8 +118,8 @@ nav:
       - Configuration: getting-started/configuration.md
       - Quick Start: getting-started/quick-start.md
       - Upgrading: getting-started/upgrading.md
-      - Troubleshooting: reference/troubleshooting.md
-      - FAQ: reference/faq.md
+      - Troubleshooting: getting-started/troubleshooting.md
+      - FAQ: getting-started/faq.md
   - User Guide:
       - Browse and Display: user-guide/browse-and-display.md
       - Content Restrictions: user-guide/content-restrictions.md
@@ -126,8 +133,8 @@ nav:
       - User Management: user-guide/user-management.md
       - Watch History: user-guide/watch-history.md
   - Reference:
-      - Docker Basics: getting-started/docker-basics.md
-      - API Reference: development/api-reference.md
+      - Docker Basics: reference/docker-basics.md
+      - API Reference: reference/api-reference.md
       - Entity Relationships: reference/entity-relationships.md
   - Development:
       - Local Setup: development/local-setup.md

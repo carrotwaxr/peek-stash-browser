@@ -150,10 +150,10 @@ Organize your favorite scenes into custom playlists:
 ## Next Steps
 
 - [Full Configuration Guide](configuration.md)
-- [Complete Troubleshooting](../reference/troubleshooting.md)
+- [Complete Troubleshooting](troubleshooting.md)
 
 ## Need Help?
 
-- [Troubleshooting Guide](../reference/troubleshooting.md)
+- [Troubleshooting Guide](troubleshooting.md)
 - [GitHub Issues](https://github.com/carrotwaxr/peek-stash-browser/issues)
 - [Stash Discord](https://discord.gg/2TsNFKt) - #third-party-integrations channel

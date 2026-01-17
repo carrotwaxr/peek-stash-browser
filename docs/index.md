@@ -4,7 +4,7 @@ A modern mobile-friendly web application for browsing and streaming your [Stash]
 
 - [**Installation**](getting-started/installation.md) - Get up and running with Docker or unRAID
 - [**Configuration**](getting-started/configuration.md) - Connect Peek to your Stash server
-- [**Troubleshooting**](reference/troubleshooting.md) - Common issues and solutions
+- [**Troubleshooting**](getting-started/troubleshooting.md) - Common issues and solutions
 
 ### Key Features
 

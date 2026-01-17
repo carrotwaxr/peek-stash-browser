@@ -299,4 +299,4 @@ Peek is lightweight - it proxies streams through Stash rather than transcoding l
 
 - [Configure environment variables](configuration.md)
 - [Quick Start Guide](quick-start.md)
-- [Troubleshooting](../reference/troubleshooting.md)
+- [Troubleshooting](troubleshooting.md)

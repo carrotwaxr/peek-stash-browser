@@ -290,4 +290,4 @@ Check:
 ## Next Steps
 
 - [Quick Start Guide](quick-start.md)
-- [Troubleshooting](../reference/troubleshooting.md)
+- [Troubleshooting](troubleshooting.md)

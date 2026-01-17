@@ -234,4 +234,4 @@ After setting restrictions:
 
 - **[Hidden Items](hidden-items.md)** — User-controlled hiding of individual items
 - **[User Management](user-management.md)** — Full user administration guide
-- **[FAQ](../reference/faq.md)** — Common questions including sync behavior
+- **[FAQ](../getting-started/faq.md)** — Common questions including sync behavior

@@ -175,5 +175,5 @@ There's no limit to how many:
 
 - [Watch History](watch-history.md) - Resume playback from where you left off
 - [Keyboard Navigation](keyboard-navigation.md) - Complete keyboard shortcuts and TV mode
-- [Troubleshooting](../reference/troubleshooting.md) - Fix common issues
-- [FAQ](../reference/faq.md) - Frequently asked questions
+- [Troubleshooting](../getting-started/troubleshooting.md) - Fix common issues
+- [FAQ](../getting-started/faq.md) - Frequently asked questions
