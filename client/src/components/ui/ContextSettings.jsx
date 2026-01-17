@@ -3,6 +3,10 @@ import { LucideSettings } from "lucide-react";
 import axios from "axios";
 import { showError, showSuccess } from "../../utils/toast.jsx";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import {
+  getAvailableSettings,
+  SETTING_LABELS,
+} from "../../config/entityDisplayConfig.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -228,68 +232,23 @@ const ContextSettings = ({
                   Card Display
                 </h4>
                 <div className="space-y-2">
-                  {entityType === "scene" && (
-                    <label className="flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={cardSettings?.showCodeOnCard ?? true}
-                        onChange={(e) => handleCardSettingChange("showCodeOnCard", e.target.checked)}
-                        className="w-4 h-4"
-                        style={{ accentColor: "var(--accent-primary)" }}
-                      />
-                      <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                        Show code
-                      </span>
-                    </label>
-                  )}
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cardSettings?.showDescriptionOnCard ?? true}
-                      onChange={(e) => handleCardSettingChange("showDescriptionOnCard", e.target.checked)}
-                      className="w-4 h-4"
-                      style={{ accentColor: "var(--accent-primary)" }}
-                    />
-                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                      Show description
-                    </span>
-                  </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cardSettings?.showRating ?? true}
-                      onChange={(e) => handleCardSettingChange("showRating", e.target.checked)}
-                      className="w-4 h-4"
-                      style={{ accentColor: "var(--accent-primary)" }}
-                    />
-                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                      Show rating
-                    </span>
-                  </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cardSettings?.showFavorite ?? true}
-                      onChange={(e) => handleCardSettingChange("showFavorite", e.target.checked)}
-                      className="w-4 h-4"
-                      style={{ accentColor: "var(--accent-primary)" }}
-                    />
-                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                      Show favorite
-                    </span>
-                  </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cardSettings?.showOCounter ?? true}
-                      onChange={(e) => handleCardSettingChange("showOCounter", e.target.checked)}
-                      className="w-4 h-4"
-                      style={{ accentColor: "var(--accent-primary)" }}
-                    />
-                    <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
-                      Show O counter
-                    </span>
-                  </label>
+                  {/* Dynamically render settings based on entity config */}
+                  {getAvailableSettings(entityType)
+                    .filter((key) => key !== "defaultViewMode" && key !== "showDescriptionOnDetail")
+                    .map((settingKey) => (
+                      <label key={settingKey} className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={cardSettings?.[settingKey] ?? true}
+                          onChange={(e) => handleCardSettingChange(settingKey, e.target.checked)}
+                          className="w-4 h-4"
+                          style={{ accentColor: "var(--accent-primary)" }}
+                        />
+                        <span className="ml-2 text-sm" style={{ color: "var(--text-primary)" }}>
+                          {SETTING_LABELS[settingKey] || settingKey}
+                        </span>
+                      </label>
+                    ))}
                 </div>
               </div>
             )}
