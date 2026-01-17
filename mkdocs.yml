@@ -114,6 +114,7 @@ nav:
       - Troubleshooting: reference/troubleshooting.md
       - FAQ: reference/faq.md
   - User Guide:
+      - Browse and Display: user-guide/browse-and-display.md
       - Content Restrictions: user-guide/content-restrictions.md
       - Custom Carousels: user-guide/custom-carousels.md
       - External Player: user-guide/external-player.md

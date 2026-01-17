@@ -126,38 +126,65 @@ Peek mirrors Stash's entity model, caching entities locally in SQLite. This enab
 
 ---
 
-## Pseudo-Relationships (Inheritance)
+## Metadata Inheritance
 
-Some relationships are "inherited" for display/search/filtering purposes.
+Peek pre-computes inherited metadata during sync to enable efficient filtering and consistent behavior.
 
 ### Scene Tag Inheritance
 
-When filtering Scenes (e.g., for content restrictions), Tags are collected from multiple sources:
+Scenes inherit tags from their associated performers, studio, and groups. This enables tag-based filtering to work transparently across all related entities.
+
+**Inheritance sources:**
 
 | Source | Description |
 |--------|-------------|
-| Direct Scene Tags | Explicitly assigned to the scene |
-| Performer Tags | Tags on any Performer in the scene |
-| Studio Tags | Tags on the scene's Studio |
-| Group Tags | Tags on any Group the scene belongs to |
+| Performer Tags | Tags on any performer in the scene |
+| Studio Tags | Tags on the scene's studio |
+| Group Tags | Tags on any group the scene belongs to |
 
-**Rationale:** If a Tag represents content that should be restricted (e.g., "explicit"), that restriction should apply whether the tag is on the scene directly, on a performer in the scene, on the studio, or on a thematic group/series.
+**Key rules:**
+
+- **No duplication**: Tags already directly on the scene are not added to inherited tags
+- **Deduplicated**: Same tag from multiple sources (e.g., two performers) appears once
+- **Stored separately**: Inherited tags stored in `inheritedTagIds` field, not mixed with direct tags
+- **When computed**: After every sync (full, incremental, or smart)
+
+**Query behavior:**
+
+When you filter scenes by tag, Peek searches both direct tags AND inherited tags. This means:
+
+- Filtering by a performer's tag shows scenes with that performer
+- Filtering by a studio's tag shows scenes from that studio
+- Content restrictions on tags apply to inherited tags too
+
+**Example:** If performer "Jane" has tag "Comedy", all scenes with Jane will match a "Comedy" tag filter, even if the scene itself isn't tagged "Comedy".
 
 ### Image Gallery Inheritance
 
-Images can inherit metadata from their parent Gallery during sync. This denormalization enables simpler queries and consistent filtering.
+Images inherit metadata from their parent gallery when the image's own field is empty. This ensures images in a gallery share consistent metadata without manual duplication.
 
-| Field | Inheritance Behavior |
-|-------|---------------------|
-| Performers | Inherit from Gallery if Image has none |
-| Tags | Inherit from Gallery if Image has none |
-| Studio | Inherit from Gallery if Image has none |
-| Date | Inherit from Gallery if Image has none |
-| Photographer | Inherit from Gallery if Image has none |
-| Details | Inherit from Gallery if Image has none |
+**Inherited fields:**
+
+| Field | Inheritance Rule |
+|-------|------------------|
+| Performers | Inherit if image has no performers |
+| Tags | Inherit if image has no tags |
+| Studio | Inherit if image has no studio |
+| Date | Inherit if image has no date |
+| Photographer | Inherit if image has no photographer |
+| Details | Inherit if image has no details |
+
+**Key rules:**
+
+- **Never overwrites**: Only copies when image field is NULL/empty
+- **All-or-nothing for relationships**: Performers and tags only inherit if image has NONE
+- **Multi-gallery handling**: If image is in multiple galleries, uses first gallery (by ID)
+- **When computed**: After every sync that touches images or galleries
 
 !!! note
     Image `title` is NOT inherited — each image keeps its own name.
+
+**Example:** A gallery has studio "Acme" and tags "Nature", "Landscape". An image in that gallery with no metadata will inherit all three. An image with its own studio but no tags will keep its studio and inherit the tags.
 
 ---
 
