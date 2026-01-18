@@ -29,6 +29,7 @@ model User {
   unitPreference          String? @default("metric") // "metric" or "imperial" for measurement display
   tableColumnDefaults     Json? // Object with keys: scene, performer, studio, tag, group, gallery, image - each containing {visible: string[], order: string[]}
   cardDisplaySettings     Json? // Object with per-entity-type card display toggles: {scene: {showCodeOnCard, showDescriptionOnCard, ...}, performer: {...}, ...}
+  landingPagePreference   Json? @default("{\"pages\":[\"home\"],\"randomize\":false}")
 
   // Watch history settings
   minimumPlayPercent Int     @default(20) // Percent of video to watch before incrementing play_count (0-100)
