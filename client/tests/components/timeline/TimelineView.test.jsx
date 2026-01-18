@@ -8,6 +8,26 @@ vi.mock("../../../src/components/timeline/useTimelineState.js", () => ({
   useTimelineState: (...args) => mockUseTimelineState(...args),
 }));
 
+// Mock useMediaQuery - default to desktop (false = not mobile)
+const mockUseMediaQuery = vi.fn(() => false);
+vi.mock("../../../src/hooks/useMediaQuery.js", () => ({
+  useMediaQuery: (...args) => mockUseMediaQuery(...args),
+}));
+
+// Mock TimelineMobileSheet
+vi.mock("../../../src/components/timeline/TimelineMobileSheet.jsx", () => ({
+  default: ({ isOpen, selectedPeriod, itemCount, children }) => (
+    <div data-testid="timeline-mobile-sheet">
+      <span data-testid="mobile-sheet-open">{isOpen ? "open" : "closed"}</span>
+      {selectedPeriod && (
+        <span data-testid="mobile-sheet-period">{selectedPeriod.label}</span>
+      )}
+      <span data-testid="mobile-sheet-count">{itemCount}</span>
+      <div data-testid="mobile-sheet-children">{children}</div>
+    </div>
+  ),
+}));
+
 // Mock TimelineControls to simplify testing
 vi.mock("../../../src/components/timeline/TimelineControls.jsx", () => ({
   default: ({ zoomLevel, onZoomLevelChange }) => (
@@ -60,6 +80,7 @@ describe("TimelineView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseTimelineState.mockReturnValue(defaultHookReturn);
+    mockUseMediaQuery.mockReturnValue(false); // Default to desktop
   });
 
   describe("Rendering", () => {
@@ -410,6 +431,116 @@ describe("TimelineView", () => {
 
       const stickyHeader = container.querySelector(".sticky.top-0.z-10");
       expect(stickyHeader).toBeInTheDocument();
+    });
+  });
+
+  describe("Mobile Layout", () => {
+    beforeEach(() => {
+      mockUseMediaQuery.mockReturnValue(true); // Mobile view
+    });
+
+    it("renders TimelineMobileSheet on mobile", () => {
+      render(<TimelineView {...defaultProps} />);
+
+      expect(screen.getByTestId("timeline-mobile-sheet")).toBeInTheDocument();
+    });
+
+    it("does not render TimelineMobileSheet on desktop", () => {
+      mockUseMediaQuery.mockReturnValue(false);
+      render(<TimelineView {...defaultProps} />);
+
+      expect(screen.queryByTestId("timeline-mobile-sheet")).not.toBeInTheDocument();
+    });
+
+    it("passes selectedPeriod to TimelineMobileSheet", () => {
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      render(<TimelineView {...defaultProps} />);
+
+      expect(screen.getByTestId("mobile-sheet-period")).toHaveTextContent("January 2024");
+    });
+
+    it("passes item count to TimelineMobileSheet", () => {
+      const mockItems = [
+        { id: "1", title: "Scene 1" },
+        { id: "2", title: "Scene 2" },
+      ];
+
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      render(<TimelineView {...defaultProps} items={mockItems} />);
+
+      expect(screen.getByTestId("mobile-sheet-count")).toHaveTextContent("2");
+    });
+
+    it("renders timeline controls inside mobile sheet", () => {
+      render(<TimelineView {...defaultProps} />);
+
+      const sheetChildren = screen.getByTestId("mobile-sheet-children");
+      expect(sheetChildren).toContainElement(screen.getByTestId("timeline-controls"));
+    });
+
+    it("renders timeline strip inside mobile sheet", () => {
+      render(<TimelineView {...defaultProps} />);
+
+      const sheetChildren = screen.getByTestId("mobile-sheet-children");
+      expect(sheetChildren).toContainElement(screen.getByTestId("timeline-strip"));
+    });
+
+    it('shows mobile-friendly empty message when no period selected', () => {
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: null,
+      });
+
+      render(<TimelineView {...defaultProps} />);
+
+      expect(
+        screen.getByText("Tap the timeline below to select a period")
+      ).toBeInTheDocument();
+    });
+
+    it("does not show period label in header on mobile (shows in sheet instead)", () => {
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      render(<TimelineView {...defaultProps} />);
+
+      // Period is shown in mobile sheet header, not in timeline header controls row
+      const sheetPeriod = screen.getByTestId("mobile-sheet-period");
+      expect(sheetPeriod).toHaveTextContent("January 2024");
+
+      // Should not have "(X items)" text in the controls row on mobile
+      expect(screen.queryByText(/\(\d+ items\)/)).not.toBeInTheDocument();
+    });
+
+    it("calls useMediaQuery with correct breakpoint", () => {
+      render(<TimelineView {...defaultProps} />);
+
+      expect(mockUseMediaQuery).toHaveBeenCalledWith("(max-width: 768px)");
     });
   });
 });
