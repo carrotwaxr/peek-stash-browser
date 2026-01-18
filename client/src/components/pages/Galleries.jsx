@@ -19,12 +19,14 @@ import {
 } from "../ui/index.js";
 import { TableView, ColumnConfigPopover } from "../table/index.js";
 import WallView from "../wall/WallView.jsx";
+import TimelineView from "../timeline/TimelineView.jsx";
 
 // View modes available for galleries page
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
+  { id: "timeline", label: "Timeline view" },
 ];
 
 const Galleries = () => {
@@ -198,6 +200,24 @@ const Galleries = () => {
                 onItemClick={handleGalleryClick}
                 loading={isLoading}
                 emptyMessage="No galleries found"
+              />
+            ) : viewMode === "timeline" ? (
+              <TimelineView
+                entityType="gallery"
+                items={currentGalleries}
+                renderItem={(gallery, index, { onItemClick }) => (
+                  <GalleryCard
+                    key={gallery.id}
+                    gallery={gallery}
+                    onClick={() => onItemClick?.(gallery)}
+                    fromPageTitle="Galleries"
+                    tabIndex={0}
+                  />
+                )}
+                onItemClick={handleGalleryClick}
+                loading={isLoading}
+                emptyMessage="No galleries found for this time period"
+                gridDensity={gridDensity}
               />
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
