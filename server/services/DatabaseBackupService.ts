@@ -9,6 +9,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { logger } from "../utils/logger.js";
+import prisma from "../prisma/singleton.js";
 
 const BACKUP_PATTERN = /^peek-stash-browser\.db\.backup-\d{8}-\d{6}$/;
 
@@ -65,6 +66,42 @@ class DatabaseBackupService {
     backups.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return backups;
+  }
+
+  /**
+   * Create a new backup using SQLite VACUUM INTO.
+   * Returns info about the created backup.
+   */
+  async createBackup(): Promise<BackupInfo> {
+    const dataDir = this.getDataDir();
+    const timestamp = this.formatTimestamp(new Date());
+    const filename = `peek-stash-browser.db.backup-${timestamp}`;
+    const backupPath = path.join(dataDir, filename);
+
+    logger.info(`Creating database backup: ${filename}`);
+
+    // Use VACUUM INTO for atomic, consistent backup
+    await prisma.$executeRawUnsafe(`VACUUM INTO '${backupPath}'`);
+
+    const stat = await fs.stat(backupPath);
+
+    logger.info(`Backup created successfully: ${filename} (${stat.size} bytes)`);
+
+    return {
+      filename,
+      size: stat.size,
+      createdAt: stat.mtime,
+    };
+  }
+
+  private formatTimestamp(date: Date): string {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const hours = String(date.getUTCHours()).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+    return `${year}${month}${day}-${hours}${minutes}${seconds}`;
   }
 }
 

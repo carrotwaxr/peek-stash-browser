@@ -8,6 +8,15 @@ import path from "path";
 // Mock fs/promises
 vi.mock("fs/promises");
 
+// Mock prisma - add at top with other mocks
+vi.mock("../../prisma/singleton.js", () => ({
+  default: {
+    $executeRawUnsafe: vi.fn(),
+  },
+}));
+
+import prisma from "../../prisma/singleton.js";
+
 // Mock logger
 vi.mock("../../utils/logger.js", () => ({
   logger: {
@@ -146,6 +155,49 @@ describe("DatabaseBackupService", () => {
       expect(backups).toHaveLength(2);
       expect(backups[0].filename).toBe("peek-stash-browser.db.backup-20260118-104532");
       expect(backups[1].filename).toBe("peek-stash-browser.db.backup-20260116-080000");
+    });
+  });
+
+  describe("createBackup", () => {
+    it("should create a backup with timestamped filename", async () => {
+      // Mock Date to get predictable filename - must be before import
+      vi.useFakeTimers();
+      const mockDate = new Date("2026-01-18T10:45:32.000Z");
+      vi.setSystemTime(mockDate);
+
+      vi.mocked(prisma.$executeRawUnsafe).mockResolvedValue(0);
+      vi.mocked(fs.stat).mockResolvedValue({
+        size: 246747136,
+        mtime: new Date("2026-01-18T10:45:32.000Z"),
+      } as any);
+
+      const { databaseBackupService } = await import(
+        "../../services/DatabaseBackupService.js"
+      );
+
+      const backup = await databaseBackupService.createBackup();
+
+      expect(backup.filename).toBe("peek-stash-browser.db.backup-20260118-104532");
+      expect(backup.size).toBe(246747136);
+      expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining("VACUUM INTO")
+      );
+
+      vi.useRealTimers();
+    });
+
+    it("should throw error if VACUUM INTO fails", async () => {
+      vi.mocked(prisma.$executeRawUnsafe).mockRejectedValue(
+        new Error("Database locked")
+      );
+
+      const { databaseBackupService } = await import(
+        "../../services/DatabaseBackupService.js"
+      );
+
+      await expect(databaseBackupService.createBackup()).rejects.toThrow(
+        "Database locked"
+      );
     });
   });
 });
