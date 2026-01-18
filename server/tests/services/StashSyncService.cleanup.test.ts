@@ -60,6 +60,8 @@ vi.mock("../../prisma/singleton.js", () => ({
       ]),
     },
     $queryRaw: vi.fn(),
+    $executeRawUnsafe: vi.fn().mockResolvedValue(undefined),
+    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -245,14 +247,11 @@ describe("StashSyncService Cleanup", () => {
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }], count: 3 },
       });
-      // Mock findMany to return all local scenes (1-5), of which 4,5 are not in Stash
-      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
-        { id: "1", phash: null },
-        { id: "2", phash: null },
-        { id: "3", phash: null },
+      // Mock $queryRawUnsafe to return scenes 4,5 that should be deleted (not in Stash)
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([
         { id: "4", phash: null },
         { id: "5", phash: null },
-      ] as any);
+      ]);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 2 });
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
@@ -284,10 +283,8 @@ describe("StashSyncService Cleanup", () => {
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [{ id: "1" }], count: 1 },
       });
-      // Mock findMany to return only the scene that exists in Stash
-      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
-        { id: "1", phash: null },
-      ] as any);
+      // Mock $queryRawUnsafe to return no scenes (all local scenes exist in Stash)
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([]);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 0 });
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
@@ -347,12 +344,12 @@ describe("StashSyncService Cleanup", () => {
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [], count: 0 },
       });
-      // Mock findMany to return 100 local scenes that should all be deleted
+      // Mock $queryRawUnsafe to return 100 local scenes that should all be deleted
       const localScenes = Array.from({ length: 100 }, (_, i) => ({
         id: String(i + 1),
         phash: null,
       }));
-      vi.mocked(prisma.stashScene.findMany).mockResolvedValue(localScenes as any);
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue(localScenes);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 100 });
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");

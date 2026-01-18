@@ -1213,16 +1213,33 @@ class StashSyncService extends EventEmitter {
 
       switch (entityType) {
         case "scene": {
-          // Get all local scene IDs to compute difference (avoids SQLite parameter limit)
-          // Using raw query for efficiency - just need id and phash
-          const localScenes = await prisma.stashScene.findMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null },
-            select: { id: true, phash: true },
-          });
+          // For large libraries (100k+ scenes), we use a temp table approach to avoid:
+          // 1. Loading all scene IDs into memory
+          // 2. Exceeding SQLite's parameter limit (~32k)
+          //
+          // Strategy: Insert stashIds into temp table, then query scenes NOT IN temp table
 
-          // Compute scenes to delete (in local but not in Stash)
-          const stashIdSet = new Set(stashIds);
-          const scenesToDelete = localScenes.filter((s) => !stashIdSet.has(s.id));
+          // Create temp table and populate with Stash IDs in batches
+          await prisma.$executeRawUnsafe(`CREATE TEMP TABLE IF NOT EXISTS _stash_scene_ids (id TEXT PRIMARY KEY)`);
+          await prisma.$executeRawUnsafe(`DELETE FROM _stash_scene_ids`);
+
+          const BATCH_SIZE = 500;
+          for (let i = 0; i < stashIds.length; i += BATCH_SIZE) {
+            const batch = stashIds.slice(i, i + BATCH_SIZE);
+            if (batch.length > 0) {
+              const values = batch.map((id) => `('${id}')`).join(",");
+              await prisma.$executeRawUnsafe(`INSERT OR IGNORE INTO _stash_scene_ids (id) VALUES ${values}`);
+            }
+          }
+
+          // Find scenes to delete (in local DB but not in Stash) - only fetch what we need
+          const instanceFilter = stashInstanceId ? `stashInstanceId = '${stashInstanceId}'` : `stashInstanceId IS NULL`;
+          const scenesToDelete = await prisma.$queryRawUnsafe<Array<{ id: string; phash: string | null }>>(
+            `SELECT id, phash FROM StashScene
+             WHERE deletedAt IS NULL
+             AND ${instanceFilter}
+             AND id NOT IN (SELECT id FROM _stash_scene_ids)`
+          );
 
           if (scenesToDelete.length > 0) {
             // Check for merges and reconcile user data before soft-deleting
@@ -1243,9 +1260,8 @@ class StashSyncService extends EventEmitter {
               }
             }
 
-            // Now soft-delete the scenes (use batched IN clause to avoid parameter limits)
+            // Soft-delete in batches
             const deleteIds = scenesToDelete.map((s) => s.id);
-            const BATCH_SIZE = 500;
             for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
               const batch = deleteIds.slice(i, i + BATCH_SIZE);
               await prisma.stashScene.updateMany({
@@ -1255,6 +1271,9 @@ class StashSyncService extends EventEmitter {
             }
             deletedCount = deleteIds.length;
           }
+
+          // Clean up temp table
+          await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS _stash_scene_ids`);
           break;
         }
         case "performer":
