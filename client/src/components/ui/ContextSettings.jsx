@@ -8,6 +8,7 @@ import {
   getViewModes,
   SETTING_LABELS,
 } from "../../config/entityDisplayConfig.js";
+import ZoomSlider from "./ZoomSlider.jsx";
 
 const api = axios.create({
   baseURL: "/api",
@@ -260,6 +261,30 @@ const ContextSettings = ({
                           </option>
                         ))}
                       </select>
+                    </div>
+                  )}
+                  {/* Default Density - shown for Grid or Wall view modes */}
+                  {(cardSettings?.defaultViewMode === "grid" || cardSettings?.defaultViewMode === "wall") && (
+                    <div className="mt-2">
+                      <label
+                        className="block text-xs font-medium mb-1"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {cardSettings?.defaultViewMode === "grid" ? "Default Grid Density" : "Default Wall Size"}
+                      </label>
+                      <ZoomSlider
+                        value={
+                          cardSettings?.defaultViewMode === "grid"
+                            ? (cardSettings?.defaultGridDensity || "medium")
+                            : (cardSettings?.defaultWallZoom || "medium")
+                        }
+                        onChange={(density) =>
+                          handleCardSettingChange(
+                            cardSettings?.defaultViewMode === "grid" ? "defaultGridDensity" : "defaultWallZoom",
+                            density
+                          )
+                        }
+                      />
                     </div>
                   )}
                   {/* Toggle settings */}
