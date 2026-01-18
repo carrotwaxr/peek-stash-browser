@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LANDING_PAGE_OPTIONS } from "../../constants/navigation.js";
 import { Button, Switch } from "../ui/index.js";
 
@@ -15,6 +15,14 @@ const LandingPageSettings = ({ landingPagePreference, onSave }) => {
   );
   const [hasChanges, setHasChanges] = useState(false);
   const [validationError, setValidationError] = useState("");
+
+  // Sync state when prop changes (e.g., after settings reload)
+  useEffect(() => {
+    setRandomize(landingPagePreference?.randomize || false);
+    setSelectedPages(landingPagePreference?.pages || ["home"]);
+    setHasChanges(false);
+    setValidationError("");
+  }, [landingPagePreference]);
 
   const handleRandomizeToggle = (checked) => {
     setRandomize(checked);
