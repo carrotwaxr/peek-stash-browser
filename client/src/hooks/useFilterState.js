@@ -14,6 +14,8 @@ export const useFilterState = ({
   filterOptions = [],
   syncToUrl = true,
   defaultViewMode = "grid",
+  defaultGridDensity = "medium",
+  defaultZoomLevel = "medium",
 } = {}) => {
   const effectiveContext = context || artifactType;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,8 +31,8 @@ export const useFilterState = ({
   const [pagination, setPaginationState] = useState({ page: 1, perPage: 24 });
   const [searchText, setSearchTextState] = useState("");
   const [viewMode, setViewModeState] = useState(defaultViewMode);
-  const [zoomLevel, setZoomLevelState] = useState("medium");
-  const [gridDensity, setGridDensityState] = useState("medium");
+  const [zoomLevel, setZoomLevelState] = useState(defaultZoomLevel);
+  const [gridDensity, setGridDensityState] = useState(defaultGridDensity);
   const [tableColumns, setTableColumnsState] = useState(null);
 
   // Initialize on mount
@@ -101,8 +103,8 @@ export const useFilterState = ({
             perPage: urlState.perPage,
             searchText: "",
             viewMode: defaultPreset.viewMode || defaultViewMode,
-            zoomLevel: defaultPreset.zoomLevel || "medium",
-            gridDensity: defaultPreset.gridDensity || "medium",
+            zoomLevel: defaultPreset.zoomLevel || defaultZoomLevel,
+            gridDensity: defaultPreset.gridDensity || defaultGridDensity,
           };
         } else {
           // No URL params, no preset: use defaults
@@ -114,8 +116,8 @@ export const useFilterState = ({
             perPage: urlState.perPage,
             searchText: "",
             viewMode: defaultViewMode,
-            zoomLevel: "medium",
-            gridDensity: "medium",
+            zoomLevel: defaultZoomLevel,
+            gridDensity: defaultGridDensity,
           };
         }
 
@@ -318,8 +320,8 @@ export const useFilterState = ({
   const loadPreset = useCallback((preset) => {
     const newFilters = { ...permanentFilters, ...preset.filters };
     const newViewMode = preset.viewMode || defaultViewMode;
-    const newZoomLevel = preset.zoomLevel || "medium";
-    const newGridDensity = preset.gridDensity || "medium";
+    const newZoomLevel = preset.zoomLevel || defaultZoomLevel;
+    const newGridDensity = preset.gridDensity || defaultGridDensity;
     const newTableColumns = preset.tableColumns || null;
     setFiltersState(newFilters);
     setSortState({ field: preset.sort, direction: preset.direction });
@@ -337,7 +339,7 @@ export const useFilterState = ({
       zoomLevel: newZoomLevel,
       gridDensity: newGridDensity,
     });
-  }, [permanentFilters, pagination, searchText, syncToUrlParams, defaultViewMode]);
+  }, [permanentFilters, pagination, searchText, syncToUrlParams, defaultViewMode, defaultZoomLevel, defaultGridDensity]);
 
   const setTableColumns = useCallback((columns) => {
     setTableColumnsState(columns);

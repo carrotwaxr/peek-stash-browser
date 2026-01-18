@@ -128,10 +128,12 @@ const SearchControls = ({
   // Unit preference for filter conversions
   const { unitPreference } = useUnitPreference();
 
-  // Get default view mode from card display settings
+  // Get default view mode and density settings from card display settings
   const { getSettings } = useCardDisplaySettings();
   const entitySettings = getSettings(artifactType);
   const defaultViewMode = entitySettings.defaultViewMode || "grid";
+  const defaultGridDensity = entitySettings.defaultGridDensity || "medium";
+  const defaultZoomLevel = entitySettings.defaultWallZoom || "medium";
 
   // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom, ContextSettings
   const searchZoneItems = useMemo(() => [
@@ -267,6 +269,8 @@ const SearchControls = ({
     filterOptions,
     syncToUrl,
     defaultViewMode,
+    defaultGridDensity,
+    defaultZoomLevel,
   });
 
   // Extract values for compatibility with existing code
@@ -779,6 +783,7 @@ const SearchControls = ({
             currentDirection={sortDirection}
             currentViewMode={viewMode}
             currentZoomLevel={zoomLevel}
+            currentGridDensity={gridDensity}
             currentTableColumns={currentTableColumns}
             permanentFilters={permanentFilters}
             onLoadPreset={handleLoadPreset}

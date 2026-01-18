@@ -95,7 +95,7 @@ const EntitySettingsSection = ({ entityType }) => {
         {/* Default Density - shown for Grid or Wall view modes */}
         {(settings.defaultViewMode === "grid" || settings.defaultViewMode === "wall") && (
           <div className="mt-2">
-            <label className="flex flex-col gap-1">
+            <label className="flex items-center justify-between gap-3">
               <span style={{ color: "var(--text-primary)" }}>
                 {settings.defaultViewMode === "grid" ? "Default Grid Density" : "Default Wall Size"}
               </span>
