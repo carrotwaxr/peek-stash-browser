@@ -7,6 +7,7 @@ import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { libraryApi } from "../../services/api.js";
 import {
+  SceneCard,
   SyncProgressBanner,
   ErrorMessage,
   PageHeader,
@@ -16,12 +17,14 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index.js";
 import SceneGrid from "./SceneGrid.jsx";
 import WallView from "../wall/WallView.jsx";
+import TimelineView from "../timeline/TimelineView.jsx";
 
 // View modes available for scene search
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
+  { id: "timeline", label: "Timeline view" },
 ];
 
 // Context settings for wall view preview behavior
@@ -231,6 +234,25 @@ const SceneSearch = ({
               onItemClick={handleSceneClick}
               loading={isLoading}
               emptyMessage="No scenes found"
+            />
+          ) : viewMode === "timeline" ? (
+            <TimelineView
+              entityType="scene"
+              items={currentScenes}
+              renderItem={(scene, index, { onItemClick }) => (
+                <SceneCard
+                  key={scene.id}
+                  scene={scene}
+                  onClick={() => onItemClick?.(scene)}
+                  onHideSuccess={handleHideSuccess}
+                  fromPageTitle={fromPageTitle}
+                  tabIndex={0}
+                />
+              )}
+              onItemClick={handleSceneClick}
+              loading={isLoading}
+              emptyMessage="No scenes found for this time period"
+              gridDensity={gridDensity}
             />
           ) : (
             <SceneGrid
