@@ -100,17 +100,34 @@ export const getLandingPagePath = (key) => {
 /**
  * Get the landing page destination based on user preference
  * @param {Object} preference - User's landing page preference {pages: string[], randomize: boolean}
+ * @param {string} [currentPath] - Current path to exclude from random selection
  * @returns {string} Path to navigate to
  */
-export const getLandingPage = (preference) => {
+export const getLandingPage = (preference, currentPath) => {
   // Default fallback
   if (!preference || !preference.pages?.length) {
     return "/";
   }
 
   if (preference.randomize && preference.pages.length > 1) {
-    const randomIndex = Math.floor(Math.random() * preference.pages.length);
-    return getLandingPagePath(preference.pages[randomIndex]);
+    // Filter out the current page from random selection (if provided)
+    let availablePages = preference.pages;
+    if (currentPath) {
+      const currentKey = LANDING_PAGE_OPTIONS.find(
+        (opt) => opt.path === currentPath
+      )?.key;
+      if (currentKey) {
+        availablePages = preference.pages.filter((key) => key !== currentKey);
+      }
+    }
+
+    // If all pages were filtered (shouldn't happen with 2+ pages), fall back to all pages
+    if (availablePages.length === 0) {
+      availablePages = preference.pages;
+    }
+
+    const randomIndex = Math.floor(Math.random() * availablePages.length);
+    return getLandingPagePath(availablePages[randomIndex]);
   }
 
   return getLandingPagePath(preference.pages[0]);

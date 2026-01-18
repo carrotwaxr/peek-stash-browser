@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import { getLandingPage } from "../../constants/navigation.js";
 
@@ -7,13 +7,14 @@ export const PeekLogo = ({
   variant = "auto", // 'auto', 'active', 'inactive', 'text-only', 'icon-only'
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   // Navigate to user's preferred landing page
-  // Called on each click so random mode produces different results each time
+  // Passes current path so random mode excludes the current page
   const handleClick = (e) => {
     e.preventDefault();
-    const destination = getLandingPage(user?.landingPagePreference);
+    const destination = getLandingPage(user?.landingPagePreference, location.pathname);
     navigate(destination);
   };
 
