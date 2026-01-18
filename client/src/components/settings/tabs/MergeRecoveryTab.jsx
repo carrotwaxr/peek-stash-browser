@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { showError, showSuccess } from "../../../utils/toast.jsx";
 import { Button } from "../../ui/index.js";
 
@@ -162,9 +163,11 @@ const MergeRecoveryTab = () => {
                       {orphan.hasFavorites && " | Favorited"}
                     </p>
                   </div>
-                  <span style={{ color: "var(--text-secondary)" }}>
-                    {expandedOrphan === orphan.id ? "▼" : "▶"}
-                  </span>
+                  {expandedOrphan === orphan.id ? (
+                    <ChevronDown size={20} style={{ color: "var(--text-secondary)" }} />
+                  ) : (
+                    <ChevronRight size={20} style={{ color: "var(--text-secondary)" }} />
+                  )}
                 </div>
 
                 {expandedOrphan === orphan.id && (
@@ -204,6 +207,7 @@ const MergeRecoveryTab = () => {
                             <Button
                               onClick={() => handleReconcile(orphan.id, match.sceneId)}
                               disabled={processing === orphan.id}
+                              variant="primary"
                               size="sm"
                             >
                               Transfer
@@ -231,6 +235,7 @@ const MergeRecoveryTab = () => {
                       <Button
                         onClick={() => handleReconcile(orphan.id, manualTargetId[orphan.id])}
                         disabled={!manualTargetId[orphan.id] || processing === orphan.id}
+                        variant="primary"
                         size="sm"
                       >
                         Transfer
