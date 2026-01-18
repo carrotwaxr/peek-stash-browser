@@ -2,6 +2,7 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
 import { timelineService, type Granularity, type TimelineEntityType } from "../services/TimelineService.js";
+import { logger } from "../utils/logger.js";
 
 const VALID_ENTITY_TYPES: TimelineEntityType[] = ["scene", "gallery", "image"];
 const VALID_GRANULARITIES: Granularity[] = ["years", "months", "weeks", "days"];
@@ -32,7 +33,10 @@ export async function getDateDistribution(
     );
     res.json({ distribution });
   } catch (error) {
-    console.error("Error fetching date distribution:", error);
+    logger.error("Error fetching date distribution", {
+      error: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     res.status(500).json({ error: "Failed to fetch date distribution" });
   }
 }
