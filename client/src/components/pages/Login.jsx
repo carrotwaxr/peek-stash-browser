@@ -5,7 +5,7 @@ import { Button } from "../ui/index.js";
 import { REDIRECT_STORAGE_KEY } from "../../services/api.js";
 import { getLandingPage } from "../../constants/navigation.js";
 
-const Login = ({ onLoginSuccess }) => {
+const Login = () => {
   const { login } = useAuth();
   const { theme } = useTheme();
   const [credentials, setCredentials] = useState({
