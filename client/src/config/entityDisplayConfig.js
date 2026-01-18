@@ -14,6 +14,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     ],
     defaultSettings: {
       defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      defaultWallZoom: "medium",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showCodeOnCard: true,
@@ -28,6 +30,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     // Order: View mode, subtitle parts, descriptions, indicators, rating row controls
     availableSettings: [
       "defaultViewMode",
+      "defaultGridDensity",
+      "defaultWallZoom",
       "showStudio",
       "showDate",
       "showCodeOnCard",
@@ -49,6 +53,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     ],
     defaultSettings: {
       defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      defaultWallZoom: "medium",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showStudio: true,
@@ -62,6 +68,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     // Order: View mode, subtitle parts, descriptions, indicators, rating row controls
     availableSettings: [
       "defaultViewMode",
+      "defaultGridDensity",
+      "defaultWallZoom",
       "showStudio",
       "showDate",
       "showDescriptionOnCard",
@@ -81,6 +89,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     ],
     defaultSettings: {
       defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      defaultWallZoom: "medium",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showStudio: true,
@@ -94,6 +104,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     // Order: View mode, subtitle parts, descriptions, indicators, rating row controls
     availableSettings: [
       "defaultViewMode",
+      "defaultGridDensity",
+      "defaultWallZoom",
       "showStudio",
       "showDate",
       "showDescriptionOnCard",
@@ -114,6 +126,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     ],
     defaultSettings: {
       defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      defaultWallZoom: "medium",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showRelationshipIndicators: true,
@@ -124,6 +138,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     },
     availableSettings: [
       "defaultViewMode",
+      "defaultGridDensity",
+      "defaultWallZoom",
       "showDescriptionOnCard",
       "showDescriptionOnDetail",
       "showRelationshipIndicators",
@@ -142,6 +158,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     ],
     defaultSettings: {
       defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      defaultWallZoom: "medium",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showRelationshipIndicators: true,
@@ -152,6 +170,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     },
     availableSettings: [
       "defaultViewMode",
+      "defaultGridDensity",
+      "defaultWallZoom",
       "showDescriptionOnCard",
       "showDescriptionOnDetail",
       "showRelationshipIndicators",
@@ -170,6 +190,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     ],
     defaultSettings: {
       defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      defaultWallZoom: "medium",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showRelationshipIndicators: true,
@@ -177,6 +199,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     },
     availableSettings: [
       "defaultViewMode",
+      "defaultGridDensity",
+      "defaultWallZoom",
       "showDescriptionOnCard",
       "showDescriptionOnDetail",
       "showRelationshipIndicators",
@@ -192,6 +216,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     ],
     defaultSettings: {
       defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      defaultWallZoom: "medium",
       showDescriptionOnCard: true,
       showDescriptionOnDetail: true,
       showStudio: true,
@@ -204,6 +230,8 @@ export const ENTITY_DISPLAY_CONFIG = {
     },
     availableSettings: [
       "defaultViewMode",
+      "defaultGridDensity",
+      "defaultWallZoom",
       "showStudio",
       "showDate",
       "showDescriptionOnCard",
@@ -248,6 +276,8 @@ export const getAvailableSettings = (entityType) => {
  */
 export const SETTING_LABELS = {
   defaultViewMode: "Default view mode",
+  defaultGridDensity: "Default grid density",
+  defaultWallZoom: "Default wall size",
   showCodeOnCard: "Show studio code on cards",
   showStudio: "Show studio name",
   showDate: "Show date",
