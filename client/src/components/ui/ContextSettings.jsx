@@ -289,7 +289,7 @@ const ContextSettings = ({
                   )}
                   {/* Toggle settings */}
                   {getAvailableSettings(entityType)
-                    .filter((key) => key !== "defaultViewMode" && key !== "showDescriptionOnDetail")
+                    .filter((key) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom", "showDescriptionOnDetail"].includes(key))
                     .map((settingKey) => (
                       <label key={settingKey} className="flex items-center cursor-pointer">
                         <input

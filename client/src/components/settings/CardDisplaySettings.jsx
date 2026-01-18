@@ -118,7 +118,7 @@ const EntitySettingsSection = ({ entityType }) => {
 
         {/* Toggle settings */}
         {availableSettings
-          .filter((key) => key !== "defaultViewMode")
+          .filter((key) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom"].includes(key))
           .map((settingKey) => (
             <Toggle
               key={settingKey}
