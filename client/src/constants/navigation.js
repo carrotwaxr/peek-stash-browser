@@ -69,6 +69,54 @@ export const NAV_DEFINITIONS = [
 ];
 
 /**
+ * Landing page options for post-login redirect
+ * Order matters - this is the display order in settings
+ */
+export const LANDING_PAGE_OPTIONS = [
+  { key: "home", label: "Home", path: "/" },
+  { key: "scenes", label: "Scenes", path: "/scenes" },
+  { key: "performers", label: "Performers", path: "/performers" },
+  { key: "studios", label: "Studios", path: "/studios" },
+  { key: "tags", label: "Tags", path: "/tags" },
+  { key: "collections", label: "Collections", path: "/collections" },
+  { key: "galleries", label: "Galleries", path: "/galleries" },
+  { key: "images", label: "Images", path: "/images" },
+  { key: "playlists", label: "Playlists", path: "/playlists" },
+  { key: "recommended", label: "Recommended", path: "/recommended" },
+  { key: "watch-history", label: "Watch History", path: "/watch-history" },
+  { key: "user-stats", label: "User Stats", path: "/user-stats" },
+];
+
+/**
+ * Get the path for a landing page key
+ * @param {string} key - Landing page key
+ * @returns {string} Path for the landing page, defaults to "/"
+ */
+export const getLandingPagePath = (key) => {
+  const option = LANDING_PAGE_OPTIONS.find((opt) => opt.key === key);
+  return option?.path || "/";
+};
+
+/**
+ * Get the landing page destination based on user preference
+ * @param {Object} preference - User's landing page preference {pages: string[], randomize: boolean}
+ * @returns {string} Path to navigate to
+ */
+export const getLandingPage = (preference) => {
+  // Default fallback
+  if (!preference || !preference.pages?.length) {
+    return "/";
+  }
+
+  if (preference.randomize && preference.pages.length > 1) {
+    const randomIndex = Math.floor(Math.random() * preference.pages.length);
+    return getLandingPagePath(preference.pages[randomIndex]);
+  }
+
+  return getLandingPagePath(preference.pages[0]);
+};
+
+/**
  * Migrate navigation preferences to include any new items
  * @param {Array} savedPreferences - User's saved nav preferences
  * @returns {Array} Migrated preferences with all current nav items

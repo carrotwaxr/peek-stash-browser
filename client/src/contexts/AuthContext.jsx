@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
     if (response.ok) {
       setIsAuthenticated(true);
       setUser(data.user);
-      return { success: true };
+      return { success: true, user: data.user };
     } else {
       return { success: false, error: data.error || "Login failed" };
     }

@@ -75,9 +75,11 @@ export const ProtectedRoute = ({ children, setupStatus, checkingSetup }) => {
   }
 
   if (!isAuthenticated) {
-    // Save current URL for redirect after login
+    // Save current URL for redirect after login (but not "/" since that's the default)
     const currentUrl = location.pathname + location.search;
-    sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
+    if (currentUrl !== "/" && currentUrl !== "/?") {
+      sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
+    }
     return <Navigate to="/login" replace />;
   }
 

@@ -83,11 +83,6 @@ const AppContent = () => {
     window.location.href = "/";
   };
 
-  // Handler for successful login - navigate to home
-  const handleLoginSuccess = () => {
-    window.location.href = "/";
-  };
-
   // Ensure setupStatus has defaults to prevent null access in guards
   const safeSetupStatus = setupStatus || { setupComplete: false, hasUsers: false, hasStashInstance: false };
 
@@ -113,7 +108,7 @@ const AppContent = () => {
             path="/login"
             element={
               <LoginGuard setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
-                <Login onLoginSuccess={handleLoginSuccess} />
+                <Login />
               </LoginGuard>
             }
           />

@@ -3,8 +3,9 @@ import { useAuth } from "../../hooks/useAuth.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { Button } from "../ui/index.js";
 import { REDIRECT_STORAGE_KEY } from "../../services/api.js";
+import { getLandingPage } from "../../constants/navigation.js";
 
-const Login = ({ onLoginSuccess }) => {
+const Login = () => {
   const { login } = useAuth();
   const { theme } = useTheme();
   const [credentials, setCredentials] = useState({
@@ -23,13 +24,15 @@ const Login = ({ onLoginSuccess }) => {
       const result = await login(credentials);
 
       if (result.success) {
-        // Check for saved redirect URL
+        // Check for saved redirect URL (takes priority over preference)
         const redirectUrl = sessionStorage.getItem(REDIRECT_STORAGE_KEY);
         if (redirectUrl) {
           sessionStorage.removeItem(REDIRECT_STORAGE_KEY);
           window.location.href = redirectUrl;
         } else {
-          onLoginSuccess();
+          // Use landing page preference if available
+          const destination = getLandingPage(result.user?.landingPagePreference);
+          window.location.href = destination;
         }
       } else {
         setError(result.error || "Login failed");

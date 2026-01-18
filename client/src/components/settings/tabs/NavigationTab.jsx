@@ -4,6 +4,7 @@ import { migrateCarouselPreferences } from "../../../constants/carousels.js";
 import { migrateNavPreferences } from "../../../constants/navigation.js";
 import { showError, showSuccess } from "../../../utils/toast.jsx";
 import CarouselSettings from "../CarouselSettings.jsx";
+import LandingPageSettings from "../LandingPageSettings.jsx";
 import NavigationSettings from "../NavigationSettings.jsx";
 
 const api = axios.create({
@@ -15,6 +16,7 @@ const NavigationTab = () => {
   const [loading, setLoading] = useState(true);
   const [carouselPreferences, setCarouselPreferences] = useState([]);
   const [navPreferences, setNavPreferences] = useState([]);
+  const [landingPagePreference, setLandingPagePreference] = useState(null);
 
   // Load settings on mount
   useEffect(() => {
@@ -31,6 +33,10 @@ const NavigationTab = () => {
 
         const migratedNavPrefs = migrateNavPreferences(settings.navPreferences);
         setNavPreferences(migratedNavPrefs);
+
+        setLandingPagePreference(
+          settings.landingPagePreference || { pages: ["home"], randomize: false }
+        );
       } catch {
         showError("Failed to load navigation settings");
       } finally {
@@ -70,6 +76,19 @@ const NavigationTab = () => {
     }
   };
 
+  const saveLandingPagePreference = async (newPreference) => {
+    try {
+      await api.put("/user/settings", {
+        landingPagePreference: newPreference,
+      });
+
+      setLandingPagePreference(newPreference);
+      showSuccess("Landing page preference saved successfully!");
+    } catch (err) {
+      showError(err.response?.data?.error || "Failed to save landing page preference");
+    }
+  };
+
   if (loading) {
     return (
       <div
@@ -83,6 +102,20 @@ const NavigationTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* Landing Page Settings */}
+      <div
+        className="p-6 rounded-lg border"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          borderColor: "var(--border-color)",
+        }}
+      >
+        <LandingPageSettings
+          landingPagePreference={landingPagePreference}
+          onSave={saveLandingPagePreference}
+        />
+      </div>
+
       {/* Navigation Settings */}
       <div
         className="p-6 rounded-lg border"

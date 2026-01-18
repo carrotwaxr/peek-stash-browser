@@ -24,6 +24,13 @@ router.post("/login", async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { username },
+      select: {
+        id: true,
+        username: true,
+        password: true,
+        role: true,
+        landingPagePreference: true,
+      },
     });
 
     if (!user) {
@@ -50,6 +57,7 @@ router.post("/login", async (req, res) => {
         id: user.id,
         username: user.username,
         role: user.role,
+        landingPagePreference: user.landingPagePreference || { pages: ["home"], randomize: false },
       },
     });
   } catch (error) {
