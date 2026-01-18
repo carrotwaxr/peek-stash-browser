@@ -23,6 +23,7 @@ import { sceneTagInheritanceService } from "./SceneTagInheritanceService.js";
 import { stashInstanceManager } from "./StashInstanceManager.js";
 import { userStatsService } from "./UserStatsService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
+import { mergeReconciliationService } from "./MergeReconciliationService.js";
 
 export interface SyncProgress {
   entityType: string;
@@ -132,6 +133,39 @@ function validateEntityId(id: string): boolean {
   // Allow alphanumeric, hyphens (UUIDs), and underscores
   // Most Stash IDs are numeric, but UUIDs are possible
   return /^[a-zA-Z0-9_-]+$/.test(id);
+}
+
+/**
+ * Extract PHASH fingerprints from scene files.
+ * Returns primary phash and array of all phashes.
+ */
+function extractPhashes(files: Array<{ fingerprints?: Array<{ type: string; value: string }> }> | undefined): {
+  phash: string | null;
+  phashes: string | null;
+} {
+  if (!files || files.length === 0) {
+    return { phash: null, phashes: null };
+  }
+
+  const allPhashes: string[] = [];
+  for (const file of files) {
+    if (file.fingerprints) {
+      for (const fp of file.fingerprints) {
+        if (fp.type === "phash" && fp.value) {
+          allPhashes.push(fp.value);
+        }
+      }
+    }
+  }
+
+  if (allPhashes.length === 0) {
+    return { phash: null, phashes: null };
+  }
+
+  return {
+    phash: allPhashes[0],
+    phashes: allPhashes.length > 1 ? JSON.stringify(allPhashes) : null,
+  };
 }
 
 class StashSyncService extends EventEmitter {
@@ -911,6 +945,8 @@ class StashSyncService extends EventEmitter {
       .map((scene) => {
         const file = scene.files?.[0];
         const paths = scene.paths as any; // Cast to any to access optional chapters_vtt
+        // Extract phashes from files
+        const { phash, phashes } = extractPhashes(scene.files);
 
         return `(
       '${this.escape(scene.id)}',
@@ -947,7 +983,9 @@ class StashSyncService extends EventEmitter {
       ${scene.created_at ? `'${scene.created_at}'` : "NULL"},
       ${scene.updated_at ? `'${scene.updated_at}'` : "NULL"},
       datetime('now'),
-      NULL
+      NULL,
+      ${this.escapeNullable(phash)},
+      ${this.escapeNullable(phashes)}
     )`;
       })
       .join(",\n");
@@ -959,7 +997,7 @@ class StashSyncService extends EventEmitter {
       fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
       pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption,
       streams, oCounter, playCount, playDuration, stashCreatedAt, stashUpdatedAt,
-      syncedAt, deletedAt
+      syncedAt, deletedAt, phash, phashes
     ) VALUES ${sceneValues}
     ON CONFLICT(id) DO UPDATE SET
       title = excluded.title,
@@ -994,7 +1032,9 @@ class StashSyncService extends EventEmitter {
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
       syncedAt = excluded.syncedAt,
-      deletedAt = NULL
+      deletedAt = NULL,
+      phash = excluded.phash,
+      phashes = excluded.phashes
   `);
 
     // Collect all junction records (validate related entity IDs too)
@@ -1172,12 +1212,70 @@ class StashSyncService extends EventEmitter {
       let deletedCount = 0;
 
       switch (entityType) {
-        case "scene":
-          deletedCount = (await prisma.stashScene.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
-            data: { deletedAt: now },
-          })).count;
+        case "scene": {
+          // For large libraries (100k+ scenes), we use a temp table approach to avoid:
+          // 1. Loading all scene IDs into memory
+          // 2. Exceeding SQLite's parameter limit (~32k)
+          //
+          // Strategy: Insert stashIds into temp table, then query scenes NOT IN temp table
+
+          // Create temp table and populate with Stash IDs in batches
+          await prisma.$executeRawUnsafe(`CREATE TEMP TABLE IF NOT EXISTS _stash_scene_ids (id TEXT PRIMARY KEY)`);
+          await prisma.$executeRawUnsafe(`DELETE FROM _stash_scene_ids`);
+
+          const BATCH_SIZE = 500;
+          for (let i = 0; i < stashIds.length; i += BATCH_SIZE) {
+            const batch = stashIds.slice(i, i + BATCH_SIZE);
+            if (batch.length > 0) {
+              const values = batch.map((id) => `('${id}')`).join(",");
+              await prisma.$executeRawUnsafe(`INSERT OR IGNORE INTO _stash_scene_ids (id) VALUES ${values}`);
+            }
+          }
+
+          // Find scenes to delete (in local DB but not in Stash) - only fetch what we need
+          const instanceFilter = stashInstanceId ? `stashInstanceId = '${stashInstanceId}'` : `stashInstanceId IS NULL`;
+          const scenesToDelete = await prisma.$queryRawUnsafe<Array<{ id: string; phash: string | null }>>(
+            `SELECT id, phash FROM StashScene
+             WHERE deletedAt IS NULL
+             AND ${instanceFilter}
+             AND id NOT IN (SELECT id FROM _stash_scene_ids)`
+          );
+
+          if (scenesToDelete.length > 0) {
+            // Check for merges and reconcile user data before soft-deleting
+            for (const scene of scenesToDelete) {
+              if (scene.phash) {
+                // Try to find a merge target
+                const matches = await mergeReconciliationService.findPhashMatches(scene.id);
+                if (matches.length > 0) {
+                  const target = matches[0]; // Use the recommended match
+                  logger.info(`Detected merge: scene ${scene.id} -> ${target.sceneId}`);
+                  await mergeReconciliationService.reconcileScene(
+                    scene.id,
+                    target.sceneId,
+                    scene.phash,
+                    null // automatic
+                  );
+                }
+              }
+            }
+
+            // Soft-delete in batches
+            const deleteIds = scenesToDelete.map((s) => s.id);
+            for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
+              const batch = deleteIds.slice(i, i + BATCH_SIZE);
+              await prisma.stashScene.updateMany({
+                where: { id: { in: batch } },
+                data: { deletedAt: now },
+              });
+            }
+            deletedCount = deleteIds.length;
+          }
+
+          // Clean up temp table
+          await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS _stash_scene_ids`);
           break;
+        }
         case "performer":
           deletedCount = (await prisma.stashPerformer.updateMany({
             where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
