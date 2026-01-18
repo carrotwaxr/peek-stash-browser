@@ -1,0 +1,435 @@
+// client/tests/components/timeline/TimelineStrip.test.jsx
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import TimelineStrip from "../../../src/components/timeline/TimelineStrip.jsx";
+
+describe("TimelineStrip", () => {
+  const defaultDistribution = [
+    { period: "2024-01", count: 10 },
+    { period: "2024-02", count: 20 },
+    { period: "2024-03", count: 15 },
+  ];
+
+  const defaultProps = {
+    distribution: defaultDistribution,
+    maxCount: 20,
+    zoomLevel: "months",
+    selectedPeriod: null,
+    onSelectPeriod: vi.fn(),
+    onKeyboardNavigate: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("Rendering", () => {
+    it("renders with role listbox and aria-label", () => {
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      expect(listbox).toHaveAttribute("aria-label", "Timeline");
+    });
+
+    it("renders a TimelineBar for each distribution item", () => {
+      render(<TimelineStrip {...defaultProps} />);
+
+      const options = screen.getAllByRole("option");
+      expect(options).toHaveLength(3);
+    });
+
+    it("passes correct props to TimelineBar components", () => {
+      render(<TimelineStrip {...defaultProps} />);
+
+      // Check that each TimelineBar has the correct aria-label
+      expect(
+        screen.getByRole("option", { name: /Jan 2024: 10 items/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: /Feb 2024: 20 items/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: /Mar 2024: 15 items/i })
+      ).toBeInTheDocument();
+    });
+
+    it("renders baseline element", () => {
+      const { container } = render(<TimelineStrip {...defaultProps} />);
+
+      // The baseline is the horizontal line at the bottom of bars
+      const baseline = container.querySelector(".bg-border-primary");
+      expect(baseline).toBeInTheDocument();
+    });
+
+    it("applies custom className", () => {
+      render(<TimelineStrip {...defaultProps} className="custom-class" />);
+
+      const listbox = screen.getByRole("listbox");
+      expect(listbox).toHaveClass("custom-class");
+    });
+
+    it("makes container focusable with tabIndex 0", () => {
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      expect(listbox).toHaveAttribute("tabindex", "0");
+    });
+  });
+
+  describe("Empty State", () => {
+    it('shows "No dated content available" when distribution is empty', () => {
+      render(<TimelineStrip {...defaultProps} distribution={[]} />);
+
+      expect(screen.getByText("No dated content available")).toBeInTheDocument();
+    });
+
+    it("does not render listbox when distribution is empty", () => {
+      render(<TimelineStrip {...defaultProps} distribution={[]} />);
+
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Period Labels", () => {
+    it('formats labels for "years" zoom level', () => {
+      const yearDistribution = [
+        { period: "2022", count: 5 },
+        { period: "2023", count: 10 },
+        { period: "2024", count: 15 },
+      ];
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          distribution={yearDistribution}
+          zoomLevel="years"
+        />
+      );
+
+      expect(screen.getByText("2022")).toBeInTheDocument();
+      expect(screen.getByText("2023")).toBeInTheDocument();
+      expect(screen.getByText("2024")).toBeInTheDocument();
+    });
+
+    it('formats labels for "months" zoom level', () => {
+      render(<TimelineStrip {...defaultProps} zoomLevel="months" />);
+
+      expect(screen.getByText("Jan 2024")).toBeInTheDocument();
+      expect(screen.getByText("Feb 2024")).toBeInTheDocument();
+      expect(screen.getByText("Mar 2024")).toBeInTheDocument();
+    });
+
+    it('formats labels for "weeks" zoom level', () => {
+      const weekDistribution = [
+        { period: "2024-W01", count: 5 },
+        { period: "2024-W02", count: 10 },
+        { period: "2024-W12", count: 15 },
+      ];
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          distribution={weekDistribution}
+          zoomLevel="weeks"
+        />
+      );
+
+      expect(screen.getByText("W01")).toBeInTheDocument();
+      expect(screen.getByText("W02")).toBeInTheDocument();
+      expect(screen.getByText("W12")).toBeInTheDocument();
+    });
+
+    it('formats labels for "days" zoom level', () => {
+      const dayDistribution = [
+        { period: "2024-01-15", count: 5 },
+        { period: "2024-03-01", count: 10 },
+        { period: "2024-12-25", count: 15 },
+      ];
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          distribution={dayDistribution}
+          zoomLevel="days"
+        />
+      );
+
+      expect(screen.getByText("Jan 15")).toBeInTheDocument();
+      expect(screen.getByText("Mar 1")).toBeInTheDocument();
+      expect(screen.getByText("Dec 25")).toBeInTheDocument();
+    });
+
+    it("falls back to months format for unknown zoom level", () => {
+      render(<TimelineStrip {...defaultProps} zoomLevel="unknown" />);
+
+      // Should still render with months format
+      expect(screen.getByText("Jan 2024")).toBeInTheDocument();
+    });
+  });
+
+  describe("Selected Period Highlighting", () => {
+    it("highlights the selected period bar", () => {
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          selectedPeriod={{ period: "2024-02" }}
+        />
+      );
+
+      const selectedOption = screen.getByRole("option", {
+        name: /Feb 2024: 20 items/i,
+      });
+      expect(selectedOption).toHaveAttribute("aria-selected", "true");
+    });
+
+    it("does not highlight non-selected period bars", () => {
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          selectedPeriod={{ period: "2024-02" }}
+        />
+      );
+
+      const nonSelectedOption = screen.getByRole("option", {
+        name: /Jan 2024: 10 items/i,
+      });
+      expect(nonSelectedOption).toHaveAttribute("aria-selected", "false");
+    });
+
+    it("applies highlight styling to selected period label", () => {
+      const { container } = render(
+        <TimelineStrip
+          {...defaultProps}
+          selectedPeriod={{ period: "2024-02" }}
+        />
+      );
+
+      // Find the label with the selected styling
+      const selectedLabel = container.querySelector(
+        "span.text-accent-primary.font-medium"
+      );
+      expect(selectedLabel).toBeInTheDocument();
+      expect(selectedLabel).toHaveTextContent("Feb 2024");
+    });
+
+    it("does not highlight labels when no period is selected", () => {
+      const { container } = render(
+        <TimelineStrip {...defaultProps} selectedPeriod={null} />
+      );
+
+      const highlightedLabel = container.querySelector(
+        "span.text-accent-primary.font-medium"
+      );
+      expect(highlightedLabel).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Click Interactions", () => {
+    it("calls onSelectPeriod when a bar is clicked", async () => {
+      const user = userEvent.setup();
+      const onSelectPeriod = vi.fn();
+
+      render(
+        <TimelineStrip {...defaultProps} onSelectPeriod={onSelectPeriod} />
+      );
+
+      const secondOption = screen.getByRole("option", {
+        name: /Feb 2024: 20 items/i,
+      });
+      await user.click(secondOption);
+
+      expect(onSelectPeriod).toHaveBeenCalledWith("2024-02");
+    });
+  });
+
+  describe("Keyboard Navigation", () => {
+    it("navigates right with ArrowRight key", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox); // Focus the container (sets initial focus to last)
+
+      // After focus, focusedIndex should be at last item (index 2)
+      // ArrowRight should wrap to first (index 0)
+      await user.keyboard("{ArrowRight}");
+
+      // First item should now be focused
+      const firstBar = screen.getAllByTestId("timeline-bar")[0];
+      expect(firstBar).toHaveClass("ring-2");
+    });
+
+    it("navigates left with ArrowLeft key", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox); // Focus the container (sets initial focus to last)
+
+      // After focus, focusedIndex should be at last item (index 2)
+      // ArrowLeft should move to previous (index 1)
+      await user.keyboard("{ArrowLeft}");
+
+      // Second item should now be focused
+      const secondBar = screen.getAllByTestId("timeline-bar")[1];
+      expect(secondBar).toHaveClass("ring-2");
+    });
+
+    it("navigates to first item with Home key", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+      await user.keyboard("{Home}");
+
+      const firstBar = screen.getAllByTestId("timeline-bar")[0];
+      expect(firstBar).toHaveClass("ring-2");
+    });
+
+    it("navigates to last item with End key", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+      await user.keyboard("{Home}"); // First go to first
+      await user.keyboard("{End}"); // Then to last
+
+      const lastBar = screen.getAllByTestId("timeline-bar")[2];
+      expect(lastBar).toHaveClass("ring-2");
+    });
+
+    it("selects focused item with Enter key", async () => {
+      const user = userEvent.setup();
+      const onSelectPeriod = vi.fn();
+
+      render(
+        <TimelineStrip {...defaultProps} onSelectPeriod={onSelectPeriod} />
+      );
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+      await user.keyboard("{Home}"); // Go to first item
+      await user.keyboard("{Enter}");
+
+      expect(onSelectPeriod).toHaveBeenCalledWith("2024-01");
+    });
+
+    it("selects focused item with Space key", async () => {
+      const user = userEvent.setup();
+      const onSelectPeriod = vi.fn();
+
+      render(
+        <TimelineStrip {...defaultProps} onSelectPeriod={onSelectPeriod} />
+      );
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+      await user.keyboard("{Home}"); // Go to first item
+      await user.keyboard(" ");
+
+      expect(onSelectPeriod).toHaveBeenCalledWith("2024-01");
+    });
+
+    it("passes unhandled keys to onKeyboardNavigate", async () => {
+      const user = userEvent.setup();
+      const onKeyboardNavigate = vi.fn();
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          onKeyboardNavigate={onKeyboardNavigate}
+        />
+      );
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+      await user.keyboard("+"); // Unhandled key
+
+      expect(onKeyboardNavigate).toHaveBeenCalled();
+    });
+
+    it("wraps focus from last to first with ArrowRight", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox); // Focus initially at last (index 2)
+      await user.keyboard("{ArrowRight}"); // Should wrap to first (index 0)
+
+      const firstBar = screen.getAllByTestId("timeline-bar")[0];
+      expect(firstBar).toHaveClass("ring-2");
+    });
+
+    it("wraps focus from first to last with ArrowLeft", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+      await user.keyboard("{Home}"); // Go to first
+      await user.keyboard("{ArrowLeft}"); // Should wrap to last
+
+      const lastBar = screen.getAllByTestId("timeline-bar")[2];
+      expect(lastBar).toHaveClass("ring-2");
+    });
+  });
+
+  describe("Focus Management", () => {
+    it("sets initial focus to selected period when focused", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          selectedPeriod={{ period: "2024-02" }}
+        />
+      );
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+
+      // The second bar (index 1) should be focused
+      const secondBar = screen.getAllByTestId("timeline-bar")[1];
+      expect(secondBar).toHaveClass("ring-2");
+    });
+
+    it("sets initial focus to last (most recent) when no period is selected", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} selectedPeriod={null} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox);
+
+      // The last bar should be focused
+      const lastBar = screen.getAllByTestId("timeline-bar")[2];
+      expect(lastBar).toHaveClass("ring-2");
+    });
+
+    it("does not reset focus if already focused", async () => {
+      const user = userEvent.setup();
+
+      render(<TimelineStrip {...defaultProps} selectedPeriod={null} />);
+
+      const listbox = screen.getByRole("listbox");
+      await user.click(listbox); // Initial focus at last
+      await user.keyboard("{Home}"); // Move to first
+
+      // Trigger another focus event - should NOT reset
+      listbox.dispatchEvent(new FocusEvent("focus", { bubbles: true }));
+
+      // First bar should still be focused (not reset to last)
+      const firstBar = screen.getAllByTestId("timeline-bar")[0];
+      expect(firstBar).toHaveClass("ring-2");
+    });
+  });
+});
