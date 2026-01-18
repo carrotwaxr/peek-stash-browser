@@ -16,6 +16,7 @@ vi.mock("../../prisma/singleton.js", () => ({
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       deleteMany: vi.fn(),
     },
     sceneRating: {
@@ -23,6 +24,7 @@ vi.mock("../../prisma/singleton.js", () => ({
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
       deleteMany: vi.fn(),
     },
     mergeRecord: {

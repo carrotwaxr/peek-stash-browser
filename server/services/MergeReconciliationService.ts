@@ -294,6 +294,18 @@ class MergeReconciliationService {
       },
     });
 
+    // Delete source records after successful transfer
+    if (sourceHistory) {
+      await prisma.watchHistory.delete({
+        where: { userId_sceneId: { userId, sceneId: sourceSceneId } },
+      });
+    }
+    if (sourceRating) {
+      await prisma.sceneRating.delete({
+        where: { userId_sceneId: { userId, sceneId: sourceSceneId } },
+      });
+    }
+
     logger.info(`Transferred user data from scene ${sourceSceneId} to ${targetSceneId} for user ${userId}`);
 
     return { success: true, mergeRecordId: mergeRecord.id };
