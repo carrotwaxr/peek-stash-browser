@@ -200,4 +200,58 @@ describe("DatabaseBackupService", () => {
       );
     });
   });
+
+  describe("deleteBackup", () => {
+    it("should delete a valid backup file", async () => {
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+      const { databaseBackupService } = await import(
+        "../../services/DatabaseBackupService.js"
+      );
+
+      await databaseBackupService.deleteBackup(
+        "peek-stash-browser.db.backup-20260118-104532"
+      );
+
+      expect(fs.unlink).toHaveBeenCalledWith(
+        "/app/data/peek-stash-browser.db.backup-20260118-104532"
+      );
+    });
+
+    it("should reject invalid filenames (path traversal prevention)", async () => {
+      const { databaseBackupService } = await import(
+        "../../services/DatabaseBackupService.js"
+      );
+
+      await expect(
+        databaseBackupService.deleteBackup("../../../etc/passwd")
+      ).rejects.toThrow("Invalid backup filename");
+
+      await expect(
+        databaseBackupService.deleteBackup("peek-stash-browser.db")
+      ).rejects.toThrow("Invalid backup filename");
+
+      await expect(
+        databaseBackupService.deleteBackup("random-file.txt")
+      ).rejects.toThrow("Invalid backup filename");
+
+      expect(fs.unlink).not.toHaveBeenCalled();
+    });
+
+    it("should throw error if file does not exist", async () => {
+      vi.mocked(fs.unlink).mockRejectedValue(
+        Object.assign(new Error("ENOENT"), { code: "ENOENT" })
+      );
+
+      const { databaseBackupService } = await import(
+        "../../services/DatabaseBackupService.js"
+      );
+
+      await expect(
+        databaseBackupService.deleteBackup(
+          "peek-stash-browser.db.backup-20260118-104532"
+        )
+      ).rejects.toThrow();
+    });
+  });
 });

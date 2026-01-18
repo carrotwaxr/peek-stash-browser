@@ -94,6 +94,24 @@ class DatabaseBackupService {
     };
   }
 
+  /**
+   * Delete a backup file.
+   * Validates filename to prevent path traversal attacks.
+   */
+  async deleteBackup(filename: string): Promise<void> {
+    // Security: validate filename matches expected pattern
+    if (!BACKUP_PATTERN.test(filename)) {
+      throw new Error("Invalid backup filename");
+    }
+
+    const dataDir = this.getDataDir();
+    const filePath = path.join(dataDir, filename);
+
+    logger.info(`Deleting backup: ${filename}`);
+    await fs.unlink(filePath);
+    logger.info(`Backup deleted: ${filename}`);
+  }
+
   private formatTimestamp(date: Date): string {
     const year = date.getUTCFullYear();
     const month = String(date.getUTCMonth() + 1).padStart(2, "0");
