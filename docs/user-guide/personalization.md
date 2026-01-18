@@ -39,9 +39,28 @@ For variety, enable **Random one of selected pages** to land on a different page
 
 Each time you log in, Peek randomly picks one of your selected pages.
 
-### Priority Rules
+### Peek Logo Navigation
 
-Your landing page preference is used when you navigate directly to the login page. However, if you were redirected to login while trying to access a specific page (e.g., `/performers`), you'll be returned to that page instead of your preference.
+Clicking the **Peek logo** in the navigation bar also respects your landing page preference:
+
+- If you've set a specific page, clicking the logo takes you there
+- In random mode, each click picks a different page from your selection
+- This works in all layouts: mobile top bar, expanded sidebar, and collapsed sidebar
+
+### When Preferences Apply
+
+Your landing page preference applies when:
+
+- **Logging in** from a fresh browser or after session expiry
+- **Clicking the Peek logo** from any page
+
+Your preference does **not** apply when:
+
+- **Redirected to login**: If you were browsing `/performers` and your session expired, you'll return to `/performers` after login (not your preference)
+- **Existing tab**: If you have a long-running tab open, Peek remembers your last URL and returns you there after re-authentication
+
+!!! tip "Testing your preference"
+    After changing your landing page setting, open a **new browser tab** to test. Existing tabs remember your last location.
 
 ---
 

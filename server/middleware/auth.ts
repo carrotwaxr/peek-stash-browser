@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/library";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma/singleton.js";
@@ -25,6 +26,7 @@ export interface RequestUser {
   enableCast?: boolean;
   theme?: string | null;
   hideConfirmationDisabled?: boolean;
+  landingPagePreference?: JsonValue;
 }
 
 /**
@@ -93,6 +95,7 @@ const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
       enableCast: true,
       theme: true,
       hideConfirmationDisabled: true,
+      landingPagePreference: true,
     },
   });
 
