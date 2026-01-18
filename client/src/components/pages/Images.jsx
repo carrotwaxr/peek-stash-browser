@@ -20,6 +20,7 @@ import {
 } from "../ui/index.js";
 import Lightbox from "../ui/Lightbox.jsx";
 import WallView from "../wall/WallView.jsx";
+import TimelineView from "../timeline/TimelineView.jsx";
 import { TableView, ColumnConfigPopover } from "../table/index.js";
 
 // View modes available for images page
@@ -27,6 +28,7 @@ const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
+  { id: "timeline", label: "Timeline view" },
 ];
 
 const Images = () => {
@@ -267,6 +269,27 @@ const Images = () => {
                 onItemClick={handleImageClick}
                 loading={isLoading}
                 emptyMessage="No images found"
+              />
+            ) : viewMode === "timeline" ? (
+              <TimelineView
+                entityType="image"
+                items={currentImages}
+                renderItem={(image, index, { onItemClick }) => (
+                  <ImageCard
+                    key={image.id}
+                    image={image}
+                    onClick={() => onItemClick?.(image)}
+                    fromPageTitle="Images"
+                    tabIndex={0}
+                    onOCounterChange={handleOCounterChange}
+                    onRatingChange={handleRatingChange}
+                    onFavoriteChange={handleFavoriteChange}
+                  />
+                )}
+                onItemClick={handleImageClick}
+                loading={isLoading}
+                emptyMessage="No images found for this time period"
+                gridDensity={gridDensity}
               />
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
