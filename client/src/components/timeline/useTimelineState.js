@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { apiGet } from "../../services/api.js";
 import {
   startOfYear,
@@ -57,11 +57,24 @@ function parsePeriodToDateRange(period, zoomLevel) {
 }
 
 export function useTimelineState({ entityType, autoSelectRecent = false }) {
-  const [zoomLevel, setZoomLevel] = useState("months");
+  const [zoomLevel, setZoomLevelState] = useState("months");
   const [selectedPeriod, setSelectedPeriod] = useState(null);
   const [distribution, setDistribution] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Track whether we've done the initial load (for autoSelectRecent)
+  const hasInitiallyLoaded = useRef(false);
+
+  // Clear selection when zoom level changes
+  const setZoomLevel = useCallback((newLevel) => {
+    setZoomLevelState((prevLevel) => {
+      if (prevLevel !== newLevel) {
+        setSelectedPeriod(null);
+      }
+      return newLevel;
+    });
+  }, []);
 
   // Fetch distribution when entityType or zoomLevel changes
   useEffect(() => {
@@ -79,11 +92,17 @@ export function useTimelineState({ entityType, autoSelectRecent = false }) {
         if (!cancelled) {
           setDistribution(response.distribution || []);
 
-          // Auto-select most recent period if enabled and no selection
-          if (autoSelectRecent && response.distribution?.length > 0) {
+          // Auto-select most recent period only on initial fetch
+          if (
+            autoSelectRecent &&
+            !hasInitiallyLoaded.current &&
+            response.distribution?.length > 0
+          ) {
             const mostRecent = response.distribution[response.distribution.length - 1];
             setSelectedPeriod(parsePeriodToDateRange(mostRecent.period, zoomLevel));
           }
+
+          hasInitiallyLoaded.current = true;
         }
       } catch (err) {
         if (!cancelled) {
@@ -106,13 +125,11 @@ export function useTimelineState({ entityType, autoSelectRecent = false }) {
 
   const selectPeriod = useCallback(
     (period) => {
-      if (selectedPeriod?.period === period) {
-        setSelectedPeriod(null);
-      } else {
-        setSelectedPeriod(parsePeriodToDateRange(period, zoomLevel));
-      }
+      setSelectedPeriod((prev) =>
+        prev?.period === period ? null : parsePeriodToDateRange(period, zoomLevel)
+      );
     },
-    [selectedPeriod, zoomLevel]
+    [zoomLevel]
   );
 
   const clearSelection = useCallback(() => {

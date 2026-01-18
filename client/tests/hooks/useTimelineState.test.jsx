@@ -144,4 +144,21 @@ describe("useTimelineState", () => {
       expect(result.current.selectedPeriod?.period).toBe("2024-03");
     });
   });
+
+  describe("error handling", () => {
+    it("sets error state when API call fails", async () => {
+      apiGet.mockRejectedValue(new Error("Network error"));
+
+      const { result } = renderHook(() =>
+        useTimelineState({ entityType: "scene" })
+      );
+
+      await waitFor(() => {
+        expect(result.current.error).toBe("Network error");
+      });
+
+      expect(result.current.distribution).toEqual([]);
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
 });
