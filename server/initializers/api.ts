@@ -29,6 +29,7 @@ import setupRoutes from "../routes/setup.js";
 import syncRoutes from "../routes/sync.js";
 import exclusionsRoutes from "../routes/exclusions.js";
 import mergeReconciliationRoutes from "../routes/mergeReconciliation.js";
+import databaseBackupRoutes from "../routes/databaseBackup.js";
 import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
@@ -118,6 +119,9 @@ export const setupAPI = () => {
 
   // Merge reconciliation routes (admin only)
   app.use("/api/admin", mergeReconciliationRoutes);
+
+  // Database backup routes (admin only)
+  app.use("/api/admin", databaseBackupRoutes);
 
   // User settings routes (protected)
   app.use("/api/user", userRoutes);
