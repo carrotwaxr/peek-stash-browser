@@ -6,16 +6,27 @@ import { format, parse } from "date-fns";
 const PERIOD_LABELS = {
   years: (period) => period,
   months: (period) => {
-    const date = parse(period, "yyyy-MM", new Date());
-    return format(date, "MMM yyyy");
+    try {
+      const date = parse(period, "yyyy-MM", new Date());
+      if (isNaN(date.getTime())) return period;
+      return format(date, "MMM yyyy");
+    } catch {
+      return period;
+    }
   },
   weeks: (period) => {
+    if (!period || !period.includes("-W")) return period;
     const [, week] = period.split("-W");
     return `W${week}`;
   },
   days: (period) => {
-    const date = parse(period, "yyyy-MM-dd", new Date());
-    return format(date, "MMM d");
+    try {
+      const date = parse(period, "yyyy-MM-dd", new Date());
+      if (isNaN(date.getTime())) return period;
+      return format(date, "MMM d");
+    } catch {
+      return period;
+    }
   },
 };
 

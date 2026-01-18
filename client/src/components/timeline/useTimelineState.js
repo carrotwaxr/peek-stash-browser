@@ -16,44 +16,56 @@ import {
 const ZOOM_LEVELS = ["years", "months", "weeks", "days"];
 
 function parsePeriodToDateRange(period, zoomLevel) {
-  let start, end, label;
+  if (!period) return null;
 
-  switch (zoomLevel) {
-    case "years": {
-      const date = parse(period, "yyyy", new Date());
-      start = format(startOfYear(date), "yyyy-MM-dd");
-      end = format(endOfYear(date), "yyyy-MM-dd");
-      label = period;
-      break;
+  try {
+    let start, end, label;
+
+    switch (zoomLevel) {
+      case "years": {
+        const date = parse(period, "yyyy", new Date());
+        if (isNaN(date.getTime())) return null;
+        start = format(startOfYear(date), "yyyy-MM-dd");
+        end = format(endOfYear(date), "yyyy-MM-dd");
+        label = period;
+        break;
+      }
+      case "months": {
+        const date = parse(period, "yyyy-MM", new Date());
+        if (isNaN(date.getTime())) return null;
+        start = format(startOfMonth(date), "yyyy-MM-dd");
+        end = format(endOfMonth(date), "yyyy-MM-dd");
+        label = format(date, "MMMM yyyy");
+        break;
+      }
+      case "weeks": {
+        // Format: "2024-W12"
+        if (!period.includes("-W")) return null;
+        const [year, weekStr] = period.split("-W");
+        const date = parse(`${year}-W${weekStr}-1`, "RRRR-'W'II-i", new Date());
+        if (isNaN(date.getTime())) return null;
+        start = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        end = format(endOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
+        label = `Week ${weekStr}, ${year}`;
+        break;
+      }
+      case "days": {
+        const date = parse(period, "yyyy-MM-dd", new Date());
+        if (isNaN(date.getTime())) return null;
+        start = format(startOfDay(date), "yyyy-MM-dd");
+        end = format(endOfDay(date), "yyyy-MM-dd");
+        label = format(date, "MMMM d, yyyy");
+        break;
+      }
+      default:
+        return null;
     }
-    case "months": {
-      const date = parse(period, "yyyy-MM", new Date());
-      start = format(startOfMonth(date), "yyyy-MM-dd");
-      end = format(endOfMonth(date), "yyyy-MM-dd");
-      label = format(date, "MMMM yyyy");
-      break;
-    }
-    case "weeks": {
-      // Format: "2024-W12"
-      const [year, weekStr] = period.split("-W");
-      const date = parse(`${year}-W${weekStr}-1`, "RRRR-'W'II-i", new Date());
-      start = format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
-      end = format(endOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
-      label = `Week ${weekStr}, ${year}`;
-      break;
-    }
-    case "days": {
-      const date = parse(period, "yyyy-MM-dd", new Date());
-      start = format(startOfDay(date), "yyyy-MM-dd");
-      end = format(endOfDay(date), "yyyy-MM-dd");
-      label = format(date, "MMMM d, yyyy");
-      break;
-    }
-    default:
-      return null;
+
+    return { period, start, end, label };
+  } catch {
+    // Return null for any parsing errors
+    return null;
   }
-
-  return { period, start, end, label };
 }
 
 export function useTimelineState({ entityType, autoSelectRecent = false }) {
