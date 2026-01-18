@@ -70,21 +70,10 @@ docker run -d `
 
 ### unRAID Installation
 
-#### Option 1: Community Applications (Recommended)
-
-1. Open Community Applications
-2. Search for "Peek Stash Browser"
-3. Click Install and configure the template
-4. Access at `http://your-unraid-ip:6969`
-
-#### Option 2: Manual Template Installation
-
-If Peek isn't available in Community Applications yet:
-
 **Step 1: Download the template**
 
 ```
-https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/master/unraid-template.xml
+https://raw.githubusercontent.com/carrotwaxr/peek-stash-browser/main/unraid-template.xml
 ```
 
 **Step 2: Install the template**
