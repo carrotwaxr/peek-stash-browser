@@ -1,16 +1,21 @@
-import { Link } from "react-router-dom";
-
-// import { useTheme } from '../../themes/useTheme.js'; // Will be used for theme-specific logos
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../hooks/useAuth.js";
+import { getLandingPage } from "../../constants/navigation.js";
 
 export const PeekLogo = ({
   size = "default", // 'small', 'default', 'large'
   variant = "auto", // 'auto', 'active', 'inactive', 'text-only', 'icon-only'
 }) => {
-  //const location = useLocation();
-  // const { currentTheme } = useTheme(); // Will be used when we implement theme-specific logos
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  //const isHome = location.pathname === "/";
-  //const isActive = variant === "auto" ? isHome : variant === "active";
+  // Navigate to user's preferred landing page
+  // Called on each click so random mode produces different results each time
+  const handleClick = (e) => {
+    e.preventDefault();
+    const destination = getLandingPage(user?.landingPagePreference);
+    navigate(destination);
+  };
 
   // Size configurations
   const sizeConfig = {
@@ -73,9 +78,10 @@ export const PeekLogo = ({
   };
 
   return (
-    <Link
-      to="/"
-      className={`flex items-center ${config.container} hover:opacity-80 transition-opacity duration-200`}
+    <a
+      href="/"
+      onClick={handleClick}
+      className={`flex items-center ${config.container} hover:opacity-80 transition-opacity duration-200 cursor-pointer`}
     >
       {renderLogo()}
       <span
@@ -87,6 +93,6 @@ export const PeekLogo = ({
       >
         peek
       </span>
-    </Link>
+    </a>
   );
 };
