@@ -1,4 +1,4 @@
-import { SCENE_GRID_CONTAINER_CLASSNAMES, STANDARD_GRID_CONTAINER_CLASSNAMES } from '../../../constants/grids.js';
+import { getGridClasses } from '../../../constants/grids.js';
 
 /**
  * GridLayout - Responsive grid layout
@@ -14,6 +14,7 @@ import { SCENE_GRID_CONTAINER_CLASSNAMES, STANDARD_GRID_CONTAINER_CLASSNAMES } f
  *
  * @param {Object} props
  * @param {string} props.entityType - Entity type for grid selection ('scene' vs 'standard')
+ * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
  * @param {Array} props.items - Items to render
  * @param {Function} props.renderItem - Function to render each item (item, index) => ReactNode
  * @param {boolean} [props.loading] - Loading state
@@ -23,6 +24,7 @@ import { SCENE_GRID_CONTAINER_CLASSNAMES, STANDARD_GRID_CONTAINER_CLASSNAMES } f
  */
 export const GridLayout = ({
   entityType,
+  density = "medium",
   items,
   renderItem,
   loading = false,
@@ -31,9 +33,8 @@ export const GridLayout = ({
   className = "",
 }) => {
   // Determine grid type based on entity
-  const gridClasses = entityType === 'scene'
-    ? SCENE_GRID_CONTAINER_CLASSNAMES
-    : STANDARD_GRID_CONTAINER_CLASSNAMES;
+  const gridType = entityType === 'scene' ? 'scene' : 'standard';
+  const gridClasses = getGridClasses(gridType, density);
 
   // Default skeleton renderer
   const defaultRenderSkeleton = () => (

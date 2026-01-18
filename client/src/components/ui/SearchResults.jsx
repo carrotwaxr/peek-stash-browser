@@ -15,6 +15,7 @@ import Pagination from './Pagination.jsx';
  *
  * @param {Object} props
  * @param {string} props.entityType - Entity type for layout selection
+ * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
  * @param {Array} props.items - Items to render
  * @param {Function} props.renderItem - Function to render each item
  * @param {boolean} [props.loading] - Loading state
@@ -30,6 +31,7 @@ import Pagination from './Pagination.jsx';
  */
 export const SearchResults = ({
   entityType,
+  density = "medium",
   items,
   renderItem,
   loading = false,
@@ -56,6 +58,7 @@ export const SearchResults = ({
       <LayoutRenderer
         layoutType={layoutType}
         entityType={entityType}
+        density={density}
         items={[]} // empty, will render skeletons
         renderItem={renderItem}
         renderSkeleton={renderSkeleton}
@@ -87,6 +90,7 @@ export const SearchResults = ({
       <LayoutRenderer
         layoutType={layoutType}
         entityType={entityType}
+        density={density}
         items={items}
         renderItem={renderItem}
         loading={false}

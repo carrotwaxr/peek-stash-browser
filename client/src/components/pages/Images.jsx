@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
+import { getGridClasses } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -204,7 +204,7 @@ const Images = () => {
           {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
-          {({ viewMode, zoomLevel, sortField, sortDirection, onSort }) =>
+          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
@@ -226,7 +226,7 @@ const Images = () => {
                   }
                 />
               ) : (
-                <div className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
+                <div className={getGridClasses("standard", gridDensity)}>
                   {[...Array(24)].map((_, i) => (
                     <div
                       key={i}
@@ -269,7 +269,7 @@ const Images = () => {
                 emptyMessage="No images found"
               />
             ) : (
-              <div ref={gridRef} className={`${STANDARD_GRID_CONTAINER_CLASSNAMES} xl:grid-cols-4 2xl:grid-cols-5`}>
+              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
                 {currentImages.map((image, index) => {
                   const itemProps = gridItemProps(index);
                   return (

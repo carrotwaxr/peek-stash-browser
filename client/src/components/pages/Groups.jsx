@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
+import { getGridClasses } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -126,7 +126,7 @@ const Groups = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, sortField, sortDirection, onSort }) =>
+          {({ viewMode, gridDensity, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
@@ -148,7 +148,7 @@ const Groups = () => {
                   }
                 />
               ) : (
-                <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+                <div className={getGridClasses("standard", gridDensity)}>
                   {[...Array(12)].map((_, i) => (
                     <div
                       key={i}
@@ -181,7 +181,7 @@ const Groups = () => {
                 }
               />
             ) : (
-              <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
                 {currentGroups.map((group, index) => {
                   const itemProps = gridItemProps(index);
                   return (

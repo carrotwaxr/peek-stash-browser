@@ -20,6 +20,7 @@ import SearchControls from "./SearchControls.jsx";
  * @param {string} [props.emptyDescription] - Empty state description
  * @param {number} [props.skeletonCount] - Number of skeleton items during loading
  * @param {boolean} [props.syncToUrl] - Whether to sync state to URL (default: true)
+ * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
  */
 export const SearchableGrid = ({
   entityType,
@@ -34,6 +35,7 @@ export const SearchableGrid = ({
   emptyDescription,
   skeletonCount = 24,
   syncToUrl = true,
+  density = "medium",
 }) => {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
@@ -146,6 +148,7 @@ export const SearchableGrid = ({
     >
       <SearchResults
         entityType={entityType}
+        density={density}
         items={data}
         renderItem={(item, index) =>
           renderItem(item, index, { onHideSuccess: handleHideSuccess })
