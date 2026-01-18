@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { LucideCheckSquare, LucideSquare } from "lucide-react";
-import { SCENE_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
+import { getGridClasses } from "../../constants/grids.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import {
   BulkActionBar,
@@ -15,6 +15,7 @@ import {
 
 const SceneGrid = ({
   scenes,
+  density = "medium",
   loading = false,
   error = null,
   currentPage = 1,
@@ -33,6 +34,7 @@ const SceneGrid = ({
 }) => {
   const gridRef = useRef();
   const columns = useGridColumns("scenes");
+  const gridClasses = getGridClasses("scene", density);
 
   // Selection state (always enabled, no mode toggle)
   const [selectedScenes, setSelectedScenes] = useState([]);
@@ -79,7 +81,7 @@ const SceneGrid = ({
 
   if (loading) {
     return (
-      <div className={SCENE_GRID_CONTAINER_CLASSNAMES}>
+      <div className={gridClasses}>
         {[...Array(12)].map((_, i) => (
           <SkeletonSceneCard key={i} />
         ))}
@@ -135,7 +137,7 @@ const SceneGrid = ({
       )}
 
       {/* Grid */}
-      <div ref={gridRef} className={SCENE_GRID_CONTAINER_CLASSNAMES}>
+      <div ref={gridRef} className={gridClasses}>
         {scenes.map((scene, index) => {
           // Use gridItemProps if provided (TV mode with zone navigation), otherwise use defaults
           const itemProps = gridItemProps ? gridItemProps(index) : {};

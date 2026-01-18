@@ -39,7 +39,8 @@ const getContextLabel = (ctx) => {
  * @param {string} props.currentSort - Current sort field
  * @param {string} props.currentDirection - Current sort direction
  * @param {string} props.currentViewMode - Current view mode (grid/wall/table)
- * @param {string} props.currentZoomLevel - Current zoom level (small/medium/large)
+ * @param {string} props.currentZoomLevel - Current zoom level for wall view (small/medium/large)
+ * @param {string} props.currentGridDensity - Current grid density (small/medium/large)
  * @param {Object} props.currentTableColumns - Current table columns config { visible: [], order: [] }
  * @param {Function} props.onLoadPreset - Callback when a preset is loaded
  */
@@ -52,6 +53,7 @@ const FilterPresets = ({
   currentDirection,
   currentViewMode = "grid",
   currentZoomLevel = "medium",
+  currentGridDensity = "medium",
   currentTableColumns = null,
   onLoadPreset,
 }) => {
@@ -121,6 +123,7 @@ const FilterPresets = ({
         direction: currentDirection,
         viewMode: currentViewMode,
         zoomLevel: currentZoomLevel,
+        gridDensity: currentGridDensity,
         tableColumns: currentViewMode === "table" ? currentTableColumns : null,
         setAsDefault,
       });
@@ -155,6 +158,7 @@ const FilterPresets = ({
       direction: preset.direction,
       viewMode: preset.viewMode || "grid",
       zoomLevel: preset.zoomLevel || "medium",
+      gridDensity: preset.gridDensity || "medium",
       tableColumns: preset.tableColumns || null,
     });
     setIsDropdownOpen(false);

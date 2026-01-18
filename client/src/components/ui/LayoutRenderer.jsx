@@ -14,6 +14,7 @@ import { GridLayout } from './layouts/GridLayout.jsx';
  * @param {Object} props
  * @param {'grid'|'list'|'compact'} props.layoutType - Layout mode
  * @param {string} props.entityType - For grid type selection ('scene' vs 'standard')
+ * @param {string} [props.density] - Grid density level ('small', 'medium', 'large')
  * @param {Array} props.items - Items to render
  * @param {Function} props.renderItem - Render function for each item
  * @param {boolean} [props.loading] - Loading state
@@ -24,6 +25,7 @@ import { GridLayout } from './layouts/GridLayout.jsx';
 export const LayoutRenderer = ({
   layoutType = 'grid',
   entityType,
+  density = "medium",
   items,
   renderItem,
   loading = false,
@@ -63,6 +65,7 @@ export const LayoutRenderer = ({
       return (
         <GridLayout
           entityType={entityType}
+          density={density}
           items={items}
           renderItem={renderItem}
           loading={loading}

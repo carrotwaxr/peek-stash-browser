@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import ZoomSlider from "../ui/ZoomSlider.jsx";
 import {
   ENTITY_DISPLAY_CONFIG,
   getEntityTypes,
@@ -91,9 +92,33 @@ const EntitySettingsSection = ({ entityType }) => {
           />
         )}
 
+        {/* Default Density - shown for Grid or Wall view modes */}
+        {(settings.defaultViewMode === "grid" || settings.defaultViewMode === "wall") && (
+          <div className="mt-2">
+            <label className="flex items-center justify-between gap-3">
+              <span style={{ color: "var(--text-primary)" }}>
+                {settings.defaultViewMode === "grid" ? "Default Grid Density" : "Default Wall Size"}
+              </span>
+              <ZoomSlider
+                value={
+                  settings.defaultViewMode === "grid"
+                    ? (settings.defaultGridDensity || "medium")
+                    : (settings.defaultWallZoom || "medium")
+                }
+                onChange={(density) =>
+                  handleChange(
+                    settings.defaultViewMode === "grid" ? "defaultGridDensity" : "defaultWallZoom",
+                    density
+                  )
+                }
+              />
+            </label>
+          </div>
+        )}
+
         {/* Toggle settings */}
         {availableSettings
-          .filter((key) => key !== "defaultViewMode")
+          .filter((key) => !["defaultViewMode", "defaultGridDensity", "defaultWallZoom"].includes(key))
           .map((settingKey) => (
             <Toggle
               key={settingKey}

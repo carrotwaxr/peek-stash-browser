@@ -128,10 +128,12 @@ const SearchControls = ({
   // Unit preference for filter conversions
   const { unitPreference } = useUnitPreference();
 
-  // Get default view mode from card display settings
+  // Get default view mode and density settings from card display settings
   const { getSettings } = useCardDisplaySettings();
   const entitySettings = getSettings(artifactType);
   const defaultViewMode = entitySettings.defaultViewMode || "grid";
+  const defaultGridDensity = entitySettings.defaultGridDensity || "medium";
+  const defaultZoomLevel = entitySettings.defaultWallZoom || "medium";
 
   // Search zone items: SearchInput, SortControl, SortDirection, Filters, FilterPresets, ViewMode, Zoom, ContextSettings
   const searchZoneItems = useMemo(() => [
@@ -256,6 +258,8 @@ const SearchControls = ({
     setSearchText: setSearchTextAction,
     setViewMode,
     setZoomLevel,
+    gridDensity,
+    setGridDensity,
     loadPreset,
   } = useFilterState({
     artifactType,
@@ -265,6 +269,8 @@ const SearchControls = ({
     filterOptions,
     syncToUrl,
     defaultViewMode,
+    defaultGridDensity,
+    defaultZoomLevel,
   });
 
   // Extract values for compatibility with existing code
@@ -777,6 +783,7 @@ const SearchControls = ({
             currentDirection={sortDirection}
             currentViewMode={viewMode}
             currentZoomLevel={zoomLevel}
+            currentGridDensity={gridDensity}
             currentTableColumns={currentTableColumns}
             permanentFilters={permanentFilters}
             onLoadPreset={handleLoadPreset}
@@ -811,6 +818,17 @@ const SearchControls = ({
             className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
           >
             <ZoomSlider value={zoomLevel} onChange={setZoomLevel} />
+          </div>
+        )}
+
+        {/* Grid Density Slider - Only shown in grid mode */}
+        {viewMode === "grid" && (
+          <div
+            data-tv-search-item="grid-density"
+            ref={(el) => searchZoneNav.setItemRef(6, el)}
+            className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
+          >
+            <ZoomSlider value={gridDensity} onChange={setGridDensity} />
           </div>
         )}
 
@@ -994,7 +1012,7 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? children({ viewMode, zoomLevel, wallPlayback, sortField, sortDirection, onSort: handleSortChange })
+        ? children({ viewMode, zoomLevel, gridDensity, wallPlayback, sortField, sortDirection, onSort: handleSortChange })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (

@@ -13,6 +13,7 @@ The default card-based layout showing thumbnails with metadata.
 - Standard card grid with consistent sizing
 - Shows title, studio, date, and rating information
 - Hover for sprite preview (scenes)
+- Three density levels: Small, Medium, Large
 - Available for all entity types
 
 ### Wall View
@@ -66,9 +67,23 @@ A tree view showing parent/child tag relationships (Tags page only).
 
 ---
 
-## Zoom Levels
+## Density Controls
 
-In Wall View, adjust density with the zoom control (S/M/L buttons):
+Adjust how many items appear per row using the S/M/L buttons in the toolbar.
+
+### Grid Density
+
+In Grid View, density controls the number of columns:
+
+| Level | Columns (Desktop) | Description |
+|-------|-------------------|-------------|
+| **Small** | 4-6 | More items, smaller cards |
+| **Medium** | 3-5 | Balanced view (default) |
+| **Large** | 2-3 | Fewer items, larger cards |
+
+### Wall Zoom
+
+In Wall View, zoom controls row height:
 
 | Level | Row Height | Items per Row (1920px) |
 |-------|------------|------------------------|
@@ -128,6 +143,7 @@ Save your current view configuration for quick access later.
 - All active filters
 - Sort field and direction
 - View mode (Grid/Wall/Table/Hierarchy)
+- Grid density (for Grid view)
 - Zoom level (for Wall view)
 - Table column configuration
 
@@ -153,9 +169,10 @@ Your browse state is reflected in the URL, making it easy to bookmark or share s
 
 **URL parameters include:**
 
-- `view_mode` - grid, wall, table, or hierarchy
+- `view` - grid, wall, table, or hierarchy
+- `grid_density` - small, medium, or large (grid view)
 - `zoom` - small, medium, or large (wall view)
-- `sort` and `direction` - current sort settings
+- `sort` and `dir` - current sort settings
 - Filter parameters - active filters
 
 Sharing a URL shares your exact view configuration.

@@ -202,7 +202,7 @@ const SceneSearch = ({
         onViewModeChange={setCurrentViewMode}
         {...searchControlsProps}
       >
-        {({ viewMode, zoomLevel, sortField, sortDirection, onSort }) =>
+        {({ viewMode, zoomLevel, gridDensity, sortField, sortDirection, onSort }) =>
           viewMode === "table" ? (
             <TableView
               items={currentScenes}
@@ -235,6 +235,7 @@ const SceneSearch = ({
           ) : (
             <SceneGrid
               scenes={currentScenes || []}
+              density={gridDensity}
               loading={isLoading}
               error={error}
               onSceneClick={handleSceneClick}

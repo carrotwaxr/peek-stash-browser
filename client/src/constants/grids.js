@@ -9,24 +9,28 @@
   5xl (3840px)
 */
 
-/** STANDARD GRID COLUMNS
-  < 640px       1
-  640-1023px    2
-  1024-1919px   3
-  1920-2559px   5
-  2560-3839px   6
-  3840px+       10
+/** STANDARD GRID DENSITY LEVELS
+  Density: small (more columns), medium (current), large (fewer columns)
 */
-export const STANDARD_GRID_CONTAINER_CLASSNAMES =
-  "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 3xl:grid-cols-5 4xl:grid-cols-6 5xl:grid-cols-10";
+export const STANDARD_GRID_DENSITIES = {
+  small: "card-grid-responsive grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 3xl:grid-cols-6 4xl:grid-cols-8 5xl:grid-cols-12",
+  medium: "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 3xl:grid-cols-5 4xl:grid-cols-6 5xl:grid-cols-10",
+  large: "card-grid-responsive grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 3xl:grid-cols-3 4xl:grid-cols-4 5xl:grid-cols-6",
+};
 
-/** SCENE GRID COLUMNS
-  < 768px       1
-  768-1279px    2
-  1280-1919px   3
-  1920-2559px   4
-  2560-3839px   5
-  3840px+       8
-*/
-export const SCENE_GRID_CONTAINER_CLASSNAMES =
-  "card-grid-responsive grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-8";
+/** SCENE GRID DENSITY LEVELS */
+export const SCENE_GRID_DENSITIES = {
+  small: "card-grid-responsive grid gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5 4xl:grid-cols-7 5xl:grid-cols-10",
+  medium: "card-grid-responsive grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-8",
+  large: "card-grid-responsive grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-2 3xl:grid-cols-3 4xl:grid-cols-4 5xl:grid-cols-5",
+};
+
+// Keep legacy exports for backwards compatibility during migration
+export const STANDARD_GRID_CONTAINER_CLASSNAMES = STANDARD_GRID_DENSITIES.medium;
+export const SCENE_GRID_CONTAINER_CLASSNAMES = SCENE_GRID_DENSITIES.medium;
+
+/** Helper to get grid classes for a density level */
+export const getGridClasses = (gridType, density = "medium") => {
+  const densities = gridType === "scene" ? SCENE_GRID_DENSITIES : STANDARD_GRID_DENSITIES;
+  return densities[density] || densities.medium;
+};

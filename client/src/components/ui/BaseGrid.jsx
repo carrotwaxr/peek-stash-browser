@@ -1,4 +1,4 @@
-import { SCENE_GRID_CONTAINER_CLASSNAMES, STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
+import { getGridClasses } from "../../constants/grids.js";
 import EmptyState from "./EmptyState.jsx";
 import Pagination from "./Pagination.jsx";
 
@@ -9,6 +9,7 @@ import Pagination from "./Pagination.jsx";
  * @param {any[]} props.items - Array of items to render
  * @param {Function} props.renderItem - Function to render each item (item, index) => ReactNode
  * @param {'scene'|'standard'} props.gridType - Grid type for responsive columns
+ * @param {'small'|'medium'|'large'} [props.density] - Grid density for spacing/sizing
  * @param {boolean} [props.loading] - Show loading skeleton
  * @param {Error} [props.error] - Error to display
  * @param {string} [props.emptyMessage] - Message when no items
@@ -24,6 +25,7 @@ export const BaseGrid = ({
   items,
   renderItem,
   gridType = "standard",
+  density = "medium",
   loading = false,
   error,
   emptyMessage = "No items found",
@@ -35,10 +37,7 @@ export const BaseGrid = ({
   renderSkeleton,
   className = "",
 }) => {
-  const gridClasses =
-    gridType === "scene"
-      ? SCENE_GRID_CONTAINER_CLASSNAMES
-      : STANDARD_GRID_CONTAINER_CLASSNAMES;
+  const gridClasses = getGridClasses(gridType, density);
 
   // Default skeleton renderer
   const defaultRenderSkeleton = () => (

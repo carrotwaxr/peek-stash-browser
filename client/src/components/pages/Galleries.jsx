@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { STANDARD_GRID_CONTAINER_CLASSNAMES } from "../../constants/grids.js";
+import { getGridClasses } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
@@ -135,7 +135,7 @@ const Galleries = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, zoomLevel, sortField, sortDirection, onSort }) =>
+          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
             isLoading ? (
               viewMode === "table" ? (
                 <TableView
@@ -157,7 +157,7 @@ const Galleries = () => {
                   }
                 />
               ) : (
-                <div className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+                <div className={getGridClasses("standard", gridDensity)}>
                   {[...Array(24)].map((_, i) => (
                     <div
                       key={i}
@@ -200,7 +200,7 @@ const Galleries = () => {
                 emptyMessage="No galleries found"
               />
             ) : (
-              <div ref={gridRef} className={STANDARD_GRID_CONTAINER_CLASSNAMES}>
+              <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
                 {currentGalleries.map((gallery, index) => {
                   const itemProps = gridItemProps(index);
                   return (

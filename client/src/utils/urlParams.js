@@ -169,6 +169,7 @@ export const buildSearchParams = ({
   filterOptions,
   viewMode,
   zoomLevel,
+  gridDensity,
 }) => {
   const params = filtersToUrlParams(filters, filterOptions);
 
@@ -179,6 +180,7 @@ export const buildSearchParams = ({
   if (perPage !== 24) params.set("per_page", perPage.toString());
   if (viewMode && viewMode !== "grid") params.set("view", viewMode);
   if (zoomLevel && zoomLevel !== "medium") params.set("zoom", zoomLevel);
+  if (gridDensity && gridDensity !== "medium") params.set("grid_density", gridDensity);
 
   return params;
 };
@@ -204,6 +206,7 @@ export const parseSearchParams = (
     perPage: parseInt(searchParams.get("per_page") || "24", 10),
     viewMode: searchParams.get("view") || defaults.viewMode || "grid",
     zoomLevel: searchParams.get("zoom") || defaults.zoomLevel || "medium",
+    gridDensity: searchParams.get("grid_density") || defaults.gridDensity || "medium",
     filters: {
       ...defaults.filters,
       ...urlParamsToFilters(searchParams, filterOptions),
