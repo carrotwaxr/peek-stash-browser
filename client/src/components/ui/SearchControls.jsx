@@ -256,6 +256,8 @@ const SearchControls = ({
     setSearchText: setSearchTextAction,
     setViewMode,
     setZoomLevel,
+    gridDensity,
+    setGridDensity,
     loadPreset,
   } = useFilterState({
     artifactType,
@@ -814,6 +816,17 @@ const SearchControls = ({
           </div>
         )}
 
+        {/* Grid Density Slider - Only shown in grid mode */}
+        {viewMode === "grid" && (
+          <div
+            data-tv-search-item="grid-density"
+            ref={(el) => searchZoneNav.setItemRef(6, el)}
+            className={searchZoneNav.isFocused(6) ? "keyboard-focus" : ""}
+          >
+            <ZoomSlider value={gridDensity} onChange={setGridDensity} />
+          </div>
+        )}
+
         {/* Context Settings Cog */}
         <div
           data-tv-search-item="context-settings"
@@ -994,7 +1007,7 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? children({ viewMode, zoomLevel, wallPlayback, sortField, sortDirection, onSort: handleSortChange })
+        ? children({ viewMode, zoomLevel, gridDensity, wallPlayback, sortField, sortDirection, onSort: handleSortChange })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (
