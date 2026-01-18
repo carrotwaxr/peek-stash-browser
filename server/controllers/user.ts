@@ -135,6 +135,7 @@ export const getUserSettings = async (
         wallPlayback: true,
         tableColumnDefaults: true,
         cardDisplaySettings: true,
+        landingPagePreference: true,
       },
     });
 
@@ -159,6 +160,7 @@ export const getUserSettings = async (
         wallPlayback: user.wallPlayback || "autoplay",
         tableColumnDefaults: user.tableColumnDefaults || null,
         cardDisplaySettings: user.cardDisplaySettings || null,
+        landingPagePreference: user.landingPagePreference || { pages: ["home"], randomize: false },
       },
     });
   } catch (error) {
@@ -210,6 +212,7 @@ export const updateUserSettings = async (
       wallPlayback,
       tableColumnDefaults,
       cardDisplaySettings,
+      landingPagePreference,
     } = req.body;
 
     // Validate values
@@ -378,6 +381,49 @@ export const updateUserSettings = async (
       }
     }
 
+    // Validate landing page preference if provided
+    if (landingPagePreference !== undefined) {
+      if (landingPagePreference !== null && typeof landingPagePreference !== "object") {
+        return res
+          .status(400)
+          .json({ error: "Landing page preference must be an object or null" });
+      }
+
+      if (landingPagePreference !== null) {
+        if (!Array.isArray(landingPagePreference.pages) || landingPagePreference.pages.length === 0) {
+          return res
+            .status(400)
+            .json({ error: "Landing page preference must have at least one page" });
+        }
+
+        if (typeof landingPagePreference.randomize !== "boolean") {
+          return res
+            .status(400)
+            .json({ error: "Landing page preference randomize must be a boolean" });
+        }
+
+        // Validate minimum pages for randomize mode
+        if (landingPagePreference.randomize && landingPagePreference.pages.length < 2) {
+          return res
+            .status(400)
+            .json({ error: "Random mode requires at least 2 pages selected" });
+        }
+
+        // Validate page keys
+        const validPageKeys = [
+          "home", "scenes", "performers", "studios", "tags", "collections",
+          "galleries", "images", "playlists", "recommended", "watch-history", "user-stats"
+        ];
+        for (const pageKey of landingPagePreference.pages) {
+          if (!validPageKeys.includes(pageKey)) {
+            return res
+              .status(400)
+              .json({ error: `Invalid landing page key: ${pageKey}` });
+          }
+        }
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: {
@@ -396,6 +442,7 @@ export const updateUserSettings = async (
         ...(wallPlayback !== undefined && { wallPlayback }),
         ...(tableColumnDefaults !== undefined && { tableColumnDefaults }),
         ...(cardDisplaySettings !== undefined && { cardDisplaySettings }),
+        ...(landingPagePreference !== undefined && { landingPagePreference }),
       },
       select: {
         id: true,
@@ -412,6 +459,7 @@ export const updateUserSettings = async (
         wallPlayback: true,
         tableColumnDefaults: true,
         cardDisplaySettings: true,
+        landingPagePreference: true,
       },
     });
 
@@ -429,6 +477,7 @@ export const updateUserSettings = async (
         wallPlayback: updatedUser.wallPlayback || "autoplay",
         tableColumnDefaults: updatedUser.tableColumnDefaults || null,
         cardDisplaySettings: updatedUser.cardDisplaySettings || null,
+        landingPagePreference: updatedUser.landingPagePreference || { pages: ["home"], randomize: false },
       },
     });
   } catch (error) {
