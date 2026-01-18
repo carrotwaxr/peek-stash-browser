@@ -43,6 +43,8 @@ export class TimelineService {
     const config = ENTITY_CONFIG[entityType];
     const format = this.getStrftimeFormat(granularity);
 
+    // Filter for properly formatted dates (YYYY-MM-DD format)
+    // This excludes malformed dates like "2007" that SQLite can't parse correctly
     const sql = `
       SELECT
         strftime('${format}', ${config.dateField}) as period,
@@ -53,7 +55,9 @@ export class TimelineService {
       WHERE ${config.alias}.deletedAt IS NULL
         AND e.id IS NULL
         AND ${config.dateField} IS NOT NULL
+        AND ${config.dateField} LIKE '____-__-__'
       GROUP BY period
+      HAVING period IS NOT NULL AND period NOT LIKE '-%'
       ORDER BY period ASC
     `.trim();
 

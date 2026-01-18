@@ -51,17 +51,26 @@ function TimelineBar({
       <div
         className={`
           w-3 rounded-t transition-all duration-150
-          ${isSelected ? "bg-accent-primary" : "bg-accent-secondary group-hover:bg-accent-primary/70"}
-          ${isFocused ? "ring-2 ring-accent-primary ring-offset-1 ring-offset-bg-primary" : ""}
+          ${isFocused ? "ring-2 ring-offset-1" : ""}
         `}
-        style={{ height: `${barHeight}px` }}
+        style={{
+          height: `${barHeight}px`,
+          backgroundColor: isSelected
+            ? "var(--accent-primary)"
+            : "var(--accent-secondary)",
+          "--tw-ring-color": "var(--accent-primary)",
+          "--tw-ring-offset-color": "var(--bg-primary)",
+        }}
         data-testid="timeline-bar"
       />
 
       {/* Selection indicator */}
       {isSelected && (
-        <div className="absolute -bottom-1 w-0 h-0 border-l-4 border-r-4 border-t-4
-          border-l-transparent border-r-transparent border-t-accent-primary" />
+        <div
+          className="absolute -bottom-1 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"
+          style={{ borderTopColor: "var(--accent-primary)" }}
+          data-testid="selection-indicator"
+        />
       )}
     </div>
   );

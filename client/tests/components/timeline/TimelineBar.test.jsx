@@ -201,33 +201,27 @@ describe("TimelineBar", () => {
       render(<TimelineBar {...defaultProps} isSelected={true} />);
 
       const bar = screen.getByTestId("timeline-bar");
-      expect(bar).toHaveClass("bg-accent-primary");
+      expect(bar.style.backgroundColor).toBe("var(--accent-primary)");
     });
 
     it("applies non-selected styling when isSelected is false", () => {
       render(<TimelineBar {...defaultProps} isSelected={false} />);
 
       const bar = screen.getByTestId("timeline-bar");
-      expect(bar).toHaveClass("bg-accent-secondary");
+      expect(bar.style.backgroundColor).toBe("var(--accent-secondary)");
     });
 
     it("renders selection indicator when selected", () => {
-      const { container } = render(
-        <TimelineBar {...defaultProps} isSelected={true} />
-      );
+      render(<TimelineBar {...defaultProps} isSelected={true} />);
 
-      // The selection indicator has specific border classes
-      const indicator = container.querySelector(".border-t-accent-primary");
+      const indicator = screen.getByTestId("selection-indicator");
       expect(indicator).toBeInTheDocument();
     });
 
     it("does not render selection indicator when not selected", () => {
-      const { container } = render(
-        <TimelineBar {...defaultProps} isSelected={false} />
-      );
+      render(<TimelineBar {...defaultProps} isSelected={false} />);
 
-      const indicator = container.querySelector(".border-t-accent-primary");
-      expect(indicator).not.toBeInTheDocument();
+      expect(screen.queryByTestId("selection-indicator")).not.toBeInTheDocument();
     });
   });
 
@@ -237,7 +231,6 @@ describe("TimelineBar", () => {
 
       const bar = screen.getByTestId("timeline-bar");
       expect(bar).toHaveClass("ring-2");
-      expect(bar).toHaveClass("ring-accent-primary");
     });
 
     it("does not apply focus ring when isFocused is false", () => {

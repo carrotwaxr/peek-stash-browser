@@ -109,7 +109,8 @@ function TimelineStrip({
   if (distribution.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center h-20 text-text-secondary ${className}`}
+        className={`flex items-center justify-center h-20 ${className}`}
+        style={{ color: "var(--text-secondary)" }}
       >
         No dated content available
       </div>
@@ -119,11 +120,7 @@ function TimelineStrip({
   return (
     <div
       ref={containerRef}
-      className={`
-        relative flex items-end gap-1 overflow-x-auto pb-6 pt-2 px-4
-        scrollbar-thin scrollbar-thumb-border-primary scrollbar-track-transparent
-        ${className}
-      `}
+      className={`relative flex items-end gap-1 overflow-x-auto pb-6 pt-2 px-4 min-h-[100px] ${className}`}
       role="listbox"
       aria-label="Timeline"
       tabIndex={0}
@@ -141,7 +138,10 @@ function TimelineStrip({
       }}
     >
       {/* Baseline */}
-      <div className="absolute bottom-6 left-4 right-4 h-px bg-border-primary" />
+      <div
+        className="absolute bottom-6 left-4 right-4 h-px"
+        style={{ backgroundColor: "var(--border-primary)" }}
+      />
 
       {distribution.map((item, index) => (
         <div
@@ -160,10 +160,14 @@ function TimelineStrip({
           />
           {/* Period label */}
           <span
-            className={`
-              mt-1 text-xs whitespace-nowrap
-              ${selectedPeriod?.period === item.period ? "text-accent-primary font-medium" : "text-text-secondary"}
-            `}
+            className="mt-1 text-xs whitespace-nowrap"
+            style={{
+              color:
+                selectedPeriod?.period === item.period
+                  ? "var(--accent-primary)"
+                  : "var(--text-secondary)",
+              fontWeight: selectedPeriod?.period === item.period ? 500 : 400,
+            }}
           >
             {getLabel(item.period)}
           </span>

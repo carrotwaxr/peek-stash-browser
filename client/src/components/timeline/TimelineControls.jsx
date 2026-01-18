@@ -16,7 +16,8 @@ function TimelineControls({
 }) {
   return (
     <div
-      className={`inline-flex rounded-md bg-bg-secondary ${className}`}
+      className={`inline-flex rounded-md ${className}`}
+      style={{ backgroundColor: "var(--bg-secondary)" }}
       role="group"
       aria-label="Timeline zoom level"
     >
@@ -25,16 +26,14 @@ function TimelineControls({
           key={level}
           type="button"
           onClick={() => onZoomLevelChange(level)}
-          className={`
-            px-3 py-1.5 text-sm font-medium transition-colors
-            first:rounded-l-md last:rounded-r-md
-            focus:outline-none focus:ring-2 focus:ring-accent-primary focus:ring-inset
-            ${
-              zoomLevel === level
-                ? "bg-accent-primary text-white"
-                : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
-            }
-          `}
+          className="px-3 py-1.5 text-sm font-medium transition-colors first:rounded-l-md last:rounded-r-md focus:outline-none focus:ring-2 focus:ring-inset"
+          style={{
+            backgroundColor:
+              zoomLevel === level ? "var(--accent-primary)" : "transparent",
+            color:
+              zoomLevel === level ? "white" : "var(--text-secondary)",
+            "--tw-ring-color": "var(--accent-primary)",
+          }}
           aria-pressed={zoomLevel === level}
         >
           {ZOOM_LABELS[level] || level}
