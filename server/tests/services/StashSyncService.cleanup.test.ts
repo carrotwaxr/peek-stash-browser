@@ -245,8 +245,11 @@ describe("StashSyncService Cleanup", () => {
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [{ id: "1" }, { id: "2" }, { id: "3" }], count: 3 },
       });
-      // Mock findMany to return 2 scenes that should be deleted (not in Stash)
+      // Mock findMany to return all local scenes (1-5), of which 4,5 are not in Stash
       vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
+        { id: "1", phash: null },
+        { id: "2", phash: null },
+        { id: "3", phash: null },
         { id: "4", phash: null },
         { id: "5", phash: null },
       ] as any);
@@ -255,8 +258,9 @@ describe("StashSyncService Cleanup", () => {
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
 
       expect(result).toBe(2);
+      // New implementation uses batched IN clauses for scenes to delete
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { deletedAt: null, stashInstanceId: null, id: { notIn: ["1", "2", "3"] } },
+        where: { id: { in: ["4", "5"] } },
         data: { deletedAt: expect.any(Date) },
       });
     });
@@ -280,11 +284,17 @@ describe("StashSyncService Cleanup", () => {
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [{ id: "1" }], count: 1 },
       });
+      // Mock findMany to return only the scene that exists in Stash
+      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
+        { id: "1", phash: null },
+      ] as any);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 0 });
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
 
       expect(result).toBe(0);
+      // updateMany should not be called since there are no scenes to delete
+      expect(prisma.stashScene.updateMany).not.toHaveBeenCalled();
     });
 
     it("should only update entities where deletedAt is null", async () => {
@@ -333,23 +343,25 @@ describe("StashSyncService Cleanup", () => {
 
   describe("Empty Stash scenario", () => {
     it("should handle empty Stash (all entities deleted)", async () => {
-      // Stash returns no scenes - all should be soft-deleted
+      // Stash returns no scenes - all local scenes should be soft-deleted
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [], count: 0 },
       });
-      // Mock findMany to return 100 scenes that should all be deleted
-      const scenesToDelete = Array.from({ length: 100 }, (_, i) => ({
+      // Mock findMany to return 100 local scenes that should all be deleted
+      const localScenes = Array.from({ length: 100 }, (_, i) => ({
         id: String(i + 1),
         phash: null,
       }));
-      vi.mocked(prisma.stashScene.findMany).mockResolvedValue(scenesToDelete as any);
+      vi.mocked(prisma.stashScene.findMany).mockResolvedValue(localScenes as any);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 100 });
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
 
       expect(result).toBe(100);
+      // New implementation uses batched IN clauses - first batch has IDs 1-100
+      const expectedIds = Array.from({ length: 100 }, (_, i) => String(i + 1));
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { deletedAt: null, stashInstanceId: null, id: { notIn: [] } },
+        where: { id: { in: expectedIds } },
         data: { deletedAt: expect.any(Date) },
       });
     });

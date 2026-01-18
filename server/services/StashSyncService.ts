@@ -1213,34 +1213,48 @@ class StashSyncService extends EventEmitter {
 
       switch (entityType) {
         case "scene": {
-          // Before soft-deleting, check for merges and reconcile user data
-          const scenesToDelete = await prisma.stashScene.findMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+          // Get all local scene IDs to compute difference (avoids SQLite parameter limit)
+          // Using raw query for efficiency - just need id and phash
+          const localScenes = await prisma.stashScene.findMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null },
             select: { id: true, phash: true },
           });
 
-          for (const scene of scenesToDelete) {
-            if (scene.phash) {
-              // Try to find a merge target
-              const matches = await mergeReconciliationService.findPhashMatches(scene.id);
-              if (matches.length > 0) {
-                const target = matches[0]; // Use the recommended match
-                logger.info(`Detected merge: scene ${scene.id} -> ${target.sceneId}`);
-                await mergeReconciliationService.reconcileScene(
-                  scene.id,
-                  target.sceneId,
-                  scene.phash,
-                  null // automatic
-                );
+          // Compute scenes to delete (in local but not in Stash)
+          const stashIdSet = new Set(stashIds);
+          const scenesToDelete = localScenes.filter((s) => !stashIdSet.has(s.id));
+
+          if (scenesToDelete.length > 0) {
+            // Check for merges and reconcile user data before soft-deleting
+            for (const scene of scenesToDelete) {
+              if (scene.phash) {
+                // Try to find a merge target
+                const matches = await mergeReconciliationService.findPhashMatches(scene.id);
+                if (matches.length > 0) {
+                  const target = matches[0]; // Use the recommended match
+                  logger.info(`Detected merge: scene ${scene.id} -> ${target.sceneId}`);
+                  await mergeReconciliationService.reconcileScene(
+                    scene.id,
+                    target.sceneId,
+                    scene.phash,
+                    null // automatic
+                  );
+                }
               }
             }
-          }
 
-          // Now soft-delete all the scenes
-          deletedCount = (await prisma.stashScene.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
-            data: { deletedAt: now },
-          })).count;
+            // Now soft-delete the scenes (use batched IN clause to avoid parameter limits)
+            const deleteIds = scenesToDelete.map((s) => s.id);
+            const BATCH_SIZE = 500;
+            for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
+              const batch = deleteIds.slice(i, i + BATCH_SIZE);
+              await prisma.stashScene.updateMany({
+                where: { id: { in: batch } },
+                data: { deletedAt: now },
+              });
+            }
+            deletedCount = deleteIds.length;
+          }
           break;
         }
         case "performer":
