@@ -429,11 +429,13 @@ function TimelineStrip({
               tabIndex={-1}
             />
 
-            {/* Period label - slanted 45° */}
+            {/* Period label - slanted 45°, text starts centered under bar */}
             <div
-              className="absolute -bottom-6 left-1/2 origin-top-left"
+              className="absolute -bottom-6"
               style={{
-                transform: "rotate(45deg) translateX(-50%)",
+                left: "calc(50% + 4px)",
+                transform: "rotate(45deg)",
+                transformOrigin: "top left",
               }}
             >
               <span
