@@ -101,7 +101,8 @@ function TimelineView({
             <>
               <span style={{ color: "var(--text-tertiary)" }}>|</span>
               <span>
-                Selected: {selectedPeriod.label}
+                <span className="font-medium" style={{ color: "var(--accent-primary)" }}>Selected:</span>{" "}
+                {selectedPeriod.label}
               </span>
             </>
           )}
