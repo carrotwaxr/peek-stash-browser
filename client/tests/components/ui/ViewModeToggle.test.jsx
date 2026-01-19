@@ -1,20 +1,33 @@
 /**
  * ViewModeToggle Component Tests
  *
- * Tests for the configurable view mode toggle:
+ * Tests for the configurable view mode dropdown:
  * - Default modes (grid/wall) for backward compatibility
  * - Custom modes support
- * - Click handlers and active state
+ * - Click handlers and selection state
+ * - Dropdown open/close behavior
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import ViewModeToggle from "../../../src/components/ui/ViewModeToggle.jsx";
 
 describe("ViewModeToggle", () => {
-  it("renders default grid/wall modes when no modes prop", () => {
+  it("renders trigger button with current mode icon", () => {
     render(<ViewModeToggle value="grid" onChange={() => {}} />);
-    expect(screen.getByLabelText("Grid view")).toBeInTheDocument();
-    expect(screen.getByLabelText("Wall view")).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: /view mode/i });
+    expect(trigger).toBeInTheDocument();
+  });
+
+  it("opens dropdown on click and shows default grid/wall modes", () => {
+    render(<ViewModeToggle value="grid" onChange={() => {}} />);
+
+    // Click trigger to open dropdown
+    const trigger = screen.getByRole("button", { name: /view mode/i });
+    fireEvent.click(trigger);
+
+    // Dropdown should show both modes
+    expect(screen.getByRole("option", { name: /grid view/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /wall view/i })).toBeInTheDocument();
   });
 
   it("renders custom modes when modes prop provided", () => {
@@ -23,97 +36,70 @@ describe("ViewModeToggle", () => {
       { id: "hierarchy", label: "Hierarchy view" },
     ];
     render(<ViewModeToggle modes={modes} value="grid" onChange={() => {}} />);
-    expect(screen.getByLabelText("Grid view")).toBeInTheDocument();
-    expect(screen.getByLabelText("Hierarchy view")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Wall view")).not.toBeInTheDocument();
+
+    // Open dropdown
+    fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
+
+    expect(screen.getByRole("option", { name: /grid view/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /hierarchy view/i })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /wall view/i })).not.toBeInTheDocument();
   });
 
-  it("calls onChange with mode id when clicked", () => {
+  it("calls onChange with mode id when option selected", () => {
     const onChange = vi.fn();
     const modes = [
       { id: "grid", label: "Grid view" },
       { id: "hierarchy", label: "Hierarchy view" },
     ];
     render(<ViewModeToggle modes={modes} value="grid" onChange={onChange} />);
-    fireEvent.click(screen.getByLabelText("Hierarchy view"));
+
+    // Open dropdown and select hierarchy
+    fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
+    fireEvent.click(screen.getByRole("option", { name: /hierarchy view/i }));
+
     expect(onChange).toHaveBeenCalledWith("hierarchy");
   });
 
-  it("highlights the active mode", () => {
+  it("marks the selected mode with aria-selected", () => {
     const modes = [
       { id: "grid", label: "Grid view" },
       { id: "hierarchy", label: "Hierarchy view" },
     ];
     render(<ViewModeToggle modes={modes} value="hierarchy" onChange={() => {}} />);
-    const hierarchyBtn = screen.getByLabelText("Hierarchy view");
-    expect(hierarchyBtn).toHaveAttribute("aria-pressed", "true");
+
+    // Open dropdown
+    fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
+
+    const hierarchyOption = screen.getByRole("option", { name: /hierarchy view/i });
+    expect(hierarchyOption).toHaveAttribute("aria-selected", "true");
   });
 
-  describe("rapid click stability", () => {
-    it("shows exactly one active button after rapid clicks", async () => {
-      const onChange = vi.fn();
-      const { rerender } = render(
-        <ViewModeToggle
-          modes={[
-            { id: "grid", label: "Grid view" },
-            { id: "wall", label: "Wall view" },
-            { id: "table", label: "Table view" },
-          ]}
-          value="grid"
-          onChange={onChange}
-        />
-      );
+  it("closes dropdown after selection", () => {
+    const onChange = vi.fn();
+    render(<ViewModeToggle value="grid" onChange={onChange} />);
 
-      const wallBtn = screen.getByLabelText("Wall view");
-      const tableBtn = screen.getByLabelText("Table view");
-      const gridBtn = screen.getByLabelText("Grid view");
+    // Open dropdown
+    fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
 
-      // Rapid clicks
-      fireEvent.click(wallBtn);
-      fireEvent.click(tableBtn);
-      fireEvent.click(gridBtn);
-      fireEvent.click(wallBtn);
+    // Select wall mode
+    fireEvent.click(screen.getByRole("option", { name: /wall view/i }));
 
-      // Simulate parent updating value to last clicked
-      rerender(
-        <ViewModeToggle
-          modes={[
-            { id: "grid", label: "Grid view" },
-            { id: "wall", label: "Wall view" },
-            { id: "table", label: "Table view" },
-          ]}
-          value="wall"
-          onChange={onChange}
-        />
-      );
+    // Dropdown should close
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
 
-      // Verify exactly one button is active
-      const buttons = screen.getAllByRole("button");
-      const activeButtons = buttons.filter(
-        (btn) => btn.getAttribute("aria-pressed") === "true"
-      );
-      expect(activeButtons).toHaveLength(1);
-      expect(activeButtons[0]).toBe(screen.getByLabelText("Wall view"));
-    });
+  it("closes dropdown on Escape key", () => {
+    render(<ViewModeToggle value="grid" onChange={() => {}} />);
 
-    it("immediately shows clicked button as active (optimistic)", () => {
-      const onChange = vi.fn();
-      render(
-        <ViewModeToggle
-          modes={[
-            { id: "grid", label: "Grid view" },
-            { id: "wall", label: "Wall view" },
-          ]}
-          value="grid"
-          onChange={onChange}
-        />
-      );
+    // Open dropdown
+    fireEvent.click(screen.getByRole("button", { name: /view mode/i }));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
 
-      const wallBtn = screen.getByLabelText("Wall view");
-      fireEvent.click(wallBtn);
+    // Press Escape
+    fireEvent.keyDown(document, { key: "Escape" });
 
-      // Should immediately show as active (optimistic update)
-      expect(wallBtn.getAttribute("aria-pressed")).toBe("true");
-    });
+    // Dropdown should close
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });

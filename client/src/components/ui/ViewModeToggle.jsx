@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList, LucideCalendar, LucideFolderOpen } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList, LucideCalendar, LucideFolderOpen, LucideChevronDown } from "lucide-react";
 
 // Default modes for backward compatibility
 const DEFAULT_MODES = [
@@ -18,7 +18,7 @@ const MODE_ICONS = {
 };
 
 /**
- * Toggle between view modes.
+ * Toggle between view modes via icon dropdown.
  *
  * @param {Array} modes - Optional custom modes array [{id, label, icon?}]
  *                        If not provided, defaults to grid/wall
@@ -28,15 +28,46 @@ const MODE_ICONS = {
 const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => {
   // Local state for immediate visual feedback (optimistic update)
   const [localValue, setLocalValue] = useState(value);
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   // Sync local state when parent value changes (authoritative)
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
 
-  const handleClick = (modeId) => {
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
+    }
+  }, [isOpen]);
+
+  const handleSelect = (modeId) => {
     setLocalValue(modeId); // Immediate visual feedback
     onChange(modeId);       // Trigger parent update
+    setIsOpen(false);
   };
 
   // Use custom modes or fall back to defaults
@@ -47,31 +78,75 @@ const ViewModeToggle = ({ modes, value = "grid", onChange, className = "" }) => 
       }))
     : DEFAULT_MODES;
 
+  const currentMode = effectiveModes.find((m) => m.id === localValue) || effectiveModes[0];
+  const CurrentIcon = currentMode.icon;
+
   return (
-    <div
-      className={`inline-flex items-center rounded-lg overflow-hidden h-[34px] ${className}`}
-      style={{
-        backgroundColor: "var(--bg-secondary)",
-        border: "1px solid var(--border-color)",
-      }}
-    >
-      {effectiveModes.map((mode) => (
-        <button
-          key={mode.id}
-          type="button"
-          onClick={() => handleClick(mode.id)}
-          className="px-2.5 h-full transition-colors flex items-center justify-center"
+    <div ref={dropdownRef} className={`relative ${className}`}>
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex items-center gap-1 px-2.5 h-[34px] rounded-lg transition-colors"
+        style={{
+          backgroundColor: "var(--bg-secondary)",
+          border: "1px solid var(--border-color)",
+          color: "var(--text-primary)",
+        }}
+        title={`View: ${currentMode.label}`}
+        aria-label={`View mode: ${currentMode.label}`}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+      >
+        <CurrentIcon size={18} />
+        <LucideChevronDown
+          size={14}
           style={{
-            backgroundColor: localValue === mode.id ? "var(--accent-primary)" : "transparent",
-            color: localValue === mode.id ? "white" : "var(--text-secondary)",
+            color: "var(--text-tertiary)",
+            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 150ms ease",
           }}
-          title={mode.label}
-          aria-label={mode.label}
-          aria-pressed={localValue === mode.id}
+        />
+      </button>
+
+      {/* Dropdown menu - icons only */}
+      {isOpen && (
+        <div
+          className="absolute top-full left-0 mt-1 p-1 rounded-lg shadow-lg z-50 flex flex-col gap-0.5 min-w-[100px]"
+          style={{
+            backgroundColor: "var(--bg-secondary)",
+            border: "1px solid var(--border-color)",
+          }}
+          role="listbox"
+          aria-label="View modes"
         >
-          <mode.icon size={18} />
-        </button>
-      ))}
+          {effectiveModes.map((mode) => {
+            const ModeIcon = mode.icon;
+            const isSelected = localValue === mode.id;
+            // Extract single word (remove "view" suffix)
+            const shortLabel = mode.label.replace(/ view$/i, "");
+
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => handleSelect(mode.id)}
+                className="flex items-center gap-2 px-2 py-1.5 rounded transition-colors hover:bg-[var(--bg-tertiary)] text-left"
+                style={{
+                  color: isSelected ? "var(--accent-primary)" : "var(--text-secondary)",
+                  backgroundColor: isSelected ? "var(--bg-tertiary)" : "transparent",
+                }}
+                role="option"
+                aria-selected={isSelected}
+                aria-label={mode.label}
+              >
+                <ModeIcon size={16} />
+                <span className="text-sm">{shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
