@@ -66,15 +66,29 @@ const Galleries = () => {
   // Track timeline date filter for filtering by selected period
   const [timelineDateFilter, setTimelineDateFilter] = useState(null);
 
-  // Merge timeline date filter into permanent filters when in timeline view
+  // Track folder tag filter for filtering by selected folder
+  const [folderTagFilter, setFolderTagFilter] = useState(null);
+
+  // Merge timeline/folder filters into permanent filters based on view mode
   const effectivePermanentFilters = useMemo(() => {
-    if (currentViewMode !== "timeline" || !timelineDateFilter) {
-      return {};
+    let filters = {};
+
+    // Add timeline date filter when in timeline view
+    if (currentViewMode === "timeline" && timelineDateFilter) {
+      filters.date = timelineDateFilter;
     }
-    return {
-      date: timelineDateFilter,
-    };
-  }, [currentViewMode, timelineDateFilter]);
+
+    // Add folder tag filter when in folder view
+    if (currentViewMode === "folder" && folderTagFilter) {
+      filters.tags = {
+        value: [folderTagFilter],
+        modifier: "INCLUDES",
+        depth: -1, // Include child tags (hierarchical)
+      };
+    }
+
+    return filters;
+  }, [currentViewMode, timelineDateFilter, folderTagFilter]);
 
   const handleQueryChange = useCallback(
     (newQuery) => {
@@ -220,6 +234,7 @@ const Galleries = () => {
                 gridDensity={gridDensity}
                 loading={isLoading || tagsLoading}
                 emptyMessage="No galleries found"
+                onFolderPathChange={setFolderTagFilter}
                 renderItem={(gallery) => (
                   <GalleryCard
                     key={gallery.id}

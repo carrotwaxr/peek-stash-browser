@@ -19,6 +19,7 @@ const FolderView = ({
   gridDensity = "medium",
   loading = false,
   emptyMessage = "No items found",
+  onFolderPathChange, // Callback when folder path changes (for API filtering)
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -27,6 +28,15 @@ const FolderView = ({
     const pathParam = searchParams.get("folderPath");
     return pathParam ? pathParam.split(",").filter(Boolean) : [];
   }, [searchParams]);
+
+  // Notify parent when path changes (for API filtering by tag)
+  useEffect(() => {
+    if (onFolderPathChange) {
+      // Pass the deepest tag ID in the path (or null if at root)
+      const currentTagId = currentPath.length > 0 ? currentPath[currentPath.length - 1] : null;
+      onFolderPathChange(currentTagId);
+    }
+  }, [currentPath, onFolderPathChange]);
 
   // Update URL when path changes
   const setCurrentPath = useCallback(
@@ -84,23 +94,21 @@ const FolderView = ({
 
   const gridClasses = getGridClasses("standard", gridDensity);
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className={gridClasses}>
-        {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="rounded-lg animate-pulse"
-            style={{
-              backgroundColor: "var(--bg-tertiary)",
-              height: "12rem",
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
+  // Loading skeleton for content area
+  const loadingSkeleton = (
+    <div className={gridClasses}>
+      {[...Array(12)].map((_, i) => (
+        <div
+          key={i}
+          className="rounded-lg animate-pulse"
+          style={{
+            backgroundColor: "var(--bg-tertiary)",
+            height: "12rem",
+          }}
+        />
+      ))}
+    </div>
+  );
 
   // Mobile layout
   if (isMobile) {
@@ -112,29 +120,35 @@ const FolderView = ({
           onNavigate={handleBreadcrumbNavigate}
         />
 
-        {/* Content grid */}
-        <div className={gridClasses}>
-          {/* Folders first */}
-          {folders.map((folder) => (
-            <FolderCard
-              key={folder.id}
-              folder={folder}
-              onClick={handleFolderClick}
-            />
-          ))}
+        {/* Content grid or loading skeleton */}
+        {loading ? (
+          loadingSkeleton
+        ) : (
+          <>
+            <div className={gridClasses}>
+              {/* Folders first */}
+              {folders.map((folder) => (
+                <FolderCard
+                  key={folder.id}
+                  folder={folder}
+                  onClick={handleFolderClick}
+                />
+              ))}
 
-          {/* Then leaf items */}
-          {leafItems.map((item) => renderItem(item))}
-        </div>
+              {/* Then leaf items */}
+              {leafItems.map((item) => renderItem(item))}
+            </div>
 
-        {/* Empty state */}
-        {folders.length === 0 && leafItems.length === 0 && (
-          <div
-            className="text-center py-12"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            {emptyMessage}
-          </div>
+            {/* Empty state */}
+            {folders.length === 0 && leafItems.length === 0 && (
+              <div
+                className="text-center py-12"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {emptyMessage}
+              </div>
+            )}
+          </>
         )}
       </div>
     );
@@ -142,14 +156,14 @@ const FolderView = ({
 
   // Desktop layout with sidebar
   return (
-    <div className="flex gap-0 -mx-4 sm:-mx-6 lg:-mx-8">
+    <div className="flex gap-4 -mx-4 sm:-mx-6 lg:-mx-8">
       {/* Sidebar */}
       {!sidebarCollapsed && (
         <FolderTreeSidebar
           tags={tags}
           currentPath={currentPath}
           onNavigate={setCurrentPath}
-          className="w-64 flex-shrink-0 h-[calc(100vh-200px)] sticky top-4"
+          className="w-64 flex-shrink-0 h-[calc(100vh-200px)] sticky top-4 ml-4 rounded-lg"
         />
       )}
 
@@ -182,29 +196,35 @@ const FolderView = ({
           />
         </div>
 
-        {/* Content grid */}
-        <div className={gridClasses}>
-          {/* Folders first */}
-          {folders.map((folder) => (
-            <FolderCard
-              key={folder.id}
-              folder={folder}
-              onClick={handleFolderClick}
-            />
-          ))}
+        {/* Content grid or loading skeleton */}
+        {loading ? (
+          loadingSkeleton
+        ) : (
+          <>
+            <div className={gridClasses}>
+              {/* Folders first */}
+              {folders.map((folder) => (
+                <FolderCard
+                  key={folder.id}
+                  folder={folder}
+                  onClick={handleFolderClick}
+                />
+              ))}
 
-          {/* Then leaf items */}
-          {leafItems.map((item) => renderItem(item))}
-        </div>
+              {/* Then leaf items */}
+              {leafItems.map((item) => renderItem(item))}
+            </div>
 
-        {/* Empty state */}
-        {folders.length === 0 && leafItems.length === 0 && (
-          <div
-            className="text-center py-12"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            {emptyMessage}
-          </div>
+            {/* Empty state */}
+            {folders.length === 0 && leafItems.length === 0 && (
+              <div
+                className="text-center py-12"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {emptyMessage}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
