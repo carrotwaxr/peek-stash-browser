@@ -5,10 +5,7 @@
  * to the query builder, ensuring galleries/images with null dates are excluded
  * when in timeline view.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, act } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { describe, it, expect } from "vitest";
 import { buildGalleryFilter, buildImageFilter, buildSceneFilter } from "../../src/utils/filterConfig.js";
 
 // Test the filter builders directly - the core of Bug #1
