@@ -1,5 +1,5 @@
 // client/src/components/folder/FolderTreeSidebar.jsx
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { LucideChevronRight, LucideChevronDown, LucideFolder, LucideFolderOpen } from "lucide-react";
 import { buildTagTree } from "../../utils/buildTagTree.js";
 
@@ -11,11 +11,35 @@ const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }) =>
   // Build tree from tags
   const tree = useMemo(() => buildTagTree(tags, { sortField: "name", sortDirection: "ASC" }), [tags]);
 
+  // Ref for the sidebar container (for scrolling)
+  const sidebarRef = useRef(null);
+
   // Track expanded nodes
   const [expanded, setExpanded] = useState(() => {
     // Auto-expand nodes in current path
     return new Set(currentPath);
   });
+
+  // Auto-expand path and scroll to current node when path changes
+  useEffect(() => {
+    if (currentPath.length > 0) {
+      // Expand all nodes in path
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        currentPath.forEach((id) => next.add(id));
+        return next;
+      });
+
+      // Scroll to current node after a brief delay (to allow expansion to render)
+      setTimeout(() => {
+        const currentNodeId = currentPath[currentPath.length - 1];
+        const nodeElement = sidebarRef.current?.querySelector(`[data-node-id="${currentNodeId}"]`);
+        if (nodeElement) {
+          nodeElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
+    }
+  }, [currentPath]);
 
   const toggleExpanded = (tagId) => {
     setExpanded((prev) => {
@@ -37,6 +61,7 @@ const FolderTreeSidebar = ({ tags, currentPath, onNavigate, className = "" }) =>
 
   return (
     <div
+      ref={sidebarRef}
       className={`overflow-y-auto ${className}`}
       style={{
         backgroundColor: "var(--bg-secondary)",
@@ -83,6 +108,7 @@ const TreeNode = ({ node, depth, expanded, toggleExpanded, currentPath, onNaviga
   return (
     <div>
       <div
+        data-node-id={node.id}
         className={`flex items-center hover:bg-[var(--bg-tertiary)] transition-colors ${
           isCurrentNode ? "bg-[var(--bg-tertiary)]" : ""
         }`}
