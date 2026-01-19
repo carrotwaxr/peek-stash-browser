@@ -232,6 +232,17 @@ function TimelineStrip({
     }
   }, [focusedIndex]);
 
+  // Scroll to the right (most recent) when distribution first loads
+  const hasScrolledRef = useRef(false);
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || distribution.length === 0 || hasScrolledRef.current) return;
+
+    // Scroll to the end (most recent) without animation on initial load
+    container.scrollLeft = container.scrollWidth;
+    hasScrolledRef.current = true;
+  }, [distribution.length]);
+
   // Track visible range, edge state, and report to parent
   useEffect(() => {
     if (distribution.length === 0) return;
