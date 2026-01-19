@@ -4,7 +4,7 @@ import { UNTAGGED_FOLDER_ID } from "../../utils/buildFolderTree.js";
 
 /**
  * Card component for displaying a folder (tag) in folder view.
- * Shows thumbnail, folder name, and item count.
+ * Shows thumbnail and folder name.
  */
 const FolderCard = ({ folder, onClick, className = "" }) => {
   const { name, thumbnail, id } = folder;
