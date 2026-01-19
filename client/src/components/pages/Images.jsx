@@ -20,6 +20,7 @@ import {
 } from "../ui/index.js";
 import Lightbox from "../ui/Lightbox.jsx";
 import WallView from "../wall/WallView.jsx";
+import TimelineView from "../timeline/TimelineView.jsx";
 import { TableView, ColumnConfigPopover } from "../table/index.js";
 
 // View modes available for images page
@@ -27,6 +28,7 @@ const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
+  { id: "timeline", label: "Timeline view" },
 ];
 
 const Images = () => {
@@ -48,6 +50,22 @@ const Images = () => {
     moveColumn,
     getColumnConfig,
   } = useTableColumns("image");
+
+  // Track current view mode for timeline date filter
+  const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Track timeline date filter for filtering by selected period
+  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+
+  // Merge timeline date filter into permanent filters when in timeline view
+  const effectivePermanentFilters = useMemo(() => {
+    if (currentViewMode !== "timeline" || !timelineDateFilter) {
+      return {};
+    }
+    return {
+      date: timelineDateFilter,
+    };
+  }, [currentViewMode, timelineDateFilter]);
 
   // Extract URL pagination params early (needed for hooks)
   const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
@@ -186,11 +204,14 @@ const Images = () => {
           initialSort="created_at"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
+          permanentFilters={effectivePermanentFilters}
+          deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
           totalPages={totalPages}
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
           viewModes={VIEW_MODES}
+          onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -204,42 +225,8 @@ const Images = () => {
           {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
-          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
-            isLoading ? (
-              viewMode === "table" ? (
-                <TableView
-                  items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
-                  onSort={onSort}
-                  onHideColumn={hideColumn}
-                  entityType="image"
-                  isLoading={true}
-                  columnsPopover={
-                    <ColumnConfigPopover
-                      allColumns={allColumns}
-                      visibleColumnIds={visibleColumnIds}
-                      columnOrder={columnOrder}
-                      onToggleColumn={toggleColumn}
-                      onMoveColumn={moveColumn}
-                    />
-                  }
-                />
-              ) : (
-                <div className={getGridClasses("standard", gridDensity)}>
-                  {[...Array(24)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        height: "16rem",
-                      }}
-                    />
-                  ))}
-                </div>
-              )
-            ) : viewMode === "table" ? (
+          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
+            viewMode === "table" ? (
               <TableView
                 items={currentImages}
                 columns={visibleColumns}
@@ -247,7 +234,7 @@ const Images = () => {
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="image"
-                isLoading={false}
+                isLoading={isLoading}
                 columnsPopover={
                   <ColumnConfigPopover
                     allColumns={allColumns}
@@ -268,6 +255,43 @@ const Images = () => {
                 loading={isLoading}
                 emptyMessage="No images found"
               />
+            ) : viewMode === "timeline" ? (
+              <TimelineView
+                entityType="image"
+                items={currentImages}
+                renderItem={(image, index, { onItemClick }) => (
+                  <ImageCard
+                    key={image.id}
+                    image={image}
+                    onClick={() => onItemClick?.(image)}
+                    fromPageTitle="Images"
+                    tabIndex={0}
+                    onOCounterChange={handleOCounterChange}
+                    onRatingChange={handleRatingChange}
+                    onFavoriteChange={handleFavoriteChange}
+                  />
+                )}
+                onItemClick={handleImageClick}
+                onDateFilterChange={setTimelineDateFilter}
+                onPeriodChange={setTimelinePeriod}
+                initialPeriod={timelinePeriod}
+                loading={isLoading}
+                emptyMessage="No images found for this time period"
+                gridDensity={gridDensity}
+              />
+            ) : isLoading ? (
+              <div className={getGridClasses("standard", gridDensity)}>
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      height: "16rem",
+                    }}
+                  />
+                ))}
+              </div>
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
                 {currentImages.map((image, index) => {

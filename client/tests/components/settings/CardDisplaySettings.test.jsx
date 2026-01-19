@@ -299,11 +299,12 @@ describe("CardDisplaySettings", () => {
       const dropdown = screen.getByRole("combobox");
       const options = dropdown.querySelectorAll("option");
 
-      // Scene has grid, wall, table
-      expect(options.length).toBe(3);
+      // Scene has grid, wall, table, timeline
+      expect(options.length).toBe(4);
       expect(options[0]).toHaveValue("grid");
       expect(options[1]).toHaveValue("wall");
       expect(options[2]).toHaveValue("table");
+      expect(options[3]).toHaveValue("timeline");
     });
 
     it("calls updateSettings when view mode changes", async () => {
@@ -321,9 +322,10 @@ describe("CardDisplaySettings", () => {
     it("all toggles have accessible labels", () => {
       render(<CardDisplaySettings />);
 
-      // Scene has 9 toggle settings (excludes defaultViewMode which is a dropdown)
+      // Scene toggle settings exclude dropdown settings (defaultViewMode, defaultGridDensity, defaultWallZoom)
+      const dropdownSettings = ["defaultViewMode", "defaultGridDensity", "defaultWallZoom"];
       const sceneToggleSettings = getAvailableSettings("scene").filter(
-        (s) => s !== "defaultViewMode"
+        (s) => !dropdownSettings.includes(s)
       );
       const checkboxes = screen.getAllByRole("checkbox");
       expect(checkboxes.length).toBe(sceneToggleSettings.length);
@@ -332,12 +334,14 @@ describe("CardDisplaySettings", () => {
     it("accordion buttons are accessible", () => {
       render(<CardDisplaySettings />);
 
+      // Buttons include: 7 entity type accordions + 3 zoom slider buttons (smaller, reset, larger)
       const buttons = screen.getAllByRole("button");
-      expect(buttons.length).toBe(7); // One for each entity type
+      expect(buttons.length).toBe(10);
 
-      // Each button should have text content
+      // Each button should have text content (zoom buttons may have empty text but have aria-labels)
       buttons.forEach((button) => {
-        expect(button.textContent).toBeTruthy();
+        const hasContent = button.textContent || button.getAttribute("aria-label");
+        expect(hasContent).toBeTruthy();
       });
     });
   });

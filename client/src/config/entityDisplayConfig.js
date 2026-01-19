@@ -11,6 +11,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       { id: "grid", label: "Grid" },
       { id: "wall", label: "Wall" },
       { id: "table", label: "Table" },
+      { id: "timeline", label: "Timeline" },
     ],
     defaultSettings: {
       defaultViewMode: "grid",
@@ -50,6 +51,7 @@ export const ENTITY_DISPLAY_CONFIG = {
       { id: "grid", label: "Grid" },
       { id: "wall", label: "Wall" },
       { id: "table", label: "Table" },
+      { id: "timeline", label: "Timeline" },
     ],
     defaultSettings: {
       defaultViewMode: "grid",
@@ -86,6 +88,7 @@ export const ENTITY_DISPLAY_CONFIG = {
     viewModes: [
       { id: "grid", label: "Grid" },
       { id: "wall", label: "Wall" },
+      { id: "timeline", label: "Timeline" },
     ],
     defaultSettings: {
       defaultViewMode: "grid",

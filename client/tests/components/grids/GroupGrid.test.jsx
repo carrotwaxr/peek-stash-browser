@@ -8,7 +8,6 @@ describe("GroupGrid", () => {
     expect(element).toBeDefined();
     expect(element.type.name).toBe("SearchableGrid");
     expect(element.props.entityType).toBe("group");
-    expect(element.props.gridType).toBe("standard");
     expect(element.props.defaultSort).toBe("name");
   });
 

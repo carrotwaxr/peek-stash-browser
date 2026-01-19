@@ -34,6 +34,7 @@ import userRoutes from "../routes/user.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
 import userStatsRoutes from "../routes/userStats.js";
+import timelineRoutes from "../routes/timeline.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -146,6 +147,9 @@ export const setupAPI = () => {
 
   // Custom theme routes (protected)
   app.use("/api/themes/custom", customThemeRoutes);
+
+  // Timeline routes (date distribution)
+  app.use("/api/timeline", timelineRoutes);
 
   // Library routes (all entities)
   app.use("/api/library", libraryScenesRoutes);

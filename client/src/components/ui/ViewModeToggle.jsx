@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList } from "lucide-react";
+import { LucideGrid2X2, LucideSquare, LucideNetwork, LucideList, LucideCalendar } from "lucide-react";
 
 // Default modes for backward compatibility
 const DEFAULT_MODES = [
@@ -13,6 +13,7 @@ const MODE_ICONS = {
   wall: LucideSquare,
   hierarchy: LucideNetwork,
   table: LucideList,
+  timeline: LucideCalendar,
 };
 
 /**

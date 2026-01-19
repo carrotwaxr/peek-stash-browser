@@ -2720,6 +2720,14 @@ export const buildGalleryFilter = (filters) => {
     }
   }
 
+  // Date-range filters (for timeline view)
+  if (filters.date?.start || filters.date?.end) {
+    galleryFilter.date = {};
+    if (filters.date.start) galleryFilter.date.value = filters.date.start;
+    galleryFilter.date.modifier = filters.date.end ? "BETWEEN" : "GREATER_THAN";
+    if (filters.date.end) galleryFilter.date.value2 = filters.date.end;
+  }
+
   return galleryFilter;
 };
 
@@ -2813,6 +2821,14 @@ export const buildImageFilter = (filters) => {
       imageFilter.o_counter.modifier = "LESS_THAN";
       imageFilter.o_counter.value = parseInt(filters.oCounter.max) + 1;
     }
+  }
+
+  // Date-range filters (for timeline view)
+  if (filters.date?.start || filters.date?.end) {
+    imageFilter.date = {};
+    if (filters.date.start) imageFilter.date.value = filters.date.start;
+    imageFilter.date.modifier = filters.date.end ? "BETWEEN" : "GREATER_THAN";
+    if (filters.date.end) imageFilter.date.value2 = filters.date.end;
   }
 
   return imageFilter;

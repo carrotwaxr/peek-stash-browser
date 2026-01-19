@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
@@ -19,12 +19,14 @@ import {
 } from "../ui/index.js";
 import { TableView, ColumnConfigPopover } from "../table/index.js";
 import WallView from "../wall/WallView.jsx";
+import TimelineView from "../timeline/TimelineView.jsx";
 
 // View modes available for galleries page
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
+  { id: "timeline", label: "Timeline view" },
 ];
 
 const Galleries = () => {
@@ -49,6 +51,22 @@ const Galleries = () => {
   } = useTableColumns("gallery");
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+
+  // Track current view mode for timeline date filter
+  const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Track timeline date filter for filtering by selected period
+  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+
+  // Merge timeline date filter into permanent filters when in timeline view
+  const effectivePermanentFilters = useMemo(() => {
+    if (currentViewMode !== "timeline" || !timelineDateFilter) {
+      return {};
+    }
+    return {
+      date: timelineDateFilter,
+    };
+  }, [currentViewMode, timelineDateFilter]);
 
   const handleQueryChange = useCallback(
     (newQuery) => {
@@ -118,11 +136,14 @@ const Galleries = () => {
           initialSort="created_at"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
+          permanentFilters={effectivePermanentFilters}
+          deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
           totalPages={totalPages}
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
           viewModes={VIEW_MODES}
+          onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -135,42 +156,8 @@ const Galleries = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
-            isLoading ? (
-              viewMode === "table" ? (
-                <TableView
-                  items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
-                  onSort={onSort}
-                  onHideColumn={hideColumn}
-                  entityType="gallery"
-                  isLoading={true}
-                  columnsPopover={
-                    <ColumnConfigPopover
-                      allColumns={allColumns}
-                      visibleColumnIds={visibleColumnIds}
-                      columnOrder={columnOrder}
-                      onToggleColumn={toggleColumn}
-                      onMoveColumn={moveColumn}
-                    />
-                  }
-                />
-              ) : (
-                <div className={getGridClasses("standard", gridDensity)}>
-                  {[...Array(24)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        height: "20rem",
-                      }}
-                    />
-                  ))}
-                </div>
-              )
-            ) : viewMode === "table" ? (
+          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
+            viewMode === "table" ? (
               <TableView
                 items={currentGalleries}
                 columns={visibleColumns}
@@ -178,7 +165,7 @@ const Galleries = () => {
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="gallery"
-                isLoading={false}
+                isLoading={isLoading}
                 columnsPopover={
                   <ColumnConfigPopover
                     allColumns={allColumns}
@@ -199,6 +186,38 @@ const Galleries = () => {
                 loading={isLoading}
                 emptyMessage="No galleries found"
               />
+            ) : viewMode === "timeline" ? (
+              <TimelineView
+                entityType="gallery"
+                items={currentGalleries}
+                renderItem={(gallery) => (
+                  <GalleryCard
+                    key={gallery.id}
+                    gallery={gallery}
+                    fromPageTitle="Galleries"
+                    tabIndex={0}
+                  />
+                )}
+                onDateFilterChange={setTimelineDateFilter}
+                onPeriodChange={setTimelinePeriod}
+                initialPeriod={timelinePeriod}
+                loading={isLoading}
+                emptyMessage="No galleries found for this time period"
+                gridDensity={gridDensity}
+              />
+            ) : isLoading ? (
+              <div className={getGridClasses("standard", gridDensity)}>
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      height: "20rem",
+                    }}
+                  />
+                ))}
+              </div>
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
                 {currentGalleries.map((gallery, index) => {

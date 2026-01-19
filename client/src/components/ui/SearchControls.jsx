@@ -109,6 +109,8 @@ const SearchControls = ({
   tableColumnsPopover = null, // ColumnConfigPopover component to render in toolbar
   // Context settings - config array for the settings cog
   contextSettings = [], // Array of setting configs: [{key, label, type, options}]
+  // Timeline view props
+  deferInitialQueryUntilFiltersReady = false, // When true, wait for permanentFilters to be non-empty before initial query
   // TV Mode props
   tvSearchZoneActive = false,
   tvTopPaginationZoneActive = false,
@@ -261,6 +263,8 @@ const SearchControls = ({
     gridDensity,
     setGridDensity,
     loadPreset,
+    timelinePeriod,
+    setTimelinePeriod,
   } = useFilterState({
     artifactType,
     context: effectiveContext,
@@ -326,10 +330,17 @@ const SearchControls = ({
   // Track if we've triggered the initial query
   const hasTriggeredInitialQuery = useRef(false);
 
-  // Trigger initial query when hook is initialized
+  // Check if permanentFilters are ready (non-empty when deferring is enabled)
+  const permanentFiltersReady = !deferInitialQueryUntilFiltersReady ||
+    Object.keys(permanentFilters).length > 0;
+
+  // Trigger initial query when hook is initialized and filters are ready
   useEffect(() => {
-    if (!isInitialized || hasTriggeredInitialQuery.current) return;
+    if (!isInitialized || hasTriggeredInitialQuery.current || !permanentFiltersReady) return;
     hasTriggeredInitialQuery.current = true;
+
+    // Include permanent filters in initial query
+    const mergedFilters = { ...filters, ...permanentFilters };
 
     const query = {
       filter: {
@@ -339,10 +350,42 @@ const SearchControls = ({
         q: searchText,
         sort: getSortWithSeed(sortField),
       },
-      ...buildFilter(artifactType, filters, unitPreference),
+      ...buildFilter(artifactType, mergedFilters, unitPreference),
     };
     onQueryChange(query);
-  }, [isInitialized, sortDirection, currentPage, perPage, searchText, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+  }, [isInitialized, permanentFiltersReady, sortDirection, currentPage, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+
+  // Track previous permanentFilters to detect changes
+  const prevPermanentFiltersRef = useRef(permanentFilters);
+
+  // Re-trigger query when permanentFilters change (e.g., timeline date filter)
+  useEffect(() => {
+    // Skip if not initialized or if initial query hasn't fired yet
+    if (!isInitialized || !hasTriggeredInitialQuery.current) return;
+
+    // Check if permanentFilters actually changed
+    const prev = prevPermanentFiltersRef.current;
+    const changed = JSON.stringify(prev) !== JSON.stringify(permanentFilters);
+
+    if (changed) {
+      prevPermanentFiltersRef.current = permanentFilters;
+
+      // Merge new permanent filters with current filters
+      const mergedFilters = { ...filters, ...permanentFilters };
+
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page: 1, // Reset to first page when filters change
+          per_page: perPage,
+          q: searchText,
+          sort: getSortWithSeed(sortField),
+        },
+        ...buildFilter(artifactType, mergedFilters, unitPreference),
+      };
+      onQueryChange(query);
+    }
+  }, [isInitialized, permanentFilters, filters, sortDirection, perPage, searchText, sortField, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
 
   // Clear all filters
   const handleClearFilters = useCallback(() => {
@@ -1012,7 +1055,7 @@ const SearchControls = ({
       </FilterPanel>
       {/* Children: render prop or direct children */}
       {typeof children === "function"
-        ? children({ viewMode, zoomLevel, gridDensity, wallPlayback, sortField, sortDirection, onSort: handleSortChange })
+        ? children({ viewMode, zoomLevel, gridDensity, wallPlayback, sortField, sortDirection, onSort: handleSortChange, timelinePeriod, setTimelinePeriod })
         : children}
       {/* Bottom Pagination */}
       {totalPages >= 1 && (

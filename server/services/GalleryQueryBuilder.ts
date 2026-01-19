@@ -364,11 +364,24 @@ class GalleryQueryBuilder {
     filter: { value?: string | null; value2?: string | null; modifier?: string | null } | undefined | null,
     column: string
   ): FilterClause {
-    if (!filter || !filter.value) {
+    if (!filter) {
       return { sql: "", params: [] };
     }
 
     const { value, value2, modifier = "GREATER_THAN" } = filter;
+
+    // IS_NULL and NOT_NULL don't require a value
+    if (modifier === "IS_NULL") {
+      return { sql: `${column} IS NULL`, params: [] };
+    }
+    if (modifier === "NOT_NULL") {
+      return { sql: `${column} IS NOT NULL`, params: [] };
+    }
+
+    // All other modifiers require a value
+    if (!value) {
+      return { sql: "", params: [] };
+    }
 
     switch (modifier) {
       case "EQUALS":
@@ -384,10 +397,14 @@ class GalleryQueryBuilder {
           return { sql: `${column} BETWEEN ? AND ?`, params: [value, value2] };
         }
         return { sql: `${column} >= ?`, params: [value] };
-      case "IS_NULL":
-        return { sql: `${column} IS NULL`, params: [] };
-      case "NOT_NULL":
-        return { sql: `${column} IS NOT NULL`, params: [] };
+      case "NOT_BETWEEN":
+        if (value2) {
+          return {
+            sql: `(${column} IS NULL OR ${column} < ? OR ${column} > ?)`,
+            params: [value, value2],
+          };
+        }
+        return { sql: `${column} < ?`, params: [value] };
       default:
         return { sql: "", params: [] };
     }

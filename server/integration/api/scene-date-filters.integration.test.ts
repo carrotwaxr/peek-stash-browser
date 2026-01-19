@@ -131,6 +131,59 @@ describe("Scene Date Filters", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
     });
+
+    /**
+     * CRITICAL TEST: Date BETWEEN must exclude items with NULL dates
+     *
+     * This test ensures the Timeline feature works correctly - when a user
+     * selects a time period like "January 2024", only items WITH dates
+     * within that range should be shown. Items without dates should NOT
+     * appear in the filtered results.
+     */
+    it("date BETWEEN excludes scenes with NULL dates", async () => {
+      // First, count scenes with NULL dates
+      const nullDatesResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 1 },
+          scene_filter: {
+            date: { modifier: "IS_NULL" },
+          },
+        }
+      );
+
+      const scenesWithNullDates = nullDatesResponse.data.findScenes.count;
+
+      // If there are no scenes with null dates, skip this test
+      if (scenesWithNullDates === 0) {
+        console.log("Skipping NULL date exclusion test - no scenes with NULL dates in test data");
+        return;
+      }
+
+      // Now get scenes with BETWEEN filter - use very wide range to include all dated scenes
+      const betweenResponse = await adminClient.post<FindScenesResponse>(
+        "/api/library/scenes",
+        {
+          filter: { per_page: 100 },
+          scene_filter: {
+            date: {
+              value: "2000-01-01",
+              value2: "2099-12-31",
+              modifier: "BETWEEN",
+            },
+          },
+        }
+      );
+
+      expect(betweenResponse.ok).toBe(true);
+
+      // CRITICAL: No scene in the BETWEEN results should have a NULL date
+      for (const scene of betweenResponse.data.findScenes.scenes) {
+        expect(scene.date).not.toBeNull();
+        expect(scene.date).toBeDefined();
+        expect(scene.date).toBeTruthy();
+      }
+    });
   });
 
   describe("created_at filter", () => {

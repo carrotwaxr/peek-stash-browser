@@ -7,6 +7,7 @@ import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { libraryApi } from "../../services/api.js";
 import {
+  SceneCard,
   SyncProgressBanner,
   ErrorMessage,
   PageHeader,
@@ -16,12 +17,14 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index.js";
 import SceneGrid from "./SceneGrid.jsx";
 import WallView from "../wall/WallView.jsx";
+import TimelineView from "../timeline/TimelineView.jsx";
 
 // View modes available for scene search
 const VIEW_MODES = [
   { id: "grid", label: "Grid view" },
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
+  { id: "timeline", label: "Timeline view" },
 ];
 
 // Context settings for wall view preview behavior
@@ -78,6 +81,20 @@ const SceneSearch = ({
 
   // Track current view mode for context settings
   const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Track timeline date filter for filtering by selected period
+  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+
+  // Merge timeline date filter into permanent filters when in timeline view
+  const effectivePermanentFilters = useMemo(() => {
+    if (currentViewMode !== "timeline" || !timelineDateFilter) {
+      return permanentFilters;
+    }
+    return {
+      ...permanentFilters,
+      date: timelineDateFilter,
+    };
+  }, [permanentFilters, currentViewMode, timelineDateFilter]);
 
   // Context settings only shown in wall view
   const contextSettings = useMemo(() => {
@@ -179,8 +196,9 @@ const SceneSearch = ({
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
         onPerPageStateChange={setEffectivePerPage}
-        permanentFilters={permanentFilters}
+        permanentFilters={effectivePermanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
+        deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
         totalPages={totalPages}
         totalCount={totalCount}
         syncToUrl={syncToUrl}
@@ -202,7 +220,7 @@ const SceneSearch = ({
         onViewModeChange={setCurrentViewMode}
         {...searchControlsProps}
       >
-        {({ viewMode, zoomLevel, gridDensity, sortField, sortDirection, onSort }) =>
+        {({ viewMode, zoomLevel, gridDensity, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
           viewMode === "table" ? (
             <TableView
               items={currentScenes}
@@ -231,6 +249,27 @@ const SceneSearch = ({
               onItemClick={handleSceneClick}
               loading={isLoading}
               emptyMessage="No scenes found"
+            />
+          ) : viewMode === "timeline" ? (
+            <TimelineView
+              entityType="scene"
+              items={currentScenes}
+              renderItem={(scene) => (
+                <SceneCard
+                  key={scene.id}
+                  scene={scene}
+                  onHideSuccess={handleHideSuccess}
+                  fromPageTitle={fromPageTitle}
+                  tabIndex={0}
+                />
+              )}
+              onItemClick={handleSceneClick}
+              onDateFilterChange={setTimelineDateFilter}
+              onPeriodChange={setTimelinePeriod}
+              initialPeriod={timelinePeriod}
+              loading={isLoading}
+              emptyMessage="No scenes found for this time period"
+              gridDensity={gridDensity}
             />
           ) : (
             <SceneGrid
