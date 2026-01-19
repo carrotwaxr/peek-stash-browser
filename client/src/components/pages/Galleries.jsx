@@ -137,6 +137,7 @@ const Galleries = () => {
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
           permanentFilters={effectivePermanentFilters}
+          deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
           totalPages={totalPages}
           totalCount={totalCount}
           supportsWallView={true}
@@ -155,7 +156,7 @@ const Galleries = () => {
           }
           {...searchControlsProps}
         >
-          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
+          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
             viewMode === "table" ? (
               <TableView
                 items={currentGalleries}
@@ -189,17 +190,17 @@ const Galleries = () => {
               <TimelineView
                 entityType="gallery"
                 items={currentGalleries}
-                renderItem={(gallery, index, { onItemClick }) => (
+                renderItem={(gallery) => (
                   <GalleryCard
                     key={gallery.id}
                     gallery={gallery}
-                    onClick={() => onItemClick?.(gallery)}
                     fromPageTitle="Galleries"
                     tabIndex={0}
                   />
                 )}
-                onItemClick={handleGalleryClick}
                 onDateFilterChange={setTimelineDateFilter}
+                onPeriodChange={setTimelinePeriod}
+                initialPeriod={timelinePeriod}
                 loading={isLoading}
                 emptyMessage="No galleries found for this time period"
                 gridDensity={gridDensity}

@@ -495,4 +495,80 @@ describe("SearchControls", () => {
       });
     });
   });
+
+  describe("Timeline View Deferred Query", () => {
+    it("defers initial query when deferInitialQueryUntilFiltersReady is true and permanentFilters empty", async () => {
+      mockFilterState = createMockFilterState();
+      const onQueryChange = vi.fn();
+
+      render(
+        <MemoryRouter initialEntries={["/"]}>
+          <SearchControls
+            artifactType="gallery"
+            onQueryChange={onQueryChange}
+            totalPages={1}
+            totalCount={0}
+            deferInitialQueryUntilFiltersReady={true}
+            permanentFilters={{}}
+          />
+        </MemoryRouter>
+      );
+
+      // Wait a tick to ensure no query is fired
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Query should NOT have been called because permanentFilters is empty
+      expect(onQueryChange).not.toHaveBeenCalled();
+    });
+
+    it("fires initial query when deferInitialQueryUntilFiltersReady is true and permanentFilters has values", async () => {
+      mockFilterState = createMockFilterState();
+      const onQueryChange = vi.fn();
+
+      render(
+        <MemoryRouter initialEntries={["/"]}>
+          <SearchControls
+            artifactType="gallery"
+            onQueryChange={onQueryChange}
+            totalPages={1}
+            totalCount={10}
+            deferInitialQueryUntilFiltersReady={true}
+            permanentFilters={{ date: { start: "2024-01-01", end: "2024-01-31" } }}
+          />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(onQueryChange).toHaveBeenCalled();
+      });
+
+      // Verify the query includes the date filter
+      const query = onQueryChange.mock.calls[0][0];
+      expect(query.gallery_filter).toBeDefined();
+      expect(query.gallery_filter.date).toBeDefined();
+      expect(query.gallery_filter.date.value).toBe("2024-01-01");
+    });
+
+    it("fires initial query immediately when deferInitialQueryUntilFiltersReady is false", async () => {
+      mockFilterState = createMockFilterState();
+      const onQueryChange = vi.fn();
+
+      render(
+        <MemoryRouter initialEntries={["/"]}>
+          <SearchControls
+            artifactType="gallery"
+            onQueryChange={onQueryChange}
+            totalPages={1}
+            totalCount={10}
+            deferInitialQueryUntilFiltersReady={false}
+            permanentFilters={{}}
+          />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(onQueryChange).toHaveBeenCalled();
+      });
+    });
+  });
 });

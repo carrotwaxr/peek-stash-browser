@@ -148,6 +148,7 @@ describe("FilterPresets", () => {
         direction: "DESC",
         viewMode: "grid",
         zoomLevel: "medium",
+        gridDensity: "medium",
         tableColumns: null,
       });
     });
@@ -185,6 +186,7 @@ describe("FilterPresets", () => {
         direction: "DESC",
         viewMode: "grid",
         zoomLevel: "medium",
+        gridDensity: "medium",
         tableColumns: null,
       });
     });
@@ -272,6 +274,7 @@ describe("FilterPresets", () => {
           direction: "DESC",
           viewMode: "grid",
           zoomLevel: "medium",
+          gridDensity: "medium",
           tableColumns: null,
           setAsDefault: false,
         });

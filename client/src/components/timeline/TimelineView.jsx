@@ -1,5 +1,5 @@
 // client/src/components/timeline/TimelineView.jsx
-import { memo, useEffect, useMemo, useState, useCallback } from "react";
+import { memo, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import TimelineControls from "./TimelineControls.jsx";
 import TimelineStrip from "./TimelineStrip.jsx";
 import TimelineMobileSheet from "./TimelineMobileSheet.jsx";
@@ -14,6 +14,8 @@ function TimelineView({
   renderItem,
   onItemClick,
   onDateFilterChange,
+  onPeriodChange,
+  initialPeriod = null,
   loading = false,
   emptyMessage = "No items found",
   gridDensity = "medium",
@@ -28,10 +30,16 @@ function TimelineView({
     maxCount,
     isLoading: distributionLoading,
     ZOOM_LEVELS,
-  } = useTimelineState({ entityType, autoSelectRecent: true });
+  } = useTimelineState({ entityType, autoSelectRecent: !initialPeriod, initialPeriod });
 
   // Detect mobile devices for responsive layout
   const isMobile = useMediaQuery("(max-width: 768px)");
+
+  // Track last synced period to avoid unnecessary URL updates
+  const lastSyncedPeriodRef = useRef(initialPeriod);
+  // Use refs for callbacks to avoid re-triggering effects when they change identity
+  const onPeriodChangeRef = useRef(onPeriodChange);
+  onPeriodChangeRef.current = onPeriodChange;
 
   // Build date filter from selected period
   const dateFilter = useMemo(() => {
@@ -58,6 +66,17 @@ function TimelineView({
       }
     }
   }, [selectedPeriod, onDateFilterChange]);
+
+  // Sync period to URL separately - only when period actually changes from user action
+  // Uses ref for callback to avoid infinite loop from callback identity changes
+  useEffect(() => {
+    const currentPeriod = selectedPeriod?.period || null;
+    // Only sync to URL if the period has changed from what we last synced
+    if (currentPeriod !== lastSyncedPeriodRef.current) {
+      lastSyncedPeriodRef.current = currentPeriod;
+      onPeriodChangeRef.current?.(currentPeriod);
+    }
+  }, [selectedPeriod]);
 
   const gridClasses = getGridClasses("standard", gridDensity);
 

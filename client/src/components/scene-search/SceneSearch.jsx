@@ -198,6 +198,7 @@ const SceneSearch = ({
         onPerPageStateChange={setEffectivePerPage}
         permanentFilters={effectivePermanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
+        deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
         totalPages={totalPages}
         totalCount={totalCount}
         syncToUrl={syncToUrl}
@@ -219,7 +220,7 @@ const SceneSearch = ({
         onViewModeChange={setCurrentViewMode}
         {...searchControlsProps}
       >
-        {({ viewMode, zoomLevel, gridDensity, sortField, sortDirection, onSort }) =>
+        {({ viewMode, zoomLevel, gridDensity, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
           viewMode === "table" ? (
             <TableView
               items={currentScenes}
@@ -253,11 +254,10 @@ const SceneSearch = ({
             <TimelineView
               entityType="scene"
               items={currentScenes}
-              renderItem={(scene, index, { onItemClick }) => (
+              renderItem={(scene) => (
                 <SceneCard
                   key={scene.id}
                   scene={scene}
-                  onClick={() => onItemClick?.(scene)}
                   onHideSuccess={handleHideSuccess}
                   fromPageTitle={fromPageTitle}
                   tabIndex={0}
@@ -265,6 +265,8 @@ const SceneSearch = ({
               )}
               onItemClick={handleSceneClick}
               onDateFilterChange={setTimelineDateFilter}
+              onPeriodChange={setTimelinePeriod}
+              initialPeriod={timelinePeriod}
               loading={isLoading}
               emptyMessage="No scenes found for this time period"
               gridDensity={gridDensity}

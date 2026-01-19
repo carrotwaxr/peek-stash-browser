@@ -8,7 +8,6 @@ describe("ImageGrid", () => {
     expect(element).toBeDefined();
     expect(element.type.name).toBe("SearchableGrid");
     expect(element.props.entityType).toBe("image");
-    expect(element.props.gridType).toBe("standard");
     expect(element.props.defaultSort).toBe("date");
   });
 

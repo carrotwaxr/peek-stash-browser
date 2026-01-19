@@ -68,15 +68,32 @@ function parsePeriodToDateRange(period, zoomLevel) {
   }
 }
 
-export function useTimelineState({ entityType, autoSelectRecent = false }) {
-  const [zoomLevel, setZoomLevelState] = useState("months");
-  const [selectedPeriod, setSelectedPeriod] = useState(null);
+export function useTimelineState({ entityType, autoSelectRecent = false, initialPeriod = null }) {
+  // Determine initial zoom level from initialPeriod format if provided
+  const getInitialZoomLevel = () => {
+    if (!initialPeriod) return "months";
+    if (initialPeriod.includes("-W")) return "weeks";
+    if (initialPeriod.match(/^\d{4}$/)) return "years";
+    if (initialPeriod.match(/^\d{4}-\d{2}-\d{2}$/)) return "days";
+    if (initialPeriod.match(/^\d{4}-\d{2}$/)) return "months";
+    return "months";
+  };
+
+  const [zoomLevel, setZoomLevelState] = useState(getInitialZoomLevel);
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    // Parse initial period from URL if provided
+    if (initialPeriod) {
+      const zoom = getInitialZoomLevel();
+      return parsePeriodToDateRange(initialPeriod, zoom);
+    }
+    return null;
+  });
   const [distribution, setDistribution] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Track whether we've done the initial load (for autoSelectRecent)
-  const hasInitiallyLoaded = useRef(false);
+  const hasInitiallyLoaded = useRef(!!initialPeriod); // Skip auto-select if we have initialPeriod
 
   // Clear selection when zoom level changes
   const setZoomLevel = useCallback((newLevel) => {

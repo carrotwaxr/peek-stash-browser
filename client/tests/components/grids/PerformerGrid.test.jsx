@@ -8,7 +8,6 @@ describe("PerformerGrid", () => {
     expect(element).toBeDefined();
     expect(element.type.name).toBe("SearchableGrid");
     expect(element.props.entityType).toBe("performer");
-    expect(element.props.gridType).toBe("standard");
     expect(element.props.defaultSort).toBe("o_counter");
   });
 

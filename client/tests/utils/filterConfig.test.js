@@ -7,6 +7,8 @@
 import { describe, it, expect } from "vitest";
 import {
   buildSceneFilter,
+  buildGalleryFilter,
+  buildImageFilter,
   _buildPerformerFilter,
   _buildStudioFilter,
   _buildTagFilter,
@@ -503,6 +505,198 @@ describe("buildSceneFilter", () => {
       const result = buildSceneFilter(uiFilters);
       // Current implementation creates empty object - this is acceptable behavior
       expect(result.duration).toEqual({});
+    });
+  });
+});
+
+describe("buildGalleryFilter", () => {
+  describe("Date Range Filters", () => {
+    it("should build date filter with BETWEEN modifier when both start and end provided", () => {
+      const uiFilters = {
+        date: { start: "2024-01-01", end: "2024-01-31" },
+      };
+      const result = buildGalleryFilter(uiFilters);
+      expect(result.date).toEqual({
+        value: "2024-01-01",
+        value2: "2024-01-31",
+        modifier: "BETWEEN",
+      });
+    });
+
+    it("should build date filter with GREATER_THAN modifier when only start provided", () => {
+      const uiFilters = {
+        date: { start: "2024-03-15" },
+      };
+      const result = buildGalleryFilter(uiFilters);
+      expect(result.date).toEqual({
+        value: "2024-03-15",
+        modifier: "GREATER_THAN",
+      });
+    });
+
+    it("should not include date filter when date object is empty", () => {
+      const uiFilters = {
+        date: {},
+      };
+      const result = buildGalleryFilter(uiFilters);
+      expect(result.date).toBeUndefined();
+    });
+
+    it("should not include date filter when date is undefined", () => {
+      const uiFilters = {};
+      const result = buildGalleryFilter(uiFilters);
+      expect(result.date).toBeUndefined();
+    });
+  });
+
+  describe("Other Filters", () => {
+    it("should build favorite filter when true", () => {
+      const uiFilters = { favorite: true };
+      const result = buildGalleryFilter(uiFilters);
+      expect(result.favorite).toBe(true);
+    });
+
+    it("should build rating100 filter with BETWEEN modifier", () => {
+      const uiFilters = {
+        rating: { min: 40, max: 80 },
+      };
+      const result = buildGalleryFilter(uiFilters);
+      expect(result.rating100).toEqual({
+        value: 40,
+        value2: 80,
+        modifier: "BETWEEN",
+      });
+    });
+
+    it("should build tags filter with depth for hierarchical filtering", () => {
+      const uiFilters = {
+        tagIds: ["1", "2"],
+        tagIdsModifier: "INCLUDES_ALL",
+        tagIdsDepth: 2,
+      };
+      const result = buildGalleryFilter(uiFilters);
+      expect(result.tags).toEqual({
+        value: ["1", "2"],
+        modifier: "INCLUDES_ALL",
+        depth: 2,
+      });
+    });
+  });
+
+  describe("Combined Filters with Date", () => {
+    it("should build multiple filters including date correctly", () => {
+      const uiFilters = {
+        favorite: true,
+        date: { start: "2024-01-01", end: "2024-12-31" },
+        tagIds: ["1"],
+      };
+      const result = buildGalleryFilter(uiFilters);
+
+      expect(result.favorite).toBe(true);
+      expect(result.date).toEqual({
+        value: "2024-01-01",
+        value2: "2024-12-31",
+        modifier: "BETWEEN",
+      });
+      expect(result.tags).toEqual({
+        value: ["1"],
+        modifier: "INCLUDES",
+      });
+    });
+  });
+});
+
+describe("buildImageFilter", () => {
+  describe("Date Range Filters", () => {
+    it("should build date filter with BETWEEN modifier when both start and end provided", () => {
+      const uiFilters = {
+        date: { start: "2024-02-01", end: "2024-02-29" },
+      };
+      const result = buildImageFilter(uiFilters);
+      expect(result.date).toEqual({
+        value: "2024-02-01",
+        value2: "2024-02-29",
+        modifier: "BETWEEN",
+      });
+    });
+
+    it("should build date filter with GREATER_THAN modifier when only start provided", () => {
+      const uiFilters = {
+        date: { start: "2024-06-01" },
+      };
+      const result = buildImageFilter(uiFilters);
+      expect(result.date).toEqual({
+        value: "2024-06-01",
+        modifier: "GREATER_THAN",
+      });
+    });
+
+    it("should not include date filter when date object is empty", () => {
+      const uiFilters = {
+        date: {},
+      };
+      const result = buildImageFilter(uiFilters);
+      expect(result.date).toBeUndefined();
+    });
+
+    it("should not include date filter when date is undefined", () => {
+      const uiFilters = {};
+      const result = buildImageFilter(uiFilters);
+      expect(result.date).toBeUndefined();
+    });
+  });
+
+  describe("Other Filters", () => {
+    it("should build favorite filter when true", () => {
+      const uiFilters = { favorite: true };
+      const result = buildImageFilter(uiFilters);
+      expect(result.favorite).toBe(true);
+    });
+
+    it("should build o_counter filter with BETWEEN modifier", () => {
+      const uiFilters = {
+        oCounter: { min: 1, max: 10 },
+      };
+      const result = buildImageFilter(uiFilters);
+      expect(result.o_counter).toEqual({
+        value: 1,
+        value2: 10,
+        modifier: "BETWEEN",
+      });
+    });
+
+    it("should build galleries filter", () => {
+      const uiFilters = {
+        galleryIds: ["123", "456"],
+        galleryIdsModifier: "INCLUDES",
+      };
+      const result = buildImageFilter(uiFilters);
+      expect(result.galleries).toEqual({
+        value: ["123", "456"],
+        modifier: "INCLUDES",
+      });
+    });
+  });
+
+  describe("Combined Filters with Date", () => {
+    it("should build multiple filters including date correctly", () => {
+      const uiFilters = {
+        favorite: true,
+        date: { start: "2024-01-01", end: "2024-06-30" },
+        performerIds: ["perf1"],
+      };
+      const result = buildImageFilter(uiFilters);
+
+      expect(result.favorite).toBe(true);
+      expect(result.date).toEqual({
+        value: "2024-01-01",
+        value2: "2024-06-30",
+        modifier: "BETWEEN",
+      });
+      expect(result.performers).toEqual({
+        value: ["perf1"],
+        modifier: "INCLUDES",
+      });
     });
   });
 });

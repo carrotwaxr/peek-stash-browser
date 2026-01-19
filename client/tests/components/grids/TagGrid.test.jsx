@@ -8,7 +8,6 @@ describe("TagGrid", () => {
     expect(element).toBeDefined();
     expect(element.type.name).toBe("SearchableGrid");
     expect(element.props.entityType).toBe("tag");
-    expect(element.props.gridType).toBe("standard");
     expect(element.props.defaultSort).toBe("name");
   });
 

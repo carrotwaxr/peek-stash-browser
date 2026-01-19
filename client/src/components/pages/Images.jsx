@@ -205,6 +205,7 @@ const Images = () => {
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
           permanentFilters={effectivePermanentFilters}
+          deferInitialQueryUntilFiltersReady={currentViewMode === "timeline"}
           totalPages={totalPages}
           totalCount={totalCount}
           supportsWallView={true}
@@ -224,7 +225,7 @@ const Images = () => {
           {...searchControlsProps}
           paginationHandlerRef={paginationHandlerRef}
         >
-          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
+          {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort, timelinePeriod, setTimelinePeriod }) =>
             viewMode === "table" ? (
               <TableView
                 items={currentImages}
@@ -272,6 +273,8 @@ const Images = () => {
                 )}
                 onItemClick={handleImageClick}
                 onDateFilterChange={setTimelineDateFilter}
+                onPeriodChange={setTimelinePeriod}
+                initialPeriod={timelinePeriod}
                 loading={isLoading}
                 emptyMessage="No images found for this time period"
                 gridDensity={gridDensity}

@@ -119,13 +119,39 @@ describe("TimelineView", () => {
   });
 
   describe("Hook Integration", () => {
-    it("calls useTimelineState with entityType and autoSelectRecent", () => {
+    it("calls useTimelineState with correct entityType", () => {
       render(<TimelineView {...defaultProps} entityType="gallery" />);
 
       expect(mockUseTimelineState).toHaveBeenCalledWith({
         entityType: "gallery",
         autoSelectRecent: true,
+        initialPeriod: null,
       });
+    });
+
+    it("passes initialPeriod to useTimelineState when provided", () => {
+      render(
+        <TimelineView {...defaultProps} entityType="scene" initialPeriod="2024-03" />
+      );
+
+      expect(mockUseTimelineState).toHaveBeenCalledWith({
+        entityType: "scene",
+        autoSelectRecent: false,
+        initialPeriod: "2024-03",
+      });
+    });
+
+    it("sets autoSelectRecent to false when initialPeriod is provided", () => {
+      render(
+        <TimelineView {...defaultProps} entityType="image" initialPeriod="2024-W15" />
+      );
+
+      expect(mockUseTimelineState).toHaveBeenCalledWith(
+        expect.objectContaining({
+          autoSelectRecent: false,
+          initialPeriod: "2024-W15",
+        })
+      );
     });
   });
 
@@ -651,6 +677,84 @@ describe("TimelineView", () => {
         start: "2024-02-01",
         end: "2024-02-29",
       });
+    });
+  });
+
+  describe("onPeriodChange Callback", () => {
+    it("calls onPeriodChange with period string when selectedPeriod changes", () => {
+      const onPeriodChange = vi.fn();
+
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      render(
+        <TimelineView {...defaultProps} onPeriodChange={onPeriodChange} />
+      );
+
+      expect(onPeriodChange).toHaveBeenCalledWith("2024-01");
+    });
+
+    it("does not call onPeriodChange when initialPeriod matches selected period", () => {
+      const onPeriodChange = vi.fn();
+
+      // Selected period matches initialPeriod - no change needed
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      render(
+        <TimelineView
+          {...defaultProps}
+          initialPeriod="2024-01"
+          onPeriodChange={onPeriodChange}
+        />
+      );
+
+      // Should NOT be called since period already matches URL state
+      expect(onPeriodChange).not.toHaveBeenCalled();
+    });
+
+    it("does not call onPeriodChange when selectedPeriod is already null on mount", () => {
+      const onPeriodChange = vi.fn();
+
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: null,
+      });
+
+      render(
+        <TimelineView {...defaultProps} onPeriodChange={onPeriodChange} />
+      );
+
+      // Should not call since there's no change from initial state
+      expect(onPeriodChange).not.toHaveBeenCalled();
+    });
+
+    it("does not crash when onPeriodChange is not provided", () => {
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      expect(() => render(<TimelineView {...defaultProps} />)).not.toThrow();
     });
   });
 });

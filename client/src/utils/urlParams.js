@@ -170,6 +170,7 @@ export const buildSearchParams = ({
   viewMode,
   zoomLevel,
   gridDensity,
+  timelinePeriod,
 }) => {
   const params = filtersToUrlParams(filters, filterOptions);
 
@@ -181,6 +182,7 @@ export const buildSearchParams = ({
   if (viewMode && viewMode !== "grid") params.set("view", viewMode);
   if (zoomLevel && zoomLevel !== "medium") params.set("zoom", zoomLevel);
   if (gridDensity && gridDensity !== "medium") params.set("grid_density", gridDensity);
+  if (timelinePeriod) params.set("timeline_period", timelinePeriod);
 
   return params;
 };
@@ -207,6 +209,7 @@ export const parseSearchParams = (
     viewMode: searchParams.get("view") || defaults.viewMode || "grid",
     zoomLevel: searchParams.get("zoom") || defaults.zoomLevel || "medium",
     gridDensity: searchParams.get("grid_density") || defaults.gridDensity || "medium",
+    timelinePeriod: searchParams.get("timeline_period") || defaults.timelinePeriod || null,
     filters: {
       ...defaults.filters,
       ...urlParamsToFilters(searchParams, filterOptions),
