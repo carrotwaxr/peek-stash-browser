@@ -175,6 +175,7 @@ export const useFilterState = ({
   }, [filters, sort, pagination, searchText, viewMode, zoomLevel, gridDensity, timelinePeriod]);
 
   // URL sync helper - writes to URL without reading back
+  // Preserves unknown params (like folderPath) that other components may use
   const syncToUrlParams = useCallback((state, options = {}) => {
     if (!syncToUrl || !isInitialized) return;
 
@@ -193,7 +194,20 @@ export const useFilterState = ({
       timelinePeriod: state.timelinePeriod,
     });
 
-    setSearchParams(params, { replace });
+    // Preserve specific params we don't manage (folderPath from FolderView)
+    const preserveParams = ["folderPath"];
+
+    setSearchParams((prev) => {
+      // Start with new params
+      const merged = new URLSearchParams(params);
+      // Copy over preserved params from previous URL
+      for (const key of preserveParams) {
+        if (prev.has(key) && !merged.has(key)) {
+          merged.set(key, prev.get(key));
+        }
+      }
+      return merged;
+    }, { replace });
   }, [syncToUrl, isInitialized, filterOptions, setSearchParams]);
 
   // Actions

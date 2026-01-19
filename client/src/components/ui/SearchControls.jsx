@@ -120,6 +120,7 @@ const SearchControls = ({
   const effectiveContext = context || artifactType;
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [highlightedFilterKey, setHighlightedFilterKey] = useState(null);
+  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const topPaginationRef = useRef(null); // Ref for top pagination element
   const filterRefs = useRef({}); // Refs for filter controls (for scroll-to-highlight)
   const randomSeedRef = useRef(-1); // Random seed for stable pagination (-1 = uninitialized)
@@ -708,8 +709,38 @@ const SearchControls = ({
 
   return (
     <div>
-      {/* Row 1: Search, Sort, Filters - "What to show" */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-center gap-3 mb-3">
+      {/* Collapsible Search Controls Container */}
+      <div
+        className="rounded-lg mb-4"
+        style={{
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-color)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+          style={{
+            borderBottom: isControlsCollapsed ? "none" : "1px solid var(--border-color)",
+          }}
+          onClick={() => setIsControlsCollapsed(!isControlsCollapsed)}
+        >
+          <h3
+            className="font-semibold text-sm uppercase tracking-wide"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Search &amp; Filter
+          </h3>
+          <span style={{ color: "var(--text-secondary)" }}>
+            {isControlsCollapsed ? "▶" : "▼"}
+          </span>
+        </div>
+
+        {/* Collapsible controls content */}
+        {!isControlsCollapsed && (
+          <div className="p-3">
+            {/* Row 1: Search, Sort, Filters - "What to show" */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-center gap-3 mb-3">
         {/* Search Input - Flexible width with min-width */}
         <div
           data-tv-search-item="search-input"
@@ -894,15 +925,18 @@ const SearchControls = ({
         </div>
       </div>
 
-      {/* Active Filter Chips */}
-      <ActiveFilterChips
-        filters={filters}
-        filterOptions={filterOptions}
-        onRemoveFilter={handleRemoveFilter}
-        onChipClick={handleFilterChipClick}
-        permanentFilters={permanentFilters}
-        permanentFiltersMetadata={permanentFiltersMetadata}
-      />
+            {/* Active Filter Chips */}
+            <ActiveFilterChips
+              filters={filters}
+              filterOptions={filterOptions}
+              onRemoveFilter={handleRemoveFilter}
+              onChipClick={handleFilterChipClick}
+              permanentFilters={permanentFilters}
+              permanentFiltersMetadata={permanentFiltersMetadata}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Top Pagination */}
       {totalPages >= 1 && (

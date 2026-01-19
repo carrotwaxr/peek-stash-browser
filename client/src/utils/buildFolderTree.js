@@ -18,6 +18,9 @@ const getItemThumbnail = (item) => {
 /**
  * Build a folder tree structure from items and tag hierarchy.
  *
+ * Items only appear at a level if they have that exact tag AND don't have any
+ * child tags that would place them deeper in the hierarchy.
+ *
  * @param {Array} items - Content items (scenes, galleries, images) with tags array
  * @param {Array} tags - All tags with hierarchy (parents/children arrays)
  * @param {Array} currentPath - Array of tag IDs representing current navigation path
@@ -38,7 +41,7 @@ export function buildFolderTree(items, tags, currentPath = []) {
     return { id, name: tag?.name || "Unknown" };
   });
 
-  // Determine which tags to show as folders at this level
+  // Determine current location
   const currentTagId = currentPath[currentPath.length - 1] || null;
   const currentTag = currentTagId ? tagMap.get(currentTagId) : null;
 
@@ -55,8 +58,8 @@ export function buildFolderTree(items, tags, currentPath = []) {
   }
 
   // Group items by which folder they belong to at this level
-  const folderContents = new Map(); // tagId -> items[]
-  const leafItems = []; // Items that are "directly" at this level
+  const folderContents = new Map(); // tagId -> items[] (for recursive counts)
+  const leafItems = []; // Items that appear directly at this level
   const untaggedItems = [];
 
   items.forEach((item) => {
@@ -71,28 +74,52 @@ export function buildFolderTree(items, tags, currentPath = []) {
       return;
     }
 
-    // Check if item belongs to any child folder at this level
-    let belongsToChildFolder = false;
-    childTagIds.forEach((childId) => {
-      // Item belongs to this folder if it has the tag or any descendant
+    // At ROOT level: items never appear as loose items
+    // They only appear inside folders (or in Untagged)
+    if (currentPath.length === 0) {
+      // Add to each root-level folder the item belongs to (for counts)
+      childTagIds.forEach((childId) => {
+        if (itemHasTagOrDescendant(item, childId, tagMap)) {
+          if (!folderContents.has(childId)) {
+            folderContents.set(childId, []);
+          }
+          folderContents.get(childId).push(item);
+        }
+      });
+      return;
+    }
+
+    // INSIDE a tag folder: determine where this item should appear
+    // Item must have the current tag directly to appear at this level
+    if (!itemTagIds.has(currentTagId)) {
+      // Item doesn't have current tag directly - it's here via a deeper descendant
+      // Still add to child folder counts, but don't show as leaf
+      childTagIds.forEach((childId) => {
+        if (itemHasTagOrDescendant(item, childId, tagMap)) {
+          if (!folderContents.has(childId)) {
+            folderContents.set(childId, []);
+          }
+          folderContents.get(childId).push(item);
+        }
+      });
+      return;
+    }
+
+    // Item has current tag directly - check if it also has any child tag
+    let hasChildTag = false;
+    for (const childId of childTagIds) {
       if (itemHasTagOrDescendant(item, childId, tagMap)) {
         if (!folderContents.has(childId)) {
           folderContents.set(childId, []);
         }
         folderContents.get(childId).push(item);
-        belongsToChildFolder = true;
+        hasChildTag = true;
       }
-    });
+    }
 
-    // If at root and item doesn't belong to any root-level folder, it's a leaf
-    // If inside a tag and item is directly tagged with current tag but not children, it's a leaf
-    if (!belongsToChildFolder) {
-      if (currentTagId && itemTagIds.has(currentTagId)) {
-        leafItems.push(item);
-      } else if (!currentTagId) {
-        // At root with tags but none are root-level tags - treat as leaf
-        leafItems.push(item);
-      }
+    // If item has current tag but NO child tags, it's a leaf item at this level
+    if (!hasChildTag) {
+      leafItems.push(item);
     }
   });
 
@@ -137,14 +164,9 @@ export function buildFolderTree(items, tags, currentPath = []) {
   // Sort folders alphabetically
   folders.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Combine leaf items with untagged if at root
-  const displayItems = currentPath.length === 0
-    ? [...leafItems, ...untaggedItems]
-    : leafItems;
-
   return {
     folders,
-    items: displayItems,
+    items: leafItems,
     breadcrumbs,
   };
 }

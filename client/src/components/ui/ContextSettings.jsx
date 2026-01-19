@@ -138,10 +138,12 @@ const ContextSettings = ({
       {/* Popover */}
       {isOpen && hasSettings && (
         <div
-          className="absolute right-0 top-full mt-2 w-64 rounded-lg shadow-lg z-50"
+          className="absolute top-full mt-2 w-64 rounded-lg shadow-lg z-50"
           style={{
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-color)",
+            right: "max(-1rem, calc(-100vw + 100% + 1rem))",
+            maxWidth: "calc(100vw - 1rem)",
           }}
         >
           {/* Header */}
