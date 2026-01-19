@@ -20,6 +20,8 @@ import {
 import { TableView, ColumnConfigPopover } from "../table/index.js";
 import WallView from "../wall/WallView.jsx";
 import TimelineView from "../timeline/TimelineView.jsx";
+import { FolderView } from "../folder/index.js";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags.js";
 
 // View modes available for galleries page
 const VIEW_MODES = [
@@ -27,6 +29,7 @@ const VIEW_MODES = [
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
   { id: "timeline", label: "Timeline view" },
+  { id: "folder", label: "Folder view" },
 ];
 
 const Galleries = () => {
@@ -52,21 +55,40 @@ const Galleries = () => {
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
 
-  // Track current view mode for timeline date filter
+  // Track current view mode for timeline date filter and folder view
   const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Fetch tags for folder view (only when folder view is active)
+  const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
+    currentViewMode === "folder"
+  );
 
   // Track timeline date filter for filtering by selected period
   const [timelineDateFilter, setTimelineDateFilter] = useState(null);
 
-  // Merge timeline date filter into permanent filters when in timeline view
+  // Track folder tag filter for filtering by selected folder
+  const [folderTagFilter, setFolderTagFilter] = useState(null);
+
+  // Merge timeline/folder filters into permanent filters based on view mode
   const effectivePermanentFilters = useMemo(() => {
-    if (currentViewMode !== "timeline" || !timelineDateFilter) {
-      return {};
+    let filters = {};
+
+    // Add timeline date filter when in timeline view
+    if (currentViewMode === "timeline" && timelineDateFilter) {
+      filters.date = timelineDateFilter;
     }
-    return {
-      date: timelineDateFilter,
-    };
-  }, [currentViewMode, timelineDateFilter]);
+
+    // Add folder tag filter when in folder view
+    if (currentViewMode === "folder" && folderTagFilter) {
+      filters.tags = {
+        value: [folderTagFilter],
+        modifier: "INCLUDES",
+        depth: -1, // Include child tags (hierarchical)
+      };
+    }
+
+    return filters;
+  }, [currentViewMode, timelineDateFilter, folderTagFilter]);
 
   const handleQueryChange = useCallback(
     (newQuery) => {
@@ -204,6 +226,23 @@ const Galleries = () => {
                 loading={isLoading}
                 emptyMessage="No galleries found for this time period"
                 gridDensity={gridDensity}
+              />
+            ) : viewMode === "folder" ? (
+              <FolderView
+                items={currentGalleries}
+                tags={folderTags}
+                gridDensity={gridDensity}
+                loading={isLoading || tagsLoading}
+                emptyMessage="No galleries found"
+                onFolderPathChange={setFolderTagFilter}
+                renderItem={(gallery) => (
+                  <GalleryCard
+                    key={gallery.id}
+                    gallery={gallery}
+                    fromPageTitle="Galleries"
+                    tabIndex={0}
+                  />
+                )}
               />
             ) : isLoading ? (
               <div className={getGridClasses("standard", gridDensity)}>

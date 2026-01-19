@@ -299,12 +299,13 @@ describe("CardDisplaySettings", () => {
       const dropdown = screen.getByRole("combobox");
       const options = dropdown.querySelectorAll("option");
 
-      // Scene has grid, wall, table, timeline
-      expect(options.length).toBe(4);
+      // Scene has grid, wall, table, timeline, folder
+      expect(options.length).toBe(5);
       expect(options[0]).toHaveValue("grid");
       expect(options[1]).toHaveValue("wall");
       expect(options[2]).toHaveValue("table");
       expect(options[3]).toHaveValue("timeline");
+      expect(options[4]).toHaveValue("folder");
     });
 
     it("calls updateSettings when view mode changes", async () => {

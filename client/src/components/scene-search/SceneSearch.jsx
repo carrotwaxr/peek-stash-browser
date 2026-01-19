@@ -18,6 +18,8 @@ import { TableView, ColumnConfigPopover } from "../table/index.js";
 import SceneGrid from "./SceneGrid.jsx";
 import WallView from "../wall/WallView.jsx";
 import TimelineView from "../timeline/TimelineView.jsx";
+import { FolderView } from "../folder/index.js";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags.js";
 
 // View modes available for scene search
 const VIEW_MODES = [
@@ -25,6 +27,7 @@ const VIEW_MODES = [
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
   { id: "timeline", label: "Timeline view" },
+  { id: "folder", label: "Folder view" },
 ];
 
 // Context settings for wall view preview behavior
@@ -82,19 +85,37 @@ const SceneSearch = ({
   // Track current view mode for context settings
   const [currentViewMode, setCurrentViewMode] = useState("grid");
 
+  // Fetch tags for folder view (only when folder view is active)
+  const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
+    currentViewMode === "folder"
+  );
+
   // Track timeline date filter for filtering by selected period
   const [timelineDateFilter, setTimelineDateFilter] = useState(null);
 
-  // Merge timeline date filter into permanent filters when in timeline view
+  // Track folder tag filter for filtering by selected folder
+  const [folderTagFilter, setFolderTagFilter] = useState(null);
+
+  // Merge timeline/folder filters into permanent filters based on view mode
   const effectivePermanentFilters = useMemo(() => {
-    if (currentViewMode !== "timeline" || !timelineDateFilter) {
-      return permanentFilters;
+    let filters = { ...permanentFilters };
+
+    // Add timeline date filter when in timeline view
+    if (currentViewMode === "timeline" && timelineDateFilter) {
+      filters.date = timelineDateFilter;
     }
-    return {
-      ...permanentFilters,
-      date: timelineDateFilter,
-    };
-  }, [permanentFilters, currentViewMode, timelineDateFilter]);
+
+    // Add folder tag filter when in folder view
+    if (currentViewMode === "folder" && folderTagFilter) {
+      filters.tags = {
+        value: [folderTagFilter],
+        modifier: "INCLUDES",
+        depth: -1, // Include child tags (hierarchical)
+      };
+    }
+
+    return filters;
+  }, [permanentFilters, currentViewMode, timelineDateFilter, folderTagFilter]);
 
   // Context settings only shown in wall view
   const contextSettings = useMemo(() => {
@@ -270,6 +291,24 @@ const SceneSearch = ({
               loading={isLoading}
               emptyMessage="No scenes found for this time period"
               gridDensity={gridDensity}
+            />
+          ) : viewMode === "folder" ? (
+            <FolderView
+              items={currentScenes}
+              tags={folderTags}
+              gridDensity={gridDensity}
+              loading={isLoading || tagsLoading}
+              emptyMessage="No scenes found"
+              onFolderPathChange={setFolderTagFilter}
+              renderItem={(scene) => (
+                <SceneCard
+                  key={scene.id}
+                  scene={scene}
+                  onHideSuccess={handleHideSuccess}
+                  fromPageTitle={fromPageTitle}
+                  tabIndex={0}
+                />
+              )}
             />
           ) : (
             <SceneGrid
