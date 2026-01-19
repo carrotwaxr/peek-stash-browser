@@ -247,9 +247,10 @@ const FilterPresets = ({
             className="text-sm"
             disabled={isLoading}
             icon={<LucideBookmark className="w-4 h-4" />}
+            title="Load Preset"
           >
-            <span>Load Preset</span>
-            <LucideChevronDown className="w-3 h-3" />
+            <span className="hidden sm:inline">Load Preset</span>
+            <LucideChevronDown className="w-3 h-3 sm:ml-0" />
           </Button>
 
           {/* Dropdown Menu */}
@@ -352,8 +353,9 @@ const FilterPresets = ({
           className="text-sm"
           disabled={isLoading}
           icon={<LucideSave className="w-4 h-4" />}
+          title="Save Preset"
         >
-          Save Preset
+          <span className="hidden sm:inline">Save Preset</span>
         </Button>
       </div>
 

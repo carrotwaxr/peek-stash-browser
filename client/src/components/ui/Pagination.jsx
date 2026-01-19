@@ -76,7 +76,7 @@ const Pagination = ({
 
   return (
     <div
-      className={`flex flex-col sm:flex-row items-center justify-center gap-4 mt-4 w-full ${className}`}
+      className={`flex flex-col items-center justify-center gap-2 sm:gap-4 mt-4 w-full ${className}`}
     >
       {showInfo && totalCount && (
         <div style={{ color: "var(--text-muted)" }} className="text-sm">
@@ -84,7 +84,9 @@ const Pagination = ({
         </div>
       )}
 
-      <nav className="flex items-center gap-2 w-full sm:w-auto justify-center">
+      {/* Navigation row - includes per-page on mobile */}
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 w-full sm:w-auto">
+        <nav className="flex items-center gap-1 sm:gap-2">
         {/* First Page Button */}
         <div
           data-tv-pagination-item="first"
@@ -177,43 +179,44 @@ const Pagination = ({
             icon={<LucideArrowRightToLine size={16} />}
           />
         </div>
-      </nav>
+        </nav>
 
-      {showPerPageSelector && onPerPageChange && (
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-center">
-          <label
-            htmlFor="perPage"
-            className="text-sm whitespace-nowrap"
-            style={{ color: "var(--text-muted)" }}
-          >
-            Per Page:
-          </label>
-          <div
-            data-tv-pagination-item="per-page"
-            ref={(el) => paginationNav.setItemRef(5, el)}
-            className={paginationNav.isFocused(5) ? "keyboard-focus" : ""}
-          >
-            <select
-              id="perPage"
-              value={perPage}
-              onChange={(e) => onPerPageChange(parseInt(e.target.value))}
-              className="px-3 py-1 rounded text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: "var(--bg-card)",
-                color: "var(--text-primary)",
-                border: "1px solid var(--border-color)",
-                height: "1.8rem",
-              }}
+        {showPerPageSelector && onPerPageChange && (
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="perPage"
+              className="hidden sm:block text-sm whitespace-nowrap"
+              style={{ color: "var(--text-muted)" }}
             >
-              {perPageOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+              Per Page:
+            </label>
+            <div
+              data-tv-pagination-item="per-page"
+              ref={(el) => paginationNav.setItemRef(5, el)}
+              className={paginationNav.isFocused(5) ? "keyboard-focus" : ""}
+            >
+              <select
+                id="perPage"
+                value={perPage}
+                onChange={(e) => onPerPageChange(parseInt(e.target.value))}
+                className="px-2 sm:px-3 py-1 rounded text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-color)",
+                  height: "1.8rem",
+                }}
+              >
+                {perPageOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
