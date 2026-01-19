@@ -1,8 +1,11 @@
 // client/src/components/timeline/TimelineBar.jsx
+// Flagpole style: circle on top, bar extends downward
 import { memo, useState } from "react";
 
+const CIRCLE_SIZE = 12; // Circle diameter in pixels
+const BAR_WIDTH = 6; // Bar width (slightly smaller than circle)
 const MIN_BAR_HEIGHT = 4; // Minimum visible height in pixels
-const MAX_BAR_HEIGHT = 60; // Maximum bar height in pixels
+const MAX_BAR_HEIGHT = 48; // Maximum bar height in pixels
 
 function TimelineBar({
   period,
@@ -36,42 +39,45 @@ function TimelineBar({
       aria-label={`${label}: ${count} items`}
       tabIndex={tabIndex}
     >
-      {/* Tooltip */}
+      {/* Tooltip - positioned above the circle */}
       {showTooltip && (
         <div
-          className="absolute bottom-full mb-2 px-2 py-1 text-xs font-medium
+          className="absolute bottom-full mb-1 px-2 py-1 text-xs font-medium
             bg-bg-primary text-text-primary rounded shadow-lg border border-border-primary
-            whitespace-nowrap z-10 pointer-events-none"
+            whitespace-nowrap z-20 pointer-events-none"
         >
           {count} {count === 1 ? "item" : "items"}
         </div>
       )}
 
-      {/* Bar */}
+      {/* Circle (on the timeline line) */}
       <div
         className={`
-          w-3 rounded-t transition-all duration-150
+          rounded-full transition-all duration-150 z-10
           ${isFocused ? "ring-2 ring-offset-1" : ""}
         `}
         style={{
-          height: `${barHeight}px`,
-          backgroundColor: isSelected
-            ? "var(--accent-primary)"
-            : "var(--accent-secondary)",
+          width: `${CIRCLE_SIZE}px`,
+          height: `${CIRCLE_SIZE}px`,
+          backgroundColor: isSelected ? "var(--status-success)" : "var(--bg-primary)",
+          border: `1.5px solid ${isSelected ? "var(--status-success)" : "var(--accent-primary)"}`,
           "--tw-ring-color": "var(--accent-primary)",
           "--tw-ring-offset-color": "var(--bg-primary)",
         }}
-        data-testid="timeline-bar"
+        data-testid="timeline-circle"
       />
 
-      {/* Selection indicator */}
-      {isSelected && (
-        <div
-          className="absolute -bottom-1 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent"
-          style={{ borderTopColor: "var(--accent-primary)" }}
-          data-testid="selection-indicator"
-        />
-      )}
+      {/* Bar extending downward (flagpole style) */}
+      <div
+        className="rounded-b transition-all duration-150"
+        style={{
+          width: `${BAR_WIDTH}px`,
+          height: `${barHeight}px`,
+          marginTop: `-1px`, // Overlap with circle slightly
+          backgroundColor: isSelected ? "var(--status-success)" : "var(--accent-primary)",
+        }}
+        data-testid="timeline-bar"
+      />
     </div>
   );
 }

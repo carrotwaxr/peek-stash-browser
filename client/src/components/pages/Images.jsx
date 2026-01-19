@@ -225,41 +225,7 @@ const Images = () => {
           paginationHandlerRef={paginationHandlerRef}
         >
           {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
-            isLoading ? (
-              viewMode === "table" ? (
-                <TableView
-                  items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
-                  onSort={onSort}
-                  onHideColumn={hideColumn}
-                  entityType="image"
-                  isLoading={true}
-                  columnsPopover={
-                    <ColumnConfigPopover
-                      allColumns={allColumns}
-                      visibleColumnIds={visibleColumnIds}
-                      columnOrder={columnOrder}
-                      onToggleColumn={toggleColumn}
-                      onMoveColumn={moveColumn}
-                    />
-                  }
-                />
-              ) : (
-                <div className={getGridClasses("standard", gridDensity)}>
-                  {[...Array(24)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        height: "16rem",
-                      }}
-                    />
-                  ))}
-                </div>
-              )
-            ) : viewMode === "table" ? (
+            viewMode === "table" ? (
               <TableView
                 items={currentImages}
                 columns={visibleColumns}
@@ -267,7 +233,7 @@ const Images = () => {
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="image"
-                isLoading={false}
+                isLoading={isLoading}
                 columnsPopover={
                   <ColumnConfigPopover
                     allColumns={allColumns}
@@ -310,6 +276,19 @@ const Images = () => {
                 emptyMessage="No images found for this time period"
                 gridDensity={gridDensity}
               />
+            ) : isLoading ? (
+              <div className={getGridClasses("standard", gridDensity)}>
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      height: "16rem",
+                    }}
+                  />
+                ))}
+              </div>
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
                 {currentImages.map((image, index) => {

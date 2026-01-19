@@ -183,6 +183,31 @@ export const findImages = async (
       };
     }
 
+    // Date filters
+    if (image_filter?.date) {
+      filters.date = {
+        value: image_filter.date.value,
+        value2: image_filter.date.value2,
+        modifier: image_filter.date.modifier || "GREATER_THAN",
+      };
+    }
+
+    if (image_filter?.created_at) {
+      filters.created_at = {
+        value: image_filter.created_at.value,
+        value2: image_filter.created_at.value2,
+        modifier: image_filter.created_at.modifier || "GREATER_THAN",
+      };
+    }
+
+    if (image_filter?.updated_at) {
+      filters.updated_at = {
+        value: image_filter.updated_at.value,
+        value2: image_filter.updated_at.value2,
+        modifier: image_filter.updated_at.modifier || "GREATER_THAN",
+      };
+    }
+
     // Admins skip exclusions
     const applyExclusions = requestingUser?.role !== "ADMIN";
 

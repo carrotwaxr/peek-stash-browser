@@ -54,14 +54,12 @@ describe("TimelineStrip", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders baseline element", () => {
-      const { container } = render(<TimelineStrip {...defaultProps} />);
+    it("renders timeline line element", () => {
+      render(<TimelineStrip {...defaultProps} />);
 
-      // The baseline is the horizontal line at the bottom of bars (uses inline style now)
-      const baseline = container.querySelector(
-        'div[style*="background-color: var(--border-primary)"]'
-      );
-      expect(baseline).toBeInTheDocument();
+      // The timeline line is horizontal, connecting all points
+      const timelineLine = screen.getByTestId("timeline-line");
+      expect(timelineLine).toBeInTheDocument();
     });
 
     it("applies custom className", () => {
@@ -270,7 +268,7 @@ describe("TimelineStrip", () => {
       expect(nonSelectedOption).toHaveAttribute("aria-selected", "false");
     });
 
-    it("applies highlight styling to selected period label", () => {
+    it("applies bold font weight to selected period label", () => {
       const { container } = render(
         <TimelineStrip
           {...defaultProps}
@@ -278,27 +276,27 @@ describe("TimelineStrip", () => {
         />
       );
 
-      // Find the span elements and check for selected styling via inline style
-      const labels = container.querySelectorAll("span.text-xs");
+      // Find the label div elements and check for selected styling via font-weight
+      const labels = container.querySelectorAll("div.text-xs");
       const selectedLabel = Array.from(labels).find(
-        (span) => span.style.color === "var(--accent-primary)"
+        (div) => div.style.fontWeight === "600"
       );
       expect(selectedLabel).toBeInTheDocument();
       // Short label is just "Feb" (no year)
       expect(selectedLabel).toHaveTextContent("Feb");
     });
 
-    it("does not highlight labels when no period is selected", () => {
+    it("applies normal font weight to non-selected labels", () => {
       const { container } = render(
         <TimelineStrip {...defaultProps} selectedPeriod={null} />
       );
 
-      // All labels should have secondary text color when nothing is selected
-      const labels = container.querySelectorAll("span.text-xs");
-      const highlightedLabel = Array.from(labels).find(
-        (span) => span.style.color === "var(--accent-primary)"
+      // All labels should have normal font weight when nothing is selected
+      const labels = container.querySelectorAll("div.text-xs");
+      const boldLabel = Array.from(labels).find(
+        (div) => div.style.fontWeight === "600"
       );
-      expect(highlightedLabel).toBeUndefined();
+      expect(boldLabel).toBeUndefined();
     });
   });
 
@@ -333,9 +331,9 @@ describe("TimelineStrip", () => {
       // ArrowRight should wrap to first (index 0)
       await user.keyboard("{ArrowRight}");
 
-      // First item should now be focused
-      const firstBar = screen.getAllByTestId("timeline-bar")[0];
-      expect(firstBar).toHaveClass("ring-2");
+      // First item should now be focused (focus ring is on the circle)
+      const firstCircle = screen.getAllByTestId("timeline-circle")[0];
+      expect(firstCircle).toHaveClass("ring-2");
     });
 
     it("navigates left with ArrowLeft key", async () => {
@@ -343,16 +341,15 @@ describe("TimelineStrip", () => {
 
       render(<TimelineStrip {...defaultProps} />);
 
-      const listbox = screen.getByRole("listbox");
-      await user.click(listbox); // Focus the container (sets initial focus to last)
+      await user.tab(); // Tab to focus the container (keyboard users get focus ring)
 
       // After focus, focusedIndex should be at last item (index 2)
       // ArrowLeft should move to previous (index 1)
       await user.keyboard("{ArrowLeft}");
 
-      // Second item should now be focused
-      const secondBar = screen.getAllByTestId("timeline-bar")[1];
-      expect(secondBar).toHaveClass("ring-2");
+      // Second item should now be focused (focus ring is on the circle)
+      const secondCircle = screen.getAllByTestId("timeline-circle")[1];
+      expect(secondCircle).toHaveClass("ring-2");
     });
 
     it("navigates to first item with Home key", async () => {
@@ -364,8 +361,8 @@ describe("TimelineStrip", () => {
       await user.click(listbox);
       await user.keyboard("{Home}");
 
-      const firstBar = screen.getAllByTestId("timeline-bar")[0];
-      expect(firstBar).toHaveClass("ring-2");
+      const firstCircle = screen.getAllByTestId("timeline-circle")[0];
+      expect(firstCircle).toHaveClass("ring-2");
     });
 
     it("navigates to last item with End key", async () => {
@@ -378,8 +375,8 @@ describe("TimelineStrip", () => {
       await user.keyboard("{Home}"); // First go to first
       await user.keyboard("{End}"); // Then to last
 
-      const lastBar = screen.getAllByTestId("timeline-bar")[2];
-      expect(lastBar).toHaveClass("ring-2");
+      const lastCircle = screen.getAllByTestId("timeline-circle")[2];
+      expect(lastCircle).toHaveClass("ring-2");
     });
 
     it("selects focused item with Enter key", async () => {
@@ -441,8 +438,8 @@ describe("TimelineStrip", () => {
       await user.click(listbox); // Focus initially at last (index 2)
       await user.keyboard("{ArrowRight}"); // Should wrap to first (index 0)
 
-      const firstBar = screen.getAllByTestId("timeline-bar")[0];
-      expect(firstBar).toHaveClass("ring-2");
+      const firstCircle = screen.getAllByTestId("timeline-circle")[0];
+      expect(firstCircle).toHaveClass("ring-2");
     });
 
     it("wraps focus from first to last with ArrowLeft", async () => {
@@ -455,13 +452,13 @@ describe("TimelineStrip", () => {
       await user.keyboard("{Home}"); // Go to first
       await user.keyboard("{ArrowLeft}"); // Should wrap to last
 
-      const lastBar = screen.getAllByTestId("timeline-bar")[2];
-      expect(lastBar).toHaveClass("ring-2");
+      const lastCircle = screen.getAllByTestId("timeline-circle")[2];
+      expect(lastCircle).toHaveClass("ring-2");
     });
   });
 
   describe("Focus Management", () => {
-    it("sets initial focus to selected period when focused", async () => {
+    it("sets initial focus to selected period when focused via keyboard", async () => {
       const user = userEvent.setup();
 
       render(
@@ -471,12 +468,11 @@ describe("TimelineStrip", () => {
         />
       );
 
-      const listbox = screen.getByRole("listbox");
-      await user.click(listbox);
+      await user.tab(); // Tab to focus the container (keyboard users get focus ring)
 
-      // The second bar (index 1) should be focused
-      const secondBar = screen.getAllByTestId("timeline-bar")[1];
-      expect(secondBar).toHaveClass("ring-2");
+      // The second circle (index 1) should be focused
+      const secondCircle = screen.getAllByTestId("timeline-circle")[1];
+      expect(secondCircle).toHaveClass("ring-2");
     });
 
     it("sets initial focus to last (most recent) when no period is selected", async () => {
@@ -484,12 +480,11 @@ describe("TimelineStrip", () => {
 
       render(<TimelineStrip {...defaultProps} selectedPeriod={null} />);
 
-      const listbox = screen.getByRole("listbox");
-      await user.click(listbox);
+      await user.tab(); // Tab to focus the container (keyboard users get focus ring)
 
-      // The last bar should be focused
-      const lastBar = screen.getAllByTestId("timeline-bar")[2];
-      expect(lastBar).toHaveClass("ring-2");
+      // The last circle should be focused
+      const lastCircle = screen.getAllByTestId("timeline-circle")[2];
+      expect(lastCircle).toHaveClass("ring-2");
     });
 
     it("does not reset focus if already focused", async () => {
@@ -504,9 +499,9 @@ describe("TimelineStrip", () => {
       // Trigger another focus event - should NOT reset
       listbox.dispatchEvent(new FocusEvent("focus", { bubbles: true }));
 
-      // First bar should still be focused (not reset to last)
-      const firstBar = screen.getAllByTestId("timeline-bar")[0];
-      expect(firstBar).toHaveClass("ring-2");
+      // First circle should still be focused (not reset to last)
+      const firstCircle = screen.getAllByTestId("timeline-circle")[0];
+      expect(firstCircle).toHaveClass("ring-2");
     });
   });
 });

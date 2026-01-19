@@ -66,15 +66,15 @@ describe("TimelineBar", () => {
 
   describe("Bar Height Calculation", () => {
     it("calculates bar height proportionally to count/maxCount", () => {
-      // count=10, maxCount=20 means 50% of max height (60px) = 30px
+      // count=10, maxCount=20 means 50% of max height (48px) = 24px
       render(<TimelineBar {...defaultProps} count={10} maxCount={20} />);
 
       const bar = screen.getByTestId("timeline-bar");
-      expect(bar).toHaveStyle({ height: "30px" });
+      expect(bar).toHaveStyle({ height: "24px" });
     });
 
     it("enforces minimum height of 4px", () => {
-      // count=1, maxCount=1000 would give 0.06px, but min is 4px
+      // count=1, maxCount=1000 would give 0.05px, but min is 4px
       render(<TimelineBar {...defaultProps} count={1} maxCount={1000} />);
 
       const bar = screen.getByTestId("timeline-bar");
@@ -82,11 +82,11 @@ describe("TimelineBar", () => {
     });
 
     it("calculates full height at maxCount", () => {
-      // count=20, maxCount=20 means 100% of max height = 60px
+      // count=20, maxCount=20 means 100% of max height (48px) = 48px
       render(<TimelineBar {...defaultProps} count={20} maxCount={20} />);
 
       const bar = screen.getByTestId("timeline-bar");
-      expect(bar).toHaveStyle({ height: "60px" });
+      expect(bar).toHaveStyle({ height: "48px" });
     });
 
     it("handles maxCount of 0 gracefully", () => {
@@ -197,47 +197,48 @@ describe("TimelineBar", () => {
   });
 
   describe("Selected State Styling", () => {
-    it("applies selected styling when isSelected is true", () => {
-      render(<TimelineBar {...defaultProps} isSelected={true} />);
+    it("applies accent color to bar when not selected", () => {
+      render(<TimelineBar {...defaultProps} isSelected={false} />);
 
       const bar = screen.getByTestId("timeline-bar");
       expect(bar.style.backgroundColor).toBe("var(--accent-primary)");
     });
 
-    it("applies non-selected styling when isSelected is false", () => {
-      render(<TimelineBar {...defaultProps} isSelected={false} />);
-
-      const bar = screen.getByTestId("timeline-bar");
-      expect(bar.style.backgroundColor).toBe("var(--accent-secondary)");
-    });
-
-    it("renders selection indicator when selected", () => {
+    it("applies success color to bar when selected", () => {
       render(<TimelineBar {...defaultProps} isSelected={true} />);
 
-      const indicator = screen.getByTestId("selection-indicator");
-      expect(indicator).toBeInTheDocument();
+      const bar = screen.getByTestId("timeline-bar");
+      expect(bar.style.backgroundColor).toBe("var(--status-success)");
     });
 
-    it("does not render selection indicator when not selected", () => {
+    it("fills circle with success color when selected", () => {
+      render(<TimelineBar {...defaultProps} isSelected={true} />);
+
+      const circle = screen.getByTestId("timeline-circle");
+      expect(circle.style.backgroundColor).toBe("var(--status-success)");
+    });
+
+    it("does not fill circle when not selected", () => {
       render(<TimelineBar {...defaultProps} isSelected={false} />);
 
-      expect(screen.queryByTestId("selection-indicator")).not.toBeInTheDocument();
+      const circle = screen.getByTestId("timeline-circle");
+      expect(circle.style.backgroundColor).toBe("var(--bg-primary)");
     });
   });
 
   describe("Focused State Styling", () => {
-    it("applies focus ring when isFocused is true", () => {
+    it("applies focus ring to circle when isFocused is true", () => {
       render(<TimelineBar {...defaultProps} isFocused={true} />);
 
-      const bar = screen.getByTestId("timeline-bar");
-      expect(bar).toHaveClass("ring-2");
+      const circle = screen.getByTestId("timeline-circle");
+      expect(circle).toHaveClass("ring-2");
     });
 
-    it("does not apply focus ring when isFocused is false", () => {
+    it("does not apply focus ring to circle when isFocused is false", () => {
       render(<TimelineBar {...defaultProps} isFocused={false} />);
 
-      const bar = screen.getByTestId("timeline-bar");
-      expect(bar).not.toHaveClass("ring-2");
+      const circle = screen.getByTestId("timeline-circle");
+      expect(circle).not.toHaveClass("ring-2");
     });
   });
 

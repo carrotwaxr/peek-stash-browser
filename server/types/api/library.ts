@@ -417,6 +417,10 @@ export interface PeekImageFilter {
   tags?: { value: string[]; modifier?: string; depth?: number };
   studios?: { value: string[]; modifier?: string; depth?: number };
   galleries?: { value: string[]; modifier?: string };
+  // Date filters
+  date?: { value?: string; value2?: string; modifier?: string };
+  created_at?: { value?: string; value2?: string; modifier?: string };
+  updated_at?: { value?: string; value2?: string; modifier?: string };
 }
 
 /**

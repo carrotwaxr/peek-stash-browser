@@ -59,12 +59,12 @@ const SHORT_LABELS = {
   },
 };
 
-// Bar width per zoom level (wider = fewer visible, less cramped)
-const BAR_WIDTHS = {
+// Point spacing per zoom level
+const POINT_SPACING = {
   years: 48,
-  months: 56,
-  weeks: 48,
-  days: 40,
+  months: 44,
+  weeks: 40,
+  days: 36,
 };
 
 // Full labels for accessibility (aria-label)
@@ -109,6 +109,7 @@ function TimelineStrip({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [scrollState, setScrollState] = useState({ atStart: true, atEnd: true });
   const [edgeLabels, setEdgeLabels] = useState({ left: "", right: "" });
+  const isMouseDownRef = useRef(false); // Track if focus came from mouse click
 
   const getShortLabel = useCallback(
     (period) => {
@@ -126,10 +127,34 @@ function TimelineStrip({
     [zoomLevel]
   );
 
-  // Get bar width for current zoom level
-  const barWidth = BAR_WIDTHS[zoomLevel] || BAR_WIDTHS.months;
+  // Get point spacing for current zoom level
+  const pointSpacing = POINT_SPACING[zoomLevel] || POINT_SPACING.months;
 
-  // Compute context markers (where year/month changes)
+  // Determine which labels to show (every other, unless selected or years zoom)
+  const shouldShowLabel = useCallback(
+    (index) => {
+      // Years zoom: show all labels
+      if (zoomLevel === "years") return true;
+
+      // Find selected index
+      const selectedIndex = selectedPeriod
+        ? distribution.findIndex((d) => d.period === selectedPeriod.period)
+        : -1;
+
+      // Always show selected
+      if (index === selectedIndex) return true;
+
+      // Determine parity based on selection
+      // If selected is at odd index, show odd indices; otherwise show even
+      const showOdd = selectedIndex >= 0 && selectedIndex % 2 === 1;
+      const indexIsOdd = index % 2 === 1;
+
+      return showOdd ? indexIsOdd : !indexIsOdd;
+    },
+    [zoomLevel, selectedPeriod, distribution]
+  );
+
+  // Compute context markers (where year/month changes) with range info for sticky
   const contextMarkers = useMemo(() => {
     if (zoomLevel === "years") return []; // Years don't need markers
 
@@ -143,7 +168,7 @@ function TimelineStrip({
       if (zoomLevel === "months" || zoomLevel === "weeks") {
         // Show year marker when year changes
         if (ctx.year && ctx.year !== lastYear) {
-          markers.push({ index, type: "year", label: ctx.year });
+          markers.push({ index, type: "year", label: ctx.year, context: ctx.year });
           lastYear = ctx.year;
         }
       } else if (zoomLevel === "days") {
@@ -155,7 +180,7 @@ function TimelineStrip({
             try {
               const date = parse(`${ctx.year}-${ctx.month}-01`, "yyyy-MM-dd", new Date());
               if (!isNaN(date.getTime())) {
-                markers.push({ index, type: "month", label: format(date, "MMM yyyy") });
+                markers.push({ index, type: "month", label: format(date, "MMM yyyy"), context: monthKey });
               }
             } catch {
               // Skip invalid dates
@@ -166,6 +191,11 @@ function TimelineStrip({
         }
       }
     });
+
+    // Calculate end indices for each marker (where the next context starts)
+    for (let i = 0; i < markers.length; i++) {
+      markers[i].endIndex = i < markers.length - 1 ? markers[i + 1].index - 1 : distribution.length - 1;
+    }
 
     return markers;
   }, [distribution, zoomLevel]);
@@ -212,12 +242,6 @@ function TimelineStrip({
     [distribution, focusedIndex, onSelectPeriod, onKeyboardNavigate]
   );
 
-  // Check if an index has a context marker
-  const getMarkerAt = useCallback(
-    (index) => contextMarkers.find((m) => m.index === index),
-    [contextMarkers]
-  );
-
   // Scroll focused bar into view
   useEffect(() => {
     if (focusedIndex >= 0 && containerRef.current) {
@@ -243,7 +267,7 @@ function TimelineStrip({
     hasScrolledRef.current = true;
   }, [distribution.length]);
 
-  // Track visible range, edge state, and report to parent
+  // Track visible range, edge state, sticky context, and report to parent
   useEffect(() => {
     if (distribution.length === 0) return;
 
@@ -261,14 +285,14 @@ function TimelineStrip({
       const atEnd = scrollLeft + viewportWidth >= scrollWidth - 1;
       setScrollState({ atStart, atEnd });
 
-      // Calculate which bars are visible
+      // Calculate which points are visible
       const firstVisibleIndex = Math.max(
         0,
-        Math.floor((scrollLeft - padding) / (barWidth + 4))
+        Math.floor((scrollLeft - padding) / pointSpacing)
       );
       const lastVisibleIndex = Math.min(
         distribution.length - 1,
-        Math.floor((scrollLeft + viewportWidth - padding) / (barWidth + 4))
+        Math.floor((scrollLeft + viewportWidth - padding) / pointSpacing)
       );
 
       // Calculate edge labels (what's beyond the viewport)
@@ -306,7 +330,7 @@ function TimelineStrip({
       container.removeEventListener("scroll", calculateVisibleRange);
       resizeObserver.disconnect();
     };
-  }, [distribution, barWidth, onVisibleRangeChange, getFullLabel]);
+  }, [distribution, pointSpacing, contextMarkers, onVisibleRangeChange, getFullLabel]);
 
   // Scroll handlers for edge navigation
   const scrollLeft = useCallback(() => {
@@ -321,17 +345,23 @@ function TimelineStrip({
     container.scrollBy({ left: container.clientWidth * 0.8, behavior: "smooth" });
   }, []);
 
-  // Convert vertical mousewheel to horizontal scroll
-  const handleWheel = useCallback((e) => {
+  // Convert vertical mousewheel to horizontal scroll (native listener for passive: false)
+  useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // Only intercept if there's vertical scroll (deltaY) and container can scroll horizontally
-    if (e.deltaY !== 0 && container.scrollWidth > container.clientWidth) {
-      e.preventDefault();
-      container.scrollBy({ left: e.deltaY, behavior: "auto" });
-    }
-  }, []);
+    const handleWheel = (e) => {
+      // Only intercept if there's vertical scroll (deltaY) and container can scroll horizontally
+      if (e.deltaY !== 0 && container.scrollWidth > container.clientWidth) {
+        e.preventDefault();
+        e.stopPropagation();
+        container.scrollBy({ left: e.deltaY, behavior: "auto" });
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [distribution.length]);
 
   if (distribution.length === 0) {
     return (
@@ -343,6 +373,9 @@ function TimelineStrip({
       </div>
     );
   }
+
+  // Calculate total width for the timeline line
+  const totalWidth = distribution.length * pointSpacing;
 
   return (
     <div className={`relative ${className}`}>
@@ -360,16 +393,24 @@ function TimelineStrip({
         onClick={scrollRight}
       />
 
+
       {/* Scrollable timeline container */}
       <div
         ref={containerRef}
-        className="relative flex items-end gap-1 overflow-x-auto pb-10 pt-2 px-4 min-h-[120px]"
+        className="relative overflow-x-auto pt-8 pb-4 px-4"
         role="listbox"
         aria-label="Timeline"
         tabIndex={0}
         onKeyDown={handleKeyDown}
-        onWheel={handleWheel}
+        onMouseDown={() => {
+          isMouseDownRef.current = true;
+        }}
         onFocus={() => {
+          // Only set focus for keyboard navigation (tab), not mouse clicks
+          if (isMouseDownRef.current) {
+            isMouseDownRef.current = false;
+            return;
+          }
           if (focusedIndex === -1 && distribution.length > 0) {
             // Focus on selected period or last (most recent)
             const selectedIndex = distribution.findIndex(
@@ -380,79 +421,103 @@ function TimelineStrip({
             );
           }
         }}
+        onBlur={() => {
+          // Clear focus ring when container loses focus (mouse users don't need it)
+          setFocusedIndex(-1);
+        }}
       >
-        {/* Baseline */}
+        {/* Inner container with fixed width for proper scrolling */}
         <div
-          className="absolute bottom-10 left-4 right-4 h-px"
-          style={{ backgroundColor: "var(--border-primary)" }}
-        />
-
-      {distribution.map((item, index) => {
-        const marker = getMarkerAt(index);
-        const isSelected = selectedPeriod?.period === item.period;
-
-        return (
-          <div
-            key={item.period}
-            className="relative flex flex-col items-center"
-            style={{ minWidth: `${barWidth}px` }}
-          >
-            {/* Context marker (year/month indicator) */}
-            {marker && (
+          className="relative"
+          style={{ width: `${totalWidth}px`, minHeight: "100px" }}
+        >
+          {/* Context markers row (above labels) */}
+          <div className="absolute top-0 left-0 right-0 h-5">
+            {contextMarkers.map((marker) => (
               <div
-                className="absolute -bottom-9 left-0 flex flex-col items-start"
+                key={`${marker.type}-${marker.index}`}
+                className="absolute text-xs font-medium whitespace-nowrap"
+                style={{
+                  left: `${marker.index * pointSpacing + pointSpacing / 2}px`,
+                  color: "var(--text-muted)",
+                }}
                 data-testid="context-marker"
               >
-                {/* Vertical tick mark */}
-                <div
-                  className="absolute -top-4 left-1/2 w-px h-3"
-                  style={{ backgroundColor: "var(--border-secondary)" }}
-                />
-                {/* Context label */}
-                <span
-                  className="text-[10px] font-medium whitespace-nowrap"
-                  style={{ color: "var(--text-tertiary)" }}
-                >
-                  {marker.label}
-                </span>
+                {marker.label}
               </div>
-            )}
-
-            <TimelineBar
-              period={item.period}
-              count={item.count}
-              maxCount={maxCount}
-              isSelected={isSelected}
-              isFocused={focusedIndex === index}
-              onClick={onSelectPeriod}
-              label={getFullLabel(item.period)}
-              tabIndex={-1}
-            />
-
-            {/* Period label - slanted 45°, text starts centered under bar */}
-            <div
-              className="absolute -bottom-6"
-              style={{
-                left: "calc(50% + 4px)",
-                transform: "rotate(45deg)",
-                transformOrigin: "top left",
-              }}
-            >
-              <span
-                className="text-xs whitespace-nowrap"
-                style={{
-                  color: isSelected
-                    ? "var(--accent-primary)"
-                    : "var(--text-secondary)",
-                  fontWeight: isSelected ? 500 : 400,
-                }}
-              >
-                {getShortLabel(item.period)}
-              </span>
-            </div>
+            ))}
           </div>
-        );
-      })}
+
+          {/* Period labels row (above the line) */}
+          <div className="absolute left-0 right-0 h-4" style={{ top: "22px" }}>
+            {distribution.map((item, index) => {
+              const isSelected = selectedPeriod?.period === item.period;
+              const showLabel = shouldShowLabel(index);
+
+              return (
+                <div
+                  key={`label-${item.period}`}
+                  className="absolute text-xs whitespace-nowrap"
+                  style={{
+                    left: `${index * pointSpacing + pointSpacing / 2}px`,
+                    transform: "translateX(-50%)",
+                    color: "var(--text-primary)",
+                    fontWeight: isSelected ? 600 : 400,
+                    opacity: showLabel ? 1 : 0,
+                    transition: "opacity 150ms ease-in-out",
+                  }}
+                >
+                  {getShortLabel(item.period)}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Timeline line (continuous, from first to last point) */}
+          <div
+            className="absolute"
+            style={{
+              top: "46px",
+              left: `${pointSpacing / 2}px`,
+              width: `${(distribution.length - 1) * pointSpacing}px`,
+              height: "2px",
+              backgroundColor: "var(--bg-tertiary)",
+            }}
+            data-testid="timeline-line"
+          />
+
+          {/* Timeline points and bars */}
+          <div className="absolute top-10 left-0 right-0">
+            {distribution.map((item, index) => {
+              const isSelected = selectedPeriod?.period === item.period;
+
+              return (
+                <div
+                  key={item.period}
+                  className="absolute flex flex-col items-center"
+                  style={{
+                    left: `${index * pointSpacing + pointSpacing / 2}px`,
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  <TimelineBar
+                    period={item.period}
+                    count={item.count}
+                    maxCount={maxCount}
+                    isSelected={isSelected}
+                    isFocused={focusedIndex === index}
+                    onClick={(period) => {
+                      setFocusedIndex(index);
+                      onSelectPeriod(period);
+                    }}
+                    label={getFullLabel(item.period)}
+                    tabIndex={-1}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

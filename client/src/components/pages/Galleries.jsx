@@ -156,41 +156,7 @@ const Galleries = () => {
           {...searchControlsProps}
         >
           {({ viewMode, gridDensity, zoomLevel, sortField, sortDirection, onSort }) =>
-            isLoading ? (
-              viewMode === "table" ? (
-                <TableView
-                  items={[]}
-                  columns={visibleColumns}
-                  sort={{ field: sortField, direction: sortDirection }}
-                  onSort={onSort}
-                  onHideColumn={hideColumn}
-                  entityType="gallery"
-                  isLoading={true}
-                  columnsPopover={
-                    <ColumnConfigPopover
-                      allColumns={allColumns}
-                      visibleColumnIds={visibleColumnIds}
-                      columnOrder={columnOrder}
-                      onToggleColumn={toggleColumn}
-                      onMoveColumn={moveColumn}
-                    />
-                  }
-                />
-              ) : (
-                <div className={getGridClasses("standard", gridDensity)}>
-                  {[...Array(24)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="rounded-lg animate-pulse"
-                      style={{
-                        backgroundColor: "var(--bg-tertiary)",
-                        height: "20rem",
-                      }}
-                    />
-                  ))}
-                </div>
-              )
-            ) : viewMode === "table" ? (
+            viewMode === "table" ? (
               <TableView
                 items={currentGalleries}
                 columns={visibleColumns}
@@ -198,7 +164,7 @@ const Galleries = () => {
                 onSort={onSort}
                 onHideColumn={hideColumn}
                 entityType="gallery"
-                isLoading={false}
+                isLoading={isLoading}
                 columnsPopover={
                   <ColumnConfigPopover
                     allColumns={allColumns}
@@ -238,6 +204,19 @@ const Galleries = () => {
                 emptyMessage="No galleries found for this time period"
                 gridDensity={gridDensity}
               />
+            ) : isLoading ? (
+              <div className={getGridClasses("standard", gridDensity)}>
+                {[...Array(24)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg animate-pulse"
+                    style={{
+                      backgroundColor: "var(--bg-tertiary)",
+                      height: "20rem",
+                    }}
+                  />
+                ))}
+              </div>
             ) : (
               <div ref={gridRef} className={getGridClasses("standard", gridDensity)}>
                 {currentGalleries.map((gallery, index) => {

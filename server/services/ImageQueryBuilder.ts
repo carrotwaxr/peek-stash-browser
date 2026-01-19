@@ -37,6 +37,10 @@ export interface ImageFilter {
   studios?: { value: string[]; modifier?: string; depth?: number };
   galleries?: { value: string[]; modifier?: string };
   q?: string; // Search query
+  // Date filters
+  date?: { value?: string; value2?: string; modifier?: string };
+  created_at?: { value?: string; value2?: string; modifier?: string };
+  updated_at?: { value?: string; value2?: string; modifier?: string };
 }
 
 // Query result
@@ -338,6 +342,60 @@ class ImageQueryBuilder {
     }
   }
 
+  // Build date filter clause
+  private buildDateFilter(
+    filter: { value?: string; value2?: string; modifier?: string } | undefined,
+    column: string
+  ): FilterClause {
+    if (!filter) {
+      return { sql: "", params: [] };
+    }
+
+    const { value, value2, modifier = "GREATER_THAN" } = filter;
+
+    // IS_NULL and NOT_NULL don't require a value
+    if (modifier === "IS_NULL") {
+      return { sql: `${column} IS NULL`, params: [] };
+    }
+    if (modifier === "NOT_NULL") {
+      return { sql: `${column} IS NOT NULL`, params: [] };
+    }
+
+    // All other modifiers require a value
+    if (!value) {
+      return { sql: "", params: [] };
+    }
+
+    switch (modifier) {
+      case "EQUALS":
+        return { sql: `date(${column}) = date(?)`, params: [value] };
+      case "NOT_EQUALS":
+        return {
+          sql: `(${column} IS NULL OR date(${column}) != date(?))`,
+          params: [value],
+        };
+      case "GREATER_THAN":
+        return { sql: `${column} > ?`, params: [value] };
+      case "LESS_THAN":
+        return { sql: `${column} < ?`, params: [value] };
+      case "BETWEEN":
+        if (value2) {
+          return { sql: `${column} BETWEEN ? AND ?`, params: [value, value2] };
+        }
+        return { sql: `${column} >= ?`, params: [value] };
+      case "NOT_BETWEEN":
+        if (value2) {
+          return {
+            sql: `(${column} IS NULL OR ${column} < ? OR ${column} > ?)`,
+            params: [value, value2],
+          };
+        }
+        return { sql: `${column} < ?`, params: [value] };
+      default:
+        return { sql: "", params: [] };
+    }
+  }
+
   // Build sort clause
   private buildSortClause(
     sort: string,
@@ -504,6 +562,22 @@ class ImageQueryBuilder {
     if (filters?.ids) {
       const idFilter = this.buildIdFilter(filters.ids);
       if (idFilter.sql) whereClauses.push(idFilter);
+    }
+
+    // Add date filters
+    if (filters?.date) {
+      const dateFilter = this.buildDateFilter(filters.date, "i.date");
+      if (dateFilter.sql) whereClauses.push(dateFilter);
+    }
+
+    if (filters?.created_at) {
+      const createdAtFilter = this.buildDateFilter(filters.created_at, "i.stashCreatedAt");
+      if (createdAtFilter.sql) whereClauses.push(createdAtFilter);
+    }
+
+    if (filters?.updated_at) {
+      const updatedAtFilter = this.buildDateFilter(filters.updated_at, "i.stashUpdatedAt");
+      if (updatedAtFilter.sql) whereClauses.push(updatedAtFilter);
     }
 
     // Combine WHERE clauses
