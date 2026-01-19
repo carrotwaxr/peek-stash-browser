@@ -98,17 +98,17 @@ function TimelineView({
     return `${visibleRange.firstLabel} — ${visibleRange.lastLabel}`;
   }, [visibleRange]);
 
-  // Shared timeline header content for both layouts
-  const timelineHeaderContent = (
+  // Timeline header content - adapts layout for mobile vs desktop
+  const renderTimelineHeader = (forMobile = false) => (
     <>
       {/* Controls Row - Range on left, zoom controls on right */}
       <div
-        className="flex items-center justify-between px-4 py-2"
+        className={`flex items-center justify-between px-4 py-2 ${forMobile ? "px-3 py-1.5" : ""}`}
         style={{ backgroundColor: "var(--bg-secondary)" }}
       >
         {/* Left: Visible range and selection indicator */}
         <div
-          className="flex items-center gap-2 text-sm"
+          className={`flex items-center gap-2 ${forMobile ? "text-xs" : "text-sm"}`}
           style={{ color: "var(--text-secondary)" }}
         >
           {visibleRangeText && (
@@ -116,7 +116,7 @@ function TimelineView({
               {visibleRangeText}
             </span>
           )}
-          {!isMobile && selectedPeriod && (
+          {!forMobile && selectedPeriod && (
             <>
               <span style={{ color: "var(--text-tertiary)" }}>|</span>
               <span>
@@ -127,11 +127,12 @@ function TimelineView({
           )}
         </div>
 
-        {/* Right: Zoom controls */}
+        {/* Right: Zoom controls - dropdown on mobile, buttons on desktop */}
         <TimelineControls
           zoomLevel={zoomLevel}
           onZoomLevelChange={setZoomLevel}
           zoomLevels={ZOOM_LEVELS}
+          variant={forMobile ? "dropdown" : "buttons"}
         />
       </div>
 
@@ -155,13 +156,19 @@ function TimelineView({
           <LoadingSpinner className="text-accent-primary" />
         </div>
       ) : !selectedPeriod ? (
-        <div className="flex items-center justify-center h-32 text-text-secondary">
+        <div
+          className="flex items-center justify-center h-32"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {isMobile
             ? "Tap the timeline below to select a period"
             : "Select a time period on the timeline above"}
         </div>
       ) : items.length === 0 ? (
-        <div className="flex items-center justify-center h-32 text-text-secondary">
+        <div
+          className="flex items-center justify-center h-32"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {emptyMessage}
         </div>
       ) : (
@@ -184,7 +191,7 @@ function TimelineView({
           selectedPeriod={selectedPeriod}
           itemCount={items.length}
         >
-          {timelineHeaderContent}
+          {renderTimelineHeader(true)}
         </TimelineMobileSheet>
       </div>
     );
@@ -194,8 +201,14 @@ function TimelineView({
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Timeline Header - Fixed */}
-      <div className="flex-shrink-0 border-b border-border-primary bg-bg-primary sticky top-0 z-10">
-        {timelineHeaderContent}
+      <div
+        className="flex-shrink-0 sticky top-0 z-10"
+        style={{
+          backgroundColor: "var(--bg-primary)",
+          borderBottom: "1px solid var(--border-color)",
+        }}
+      >
+        {renderTimelineHeader(false)}
       </div>
       {resultsContent}
     </div>

@@ -12,8 +12,34 @@ function TimelineControls({
   zoomLevel,
   onZoomLevelChange,
   zoomLevels = ["years", "months", "weeks", "days"],
+  variant = "buttons", // "buttons" (desktop) or "dropdown" (mobile)
   className = "",
 }) {
+  // Dropdown variant for mobile - saves horizontal space
+  if (variant === "dropdown") {
+    return (
+      <select
+        value={zoomLevel}
+        onChange={(e) => onZoomLevelChange(e.target.value)}
+        className={`px-2 py-1.5 text-sm font-medium rounded-md focus:outline-none focus:ring-2 ${className}`}
+        style={{
+          backgroundColor: "var(--bg-secondary)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-color)",
+          "--tw-ring-color": "var(--accent-primary)",
+        }}
+        aria-label="Timeline zoom level"
+      >
+        {zoomLevels.map((level) => (
+          <option key={level} value={level}>
+            {ZOOM_LABELS[level] || level}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  // Button group variant for desktop
   return (
     <div
       className={`inline-flex rounded-md ${className}`}

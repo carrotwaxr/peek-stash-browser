@@ -43,8 +43,12 @@ function TimelineBar({
       {showTooltip && (
         <div
           className="absolute bottom-full mb-1 px-2 py-1 text-xs font-medium
-            bg-bg-primary text-text-primary rounded shadow-lg border border-border-primary
-            whitespace-nowrap z-20 pointer-events-none"
+            rounded shadow-lg whitespace-nowrap z-20 pointer-events-none"
+          style={{
+            backgroundColor: "var(--bg-primary)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border-color)",
+          }}
         >
           {count} {count === 1 ? "item" : "items"}
         </div>

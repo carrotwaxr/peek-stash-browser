@@ -108,7 +108,6 @@ function TimelineStrip({
   const containerRef = useRef(null);
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [scrollState, setScrollState] = useState({ atStart: true, atEnd: true });
-  const [edgeLabels, setEdgeLabels] = useState({ left: "", right: "" });
   const isMouseDownRef = useRef(false); // Track if focus came from mouse click
 
   const getShortLabel = useCallback(
@@ -295,16 +294,6 @@ function TimelineStrip({
         Math.floor((scrollLeft + viewportWidth - padding) / pointSpacing)
       );
 
-      // Calculate edge labels (what's beyond the viewport)
-      if (firstVisibleIndex > 0) {
-        const leftLabel = getFullLabel(distribution[0].period);
-        setEdgeLabels((prev) => ({ ...prev, left: leftLabel }));
-      }
-      if (lastVisibleIndex < distribution.length - 1) {
-        const rightLabel = getFullLabel(distribution[distribution.length - 1].period);
-        setEdgeLabels((prev) => ({ ...prev, right: rightLabel }));
-      }
-
       const firstPeriod = distribution[firstVisibleIndex]?.period;
       const lastPeriod = distribution[lastVisibleIndex]?.period;
 
@@ -330,20 +319,7 @@ function TimelineStrip({
       container.removeEventListener("scroll", calculateVisibleRange);
       resizeObserver.disconnect();
     };
-  }, [distribution, pointSpacing, contextMarkers, onVisibleRangeChange, getFullLabel]);
-
-  // Scroll handlers for edge navigation
-  const scrollLeft = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.scrollBy({ left: -container.clientWidth * 0.8, behavior: "smooth" });
-  }, []);
-
-  const scrollRight = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.scrollBy({ left: container.clientWidth * 0.8, behavior: "smooth" });
-  }, []);
+  }, [distribution, pointSpacing, onVisibleRangeChange, getFullLabel]);
 
   // Convert vertical mousewheel to horizontal scroll (native listener for passive: false)
   useEffect(() => {
@@ -379,19 +355,9 @@ function TimelineStrip({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Edge navigation overlays */}
-      <TimelineEdgeNav
-        side="left"
-        label={edgeLabels.left}
-        visible={!scrollState.atStart}
-        onClick={scrollLeft}
-      />
-      <TimelineEdgeNav
-        side="right"
-        label={edgeLabels.right}
-        visible={!scrollState.atEnd}
-        onClick={scrollRight}
-      />
+      {/* Edge fade overlays to indicate scrollable content */}
+      <TimelineEdgeNav side="left" visible={!scrollState.atStart} />
+      <TimelineEdgeNav side="right" visible={!scrollState.atEnd} />
 
 
       {/* Scrollable timeline container */}

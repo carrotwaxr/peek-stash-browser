@@ -7,7 +7,6 @@ import TimelineMobileSheet from "../../../src/components/timeline/TimelineMobile
 describe("TimelineMobileSheet", () => {
   const defaultProps = {
     isOpen: true,
-    onDismiss: vi.fn(),
     selectedPeriod: { period: "2024-03", label: "March 2024" },
     itemCount: 42,
     children: <div data-testid="timeline-content">Timeline Content</div>,
@@ -37,74 +36,30 @@ describe("TimelineMobileSheet", () => {
 
       expect(screen.getByTestId("drag-handle")).toBeInTheDocument();
     });
-  });
 
-  describe("Selected Period Display", () => {
-    it("shows selected period label", () => {
-      render(
-        <TimelineMobileSheet
-          {...defaultProps}
-          selectedPeriod={{ period: "2024-03", label: "March 2024" }}
-        />
-      );
+    it("is positioned fixed at the bottom", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
 
-      expect(screen.getByText("March 2024")).toBeInTheDocument();
+      const sheet = screen.getByTestId("timeline-mobile-sheet");
+      expect(sheet).toHaveClass("fixed", "bottom-0", "left-0", "right-0");
     });
 
-    it("shows different period labels correctly", () => {
-      render(
-        <TimelineMobileSheet
-          {...defaultProps}
-          selectedPeriod={{ period: "2023-12", label: "December 2023" }}
-        />
-      );
+    it("has correct z-index for overlay", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
 
-      expect(screen.getByText("December 2023")).toBeInTheDocument();
+      const sheet = screen.getByTestId("timeline-mobile-sheet");
+      expect(sheet).toHaveClass("z-50");
     });
 
-    it("handles null selectedPeriod gracefully", () => {
-      render(
-        <TimelineMobileSheet {...defaultProps} selectedPeriod={null} />
-      );
+    it("renders chevron icon", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
 
-      expect(screen.getByTestId("timeline-mobile-sheet")).toBeInTheDocument();
-    });
-  });
-
-  describe("Item Count Display", () => {
-    it("shows item count", () => {
-      render(<TimelineMobileSheet {...defaultProps} itemCount={42} />);
-
-      expect(screen.getByText(/42/)).toBeInTheDocument();
-    });
-
-    it("shows different item counts correctly", () => {
-      render(<TimelineMobileSheet {...defaultProps} itemCount={100} />);
-
-      expect(screen.getByText(/100/)).toBeInTheDocument();
-    });
-
-    it("handles zero item count", () => {
-      render(<TimelineMobileSheet {...defaultProps} itemCount={0} />);
-
-      expect(screen.getByText("0 items")).toBeInTheDocument();
-    });
-
-    it("uses singular 'item' for count of 1", () => {
-      render(<TimelineMobileSheet {...defaultProps} itemCount={1} />);
-
-      expect(screen.getByText("1 item")).toBeInTheDocument();
-    });
-
-    it("uses plural 'items' for count greater than 1", () => {
-      render(<TimelineMobileSheet {...defaultProps} itemCount={5} />);
-
-      expect(screen.getByText("5 items")).toBeInTheDocument();
+      expect(screen.getByTestId("chevron-icon")).toBeInTheDocument();
     });
   });
 
   describe("Children Content", () => {
-    it("renders children content", () => {
+    it("renders children content when expanded (default)", () => {
       render(
         <TimelineMobileSheet {...defaultProps}>
           <div data-testid="child-content">Child Content</div>
@@ -125,73 +80,91 @@ describe("TimelineMobileSheet", () => {
       expect(screen.getByTestId("child-1")).toBeInTheDocument();
       expect(screen.getByTestId("child-2")).toBeInTheDocument();
     });
-  });
 
-  describe("Expanded State Toggle", () => {
-    it("starts in minimized state by default", () => {
-      render(<TimelineMobileSheet {...defaultProps} />);
+    it("starts expanded by default", () => {
+      render(
+        <TimelineMobileSheet {...defaultProps}>
+          <div data-testid="timeline-controls">Controls</div>
+        </TimelineMobileSheet>
+      );
 
-      const sheet = screen.getByTestId("timeline-mobile-sheet");
-      // Minimized height is 48px
-      expect(sheet).toHaveStyle({ height: "48px" });
-    });
-
-    it("toggles to expanded state on click", async () => {
-      const user = userEvent.setup();
-      render(<TimelineMobileSheet {...defaultProps} />);
-
-      const header = screen.getByTestId("sheet-header");
-      await user.click(header);
-
-      const sheet = screen.getByTestId("timeline-mobile-sheet");
-      // Expanded height is 200px
-      expect(sheet).toHaveStyle({ height: "200px" });
-    });
-
-    it("toggles back to minimized state on second click", async () => {
-      const user = userEvent.setup();
-      render(<TimelineMobileSheet {...defaultProps} />);
-
-      const header = screen.getByTestId("sheet-header");
-
-      // First click - expand
-      await user.click(header);
-      expect(screen.getByTestId("timeline-mobile-sheet")).toHaveStyle({
-        height: "200px",
-      });
-
-      // Second click - minimize
-      await user.click(header);
-      expect(screen.getByTestId("timeline-mobile-sheet")).toHaveStyle({
-        height: "48px",
-      });
+      // Children should be immediately visible
+      expect(screen.getByTestId("timeline-controls")).toBeVisible();
     });
   });
 
-  describe("Chevron Icon", () => {
-    it("renders chevron icon", () => {
-      render(<TimelineMobileSheet {...defaultProps} />);
-
-      expect(screen.getByTestId("chevron-icon")).toBeInTheDocument();
-    });
-
-    it("chevron points up when minimized", () => {
-      render(<TimelineMobileSheet {...defaultProps} />);
-
-      const chevron = screen.getByTestId("chevron-icon");
-      // When minimized, chevron should not be rotated
-      expect(chevron).not.toHaveClass("rotate-180");
-    });
-
-    it("chevron rotates when expanded", async () => {
+  describe("Expand/Collapse Toggle", () => {
+    it("collapses when header is clicked", async () => {
       const user = userEvent.setup();
       render(<TimelineMobileSheet {...defaultProps} />);
 
       const header = screen.getByTestId("sheet-header");
       await user.click(header);
 
+      // After collapse, children should not be visible
+      expect(screen.queryByTestId("timeline-content")).not.toBeInTheDocument();
+    });
+
+    it("expands when header is clicked while collapsed", async () => {
+      const user = userEvent.setup();
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      const header = screen.getByTestId("sheet-header");
+      // First click - collapse
+      await user.click(header);
+      expect(screen.queryByTestId("timeline-content")).not.toBeInTheDocument();
+
+      // Second click - expand
+      await user.click(header);
+      expect(screen.getByTestId("timeline-content")).toBeInTheDocument();
+    });
+
+    it("shows selection info when minimized", async () => {
+      const user = userEvent.setup();
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      const header = screen.getByTestId("sheet-header");
+      await user.click(header); // Collapse
+
+      expect(screen.getByText("March 2024")).toBeInTheDocument();
+      expect(screen.getByText("42 items")).toBeInTheDocument();
+    });
+
+    it("hides selection info when expanded", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      // When expanded, selection info should not be visible
+      expect(screen.queryByText("March 2024")).not.toBeInTheDocument();
+      expect(screen.queryByText("42 items")).not.toBeInTheDocument();
+    });
+
+    it("uses singular 'item' for count of 1", async () => {
+      const user = userEvent.setup();
+      render(<TimelineMobileSheet {...defaultProps} itemCount={1} />);
+
+      const header = screen.getByTestId("sheet-header");
+      await user.click(header); // Collapse
+
+      expect(screen.getByText("1 item")).toBeInTheDocument();
+    });
+
+    it("chevron rotates when expanded", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
+
       const chevron = screen.getByTestId("chevron-icon");
+      // Expanded by default - chevron should point down (rotate-180)
       expect(chevron).toHaveClass("rotate-180");
+    });
+
+    it("chevron points up when collapsed", async () => {
+      const user = userEvent.setup();
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      const header = screen.getByTestId("sheet-header");
+      await user.click(header); // Collapse
+
+      const chevron = screen.getByTestId("chevron-icon");
+      expect(chevron).not.toHaveClass("rotate-180");
     });
   });
 
@@ -202,31 +175,61 @@ describe("TimelineMobileSheet", () => {
       expect(screen.getByRole("button")).toBeInTheDocument();
     });
 
-    it("has aria-expanded attribute", () => {
+    it("has aria-expanded attribute when expanded", () => {
       render(<TimelineMobileSheet {...defaultProps} />);
 
       const button = screen.getByRole("button");
-      expect(button).toHaveAttribute("aria-expanded", "false");
+      expect(button).toHaveAttribute("aria-expanded", "true");
     });
 
-    it("updates aria-expanded when expanded", async () => {
+    it("updates aria-expanded when collapsed", async () => {
       const user = userEvent.setup();
       render(<TimelineMobileSheet {...defaultProps} />);
 
       const button = screen.getByRole("button");
       await user.click(button);
 
-      expect(button).toHaveAttribute("aria-expanded", "true");
+      expect(button).toHaveAttribute("aria-expanded", "false");
     });
 
-    it("has appropriate aria-label", () => {
+    it("has appropriate aria-label when expanded", () => {
       render(<TimelineMobileSheet {...defaultProps} />);
 
       const button = screen.getByRole("button");
-      expect(button).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("timeline")
-      );
+      expect(button).toHaveAttribute("aria-label", "Minimize timeline");
+    });
+
+    it("has appropriate aria-label when collapsed", async () => {
+      const user = userEvent.setup();
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      const button = screen.getByRole("button");
+      await user.click(button);
+
+      expect(button).toHaveAttribute("aria-label", "Expand timeline");
+    });
+  });
+
+  describe("Styling", () => {
+    it("has style attribute with background color", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      const sheet = screen.getByTestId("timeline-mobile-sheet");
+      expect(sheet).toHaveAttribute("style", expect.stringContaining("background-color"));
+    });
+
+    it("has style attribute with border top", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      const sheet = screen.getByTestId("timeline-mobile-sheet");
+      expect(sheet).toHaveAttribute("style", expect.stringContaining("border-top"));
+    });
+
+    it("drag handle has correct styling", () => {
+      render(<TimelineMobileSheet {...defaultProps} />);
+
+      const dragHandle = screen.getByTestId("drag-handle");
+      expect(dragHandle).toHaveClass("w-10", "h-1", "rounded-full");
     });
   });
 });
