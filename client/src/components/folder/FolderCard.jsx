@@ -7,7 +7,7 @@ import { UNTAGGED_FOLDER_ID } from "../../utils/buildFolderTree.js";
  * Shows thumbnail, folder name, and item count.
  */
 const FolderCard = ({ folder, onClick, className = "" }) => {
-  const { name, thumbnail, totalCount, id } = folder;
+  const { name, thumbnail, id } = folder;
   const isUntagged = id === UNTAGGED_FOLDER_ID;
 
   return (
@@ -56,12 +56,6 @@ const FolderCard = ({ folder, onClick, className = "" }) => {
         >
           {name}
         </h3>
-        <p
-          className="text-sm text-left"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          {totalCount} {totalCount === 1 ? "item" : "items"}
-        </p>
       </div>
     </button>
   );
