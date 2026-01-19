@@ -1,95 +1,132 @@
 // client/src/components/timeline/TimelineMobileSheet.jsx
-import { memo, useState } from "react";
+import { memo, useState, useRef, useCallback } from "react";
 import { ChevronUp } from "lucide-react";
 
-const MINIMIZED_HEIGHT = 48; // Minimized state height in pixels
-const EXPANDED_HEIGHT = 200; // Expanded state height in pixels
+const MINIMIZED_HEIGHT = 48; // Just handle + selection info
+const SWIPE_THRESHOLD = 50; // Minimum swipe distance to trigger state change
 
 /**
- * Mobile-friendly bottom sheet wrapper for the timeline.
- * Can be minimized or expanded to show full timeline controls.
+ * Mobile-friendly bottom sheet for the timeline.
+ * Tap or swipe the drag handle to toggle between minimized and expanded states.
+ * When expanded, shows full timeline controls matching desktop layout.
  *
  * @param {Object} props
  * @param {boolean} props.isOpen - Whether the sheet is visible
- * @param {Function} props.onDismiss - Callback when sheet is dismissed
- * @param {Object} props.selectedPeriod - Selected period { period, label }
- * @param {number} props.itemCount - Number of items in the selected period
+ * @param {Object} props.selectedPeriod - Currently selected period { period, label }
+ * @param {number} props.itemCount - Number of items in selected period
  * @param {React.ReactNode} props.children - Timeline controls and strip content
  */
 function TimelineMobileSheet({
   isOpen,
-  onDismiss: _onDismiss, // eslint-disable-line no-unused-vars -- Reserved for future swipe-down dismiss
   selectedPeriod,
-  itemCount,
+  itemCount = 0,
   children,
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const touchStartY = useRef(null);
+  const touchStartTime = useRef(null);
+
+  const toggleExpanded = useCallback(() => setIsExpanded((prev) => !prev), []);
+  const itemText = itemCount === 1 ? "item" : "items";
+
+  // Touch handlers for swipe gestures
+  const handleTouchStart = useCallback((e) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+  }, []);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (touchStartY.current === null) return;
+
+    const touchEndY = e.changedTouches[0].clientY;
+    const deltaY = touchEndY - touchStartY.current;
+    const deltaTime = Date.now() - touchStartTime.current;
+
+    // Check if swipe was fast enough or long enough
+    const isValidSwipe = Math.abs(deltaY) > SWIPE_THRESHOLD ||
+      (Math.abs(deltaY) > 20 && deltaTime < 300);
+
+    if (isValidSwipe) {
+      if (deltaY > 0 && isExpanded) {
+        // Swipe down while expanded -> minimize
+        setIsExpanded(false);
+        e.preventDefault();
+      } else if (deltaY < 0 && !isExpanded) {
+        // Swipe up while minimized -> expand
+        setIsExpanded(true);
+        e.preventDefault();
+      }
+    }
+
+    touchStartY.current = null;
+    touchStartTime.current = null;
+  }, [isExpanded]);
 
   if (!isOpen) {
     return null;
   }
 
-  const toggleExpanded = () => {
-    setIsExpanded((prev) => !prev);
-  };
-
-  const height = isExpanded ? EXPANDED_HEIGHT : MINIMIZED_HEIGHT;
-  const itemText = itemCount === 1 ? "item" : "items";
-
   return (
     <div
       data-testid="timeline-mobile-sheet"
-      className="fixed bottom-0 left-0 right-0 bg-bg-primary border-t border-border-primary
-        shadow-lg transition-all duration-300 ease-out z-50"
-      style={{ height: `${height}px` }}
+      className="fixed bottom-0 left-0 right-0 shadow-lg z-50 transition-all duration-300 ease-out"
+      style={{
+        backgroundColor: "var(--bg-primary)",
+        borderTop: "1px solid var(--border-color)",
+        // Only set fixed height when minimized; expanded uses auto height
+        ...(isExpanded ? {} : { height: `${MINIMIZED_HEIGHT}px`, overflow: "hidden" }),
+      }}
     >
-      {/* Clickable header area */}
+      {/* Tappable/swipeable header with drag handle */}
       <button
         type="button"
         data-testid="sheet-header"
-        className="w-full flex items-center justify-between px-4 py-2 cursor-pointer
-          hover:bg-bg-secondary/50 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-2 cursor-pointer touch-none"
         onClick={toggleExpanded}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         aria-expanded={isExpanded}
-        aria-label="Toggle timeline panel"
+        aria-label={isExpanded ? "Minimize timeline" : "Expand timeline"}
       >
-        {/* Drag handle */}
-        <div className="flex-1 flex justify-center">
-          <div
-            data-testid="drag-handle"
-            className="w-10 h-1 rounded-full bg-border-secondary"
-          />
-        </div>
-
-        {/* Selected period and count info */}
+        {/* Left: Selection info when minimized */}
         <div className="flex items-center gap-2 text-sm">
-          {selectedPeriod && (
-            <span className="text-text-primary font-medium">
+          {!isExpanded && selectedPeriod && (
+            <span className="font-medium" style={{ color: "var(--text-primary)" }}>
               {selectedPeriod.label}
             </span>
           )}
-          <span className="text-text-secondary">
-            {itemCount} {itemText}
-          </span>
+          {!isExpanded && (
+            <span style={{ color: "var(--text-secondary)" }}>
+              {itemCount} {itemText}
+            </span>
+          )}
         </div>
 
-        {/* Chevron indicator */}
-        <div className="flex-1 flex justify-end">
+        {/* Center: Drag handle */}
+        <div className="flex-1 flex justify-center">
+          <div
+            data-testid="drag-handle"
+            className="w-10 h-1 rounded-full"
+            style={{ backgroundColor: "var(--border-color)" }}
+          />
+        </div>
+
+        {/* Right: Chevron indicator */}
+        <div className="flex items-center">
           <ChevronUp
             data-testid="chevron-icon"
-            className={`w-5 h-5 text-text-secondary transition-transform duration-300
-              ${isExpanded ? "rotate-180" : ""}`}
+            className={`w-5 h-5 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
+            style={{ color: "var(--text-secondary)" }}
           />
         </div>
       </button>
 
-      {/* Content area - visible when expanded */}
-      <div
-        className={`px-4 overflow-hidden transition-opacity duration-300
-          ${isExpanded ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-      >
-        {children}
-      </div>
+      {/* Timeline content - visible when expanded */}
+      {isExpanded && (
+        <div className="overflow-hidden pb-4">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
