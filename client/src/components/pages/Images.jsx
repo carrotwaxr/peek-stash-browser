@@ -22,6 +22,8 @@ import Lightbox from "../ui/Lightbox.jsx";
 import WallView from "../wall/WallView.jsx";
 import TimelineView from "../timeline/TimelineView.jsx";
 import { TableView, ColumnConfigPopover } from "../table/index.js";
+import { FolderView } from "../folder/index.js";
+import { useFolderViewTags } from "../../hooks/useFolderViewTags.js";
 
 // View modes available for images page
 const VIEW_MODES = [
@@ -29,6 +31,7 @@ const VIEW_MODES = [
   { id: "wall", label: "Wall view" },
   { id: "table", label: "Table view" },
   { id: "timeline", label: "Timeline view" },
+  { id: "folder", label: "Folder view" },
 ];
 
 const Images = () => {
@@ -51,8 +54,13 @@ const Images = () => {
     getColumnConfig,
   } = useTableColumns("image");
 
-  // Track current view mode for timeline date filter
+  // Track current view mode for timeline date filter and folder view
   const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Fetch tags for folder view (only when folder view is active)
+  const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
+    currentViewMode === "folder"
+  );
 
   // Track timeline date filter for filtering by selected period
   const [timelineDateFilter, setTimelineDateFilter] = useState(null);
@@ -278,6 +286,26 @@ const Images = () => {
                 loading={isLoading}
                 emptyMessage="No images found for this time period"
                 gridDensity={gridDensity}
+              />
+            ) : viewMode === "folder" ? (
+              <FolderView
+                items={currentImages}
+                tags={folderTags}
+                gridDensity={gridDensity}
+                loading={isLoading || tagsLoading}
+                emptyMessage="No images found"
+                renderItem={(image) => (
+                  <ImageCard
+                    key={image.id}
+                    image={image}
+                    onClick={() => handleImageClick(image)}
+                    fromPageTitle="Images"
+                    tabIndex={0}
+                    onOCounterChange={handleOCounterChange}
+                    onRatingChange={handleRatingChange}
+                    onFavoriteChange={handleFavoriteChange}
+                  />
+                )}
               />
             ) : isLoading ? (
               <div className={getGridClasses("standard", gridDensity)}>
