@@ -57,16 +57,21 @@ describe("TimelineStrip", () => {
     it("renders baseline element", () => {
       const { container } = render(<TimelineStrip {...defaultProps} />);
 
-      // The baseline is the horizontal line at the bottom of bars
-      const baseline = container.querySelector(".bg-border-primary");
+      // The baseline is the horizontal line at the bottom of bars (uses inline style now)
+      const baseline = container.querySelector(
+        'div[style*="background-color: var(--border-primary)"]'
+      );
       expect(baseline).toBeInTheDocument();
     });
 
     it("applies custom className", () => {
-      render(<TimelineStrip {...defaultProps} className="custom-class" />);
+      const { container } = render(
+        <TimelineStrip {...defaultProps} className="custom-class" />
+      );
 
-      const listbox = screen.getByRole("listbox");
-      expect(listbox).toHaveClass("custom-class");
+      // className is applied to the outer wrapper, which contains the listbox
+      const wrapper = container.firstChild;
+      expect(wrapper).toHaveClass("custom-class");
     });
 
     it("makes container focusable with tabIndex 0", () => {
@@ -92,7 +97,7 @@ describe("TimelineStrip", () => {
   });
 
   describe("Period Labels", () => {
-    it('formats labels for "years" zoom level', () => {
+    it('formats short labels for "years" zoom level', () => {
       const yearDistribution = [
         { period: "2022", count: 5 },
         { period: "2023", count: 10 },
@@ -112,15 +117,16 @@ describe("TimelineStrip", () => {
       expect(screen.getByText("2024")).toBeInTheDocument();
     });
 
-    it('formats labels for "months" zoom level', () => {
+    it('formats short labels for "months" zoom level (just month, no year)', () => {
       render(<TimelineStrip {...defaultProps} zoomLevel="months" />);
 
-      expect(screen.getByText("Jan 2024")).toBeInTheDocument();
-      expect(screen.getByText("Feb 2024")).toBeInTheDocument();
-      expect(screen.getByText("Mar 2024")).toBeInTheDocument();
+      // Short labels show just month abbreviation
+      expect(screen.getByText("Jan")).toBeInTheDocument();
+      expect(screen.getByText("Feb")).toBeInTheDocument();
+      expect(screen.getByText("Mar")).toBeInTheDocument();
     });
 
-    it('formats labels for "weeks" zoom level', () => {
+    it('formats short labels for "weeks" zoom level', () => {
       const weekDistribution = [
         { period: "2024-W01", count: 5 },
         { period: "2024-W02", count: 10 },
@@ -140,11 +146,11 @@ describe("TimelineStrip", () => {
       expect(screen.getByText("W12")).toBeInTheDocument();
     });
 
-    it('formats labels for "days" zoom level', () => {
+    it('formats short labels for "days" zoom level (just day number)', () => {
       const dayDistribution = [
         { period: "2024-01-15", count: 5 },
-        { period: "2024-03-01", count: 10 },
-        { period: "2024-12-25", count: 15 },
+        { period: "2024-01-16", count: 10 },
+        { period: "2024-01-17", count: 15 },
       ];
 
       render(
@@ -155,16 +161,83 @@ describe("TimelineStrip", () => {
         />
       );
 
-      expect(screen.getByText("Jan 15")).toBeInTheDocument();
-      expect(screen.getByText("Mar 1")).toBeInTheDocument();
-      expect(screen.getByText("Dec 25")).toBeInTheDocument();
+      // Short labels show just day number
+      expect(screen.getByText("15")).toBeInTheDocument();
+      expect(screen.getByText("16")).toBeInTheDocument();
+      expect(screen.getByText("17")).toBeInTheDocument();
     });
 
     it("falls back to months format for unknown zoom level", () => {
       render(<TimelineStrip {...defaultProps} zoomLevel="unknown" />);
 
-      // Should still render with months format
+      // Should still render with months short format
+      expect(screen.getByText("Jan")).toBeInTheDocument();
+    });
+  });
+
+  describe("Context Markers", () => {
+    it("shows year markers when year changes in months zoom level", () => {
+      const distribution = [
+        { period: "2023-11", count: 5 },
+        { period: "2023-12", count: 10 },
+        { period: "2024-01", count: 15 },
+        { period: "2024-02", count: 20 },
+      ];
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          distribution={distribution}
+          zoomLevel="months"
+        />
+      );
+
+      // Should show year markers at start of each year
+      const markers = screen.getAllByTestId("context-marker");
+      expect(markers).toHaveLength(2); // 2023 and 2024
+      expect(screen.getByText("2023")).toBeInTheDocument();
+      expect(screen.getByText("2024")).toBeInTheDocument();
+    });
+
+    it("shows month markers when month changes in days zoom level", () => {
+      const distribution = [
+        { period: "2024-01-30", count: 5 },
+        { period: "2024-01-31", count: 10 },
+        { period: "2024-02-01", count: 15 },
+        { period: "2024-02-02", count: 20 },
+      ];
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          distribution={distribution}
+          zoomLevel="days"
+        />
+      );
+
+      // Should show month markers
+      const markers = screen.getAllByTestId("context-marker");
+      expect(markers).toHaveLength(2); // Jan 2024 and Feb 2024
       expect(screen.getByText("Jan 2024")).toBeInTheDocument();
+      expect(screen.getByText("Feb 2024")).toBeInTheDocument();
+    });
+
+    it("does not show markers for years zoom level", () => {
+      const yearDistribution = [
+        { period: "2022", count: 5 },
+        { period: "2023", count: 10 },
+        { period: "2024", count: 15 },
+      ];
+
+      render(
+        <TimelineStrip
+          {...defaultProps}
+          distribution={yearDistribution}
+          zoomLevel="years"
+        />
+      );
+
+      expect(screen.queryByTestId("context-marker")).not.toBeInTheDocument();
     });
   });
 
@@ -205,12 +278,14 @@ describe("TimelineStrip", () => {
         />
       );
 
-      // Find the label with the selected styling
-      const selectedLabel = container.querySelector(
-        "span.text-accent-primary.font-medium"
+      // Find the span elements and check for selected styling via inline style
+      const labels = container.querySelectorAll("span.text-xs");
+      const selectedLabel = Array.from(labels).find(
+        (span) => span.style.color === "var(--accent-primary)"
       );
       expect(selectedLabel).toBeInTheDocument();
-      expect(selectedLabel).toHaveTextContent("Feb 2024");
+      // Short label is just "Feb" (no year)
+      expect(selectedLabel).toHaveTextContent("Feb");
     });
 
     it("does not highlight labels when no period is selected", () => {
@@ -218,10 +293,12 @@ describe("TimelineStrip", () => {
         <TimelineStrip {...defaultProps} selectedPeriod={null} />
       );
 
-      const highlightedLabel = container.querySelector(
-        "span.text-accent-primary.font-medium"
+      // All labels should have secondary text color when nothing is selected
+      const labels = container.querySelectorAll("span.text-xs");
+      const highlightedLabel = Array.from(labels).find(
+        (span) => span.style.color === "var(--accent-primary)"
       );
-      expect(highlightedLabel).not.toBeInTheDocument();
+      expect(highlightedLabel).toBeUndefined();
     });
   });
 

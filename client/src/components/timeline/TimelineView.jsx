@@ -1,5 +1,5 @@
 // client/src/components/timeline/TimelineView.jsx
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useState, useCallback } from "react";
 import TimelineControls from "./TimelineControls.jsx";
 import TimelineStrip from "./TimelineStrip.jsx";
 import TimelineMobileSheet from "./TimelineMobileSheet.jsx";
@@ -63,24 +63,60 @@ function TimelineView({
 
   const isLoading = loading || distributionLoading;
 
+  // Track visible range from timeline strip
+  const [visibleRange, setVisibleRange] = useState(null);
+
+  const handleVisibleRangeChange = useCallback((range) => {
+    setVisibleRange(range);
+  }, []);
+
+  // Format visible range for display
+  const visibleRangeText = useMemo(() => {
+    if (!visibleRange) return null;
+    if (visibleRange.firstLabel === visibleRange.lastLabel) {
+      return visibleRange.firstLabel;
+    }
+    return `${visibleRange.firstLabel} — ${visibleRange.lastLabel}`;
+  }, [visibleRange]);
+
   // Shared timeline header content for both layouts
   const timelineHeaderContent = (
     <>
-      {/* Controls Row */}
-      <div className="flex items-center justify-between px-4 py-2">
+      {/* Controls Row - Range on left, zoom controls on right */}
+      <div
+        className="flex items-center justify-between px-4 py-2"
+        style={{ backgroundColor: "var(--bg-secondary)" }}
+      >
+        {/* Left: Visible range indicator */}
+        <div className="flex items-center gap-3">
+          {visibleRangeText && (
+            <span
+              className="text-sm font-medium"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {visibleRangeText}
+            </span>
+          )}
+          {!isMobile && selectedPeriod && (
+            <span
+              className="text-sm px-2 py-0.5 rounded"
+              style={{
+                backgroundColor: "var(--accent-primary)",
+                color: "white",
+              }}
+            >
+              {selectedPeriod.label}
+              {items.length > 0 && ` (${items.length})`}
+            </span>
+          )}
+        </div>
+
+        {/* Right: Zoom controls */}
         <TimelineControls
           zoomLevel={zoomLevel}
           onZoomLevelChange={setZoomLevel}
           zoomLevels={ZOOM_LEVELS}
         />
-        {!isMobile && selectedPeriod && (
-          <div className="text-sm text-text-secondary">
-            <span className="font-medium text-text-primary">{selectedPeriod.label}</span>
-            {items.length > 0 && (
-              <span className="ml-2">({items.length} items)</span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Timeline Strip */}
@@ -90,6 +126,7 @@ function TimelineView({
         zoomLevel={zoomLevel}
         selectedPeriod={selectedPeriod}
         onSelectPeriod={selectPeriod}
+        onVisibleRangeChange={handleVisibleRangeChange}
       />
     </>
   );

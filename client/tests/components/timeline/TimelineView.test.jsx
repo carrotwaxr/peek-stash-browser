@@ -351,7 +351,8 @@ describe("TimelineView", () => {
 
       render(<TimelineView {...defaultProps} items={mockItems} />);
 
-      expect(screen.getByText("(2 items)")).toBeInTheDocument();
+      // New format shows "(2)" instead of "(2 items)" in the compact badge
+      expect(screen.getByText(/\(2\)/)).toBeInTheDocument();
     });
 
     it("does not show item count when items array is empty", () => {
