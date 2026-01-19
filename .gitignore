@@ -90,3 +90,6 @@ server/integration/.env.integration
 
 # Git worktrees
 .worktrees/
+
+# Local data directory (database backups, etc.)
+.peek-data/
