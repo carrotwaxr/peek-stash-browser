@@ -51,6 +51,22 @@ const Images = () => {
     getColumnConfig,
   } = useTableColumns("image");
 
+  // Track current view mode for timeline date filter
+  const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Track timeline date filter for filtering by selected period
+  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+
+  // Merge timeline date filter into permanent filters when in timeline view
+  const effectivePermanentFilters = useMemo(() => {
+    if (currentViewMode !== "timeline" || !timelineDateFilter) {
+      return {};
+    }
+    return {
+      date: timelineDateFilter,
+    };
+  }, [currentViewMode, timelineDateFilter]);
+
   // Extract URL pagination params early (needed for hooks)
   const urlPerPage = parseInt(searchParams.get("per_page")) || 24;
   const urlPage = parseInt(searchParams.get("page")) || 1;
@@ -188,11 +204,13 @@ const Images = () => {
           initialSort="created_at"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
+          permanentFilters={effectivePermanentFilters}
           totalPages={totalPages}
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
           viewModes={VIEW_MODES}
+          onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -287,6 +305,7 @@ const Images = () => {
                   />
                 )}
                 onItemClick={handleImageClick}
+                onDateFilterChange={setTimelineDateFilter}
                 loading={isLoading}
                 emptyMessage="No images found for this time period"
                 gridDensity={gridDensity}

@@ -543,4 +543,110 @@ describe("TimelineView", () => {
       expect(mockUseMediaQuery).toHaveBeenCalledWith("(max-width: 768px)");
     });
   });
+
+  describe("onDateFilterChange Callback", () => {
+    it("calls onDateFilterChange with date filter when selectedPeriod changes", () => {
+      const onDateFilterChange = vi.fn();
+
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      render(
+        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange} />
+      );
+
+      expect(onDateFilterChange).toHaveBeenCalledWith({
+        start: "2024-01-01",
+        end: "2024-01-31",
+      });
+    });
+
+    it("calls onDateFilterChange with null when selectedPeriod is cleared", () => {
+      const onDateFilterChange = vi.fn();
+
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: null,
+      });
+
+      render(
+        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange} />
+      );
+
+      expect(onDateFilterChange).toHaveBeenCalledWith(null);
+    });
+
+    it("does not crash when onDateFilterChange is not provided", () => {
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      // Should not throw
+      expect(() => render(<TimelineView {...defaultProps} />)).not.toThrow();
+    });
+
+    it("calls onDateFilterChange on each render when selectedPeriod changes", () => {
+      // This test verifies that when the component re-renders with a different
+      // selectedPeriod from the hook, the callback is called with the new values.
+      // We test this by rendering twice with different mock returns.
+
+      const onDateFilterChange1 = vi.fn();
+      const onDateFilterChange2 = vi.fn();
+
+      // First render with January
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-01",
+          start: "2024-01-01",
+          end: "2024-01-31",
+          label: "January 2024",
+        },
+      });
+
+      const { unmount } = render(
+        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange1} />
+      );
+
+      expect(onDateFilterChange1).toHaveBeenCalledWith({
+        start: "2024-01-01",
+        end: "2024-01-31",
+      });
+
+      unmount();
+
+      // Second render with February (simulates what happens when user clicks different bar)
+      mockUseTimelineState.mockReturnValue({
+        ...defaultHookReturn,
+        selectedPeriod: {
+          period: "2024-02",
+          start: "2024-02-01",
+          end: "2024-02-29",
+          label: "February 2024",
+        },
+      });
+
+      render(
+        <TimelineView {...defaultProps} onDateFilterChange={onDateFilterChange2} />
+      );
+
+      expect(onDateFilterChange2).toHaveBeenCalledWith({
+        start: "2024-02-01",
+        end: "2024-02-29",
+      });
+    });
+  });
 });

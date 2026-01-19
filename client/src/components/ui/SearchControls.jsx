@@ -344,6 +344,38 @@ const SearchControls = ({
     onQueryChange(query);
   }, [isInitialized, sortDirection, currentPage, perPage, searchText, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
 
+  // Track previous permanentFilters to detect changes
+  const prevPermanentFiltersRef = useRef(permanentFilters);
+
+  // Re-trigger query when permanentFilters change (e.g., timeline date filter)
+  useEffect(() => {
+    // Skip if not initialized or if this is the first render
+    if (!isInitialized || !hasTriggeredInitialQuery.current) return;
+
+    // Check if permanentFilters actually changed
+    const prev = prevPermanentFiltersRef.current;
+    const changed = JSON.stringify(prev) !== JSON.stringify(permanentFilters);
+
+    if (changed) {
+      prevPermanentFiltersRef.current = permanentFilters;
+
+      // Merge new permanent filters with current filters
+      const mergedFilters = { ...filters, ...permanentFilters };
+
+      const query = {
+        filter: {
+          direction: sortDirection,
+          page: 1, // Reset to first page when filters change
+          per_page: perPage,
+          q: searchText,
+          sort: getSortWithSeed(sortField),
+        },
+        ...buildFilter(artifactType, mergedFilters, unitPreference),
+      };
+      onQueryChange(query);
+    }
+  }, [isInitialized, permanentFilters, filters, sortDirection, perPage, searchText, sortField, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+
   // Clear all filters
   const handleClearFilters = useCallback(() => {
     clearFiltersAction(); // Hook handles URL sync and resets to page 1

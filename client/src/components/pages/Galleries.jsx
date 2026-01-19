@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getGridClasses } from "../../constants/grids.js";
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
@@ -51,6 +51,22 @@ const Galleries = () => {
   } = useTableColumns("gallery");
 
   const { data, isLoading, error, initMessage, execute } = useCancellableQuery();
+
+  // Track current view mode for timeline date filter
+  const [currentViewMode, setCurrentViewMode] = useState("grid");
+
+  // Track timeline date filter for filtering by selected period
+  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+
+  // Merge timeline date filter into permanent filters when in timeline view
+  const effectivePermanentFilters = useMemo(() => {
+    if (currentViewMode !== "timeline" || !timelineDateFilter) {
+      return {};
+    }
+    return {
+      date: timelineDateFilter,
+    };
+  }, [currentViewMode, timelineDateFilter]);
 
   const handleQueryChange = useCallback(
     (newQuery) => {
@@ -120,11 +136,13 @@ const Galleries = () => {
           initialSort="created_at"
           onQueryChange={handleQueryChange}
           onPerPageStateChange={setEffectivePerPage}
+          permanentFilters={effectivePermanentFilters}
           totalPages={totalPages}
           totalCount={totalCount}
           supportsWallView={true}
           wallPlayback={wallPlayback}
           viewModes={VIEW_MODES}
+          onViewModeChange={setCurrentViewMode}
           currentTableColumns={getColumnConfig()}
           tableColumnsPopover={
             <ColumnConfigPopover
@@ -215,6 +233,7 @@ const Galleries = () => {
                   />
                 )}
                 onItemClick={handleGalleryClick}
+                onDateFilterChange={setTimelineDateFilter}
                 loading={isLoading}
                 emptyMessage="No galleries found for this time period"
                 gridDensity={gridDensity}

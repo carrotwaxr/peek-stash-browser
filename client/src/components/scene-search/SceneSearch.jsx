@@ -82,6 +82,20 @@ const SceneSearch = ({
   // Track current view mode for context settings
   const [currentViewMode, setCurrentViewMode] = useState("grid");
 
+  // Track timeline date filter for filtering by selected period
+  const [timelineDateFilter, setTimelineDateFilter] = useState(null);
+
+  // Merge timeline date filter into permanent filters when in timeline view
+  const effectivePermanentFilters = useMemo(() => {
+    if (currentViewMode !== "timeline" || !timelineDateFilter) {
+      return permanentFilters;
+    }
+    return {
+      ...permanentFilters,
+      date: timelineDateFilter,
+    };
+  }, [permanentFilters, currentViewMode, timelineDateFilter]);
+
   // Context settings only shown in wall view
   const contextSettings = useMemo(() => {
     return currentViewMode === "wall" ? WALL_VIEW_SETTINGS : [];
@@ -182,7 +196,7 @@ const SceneSearch = ({
         initialSort={initialSort}
         onQueryChange={handleQueryChange}
         onPerPageStateChange={setEffectivePerPage}
-        permanentFilters={permanentFilters}
+        permanentFilters={effectivePermanentFilters}
         permanentFiltersMetadata={permanentFiltersMetadata}
         totalPages={totalPages}
         totalCount={totalCount}
@@ -250,6 +264,7 @@ const SceneSearch = ({
                 />
               )}
               onItemClick={handleSceneClick}
+              onDateFilterChange={setTimelineDateFilter}
               loading={isLoading}
               emptyMessage="No scenes found for this time period"
               gridDensity={gridDensity}

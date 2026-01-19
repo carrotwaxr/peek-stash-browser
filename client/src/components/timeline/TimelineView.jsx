@@ -1,5 +1,5 @@
 // client/src/components/timeline/TimelineView.jsx
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo } from "react";
 import TimelineControls from "./TimelineControls.jsx";
 import TimelineStrip from "./TimelineStrip.jsx";
 import TimelineMobileSheet from "./TimelineMobileSheet.jsx";
@@ -13,6 +13,7 @@ function TimelineView({
   items = [],
   renderItem,
   onItemClick,
+  onDateFilterChange,
   loading = false,
   emptyMessage = "No items found",
   gridDensity = "medium",
@@ -43,6 +44,20 @@ function TimelineView({
       },
     };
   }, [selectedPeriod]);
+
+  // Notify parent when selected period changes
+  useEffect(() => {
+    if (onDateFilterChange) {
+      if (selectedPeriod) {
+        onDateFilterChange({
+          start: selectedPeriod.start,
+          end: selectedPeriod.end,
+        });
+      } else {
+        onDateFilterChange(null);
+      }
+    }
+  }, [selectedPeriod, onDateFilterChange]);
 
   const gridClasses = getGridClasses("standard", gridDensity);
 
