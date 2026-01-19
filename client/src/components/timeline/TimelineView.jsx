@@ -87,27 +87,23 @@ function TimelineView({
         className="flex items-center justify-between px-4 py-2"
         style={{ backgroundColor: "var(--bg-secondary)" }}
       >
-        {/* Left: Visible range indicator */}
-        <div className="flex items-center gap-3">
+        {/* Left: Visible range and selection indicator */}
+        <div
+          className="flex items-center gap-2 text-sm"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {visibleRangeText && (
-            <span
-              className="text-sm font-medium"
-              style={{ color: "var(--text-primary)" }}
-            >
+            <span style={{ color: "var(--text-primary)" }}>
               {visibleRangeText}
             </span>
           )}
           {!isMobile && selectedPeriod && (
-            <span
-              className="text-sm px-2 py-0.5 rounded"
-              style={{
-                backgroundColor: "var(--accent-primary)",
-                color: "white",
-              }}
-            >
-              {selectedPeriod.label}
-              {items.length > 0 && ` (${items.length})`}
-            </span>
+            <>
+              <span style={{ color: "var(--text-tertiary)" }}>|</span>
+              <span>
+                Selected: {selectedPeriod.label}
+              </span>
+            </>
           )}
         </div>
 

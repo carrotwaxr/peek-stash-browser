@@ -330,10 +330,12 @@ describe("TimelineView", () => {
 
       render(<TimelineView {...defaultProps} />);
 
-      expect(screen.getByText("January 2024")).toBeInTheDocument();
+      // New format shows "Selected: January 2024"
+      expect(screen.getByText(/Selected:/)).toBeInTheDocument();
+      expect(screen.getByText(/January 2024/)).toBeInTheDocument();
     });
 
-    it("shows item count next to period label when items present", () => {
+    it("does not show item count in header (pagination controls handle counts)", () => {
       const mockItems = [
         { id: "1", title: "Scene 1" },
         { id: "2", title: "Scene 2" },
@@ -351,8 +353,9 @@ describe("TimelineView", () => {
 
       render(<TimelineView {...defaultProps} items={mockItems} />);
 
-      // New format shows "(2)" instead of "(2 items)" in the compact badge
-      expect(screen.getByText(/\(2\)/)).toBeInTheDocument();
+      // Item count is no longer shown in header - pagination controls show counts
+      expect(screen.getByText(/Selected:/)).toBeInTheDocument();
+      expect(screen.queryByText(/\(2\)/)).not.toBeInTheDocument();
     });
 
     it("does not show item count when items array is empty", () => {

@@ -310,6 +310,18 @@ function TimelineStrip({
     container.scrollBy({ left: container.clientWidth * 0.8, behavior: "smooth" });
   }, []);
 
+  // Convert vertical mousewheel to horizontal scroll
+  const handleWheel = useCallback((e) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Only intercept if there's vertical scroll (deltaY) and container can scroll horizontally
+    if (e.deltaY !== 0 && container.scrollWidth > container.clientWidth) {
+      e.preventDefault();
+      container.scrollBy({ left: e.deltaY, behavior: "auto" });
+    }
+  }, []);
+
   if (distribution.length === 0) {
     return (
       <div
@@ -345,6 +357,7 @@ function TimelineStrip({
         aria-label="Timeline"
         tabIndex={0}
         onKeyDown={handleKeyDown}
+        onWheel={handleWheel}
         onFocus={() => {
           if (focusedIndex === -1 && distribution.length > 0) {
             // Focus on selected period or last (most recent)
