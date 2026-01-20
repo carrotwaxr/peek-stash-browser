@@ -68,7 +68,7 @@ function parsePeriodToDateRange(period, zoomLevel) {
   }
 }
 
-export function useTimelineState({ entityType, autoSelectRecent = false, initialPeriod = null }) {
+export function useTimelineState({ entityType, autoSelectRecent = false, initialPeriod = null, filters = null }) {
   // Determine initial zoom level from initialPeriod format if provided
   const getInitialZoomLevel = () => {
     if (!initialPeriod) return "months";
@@ -92,6 +92,12 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Memoize filter key to prevent unnecessary refetches
+  const filterKey = useMemo(() => {
+    if (!filters) return null;
+    return JSON.stringify(filters);
+  }, [filters]);
+
   // Track whether we've done the initial load (for autoSelectRecent)
   const hasInitiallyLoaded = useRef(!!initialPeriod); // Skip auto-select if we have initialPeriod
 
@@ -114,8 +120,15 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
       setError(null);
 
       try {
+        // Build query params
+        const params = new URLSearchParams({ granularity: zoomLevel });
+        if (filters?.performerId) params.set("performerId", filters.performerId);
+        if (filters?.tagId) params.set("tagId", filters.tagId);
+        if (filters?.studioId) params.set("studioId", filters.studioId);
+        if (filters?.groupId) params.set("groupId", filters.groupId);
+
         const response = await apiGet(
-          `/timeline/${entityType}/distribution?granularity=${zoomLevel}`
+          `/timeline/${entityType}/distribution?${params.toString()}`
         );
 
         if (!cancelled) {
@@ -150,7 +163,7 @@ export function useTimelineState({ entityType, autoSelectRecent = false, initial
     return () => {
       cancelled = true;
     };
-  }, [entityType, zoomLevel, autoSelectRecent]);
+  }, [entityType, zoomLevel, autoSelectRecent, filterKey]);
 
   const selectPeriod = useCallback(
     (period) => {
