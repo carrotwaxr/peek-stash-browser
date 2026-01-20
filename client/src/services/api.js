@@ -753,6 +753,14 @@ export const removeGroupMember = (groupId, userId) =>
   apiDelete(`/groups/${groupId}/members/${userId}`);
 
 /**
+ * Get group memberships for a specific user (admin only)
+ * @param {number} userId - User ID
+ * @returns {Promise<{groups: Array}>}
+ */
+export const getUserGroupMemberships = (userId) =>
+  apiGet(`/user/${userId}/groups`);
+
+/**
  * User: Get my groups (for sharing UI)
  * @returns {Promise<{groups: Array}>}
  */

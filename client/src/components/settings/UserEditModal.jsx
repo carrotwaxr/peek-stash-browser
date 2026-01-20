@@ -1,7 +1,8 @@
-// eslint-disable-next-line no-unused-vars
+ 
 import { useState, useEffect } from "react";
 import { User, X, Shield, Users, Key, Trash2 } from "lucide-react";
 import { Button, Paper } from "../ui/index.js";
+import { getUserGroupMemberships, addGroupMember, removeGroupMember } from "../../services/api.js";
 
 /**
  * UserEditModalContent - Inner component that handles the modal content
@@ -28,6 +29,40 @@ const UserEditModalContent = ({
 
   // Track what has changed for save
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Load user's current group memberships
+  useEffect(() => {
+    const loadUserGroups = async () => {
+      try {
+        const response = await getUserGroupMemberships(user.id);
+        const memberGroupIds = (response.groups || []).map((g) => g.id);
+        setUserGroups(memberGroupIds);
+      } catch (err) {
+        console.error("Failed to load user groups:", err);
+      }
+    };
+
+    if (user?.id) {
+      loadUserGroups();
+    }
+  }, [user?.id]);
+
+  const handleGroupToggle = async (groupId, isCurrentlyMember) => {
+    try {
+      if (isCurrentlyMember) {
+        await removeGroupMember(groupId, user.id);
+        setUserGroups((prev) => prev.filter((id) => id !== groupId));
+        onMessage?.(`Removed ${user.username} from group`);
+      } else {
+        await addGroupMember(groupId, user.id);
+        setUserGroups((prev) => [...prev, groupId]);
+        onMessage?.(`Added ${user.username} to group`);
+      }
+      setHasChanges(true);
+    } catch (err) {
+      setError(err.message || "Failed to update group membership");
+    }
+  };
 
   const handleClose = () => {
     if (hasChanges) {
@@ -160,7 +195,7 @@ const UserEditModalContent = ({
               </div>
             </section>
 
-            {/* Section 2: Groups - placeholder */}
+            {/* Section 2: Groups */}
             <section>
               <h3
                 className="text-sm font-medium mb-3 flex items-center gap-2"
@@ -176,9 +211,48 @@ const UserEditModalContent = ({
                   border: "1px solid var(--border-color)",
                 }}
               >
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Groups section - to be implemented
-                </p>
+                {groups.length === 0 ? (
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    No groups available. Create a group first to assign users.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {groups.map((group) => {
+                      const isMember = userGroups.includes(group.id);
+                      return (
+                        <label
+                          key={group.id}
+                          className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-opacity-50"
+                          style={{ backgroundColor: isMember ? "rgba(59, 130, 246, 0.05)" : "transparent" }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isMember}
+                            onChange={() => handleGroupToggle(group.id, isMember)}
+                            className="w-4 h-4 rounded cursor-pointer"
+                            style={{ accentColor: "var(--primary-color)" }}
+                          />
+                          <div className="flex-1">
+                            <span
+                              className="text-sm font-medium"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              {group.name}
+                            </span>
+                            {group.description && (
+                              <p
+                                className="text-xs mt-0.5"
+                                style={{ color: "var(--text-muted)" }}
+                              >
+                                {group.description}
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </section>
 
