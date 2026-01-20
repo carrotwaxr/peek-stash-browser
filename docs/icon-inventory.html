@@ -885,33 +885,97 @@
 
   <!-- GENDER ICONS -->
   <h2>9. Gender Icons</h2>
-  <div class="section-note success">
-    Now centralized in <code>client/src/constants/appIcons.js</code> — GENDER_ICONS
+  <div class="section-note">
+    Used in <code>GenderIcon.jsx</code> — displayed on PerformerCard and PerformerDetail.
+    Custom SVG icons for transgender, intersex, and non-binary match Lucide's style.
   </div>
 
   <div class="grid">
     <div class="icon-card action">
-      <div class="icon" style="color: #60a5fa;"><i data-lucide="user"></i></div>
-      <div class="content">
-        <div class="label">Unknown / Non-binary</div>
-        <div class="icon-name">User</div>
-        <div class="usage">GenderIcon.jsx</div>
-      </div>
-    </div>
-    <div class="icon-card action">
-      <div class="icon" style="color: #60a5fa;"><i data-lucide="mars" class="icon"></i></div>
+      <div class="icon" style="color: #0561fa;"><i data-lucide="mars"></i></div>
       <div class="content">
         <div class="label">Male</div>
-        <div class="icon-name">Mars</div>
-        <div class="usage">GenderIcon.jsx</div>
+        <div class="icon-name">Mars (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
       </div>
     </div>
     <div class="icon-card action">
-      <div class="icon" style="color: #f472b6;"><i data-lucide="venus"></i></div>
+      <div class="icon" style="color: #ff0080;"><i data-lucide="venus"></i></div>
       <div class="content">
         <div class="label">Female</div>
-        <div class="icon-name">Venus</div>
-        <div class="usage">GenderIcon.jsx</div>
+        <div class="icon-name">Venus (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #5BCEFA;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="14" r="5" />
+          <path d="M12 9 L12 4 M12 4 L15 7 M12 4 L9 7" />
+          <path d="M12 19 L12 22" />
+          <path d="M7 14 L4 14" />
+        </svg>
+      </div>
+      <div class="content">
+        <div class="label">Transgender Male</div>
+        <div class="icon-name">TransgenderIcon (Custom SVG)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Light blue from trans pride flag (#5BCEFA)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #F5A9B8;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="14" r="5" />
+          <path d="M12 9 L12 4 M12 4 L15 7 M12 4 L9 7" />
+          <path d="M12 19 L12 22" />
+          <path d="M7 14 L4 14" />
+        </svg>
+      </div>
+      <div class="content">
+        <div class="label">Transgender Female</div>
+        <div class="icon-name">TransgenderIcon (Custom SVG)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Light pink from trans pride flag (#F5A9B8)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #FFD800;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="5" />
+        </svg>
+      </div>
+      <div class="content">
+        <div class="label">Intersex</div>
+        <div class="icon-name">IntersexIcon (Custom SVG)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Yellow from intersex pride flag (#FFD800)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #FFF430;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <path d="M15.5 8.5 L19 5 M19 5 L19 9 M19 5 L15 5" />
+          <path d="M8.5 15.5 L5 19 M5 19 L5 15 M5 19 L9 19" />
+          <path d="M12 7 L12 4" />
+          <path d="M12 17 L12 20" />
+        </svg>
+      </div>
+      <div class="content">
+        <div class="label">Non-Binary</div>
+        <div class="icon-name">NonBinaryIcon (Custom SVG)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Yellow from non-binary pride flag (#FFF430)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #6c757d;"><i data-lucide="user"></i></div>
+      <div class="content">
+        <div class="label">Unknown</div>
+        <div class="icon-name">User (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail (fallback)</div>
       </div>
     </div>
   </div>
