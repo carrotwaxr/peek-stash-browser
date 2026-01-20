@@ -142,10 +142,20 @@ export const findStudios = async (
       const allStudios = await stashEntityService.getAllStudios();
       const allHydrated = await hydrateStudioRelationships(allStudios);
       hydratedStudios = allHydrated.filter((s) => resultStudios.some((r) => r.id === s.id));
-      // Merge the computed counts back
+      // Merge the computed counts back (preserving hydrated parent_studio and child_studios)
       hydratedStudios = hydratedStudios.map((h) => {
         const result = resultStudios.find((r) => r.id === h.id);
-        return result ? { ...h, ...result } : h;
+        if (!result) return h;
+        return {
+          ...result,
+          ...h,
+          // Override counts from result (which has freshly computed values)
+          scene_count: result.scene_count,
+          image_count: result.image_count,
+          gallery_count: result.gallery_count,
+          performer_count: result.performer_count,
+          group_count: result.group_count,
+        };
       });
     } else {
       hydratedStudios = await hydrateStudioRelationships(resultStudios);
