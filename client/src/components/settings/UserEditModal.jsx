@@ -12,6 +12,7 @@ import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPerm
 const UserEditModalContent = ({
   user,
   groups = [],
+  currentUser,
   onClose,
   onSave,
   onMessage,
@@ -20,6 +21,9 @@ const UserEditModalContent = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Check if editing current user
+  const isCurrentUser = user?.id === currentUser?.id;
 
   // Form state
   const [role, setRole] = useState(user.role || "USER");
@@ -91,6 +95,29 @@ const UserEditModalContent = ({
       setHasChanges(true);
     } catch (err) {
       setError(err.message || "Failed to update permission");
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (isCurrentUser) {
+      setError("You cannot delete your own account");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete user "${user.username}"?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await api.delete(`/user/${user.id}`);
+      onMessage?.(`User "${user.username}" deleted`);
+      onClose();
+      onSave?.();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to delete user");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -230,7 +257,12 @@ const UserEditModalContent = ({
                     id="userRole"
                     value={role}
                     onChange={(e) => {
-                      setRole(e.target.value);
+                      if (isCurrentUser) {
+                        setError("You cannot change your own role");
+                        return;
+                      }
+                      const newRole = e.target.value;
+                      setRole(newRole);
                       setHasChanges(true);
                     }}
                     className="w-full px-3 py-2 rounded-lg text-sm"
@@ -466,7 +498,7 @@ const UserEditModalContent = ({
               </div>
             </section>
 
-            {/* Section 4: Account Actions - placeholder */}
+            {/* Section 4: Account Actions */}
             <section>
               <h3
                 className="text-sm font-medium mb-3 flex items-center gap-2"
@@ -482,15 +514,31 @@ const UserEditModalContent = ({
                   border: "1px solid var(--border-color)",
                 }}
               >
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" disabled>
-                    Reset Password
-                  </Button>
-                  <Button variant="destructive" size="sm" disabled>
-                    <Trash2 size={14} className="mr-1" />
-                    Delete User
-                  </Button>
-                </div>
+                {isCurrentUser ? (
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    You cannot modify your own account from this modal. Use the account settings page instead.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled
+                      title="Coming in future release"
+                    >
+                      Reset Password
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteUser}
+                      disabled={loading}
+                    >
+                      <Trash2 size={14} className="mr-1" />
+                      Delete User
+                    </Button>
+                  </div>
+                )}
               </div>
             </section>
           </div>
@@ -524,6 +572,7 @@ const UserEditModalContent = ({
  * @param {Object} props
  * @param {Object} props.user - User object to edit
  * @param {Array} props.groups - List of all groups
+ * @param {Object} props.currentUser - Currently logged in user (for self-edit prevention)
  * @param {Function} props.onClose - Callback when modal is closed
  * @param {Function} props.onSave - Callback when changes are saved
  * @param {Function} props.onMessage - Callback for success messages
