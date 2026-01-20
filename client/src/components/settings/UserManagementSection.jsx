@@ -686,6 +686,7 @@ const UserManagementSection = ({
         <UserEditModal
           user={editingUser}
           groups={groups}
+          currentUser={currentUser}
           onClose={() => setEditingUser(null)}
           onSave={() => {
             setEditingUser(null);
