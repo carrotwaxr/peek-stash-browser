@@ -57,7 +57,7 @@ const CARD_COUNT_INDICATOR_TYPES = {
   },
   STUDIOS: {
     icon: ENTITY_ICONS.studio,
-    iconColor: hueify("var(--accent-tertiary)", "lighter"),
+    iconColor: hueify("var(--status-info)", "lighter"),
     label: (count) => count === 1 ? "1 studio" : `${count} studios`,
   },
 };
