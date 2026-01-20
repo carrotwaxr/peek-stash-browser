@@ -35,6 +35,9 @@ const getDisplayName = (item) => {
  * All items use consistent row height - landscape images pillarboxed to match portrait height
  * @param {string} entityType - Type of entity for aspect ratio (performer, studio, tag, scene)
  */
+// Fixed height for 5 visible items (each row ~72px with padding)
+const LIST_HEIGHT = "360px";
+
 const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage = true }) => {
   if (!items || items.length === 0) {
     return null;
@@ -56,7 +59,13 @@ const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage
           {title}
         </h3>
       </div>
-      <div className="divide-y" style={{ borderColor: "var(--border-color)" }}>
+      <div
+        className="divide-y overflow-y-auto"
+        style={{
+          borderColor: "var(--border-color)",
+          maxHeight: LIST_HEIGHT,
+        }}
+      >
         {items.map((item, index) => {
           const duration =
             item.playDuration > 0

@@ -19,6 +19,12 @@ export const TAG_PERFORMER_RATED_WEIGHT = 0.15;
 export const TAG_STUDIO_FAVORITE_WEIGHT = 0.5;
 export const TAG_STUDIO_RATED_WEIGHT = 0.25;
 
+// Implicit engagement weights (from watch history / UserEntityRanking)
+// These scale the engagementRate (which is already normalized by library presence)
+export const IMPLICIT_PERFORMER_WEIGHT = 3;
+export const IMPLICIT_STUDIO_WEIGHT = 2;
+export const IMPLICIT_TAG_WEIGHT = 0.8;
+
 export interface SceneRatingInput {
   sceneId: string;
   rating: number | null;
@@ -36,6 +42,10 @@ export interface EntityPreferences {
   derivedPerformerWeights: Map<string, number>;
   derivedStudioWeights: Map<string, number>;
   derivedTagWeights: Map<string, number>;
+  // Implicit weights from watch history engagement (from UserEntityRanking)
+  implicitPerformerWeights: Map<string, number>;
+  implicitStudioWeights: Map<string, number>;
+  implicitTagWeights: Map<string, number>;
 }
 
 export interface UserCriteriaCounts {
@@ -141,6 +151,62 @@ export function buildDerivedWeightsFromScenes(
 }
 
 /**
+ * Ranking data from UserEntityRanking table
+ */
+export interface EntityRankingData {
+  entityId: string;
+  entityType: string;
+  engagementRate: number;
+  percentileRank: number;
+}
+
+/**
+ * Build implicit entity weights from UserEntityRanking data
+ * Uses engagementRate (already normalized by library presence) as the weight
+ * Only includes entities above a minimum percentile threshold
+ */
+export function buildImplicitWeightsFromRankings(
+  rankings: EntityRankingData[],
+  minPercentile: number = 50 // Only include top half by default
+): {
+  implicitPerformerWeights: Map<string, number>;
+  implicitStudioWeights: Map<string, number>;
+  implicitTagWeights: Map<string, number>;
+} {
+  const implicitPerformerWeights = new Map<string, number>();
+  const implicitStudioWeights = new Map<string, number>();
+  const implicitTagWeights = new Map<string, number>();
+
+  for (const ranking of rankings) {
+    // Skip entities below the percentile threshold
+    if (ranking.percentileRank < minPercentile) continue;
+
+    // Use engagementRate as the weight (already normalized by library presence)
+    // Scale by percentile to give more weight to top-ranked entities
+    const weight = ranking.engagementRate * (ranking.percentileRank / 100);
+
+    switch (ranking.entityType) {
+      case "performer":
+        implicitPerformerWeights.set(ranking.entityId, weight);
+        break;
+      case "studio":
+        implicitStudioWeights.set(ranking.entityId, weight);
+        break;
+      case "tag":
+        implicitTagWeights.set(ranking.entityId, weight);
+        break;
+      // scenes are not used as preference signals
+    }
+  }
+
+  return {
+    implicitPerformerWeights,
+    implicitStudioWeights,
+    implicitTagWeights,
+  };
+}
+
+/**
  * Score a scene based on user preferences (explicit + derived)
  * Returns the base score before watch status modifiers
  */
@@ -155,6 +221,7 @@ export function scoreSceneByPreferences(
     let favoritePerformerCount = 0;
     let highlyRatedPerformerCount = 0;
     let derivedPerformerWeight = 0;
+    let implicitPerformerWeight = 0;
 
     for (const performer of scene.performers) {
       const performerId = String(performer.id);
@@ -170,6 +237,12 @@ export function scoreSceneByPreferences(
       if (derived) {
         derivedPerformerWeight += derived;
       }
+
+      // Add implicit engagement weight
+      const implicit = prefs.implicitPerformerWeights?.get(performerId);
+      if (implicit) {
+        implicitPerformerWeight += implicit;
+      }
     }
 
     if (favoritePerformerCount > 0) {
@@ -181,6 +254,10 @@ export function scoreSceneByPreferences(
     if (derivedPerformerWeight > 0) {
       // Apply sqrt to accumulated derived weight, scale by favorite weight
       baseScore += PERFORMER_FAVORITE_WEIGHT * Math.sqrt(derivedPerformerWeight);
+    }
+    if (implicitPerformerWeight > 0) {
+      // Implicit engagement signal from watch history
+      baseScore += IMPLICIT_PERFORMER_WEIGHT * Math.sqrt(implicitPerformerWeight);
     }
   }
 
@@ -198,6 +275,12 @@ export function scoreSceneByPreferences(
     const derivedStudio = prefs.derivedStudioWeights.get(studioId);
     if (derivedStudio) {
       baseScore += STUDIO_FAVORITE_WEIGHT * Math.sqrt(derivedStudio);
+    }
+
+    // Add implicit engagement weight
+    const implicitStudio = prefs.implicitStudioWeights?.get(studioId);
+    if (implicitStudio) {
+      baseScore += IMPLICIT_STUDIO_WEIGHT * Math.sqrt(implicitStudio);
     }
   }
 
@@ -221,6 +304,7 @@ export function scoreSceneByPreferences(
   let ratedPerformerTagCount = 0;
   let ratedStudioTagCount = 0;
   let derivedTagWeight = 0;
+  let implicitTagWeight = 0;
 
   for (const tagId of sceneTags) {
     if (prefs.favoriteTags.has(tagId)) favoriteSceneTagCount++;
@@ -228,6 +312,9 @@ export function scoreSceneByPreferences(
 
     const derived = prefs.derivedTagWeights.get(tagId);
     if (derived) derivedTagWeight += derived;
+
+    const implicit = prefs.implicitTagWeights?.get(tagId);
+    if (implicit) implicitTagWeight += implicit;
   }
 
   for (const tagId of performerTags) {
@@ -264,6 +351,9 @@ export function scoreSceneByPreferences(
   }
   if (derivedTagWeight > 0) {
     baseScore += TAG_SCENE_FAVORITE_WEIGHT * Math.sqrt(derivedTagWeight);
+  }
+  if (implicitTagWeight > 0) {
+    baseScore += IMPLICIT_TAG_WEIGHT * Math.sqrt(implicitTagWeight);
   }
 
   return baseScore;
@@ -320,6 +410,10 @@ export interface LightweightEntityPreferences {
   derivedPerformerWeights: Map<string, number>;
   derivedStudioWeights: Map<string, number>;
   derivedTagWeights: Map<string, number>;
+  // Implicit weights from watch history engagement (from UserEntityRanking)
+  implicitPerformerWeights: Map<string, number>;
+  implicitStudioWeights: Map<string, number>;
+  implicitTagWeights: Map<string, number>;
 }
 
 /**
@@ -390,6 +484,7 @@ export function scoreScoringDataByPreferences(
   let favoritePerformerCount = 0;
   let highlyRatedPerformerCount = 0;
   let derivedPerformerWeight = 0;
+  let implicitPerformerWeight = 0;
 
   for (const performerId of scoringData.performerIds) {
     if (prefs.favoritePerformers.has(performerId)) {
@@ -402,6 +497,11 @@ export function scoreScoringDataByPreferences(
     if (derived) {
       derivedPerformerWeight += derived;
     }
+
+    const implicit = prefs.implicitPerformerWeights?.get(performerId);
+    if (implicit) {
+      implicitPerformerWeight += implicit;
+    }
   }
 
   if (favoritePerformerCount > 0) {
@@ -412,6 +512,9 @@ export function scoreScoringDataByPreferences(
   }
   if (derivedPerformerWeight > 0) {
     baseScore += PERFORMER_FAVORITE_WEIGHT * Math.sqrt(derivedPerformerWeight);
+  }
+  if (implicitPerformerWeight > 0) {
+    baseScore += IMPLICIT_PERFORMER_WEIGHT * Math.sqrt(implicitPerformerWeight);
   }
 
   // Score studio
@@ -426,12 +529,18 @@ export function scoreScoringDataByPreferences(
     if (derivedStudio) {
       baseScore += STUDIO_FAVORITE_WEIGHT * Math.sqrt(derivedStudio);
     }
+
+    const implicitStudio = prefs.implicitStudioWeights?.get(scoringData.studioId);
+    if (implicitStudio) {
+      baseScore += IMPLICIT_STUDIO_WEIGHT * Math.sqrt(implicitStudio);
+    }
   }
 
   // Score scene tags only (no performer/studio tag data in lightweight scoring)
   let favoriteTagCount = 0;
   let ratedTagCount = 0;
   let derivedTagWeight = 0;
+  let implicitTagWeight = 0;
 
   for (const tagId of scoringData.tagIds) {
     if (prefs.favoriteTags.has(tagId)) {
@@ -444,6 +553,11 @@ export function scoreScoringDataByPreferences(
     if (derived) {
       derivedTagWeight += derived;
     }
+
+    const implicit = prefs.implicitTagWeights?.get(tagId);
+    if (implicit) {
+      implicitTagWeight += implicit;
+    }
   }
 
   if (favoriteTagCount > 0) {
@@ -454,6 +568,9 @@ export function scoreScoringDataByPreferences(
   }
   if (derivedTagWeight > 0) {
     baseScore += TAG_SCENE_FAVORITE_WEIGHT * Math.sqrt(derivedTagWeight);
+  }
+  if (implicitTagWeight > 0) {
+    baseScore += IMPLICIT_TAG_WEIGHT * Math.sqrt(implicitTagWeight);
   }
 
   return baseScore;

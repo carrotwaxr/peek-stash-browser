@@ -561,17 +561,19 @@ export async function clearAllWatchHistory(
 
     logger.info("Clearing all watch history and stats", { userId });
 
-    // Delete watch history and all related stats in parallel
+    // Delete watch history, all related stats, and rankings in parallel
     const [
       watchHistoryResult,
       performerStatsResult,
       studioStatsResult,
       tagStatsResult,
+      rankingsResult,
     ] = await Promise.all([
       prisma.watchHistory.deleteMany({ where: { userId } }),
       prisma.userPerformerStats.deleteMany({ where: { userId } }),
       prisma.userStudioStats.deleteMany({ where: { userId } }),
       prisma.userTagStats.deleteMany({ where: { userId } }),
+      prisma.userEntityRanking.deleteMany({ where: { userId } }),
     ]);
 
     logger.info("Watch history and stats cleared", {
@@ -580,6 +582,7 @@ export async function clearAllWatchHistory(
       performerStatsDeleted: performerStatsResult.count,
       studioStatsDeleted: studioStatsResult.count,
       tagStatsDeleted: tagStatsResult.count,
+      rankingsDeleted: rankingsResult.count,
     });
 
     res.json({
@@ -589,6 +592,7 @@ export async function clearAllWatchHistory(
         performerStats: performerStatsResult.count,
         studioStats: studioStatsResult.count,
         tagStats: tagStatsResult.count,
+        rankings: rankingsResult.count,
       },
       message: `Cleared ${watchHistoryResult.count} watch history records and all associated statistics`,
     });

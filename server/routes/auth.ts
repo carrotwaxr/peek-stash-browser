@@ -7,6 +7,7 @@ import {
   setTokenCookie,
 } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
+import rankingComputeService from "../services/RankingComputeService.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -50,6 +51,11 @@ router.post("/login", async (req, res) => {
 
     // Set HTTP-only cookie
     setTokenCookie(res, token);
+
+    // Recompute rankings asynchronously on login (fire-and-forget)
+    rankingComputeService.recomputeAllRankings(user.id).catch((err) => {
+      console.error("Failed to recompute rankings on login:", err);
+    });
 
     res.json({
       success: true,

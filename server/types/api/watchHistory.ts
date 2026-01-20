@@ -166,6 +166,7 @@ export interface ClearAllWatchHistoryResponse {
     performerStats: number;
     studioStats: number;
     tagStats: number;
+    rankings: number;
   };
   message: string;
 }

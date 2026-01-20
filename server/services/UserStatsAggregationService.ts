@@ -1,4 +1,15 @@
 // server/services/UserStatsAggregationService.ts
+/**
+ * Aggregates user statistics for the My Stats page.
+ *
+ * Top lists are read from pre-computed UserEntityRanking table,
+ * which is populated by RankingComputeService on login and engagement changes.
+ *
+ * Rankings use percentile-based scoring:
+ * - Raw engagement: (oCount × 5) + (normalizedDuration) + (playCount)
+ * - Engagement rate: raw engagement / library presence
+ * - Percentile: rank among all entities user has engaged with (100 = top)
+ */
 
 import prisma from "../prisma/singleton.js";
 import type {
@@ -45,7 +56,7 @@ export function transformUrl(urlOrPath: string | null): string | null {
 class UserStatsAggregationService {
   /**
    * Get all user stats in a single call
-   * All queries respect content exclusions via UserExcludedEntity
+   * Top lists read from pre-computed UserEntityRanking table
    */
   async getUserStats(userId: number): Promise<UserStatsResponse> {
     const [
@@ -62,10 +73,10 @@ class UserStatsAggregationService {
     ] = await Promise.all([
       this.getLibraryStats(userId),
       this.getEngagementStats(userId),
-      this.getTopScenes(userId, 5),
-      this.getTopPerformers(userId, 5),
-      this.getTopStudios(userId, 5),
-      this.getTopTags(userId, 5),
+      this.getTopScenes(userId, 10),
+      this.getTopPerformers(userId, 10),
+      this.getTopStudios(userId, 10),
+      this.getTopTags(userId, 10),
       this.getMostWatchedScene(userId),
       this.getMostViewedImage(userId),
       this.getMostOdScene(userId),
@@ -167,242 +178,142 @@ class UserStatsAggregationService {
   }
 
   /**
-   * Get top scenes by play count (exclusion-aware)
+   * Get top scenes by percentile rank from pre-computed rankings
    */
-  private async getTopScenes(
-    userId: number,
-    limit: number
-  ): Promise<TopScene[]> {
-    const stats = await prisma.$queryRaw<
-      Array<{
-        sceneId: string;
-        playCount: number;
-        playDuration: number;
-        oCount: number;
-      }>
-    >`
-      SELECT
-        w.sceneId,
-        w.playCount,
-        w.playDuration,
-        w.oCount
-      FROM WatchHistory w
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'scene'
-        AND e.entityId = w.sceneId
-      WHERE w.userId = ${userId}
-        AND e.id IS NULL
-        AND w.playCount > 0
-      ORDER BY w.playCount DESC
-      LIMIT ${limit}
-    `;
+  private async getTopScenes(userId: number, limit: number): Promise<TopScene[]> {
+    // Query pre-computed rankings
+    const rankings = await prisma.userEntityRanking.findMany({
+      where: { userId, entityType: "scene" },
+      orderBy: { percentileRank: "desc" },
+      take: limit,
+    });
 
-    if (stats.length === 0) return [];
+    if (rankings.length === 0) return [];
 
     // Fetch scene details
     const scenes = await prisma.stashScene.findMany({
-      where: { id: { in: stats.map((s) => s.sceneId) } },
+      where: { id: { in: rankings.map((r) => r.entityId) } },
       select: { id: true, title: true, filePath: true, pathScreenshot: true },
     });
 
     const sceneMap = new Map(scenes.map((s) => [s.id, s]));
 
-    return stats.map((s) => {
-      const scene = sceneMap.get(s.sceneId);
+    return rankings.map((r) => {
+      const scene = sceneMap.get(r.entityId);
       return {
-        id: s.sceneId,
+        id: r.entityId,
         title: scene?.title ?? null,
         filePath: scene?.filePath ?? null,
         imageUrl: transformUrl(scene?.pathScreenshot ?? null),
-        playCount: s.playCount,
-        playDuration: Math.round(s.playDuration),
-        oCount: s.oCount,
+        playCount: r.playCount,
+        playDuration: Math.round(r.playDuration),
+        oCount: r.oCount,
+        score: r.percentileRank,
       };
     });
   }
 
   /**
-   * Get top performers by play count (exclusion-aware)
-   * Aggregates playDuration from WatchHistory via ScenePerformer join
+   * Get top performers by percentile rank from pre-computed rankings
    */
-  private async getTopPerformers(
-    userId: number,
-    limit: number
-  ): Promise<TopPerformer[]> {
-    // Get top performers with aggregated playDuration from WatchHistory
-    const stats = await prisma.$queryRaw<
-      Array<{
-        performerId: string;
-        playCount: number;
-        oCounter: number;
-        playDuration: number;
-      }>
-    >`
-      SELECT
-        ups.performerId,
-        ups.playCount,
-        ups.oCounter,
-        COALESCE(dur.totalDuration, 0) as playDuration
-      FROM UserPerformerStats ups
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'performer'
-        AND e.entityId = ups.performerId
-      LEFT JOIN (
-        SELECT sp.performerId, SUM(w.playDuration) as totalDuration
-        FROM ScenePerformer sp
-        JOIN WatchHistory w ON w.sceneId = sp.sceneId AND w.userId = ${userId}
-        GROUP BY sp.performerId
-      ) dur ON dur.performerId = ups.performerId
-      WHERE ups.userId = ${userId}
-        AND e.id IS NULL
-        AND ups.playCount > 0
-      ORDER BY ups.playCount DESC
-      LIMIT ${limit}
-    `;
+  private async getTopPerformers(userId: number, limit: number): Promise<TopPerformer[]> {
+    // Query pre-computed rankings
+    const rankings = await prisma.userEntityRanking.findMany({
+      where: { userId, entityType: "performer" },
+      orderBy: { percentileRank: "desc" },
+      take: limit,
+    });
 
-    if (stats.length === 0) return [];
+    if (rankings.length === 0) return [];
 
     // Fetch performer details
     const performers = await prisma.stashPerformer.findMany({
-      where: { id: { in: stats.map((s) => s.performerId) } },
+      where: { id: { in: rankings.map((r) => r.entityId) } },
       select: { id: true, name: true, imagePath: true },
     });
 
     const performerMap = new Map(performers.map((p) => [p.id, p]));
 
-    return stats.map((s) => {
-      const performer = performerMap.get(s.performerId);
+    return rankings.map((r) => {
+      const performer = performerMap.get(r.entityId);
       return {
-        id: s.performerId,
+        id: r.entityId,
         name: performer?.name ?? "Unknown",
         imageUrl: transformUrl(performer?.imagePath ?? null),
-        playCount: s.playCount,
-        playDuration: Math.round(Number(s.playDuration) || 0),
-        oCount: s.oCounter,
+        playCount: r.playCount,
+        playDuration: Math.round(r.playDuration),
+        oCount: r.oCount,
+        score: r.percentileRank,
       };
     });
   }
 
   /**
-   * Get top studios by play count (exclusion-aware)
-   * Aggregates playDuration from WatchHistory via StashScene.studioId
+   * Get top studios by percentile rank from pre-computed rankings
    */
-  private async getTopStudios(
-    userId: number,
-    limit: number
-  ): Promise<TopStudio[]> {
-    const stats = await prisma.$queryRaw<
-      Array<{
-        studioId: string;
-        playCount: number;
-        oCounter: number;
-        playDuration: number;
-      }>
-    >`
-      SELECT
-        uss.studioId,
-        uss.playCount,
-        uss.oCounter,
-        COALESCE(dur.totalDuration, 0) as playDuration
-      FROM UserStudioStats uss
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'studio'
-        AND e.entityId = uss.studioId
-      LEFT JOIN (
-        SELECT s.studioId, SUM(w.playDuration) as totalDuration
-        FROM StashScene s
-        JOIN WatchHistory w ON w.sceneId = s.id AND w.userId = ${userId}
-        WHERE s.studioId IS NOT NULL
-        GROUP BY s.studioId
-      ) dur ON dur.studioId = uss.studioId
-      WHERE uss.userId = ${userId}
-        AND e.id IS NULL
-        AND uss.playCount > 0
-      ORDER BY uss.playCount DESC
-      LIMIT ${limit}
-    `;
+  private async getTopStudios(userId: number, limit: number): Promise<TopStudio[]> {
+    // Query pre-computed rankings
+    const rankings = await prisma.userEntityRanking.findMany({
+      where: { userId, entityType: "studio" },
+      orderBy: { percentileRank: "desc" },
+      take: limit,
+    });
 
-    if (stats.length === 0) return [];
+    if (rankings.length === 0) return [];
 
     // Fetch studio details
     const studios = await prisma.stashStudio.findMany({
-      where: { id: { in: stats.map((s) => s.studioId) } },
+      where: { id: { in: rankings.map((r) => r.entityId) } },
       select: { id: true, name: true, imagePath: true },
     });
 
     const studioMap = new Map(studios.map((s) => [s.id, s]));
 
-    return stats.map((s) => {
-      const studio = studioMap.get(s.studioId);
+    return rankings.map((r) => {
+      const studio = studioMap.get(r.entityId);
       return {
-        id: s.studioId,
+        id: r.entityId,
         name: studio?.name ?? "Unknown",
         imageUrl: transformUrl(studio?.imagePath ?? null),
-        playCount: s.playCount,
-        playDuration: Math.round(Number(s.playDuration) || 0),
-        oCount: s.oCounter,
+        playCount: r.playCount,
+        playDuration: Math.round(r.playDuration),
+        oCount: r.oCount,
+        score: r.percentileRank,
       };
     });
   }
 
   /**
-   * Get top tags by play count (exclusion-aware)
-   * Aggregates playDuration from WatchHistory via SceneTag join
+   * Get top tags by percentile rank from pre-computed rankings
    */
   private async getTopTags(userId: number, limit: number): Promise<TopTag[]> {
-    const stats = await prisma.$queryRaw<
-      Array<{
-        tagId: string;
-        playCount: number;
-        oCounter: number;
-        playDuration: number;
-      }>
-    >`
-      SELECT
-        uts.tagId,
-        uts.playCount,
-        uts.oCounter,
-        COALESCE(dur.totalDuration, 0) as playDuration
-      FROM UserTagStats uts
-      LEFT JOIN UserExcludedEntity e
-        ON e.userId = ${userId}
-        AND e.entityType = 'tag'
-        AND e.entityId = uts.tagId
-      LEFT JOIN (
-        SELECT st.tagId, SUM(w.playDuration) as totalDuration
-        FROM SceneTag st
-        JOIN WatchHistory w ON w.sceneId = st.sceneId AND w.userId = ${userId}
-        GROUP BY st.tagId
-      ) dur ON dur.tagId = uts.tagId
-      WHERE uts.userId = ${userId}
-        AND e.id IS NULL
-        AND uts.playCount > 0
-      ORDER BY uts.playCount DESC
-      LIMIT ${limit}
-    `;
+    // Query pre-computed rankings
+    const rankings = await prisma.userEntityRanking.findMany({
+      where: { userId, entityType: "tag" },
+      orderBy: { percentileRank: "desc" },
+      take: limit,
+    });
 
-    if (stats.length === 0) return [];
+    if (rankings.length === 0) return [];
 
     // Fetch tag details
     const tags = await prisma.stashTag.findMany({
-      where: { id: { in: stats.map((s) => s.tagId) } },
+      where: { id: { in: rankings.map((r) => r.entityId) } },
       select: { id: true, name: true, imagePath: true },
     });
 
     const tagMap = new Map(tags.map((t) => [t.id, t]));
 
-    return stats.map((s) => {
-      const tag = tagMap.get(s.tagId);
+    return rankings.map((r) => {
+      const tag = tagMap.get(r.entityId);
       return {
-        id: s.tagId,
+        id: r.entityId,
         name: tag?.name ?? "Unknown",
         imageUrl: transformUrl(tag?.imagePath ?? null),
-        playCount: s.playCount,
-        playDuration: Math.round(Number(s.playDuration) || 0),
-        oCount: s.oCounter,
+        playCount: r.playCount,
+        playDuration: Math.round(r.playDuration),
+        oCount: r.oCount,
+        score: r.percentileRank,
       };
     });
   }

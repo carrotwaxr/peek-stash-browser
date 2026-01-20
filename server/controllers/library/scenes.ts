@@ -20,11 +20,13 @@ import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import {
   buildDerivedWeightsFromScoringData,
+  buildImplicitWeightsFromRankings,
   scoreScoringDataByPreferences,
   countUserCriteria,
   hasAnyCriteria,
   type LightweightEntityPreferences,
   type SceneRatingInput,
+  type EntityRankingData,
 } from "../../services/RecommendationScoringService.js";
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
@@ -1376,7 +1378,7 @@ export const getRecommendedScenes = async (
       return res.status(401).json({ error: "User not authenticated" });
     }
 
-    // Fetch user ratings, watch history, and lightweight scoring data in parallel
+    // Fetch user ratings, watch history, engagement rankings, and lightweight scoring data in parallel
     const [
       performerRatings,
       studioRatings,
@@ -1385,6 +1387,7 @@ export const getRecommendedScenes = async (
       watchHistory,
       allScoringData,
       excludedIds,
+      engagementRankings,
     ] = await Promise.all([
       prisma.performerRating.findMany({ where: { userId } }),
       prisma.studioRating.findMany({ where: { userId } }),
@@ -1393,6 +1396,11 @@ export const getRecommendedScenes = async (
       prisma.watchHistory.findMany({ where: { userId } }),
       stashEntityService.getScenesForScoring(),
       entityExclusionHelper.getExcludedIds(userId, 'scene'),
+      // Fetch implicit engagement signals from pre-computed rankings
+      prisma.userEntityRanking.findMany({
+        where: { userId, entityType: { in: ['performer', 'studio', 'tag'] } },
+        select: { entityId: true, entityType: true, engagementRate: true, percentileRank: true },
+      }),
     ]);
 
     // Build sets of favorite and highly-rated entities
@@ -1481,6 +1489,20 @@ export const getRecommendedScenes = async (
       derivedTagWeights,
     } = buildDerivedWeightsFromScoringData(sceneRatingsForDerived, getScoringDataById);
 
+    // Build implicit weights from engagement rankings (top 50% by percentile)
+    const rankingData: EntityRankingData[] = engagementRankings.map((r) => ({
+      entityId: r.entityId,
+      entityType: r.entityType,
+      engagementRate: r.engagementRate,
+      percentileRank: r.percentileRank,
+    }));
+
+    const {
+      implicitPerformerWeights,
+      implicitStudioWeights,
+      implicitTagWeights,
+    } = buildImplicitWeightsFromRankings(rankingData, 50);
+
     // Build entity preferences object
     const prefs: LightweightEntityPreferences = {
       favoritePerformers,
@@ -1492,6 +1514,9 @@ export const getRecommendedScenes = async (
       derivedPerformerWeights,
       derivedStudioWeights,
       derivedTagWeights,
+      implicitPerformerWeights,
+      implicitStudioWeights,
+      implicitTagWeights,
     };
 
     // Phase 1: Score all scenes using lightweight data
