@@ -691,3 +691,95 @@ export const imageViewHistoryApi = {
    */
   getViewHistory: (imageId) => apiGet(`/image-view-history/${imageId}`),
 };
+
+// ============================================================================
+// Groups API
+// ============================================================================
+
+/**
+ * Admin: Get all groups
+ * @returns {Promise<{groups: Array}>}
+ */
+export const getGroups = () => apiGet("/groups");
+
+/**
+ * Admin: Get single group with members
+ * @param {string} groupId - Group ID
+ * @returns {Promise<{group: Object}>}
+ */
+export const getGroup = (groupId) => apiGet(`/groups/${groupId}`);
+
+/**
+ * Admin: Create group
+ * @param {Object} data - Group data
+ * @param {string} data.name - Group name
+ * @param {string} data.description - Group description (optional)
+ * @param {Object} data.permissions - Group permissions
+ * @returns {Promise<{group: Object}>}
+ */
+export const createGroup = (data) => apiPost("/groups", data);
+
+/**
+ * Admin: Update group
+ * @param {string} groupId - Group ID
+ * @param {Object} data - Updated group data
+ * @returns {Promise<{group: Object}>}
+ */
+export const updateGroup = (groupId, data) => apiPut(`/groups/${groupId}`, data);
+
+/**
+ * Admin: Delete group
+ * @param {string} groupId - Group ID
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const deleteGroup = (groupId) => apiDelete(`/groups/${groupId}`);
+
+/**
+ * Admin: Add user to group
+ * @param {string} groupId - Group ID
+ * @param {string} userId - User ID
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const addGroupMember = (groupId, userId) =>
+  apiPost(`/groups/${groupId}/members`, { userId });
+
+/**
+ * Admin: Remove user from group
+ * @param {string} groupId - Group ID
+ * @param {string} userId - User ID
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export const removeGroupMember = (groupId, userId) =>
+  apiDelete(`/groups/${groupId}/members/${userId}`);
+
+/**
+ * User: Get my groups (for sharing UI)
+ * @returns {Promise<{groups: Array}>}
+ */
+export const getMyGroups = () => apiGet("/groups/user/mine");
+
+// ============================================================================
+// Permissions API
+// ============================================================================
+
+/**
+ * User: Get my resolved permissions
+ * @returns {Promise<{permissions: Object}>}
+ */
+export const getMyPermissions = () => apiGet("/user/permissions");
+
+/**
+ * Admin: Get any user's resolved permissions
+ * @param {string} userId - User ID
+ * @returns {Promise<{permissions: Object}>}
+ */
+export const getUserPermissions = (userId) => apiGet(`/user/${userId}/permissions`);
+
+/**
+ * Admin: Update user permission overrides
+ * @param {string} userId - User ID
+ * @param {Object} overrides - Permission overrides
+ * @returns {Promise<{success: boolean, permissions: Object}>}
+ */
+export const updateUserPermissionOverrides = (userId, overrides) =>
+  apiPut(`/user/${userId}/permissions`, overrides);
