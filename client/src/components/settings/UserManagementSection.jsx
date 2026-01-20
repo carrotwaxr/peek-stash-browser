@@ -667,6 +667,7 @@ const UserManagementSection = ({
           users={users}
           onClose={handleGroupModalClose}
           onSave={handleGroupModalSave}
+          onMessage={onMessage}
         />
       )}
     </>

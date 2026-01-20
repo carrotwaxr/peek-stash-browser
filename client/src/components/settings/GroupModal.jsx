@@ -11,8 +11,9 @@ import { getGroup, createGroup, updateGroup, addGroupMember, removeGroupMember }
  * @param {Array} props.users - List of all users (for adding members)
  * @param {Function} props.onClose - Callback when modal is closed/cancelled
  * @param {Function} props.onSave - Callback when group is successfully saved
+ * @param {Function} props.onMessage - Callback for success messages
  */
-const GroupModal = ({ group, onClose, onSave, users = [] }) => {
+const GroupModal = ({ group, onClose, onSave, users = [], onMessage }) => {
   const isEditMode = !!group;
 
   // Form state
@@ -65,10 +66,10 @@ const GroupModal = ({ group, onClose, onSave, users = [] }) => {
     if (!selectedUserId) return;
 
     const userId = parseInt(selectedUserId, 10);
+    const addedUser = users.find((u) => u.id === userId);
     try {
       await addGroupMember(group.id, userId);
       // Find the user details from the users list
-      const addedUser = users.find((u) => u.id === userId);
       if (addedUser) {
         setMembers((prev) => [
           ...prev,
@@ -80,19 +81,22 @@ const GroupModal = ({ group, onClose, onSave, users = [] }) => {
             },
           },
         ]);
+        onMessage?.(`Added ${addedUser.username} to group`);
       }
       setSelectedUserId("");
     } catch (err) {
-      setError(err.message || "Failed to add member");
+      setError(err.message || `Failed to add ${addedUser?.username || "member"}`);
     }
   };
 
   const handleRemoveMember = async (userId) => {
+    const removedMember = members.find((m) => m.user.id === userId);
     try {
       await removeGroupMember(group.id, userId);
       setMembers((prev) => prev.filter((m) => m.user.id !== userId));
+      onMessage?.(`Removed ${removedMember?.user?.username || "member"} from group`);
     } catch (err) {
-      setError(err.message || "Failed to remove member");
+      setError(err.message || `Failed to remove ${removedMember?.user?.username || "member"}`);
     }
   };
 
