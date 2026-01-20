@@ -2,7 +2,7 @@ import { forwardRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ChevronRight,
-  Star,
+  Heart,
   ExternalLink,
   Droplets,
 } from "lucide-react";
@@ -267,9 +267,9 @@ const TagTreeNode = forwardRef(
               </div>
             )}
 
-            {/* Favorite star */}
+            {/* Favorite heart */}
             {tag.favorite && (
-              <Star
+              <Heart
                 size={16}
                 fill="var(--accent-primary)"
                 style={{ color: "var(--accent-primary)" }}
