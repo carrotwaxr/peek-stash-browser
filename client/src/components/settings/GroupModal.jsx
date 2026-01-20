@@ -8,9 +8,10 @@ import { getGroup, createGroup, updateGroup, removeGroupMember } from "../../ser
  *
  * @param {Object} props
  * @param {Object|null} props.group - Group object for edit mode, null for create mode
- * @param {Function} props.onClose - Callback with boolean indicating if saved
+ * @param {Function} props.onClose - Callback when modal is closed/cancelled
+ * @param {Function} props.onSave - Callback when group is successfully saved
  */
-const GroupModal = ({ group, onClose }) => {
+const GroupModal = ({ group, onClose, onSave }) => {
   const isEditMode = !!group;
 
   // Form state
@@ -93,7 +94,11 @@ const GroupModal = ({ group, onClose }) => {
         await createGroup(groupData);
       }
 
-      onClose(true);
+      if (onSave) {
+        onSave();
+      } else {
+        onClose(true);
+      }
     } catch (err) {
       setError(err.message || `Failed to ${isEditMode ? "update" : "create"} group`);
     } finally {
