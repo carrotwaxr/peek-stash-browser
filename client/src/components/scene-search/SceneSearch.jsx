@@ -85,9 +85,37 @@ const SceneSearch = ({
   // Track current view mode for context settings
   const [currentViewMode, setCurrentViewMode] = useState("grid");
 
+  // Extract filter IDs for timeline/folder views
+  const viewFilters = useMemo(() => {
+    const filters = {};
+
+    // Extract performer ID
+    if (permanentFilters.performers?.value?.length > 0) {
+      filters.performerId = String(permanentFilters.performers.value[0]);
+    }
+
+    // Extract tag ID
+    if (permanentFilters.tags?.value?.length > 0) {
+      filters.tagId = String(permanentFilters.tags.value[0]);
+    }
+
+    // Extract studio ID
+    if (permanentFilters.studios?.value?.length > 0) {
+      filters.studioId = String(permanentFilters.studios.value[0]);
+    }
+
+    // Extract group ID
+    if (permanentFilters.groups?.value?.length > 0) {
+      filters.groupId = String(permanentFilters.groups.value[0]);
+    }
+
+    return Object.keys(filters).length > 0 ? filters : null;
+  }, [permanentFilters]);
+
   // Fetch tags for folder view (only when folder view is active)
   const { tags: folderTags, isLoading: tagsLoading } = useFolderViewTags(
-    currentViewMode === "folder"
+    currentViewMode === "folder",
+    viewFilters
   );
 
   // Track timeline date filter for filtering by selected period
@@ -291,6 +319,7 @@ const SceneSearch = ({
               loading={isLoading}
               emptyMessage="No scenes found for this time period"
               gridDensity={gridDensity}
+              filters={viewFilters}
             />
           ) : viewMode === "folder" ? (
             <FolderView
@@ -300,6 +329,7 @@ const SceneSearch = ({
               loading={isLoading || tagsLoading}
               emptyMessage="No scenes found"
               onFolderPathChange={setFolderTagFilter}
+              filters={viewFilters}
               renderItem={(scene) => (
                 <SceneCard
                   key={scene.id}
