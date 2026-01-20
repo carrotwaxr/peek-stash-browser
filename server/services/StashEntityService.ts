@@ -1805,7 +1805,11 @@ class StashEntityService {
 
   private transformPerformer(performer: any): NormalizedPerformer {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = performer.tags?.map((pt: any) => ({ id: pt.tagId, name: pt.tag?.name || "Unknown" })) || [];
+    const tags = performer.tags?.map((pt: any) => ({
+      id: pt.tagId,
+      name: pt.tag?.name || "Unknown",
+      image_path: pt.tag?.imagePath ? this.transformUrl(pt.tag.imagePath) : null,
+    })) || [];
     return {
       ...DEFAULT_PERFORMER_USER_FIELDS,
       id: performer.id,
@@ -1844,7 +1848,11 @@ class StashEntityService {
 
   private transformStudio(studio: any): NormalizedStudio {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = studio.tags?.map((st: any) => ({ id: st.tagId, name: st.tag?.name || "Unknown" })) || [];
+    const tags = studio.tags?.map((st: any) => ({
+      id: st.tagId,
+      name: st.tag?.name || "Unknown",
+      image_path: st.tag?.imagePath ? this.transformUrl(st.tag.imagePath) : null,
+    })) || [];
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
       id: studio.id,
@@ -1892,7 +1900,11 @@ class StashEntityService {
 
   private transformGroup(group: any): NormalizedGroup {
     // Extract tags from junction table relation (if included) or empty array
-    const tags = group.tags?.map((gt: any) => ({ id: gt.tagId, name: gt.tag?.name || "Unknown" })) || [];
+    const tags = group.tags?.map((gt: any) => ({
+      id: gt.tagId,
+      name: gt.tag?.name || "Unknown",
+      image_path: gt.tag?.imagePath ? this.transformUrl(gt.tag.imagePath) : null,
+    })) || [];
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
       id: group.id,

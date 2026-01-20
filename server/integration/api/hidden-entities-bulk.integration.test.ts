@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { TestClient, adminClient } from "../helpers/testClient.js";
-import { TEST_ADMIN } from "../fixtures/testEntities.js";
+import { TEST_ADMIN, TEST_ENTITIES } from "../fixtures/testEntities.js";
 
 describe("Hidden Entities Bulk API Integration Tests", () => {
   let testUserId: number;
@@ -158,9 +158,12 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
     });
 
     it("should verify entities appear in hidden entities list after bulk hide", async () => {
+      // Use real scene IDs from test fixtures so they exist in cache
+      const sceneId1 = TEST_ENTITIES.sceneWithRelations;
+      const sceneId2 = TEST_ENTITIES.sceneInGroup;
       const entities = [
-        { entityType: "scene", entityId: "verify-test-scene-1" },
-        { entityType: "scene", entityId: "verify-test-scene-2" },
+        { entityType: "scene", entityId: sceneId1 },
+        { entityType: "scene", entityId: sceneId2 },
       ];
 
       // First, hide the entities
@@ -174,8 +177,8 @@ describe("Hidden Entities Bulk API Integration Tests", () => {
       expect(response.ok).toBe(true);
 
       const hiddenIds = response.data.hiddenEntities.map((e) => e.entityId);
-      expect(hiddenIds).toContain("verify-test-scene-1");
-      expect(hiddenIds).toContain("verify-test-scene-2");
+      expect(hiddenIds).toContain(sceneId1);
+      expect(hiddenIds).toContain(sceneId2);
     });
   });
 });

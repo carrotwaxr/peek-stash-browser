@@ -173,6 +173,13 @@ describe("Scene API", () => {
     });
 
     it("filters scenes by group/collection with EXCLUDES", async () => {
+      // First get total count without filter
+      const totalResponse = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
+        filter: { per_page: 1 },
+      });
+      const totalCount = totalResponse.data.findScenes.count;
+
+      // Now filter with EXCLUDES
       const response = await adminClient.post<FindScenesResponse>("/api/library/scenes", {
         filter: {
           per_page: 50,
@@ -188,7 +195,7 @@ describe("Scene API", () => {
       expect(response.ok).toBe(true);
       expect(response.data.findScenes).toBeDefined();
       // Should return fewer scenes than total (excluding group scenes)
-      expect(response.data.findScenes.count).toBeLessThan(22282);
+      expect(response.data.findScenes.count).toBeLessThan(totalCount);
     });
 
     it("respects per_page limit", async () => {
