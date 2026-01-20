@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { adminClient, guestClient, TestClient } from "../helpers/testClient.js";
 import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 // Response type for /api/library/tags
@@ -102,6 +102,109 @@ describe("Tag API", () => {
       expect(response.ok).toBe(true);
       expect(response.data.tags).toBeDefined();
       expect(Array.isArray(response.data.tags)).toBe(true);
+    });
+  });
+
+  describe("Non-admin user tag visibility (folder view)", () => {
+    let testUserId: number;
+    let testUserClient: TestClient;
+
+    beforeAll(async () => {
+      // Create a fresh test user with no restrictions
+      const createResponse = await adminClient.post<{
+        success: boolean;
+        user: { id: number; username: string };
+      }>("/api/user/create", {
+        username: "folder_view_test_user",
+        password: "test_password_123",
+        role: "USER",
+      });
+
+      if (createResponse.ok && createResponse.data.user) {
+        testUserId = createResponse.data.user.id;
+      } else {
+        // User might already exist from previous test run - fetch them
+        const usersResponse = await adminClient.get<{
+          users: Array<{ id: number; username: string }>;
+        }>("/api/user/all");
+
+        const existingUser = usersResponse.data.users?.find(
+          (u) => u.username === "folder_view_test_user"
+        );
+        if (existingUser) {
+          testUserId = existingUser.id;
+        } else {
+          throw new Error("Failed to create or find test user");
+        }
+      }
+
+      // Ensure exclusions are computed for this user
+      await adminClient.post(`/api/exclusions/recompute/${testUserId}`);
+
+      // Create and login the test user client
+      testUserClient = new TestClient();
+      await testUserClient.login("folder_view_test_user", "test_password_123");
+    });
+
+    afterAll(async () => {
+      // Clean up: delete the test user
+      if (testUserId) {
+        await adminClient.delete(`/api/user/${testUserId}`);
+      }
+    });
+
+    it("non-admin user with no restrictions should see most tags (parent tags preserved for folder view)", async () => {
+      // Get admin tag count
+      const adminResponse = await adminClient.post<FindTagsResponse>("/api/library/tags", {
+        filter: {
+          per_page: -1,
+          sort: "name",
+          direction: "ASC",
+        },
+      });
+
+      expect(adminResponse.ok).toBe(true);
+      const adminTagCount = adminResponse.data.findTags.count;
+
+      // Get non-admin tag count (same query as folder view uses)
+      const userResponse = await testUserClient.post<FindTagsResponse>("/api/library/tags", {
+        filter: {
+          per_page: -1,
+          sort: "name",
+          direction: "ASC",
+        },
+      });
+
+      expect(userResponse.ok).toBe(true);
+      const userTagCount = userResponse.data.findTags.count;
+
+      // User should see at least 95% of tags - the small difference is truly empty leaf tags
+      // (tags with no direct attachments AND no children) which are legitimately excluded
+      // The key fix is that parent/organizational tags (used for folder navigation) are now visible
+      expect(userTagCount).toBeGreaterThan(adminTagCount * 0.95);
+      expect(userTagCount).toBeGreaterThan(0);
+    });
+
+    it("non-admin user should see tags via minimal endpoint", async () => {
+      // Get admin minimal tags
+      const adminResponse = await adminClient.post<{
+        tags: Array<{ id: string; name: string }>;
+      }>("/api/library/tags/minimal", {});
+
+      expect(adminResponse.ok).toBe(true);
+      const adminTagCount = adminResponse.data.tags.length;
+
+      // Get non-admin minimal tags
+      const userResponse = await testUserClient.post<{
+        tags: Array<{ id: string; name: string }>;
+      }>("/api/library/tags/minimal", {});
+
+      expect(userResponse.ok).toBe(true);
+      const userTagCount = userResponse.data.tags.length;
+
+      // User should see at least 95% of tags (small difference is truly empty leaf tags)
+      expect(userTagCount).toBeGreaterThan(adminTagCount * 0.95);
+      expect(userTagCount).toBeGreaterThan(0);
     });
   });
 });

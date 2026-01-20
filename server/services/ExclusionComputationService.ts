@@ -681,6 +681,7 @@ class ExclusionComputationService {
     }
 
     // 5. Empty tags - tags not attached to any visible scene, performer, studio, or group
+    // BUT exclude parent/organizational tags (tags that have children) since they're used for hierarchy
     const emptyTags = await (tx as any).$queryRaw`
       SELECT t.id as tagId
       FROM StashTag t
@@ -712,6 +713,11 @@ class ExclusionComputationService {
         WHERE gt.tagId = t.id
           AND g.deletedAt IS NULL
           AND g.id NOT IN (SELECT groupId FROM temp_excluded_groups)
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM StashTag child
+        WHERE child.deletedAt IS NULL
+          AND child.parentIds LIKE '%"' || t.id || '"%'
       )
     ` as Array<{ tagId: string }>;
 
