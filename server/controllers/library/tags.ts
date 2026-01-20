@@ -571,6 +571,124 @@ export const findTagsMinimal = async (
   }
 };
 
+/**
+ * Get tags that exist on scenes matching the given filters.
+ * Used by folder view to show only relevant tags.
+ */
+export const findTagsForScenes = async (
+  req: TypedAuthRequest<{ performerId?: string; tagId?: string; studioId?: string; groupId?: string }>,
+  res: TypedResponse<{ tags: Array<{ id: string; name: string; parent_ids?: string[] }> } | ApiErrorResponse>
+) => {
+  try {
+    const { performerId, tagId, studioId, groupId } = req.body;
+    const userId = req.user?.id;
+    const requestingUser = req.user;
+
+    // Build query to find distinct tag IDs from matching scenes
+    let sceneTagQuery = `
+      SELECT DISTINCT st.tagId
+      FROM SceneTag st
+      INNER JOIN StashScene s ON s.id = st.sceneId
+      LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id
+      WHERE s.deletedAt IS NULL AND e.id IS NULL
+    `;
+    const params: (string | number)[] = [userId!];
+
+    if (performerId) {
+      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.performerId = ?)`;
+      params.push(performerId);
+    }
+    if (tagId) {
+      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM SceneTag st2 WHERE st2.sceneId = s.id AND st2.tagId = ?)`;
+      params.push(tagId);
+    }
+    if (studioId) {
+      sceneTagQuery += ` AND s.studioId = ?`;
+      params.push(studioId);
+    }
+    if (groupId) {
+      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.groupId = ?)`;
+      params.push(groupId);
+    }
+
+    const tagIdResults = await prisma.$queryRawUnsafe<Array<{ tagId: string }>>(sceneTagQuery, ...params);
+    const tagIds = new Set(tagIdResults.map(r => r.tagId));
+
+    if (tagIds.size === 0) {
+      return res.json({ tags: [] });
+    }
+
+    // Get all tags to build hierarchy
+    let allTags = await stashEntityService.getAllTags();
+
+    // Apply exclusions for non-admins
+    if (requestingUser?.role !== "ADMIN") {
+      allTags = await entityExclusionHelper.filterExcluded(allTags, userId, "tag");
+    }
+
+    // Expand to include parent tags for hierarchy
+    const expandedTagIds = new Set(tagIds);
+    const tagMap = new Map(allTags.map(t => [t.id, t]));
+
+    // Walk up parent chains
+    for (const currentTagId of tagIds) {
+      const tag = tagMap.get(currentTagId);
+      if (tag?.parents && Array.isArray(tag.parents)) {
+        for (const parent of tag.parents) {
+          expandedTagIds.add(parent.id);
+          // Also add grandparents, etc.
+          let parentTag = tagMap.get(parent.id);
+          while (parentTag?.parents && Array.isArray(parentTag.parents) && parentTag.parents.length > 0) {
+            for (const gp of parentTag.parents) {
+              expandedTagIds.add(gp.id);
+            }
+            // Get first parent to continue chain (tags can have multiple parents)
+            parentTag = parentTag.parents[0] ? tagMap.get(parentTag.parents[0].id) : undefined;
+          }
+        }
+      }
+    }
+
+    // Filter to only expanded tags
+    const filteredTags = allTags.filter(t => expandedTagIds.has(t.id));
+
+    // Build children arrays based on filtered tags only
+    // A tag's children are tags that have this tag as a parent AND are in our filtered set
+    const childrenMap = new Map<string, Array<{ id: string }>>();
+    for (const tag of filteredTags) {
+      if (tag.parents) {
+        for (const parent of tag.parents) {
+          if (expandedTagIds.has(parent.id)) {
+            if (!childrenMap.has(parent.id)) {
+              childrenMap.set(parent.id, []);
+            }
+            childrenMap.get(parent.id)!.push({ id: tag.id });
+          }
+        }
+      }
+    }
+
+    // Return tags with parents and children arrays (matching the structure buildFolderTree expects)
+    const tagsWithHierarchy = filteredTags.map(t => ({
+      id: t.id,
+      name: t.name,
+      image_path: t.image_path,
+      parents: t.parents?.filter(p => expandedTagIds.has(p.id)).map(p => ({ id: p.id })) || [],
+      children: childrenMap.get(t.id) || [],
+    }));
+
+    res.json({ tags: tagsWithHierarchy });
+  } catch (error) {
+    logger.error("Error in findTagsForScenes", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    res.status(500).json({
+      error: "Failed to find tags for scenes",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+};
+
 export const updateTag = async (
   req: TypedAuthRequest<UpdateTagRequest, UpdateTagParams>,
   res: TypedResponse<UpdateTagResponse | ApiErrorResponse>

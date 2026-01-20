@@ -2,6 +2,7 @@ import express from "express";
 import {
   findTags,
   findTagsMinimal,
+  findTagsForScenes,
   updateTag,
 } from "../../controllers/library/tags.js";
 import { authenticate, requireCacheReady } from "../../middleware/auth.js";
@@ -17,6 +18,9 @@ router.post("/tags", requireCacheReady, authenticated(findTags));
 
 // Minimal data for filter dropdowns
 router.post("/tags/minimal", requireCacheReady, authenticated(findTagsMinimal));
+
+// Tags filtered by scene criteria (for folder view)
+router.post("/tags/for-scenes", requireCacheReady, authenticated(findTagsForScenes));
 
 // Update tag
 router.put("/tags/:id", authenticated(updateTag));

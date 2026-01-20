@@ -20,6 +20,7 @@ const FolderView = ({
   loading = false,
   emptyMessage = "No items found",
   onFolderPathChange, // Callback when folder path changes (for API filtering)
+  filters = null, // eslint-disable-line no-unused-vars -- Not used directly but for API consistency
 }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
