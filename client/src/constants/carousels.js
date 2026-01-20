@@ -1,11 +1,5 @@
-import {
-  Clock,
-  Heart,
-  PlayCircle,
-  Star,
-  Tag,
-  Video,
-} from "lucide-react";
+import { Clock, Heart, PlayCircle, Star } from "lucide-react";
+import { ENTITY_ICONS } from "./entityIcons.js";
 
 /**
  * Shared carousel definitions for homepage and settings
@@ -49,7 +43,7 @@ export const CAROUSEL_DEFINITIONS = [
   },
   {
     title: "Favorite Tags",
-    iconComponent: Tag,
+    iconComponent: ENTITY_ICONS.tag,
     iconProps: {
       className: "w-6 h-6",
       style: { color: "var(--accent-primary)" },
@@ -58,7 +52,7 @@ export const CAROUSEL_DEFINITIONS = [
   },
   {
     title: "Favorite Studios",
-    iconComponent: Video,
+    iconComponent: ENTITY_ICONS.studio,
     iconProps: { className: "w-6 h-6", style: { color: "var(--status-info)" } },
     fetchKey: "favoriteStudioScenes",
   },

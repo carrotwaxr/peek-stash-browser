@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, LucideStar } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useImagesPagination } from "../../hooks/useImagesPagination.js";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";

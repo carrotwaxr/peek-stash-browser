@@ -1,3 +1,5 @@
+import { ENTITY_ICON_NAMES } from "./entityIcons.js";
+
 /**
  * Navigation item definitions with stable keys
  * These keys should NEVER change even if display names or paths are updated
@@ -7,7 +9,7 @@ export const NAV_DEFINITIONS = [
     key: "scenes",
     name: "Scenes",
     path: "/scenes",
-    icon: "clapperboard",
+    icon: ENTITY_ICON_NAMES.scene,
     description: "Browse all scenes in your library",
   },
   {
@@ -21,49 +23,49 @@ export const NAV_DEFINITIONS = [
     key: "performers",
     name: "Performers",
     path: "/performers",
-    icon: "user",
+    icon: ENTITY_ICON_NAMES.performer,
     description: "Browse performers in your library",
   },
   {
     key: "studios",
     name: "Studios",
     path: "/studios",
-    icon: "spotlight",
+    icon: ENTITY_ICON_NAMES.studio,
     description: "Browse studios in your library",
   },
   {
     key: "tags",
     name: "Tags",
     path: "/tags",
-    icon: "tags",
+    icon: ENTITY_ICON_NAMES.tag,
     description: "Browse tags in your library",
   },
   {
     key: "groups",
     name: "Collections",
     path: "/collections",
-    icon: "film",
+    icon: ENTITY_ICON_NAMES.group,
     description: "Browse collections and movies in your library",
   },
   {
     key: "galleries",
     name: "Galleries",
     path: "/galleries",
-    icon: "gallery-vertical",
+    icon: ENTITY_ICON_NAMES.gallery,
     description: "Browse image galleries in your library",
   },
   {
     key: "images",
     name: "Images",
     path: "/images",
-    icon: "image",
+    icon: ENTITY_ICON_NAMES.image,
     description: "Browse all images in your library",
   },
   {
     key: "playlists",
     name: "Playlists",
     path: "/playlists",
-    icon: "list",
+    icon: ENTITY_ICON_NAMES.playlist,
     description: "Manage your custom playlists",
   },
 ];

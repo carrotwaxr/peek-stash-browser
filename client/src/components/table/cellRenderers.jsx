@@ -2,7 +2,8 @@
 // This file exports both components and utility functions by design
 
 import { Link } from "react-router-dom";
-import { Heart, Star } from "lucide-react";
+import { Heart } from "lucide-react";
+import RatingBadge from "../ui/RatingBadge.jsx";
 import MultiValueCell from "./MultiValueCell.jsx";
 import {
   formatDuration,
@@ -16,7 +17,7 @@ import {
 // ============================================================================
 
 /**
- * RatingCell - Shows 5 stars based on rating (0-100 scale)
+ * RatingCell - Shows rating badge with bronze/silver/gold gradient (0-100 scale)
  * @param {Object} props
  * @param {number} props.rating - Rating value (0-100)
  */
@@ -25,30 +26,8 @@ export const RatingCell = ({ rating }) => {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
 
-  // Convert 0-100 scale to 0-5 stars
-  const starCount = Math.round(rating / 20);
-  const stars = [];
-
-  for (let i = 0; i < 5; i++) {
-    stars.push(
-      <Star
-        key={i}
-        size={14}
-        fill={i < starCount ? "var(--accent-primary)" : "none"}
-        stroke={i < starCount ? "var(--accent-primary)" : "var(--text-muted)"}
-        strokeWidth={1.5}
-      />
-    );
-  }
-
-  return (
-    <span
-      className="inline-flex items-center gap-0.5"
-      title={`${(rating / 10).toFixed(1)} / 10`}
-    >
-      {stars}
-    </span>
-  );
+  // RatingBadge is display-only in table context (no onClick)
+  return <RatingBadge rating={rating} size="small" />;
 };
 
 /**

@@ -1,6 +1,7 @@
 // client/src/components/pages/UserStats/components/EngagementTotals.jsx
 
-import { Clock, Play, Heart, Image, Film } from "lucide-react";
+import { Clock, Play, Heart } from "lucide-react";
+import { ENTITY_ICONS } from "../../../../constants/entityIcons.js";
 import StatCard from "./StatCard.jsx";
 import { formatDurationHumanReadable } from "../../../../utils/format.js";
 
@@ -12,6 +13,9 @@ const EngagementTotals = ({ engagement, librarySceneCount }) => {
     librarySceneCount > 0
       ? Math.round((engagement.uniqueScenesWatched / librarySceneCount) * 100)
       : 0;
+
+  const SceneIcon = ENTITY_ICONS.scene;
+  const ImageIcon = ENTITY_ICONS.image;
 
   const stats = [
     {
@@ -33,12 +37,12 @@ const EngagementTotals = ({ engagement, librarySceneCount }) => {
       label: "Scenes Watched",
       value: engagement.uniqueScenesWatched.toLocaleString(),
       subtitle: `${coveragePercent}% of library`,
-      icon: <Film size={24} />,
+      icon: <SceneIcon size={24} />,
     },
     {
       label: "Images Viewed",
       value: engagement.totalImagesViewed.toLocaleString(),
-      icon: <Image size={24} />,
+      icon: <ImageIcon size={24} />,
     },
   ];
 
