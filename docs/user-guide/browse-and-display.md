@@ -49,6 +49,40 @@ A high-density tabular layout for scanning metadata across many items.
 3. Use arrows to reorder columns
 4. Or right-click any column header → **Hide column**
 
+### Timeline View
+
+Browse content chronologically, organized by date.
+
+- Content grouped by year, month, or day
+- Expandable date sections with item counts
+- Visual timeline with thumbnails
+- Three density levels: Small, Medium, Large
+- Available for: Scenes, Galleries, Images
+
+**Navigation:**
+
+- Click date header to expand/collapse
+- Click thumbnail to open detail page
+- Use density controls to adjust items per row
+
+### Folder View
+
+Navigate content through your tag hierarchy as folders.
+
+- Tags displayed as folders based on parent/child relationships
+- Breadcrumb navigation shows your current path
+- Item count badges on each folder
+- Click into nested tags like browsing directories
+- Three density levels: Small, Medium, Large
+- Available for: Scenes, Galleries, Images
+
+**Navigation:**
+
+- Click folder to navigate into that tag
+- Use breadcrumbs to navigate back up
+- Root level shows top-level parent tags
+- Content displays when you reach a leaf tag or click to view items
+
 ### Tag Hierarchy View
 
 A tree view showing parent/child tag relationships (Tags page only).
