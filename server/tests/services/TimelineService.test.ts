@@ -50,7 +50,7 @@ describe("TimelineService", () => {
 
       expect(sql).toContain("SELECT");
       expect(sql).toContain("strftime('%Y-%m', s.date)");
-      expect(sql).toContain("COUNT(*)");
+      expect(sql).toContain("COUNT(DISTINCT s.id)");
       expect(sql).toContain("LEFT JOIN UserExcludedEntity");
       expect(sql).toContain("e.id IS NULL");
       expect(sql).toContain("s.date IS NOT NULL");

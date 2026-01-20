@@ -127,6 +127,7 @@ describe("TimelineView", () => {
         entityType: "gallery",
         autoSelectRecent: true,
         initialPeriod: null,
+        filters: null,
       });
     });
 
@@ -139,6 +140,7 @@ describe("TimelineView", () => {
         entityType: "scene",
         autoSelectRecent: false,
         initialPeriod: "2024-03",
+        filters: null,
       });
     });
 

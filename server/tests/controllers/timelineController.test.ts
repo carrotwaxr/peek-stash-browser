@@ -49,7 +49,7 @@ describe("timelineController", () => {
 
       await getDateDistribution(req, res);
 
-      expect(timelineService.getDistribution).toHaveBeenCalledWith("scene", 1, "months");
+      expect(timelineService.getDistribution).toHaveBeenCalledWith("scene", 1, "months", undefined);
       expect(res.json).toHaveBeenCalledWith({ distribution: mockDistribution });
     });
 
@@ -69,7 +69,7 @@ describe("timelineController", () => {
 
       await getDateDistribution(req, res);
 
-      expect(timelineService.getDistribution).toHaveBeenCalledWith("scene", 1, "months");
+      expect(timelineService.getDistribution).toHaveBeenCalledWith("scene", 1, "months", undefined);
     });
 
     it("returns 400 for invalid entity type", async () => {
