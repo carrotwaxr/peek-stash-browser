@@ -11,12 +11,14 @@ import {
   getFilterPresets,
   getHiddenEntities,
   getHiddenEntityIds,
+  getRecoveryKey,
   getUserGroupMemberships,
   getUserPermissions,
   getUserRestrictions,
   getUserSettings,
   hideEntities,
   hideEntity,
+  regenerateRecoveryKey,
   saveFilterPreset,
   setDefaultFilterPreset,
   syncFromStash,
@@ -40,6 +42,10 @@ router.use(authenticate);
 router.get("/settings", authenticated(getUserSettings));
 router.put("/settings", authenticated(updateUserSettings));
 router.post("/change-password", authenticated(changePassword));
+
+// Recovery key routes
+router.get("/recovery-key", authenticated(getRecoveryKey));
+router.post("/recovery-key/regenerate", authenticated(regenerateRecoveryKey));
 
 // Filter preset routes
 router.get("/filter-presets", authenticated(getFilterPresets));
