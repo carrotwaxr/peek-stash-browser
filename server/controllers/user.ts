@@ -4,6 +4,7 @@ import { Response } from "express";
 import { AuthenticatedRequest } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
+import { resolveUserPermissions } from "../services/PermissionService.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -2294,5 +2295,121 @@ export const updateHideConfirmation = async (
     res
       .status(500)
       .json({ error: "Failed to update hide confirmation preference" });
+  }
+};
+
+/**
+ * Get current user's resolved permissions
+ */
+export const getUserPermissions = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const permissions = await resolveUserPermissions(req.user.id);
+
+    if (!permissions) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ permissions });
+  } catch (error) {
+    console.error("Error getting user permissions:", error);
+    res.status(500).json({ error: "Failed to get permissions" });
+  }
+};
+
+/**
+ * Admin endpoint to get any user's permissions
+ */
+export const getAnyUserPermissions = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    if (req.user?.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: Admin access required" });
+    }
+
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    const permissions = await resolveUserPermissions(userId);
+
+    if (!permissions) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ permissions });
+  } catch (error) {
+    console.error("Error getting user permissions:", error);
+    res.status(500).json({ error: "Failed to get permissions" });
+  }
+};
+
+/**
+ * Admin endpoint to update user permission overrides
+ */
+export const updateUserPermissionOverrides = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    if (req.user?.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: Admin access required" });
+    }
+
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    const { canShareOverride, canDownloadFilesOverride, canDownloadPlaylistsOverride } =
+      req.body;
+
+    // Validate values (must be boolean or null)
+    const validateOverride = (value: unknown): boolean | null | undefined => {
+      if (value === undefined) return undefined;
+      if (value === null) return null;
+      if (typeof value === "boolean") return value;
+      throw new Error("Invalid override value");
+    };
+
+    try {
+      const updates: Record<string, boolean | null> = {};
+
+      const shareOverride = validateOverride(canShareOverride);
+      if (shareOverride !== undefined) updates.canShareOverride = shareOverride;
+
+      const filesOverride = validateOverride(canDownloadFilesOverride);
+      if (filesOverride !== undefined) updates.canDownloadFilesOverride = filesOverride;
+
+      const playlistsOverride = validateOverride(canDownloadPlaylistsOverride);
+      if (playlistsOverride !== undefined) updates.canDownloadPlaylistsOverride = playlistsOverride;
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "No valid updates provided" });
+      }
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: updates,
+      });
+
+      // Return updated permissions
+      const permissions = await resolveUserPermissions(userId);
+      res.json({ success: true, permissions });
+    } catch {
+      return res.status(400).json({ error: "Invalid override value - must be true, false, or null" });
+    }
+  } catch (error) {
+    console.error("Error updating permission overrides:", error);
+    res.status(500).json({ error: "Failed to update permission overrides" });
   }
 };
