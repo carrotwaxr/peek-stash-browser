@@ -20,6 +20,7 @@ function TimelineView({
   emptyMessage = "No items found",
   gridDensity = "medium",
   className = "",
+  filters = null,
 }) {
   const {
     zoomLevel,
@@ -30,7 +31,7 @@ function TimelineView({
     maxCount,
     isLoading: distributionLoading,
     ZOOM_LEVELS,
-  } = useTimelineState({ entityType, autoSelectRecent: !initialPeriod, initialPeriod });
+  } = useTimelineState({ entityType, autoSelectRecent: !initialPeriod, initialPeriod, filters });
 
   // Detect mobile devices for responsive layout
   const isMobile = useMediaQuery("(max-width: 768px)");
