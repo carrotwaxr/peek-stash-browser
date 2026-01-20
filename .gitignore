@@ -93,3 +93,6 @@ server/integration/.env.integration
 
 # Local data directory (database backups, etc.)
 .peek-data/
+
+# Claude planning documents (session-specific)
+docs/plans/
