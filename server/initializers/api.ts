@@ -31,6 +31,7 @@ import exclusionsRoutes from "../routes/exclusions.js";
 import mergeReconciliationRoutes from "../routes/mergeReconciliation.js";
 import databaseBackupRoutes from "../routes/databaseBackup.js";
 import userRoutes from "../routes/user.js";
+import groupRoutes from "../routes/groups.js";
 import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
 import userStatsRoutes from "../routes/userStats.js";
@@ -126,6 +127,9 @@ export const setupAPI = () => {
 
   // User settings routes (protected)
   app.use("/api/user", userRoutes);
+
+  // User group routes (protected, mostly admin only)
+  app.use("/api/groups", groupRoutes);
 
   // Playlist routes (protected)
   app.use("/api/playlists", playlistRoutes);

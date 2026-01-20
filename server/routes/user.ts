@@ -6,10 +6,12 @@ import {
   deleteUser,
   deleteUserRestrictions,
   getAllUsers,
+  getAnyUserPermissions,
   getDefaultFilterPresets,
   getFilterPresets,
   getHiddenEntities,
   getHiddenEntityIds,
+  getUserPermissions,
   getUserRestrictions,
   getUserSettings,
   hideEntities,
@@ -20,6 +22,7 @@ import {
   unhideAllEntities,
   unhideEntity,
   updateHideConfirmation,
+  updateUserPermissionOverrides,
   updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
@@ -49,6 +52,9 @@ router.delete(
 router.get("/default-presets", authenticated(getDefaultFilterPresets));
 router.put("/default-preset", authenticated(setDefaultFilterPreset));
 
+// User's own permissions
+router.get("/permissions", authenticated(getUserPermissions));
+
 // Admin-only user management routes
 router.get("/all", requireAdmin, authenticated(getAllUsers));
 router.post("/create", requireAdmin, authenticated(createUser));
@@ -64,6 +70,18 @@ router.post(
   requireAdmin,
   authenticated(syncFromStash)
 ); // Admin can sync Stash data for any user
+
+// Admin: get/update any user's permissions
+router.get(
+  "/:userId/permissions",
+  requireAdmin,
+  authenticated(getAnyUserPermissions)
+);
+router.put(
+  "/:userId/permissions",
+  requireAdmin,
+  authenticated(updateUserPermissionOverrides)
+);
 
 // Admin-only content restriction routes
 router.get(
