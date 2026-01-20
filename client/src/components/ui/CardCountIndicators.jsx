@@ -1,15 +1,6 @@
 import { useMemo } from "react";
-import {
-  LucideClapperboard,
-  LucideDroplets,
-  LucideEye,
-  LucideFilm,
-  LucideGalleryVertical,
-  LucideImages,
-  LucideList,
-  LucideTag,
-  LucideUser,
-} from "lucide-react";
+import { Droplets, Eye } from "lucide-react";
+import { ENTITY_ICONS } from "../../constants/entityIcons.js";
 import Tooltip from "./Tooltip";
 
 const hueify = (color, direction = "lighter", amount = 12) => {
@@ -20,53 +11,53 @@ const hueify = (color, direction = "lighter", amount = 12) => {
 
 const CARD_COUNT_INDICATOR_TYPES = {
   O_COUNTER: {
-    icon: LucideDroplets,
+    icon: Droplets,
     iconColor: "var(--status-info)",
     label: (count) => count === 1 ? "1 O" : `${count} O's`,
   },
   PLAY_COUNT: {
-    icon: LucideEye,
+    icon: Eye,
     iconColor: hueify("var(--status-warning)", "lighter"),
     label: (count) => count === 1 ? "Viewed 1 time" : `Viewed ${count} times`,
   },
   PERFORMERS: {
-    icon: LucideUser,
+    icon: ENTITY_ICONS.performer,
     iconColor: "var(--accent-primary)",
     label: (count) => count === 1 ? "1 performer" : `${count} performers`,
   },
   TAGS: {
-    icon: LucideTag,
+    icon: ENTITY_ICONS.tag,
     iconColor: hueify("var(--status-info)", "darker"),
     label: (count) => count === 1 ? "1 tag" : `${count} tags`,
   },
   SCENES: {
-    icon: LucideClapperboard,
+    icon: ENTITY_ICONS.scene,
     iconColor: hueify("var(--accent-secondary)", "lighter"),
     label: (count) => count === 1 ? "1 scene" : `${count} scenes`,
   },
   GROUPS: {
-    icon: LucideFilm,
+    icon: ENTITY_ICONS.group,
     iconColor: hueify("var(--accent-secondary)", "darker"),
     label: (count) => count === 1 ? "1 collection" : `${count} collections`,
   },
   IMAGES: {
-    icon: LucideImages,
+    icon: ENTITY_ICONS.images,
     iconColor: hueify("var(--status-success)", "lighter"),
     label: (count) => count === 1 ? "1 image" : `${count} images`,
   },
   GALLERIES: {
-    icon: LucideGalleryVertical,
+    icon: ENTITY_ICONS.gallery,
     iconColor: hueify("var(--status-success)", "darker"),
     label: (count) => count === 1 ? "1 gallery" : `${count} galleries`,
   },
   PLAYLISTS: {
-    icon: LucideList,
+    icon: ENTITY_ICONS.playlist,
     iconColor: hueify("var(--status-warning)", "darker"),
     label: (count) => count === 1 ? "1 playlist" : `${count} playlists`,
   },
   STUDIOS: {
-    icon: LucideClapperboard,
-    iconColor: hueify("var(--accent-secondary)", "lighter", 8),
+    icon: ENTITY_ICONS.studio,
+    iconColor: hueify("var(--accent-tertiary)", "lighter"),
     label: (count) => count === 1 ? "1 studio" : `${count} studios`,
   },
 };

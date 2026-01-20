@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Peek Icon Inventory</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      padding: 2rem;
+      margin: 0;
+    }
+    h1 {
+      color: #fff;
+      border-bottom: 2px solid #4a4a6a;
+      padding-bottom: 0.5rem;
+    }
+    h2 {
+      color: #a0a0c0;
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    h3 {
+      color: #8080a0;
+      margin-top: 1.5rem;
+      font-size: 1rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .icon-card {
+      background: #2a2a4a;
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      transition: background 0.2s;
+    }
+    .icon-card:hover {
+      background: #3a3a5a;
+    }
+    .icon-card .icon {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .icon-card .content {
+      flex: 1;
+      min-width: 0;
+    }
+    .icon-card .label {
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+    .icon-card .icon-name {
+      font-size: 0.75rem;
+      color: #888;
+      font-family: monospace;
+    }
+    .icon-card .usage {
+      font-size: 0.7rem;
+      color: #6a9fb5;
+      margin-top: 0.35rem;
+      line-height: 1.4;
+    }
+    .icon-card .note {
+      font-size: 0.7rem;
+      color: #e8a040;
+      margin-top: 0.25rem;
+    }
+    .icon-card .note.success {
+      color: #4ade80;
+    }
+    .icon-card .note.error {
+      color: #f87171;
+    }
+
+    /* Entity colors */
+    .entity-scene .icon { background: rgba(139, 92, 246, 0.2); color: #a78bfa; }
+    .entity-performer .icon { background: rgba(236, 72, 153, 0.2); color: #f472b6; }
+    .entity-studio .icon { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .entity-tag .icon { background: rgba(34, 211, 238, 0.2); color: #22d3ee; }
+    .entity-group .icon { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+    .entity-image .icon { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+    .entity-images .icon { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+    .entity-gallery .icon { background: rgba(52, 211, 153, 0.2); color: #34d399; }
+    .entity-playlist .icon { background: rgba(250, 204, 21, 0.2); color: #facc15; }
+
+    /* Feature colors */
+    .feature .icon { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+
+    /* Action colors */
+    .action-favorite .icon { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .action-rating .icon { background: rgba(250, 204, 21, 0.2); color: #facc15; }
+    .action-ocounter .icon { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+    .action-play .icon { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .action-delete .icon { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .action .icon { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+
+    /* Navigation colors */
+    .nav .icon { background: rgba(148, 163, 184, 0.15); color: #64748b; }
+
+    /* View mode colors */
+    .view .icon { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+
+    /* Carousel colors */
+    .carousel .icon { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+
+    /* Server stats */
+    .server .icon { background: rgba(34, 211, 238, 0.15); color: #22d3ee; }
+
+    .issue {
+      border: 2px solid #f87171;
+      background: rgba(248, 113, 113, 0.1);
+    }
+    .warning {
+      border: 2px solid #e8a040;
+    }
+    .fixed {
+      border: 2px solid #4ade80;
+    }
+
+    .section-note {
+      background: #2a2a4a;
+      border-left: 4px solid #4a4a6a;
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+      color: #a0a0c0;
+    }
+    .section-note.warning {
+      border-left-color: #e8a040;
+      background: rgba(232, 160, 64, 0.1);
+    }
+    .section-note.success {
+      border-left-color: #4ade80;
+      background: rgba(74, 222, 128, 0.1);
+    }
+    .section-note.error {
+      border-left-color: #f87171;
+      background: rgba(248, 113, 113, 0.1);
+    }
+    .section-note code {
+      background: #3a3a5a;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+
+    .summary-box {
+      background: #2a2a4a;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+    }
+    .summary-box h3 {
+      margin-top: 0;
+      color: #fff;
+    }
+    .summary-box ul {
+      margin: 0;
+      padding-left: 1.5rem;
+    }
+    .summary-box li {
+      margin: 0.5rem 0;
+      color: #a0a0c0;
+    }
+    .summary-box .issue-item { color: #f87171; }
+    .summary-box .warning-item { color: #e8a040; }
+    .summary-box .fixed-item { color: #4ade80; }
+  </style>
+</head>
+<body>
+  <h1>Peek Icon Inventory</h1>
+
+  <p style="color: #888;">Visual reference for all icons used in the Peek application. Generated from codebase audit.</p>
+
+  <!-- SUMMARY -->
+  <div class="summary-box">
+    <h3>Audit Summary</h3>
+    <ul>
+      <li class="fixed-item"><strong>Fixed:</strong> Studio indicator now uses Building2 (was Clapperboard)</li>
+      <li class="fixed-item"><strong>Fixed:</strong> Favorite Studios carousel now uses Building2 entity icon (was Video)</li>
+      <li class="fixed-item"><strong>Fixed:</strong> Favorite Tags carousel now uses centralized Tag entity icon</li>
+      <li class="fixed-item"><strong>Fixed:</strong> RatingCell now uses RatingBadge (bronze/silver/gold) instead of 5-star display</li>
+      <li class="fixed-item"><strong>Fixed:</strong> Removed dead LucideStar imports from PerformerDetail, StudioDetail, TagDetail</li>
+      <li class="fixed-item"><strong>Fixed:</strong> TagTreeNode favorite indicator now uses Heart (was Star) for consistency</li>
+      <li class="fixed-item"><strong>Fixed:</strong> FilterPresets "default preset" indicator now uses Pin (was Star) for clarity</li>
+      <li class="warning-item"><strong>Note:</strong> Star used for "High Rated" carousel - conceptual icon for quality, acceptable</li>
+    </ul>
+  </div>
+
+  <!-- ENTITY ICONS -->
+  <h2>1. Entity Icons</h2>
+  <div class="section-note success">
+    Centralized in <code>client/src/constants/entityIcons.js</code> — Single source of truth for entity representation.
+  </div>
+
+  <div class="grid">
+    <div class="icon-card entity-scene">
+      <div class="icon"><i data-lucide="clapperboard"></i></div>
+      <div class="content">
+        <div class="label">Scene</div>
+        <div class="icon-name">Clapperboard</div>
+        <div class="usage">CardCountIndicators, LibraryOverview, EngagementTotals, Navigation, TagTreeNode</div>
+      </div>
+    </div>
+    <div class="icon-card entity-performer">
+      <div class="icon"><i data-lucide="user"></i></div>
+      <div class="content">
+        <div class="label">Performer</div>
+        <div class="icon-name">User</div>
+        <div class="usage">CardCountIndicators, LibraryOverview, Navigation, TagTreeNode</div>
+      </div>
+    </div>
+    <div class="icon-card entity-studio fixed">
+      <div class="icon"><i data-lucide="building-2"></i></div>
+      <div class="content">
+        <div class="label">Studio</div>
+        <div class="icon-name">Building2</div>
+        <div class="usage">CardCountIndicators, LibraryOverview, Navigation, carousels.js</div>
+        <div class="note success">Fixed (was Clapperboard in indicators, Video in carousels)</div>
+      </div>
+    </div>
+    <div class="icon-card entity-tag">
+      <div class="icon"><i data-lucide="tag"></i></div>
+      <div class="content">
+        <div class="label">Tag</div>
+        <div class="icon-name">Tag</div>
+        <div class="usage">CardCountIndicators, LibraryOverview, Navigation, FolderCard, carousels.js</div>
+      </div>
+    </div>
+    <div class="icon-card entity-group">
+      <div class="icon"><i data-lucide="film"></i></div>
+      <div class="content">
+        <div class="label">Group / Collection</div>
+        <div class="icon-name">Film</div>
+        <div class="usage">CardCountIndicators, Navigation</div>
+      </div>
+    </div>
+    <div class="icon-card entity-image">
+      <div class="icon"><i data-lucide="image"></i></div>
+      <div class="content">
+        <div class="label">Image (singular)</div>
+        <div class="icon-name">Image</div>
+        <div class="usage">EngagementTotals, Navigation</div>
+      </div>
+    </div>
+    <div class="icon-card entity-images">
+      <div class="icon"><i data-lucide="images"></i></div>
+      <div class="content">
+        <div class="label">Images (plural)</div>
+        <div class="icon-name">Images</div>
+        <div class="usage">CardCountIndicators, TagTreeNode (image count)</div>
+      </div>
+    </div>
+    <div class="icon-card entity-gallery">
+      <div class="icon"><i data-lucide="gallery-vertical"></i></div>
+      <div class="content">
+        <div class="label">Gallery</div>
+        <div class="icon-name">GalleryVertical</div>
+        <div class="usage">CardCountIndicators, LibraryOverview, Navigation</div>
+      </div>
+    </div>
+    <div class="icon-card entity-playlist">
+      <div class="icon"><i data-lucide="list"></i></div>
+      <div class="content">
+        <div class="label">Playlist</div>
+        <div class="icon-name">List</div>
+        <div class="usage">CardCountIndicators, Navigation</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURE/PAGE ICONS -->
+  <h2>2. Feature / Page Icons</h2>
+  <div class="section-note success">
+    Now centralized in <code>client/src/constants/appIcons.js</code> — FEATURE_ICONS
+  </div>
+
+  <div class="grid">
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="history"></i></div>
+      <div class="content">
+        <div class="label">Watch History</div>
+        <div class="icon-name">history</div>
+        <div class="usage">Sidebar, UserMenu (via ThemedIcon)</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="bar-chart-3"></i></div>
+      <div class="content">
+        <div class="label">User Stats</div>
+        <div class="icon-name">bar-chart-3</div>
+        <div class="usage">Sidebar, UserMenu, UserStats page header</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="settings"></i></div>
+      <div class="content">
+        <div class="label">Settings</div>
+        <div class="icon-name">settings</div>
+        <div class="usage">Sidebar, TopBar, Navigation</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="circle-help"></i></div>
+      <div class="content">
+        <div class="label">Help</div>
+        <div class="icon-name">circle-help / questionCircle</div>
+        <div class="usage">Sidebar, TopBar, Navigation</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="tv"></i></div>
+      <div class="content">
+        <div class="label">TV Mode</div>
+        <div class="icon-name">tv</div>
+        <div class="usage">Sidebar, UserMenu</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="log-out"></i></div>
+      <div class="content">
+        <div class="label">Logout</div>
+        <div class="icon-name">log-out / logout</div>
+        <div class="usage">Sidebar, UserMenu</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="circle-user-round"></i></div>
+      <div class="content">
+        <div class="label">User Menu</div>
+        <div class="icon-name">circle-user-round</div>
+        <div class="usage">Sidebar, UserMenu, TopBar</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="sparkles"></i></div>
+      <div class="content">
+        <div class="label">Recommended</div>
+        <div class="icon-name">sparkles</div>
+        <div class="usage">Navigation (sidebar)</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="home"></i></div>
+      <div class="content">
+        <div class="label">Home</div>
+        <div class="icon-name">home</div>
+        <div class="usage">iconSets, FolderBreadcrumb</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION ICONS -->
+  <h2>3. Action Icons</h2>
+  <div class="section-note success">
+    Now centralized in <code>client/src/constants/appIcons.js</code> — ACTION_ICONS
+  </div>
+
+  <div class="grid">
+    <div class="icon-card action-favorite">
+      <div class="icon"><i data-lucide="heart"></i></div>
+      <div class="content">
+        <div class="label">Favorite</div>
+        <div class="icon-name">Heart</div>
+        <div class="usage">FavoriteButton, cellRenderers (FavoriteCell), EngagementTotals, carousels, TagTreeNode (favorite indicator)</div>
+      </div>
+    </div>
+    <div class="icon-card action-rating">
+      <div class="icon"><i data-lucide="star"></i></div>
+      <div class="content">
+        <div class="label">Star (Conceptual Use Only)</div>
+        <div class="icon-name">Star</div>
+        <div class="usage">carousels.js (High Rated carousel - conceptual icon for quality)</div>
+        <div class="note success">No longer used for ratings or favorites - only as conceptual "quality" icon</div>
+      </div>
+    </div>
+    <div class="icon-card action fixed">
+      <div class="icon"><i data-lucide="pin"></i></div>
+      <div class="content">
+        <div class="label">Pin (Default Preset)</div>
+        <div class="icon-name">Pin</div>
+        <div class="usage">FilterPresets (mark preset as default)</div>
+        <div class="note success">Changed from Star for clarity - "pinned as default"</div>
+      </div>
+    </div>
+    <div class="icon-card action-ocounter">
+      <div class="icon"><i data-lucide="droplets"></i></div>
+      <div class="content">
+        <div class="label">O-Counter</div>
+        <div class="icon-name">Droplets</div>
+        <div class="usage">OCounterButton, CardCountIndicators, TagTreeNode</div>
+      </div>
+    </div>
+    <div class="icon-card action-play">
+      <div class="icon"><i data-lucide="play"></i></div>
+      <div class="content">
+        <div class="label">Play</div>
+        <div class="icon-name">Play</div>
+        <div class="usage">EngagementTotals, Lightbox, GalleryDetail</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="pause"></i></div>
+      <div class="content">
+        <div class="label">Pause</div>
+        <div class="icon-name">Pause</div>
+        <div class="usage">Lightbox</div>
+      </div>
+    </div>
+    <div class="icon-card action-delete">
+      <div class="icon"><i data-lucide="trash-2"></i></div>
+      <div class="content">
+        <div class="label">Delete / Trash</div>
+        <div class="icon-name">Trash2</div>
+        <div class="usage">BackupTab, WatchHistory, RuleEditor, CustomThemeManager</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="pencil"></i></div>
+      <div class="content">
+        <div class="label">Edit</div>
+        <div class="icon-name">Pencil</div>
+        <div class="usage">CustomThemeManager</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="copy"></i></div>
+      <div class="content">
+        <div class="label">Copy</div>
+        <div class="icon-name">Copy</div>
+        <div class="usage">CustomThemeManager, ExternalPlayerButton</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="x"></i></div>
+      <div class="content">
+        <div class="label">Close</div>
+        <div class="icon-name">X</div>
+        <div class="usage">ActiveFilterChips, CustomThemeManager, Lightbox, RatingSliderDialog, IconPicker</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="plus"></i></div>
+      <div class="content">
+        <div class="label">Add / Plus</div>
+        <div class="icon-name">Plus</div>
+        <div class="usage">CustomThemeManager, BulkActionBar</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="eye-off"></i></div>
+      <div class="content">
+        <div class="label">Hide</div>
+        <div class="icon-name">EyeOff</div>
+        <div class="usage">BulkActionBar, NavigationSettings</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="eye"></i></div>
+      <div class="content">
+        <div class="label">View / Play Count</div>
+        <div class="icon-name">Eye</div>
+        <div class="usage">CardCountIndicators (play count), NavigationSettings</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="external-link"></i></div>
+      <div class="content">
+        <div class="label">External Link</div>
+        <div class="icon-name">ExternalLink</div>
+        <div class="usage">ExternalPlayerButton, TagTreeNode</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="refresh-cw"></i></div>
+      <div class="content">
+        <div class="label">Refresh</div>
+        <div class="icon-name">RefreshCw</div>
+        <div class="usage">ServerStatsSection</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="rotate-ccw"></i></div>
+      <div class="content">
+        <div class="label">Undo / Reset</div>
+        <div class="icon-name">RotateCcw</div>
+        <div class="usage">HiddenItemsPage</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVIGATION/ARROW ICONS -->
+  <h2>4. Navigation / Arrow Icons</h2>
+  <div class="section-note success">
+    Now centralized in <code>client/src/constants/appIcons.js</code> — NAV_ICONS
+  </div>
+
+  <div class="grid">
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="chevron-up"></i></div>
+      <div class="content">
+        <div class="label">Chevron Up</div>
+        <div class="icon-name">ChevronUp</div>
+        <div class="usage">NavigationSettings, TableColumnSettings, TimelineMobileSheet</div>
+      </div>
+    </div>
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="chevron-down"></i></div>
+      <div class="content">
+        <div class="label">Chevron Down</div>
+        <div class="icon-name">ChevronDown</div>
+        <div class="usage">ViewModeToggle, ThemeTab, ExternalPlayerButton, NavigationSettings, MergeRecoveryTab</div>
+      </div>
+    </div>
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="chevron-left"></i></div>
+      <div class="content">
+        <div class="label">Chevron Left</div>
+        <div class="icon-name">ChevronLeft</div>
+        <div class="usage">Pagination, Lightbox</div>
+      </div>
+    </div>
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="chevron-right"></i></div>
+      <div class="content">
+        <div class="label">Chevron Right</div>
+        <div class="icon-name">ChevronRight</div>
+        <div class="usage">Pagination, Lightbox, FolderBreadcrumb, FolderTreeSidebar, TagTreeNode, ContentTab, MergeRecoveryTab</div>
+      </div>
+    </div>
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="arrow-up"></i></div>
+      <div class="content">
+        <div class="label">Arrow Up</div>
+        <div class="icon-name">ArrowUp</div>
+        <div class="usage">TableHeader (sort ascending), SearchControls</div>
+      </div>
+    </div>
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="arrow-down"></i></div>
+      <div class="content">
+        <div class="label">Arrow Down</div>
+        <div class="icon-name">ArrowDown</div>
+        <div class="usage">TableHeader (sort descending), SearchControls</div>
+      </div>
+    </div>
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="arrow-left"></i></div>
+      <div class="content">
+        <div class="label">Arrow Left (Back)</div>
+        <div class="icon-name">ArrowLeft</div>
+        <div class="usage">Detail pages (back button): PerformerDetail, StudioDetail, TagDetail, GalleryDetail, GroupDetail, HiddenItemsPage</div>
+      </div>
+    </div>
+    <div class="icon-card nav">
+      <div class="icon"><i data-lucide="arrow-up-down"></i></div>
+      <div class="content">
+        <div class="label">Sort</div>
+        <div class="icon-name">ArrowUpDown</div>
+        <div class="usage">iconSets (via ThemedIcon)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW MODE ICONS -->
+  <h2>5. View Mode Icons</h2>
+  <div class="section-note success">
+    Now centralized in <code>client/src/constants/appIcons.js</code> — VIEW_MODE_ICONS
+  </div>
+
+  <div class="grid">
+    <div class="icon-card view">
+      <div class="icon"><i data-lucide="grid-2x2"></i></div>
+      <div class="content">
+        <div class="label">Grid View</div>
+        <div class="icon-name">Grid2X2</div>
+        <div class="usage">ViewModeToggle</div>
+      </div>
+    </div>
+    <div class="icon-card view">
+      <div class="icon"><i data-lucide="square"></i></div>
+      <div class="content">
+        <div class="label">Card View</div>
+        <div class="icon-name">Square</div>
+        <div class="usage">ViewModeToggle</div>
+      </div>
+    </div>
+    <div class="icon-card view">
+      <div class="icon"><i data-lucide="network"></i></div>
+      <div class="content">
+        <div class="label">Tree View</div>
+        <div class="icon-name">Network</div>
+        <div class="usage">ViewModeToggle</div>
+      </div>
+    </div>
+    <div class="icon-card view">
+      <div class="icon"><i data-lucide="list"></i></div>
+      <div class="content">
+        <div class="label">List / Table View</div>
+        <div class="icon-name">List</div>
+        <div class="usage">ViewModeToggle (also used for Playlist entity)</div>
+      </div>
+    </div>
+    <div class="icon-card view">
+      <div class="icon"><i data-lucide="calendar"></i></div>
+      <div class="content">
+        <div class="label">Timeline View</div>
+        <div class="icon-name">Calendar</div>
+        <div class="usage">ViewModeToggle</div>
+      </div>
+    </div>
+    <div class="icon-card view">
+      <div class="icon"><i data-lucide="folder-open"></i></div>
+      <div class="content">
+        <div class="label">Folder View (Open)</div>
+        <div class="icon-name">FolderOpen</div>
+        <div class="usage">ViewModeToggle, FolderTreeSidebar</div>
+      </div>
+    </div>
+    <div class="icon-card view">
+      <div class="icon"><i data-lucide="folder"></i></div>
+      <div class="content">
+        <div class="label">Folder (Closed)</div>
+        <div class="icon-name">Folder</div>
+        <div class="usage">FolderCard, FolderTreeSidebar</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAROUSEL ICONS -->
+  <h2>6. Carousel Icons</h2>
+  <div class="section-note success">
+    Defined in <code>client/src/constants/carousels.js</code> — Now uses entity icons for entity-related carousels
+  </div>
+
+  <div class="grid">
+    <div class="icon-card carousel">
+      <div class="icon"><i data-lucide="play-circle"></i></div>
+      <div class="content">
+        <div class="label">Continue Watching</div>
+        <div class="icon-name">PlayCircle</div>
+        <div class="usage">carousels.js - conceptual icon for "in progress" content</div>
+      </div>
+    </div>
+    <div class="icon-card carousel">
+      <div class="icon"><i data-lucide="clock"></i></div>
+      <div class="content">
+        <div class="label">Recently Added</div>
+        <div class="icon-name">Clock</div>
+        <div class="usage">carousels.js - conceptual icon for "new/recent"</div>
+      </div>
+    </div>
+    <div class="icon-card carousel">
+      <div class="icon"><i data-lucide="star"></i></div>
+      <div class="content">
+        <div class="label">High Rated</div>
+        <div class="icon-name">Star</div>
+        <div class="usage">carousels.js - conceptual icon for "top quality" (acceptable)</div>
+      </div>
+    </div>
+    <div class="icon-card carousel">
+      <div class="icon"><i data-lucide="heart"></i></div>
+      <div class="content">
+        <div class="label">Favorite Performers</div>
+        <div class="icon-name">Heart</div>
+        <div class="usage">carousels.js - conceptual icon for "loved" content</div>
+      </div>
+    </div>
+    <div class="icon-card carousel fixed">
+      <div class="icon"><i data-lucide="tag"></i></div>
+      <div class="content">
+        <div class="label">Favorite Tags</div>
+        <div class="icon-name">Tag (via ENTITY_ICONS.tag)</div>
+        <div class="usage">carousels.js</div>
+        <div class="note success">Now uses centralized entity icon</div>
+      </div>
+    </div>
+    <div class="icon-card carousel fixed">
+      <div class="icon"><i data-lucide="building-2"></i></div>
+      <div class="content">
+        <div class="label">Favorite Studios</div>
+        <div class="icon-name">Building2 (via ENTITY_ICONS.studio)</div>
+        <div class="usage">carousels.js</div>
+        <div class="note success">Fixed (was Video)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERVER STATS ICONS -->
+  <h2>7. Server Stats Icons</h2>
+  <div class="section-note success">
+    Now centralized in <code>client/src/constants/appIcons.js</code> — SERVER_ICONS
+  </div>
+
+  <div class="grid">
+    <div class="icon-card server">
+      <div class="icon"><i data-lucide="clock"></i></div>
+      <div class="content">
+        <div class="label">Uptime</div>
+        <div class="icon-name">Clock</div>
+        <div class="usage">ServerStatsSection</div>
+      </div>
+    </div>
+    <div class="icon-card server">
+      <div class="icon"><i data-lucide="cpu"></i></div>
+      <div class="content">
+        <div class="label">CPU</div>
+        <div class="icon-name">Cpu</div>
+        <div class="usage">ServerStatsSection</div>
+      </div>
+    </div>
+    <div class="icon-card server">
+      <div class="icon"><i data-lucide="database"></i></div>
+      <div class="content">
+        <div class="label">Database</div>
+        <div class="icon-name">Database</div>
+        <div class="usage">ServerStatsSection</div>
+      </div>
+    </div>
+    <div class="icon-card server">
+      <div class="icon"><i data-lucide="hard-drive"></i></div>
+      <div class="content">
+        <div class="label">Storage</div>
+        <div class="icon-name">HardDrive</div>
+        <div class="usage">ServerStatsSection</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MISC/UI ICONS -->
+  <h2>8. Miscellaneous UI Icons</h2>
+  <div class="section-note success">
+    Now centralized in <code>client/src/constants/appIcons.js</code> — UI_ICONS
+  </div>
+
+  <div class="grid">
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="menu"></i></div>
+      <div class="content">
+        <div class="label">Menu (Hamburger)</div>
+        <div class="icon-name">Menu</div>
+        <div class="usage">TopBar (mobile)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="more-vertical"></i></div>
+      <div class="content">
+        <div class="label">More Options</div>
+        <div class="icon-name">MoreVertical</div>
+        <div class="usage">EntityMenu</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="search"></i></div>
+      <div class="content">
+        <div class="label">Search</div>
+        <div class="icon-name">Search</div>
+        <div class="usage">SearchableSelect, IconPicker</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="filter"></i></div>
+      <div class="content">
+        <div class="label">Filter</div>
+        <div class="icon-name">Filter</div>
+        <div class="usage">iconSets (via ThemedIcon)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="info"></i></div>
+      <div class="content">
+        <div class="label">Info</div>
+        <div class="icon-name">Info</div>
+        <div class="usage">Lightbox, iconSets</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="alert-circle"></i></div>
+      <div class="content">
+        <div class="label">Alert / Warning</div>
+        <div class="icon-name">AlertCircle</div>
+        <div class="usage">CarouselPreview</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="loader-2"></i></div>
+      <div class="content">
+        <div class="label">Loading</div>
+        <div class="icon-name">Loader2</div>
+        <div class="usage">CarouselPreview</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="image-off"></i></div>
+      <div class="content">
+        <div class="label">No Image</div>
+        <div class="icon-name">ImageOff</div>
+        <div class="usage">CarouselPreview</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="check"></i></div>
+      <div class="content">
+        <div class="label">Check / Success</div>
+        <div class="icon-name">Check</div>
+        <div class="usage">iconSets (via ThemedIcon)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="check-square"></i></div>
+      <div class="content">
+        <div class="label">Checkbox (Checked)</div>
+        <div class="icon-name">CheckSquare</div>
+        <div class="usage">SceneGrid (multi-select)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="square"></i></div>
+      <div class="content">
+        <div class="label">Checkbox (Unchecked)</div>
+        <div class="icon-name">Square</div>
+        <div class="usage">SceneGrid (multi-select)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="maximize"></i></div>
+      <div class="content">
+        <div class="label">Fullscreen</div>
+        <div class="icon-name">Maximize</div>
+        <div class="usage">Lightbox</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="minimize"></i></div>
+      <div class="content">
+        <div class="label">Exit Fullscreen</div>
+        <div class="icon-name">Minimize</div>
+        <div class="usage">Lightbox</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="wrench"></i></div>
+      <div class="content">
+        <div class="label">Tools / Admin</div>
+        <div class="icon-name">Wrench</div>
+        <div class="usage">Navigation (admin tools)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="bookmark"></i></div>
+      <div class="content">
+        <div class="label">Bookmark / Save</div>
+        <div class="icon-name">Bookmark</div>
+        <div class="usage">FilterPresets (saved presets)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon"><i data-lucide="save"></i></div>
+      <div class="content">
+        <div class="label">Save</div>
+        <div class="icon-name">Save</div>
+        <div class="usage">FilterPresets</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENDER ICONS -->
+  <h2>9. Gender Icons</h2>
+  <div class="section-note">
+    Used in <code>GenderIcon.jsx</code> — displayed on PerformerCard and PerformerDetail.
+    Custom SVG icons for intersex and non-binary match Lucide's style.
+  </div>
+
+  <div class="grid">
+    <div class="icon-card action">
+      <div class="icon" style="color: #0561fa;"><i data-lucide="mars"></i></div>
+      <div class="content">
+        <div class="label">Male</div>
+        <div class="icon-name">Mars (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #ff0080;"><i data-lucide="venus"></i></div>
+      <div class="content">
+        <div class="label">Female</div>
+        <div class="icon-name">Venus (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #5BCEFA;"><i data-lucide="transgender"></i></div>
+      <div class="content">
+        <div class="label">Transgender Male</div>
+        <div class="icon-name">Transgender (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Light blue from trans pride flag (#5BCEFA)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #F5A9B8;"><i data-lucide="transgender"></i></div>
+      <div class="content">
+        <div class="label">Transgender Female</div>
+        <div class="icon-name">Transgender (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Light pink from trans pride flag (#F5A9B8)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #FFD800;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <circle cx="12" cy="12" r="5" />
+        </svg>
+      </div>
+      <div class="content">
+        <div class="label">Intersex</div>
+        <div class="icon-name">IntersexIcon (Custom SVG)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Yellow from intersex pride flag (#FFD800)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #FFF430;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <path d="M15.5 8.5 L19 5 M19 5 L19 9 M19 5 L15 5" />
+          <path d="M8.5 15.5 L5 19 M5 19 L5 15 M5 19 L9 19" />
+          <path d="M12 7 L12 4" />
+          <path d="M12 17 L12 20" />
+        </svg>
+      </div>
+      <div class="content">
+        <div class="label">Non-Binary</div>
+        <div class="icon-name">NonBinaryIcon (Custom SVG)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail</div>
+        <div class="note">Yellow from non-binary pride flag (#FFF430)</div>
+      </div>
+    </div>
+    <div class="icon-card action">
+      <div class="icon" style="color: #6c757d;"><i data-lucide="user"></i></div>
+      <div class="content">
+        <div class="label">Unknown</div>
+        <div class="icon-name">User (Lucide)</div>
+        <div class="usage">GenderIcon.jsx → PerformerCard, PerformerDetail (fallback)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BRAND ICONS -->
+  <h2>10. Brand / Logo Icons</h2>
+  <div class="section-note success">
+    Now centralized in <code>client/src/constants/appIcons.js</code> — BRAND_ICONS
+  </div>
+
+  <div class="grid">
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="eye"></i></div>
+      <div class="content">
+        <div class="label">Peek Logo</div>
+        <div class="icon-name">Eye</div>
+        <div class="usage">iconSets (logo)</div>
+      </div>
+    </div>
+    <div class="icon-card feature">
+      <div class="icon"><i data-lucide="eye-off"></i></div>
+      <div class="content">
+        <div class="label">Peek Alt</div>
+        <div class="icon-name">EyeOff</div>
+        <div class="usage">iconSets (peek)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALL ISSUES RESOLVED -->
+  <h2>11. Audit Complete</h2>
+  <div class="section-note success">
+    All icon issues have been resolved. The icon system is now consistent and centralized.
+  </div>
+
+  <!-- Initialize Lucide icons -->
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

@@ -1,14 +1,12 @@
 import { forwardRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  LucideChevronRight,
-  LucideStar,
-  LucideExternalLink,
-  LucideClapperboard,
-  LucideImages,
-  LucideUser,
-  LucideDroplets,
+  ChevronRight,
+  Heart,
+  ExternalLink,
+  Droplets,
 } from "lucide-react";
+import { ENTITY_ICONS } from "../../constants/entityIcons.js";
 
 // Color utilities matching CardCountIndicators
 const hueify = (color, direction = "lighter", amount = 12) => {
@@ -141,7 +139,7 @@ const TagTreeNode = forwardRef(
           {/* Expand/collapse chevron */}
           <div className="w-5 flex-shrink-0">
             {hasChildren && (
-              <LucideChevronRight
+              <ChevronRight
                 size={18}
                 className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
                 style={{ color: "var(--text-muted)" }}
@@ -194,7 +192,7 @@ const TagTreeNode = forwardRef(
                 className="flex items-center gap-1"
                 title={`${tag.scene_count} scene${tag.scene_count !== 1 ? "s" : ""}`}
               >
-                <LucideClapperboard
+                <ENTITY_ICONS.scene
                   size={16}
                   style={{ color: hueify("var(--accent-secondary)", "lighter") }}
                 />
@@ -210,7 +208,7 @@ const TagTreeNode = forwardRef(
                 className="flex items-center gap-1"
                 title={`${tag.image_count} image${tag.image_count !== 1 ? "s" : ""}`}
               >
-                <LucideImages
+                <ENTITY_ICONS.images
                   size={16}
                   style={{ color: hueify("var(--status-success)", "lighter") }}
                 />
@@ -226,7 +224,7 @@ const TagTreeNode = forwardRef(
                 className="flex items-center gap-1"
                 title={`${tag.performer_count} performer${tag.performer_count !== 1 ? "s" : ""}`}
               >
-                <LucideUser
+                <ENTITY_ICONS.performer
                   size={16}
                   style={{ color: "var(--accent-primary)" }}
                 />
@@ -259,7 +257,7 @@ const TagTreeNode = forwardRef(
                 className="flex items-center gap-1"
                 title={`O-Counter: ${tag.o_counter}`}
               >
-                <LucideDroplets
+                <Droplets
                   size={16}
                   style={{ color: "var(--status-info)" }}
                 />
@@ -269,9 +267,9 @@ const TagTreeNode = forwardRef(
               </div>
             )}
 
-            {/* Favorite star */}
+            {/* Favorite heart */}
             {tag.favorite && (
-              <LucideStar
+              <Heart
                 size={16}
                 fill="var(--accent-primary)"
                 style={{ color: "var(--accent-primary)" }}
@@ -288,7 +286,7 @@ const TagTreeNode = forwardRef(
               title="Go to tag"
               aria-label={`Go to ${tag.name}`}
             >
-              <LucideExternalLink
+              <ExternalLink
                 size={14}
                 style={{ color: "var(--text-secondary)" }}
               />

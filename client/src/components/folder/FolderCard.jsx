@@ -1,5 +1,6 @@
 // client/src/components/folder/FolderCard.jsx
-import { LucideFolder, LucideTag } from "lucide-react";
+import { Folder } from "lucide-react";
+import { ENTITY_ICONS } from "../../constants/entityIcons.js";
 import { UNTAGGED_FOLDER_ID } from "../../utils/buildFolderTree.js";
 
 /**
@@ -32,9 +33,9 @@ const FolderCard = ({ folder, onClick, className = "" }) => {
             style={{ backgroundColor: "var(--bg-tertiary)" }}
           >
             {isUntagged ? (
-              <LucideTag size={48} style={{ color: "var(--text-tertiary)" }} />
+              <ENTITY_ICONS.tag size={48} style={{ color: "var(--text-tertiary)" }} />
             ) : (
-              <LucideFolder size={48} style={{ color: "var(--text-tertiary)" }} />
+              <Folder size={48} style={{ color: "var(--text-tertiary)" }} />
             )}
           </div>
         )}
@@ -44,7 +45,7 @@ const FolderCard = ({ folder, onClick, className = "" }) => {
           className="absolute bottom-2 right-2 p-1.5 rounded-md"
           style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
         >
-          <LucideFolder size={16} className="text-white" />
+          <Folder size={16} className="text-white" />
         </div>
       </div>
 

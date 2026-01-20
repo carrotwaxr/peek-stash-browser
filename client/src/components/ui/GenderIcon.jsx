@@ -1,7 +1,11 @@
-import { LucideMars, LucideUser, LucideVenus } from "lucide-react";
+import {
+  LucideMars,
+  LucideTransgender,
+  LucideUser,
+  LucideVenus,
+} from "lucide-react";
 import IntersexIcon from "./icons/IntersexIcon.jsx";
 import NonBinaryIcon from "./icons/NonBinaryIcon.jsx";
-import TransgenderIcon from "./icons/TransgenderIcon.jsx";
 
 /**
  * Reusable gender icon component supporting all Stash gender values
@@ -37,13 +41,13 @@ const GenderIcon = ({ gender, size = 24, className = "" }) => {
         };
       case "TRANSGENDER_MALE":
         return {
-          icon: TransgenderIcon,
+          icon: LucideTransgender,
           color: "#5BCEFA", // Light blue from trans flag
           label: "Trans Male",
         };
       case "TRANSGENDER_FEMALE":
         return {
-          icon: TransgenderIcon,
+          icon: LucideTransgender,
           color: "#F5A9B8", // Light pink from trans flag
           label: "Trans Female",
         };
