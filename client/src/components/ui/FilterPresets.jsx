@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import {
   LucideBookmark,
   LucideChevronDown,
+  LucidePin,
   LucideSave,
-  LucideStar,
   LucideTrash2,
 } from "lucide-react";
 import { apiDelete, apiGet, apiPost, apiPut } from "../../services/api.js";
@@ -312,15 +312,15 @@ const FilterPresets = ({
                                   : "Set as default"
                               }
                             >
-                              <LucideStar
+                              <LucidePin
                                 className={`w-3.5 h-3.5 ${
                                   isDefault
-                                    ? "fill-yellow-400 stroke-yellow-400"
+                                    ? "fill-current"
                                     : ""
                                 }`}
                                 style={{
                                   color: isDefault
-                                    ? "rgb(250, 204, 21)"
+                                    ? "var(--accent-primary)"
                                     : "currentColor",
                                 }}
                               />

@@ -198,11 +198,11 @@
       <li class="fixed-item"><strong>Fixed:</strong> Studio indicator now uses Building2 (was Clapperboard)</li>
       <li class="fixed-item"><strong>Fixed:</strong> Favorite Studios carousel now uses Building2 entity icon (was Video)</li>
       <li class="fixed-item"><strong>Fixed:</strong> Favorite Tags carousel now uses centralized Tag entity icon</li>
-      <li class="issue-item"><strong>Issue:</strong> RatingCell in table view uses 5-star display - should use bronze/silver/gold badge</li>
-      <li class="issue-item"><strong>Issue:</strong> Star is imported but unused in PerformerDetail, StudioDetail, TagDetail (dead imports)</li>
-      <li class="warning-item"><strong>Review:</strong> Star used for "default preset" indicator in FilterPresets - acceptable (not rating)</li>
-      <li class="warning-item"><strong>Review:</strong> Star used for "favorite" indicator in TagTreeNode - acceptable (marking favorites)</li>
-      <li class="warning-item"><strong>Review:</strong> Star used for "High Rated" carousel - conceptual icon, acceptable</li>
+      <li class="fixed-item"><strong>Fixed:</strong> RatingCell now uses RatingBadge (bronze/silver/gold) instead of 5-star display</li>
+      <li class="fixed-item"><strong>Fixed:</strong> Removed dead LucideStar imports from PerformerDetail, StudioDetail, TagDetail</li>
+      <li class="fixed-item"><strong>Fixed:</strong> TagTreeNode favorite indicator now uses Heart (was Star) for consistency</li>
+      <li class="fixed-item"><strong>Fixed:</strong> FilterPresets "default preset" indicator now uses Pin (was Star) for clarity</li>
+      <li class="warning-item"><strong>Note:</strong> Star used for "High Rated" carousel - conceptual icon for quality, acceptable</li>
     </ul>
   </div>
 
@@ -381,21 +381,25 @@
       <div class="content">
         <div class="label">Favorite</div>
         <div class="icon-name">Heart</div>
-        <div class="usage">FavoriteButton, cellRenderers (FavoriteCell), EngagementTotals, carousels</div>
+        <div class="usage">FavoriteButton, cellRenderers (FavoriteCell), EngagementTotals, carousels, TagTreeNode (favorite indicator)</div>
       </div>
     </div>
-    <div class="icon-card action-rating issue">
+    <div class="icon-card action-rating">
       <div class="icon"><i data-lucide="star"></i></div>
       <div class="content">
-        <div class="label">Star (Multiple Uses)</div>
+        <div class="label">Star (Conceptual Use Only)</div>
         <div class="icon-name">Star</div>
-        <div class="usage">
-          <strong>RatingCell</strong> (5-star display - ISSUE),
-          FilterPresets (default marker),
-          TagTreeNode (favorite indicator),
-          carousels (High Rated concept)
-        </div>
-        <div class="note error">RatingCell should use bronze/silver/gold badges, not 5-star display</div>
+        <div class="usage">carousels.js (High Rated carousel - conceptual icon for quality)</div>
+        <div class="note success">No longer used for ratings or favorites - only as conceptual "quality" icon</div>
+      </div>
+    </div>
+    <div class="icon-card action fixed">
+      <div class="icon"><i data-lucide="pin"></i></div>
+      <div class="content">
+        <div class="label">Pin (Default Preset)</div>
+        <div class="icon-name">Pin</div>
+        <div class="usage">FilterPresets (mark preset as default)</div>
+        <div class="note success">Changed from Star for clarity - "pinned as default"</div>
       </div>
     </div>
     <div class="icon-card action-ocounter">
@@ -937,28 +941,10 @@
     </div>
   </div>
 
-  <!-- ISSUES SECTION -->
-  <h2>11. Issues to Address</h2>
-
-  <div class="grid">
-    <div class="icon-card issue">
-      <div class="icon" style="background: rgba(248, 113, 113, 0.3);"><i data-lucide="star"></i></div>
-      <div class="content">
-        <div class="label">RatingCell - 5-Star Display</div>
-        <div class="icon-name">Star (x5)</div>
-        <div class="usage">cellRenderers.jsx:23-52</div>
-        <div class="note error">Should use bronze/silver/gold gradient badges like RatingBadge component</div>
-      </div>
-    </div>
-    <div class="icon-card warning">
-      <div class="icon" style="background: rgba(232, 160, 64, 0.3);"><i data-lucide="star"></i></div>
-      <div class="content">
-        <div class="label">Dead Imports - LucideStar</div>
-        <div class="icon-name">LucideStar</div>
-        <div class="usage">PerformerDetail.jsx, StudioDetail.jsx, TagDetail.jsx</div>
-        <div class="note">Imported but never used - should be removed</div>
-      </div>
-    </div>
+  <!-- ALL ISSUES RESOLVED -->
+  <h2>11. Audit Complete</h2>
+  <div class="section-note success">
+    All icon issues have been resolved. The icon system is now consistent and centralized.
   </div>
 
   <!-- Initialize Lucide icons -->
