@@ -82,11 +82,9 @@ const GroupModal = ({ group, onClose }) => {
       const groupData = {
         name: name.trim(),
         description: description.trim() || null,
-        permissions: {
-          canShare,
-          canDownloadFiles,
-          canDownloadPlaylists,
-        },
+        canShare,
+        canDownloadFiles,
+        canDownloadPlaylists,
       };
 
       if (isEditMode) {

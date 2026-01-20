@@ -75,10 +75,10 @@ const GroupsTab = () => {
     loadGroups();
   };
 
-  const renderPermissionBadges = (permissions) => {
+  const renderPermissionBadges = (group) => {
     const badges = [];
 
-    if (permissions?.canShare) {
+    if (group?.canShare) {
       badges.push(
         <span
           key="share"
@@ -94,7 +94,7 @@ const GroupsTab = () => {
       );
     }
 
-    if (permissions?.canDownloadFiles) {
+    if (group?.canDownloadFiles) {
       badges.push(
         <span
           key="download-files"
@@ -110,7 +110,7 @@ const GroupsTab = () => {
       );
     }
 
-    if (permissions?.canDownloadPlaylists) {
+    if (group?.canDownloadPlaylists) {
       badges.push(
         <span
           key="download-playlists"
@@ -300,11 +300,11 @@ const GroupsTab = () => {
                       >
                         <span className="inline-flex items-center gap-1">
                           <Users size={14} style={{ color: "var(--text-secondary)" }} />
-                          {group._count?.members ?? group.members?.length ?? 0}
+                          {group.memberCount ?? 0}
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        {renderPermissionBadges(group.permissions)}
+                        {renderPermissionBadges(group)}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex justify-end gap-2">
