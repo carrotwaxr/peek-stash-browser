@@ -11,6 +11,7 @@ import {
   getFilterPresets,
   getHiddenEntities,
   getHiddenEntityIds,
+  getUserGroupMemberships,
   getUserPermissions,
   getUserRestrictions,
   getUserSettings,
@@ -81,6 +82,13 @@ router.put(
   "/:userId/permissions",
   requireAdmin,
   authenticated(updateUserPermissionOverrides)
+);
+
+// Admin: get user's group memberships
+router.get(
+  "/:userId/groups",
+  requireAdmin,
+  authenticated(getUserGroupMemberships)
 );
 
 // Admin-only content restriction routes

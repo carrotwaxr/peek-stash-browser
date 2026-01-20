@@ -2426,3 +2426,45 @@ export const updateUserPermissionOverrides = async (
     res.status(500).json({ error: "Failed to update permission overrides" });
   }
 };
+
+/**
+ * Get user's group memberships (admin only)
+ */
+export const getUserGroupMemberships = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    if (req.user?.role !== "ADMIN") {
+      return res.status(403).json({ error: "Forbidden: Admin access required" });
+    }
+
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    const memberships = await prisma.userGroupMembership.findMany({
+      where: { userId },
+      include: {
+        group: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            canShare: true,
+            canDownloadFiles: true,
+            canDownloadPlaylists: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      groups: memberships.map((m) => m.group),
+    });
+  } catch (error) {
+    console.error("Error getting user group memberships:", error);
+    res.status(500).json({ error: "Failed to get user group memberships" });
+  }
+};

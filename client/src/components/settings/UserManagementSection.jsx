@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { Users, Edit2, Trash2, Shield, Download, Share2, Plus } from "lucide-react";
 import { getGroups, deleteGroup } from "../../services/api.js";
 import { formatDate } from "../../utils/date.js";
-import ContentRestrictionsModal from "./ContentRestrictionsModal.jsx";
 import CreateUserModal from "./CreateUserModal.jsx";
 import GroupModal from "./GroupModal.jsx";
 import SyncFromStashModal from "./SyncFromStashModal.jsx";
-import UserGroupsModal from "./UserGroupsModal.jsx";
+import UserEditModal from "./UserEditModal.jsx";
 import { Button, Paper } from "../ui/index.js";
 
 const UserManagementSection = ({
@@ -20,12 +19,10 @@ const UserManagementSection = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncTargetUser, setSyncTargetUser] = useState(null);
-  const [showRestrictionsModal, setShowRestrictionsModal] = useState(false);
-  const [restrictionsTargetUser, setRestrictionsTargetUser] = useState(null);
   const [groups, setGroups] = useState([]);
-  const [groupModalUser, setGroupModalUser] = useState(null);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
 
   // Load groups on mount
   const loadGroups = async () => {
@@ -146,36 +143,6 @@ const UserManagementSection = ({
     return <div className="flex flex-wrap gap-1">{badges}</div>;
   };
 
-  const deleteUser = async (userId, username) => {
-    if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
-      return;
-    }
-
-    try {
-      await api.delete(`/user/${userId}`);
-      onMessage(`User "${username}" deleted successfully!`);
-      onUsersChanged();
-    } catch (err) {
-      onError(err.response?.data?.error || "Failed to delete user");
-    }
-  };
-
-  const changeUserRole = async (userId, username, currentRole) => {
-    const newRole = currentRole === "ADMIN" ? "USER" : "ADMIN";
-
-    if (!confirm(`Change "${username}" from ${currentRole} to ${newRole}?`)) {
-      return;
-    }
-
-    try {
-      await api.put(`/user/${userId}/role`, { role: newRole });
-      onMessage(`User "${username}" role changed to ${newRole}!`);
-      onUsersChanged();
-    } catch (err) {
-      onError(err.response?.data?.error || "Failed to change user role");
-    }
-  };
-
   const toggleSyncToStash = async (userId, username, currentSyncToStash) => {
     const newSyncToStash = !currentSyncToStash;
 
@@ -195,11 +162,6 @@ const UserManagementSection = ({
   const openSyncModal = (user) => {
     setSyncTargetUser(user);
     setShowSyncModal(true);
-  };
-
-  const openRestrictionsModal = (user) => {
-    setRestrictionsTargetUser(user);
-    setShowRestrictionsModal(true);
   };
 
   return (
@@ -558,43 +520,13 @@ const UserManagementSection = ({
                           Sync from Stash
                         </Button>
                         <Button
-                          onClick={() => openRestrictionsModal(user)}
-                          variant="tertiary"
-                          size="sm"
-                          className="px-3 py-1 text-sm whitespace-nowrap"
-                          title="Manage content restrictions for this user"
-                        >
-                          Content Restrictions
-                        </Button>
-                        <Button
-                          onClick={() => setGroupModalUser(user)}
-                          variant="tertiary"
-                          size="sm"
-                          className="px-3 py-1 text-sm whitespace-nowrap"
-                          title="Manage group memberships for this user"
-                        >
-                          <Users className="w-4 h-4 mr-1 inline" />
-                          Groups
-                        </Button>
-                        <Button
-                          onClick={() =>
-                            changeUserRole(user.id, user.username, user.role)
-                          }
-                          disabled={user.id === currentUser?.id}
+                          onClick={() => setEditingUser(user)}
                           variant="secondary"
                           size="sm"
+                          icon={<Edit2 size={14} />}
                           className="px-3 py-1 text-sm whitespace-nowrap"
                         >
-                          Change Role
-                        </Button>
-                        <Button
-                          onClick={() => deleteUser(user.id, user.username)}
-                          disabled={user.id === currentUser?.id}
-                          variant="destructive"
-                          size="sm"
-                          className="px-3 py-1 text-sm whitespace-nowrap"
-                        >
-                          Delete
+                          Edit
                         </Button>
                       </div>
                     </td>
@@ -632,35 +564,6 @@ const UserManagementSection = ({
         />
       )}
 
-      {showRestrictionsModal && restrictionsTargetUser && (
-        <ContentRestrictionsModal
-          user={restrictionsTargetUser}
-          onClose={() => {
-            setShowRestrictionsModal(false);
-            setRestrictionsTargetUser(null);
-          }}
-          onSave={() => {
-            onMessage(
-              `Content restrictions updated for ${restrictionsTargetUser.username}!`
-            );
-          }}
-        />
-      )}
-
-      {groupModalUser && (
-        <UserGroupsModal
-          user={groupModalUser}
-          groups={groups}
-          onClose={() => {
-            setGroupModalUser(null);
-            // Refresh users to show updated group memberships
-            onUsersChanged();
-            // Also refresh groups to update member counts
-            loadGroups();
-          }}
-        />
-      )}
-
       {showGroupModal && (
         <GroupModal
           group={editingGroup}
@@ -668,6 +571,24 @@ const UserManagementSection = ({
           onClose={handleGroupModalClose}
           onSave={handleGroupModalSave}
           onMessage={onMessage}
+        />
+      )}
+
+      {editingUser && (
+        <UserEditModal
+          user={editingUser}
+          groups={groups}
+          currentUser={currentUser}
+          onClose={() => setEditingUser(null)}
+          onSave={() => {
+            setEditingUser(null);
+            onMessage(`User "${editingUser.username}" updated successfully`);
+            onUsersChanged();
+            loadGroups();
+          }}
+          onMessage={onMessage}
+          onError={onError}
+          api={api}
         />
       )}
     </>
