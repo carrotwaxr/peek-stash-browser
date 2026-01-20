@@ -791,3 +791,54 @@ export const getUserPermissions = (userId) => apiGet(`/user/${userId}/permission
  */
 export const updateUserPermissionOverrides = (userId, overrides) =>
   apiPut(`/user/${userId}/permissions`, overrides);
+
+// ============================================================================
+// Recovery Key & Password Reset API
+// ============================================================================
+
+/**
+ * Get current user's recovery key
+ * @returns {Promise<{recoveryKey: string | null}>}
+ */
+export const getRecoveryKey = () => apiGet("/user/recovery-key");
+
+/**
+ * Regenerate current user's recovery key
+ * @returns {Promise<{recoveryKey: string}>}
+ */
+export const regenerateRecoveryKey = () => apiPost("/user/recovery-key/regenerate");
+
+/**
+ * Forgot password - check if user has recovery key
+ * @param {string} username
+ * @returns {Promise<{hasRecoveryKey: boolean}>}
+ */
+export const forgotPasswordInit = (username) =>
+  apiPost("/auth/forgot-password/init", { username });
+
+/**
+ * Forgot password - reset with recovery key
+ * @param {string} username
+ * @param {string} recoveryKey
+ * @param {string} newPassword
+ * @returns {Promise<{success: boolean}>}
+ */
+export const forgotPasswordReset = (username, recoveryKey, newPassword) =>
+  apiPost("/auth/forgot-password/reset", { username, recoveryKey, newPassword });
+
+/**
+ * Admin: Reset user's password
+ * @param {number} userId
+ * @param {string} newPassword
+ * @returns {Promise<{success: boolean}>}
+ */
+export const adminResetPassword = (userId, newPassword) =>
+  apiPost(`/user/${userId}/reset-password`, { newPassword });
+
+/**
+ * Admin: Regenerate user's recovery key
+ * @param {number} userId
+ * @returns {Promise<{recoveryKey: string}>}
+ */
+export const adminRegenerateRecoveryKey = (userId) =>
+  apiPost(`/user/${userId}/regenerate-recovery-key`);
