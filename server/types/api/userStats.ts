@@ -42,6 +42,7 @@ export interface EngagementStats {
 
 /**
  * A scene ranked by engagement
+ * Score formula: (oCount × 5) + (normalizedDuration × 1) + (playCount × 1)
  */
 export interface TopScene {
   id: string;
@@ -51,10 +52,12 @@ export interface TopScene {
   playCount: number;
   playDuration: number; // seconds
   oCount: number;
+  score: number; // Computed engagement score
 }
 
 /**
  * A performer ranked by engagement
+ * Score formula: Bayesian-weighted (engagement rate normalized by library presence)
  */
 export interface TopPerformer {
   id: string;
@@ -63,10 +66,12 @@ export interface TopPerformer {
   playCount: number;
   playDuration: number; // seconds
   oCount: number;
+  score: number; // Computed Bayesian engagement score
 }
 
 /**
  * A studio ranked by engagement
+ * Score formula: Bayesian-weighted (engagement rate normalized by library presence)
  */
 export interface TopStudio {
   id: string;
@@ -75,10 +80,12 @@ export interface TopStudio {
   playCount: number;
   playDuration: number; // seconds
   oCount: number;
+  score: number; // Computed Bayesian engagement score
 }
 
 /**
  * A tag ranked by engagement
+ * Score formula: Bayesian-weighted (engagement rate normalized by library presence)
  */
 export interface TopTag {
   id: string;
@@ -87,6 +94,7 @@ export interface TopTag {
   playCount: number;
   playDuration: number; // seconds
   oCount: number;
+  score: number; // Computed Bayesian engagement score
 }
 
 // =============================================================================

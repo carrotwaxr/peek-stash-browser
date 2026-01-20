@@ -365,6 +365,32 @@ model UserTagStats {
   @@index([tagId])
 }
 
+// Pre-computed percentile rankings for user stats "Top" lists
+// Refreshed on login or when engagement changes significantly
+model UserEntityRanking {
+  id         Int    @id @default(autoincrement())
+  userId     Int
+  entityType String // 'performer' | 'studio' | 'tag' | 'scene'
+  entityId   String // Stash entity ID
+
+  // Raw engagement metrics (for display)
+  playCount    Int   @default(0)
+  playDuration Float @default(0) // seconds
+  oCount       Int   @default(0)
+
+  // Computed ranking data
+  engagementScore  Float @default(0) // Raw weighted score: (oCount × 5) + (normalizedDuration) + (playCount)
+  libraryPresence  Int   @default(1) // Number of scenes in library for this entity
+  engagementRate   Float @default(0) // engagementScore / libraryPresence
+  percentileRank   Float @default(0) // 0-100, where 100 = top ranked among user's engaged entities of this type
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId, entityType, percentileRank(sort: Desc)])
+  @@index([userId, entityType])
+}
+
 enum UserRole {
   ADMIN
   USER

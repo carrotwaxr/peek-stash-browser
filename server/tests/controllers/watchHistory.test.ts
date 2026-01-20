@@ -36,6 +36,9 @@ vi.mock("../../prisma/singleton.js", () => ({
     userTagStats: {
       deleteMany: vi.fn(),
     },
+    userEntityRanking: {
+      deleteMany: vi.fn(),
+    },
   },
 }));
 
@@ -682,6 +685,7 @@ describe("Watch History Controller", () => {
       mockPrisma.userPerformerStats.deleteMany.mockResolvedValue({ count: 5 } as never);
       mockPrisma.userStudioStats.deleteMany.mockResolvedValue({ count: 3 } as never);
       mockPrisma.userTagStats.deleteMany.mockResolvedValue({ count: 15 } as never);
+      mockPrisma.userEntityRanking.deleteMany.mockResolvedValue({ count: 20 } as never);
 
       await clearAllWatchHistory(mockRequest as AuthenticatedRequest, mockResponse as Response);
 
@@ -697,6 +701,9 @@ describe("Watch History Controller", () => {
       expect(mockPrisma.userTagStats.deleteMany).toHaveBeenCalledWith({
         where: { userId: 1 },
       });
+      expect(mockPrisma.userEntityRanking.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 1 },
+      });
 
       expect(responseJson).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -706,6 +713,7 @@ describe("Watch History Controller", () => {
             performerStats: 5,
             studioStats: 3,
             tagStats: 15,
+            rankings: 20,
           },
         })
       );
