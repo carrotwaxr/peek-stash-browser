@@ -895,8 +895,8 @@ const SearchControls = ({
           </div>
         )}
 
-        {/* Grid Density Slider - Only shown in grid mode */}
-        {viewMode === "grid" && (
+        {/* Grid Density Slider - Shown in grid, folder, and timeline modes */}
+        {(viewMode === "grid" || viewMode === "folder" || viewMode === "timeline") && (
           <div
             data-tv-search-item="grid-density"
             ref={(el) => searchZoneNav.setItemRef(6, el)}
