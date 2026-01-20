@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { User, X, Shield, Users, Key, Trash2 } from "lucide-react";
 import { Button, Paper } from "../ui/index.js";
-import { getUserGroupMemberships, addGroupMember, removeGroupMember } from "../../services/api.js";
+import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides } from "../../services/api.js";
 
 /**
  * UserEditModalContent - Inner component that handles the modal content
@@ -47,6 +47,22 @@ const UserEditModalContent = ({
     }
   }, [user?.id]);
 
+  // Load user's permissions
+  useEffect(() => {
+    const loadPermissions = async () => {
+      try {
+        const response = await getUserPermissions(user.id);
+        setPermissions(response.permissions);
+      } catch (err) {
+        console.error("Failed to load user permissions:", err);
+      }
+    };
+
+    if (user?.id) {
+      loadPermissions();
+    }
+  }, [user?.id, userGroups]); // Re-fetch when groups change
+
   const handleGroupToggle = async (groupId, isCurrentlyMember) => {
     try {
       if (isCurrentlyMember) {
@@ -62,6 +78,42 @@ const UserEditModalContent = ({
     } catch (err) {
       setError(err.message || "Failed to update group membership");
     }
+  };
+
+  const handlePermissionOverride = async (permissionKey, newValue) => {
+    try {
+      const overrideKey = `${permissionKey}Override`;
+      const response = await updateUserPermissionOverrides(user.id, {
+        [overrideKey]: newValue,
+      });
+      setPermissions(response.permissions);
+      onMessage?.(`Permission updated for ${user.username}`);
+      setHasChanges(true);
+    } catch (err) {
+      setError(err.message || "Failed to update permission");
+    }
+  };
+
+  const renderInheritanceLabel = (source) => {
+    if (source === "override") {
+      return (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Overridden (user-level)
+        </span>
+      );
+    }
+    if (source === "default") {
+      return (
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          Default (no groups grant this)
+        </span>
+      );
+    }
+    return (
+      <span className="text-xs" style={{ color: "rgb(59, 130, 246)" }}>
+        Inherited from: {source}
+      </span>
+    );
   };
 
   const handleClose = () => {
@@ -256,7 +308,7 @@ const UserEditModalContent = ({
               </div>
             </section>
 
-            {/* Section 3: Permissions - placeholder */}
+            {/* Section 3: Permissions */}
             <section>
               <h3
                 className="text-sm font-medium mb-3 flex items-center gap-2"
@@ -266,15 +318,151 @@ const UserEditModalContent = ({
                 Permissions
               </h3>
               <div
-                className="p-4 rounded-lg"
+                className="p-4 rounded-lg space-y-4"
                 style={{
                   backgroundColor: "var(--bg-secondary)",
                   border: "1px solid var(--border-color)",
                 }}
               >
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Permissions section - to be implemented
-                </p>
+                {!permissions ? (
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Loading permissions...
+                  </p>
+                ) : (
+                  <>
+                    {/* Can Share */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          Can share playlists
+                        </span>
+                        <div className="mt-1">
+                          {renderInheritanceLabel(permissions.sources.canShare)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={
+                            permissions.sources.canShare === "override"
+                              ? String(permissions.canShare)
+                              : "inherit"
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handlePermissionOverride(
+                              "canShare",
+                              val === "inherit" ? null : val === "true"
+                            );
+                          }}
+                          className="px-2 py-1 rounded text-sm"
+                          style={{
+                            backgroundColor: "var(--bg-tertiary)",
+                            border: "1px solid var(--border-color)",
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          <option value="inherit">Inherit from groups</option>
+                          <option value="true">Force enabled</option>
+                          <option value="false">Force disabled</option>
+                        </select>
+                        <span
+                          className={`w-3 h-3 rounded-full ${permissions.canShare ? "bg-green-500" : "bg-gray-400"}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Can Download Files */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          Can download files
+                        </span>
+                        <div className="mt-1">
+                          {renderInheritanceLabel(permissions.sources.canDownloadFiles)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={
+                            permissions.sources.canDownloadFiles === "override"
+                              ? String(permissions.canDownloadFiles)
+                              : "inherit"
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handlePermissionOverride(
+                              "canDownloadFiles",
+                              val === "inherit" ? null : val === "true"
+                            );
+                          }}
+                          className="px-2 py-1 rounded text-sm"
+                          style={{
+                            backgroundColor: "var(--bg-tertiary)",
+                            border: "1px solid var(--border-color)",
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          <option value="inherit">Inherit from groups</option>
+                          <option value="true">Force enabled</option>
+                          <option value="false">Force disabled</option>
+                        </select>
+                        <span
+                          className={`w-3 h-3 rounded-full ${permissions.canDownloadFiles ? "bg-green-500" : "bg-gray-400"}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Can Download Playlists */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          Can download playlists
+                        </span>
+                        <div className="mt-1">
+                          {renderInheritanceLabel(permissions.sources.canDownloadPlaylists)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={
+                            permissions.sources.canDownloadPlaylists === "override"
+                              ? String(permissions.canDownloadPlaylists)
+                              : "inherit"
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handlePermissionOverride(
+                              "canDownloadPlaylists",
+                              val === "inherit" ? null : val === "true"
+                            );
+                          }}
+                          className="px-2 py-1 rounded text-sm"
+                          style={{
+                            backgroundColor: "var(--bg-tertiary)",
+                            border: "1px solid var(--border-color)",
+                            color: "var(--text-primary)",
+                          }}
+                        >
+                          <option value="inherit">Inherit from groups</option>
+                          <option value="true">Force enabled</option>
+                          <option value="false">Force disabled</option>
+                        </select>
+                        <span
+                          className={`w-3 h-3 rounded-full ${permissions.canDownloadPlaylists ? "bg-green-500" : "bg-gray-400"}`}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </section>
 
