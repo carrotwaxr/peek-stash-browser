@@ -4,19 +4,11 @@ import { User, X, Shield, Users, Key, Trash2 } from "lucide-react";
 import { Button, Paper } from "../ui/index.js";
 
 /**
- * UserEditModal - Comprehensive user management modal
- *
- * @param {Object} props
- * @param {Object} props.user - User object to edit
- * @param {Array} props.groups - List of all groups
- * @param {Function} props.onClose - Callback when modal is closed
- * @param {Function} props.onSave - Callback when changes are saved
- * @param {Function} props.onMessage - Callback for success messages
- * @param {Function} props.onError - Callback for error messages
- * @param {Object} props.api - API instance for requests
+ * UserEditModalContent - Inner component that handles the modal content
+ * This is separated to ensure hooks are always called (user is guaranteed to exist)
  */
 /* eslint-disable no-unused-vars */
-const UserEditModal = ({
+const UserEditModalContent = ({
   user,
   groups = [],
   onClose,
@@ -29,15 +21,13 @@ const UserEditModal = ({
   const [error, setError] = useState(null);
 
   // Form state
-  const [role, setRole] = useState(user?.role || "USER");
+  const [role, setRole] = useState(user.role || "USER");
   const [userGroups, setUserGroups] = useState([]);
   const [permissions, setPermissions] = useState(null);
   /* eslint-enable no-unused-vars */
 
   // Track what has changed for save
   const [hasChanges, setHasChanges] = useState(false);
-
-  if (!user) return null;
 
   const handleClose = () => {
     if (hasChanges) {
@@ -46,6 +36,22 @@ const UserEditModal = ({
       }
     }
     onClose();
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (role !== user.role) {
+        await api.put(`/user/${user.id}/role`, { role });
+      }
+      onMessage?.(`User "${user.username}" updated`);
+      onSave?.();
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to save changes");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,6 +73,7 @@ const UserEditModal = ({
               onClick={handleClose}
               className="p-1 rounded hover:bg-opacity-80 transition-colors"
               style={{ color: "var(--text-muted)" }}
+              aria-label="Close"
             >
               <X className="w-5 h-5" />
             </button>
@@ -126,12 +133,14 @@ const UserEditModal = ({
                 {/* Role dropdown */}
                 <div>
                   <label
+                    htmlFor="userRole"
                     className="block text-sm font-medium mb-1"
                     style={{ color: "var(--text-secondary)" }}
                   >
                     Role
                   </label>
                   <select
+                    id="userRole"
                     value={role}
                     onChange={(e) => {
                       setRole(e.target.value);
@@ -237,6 +246,7 @@ const UserEditModal = ({
             variant="primary"
             disabled={!hasChanges || loading}
             loading={loading}
+            onClick={handleSave}
           >
             Save Changes
           </Button>
@@ -244,6 +254,25 @@ const UserEditModal = ({
       </Paper>
     </div>
   );
+};
+
+/**
+ * UserEditModal - Comprehensive user management modal
+ *
+ * @param {Object} props
+ * @param {Object} props.user - User object to edit
+ * @param {Array} props.groups - List of all groups
+ * @param {Function} props.onClose - Callback when modal is closed
+ * @param {Function} props.onSave - Callback when changes are saved
+ * @param {Function} props.onMessage - Callback for success messages
+ * @param {Function} props.onError - Callback for error messages
+ * @param {Object} props.api - API instance for requests
+ */
+const UserEditModal = (props) => {
+  // Early return before any hooks - this wrapper has no hooks
+  if (!props.user) return null;
+
+  return <UserEditModalContent {...props} />;
 };
 
 export default UserEditModal;
