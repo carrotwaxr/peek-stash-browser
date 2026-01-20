@@ -8,6 +8,7 @@ import {
 } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import rankingComputeService from "../services/RankingComputeService.js";
+import { generateRecoveryKey } from "../utils/recoveryKey.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.post("/login", async (req, res) => {
         password: true,
         role: true,
         landingPagePreference: true,
+        recoveryKey: true,
       },
     });
 
@@ -41,6 +43,16 @@ router.post("/login", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Generate recovery key if user doesn't have one
+    if (!user.recoveryKey) {
+      const recoveryKey = generateRecoveryKey();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { recoveryKey },
+      });
+      user.recoveryKey = recoveryKey;
     }
 
     const token = generateToken({
