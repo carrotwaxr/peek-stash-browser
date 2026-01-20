@@ -1,7 +1,7 @@
 // server/controllers/timelineController.ts
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
-import { timelineService, type Granularity, type TimelineEntityType } from "../services/TimelineService.js";
+import { timelineService, type Granularity, type TimelineEntityType, type TimelineFilters } from "../services/TimelineService.js";
 import { logger } from "../utils/logger.js";
 
 const VALID_ENTITY_TYPES: TimelineEntityType[] = ["scene", "gallery", "image"];
@@ -14,6 +14,13 @@ export async function getDateDistribution(
   const { entityType } = req.params;
   const granularity = (req.query.granularity as string) || "months";
   const userId = req.user!.id;
+
+  // Parse optional filter params
+  const filters: TimelineFilters = {};
+  if (req.query.performerId) filters.performerId = req.query.performerId as string;
+  if (req.query.tagId) filters.tagId = req.query.tagId as string;
+  if (req.query.studioId) filters.studioId = req.query.studioId as string;
+  if (req.query.groupId) filters.groupId = req.query.groupId as string;
 
   if (!VALID_ENTITY_TYPES.includes(entityType as TimelineEntityType)) {
     res.status(400).json({ error: "Invalid entity type" });
@@ -29,7 +36,8 @@ export async function getDateDistribution(
     const distribution = await timelineService.getDistribution(
       entityType as TimelineEntityType,
       userId,
-      granularity as Granularity
+      granularity as Granularity,
+      Object.keys(filters).length > 0 ? filters : undefined
     );
     res.json({ distribution });
   } catch (error) {
