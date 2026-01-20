@@ -664,6 +664,7 @@ const UserManagementSection = ({
       {showGroupModal && (
         <GroupModal
           group={editingGroup}
+          users={users}
           onClose={handleGroupModalClose}
           onSave={handleGroupModalSave}
         />

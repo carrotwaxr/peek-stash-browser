@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
-import { Users, X } from "lucide-react";
+import { Users, X, Plus } from "lucide-react";
 import { Button, Paper } from "../ui/index.js";
-import { getGroup, createGroup, updateGroup, removeGroupMember } from "../../services/api.js";
+import { getGroup, createGroup, updateGroup, addGroupMember, removeGroupMember } from "../../services/api.js";
 
 /**
  * GroupModal - Create or Edit a user group
  *
  * @param {Object} props
  * @param {Object|null} props.group - Group object for edit mode, null for create mode
+ * @param {Array} props.users - List of all users (for adding members)
  * @param {Function} props.onClose - Callback when modal is closed/cancelled
  * @param {Function} props.onSave - Callback when group is successfully saved
  */
-const GroupModal = ({ group, onClose, onSave }) => {
+const GroupModal = ({ group, onClose, onSave, users = [] }) => {
   const isEditMode = !!group;
 
   // Form state
@@ -24,6 +25,7 @@ const GroupModal = ({ group, onClose, onSave }) => {
   // Members state (only used in edit mode)
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState("");
 
   // General state
   const [loading, setLoading] = useState(false);
@@ -59,6 +61,32 @@ const GroupModal = ({ group, onClose, onSave }) => {
     }
   };
 
+  const handleAddMember = async () => {
+    if (!selectedUserId) return;
+
+    const userId = parseInt(selectedUserId, 10);
+    try {
+      await addGroupMember(group.id, userId);
+      // Find the user details from the users list
+      const addedUser = users.find((u) => u.id === userId);
+      if (addedUser) {
+        setMembers((prev) => [
+          ...prev,
+          {
+            user: {
+              id: addedUser.id,
+              username: addedUser.username,
+              role: addedUser.role,
+            },
+          },
+        ]);
+      }
+      setSelectedUserId("");
+    } catch (err) {
+      setError(err.message || "Failed to add member");
+    }
+  };
+
   const handleRemoveMember = async (userId) => {
     try {
       await removeGroupMember(group.id, userId);
@@ -67,6 +95,11 @@ const GroupModal = ({ group, onClose, onSave }) => {
       setError(err.message || "Failed to remove member");
     }
   };
+
+  // Get users that are not already members
+  const availableUsers = users.filter(
+    (user) => !members.some((m) => m.user.id === user.id)
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -314,6 +347,40 @@ const GroupModal = ({ group, onClose, onSave }) => {
                       >
                         Members ({members.length})
                       </h3>
+
+                      {/* Add member dropdown */}
+                      {availableUsers.length > 0 && (
+                        <div className="flex gap-2 mb-3">
+                          <select
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-lg text-sm"
+                            style={{
+                              backgroundColor: "var(--bg-secondary)",
+                              border: "1px solid var(--border-color)",
+                              color: "var(--text-primary)",
+                            }}
+                          >
+                            <option value="">Select a user to add...</option>
+                            {availableUsers.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.username} {user.role === "ADMIN" ? "(Admin)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            icon={<Plus size={14} />}
+                            onClick={handleAddMember}
+                            disabled={!selectedUserId}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      )}
+
                       {members.length === 0 ? (
                         <p
                           className="text-sm p-4 rounded-lg text-center"
@@ -322,7 +389,7 @@ const GroupModal = ({ group, onClose, onSave }) => {
                             color: "var(--text-muted)",
                           }}
                         >
-                          No members yet. Add members from the Users tab.
+                          No members yet. Select a user above to add them to this group.
                         </p>
                       ) : (
                         <div
