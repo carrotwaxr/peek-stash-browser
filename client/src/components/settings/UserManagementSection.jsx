@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Users } from "lucide-react";
+import { getGroups } from "../../services/api.js";
 import { formatDate } from "../../utils/date.js";
 import ContentRestrictionsModal from "./ContentRestrictionsModal.jsx";
 import CreateUserModal from "./CreateUserModal.jsx";
 import SyncFromStashModal from "./SyncFromStashModal.jsx";
+import UserGroupsModal from "./UserGroupsModal.jsx";
 import { Button, Paper } from "../ui/index.js";
 
 const UserManagementSection = ({
@@ -18,6 +21,21 @@ const UserManagementSection = ({
   const [syncTargetUser, setSyncTargetUser] = useState(null);
   const [showRestrictionsModal, setShowRestrictionsModal] = useState(false);
   const [restrictionsTargetUser, setRestrictionsTargetUser] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [groupModalUser, setGroupModalUser] = useState(null);
+
+  // Load groups on mount
+  useEffect(() => {
+    const loadGroups = async () => {
+      try {
+        const response = await getGroups();
+        setGroups(response.groups || []);
+      } catch (err) {
+        console.error("Failed to load groups:", err);
+      }
+    };
+    loadGroups();
+  }, []);
 
   const deleteUser = async (userId, username) => {
     if (!confirm(`Are you sure you want to delete user "${username}"?`)) {
@@ -162,6 +180,12 @@ const UserManagementSection = ({
                     className="text-left px-6 py-4 font-medium"
                     style={{ color: "var(--text-secondary)" }}
                   >
+                    Groups
+                  </th>
+                  <th
+                    className="text-left px-6 py-4 font-medium"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     Created
                   </th>
                   <th
@@ -238,6 +262,31 @@ const UserManagementSection = ({
                         }
                       />
                     </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {user.groups && user.groups.length > 0 ? (
+                          user.groups.map((group) => (
+                            <span
+                              key={group.id}
+                              className="text-xs px-2 py-0.5 rounded"
+                              style={{
+                                backgroundColor: "rgba(59, 130, 246, 0.1)",
+                                color: "rgb(59, 130, 246)",
+                              }}
+                            >
+                              {group.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span
+                            className="text-xs"
+                            style={{ color: "var(--text-muted)" }}
+                          >
+                            None
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td
                       className="px-6 py-4 text-sm"
                       style={{ color: "var(--text-secondary)" }}
@@ -262,6 +311,16 @@ const UserManagementSection = ({
                           title="Manage content restrictions for this user"
                         >
                           Content Restrictions
+                        </Button>
+                        <Button
+                          onClick={() => setGroupModalUser(user)}
+                          variant="tertiary"
+                          size="sm"
+                          className="px-3 py-1 text-sm whitespace-nowrap"
+                          title="Manage group memberships for this user"
+                        >
+                          <Users className="w-4 h-4 mr-1 inline" />
+                          Groups
                         </Button>
                         <Button
                           onClick={() =>
@@ -330,6 +389,18 @@ const UserManagementSection = ({
             onMessage(
               `Content restrictions updated for ${restrictionsTargetUser.username}!`
             );
+          }}
+        />
+      )}
+
+      {groupModalUser && (
+        <UserGroupsModal
+          user={groupModalUser}
+          groups={groups}
+          onClose={() => {
+            setGroupModalUser(null);
+            // Refresh users to show updated group memberships
+            onUsersChanged();
           }}
         />
       )}

@@ -566,13 +566,26 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
         createdAt: true,
         updatedAt: true,
         syncToStash: true,
+        groupMemberships: {
+          select: {
+            group: {
+              select: { id: true, name: true },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
       },
     });
 
-    res.json({ users });
+    res.json({
+      users: users.map((u) => ({
+        ...u,
+        groups: u.groupMemberships.map((m) => m.group),
+        groupMemberships: undefined,
+      })),
+    });
   } catch (error) {
     console.error("Error getting all users:", error);
     res.status(500).json({ error: "Failed to get users" });
