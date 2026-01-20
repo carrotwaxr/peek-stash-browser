@@ -1,8 +1,8 @@
 # Multiple Stash Instances - Implementation Plan
 
-**Status**: Deferred
+**Status**: Design Complete (v3.5)
 **Created**: 2025-11-25
-**Last Updated**: 2025-11-25
+**Last Updated**: 2026-01-20
 
 ## Overview
 
@@ -194,23 +194,76 @@ Entities returned from API will include `instanceId`:
 }
 ```
 
-## Open Questions
+## Design Decisions (Resolved 2026-01-20)
 
-1. **Should deduplication be automatic or user-controlled?**
-   - Automatic based on StashDB ID?
-   - Let users manually merge entities?
+### 1. Deduplication Strategy
 
-2. **How to handle conflicting metadata?**
-   - Same performer, different bios on different instances
-   - Which instance's data takes precedence?
+**Decision**: Automatic with manual override capability.
 
-3. **Performance impact of multi-instance cache?**
-   - Cache size doubles/triples with multiple instances
-   - Refresh time increases proportionally
+**How it works**:
+- Stash stores `stash_ids` as an array of `{endpoint, stash_id, updated_at}` per entity
+- Each entry identifies the stash-box URL and the ID within that stash-box
+- An entity can have multiple stash_ids from different stash-boxes
 
-4. **Should users be able to filter by instance?**
-   - "Show only scenes from Instance A"
-   - Useful for debugging, maybe not for regular use
+**Auto-deduplication rule**:
+- If any `(endpoint, stash_id)` pair matches across instances → same entity
+- Different stash-box endpoints with different IDs → no automatic deduplication
+- Admin can manually link/merge entities that can't be auto-matched
+
+**Example**:
+```
+Instance A performer: [{endpoint: "stashdb.org", stash_id: "abc-123"}]
+Instance B performer: [{endpoint: "stashdb.org", stash_id: "abc-123"}]
+→ Match! Same performer, auto-dedupe.
+
+Instance A performer: [{endpoint: "stashdb.org", stash_id: "abc-123"}]
+Instance B performer: [{endpoint: "private-box.local", stash_id: "xyz-789"}]
+→ No match. Could be same person, but no proof. Admin can manually link.
+```
+
+### 2. Conflicting Metadata Handling
+
+**Decision**: No automatic resolution in Peek. Surface conflicts, resolve in Stash.
+
+**How it works**:
+- When deduplicated entities have differing metadata, pick one deterministically (e.g., lowest instance priority number)
+- Surface conflicts to admin in UI (show which entities have mismatched data)
+- Admin resolves the conflict in Stash at the source
+- Next sync picks up the corrected data
+
+**Rationale**: Peek is a viewer, not a metadata management tool. Stash is the source of truth.
+
+### 3. Performance / Cache Strategy
+
+**Decision**: Admin-configurable sync interval with staggered refresh.
+
+**How it works**:
+- Admin can configure sync interval (default: hourly)
+- Instances refresh in staggered fashion, not all at once
+- Parallel fetching during sync for each instance
+- Per-instance cache invalidation when needed
+
+**Details**: Implementation detail to refine during development.
+
+### 4. Instance Filtering in UI
+
+**Decision**: Unified view only (no per-instance filtering).
+
+**How it works**:
+- Users select which instances to use during first-login setup (v3.3 feature)
+- After setup, users see a merged library from their selected instances
+- No filter option to show "only Instance A" in browse UI
+
+**Future**: Could add as advanced/power-user feature if requested.
+
+### 5. Playlist Scope
+
+**Decision**: Global playlists (cross-instance).
+
+**How it works**:
+- Playlists can contain scenes from any instance
+- Playlist items store `(instanceId, sceneId)` composite reference
+- Fits the unified library experience
 
 ## Alternatives Considered
 
@@ -243,12 +296,24 @@ Recommend users use Stash's built-in library merging features instead.
 
 ## Dependencies
 
-- Understanding of StashDB ID structure in Stash GraphQL
+- v3.3 First-Login Setup Wizard (#321) - User instance selection happens here
 - Testing with multiple actual Stash instances
-- User feedback on deduplication preferences
+- Understanding of stash-box `stash_ids` structure (researched - see Design Decisions)
 
 ## References
 
 - [Stash GraphQL Schema](https://github.com/stashapp/stash/blob/develop/graphql/schema/schema.graphql)
 - [StashDB Integration Docs](https://docs.stashapp.cc/)
 - Commit 1: `291b428` - Single instance database storage
+
+## Integration with v3.3
+
+The first-login setup wizard (#321) introduced in v3.3 will be extended in v3.5:
+
+**v3.3 setup steps**:
+1. Choose recovery method
+
+**v3.5 adds**:
+2. Select which Stash instances to use (if multi-instance enabled)
+
+Users can change their instance selection later in User Preferences.

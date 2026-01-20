@@ -60,12 +60,50 @@ model User {
   hiddenEntities           UserHiddenEntity[]
   hideConfirmationDisabled Boolean            @default(false) // Don't show hide confirmation dialog
 
+  // Permission overrides (null = inherit from groups, true/false = explicit override)
+  canShareOverride             Boolean?
+  canDownloadFilesOverride     Boolean?
+  canDownloadPlaylistsOverride Boolean?
+
+  // Group memberships relation
+  groupMemberships UserGroupMembership[]
+
   // Pre-computed exclusions cache
   excludedEntities UserExcludedEntity[]
   entityStats      UserEntityStats[]
 
   // Custom carousels
   customCarousels UserCarousel[]
+}
+
+model UserGroup {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+
+  // Permission defaults for group members
+  canShare             Boolean @default(false)
+  canDownloadFiles     Boolean @default(false)
+  canDownloadPlaylists Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members UserGroupMembership[]
+}
+
+model UserGroupMembership {
+  id      Int       @id @default(autoincrement())
+  userId  Int
+  groupId Int
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group   UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
 }
 
 model WatchHistory {
