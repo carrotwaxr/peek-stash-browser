@@ -1,5 +1,7 @@
 import express from "express";
 import {
+  adminRegenerateRecoveryKey,
+  adminResetPassword,
   changePassword,
   createUser,
   deleteFilterPreset,
@@ -95,6 +97,20 @@ router.get(
   "/:userId/groups",
   requireAdmin,
   authenticated(getUserGroupMemberships)
+);
+
+// Admin: reset user password
+router.post(
+  "/:userId/reset-password",
+  requireAdmin,
+  authenticated(adminResetPassword)
+);
+
+// Admin: regenerate user recovery key
+router.post(
+  "/:userId/regenerate-recovery-key",
+  requireAdmin,
+  authenticated(adminRegenerateRecoveryKey)
 );
 
 // Admin-only content restriction routes

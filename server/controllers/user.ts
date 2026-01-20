@@ -2535,3 +2535,109 @@ export const getUserGroupMemberships = async (
     res.status(500).json({ error: "Failed to get user group memberships" });
   }
 };
+
+/**
+ * Admin: Reset a user's password
+ */
+export const adminResetPassword = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    // Check if user is admin
+    if (req.user?.role !== "ADMIN") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
+    }
+
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+    const userIdInt = parseInt(userId, 10);
+
+    if (isNaN(userIdInt)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    if (!newPassword) {
+      return res.status(400).json({ error: "New password is required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters" });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userIdInt },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: userIdInt },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error resetting user password:", error);
+    res.status(500).json({ error: "Failed to reset user password" });
+  }
+};
+
+/**
+ * Admin: Regenerate a user's recovery key
+ */
+export const adminRegenerateRecoveryKey = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    // Check if user is admin
+    if (req.user?.role !== "ADMIN") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
+    }
+
+    const { userId } = req.params;
+    const userIdInt = parseInt(userId, 10);
+
+    if (isNaN(userIdInt)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userIdInt },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Generate new recovery key
+    const newKey = generateRecoveryKey();
+
+    // Update user in database
+    await prisma.user.update({
+      where: { id: userIdInt },
+      data: { recoveryKey: newKey },
+    });
+
+    // Return formatted key
+    res.json({ recoveryKey: formatRecoveryKey(newKey) });
+  } catch (error) {
+    console.error("Error regenerating user recovery key:", error);
+    res.status(500).json({ error: "Failed to regenerate user recovery key" });
+  }
+};
