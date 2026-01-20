@@ -539,7 +539,7 @@ const StudioDetails = ({ studio, settings }) => {
         </Card>
       )}
 
-      {studio?.parent_studio && (
+      {studio?.parent_studio?.id && (
         <Card title="Parent Studio">
           <Link
             to={`/studio/${studio.parent_studio.id}`}
@@ -548,7 +548,7 @@ const StudioDetails = ({ studio, settings }) => {
               backgroundColor: "var(--accent-primary)",
               color: "white" }}
           >
-            {studio.parent_studio.name}
+            {studio.parent_studio.name || `Studio ${studio.parent_studio.id}`}
           </Link>
         </Card>
       )}
@@ -587,22 +587,6 @@ const StudioDetails = ({ studio, settings }) => {
                 style={{ color: "var(--text-primary)" }}
               >
                 {movie.name}
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
-
-      {studio?.groups && studio.groups.length > 0 && (
-        <Card title="Collections">
-          <div className="space-y-1">
-            {studio.groups.map((group) => (
-              <div
-                key={group.id}
-                className="text-sm"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {group.name}
               </div>
             ))}
           </div>
