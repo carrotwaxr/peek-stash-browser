@@ -649,16 +649,35 @@ export const findTagsForScenes = async (
       }
     }
 
-    // Filter to only expanded tags and extract parent IDs
-    const filteredTags = allTags
-      .filter(t => expandedTagIds.has(t.id))
-      .map(t => ({
-        id: t.id,
-        name: t.name,
-        parent_ids: t.parents?.map(p => p.id),
-      }));
+    // Filter to only expanded tags
+    const filteredTags = allTags.filter(t => expandedTagIds.has(t.id));
 
-    res.json({ tags: filteredTags });
+    // Build children arrays based on filtered tags only
+    // A tag's children are tags that have this tag as a parent AND are in our filtered set
+    const childrenMap = new Map<string, Array<{ id: string }>>();
+    for (const tag of filteredTags) {
+      if (tag.parents) {
+        for (const parent of tag.parents) {
+          if (expandedTagIds.has(parent.id)) {
+            if (!childrenMap.has(parent.id)) {
+              childrenMap.set(parent.id, []);
+            }
+            childrenMap.get(parent.id)!.push({ id: tag.id });
+          }
+        }
+      }
+    }
+
+    // Return tags with parents and children arrays (matching the structure buildFolderTree expects)
+    const tagsWithHierarchy = filteredTags.map(t => ({
+      id: t.id,
+      name: t.name,
+      image_path: t.image_path,
+      parents: t.parents?.filter(p => expandedTagIds.has(p.id)).map(p => ({ id: p.id })) || [],
+      children: childrenMap.get(t.id) || [],
+    }));
+
+    res.json({ tags: tagsWithHierarchy });
   } catch (error) {
     logger.error("Error in findTagsForScenes", {
       error: error instanceof Error ? error.message : "Unknown error",
