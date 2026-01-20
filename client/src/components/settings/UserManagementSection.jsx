@@ -6,6 +6,7 @@ import ContentRestrictionsModal from "./ContentRestrictionsModal.jsx";
 import CreateUserModal from "./CreateUserModal.jsx";
 import GroupModal from "./GroupModal.jsx";
 import SyncFromStashModal from "./SyncFromStashModal.jsx";
+import UserEditModal from "./UserEditModal.jsx";
 import UserGroupsModal from "./UserGroupsModal.jsx";
 import { Button, Paper } from "../ui/index.js";
 
@@ -26,6 +27,7 @@ const UserManagementSection = ({
   const [groupModalUser, setGroupModalUser] = useState(null);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
 
   // Load groups on mount
   const loadGroups = async () => {
@@ -550,6 +552,15 @@ const UserManagementSection = ({
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2 flex-wrap">
                         <Button
+                          onClick={() => setEditingUser(user)}
+                          variant="secondary"
+                          size="sm"
+                          icon={<Edit2 size={14} />}
+                          className="px-3 py-1 text-sm whitespace-nowrap"
+                        >
+                          Edit
+                        </Button>
+                        <Button
                           onClick={() => openSyncModal(user)}
                           variant="tertiary"
                           size="sm"
@@ -668,6 +679,23 @@ const UserManagementSection = ({
           onClose={handleGroupModalClose}
           onSave={handleGroupModalSave}
           onMessage={onMessage}
+        />
+      )}
+
+      {editingUser && (
+        <UserEditModal
+          user={editingUser}
+          groups={groups}
+          onClose={() => setEditingUser(null)}
+          onSave={() => {
+            setEditingUser(null);
+            onMessage(`User "${editingUser.username}" updated successfully`);
+            onUsersChanged();
+            loadGroups();
+          }}
+          onMessage={onMessage}
+          onError={onError}
+          api={api}
         />
       )}
     </>
