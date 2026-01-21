@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { Route, BrowserRouter as Router, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import Login from "./components/pages/Login.jsx";
+import ForgotPasswordPage from "./components/pages/ForgotPasswordPage.jsx";
 import SetupWizard from "./components/pages/SetupWizard.jsx";
 import { GlobalLayout } from "./components/ui/index.js";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
@@ -112,6 +113,9 @@ const AppContent = () => {
               </LoginGuard>
             }
           />
+
+          {/* Forgot password route */}
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
           {/* Protected app routes */}
           <Route

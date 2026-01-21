@@ -65,6 +65,9 @@ model User {
   canDownloadFilesOverride     Boolean?
   canDownloadPlaylistsOverride Boolean?
 
+  // Recovery key for password reset (stored plaintext for user viewing)
+  recoveryKey String?
+
   // Group memberships relation
   groupMemberships UserGroupMembership[]
 

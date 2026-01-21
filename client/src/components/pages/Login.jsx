@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useTheme } from "../../themes/useTheme.js";
 import { Button } from "../ui/index.js";
@@ -139,6 +140,18 @@ const Login = () => {
             >
               Sign in
             </Button>
+          </div>
+
+          <div className="text-center">
+            <Link
+              to="/forgot-password"
+              className="text-sm hover:underline"
+              style={{
+                color: theme?.properties?.["--text-muted"] || "#808080",
+              }}
+            >
+              Forgot your password?
+            </Link>
           </div>
         </form>
       </div>

@@ -8,6 +8,7 @@ import {
 } from "../middleware/auth.js";
 import prisma from "../prisma/singleton.js";
 import rankingComputeService from "../services/RankingComputeService.js";
+import { generateRecoveryKey } from "../utils/recoveryKey.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
@@ -31,6 +32,7 @@ router.post("/login", async (req, res) => {
         password: true,
         role: true,
         landingPagePreference: true,
+        recoveryKey: true,
       },
     });
 
@@ -41,6 +43,16 @@ router.post("/login", async (req, res) => {
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Generate recovery key if user doesn't have one
+    if (!user.recoveryKey) {
+      const recoveryKey = generateRecoveryKey();
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { recoveryKey },
+      });
+      user.recoveryKey = recoveryKey;
     }
 
     const token = generateToken({
@@ -97,6 +109,80 @@ router.get(
     res.json({ authenticated: true, user: req.user });
   })
 );
+
+// Forgot password - check username and get recovery method
+router.post("/forgot-password/init", async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ error: "Username is required" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, recoveryKey: true },
+    });
+
+    if (!user) {
+      // Don't reveal if user exists
+      return res.json({ hasRecoveryKey: false });
+    }
+
+    res.json({ hasRecoveryKey: !!user.recoveryKey });
+  } catch (error) {
+    console.error("Forgot password init error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Forgot password - verify recovery key and set new password
+router.post("/forgot-password/reset", async (req, res) => {
+  try {
+    const { username, recoveryKey, newPassword } = req.body;
+
+    if (!username || !recoveryKey || !newPassword) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true, recoveryKey: true },
+    });
+
+    if (!user || !user.recoveryKey) {
+      return res
+        .status(401)
+        .json({ error: "Invalid username or recovery key" });
+    }
+
+    // Normalize and compare recovery key
+    const normalizedInput = recoveryKey.replace(/-/g, "").toUpperCase();
+    if (normalizedInput !== user.recoveryKey) {
+      return res
+        .status(401)
+        .json({ error: "Invalid username or recovery key" });
+    }
+
+    // Hash new password and update
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Forgot password reset error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 // First-time password setup (for setup wizard)
 // SECURITY: Only works during initial setup (before setup is complete)

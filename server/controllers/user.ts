@@ -6,6 +6,7 @@ import prisma from "../prisma/singleton.js";
 import { exclusionComputationService } from "../services/ExclusionComputationService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { logger } from "../utils/logger.js";
+import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 
 /**
  * Carousel preference configuration
@@ -543,6 +544,72 @@ export const changePassword = async (
   } catch (error) {
     console.error("Error changing password:", error);
     res.status(500).json({ error: "Failed to change password" });
+  }
+};
+
+/**
+ * Get current user's recovery key (formatted for display)
+ */
+export const getRecoveryKey = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { recoveryKey: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Format with dashes if key exists
+    const formattedKey = user.recoveryKey
+      ? formatRecoveryKey(user.recoveryKey)
+      : null;
+
+    res.json({ recoveryKey: formattedKey });
+  } catch (error) {
+    console.error("Error getting recovery key:", error);
+    res.status(500).json({ error: "Failed to get recovery key" });
+  }
+};
+
+/**
+ * Regenerate current user's recovery key
+ */
+export const regenerateRecoveryKey = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Generate new recovery key
+    const newKey = generateRecoveryKey();
+
+    // Update user in database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { recoveryKey: newKey },
+    });
+
+    // Return formatted key
+    res.json({ recoveryKey: formatRecoveryKey(newKey) });
+  } catch (error) {
+    console.error("Error regenerating recovery key:", error);
+    res.status(500).json({ error: "Failed to regenerate recovery key" });
   }
 };
 
@@ -2466,5 +2533,111 @@ export const getUserGroupMemberships = async (
   } catch (error) {
     console.error("Error getting user group memberships:", error);
     res.status(500).json({ error: "Failed to get user group memberships" });
+  }
+};
+
+/**
+ * Admin: Reset a user's password
+ */
+export const adminResetPassword = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    // Check if user is admin
+    if (req.user?.role !== "ADMIN") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
+    }
+
+    const { userId } = req.params;
+    const { newPassword } = req.body;
+    const userIdInt = parseInt(userId, 10);
+
+    if (isNaN(userIdInt)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    if (!newPassword) {
+      return res.status(400).json({ error: "New password is required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters" });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userIdInt },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: userIdInt },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error resetting user password:", error);
+    res.status(500).json({ error: "Failed to reset user password" });
+  }
+};
+
+/**
+ * Admin: Regenerate a user's recovery key
+ */
+export const adminRegenerateRecoveryKey = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    // Check if user is admin
+    if (req.user?.role !== "ADMIN") {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: Admin access required" });
+    }
+
+    const { userId } = req.params;
+    const userIdInt = parseInt(userId, 10);
+
+    if (isNaN(userIdInt)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userIdInt },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Generate new recovery key
+    const newKey = generateRecoveryKey();
+
+    // Update user in database
+    await prisma.user.update({
+      where: { id: userIdInt },
+      data: { recoveryKey: newKey },
+    });
+
+    // Return formatted key
+    res.json({ recoveryKey: formatRecoveryKey(newKey) });
+  } catch (error) {
+    console.error("Error regenerating user recovery key:", error);
+    res.status(500).json({ error: "Failed to regenerate user recovery key" });
   }
 };
