@@ -13,6 +13,7 @@ vi.mock("../../prisma/singleton.js", () => ({
     },
     stashScene: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
     stashImage: {
       findUnique: vi.fn(),
@@ -174,19 +175,37 @@ describe("DownloadService", () => {
       };
 
       vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist as any);
-      vi.mocked(prisma.stashScene.findUnique)
-        .mockResolvedValueOnce({ fileSize: BigInt(1000000) } as any)
-        .mockResolvedValueOnce({ fileSize: BigInt(2000000) } as any);
+      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
+        { fileSize: BigInt(1000000) },
+        { fileSize: BigInt(2000000) },
+      ] as any);
 
       const size = await service.calculatePlaylistSize(1);
 
       expect(size).toBe(BigInt(3000000));
+      expect(prisma.stashScene.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ["s1", "s2"] } },
+        select: { fileSize: true },
+      });
     });
 
     it("should return 0 for playlist not found", async () => {
       vi.mocked(prisma.playlist.findUnique).mockResolvedValue(null);
 
       const size = await service.calculatePlaylistSize(999);
+
+      expect(size).toBe(BigInt(0));
+    });
+
+    it("should return 0 for empty playlist", async () => {
+      const mockPlaylist = {
+        id: 1,
+        items: [],
+      };
+
+      vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist as any);
+
+      const size = await service.calculatePlaylistSize(1);
 
       expect(size).toBe(BigInt(0));
     });
@@ -201,9 +220,10 @@ describe("DownloadService", () => {
       };
 
       vi.mocked(prisma.playlist.findUnique).mockResolvedValue(mockPlaylist as any);
-      vi.mocked(prisma.stashScene.findUnique)
-        .mockResolvedValueOnce({ fileSize: BigInt(1000000) } as any)
-        .mockResolvedValueOnce({ fileSize: null } as any);
+      vi.mocked(prisma.stashScene.findMany).mockResolvedValue([
+        { fileSize: BigInt(1000000) },
+        { fileSize: null },
+      ] as any);
 
       const size = await service.calculatePlaylistSize(1);
 
@@ -285,6 +305,7 @@ describe("DownloadService", () => {
 
   describe("markCompleted", () => {
     it("should mark download as completed with 24h expiry", async () => {
+      vi.useFakeTimers();
       const now = new Date();
       vi.setSystemTime(now);
 

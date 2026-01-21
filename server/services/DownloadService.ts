@@ -1,6 +1,9 @@
 import prisma from "../prisma/singleton.js";
 import type { Download, DownloadType, DownloadStatus } from "@prisma/client";
 
+/** 24 hours in milliseconds for download expiry */
+const DOWNLOAD_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
 export interface DownloadRecord {
   id: number;
   userId: number;
@@ -134,19 +137,19 @@ export class DownloadService {
       select: { items: { select: { sceneId: true } } },
     });
 
-    if (!playlist) {
+    if (!playlist || playlist.items.length === 0) {
       return BigInt(0);
     }
 
+    const sceneIds = playlist.items.map((item) => item.sceneId);
+    const scenes = await prisma.stashScene.findMany({
+      where: { id: { in: sceneIds } },
+      select: { fileSize: true },
+    });
+
     let totalSize = BigInt(0);
-
-    for (const item of playlist.items) {
-      const scene = await prisma.stashScene.findUnique({
-        where: { id: item.sceneId },
-        select: { fileSize: true },
-      });
-
-      if (scene?.fileSize) {
+    for (const scene of scenes) {
+      if (scene.fileSize) {
         totalSize += scene.fileSize;
       }
     }
@@ -199,7 +202,7 @@ export class DownloadService {
     fileSize: bigint
   ): Promise<Download> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(now.getTime() + DOWNLOAD_EXPIRY_MS);
 
     return prisma.download.update({
       where: { id: downloadId },
