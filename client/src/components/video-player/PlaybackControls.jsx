@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import useRatingHotkeys from "../../hooks/useRatingHotkeys.js";
-import { libraryApi } from "../../services/api.js";
+import { apiPost, getMyPermissions, libraryApi } from "../../services/api.js";
+import { showError, showSuccess } from "../../utils/toast.jsx";
+import { ThemedIcon } from "../icons/index.js";
 import {
   AddToPlaylistButton,
+  Button,
   FavoriteButton,
   OCounterButton,
   RatingSlider,
@@ -20,6 +23,10 @@ const PlaybackControls = () => {
   const [rating, setRating] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
 
+  // Download state
+  const [downloading, setDownloading] = useState(false);
+  const [permissions, setPermissions] = useState(null);
+
   // Sync state when scene changes
   useEffect(() => {
     if (scene) {
@@ -27,6 +34,20 @@ const PlaybackControls = () => {
       setIsFavorite(scene.favorite || false);
     }
   }, [scene?.id, scene?.rating, scene?.favorite]);
+
+  // Fetch user permissions on mount
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const result = await getMyPermissions();
+        setPermissions(result.permissions);
+      } catch (error) {
+        // Silently fail - permissions will remain null and download button won't show
+        console.error("Failed to fetch permissions:", error);
+      }
+    };
+    fetchPermissions();
+  }, []);
 
   // Handle rating change
   const handleRatingChange = async (newRating) => {
@@ -64,6 +85,27 @@ const PlaybackControls = () => {
     setRating: handleRatingChange,
     toggleFavorite: () => handleFavoriteChange(!isFavorite),
   });
+
+  // Handle scene download
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      const response = await apiPost(`/downloads/scene/${scene.id}`);
+      const download = response.download;
+
+      // For scenes, download is immediate - redirect to file endpoint
+      // Server sets Content-Disposition: attachment to force download
+      if (download.status === "COMPLETED") {
+        window.location.href = `/api/downloads/${download.id}/file`;
+      }
+      showSuccess("Download started");
+    } catch (error) {
+      const message = error.data?.error || error.message || "Download failed";
+      showError(message);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Don't render if no scene data yet
   if (!scene) {
@@ -123,7 +165,17 @@ const PlaybackControls = () => {
                 size="medium"
               />
             )}
-            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
+            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} compact />
+            {permissions?.canDownloadFiles && (
+              <Button
+                variant="secondary"
+                onClick={handleDownload}
+                disabled={downloading || isLoading}
+                title={downloading ? "Starting download..." : "Download"}
+              >
+                <ThemedIcon name="download" size={16} />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -169,15 +221,25 @@ const PlaybackControls = () => {
             </div>
           </div>
 
-          {/* Row 2: Add to Playlist */}
-          <div className="flex items-center justify-end">
-            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
+          {/* Row 2: Add to Playlist + Download */}
+          <div className="flex items-center justify-end gap-4">
+            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} compact />
+            {permissions?.canDownloadFiles && (
+              <Button
+                variant="secondary"
+                onClick={handleDownload}
+                disabled={downloading || isLoading}
+                title={downloading ? "Starting download..." : "Download"}
+              >
+                <ThemedIcon name="download" size={16} />
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* < SM Layout: Three rows */}
+        {/* < SM Layout: Two rows */}
         <div className="flex sm:hidden flex-col gap-4">
-          {/* Row 1: O Counter + Favorite (centered) */}
+          {/* Row 1: All buttons (centered) */}
           <div
             className="flex items-center justify-center gap-4"
             style={{ opacity: isLoading ? 0.6 : 1 }}
@@ -199,6 +261,17 @@ const PlaybackControls = () => {
                 size="medium"
               />
             )}
+            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} compact />
+            {permissions?.canDownloadFiles && (
+              <Button
+                variant="secondary"
+                onClick={handleDownload}
+                disabled={downloading || isLoading}
+                title={downloading ? "Starting download..." : "Download"}
+              >
+                <ThemedIcon name="download" size={16} />
+              </Button>
+            )}
           </div>
 
           {/* Row 2: Rating (full width) */}
@@ -212,11 +285,6 @@ const PlaybackControls = () => {
               />
             </div>
           )}
-
-          {/* Row 3: Add to Playlist */}
-          <div className="flex items-center justify-center">
-            <AddToPlaylistButton sceneId={scene?.id} disabled={isLoading} />
-          </div>
         </div>
       </div>
     </section>

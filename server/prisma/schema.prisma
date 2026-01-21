@@ -77,6 +77,9 @@ model User {
 
   // Custom carousels
   customCarousels UserCarousel[]
+
+  // Downloads
+  downloads            Download[]
 }
 
 model UserGroup {
@@ -435,6 +438,51 @@ model UserEntityRanking {
 enum UserRole {
   ADMIN
   USER
+}
+
+enum DownloadType {
+  SCENE
+  IMAGE
+  PLAYLIST
+}
+
+enum DownloadStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+model Download {
+  id          Int            @id @default(autoincrement())
+
+  userId      Int
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        DownloadType
+  status      DownloadStatus @default(PENDING)
+
+  // For playlist downloads
+  playlistId  Int?
+
+  // For individual downloads
+  entityType  String?        // "scene" or "image"
+  entityId    String?
+
+  fileName    String
+  fileSize    BigInt?
+  filePath    String?        // Server path to completed zip (playlists only)
+  progress    Int            @default(0) // 0-100
+  error       String?
+
+  createdAt   DateTime       @default(now())
+  completedAt DateTime?
+  expiresAt   DateTime?      // 24h after completion for playlists
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 model UserHiddenEntity {

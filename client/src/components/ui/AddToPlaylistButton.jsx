@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { showError, showSuccess, showWarning } from "../../utils/toast.jsx";
+import { ThemedIcon } from "../icons/index.js";
 import Button from "./Button.jsx";
 import Paper from "./Paper.jsx";
 
@@ -161,13 +162,15 @@ const AddToPlaylistButton = ({
           e.stopPropagation();
           setShowMenu(!showMenu);
         }}
-        variant={variant}
-        className={compact ? "p-2" : ""}
-        size={compact ? "sm" : "md"}
+        variant={compact ? "secondary" : variant}
         icon={icon || null}
         title="Add to playlist"
       >
-        {buttonText || (compact ? "+" : "+ Playlist")}
+        {compact ? (
+          <ThemedIcon name="list-plus" size={16} />
+        ) : (
+          buttonText || "+ Playlist"
+        )}
       </Button>
 
       {showMenu && (

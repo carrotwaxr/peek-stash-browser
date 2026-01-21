@@ -151,6 +151,19 @@ There's no limit to how many:
 - Scenes you can add to a playlist
 - Playlists a single scene can be in
 
+## Downloading Playlists
+
+You can download entire playlists as zip archives for offline viewing. The zip includes all video files plus an M3U playlist and Kodi-compatible NFO metadata files.
+
+**To download a playlist:**
+1. Open a playlist
+2. Click the **Download** button
+3. Wait for the zip to be created (progress shown)
+4. Download starts automatically when ready
+
+!!! note "Permission Required"
+    Downloading playlists requires the "Can Download Playlists" permission. See [Downloads](downloads.md) for details.
+
 ## Troubleshooting
 
 ### Scene won't add to playlist
@@ -173,6 +186,7 @@ There's no limit to how many:
 
 ## Next Steps
 
+- [Downloads](downloads.md) - Download playlists, scenes, and images for offline viewing
 - [Watch History](watch-history.md) - Resume playback from where you left off
 - [Keyboard Navigation](keyboard-navigation.md) - Complete keyboard shortcuts and TV mode
 - [Troubleshooting](../getting-started/troubleshooting.md) - Fix common issues
