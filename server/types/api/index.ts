@@ -148,6 +148,13 @@ export type {
   ReorderPlaylistParams,
   ReorderPlaylistRequest,
   ReorderPlaylistResponse,
+  SharedPlaylistData,
+  GetSharedPlaylistsResponse,
+  PlaylistShareInfo,
+  GetPlaylistSharesResponse,
+  UpdatePlaylistSharesRequest,
+  UpdatePlaylistSharesResponse,
+  DuplicatePlaylistResponse,
 } from "./playlist.js";
 
 // Carousel endpoint types
