@@ -842,3 +842,36 @@ export const adminResetPassword = (userId, newPassword) =>
  */
 export const adminRegenerateRecoveryKey = (userId) =>
   apiPost(`/user/${userId}/regenerate-recovery-key`);
+
+// ============================================================================
+// Playlist Sharing API
+// ============================================================================
+
+/**
+ * Get playlists shared with current user
+ * @returns {Promise<{playlists: Array}>}
+ */
+export const getSharedPlaylists = () => apiGet("/playlists/shared");
+
+/**
+ * Get sharing info for a playlist (owner only)
+ * @param {number} playlistId - Playlist ID
+ * @returns {Promise<{shares: Array}>}
+ */
+export const getPlaylistShares = (playlistId) => apiGet(`/playlists/${playlistId}/shares`);
+
+/**
+ * Update playlist sharing
+ * @param {number} playlistId - Playlist ID
+ * @param {number[]} groupIds - Array of group IDs to share with
+ * @returns {Promise<{shares: Array}>}
+ */
+export const updatePlaylistShares = (playlistId, groupIds) =>
+  apiPut(`/playlists/${playlistId}/shares`, { groupIds });
+
+/**
+ * Duplicate a playlist
+ * @param {number} playlistId - Playlist ID to duplicate
+ * @returns {Promise<{playlist: Object}>}
+ */
+export const duplicatePlaylist = (playlistId) => apiPost(`/playlists/${playlistId}/duplicate`);
