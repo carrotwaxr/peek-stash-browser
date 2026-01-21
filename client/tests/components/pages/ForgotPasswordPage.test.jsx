@@ -70,8 +70,8 @@ describe("ForgotPasswordPage", () => {
 
     // Step 2
     fireEvent.change(screen.getByLabelText("Recovery Key"), { target: { value: "ABCD-1234" } });
-    fireEvent.change(screen.getByLabelText("New Password"), { target: { value: "newpassword" } });
-    fireEvent.change(screen.getByLabelText("Confirm New Password"), { target: { value: "newpassword" } });
+    fireEvent.change(screen.getByLabelText("New Password"), { target: { value: "newpassword123" } });
+    fireEvent.change(screen.getByLabelText("Confirm New Password"), { target: { value: "newpassword123" } });
     fireEvent.click(screen.getByRole("button", { name: "Reset Password" }));
 
     await waitFor(() => {
