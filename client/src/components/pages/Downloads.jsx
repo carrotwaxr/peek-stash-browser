@@ -33,6 +33,17 @@ const formatDate = (dateStr) => {
 };
 
 /**
+ * Get display name from fileName (strip extension for cleaner display)
+ * @param {string} fileName - File name with extension
+ * @returns {string} Display name without extension
+ */
+const getDisplayName = (fileName) => {
+  if (!fileName) return "Untitled";
+  // Remove extension for display
+  return fileName.replace(/\.[^/.]+$/, "") || "Untitled";
+};
+
+/**
  * Get colored badge for download status
  * @param {string} status - Download status
  * @returns {JSX.Element} Status badge
@@ -87,7 +98,7 @@ const getDownloadThumbnail = (download) => {
     return (
       <div className="flex-shrink-0 w-16 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/stash/scene/${download.entityId}/screenshot`}
+          src={`/api/proxy/stash?path=${encodeURIComponent(`/scene/${download.entityId}/screenshot`)}`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -104,7 +115,7 @@ const getDownloadThumbnail = (download) => {
     return (
       <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-black">
         <img
-          src={`/api/proxy/stash/image/${download.entityId}/thumbnail`}
+          src={`/api/proxy/image/${download.entityId}/thumbnail`}
           alt=""
           className="w-full h-full object-cover"
           onError={(e) => {
@@ -297,7 +308,7 @@ const Downloads = () => {
                       className="font-medium truncate"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      {download.fileName || "Untitled"}
+                      {getDisplayName(download.fileName)}
                     </span>
                     {getStatusBadge(download.status)}
                   </div>
