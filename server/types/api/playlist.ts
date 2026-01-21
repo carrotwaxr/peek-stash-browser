@@ -69,6 +69,9 @@ export interface GetPlaylistParams extends Record<string, string> {
 
 export interface GetPlaylistResponse {
   playlist: PlaylistData;
+  isOwner?: boolean;
+  accessLevel?: "owner" | "shared";
+  sharedViaGroups?: string[];
 }
 
 // =============================================================================
