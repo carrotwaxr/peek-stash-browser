@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { User, X, Shield, Users, Key, Trash2 } from "lucide-react";
 import { Button, Paper } from "../ui/index.js";
-import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides } from "../../services/api.js";
+import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../services/api.js";
 
 /**
  * UserEditModalContent - Inner component that handles the modal content
@@ -30,6 +30,11 @@ const UserEditModalContent = ({
   const [userGroups, setUserGroups] = useState([]);
   const [permissions, setPermissions] = useState(null);
   /* eslint-enable no-unused-vars */
+
+  // Password reset state
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [generatedKey, setGeneratedKey] = useState(null);
 
   // Track what has changed for save
   const [hasChanges, setHasChanges] = useState(false);
@@ -116,6 +121,42 @@ const UserEditModalContent = ({
       onSave?.();
     } catch (err) {
       setError(err.response?.data?.error || "Failed to delete user");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await adminResetPassword(user.id, newPassword);
+      onMessage?.(`Password reset for ${user.username}`);
+      setShowPasswordReset(false);
+      setNewPassword("");
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to reset password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegenerateRecoveryKey = async () => {
+    if (!confirm(`Regenerate recovery key for "${user.username}"?\n\nTheir old key will no longer work.`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await adminRegenerateRecoveryKey(user.id);
+      setGeneratedKey(response.recoveryKey);
+      onMessage?.(`Recovery key regenerated for ${user.username}`);
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to regenerate recovery key");
     } finally {
       setLoading(false);
     }
@@ -519,24 +560,67 @@ const UserEditModalContent = ({
                     You cannot modify your own account from this modal. Use the account settings page instead.
                   </p>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled
-                      title="Coming in future release"
-                    >
-                      Reset Password
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleDeleteUser}
-                      disabled={loading}
-                    >
-                      <Trash2 size={14} className="mr-1" />
-                      Delete User
-                    </Button>
+                  <div className="space-y-4">
+                    {/* Password Reset */}
+                    {showPasswordReset ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="New password (min 6 chars)"
+                          className="flex-1 px-3 py-2 rounded text-sm"
+                          style={{
+                            backgroundColor: "var(--bg-tertiary)",
+                            border: "1px solid var(--border-color)",
+                            color: "var(--text-primary)",
+                          }}
+                        />
+                        <Button variant="primary" size="sm" onClick={handleResetPassword} disabled={loading}>
+                          Set
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={() => { setShowPasswordReset(false); setNewPassword(""); }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="secondary" size="sm" onClick={() => setShowPasswordReset(true)}>
+                          Reset Password
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={handleRegenerateRecoveryKey} disabled={loading}>
+                          <Key size={14} className="mr-1" />
+                          Regenerate Recovery Key
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleDeleteUser}
+                          disabled={loading}
+                        >
+                          <Trash2 size={14} className="mr-1" />
+                          Delete User
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Show generated key */}
+                    {generatedKey && (
+                      <div
+                        className="p-3 rounded"
+                        style={{
+                          backgroundColor: "var(--bg-tertiary)",
+                          border: "1px solid var(--border-color)",
+                        }}
+                      >
+                        <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+                          New recovery key (show to user):
+                        </p>
+                        <code className="text-sm font-mono" style={{ color: "var(--text-primary)" }}>
+                          {generatedKey}
+                        </code>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
