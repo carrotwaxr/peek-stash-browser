@@ -39,6 +39,7 @@ const Sidebar = ({ navPreferences = [] }) => {
   const userMenuSubItems = useMemo(() => [
     { name: "Watch History", path: "/watch-history", icon: "history", isSubItem: true },
     { name: "My Stats", path: "/user-stats", icon: "bar-chart-3", isSubItem: true },
+    { name: "Downloads", path: "/downloads", icon: "download", isSubItem: true },
     { name: "TV Mode", path: null, isToggle: true, icon: "tv", isSubItem: true },
     { name: "Sign Out", path: null, isButton: true, icon: "logout", isSubItem: true },
   ], []);
