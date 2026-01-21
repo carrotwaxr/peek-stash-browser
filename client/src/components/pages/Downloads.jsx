@@ -77,42 +77,48 @@ const getStatusBadge = (status) => {
 };
 
 /**
- * Get icon for download type
- * @param {string} type - Download type (SCENE, IMAGE, PLAYLIST)
- * @returns {JSX.Element} Type icon
+ * Get thumbnail or icon for download
+ * @param {Object} download - Download object
+ * @returns {JSX.Element} Thumbnail or type icon
  */
-const getTypeIcon = (type) => {
+const getDownloadThumbnail = (download) => {
+  // For scenes and images, show actual thumbnail
+  if (download.type === "SCENE" && download.entityId) {
+    return (
+      <div className="flex-shrink-0 w-16 h-10 rounded overflow-hidden bg-black">
+        <img
+          src={`/api/proxy/stash/scene/${download.entityId}/screenshot`}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.target.style.display = "none";
+            e.target.parentElement.classList.add("flex", "items-center", "justify-center");
+            e.target.parentElement.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>`;
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (download.type === "IMAGE" && download.entityId) {
+    return (
+      <div className="flex-shrink-0 w-10 h-10 rounded overflow-hidden bg-black">
+        <img
+          src={`/api/proxy/stash/image/${download.entityId}/thumbnail`}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.target.style.display = "none";
+            e.target.parentElement.classList.add("flex", "items-center", "justify-center");
+            e.target.parentElement.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--text-muted)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>`;
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Fallback icons for playlists and unknown types
   const icons = {
-    SCENE: (
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-        />
-      </svg>
-    ),
-    IMAGE: (
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-        />
-      </svg>
-    ),
     PLAYLIST: (
       <svg
         className="w-5 h-5"
@@ -128,6 +134,21 @@ const getTypeIcon = (type) => {
         />
       </svg>
     ),
+    SCENE: (
+      <svg
+        className="w-5 h-5"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+        />
+      </svg>
+    ),
   };
 
   return (
@@ -135,7 +156,7 @@ const getTypeIcon = (type) => {
       className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
       style={{ backgroundColor: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
     >
-      {icons[type] || icons.SCENE}
+      {icons[download.type] || icons.SCENE}
     </div>
   );
 };
@@ -266,8 +287,8 @@ const Downloads = () => {
               }}
             >
               <div className="flex items-start gap-4">
-                {/* Type Icon */}
-                {getTypeIcon(download.type)}
+                {/* Thumbnail or Type Icon */}
+                {getDownloadThumbnail(download)}
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
@@ -276,7 +297,7 @@ const Downloads = () => {
                       className="font-medium truncate"
                       style={{ color: "var(--text-primary)" }}
                     >
-                      {download.filename || "Untitled"}
+                      {download.fileName || "Untitled"}
                     </span>
                     {getStatusBadge(download.status)}
                   </div>
@@ -334,10 +355,10 @@ const Downloads = () => {
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {/* Download button for completed */}
-                  {download.status === "COMPLETED" && download.downloadUrl && (
+                  {download.status === "COMPLETED" && (
                     <a
-                      href={download.downloadUrl}
-                      download
+                      href={`/api/downloads/${download.id}/file`}
+                      download={download.fileName}
                       className="inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-lg font-medium transition-all"
                       style={{
                         backgroundColor: "var(--accent-primary)",

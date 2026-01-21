@@ -33,14 +33,22 @@ export class DownloadService {
   ): Promise<DownloadRecord> {
     const scene = await prisma.stashScene.findUnique({
       where: { id: sceneId },
-      select: { id: true, title: true, fileSize: true },
+      select: { id: true, title: true, filePath: true, fileSize: true },
     });
 
     if (!scene) {
       throw new Error("Scene not found");
     }
 
-    const fileName = this.sanitizeFileName(scene.title || sceneId) + ".mp4";
+    // Use title, or filename from path, or sceneId as fallback
+    let displayName = scene.title;
+    if (!displayName && scene.filePath) {
+      // Extract filename without extension from path
+      const pathParts = scene.filePath.split("/");
+      const fileWithExt = pathParts[pathParts.length - 1];
+      displayName = fileWithExt.replace(/\.[^/.]+$/, ""); // Remove extension
+    }
+    const fileName = this.sanitizeFileName(displayName || sceneId) + ".mp4";
 
     const download = await prisma.download.create({
       data: {
