@@ -7,10 +7,7 @@ import {
 import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
-import { apiPost, getMyPermissions } from "../../services/api.js";
-import { showError, showSuccess } from "../../utils/toast.jsx";
 import { canDirectPlayVideo } from "../../utils/videoFormat.js";
-import { ThemedIcon } from "../icons/index.js";
 import PlaylistSidebar from "../playlist/PlaylistSidebar.jsx";
 import PlaylistStatusCard from "../playlist/PlaylistStatusCard.jsx";
 import {
@@ -55,10 +52,6 @@ const SceneContent = () => {
   // TAB_COUNT_LOADING means loading (show tab without count badge), updated by ScenesLikeThis onCountChange
   const [similarScenesCount, setSimilarScenesCount] = useState(TAB_COUNT_LOADING);
 
-  // Download state
-  const [downloading, setDownloading] = useState(false);
-  const [permissions, setPermissions] = useState(null);
-
   // Dispatch zone change event to disable TV navigation on this page
   useEffect(() => {
     // Dispatch event to inform global listeners (Sidebar) that we're on a page without TV navigation zones
@@ -68,40 +61,6 @@ const SceneContent = () => {
       })
     );
   }, []); // Run once on mount
-
-  // Fetch user permissions on mount
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      try {
-        const result = await getMyPermissions();
-        setPermissions(result.permissions);
-      } catch (error) {
-        // Silently fail - permissions will remain null and download button won't show
-        console.error("Failed to fetch permissions:", error);
-      }
-    };
-    fetchPermissions();
-  }, []);
-
-  // Handle scene download
-  const handleDownload = async () => {
-    try {
-      setDownloading(true);
-      const response = await apiPost(`/downloads/scene/${scene.id}`);
-      const download = response.download;
-
-      // For scenes, download is immediate - redirect to file
-      if (download.status === "COMPLETED") {
-        window.location.href = `/api/downloads/${download.id}/file`;
-      }
-      showSuccess("Download started");
-    } catch (error) {
-      const message = error.data?.error || error.message || "Download failed";
-      showError(message);
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   // Reset similar scenes count when scene changes (back to loading state)
   useEffect(() => {
@@ -185,17 +144,6 @@ const SceneContent = () => {
               title={displayTitle}
             />
             <ViewInStashButton stashUrl={scene?.stashUrl} size={20} />
-            {permissions?.canDownloadFiles && (
-              <Button
-                variant="secondary"
-                onClick={handleDownload}
-                disabled={downloading}
-                className="inline-flex items-center gap-2"
-              >
-                <ThemedIcon name="download" size={16} />
-                <span>{downloading ? "Starting..." : "Download"}</span>
-              </Button>
-            )}
           </div>
           <h1
             className="text-2xl font-bold line-clamp-2"
