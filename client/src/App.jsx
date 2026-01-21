@@ -44,6 +44,7 @@ const UserStats = lazy(() => import("./components/pages/UserStats/index.js"));
 const HiddenItemsPage = lazy(
   () => import("./components/pages/HiddenItemsPage.jsx")
 );
+const Downloads = lazy(() => import("./components/pages/Downloads.jsx"));
 const CarouselBuilder = lazy(
   () => import("./components/carousel-builder/CarouselBuilder.jsx")
 );
@@ -284,6 +285,16 @@ const AppContent = () => {
               <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
                 <GlobalLayout>
                   <HiddenItemsPage />
+                </GlobalLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/downloads"
+            element={
+              <ProtectedRoute setupStatus={safeSetupStatus} checkingSetup={checkingSetup}>
+                <GlobalLayout>
+                  <Downloads />
                 </GlobalLayout>
               </ProtectedRoute>
             }
