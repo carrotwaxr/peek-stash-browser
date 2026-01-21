@@ -30,6 +30,7 @@ import syncRoutes from "../routes/sync.js";
 import exclusionsRoutes from "../routes/exclusions.js";
 import mergeReconciliationRoutes from "../routes/mergeReconciliation.js";
 import databaseBackupRoutes from "../routes/databaseBackup.js";
+import downloadRoutes from "../routes/download.js";
 import userRoutes from "../routes/user.js";
 import groupRoutes from "../routes/groups.js";
 import videoRoutes from "../routes/video.js";
@@ -133,6 +134,9 @@ export const setupAPI = () => {
 
   // Playlist routes (protected)
   app.use("/api/playlists", playlistRoutes);
+
+  // Download routes (protected)
+  app.use("/api/downloads", downloadRoutes);
 
   // Custom carousel routes (protected)
   app.use("/api/carousels", carouselRoutes);
