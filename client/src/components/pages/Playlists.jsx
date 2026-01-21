@@ -83,7 +83,9 @@ const Playlists = () => {
   const activeTab = searchParams.get("tab") || "mine";
 
   useEffect(() => {
+    // Load both playlist types on mount
     loadPlaylists();
+    loadSharedPlaylists();
   }, []);
 
   const loadPlaylists = async () => {
@@ -105,17 +107,11 @@ const Playlists = () => {
       setSharedPlaylists(response.playlists);
       setSharedLoaded(true);
     } catch {
-      showError("Failed to load shared playlists");
+      // Silently fail for shared - not critical
     } finally {
       setLoadingShared(false);
     }
   };
-
-  useEffect(() => {
-    if (activeTab === "shared" && !sharedLoaded) {
-      loadSharedPlaylists();
-    }
-  }, [activeTab, sharedLoaded]);
 
   const createPlaylist = async (e) => {
     e.preventDefault();
@@ -170,14 +166,10 @@ const Playlists = () => {
     );
   }
 
-  // Build tab configuration - always show both tabs
+  // Build tab configuration - always show both tabs (use TAB_COUNT_LOADING to hide badge but show tab)
   const tabs = [
-    { id: "mine", label: "My Playlists", count: playlists.length },
-    {
-      id: "shared",
-      label: "Shared with Me",
-      count: sharedLoaded ? sharedPlaylists.length : TAB_COUNT_LOADING,
-    },
+    { id: "mine", label: "My Playlists", count: TAB_COUNT_LOADING },
+    { id: "shared", label: "Shared with Me", count: TAB_COUNT_LOADING },
   ];
 
   return (
