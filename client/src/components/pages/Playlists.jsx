@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
@@ -9,6 +9,8 @@ import {
   ConfirmDialog,
   PageLayout,
   Paper,
+  TabNavigation,
+  TAB_COUNT_LOADING,
 } from "../ui/index.js";
 
 const api = axios.create({
@@ -16,8 +18,54 @@ const api = axios.create({
   withCredentials: true,
 });
 
+/**
+ * Reusable 2x2 thumbnail grid for playlist preview
+ */
+const PlaylistThumbnailGrid = ({ items, totalCount }) => {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div className="flex-shrink-0 w-32 h-32">
+      <div className="grid grid-cols-2 gap-1 w-full h-full rounded-lg overflow-hidden">
+        {items.slice(0, 4).map((item, idx) => (
+          <div
+            key={item.scene?.id || idx}
+            className="aspect-square overflow-hidden"
+            style={{ backgroundColor: "var(--bg-tertiary)" }}
+          >
+            {item.scene?.paths?.screenshot ? (
+              <img
+                src={item.scene.paths.screenshot}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full flex items-center justify-center text-xs"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {idx < totalCount ? "?" : ""}
+              </div>
+            )}
+          </div>
+        ))}
+        {/* Fill remaining slots if less than 4 items */}
+        {items.length < 4 &&
+          [...Array(4 - items.length)].map((_, idx) => (
+            <div
+              key={`empty-${idx}`}
+              className="aspect-square"
+              style={{ backgroundColor: "var(--bg-tertiary)" }}
+            />
+          ))}
+      </div>
+    </div>
+  );
+};
+
 const Playlists = () => {
   usePageTitle("Playlists");
+  const [searchParams] = useSearchParams();
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,9 +75,12 @@ const Playlists = () => {
   const [creating, setCreating] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [playlistToDelete, setPlaylistToDelete] = useState(null);
-  const [activeTab, setActiveTab] = useState("mine"); // "mine" or "shared"
   const [sharedPlaylists, setSharedPlaylists] = useState([]);
   const [loadingShared, setLoadingShared] = useState(false);
+  const [sharedLoaded, setSharedLoaded] = useState(false);
+
+  // Get active tab from URL or default to "mine"
+  const activeTab = searchParams.get("tab") || "mine";
 
   useEffect(() => {
     loadPlaylists();
@@ -52,6 +103,7 @@ const Playlists = () => {
       setLoadingShared(true);
       const response = await getSharedPlaylists();
       setSharedPlaylists(response.playlists);
+      setSharedLoaded(true);
     } catch {
       showError("Failed to load shared playlists");
     } finally {
@@ -60,10 +112,10 @@ const Playlists = () => {
   };
 
   useEffect(() => {
-    if (activeTab === "shared" && sharedPlaylists.length === 0) {
+    if (activeTab === "shared" && !sharedLoaded) {
       loadSharedPlaylists();
     }
-  }, [activeTab]);
+  }, [activeTab, sharedLoaded]);
 
   const createPlaylist = async (e) => {
     e.preventDefault();
@@ -118,30 +170,23 @@ const Playlists = () => {
     );
   }
 
+  // Build tab configuration - always show both tabs
+  const tabs = [
+    { id: "mine", label: "My Playlists", count: playlists.length },
+    {
+      id: "shared",
+      label: "Shared with Me",
+      count: sharedLoaded ? sharedPlaylists.length : TAB_COUNT_LOADING,
+    },
+  ];
+
   return (
     <PageLayout>
-      {/* Header with Tabs */}
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setActiveTab("mine")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === "mine" ? "bg-blue-600 text-white" : ""
-            }`}
-            style={activeTab !== "mine" ? { color: "var(--text-secondary)" } : {}}
-          >
-            My Playlists
-          </button>
-          <button
-            onClick={() => setActiveTab("shared")}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === "shared" ? "bg-blue-600 text-white" : ""
-            }`}
-            style={activeTab !== "shared" ? { color: "var(--text-secondary)" } : {}}
-          >
-            Shared with Me
-          </button>
-        </div>
+      {/* Header with New Playlist button */}
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
+        <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
+          Playlists
+        </h1>
         {activeTab === "mine" && (
           <Button
             onClick={() => setShowCreateModal(true)}
@@ -152,6 +197,9 @@ const Playlists = () => {
           </Button>
         )}
       </div>
+
+      {/* Tab Navigation */}
+      <TabNavigation tabs={tabs} defaultTab="mine" showSingleTab />
 
       {activeTab === "mine" ? (
         <>
@@ -168,7 +216,7 @@ const Playlists = () => {
             </div>
           )}
 
-          {/* Playlists Grid - Wider cards with scene preview images */}
+          {/* My Playlists Grid */}
           {playlists.length === 0 ? (
             <div className="text-center py-16">
               <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
@@ -190,46 +238,10 @@ const Playlists = () => {
                 <Paper key={playlist.id}>
                   <Paper.Body>
                     <div className="flex gap-4">
-                      {/* Scene Preview Grid (2x2) */}
-                      {playlist.items && playlist.items.length > 0 && (
-                        <div className="flex-shrink-0 w-32 h-32">
-                          <div className="grid grid-cols-2 gap-1 w-full h-full rounded-lg overflow-hidden">
-                            {playlist.items.slice(0, 4).map((item, idx) => (
-                              <div
-                                key={item.scene?.id || idx}
-                                className="aspect-square overflow-hidden"
-                                style={{ backgroundColor: "var(--bg-tertiary)" }}
-                              >
-                                {item.scene?.paths?.screenshot ? (
-                                  <img
-                                    src={item.scene.paths.screenshot}
-                                    alt=""
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div
-                                    className="w-full h-full flex items-center justify-center text-xs"
-                                    style={{ color: "var(--text-muted)" }}
-                                  >
-                                    {idx < playlist._count.items ? "?" : ""}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            {/* Fill remaining slots if less than 4 items */}
-                            {playlist.items.length < 4 &&
-                              [...Array(4 - playlist.items.length)].map((_, idx) => (
-                                <div
-                                  key={`empty-${idx}`}
-                                  className="aspect-square"
-                                  style={{ backgroundColor: "var(--bg-tertiary)" }}
-                                />
-                              ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Playlist Details */}
+                      <PlaylistThumbnailGrid
+                        items={playlist.items}
+                        totalCount={playlist._count?.items || 0}
+                      />
                       <div className="flex-1 min-w-0">
                         <Link to={`/playlist/${playlist.id}`}>
                           <h3
@@ -252,8 +264,8 @@ const Playlists = () => {
                           style={{ color: "var(--text-muted)" }}
                         >
                           <span>
-                            {playlist._count.items}{" "}
-                            {playlist._count.items === 1 ? "video" : "videos"}
+                            {playlist._count?.items || 0}{" "}
+                            {(playlist._count?.items || 0) === 1 ? "video" : "videos"}
                           </span>
                           <Button
                             onClick={() => handleDeleteClick(playlist)}
@@ -296,6 +308,10 @@ const Playlists = () => {
               <Paper key={playlist.id}>
                 <Paper.Body>
                   <div className="flex gap-4">
+                    <PlaylistThumbnailGrid
+                      items={playlist.items}
+                      totalCount={playlist.sceneCount || 0}
+                    />
                     <div className="flex-1 min-w-0">
                       <Link to={`/playlist/${playlist.id}`}>
                         <h3

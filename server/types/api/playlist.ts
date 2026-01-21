@@ -24,6 +24,14 @@ export interface PlaylistItemWithScene {
 }
 
 /**
+ * Simplified playlist item for preview thumbnails (only needs scene screenshot)
+ */
+export interface PlaylistPreviewItem {
+  sceneId: string;
+  scene?: Partial<Scene> | null;
+}
+
+/**
  * Playlist with item count and optional items
  * Uses Partial for optional fields since not all queries return all data
  */
@@ -217,6 +225,8 @@ export interface SharedPlaylistData {
   owner: { id: number; username: string };
   sharedViaGroups: string[];
   sharedAt: string;
+  // Preview items for thumbnail grid - uses Partial<Scene> from transformScene
+  items?: PlaylistPreviewItem[];
 }
 
 export interface GetSharedPlaylistsResponse {

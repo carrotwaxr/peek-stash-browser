@@ -196,25 +196,76 @@ export const getSharedPlaylists = async (
         _count: {
           select: { items: true },
         },
+        items: {
+          orderBy: {
+            position: "asc",
+          },
+          take: 4, // Only fetch first 4 items for preview thumbnails
+        },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    const playlists = sharedPlaylists.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      sceneCount: p._count.items,
-      owner: { id: p.user.id, username: p.user.username },
-      sharedViaGroups: p.shares.map((s) => s.group.name),
-      sharedAt: p.shares.length > 0
-        ? p.shares.reduce((earliest, s) =>
-            s.sharedAt < earliest ? s.sharedAt : earliest,
-          p.shares[0].sharedAt).toISOString()
-        : new Date().toISOString(),
-    }));
+    // Fetch scene details for preview items from cache
+    const playlistsWithScenes = await Promise.all(
+      sharedPlaylists.map(async (p) => {
+        let itemsWithScenes: Array<{ sceneId: string; scene: ReturnType<typeof transformScene> | null }> = [];
 
-    res.json({ playlists });
+        if (p.items.length > 0) {
+          const sceneIds = p.items.map((item) => item.sceneId);
+
+          try {
+            // Fetch scenes from cache with relations
+            const scenes = await stashEntityService.getScenesByIdsWithRelations(sceneIds);
+
+            // Apply user exclusions (filter out hidden/restricted scenes)
+            const visibleScenes = await entityExclusionHelper.filterExcluded(
+              scenes,
+              userId,
+              'scene'
+            );
+
+            // Transform scenes to add proxy URLs
+            const transformedScenes = visibleScenes.map((s) =>
+              transformScene(s as unknown as Scene)
+            );
+
+            // Create a map of scene ID to scene data
+            const sceneMap = new Map(
+              transformedScenes.map((s) => [s.id, s])
+            );
+
+            // Attach scene data to each playlist item
+            itemsWithScenes = p.items.map((item) => ({
+              sceneId: item.sceneId,
+              scene: sceneMap.get(item.sceneId) || null,
+            }));
+          } catch (cacheError) {
+            console.error(
+              `Error fetching scenes for shared playlist ${p.id}:`,
+              cacheError
+            );
+          }
+        }
+
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          sceneCount: p._count.items,
+          owner: { id: p.user.id, username: p.user.username },
+          sharedViaGroups: p.shares.map((s) => s.group.name),
+          sharedAt: p.shares.length > 0
+            ? p.shares.reduce((earliest, s) =>
+                s.sharedAt < earliest ? s.sharedAt : earliest,
+              p.shares[0].sharedAt).toISOString()
+            : new Date().toISOString(),
+          items: itemsWithScenes,
+        };
+      })
+    );
+
+    res.json({ playlists: playlistsWithScenes });
   } catch (error) {
     console.error("Error getting shared playlists:", error);
     res.status(500).json({ error: "Failed to get shared playlists" });
