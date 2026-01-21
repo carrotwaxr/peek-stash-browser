@@ -68,8 +68,16 @@ const AccountTab = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      showError("Password must be at least 6 characters");
+    if (newPassword.length < 8) {
+      showError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[a-zA-Z]/.test(newPassword)) {
+      showError("Password must contain at least one letter");
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      showError("Password must contain at least one number");
       return;
     }
 
@@ -142,6 +150,9 @@ const AccountTab = () => {
               >
                 New Password
               </label>
+              <p className="text-xs mb-1" style={{ color: "var(--text-muted)" }}>
+                8+ characters with at least one letter and one number
+              </p>
               <input
                 type="password"
                 id="newPassword"
@@ -154,7 +165,7 @@ const AccountTab = () => {
                   color: "var(--text-primary)",
                 }}
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
 
@@ -178,7 +189,7 @@ const AccountTab = () => {
                   color: "var(--text-primary)",
                 }}
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
 
