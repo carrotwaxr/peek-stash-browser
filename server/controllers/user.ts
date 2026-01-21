@@ -7,6 +7,7 @@ import { exclusionComputationService } from "../services/ExclusionComputationSer
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
+import { validatePassword } from "../utils/passwordValidation.js";
 
 /**
  * Carousel preference configuration
@@ -510,10 +511,9 @@ export const changePassword = async (
         .json({ error: "Current password and new password are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "New password must be at least 6 characters" });
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.errors.join(". ") });
     }
 
     // Get current user with password
@@ -2563,10 +2563,9 @@ export const adminResetPassword = async (
       return res.status(400).json({ error: "New password is required" });
     }
 
-    if (newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "Password must be at least 6 characters" });
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.errors.join(". ") });
     }
 
     // Check if user exists
