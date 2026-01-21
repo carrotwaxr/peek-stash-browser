@@ -19,8 +19,10 @@ import {
 } from "lucide-react";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { apiPost, getMyPermissions } from "../../services/api.js";
 import { getSceneTitle } from "../../utils/format.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
+import { ThemedIcon } from "../icons/index.js";
 import {
   AddToPlaylistButton,
   Button,
@@ -51,6 +53,8 @@ const PlaylistDetail = () => {
   const [reorderMode, setReorderMode] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState("none"); // "none", "all", "one"
+  const [downloading, setDownloading] = useState(false);
+  const [permissions, setPermissions] = useState(null);
 
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
@@ -62,6 +66,20 @@ const PlaylistDetail = () => {
     loadPlaylist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistId]); // loadPlaylist is stable and doesn't need to be in dependencies
+
+  // Fetch user permissions on mount
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const result = await getMyPermissions();
+        setPermissions(result.permissions);
+      } catch (error) {
+        // Silently fail - permissions will remain null and download button won't show
+        console.error("Failed to fetch permissions:", error);
+      }
+    };
+    fetchPermissions();
+  }, []);
 
   const loadPlaylist = async () => {
     try {
@@ -253,6 +271,24 @@ const PlaylistDetail = () => {
     }
   };
 
+  // Handle playlist download
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+      await apiPost(`/downloads/playlist/${playlist.id}`);
+      showSuccess("Download started - check Downloads page for progress");
+    } catch (error) {
+      const message = error.data?.error || error.message || "Download failed";
+      if (error.data?.totalSizeMB) {
+        showError(`${message} (${error.data.totalSizeMB}MB exceeds ${error.data.maxSizeMB}MB limit)`);
+      } else {
+        showError(message);
+      }
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading) {
     return (
       <PageLayout>
@@ -318,6 +354,21 @@ const PlaylistDetail = () => {
                     title="Reorder Scenes"
                   >
                     <span className="hidden sm:inline">Reorder</span>
+                  </Button>
+                )}
+
+                {/* Download button */}
+                {permissions?.canDownloadPlaylists && scenes.length > 0 && (
+                  <Button
+                    onClick={handleDownload}
+                    variant="secondary"
+                    disabled={downloading}
+                    icon={<ThemedIcon name="download" size={16} />}
+                    title="Download Playlist"
+                  >
+                    <span className="hidden sm:inline">
+                      {downloading ? "Starting..." : "Download"}
+                    </span>
                   </Button>
                 )}
               </>
