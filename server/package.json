@@ -37,6 +37,7 @@
     "@graphql-codegen/typescript-graphql-request": "^6.4.0",
     "@graphql-codegen/typescript-operations": "^4.6.1",
     "@trivago/prettier-plugin-sort-imports": "^6.0.0",
+    "@types/archiver": "^7.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.9",
     "@types/cors": "^2.8.19",
@@ -59,6 +60,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.17.0",
+    "archiver": "^7.0.1",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
