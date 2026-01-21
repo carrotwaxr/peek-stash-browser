@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../middleware/auth.js";
+import { DownloadStatus, DownloadType } from "@prisma/client";
 import { downloadService } from "../services/DownloadService.js";
 import { playlistZipService } from "../services/PlaylistZipService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -285,7 +286,7 @@ export async function getDownloadFile(
     }
 
     // Check if download is completed
-    if (download.status !== "COMPLETED") {
+    if (download.status !== DownloadStatus.COMPLETED) {
       return res.status(400).json({
         error: "Download is not ready",
         status: download.status,
@@ -294,7 +295,7 @@ export async function getDownloadFile(
 
     // Handle different download types
     switch (download.type) {
-      case "PLAYLIST":
+      case DownloadType.PLAYLIST:
         // Serve the zip file from filePath
         if (!download.filePath) {
           return res.status(500).json({ error: "Download file path missing" });
@@ -305,11 +306,11 @@ export async function getDownloadFile(
           },
         });
 
-      case "SCENE":
+      case DownloadType.SCENE:
         // Redirect to Stash stream proxy
         return res.redirect(`/api/scene/${download.entityId}/proxy-stream/stream`);
 
-      case "IMAGE":
+      case DownloadType.IMAGE:
         // Redirect to Stash image proxy
         return res.redirect(`/api/proxy/stash/image/${download.entityId}/image`);
 
@@ -393,13 +394,13 @@ export async function retryDownload(
     }
 
     // Only allow retrying failed playlist downloads
-    if (download.type !== "PLAYLIST") {
+    if (download.type !== DownloadType.PLAYLIST) {
       return res.status(400).json({
         error: "Only playlist downloads can be retried",
       });
     }
 
-    if (download.status !== "FAILED") {
+    if (download.status !== DownloadStatus.FAILED) {
       return res.status(400).json({
         error: "Only failed downloads can be retried",
         currentStatus: download.status,
