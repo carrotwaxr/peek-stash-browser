@@ -4,6 +4,7 @@ import { DownloadStatus, DownloadType } from "@prisma/client";
 import { downloadService } from "../services/DownloadService.js";
 import { playlistZipService } from "../services/PlaylistZipService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
 
 /**
@@ -306,13 +307,99 @@ export async function getDownloadFile(
           },
         });
 
-      case DownloadType.SCENE:
-        // Redirect to Stash stream proxy
-        return res.redirect(`/api/scene/${download.entityId}/proxy-stream/stream`);
+      case DownloadType.SCENE: {
+        // Proxy scene stream with Content-Disposition header for download
+        const stashBaseUrl = stashInstanceManager.getBaseUrl();
+        const apiKey = stashInstanceManager.getApiKey();
+        const sceneUrl = `${stashBaseUrl}/scene/${download.entityId}/stream`;
 
-      case DownloadType.IMAGE:
-        // Redirect to Stash image proxy
-        return res.redirect(`/api/proxy/stash/image/${download.entityId}/image`);
+        const sceneResponse = await fetch(sceneUrl, {
+          headers: { ApiKey: apiKey },
+        });
+
+        if (!sceneResponse.ok) {
+          return res.status(sceneResponse.status).json({
+            error: "Failed to fetch scene from Stash",
+          });
+        }
+
+        // Set headers for download
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${download.fileName}"`
+        );
+        const contentType = sceneResponse.headers.get("content-type");
+        if (contentType) {
+          res.setHeader("Content-Type", contentType);
+        }
+        const contentLength = sceneResponse.headers.get("content-length");
+        if (contentLength) {
+          res.setHeader("Content-Length", contentLength);
+        }
+
+        // Stream the response body
+        if (sceneResponse.body) {
+          const reader = sceneResponse.body.getReader();
+          const pump = async (): Promise<void> => {
+            const { done, value } = await reader.read();
+            if (done) {
+              res.end();
+              return;
+            }
+            res.write(Buffer.from(value));
+            return pump();
+          };
+          await pump();
+        }
+        return;
+      }
+
+      case DownloadType.IMAGE: {
+        // Proxy image with Content-Disposition header for download
+        const stashBaseUrl2 = stashInstanceManager.getBaseUrl();
+        const apiKey2 = stashInstanceManager.getApiKey();
+        const imageUrl = `${stashBaseUrl2}/image/${download.entityId}/image`;
+
+        const imageResponse = await fetch(imageUrl, {
+          headers: { ApiKey: apiKey2 },
+        });
+
+        if (!imageResponse.ok) {
+          return res.status(imageResponse.status).json({
+            error: "Failed to fetch image from Stash",
+          });
+        }
+
+        // Set headers for download
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${download.fileName}"`
+        );
+        const imgContentType = imageResponse.headers.get("content-type");
+        if (imgContentType) {
+          res.setHeader("Content-Type", imgContentType);
+        }
+        const imgContentLength = imageResponse.headers.get("content-length");
+        if (imgContentLength) {
+          res.setHeader("Content-Length", imgContentLength);
+        }
+
+        // Stream the response body
+        if (imageResponse.body) {
+          const reader = imageResponse.body.getReader();
+          const pump = async (): Promise<void> => {
+            const { done, value } = await reader.read();
+            if (done) {
+              res.end();
+              return;
+            }
+            res.write(Buffer.from(value));
+            return pump();
+          };
+          await pump();
+        }
+        return;
+      }
 
       default:
         return res.status(400).json({ error: "Unknown download type" });

@@ -93,7 +93,8 @@ const PlaybackControls = () => {
       const response = await apiPost(`/downloads/scene/${scene.id}`);
       const download = response.download;
 
-      // For scenes, download is immediate - redirect to file
+      // For scenes, download is immediate - redirect to file endpoint
+      // Server sets Content-Disposition: attachment to force download
       if (download.status === "COMPLETED") {
         window.location.href = `/api/downloads/${download.id}/file`;
       }

@@ -35,6 +35,13 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
+vi.mock("../../services/StashInstanceManager.js", () => ({
+  stashInstanceManager: {
+    getBaseUrl: vi.fn(() => "http://stash:9999"),
+    getApiKey: vi.fn(() => "test-api-key"),
+  },
+}));
+
 import {
   startSceneDownload,
   startPlaylistDownload,
@@ -59,19 +66,31 @@ describe("Download Controller", () => {
   let responseStatus: ReturnType<typeof vi.fn>;
   let responseSendFile: ReturnType<typeof vi.fn>;
   let responseRedirect: ReturnType<typeof vi.fn>;
+  let responseSetHeader: ReturnType<typeof vi.fn>;
+  let responseWrite: ReturnType<typeof vi.fn>;
+  let responseEnd: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     responseJson = vi.fn();
     responseSendFile = vi.fn();
     responseRedirect = vi.fn();
+    responseSetHeader = vi.fn();
+    responseWrite = vi.fn();
+    responseEnd = vi.fn();
     responseStatus = vi.fn(() => ({ json: responseJson }));
     mockResponse = {
       json: responseJson,
       status: responseStatus,
       sendFile: responseSendFile,
       redirect: responseRedirect,
+      setHeader: responseSetHeader,
+      write: responseWrite,
+      end: responseEnd,
     };
+
+    // Mock global fetch for scene/image downloads
+    global.fetch = vi.fn();
   });
 
   describe("startSceneDownload", () => {
@@ -383,7 +402,7 @@ describe("Download Controller", () => {
   });
 
   describe("getDownloadFile", () => {
-    it("should redirect to scene stream for SCENE downloads", async () => {
+    it("should proxy scene stream with Content-Disposition for SCENE downloads", async () => {
       mockRequest = {
         user: { id: 1, username: "testuser", role: "USER" },
         params: { id: "1" },
@@ -407,17 +426,43 @@ describe("Download Controller", () => {
       };
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
+      // Mock fetch response with readable stream
+      const mockReader = {
+        read: vi
+          .fn()
+          .mockResolvedValueOnce({
+            done: false,
+            value: new Uint8Array([1, 2, 3]),
+          })
+          .mockResolvedValueOnce({ done: true, value: undefined }),
+      };
+      const mockBody = { getReader: () => mockReader };
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        headers: new Map([
+          ["content-type", "video/mp4"],
+          ["content-length", "1000"],
+        ]),
+        body: mockBody,
+      });
+
       await getDownloadFile(
         mockRequest as AuthenticatedRequest,
         mockResponse as Response
       );
 
-      expect(responseRedirect).toHaveBeenCalledWith(
-        "/api/scene/scene-123/proxy-stream/stream"
+      expect(global.fetch).toHaveBeenCalledWith(
+        "http://stash:9999/scene/scene-123/stream",
+        { headers: { ApiKey: "test-api-key" } }
       );
+      expect(responseSetHeader).toHaveBeenCalledWith(
+        "Content-Disposition",
+        'attachment; filename="test.mp4"'
+      );
+      expect(responseEnd).toHaveBeenCalled();
     });
 
-    it("should redirect to image proxy for IMAGE downloads", async () => {
+    it("should proxy image with Content-Disposition for IMAGE downloads", async () => {
       mockRequest = {
         user: { id: 1, username: "testuser", role: "USER" },
         params: { id: "1" },
@@ -441,14 +486,40 @@ describe("Download Controller", () => {
       };
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
+      // Mock fetch response with readable stream
+      const mockReader = {
+        read: vi
+          .fn()
+          .mockResolvedValueOnce({
+            done: false,
+            value: new Uint8Array([1, 2, 3]),
+          })
+          .mockResolvedValueOnce({ done: true, value: undefined }),
+      };
+      const mockBody = { getReader: () => mockReader };
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        headers: new Map([
+          ["content-type", "image/jpeg"],
+          ["content-length", "1000"],
+        ]),
+        body: mockBody,
+      });
+
       await getDownloadFile(
         mockRequest as AuthenticatedRequest,
         mockResponse as Response
       );
 
-      expect(responseRedirect).toHaveBeenCalledWith(
-        "/api/proxy/stash/image/image-456/image"
+      expect(global.fetch).toHaveBeenCalledWith(
+        "http://stash:9999/image/image-456/image",
+        { headers: { ApiKey: "test-api-key" } }
       );
+      expect(responseSetHeader).toHaveBeenCalledWith(
+        "Content-Disposition",
+        'attachment; filename="test.jpg"'
+      );
+      expect(responseEnd).toHaveBeenCalled();
     });
 
     it("should return 400 if download is not completed", async () => {
