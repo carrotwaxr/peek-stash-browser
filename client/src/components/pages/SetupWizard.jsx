@@ -153,6 +153,14 @@ const AdminPasswordStep = ({
         >
           Password
         </label>
+        <p
+          className="text-xs mb-1"
+          style={{
+            color: theme?.properties?.["--text-muted"] || "#666666",
+          }}
+        >
+          8+ characters with at least one letter and one number
+        </p>
         <input
           type="password"
           value={adminPassword}
@@ -418,8 +426,16 @@ const SetupWizard = ({ onSetupComplete, setupStatus }) => {
       return;
     }
 
-    if (adminPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (adminPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[a-zA-Z]/.test(adminPassword)) {
+      setError("Password must contain at least one letter");
+      return;
+    }
+    if (!/[0-9]/.test(adminPassword)) {
+      setError("Password must contain at least one number");
       return;
     }
 
