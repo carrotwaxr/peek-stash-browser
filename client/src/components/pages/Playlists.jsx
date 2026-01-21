@@ -166,10 +166,10 @@ const Playlists = () => {
     );
   }
 
-  // Build tab configuration - always show both tabs (use TAB_COUNT_LOADING to hide badge but show tab)
+  // Build tab configuration with actual counts
   const tabs = [
-    { id: "mine", label: "My Playlists", count: TAB_COUNT_LOADING },
-    { id: "shared", label: "Shared with Me", count: TAB_COUNT_LOADING },
+    { id: "mine", label: "My Playlists", count: playlists.length },
+    { id: "shared", label: "Shared with Me", count: sharedLoaded ? sharedPlaylists.length : TAB_COUNT_LOADING },
   ];
 
   return (
@@ -191,7 +191,7 @@ const Playlists = () => {
       </div>
 
       {/* Tab Navigation */}
-      <TabNavigation tabs={tabs} defaultTab="mine" showSingleTab />
+      <TabNavigation tabs={tabs} defaultTab="mine" showSingleTab showEmpty />
 
       {activeTab === "mine" ? (
         <>
