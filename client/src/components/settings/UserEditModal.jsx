@@ -127,8 +127,16 @@ const UserEditModalContent = ({
   };
 
   const handleResetPassword = async () => {
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[a-zA-Z]/.test(newPassword)) {
+      setError("Password must contain at least one letter");
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setError("Password must contain at least one number");
       return;
     }
 
@@ -568,7 +576,7 @@ const UserEditModalContent = ({
                           type="password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="New password (min 6 chars)"
+                          placeholder="New password (8+ chars, letter, number)"
                           className="flex-1 px-3 py-2 rounded text-sm"
                           style={{
                             backgroundColor: "var(--bg-tertiary)",
