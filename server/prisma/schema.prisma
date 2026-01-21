@@ -96,6 +96,7 @@ model UserGroup {
   updatedAt DateTime @updatedAt
 
   members UserGroupMembership[]
+  playlistShares PlaylistShare[]
 }
 
 model UserGroupMembership {
@@ -157,9 +158,23 @@ model Playlist {
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   items PlaylistItem[]
+  shares PlaylistShare[]
 
   @@index([userId])
   @@index([updatedAt])
+}
+
+model PlaylistShare {
+  id         Int       @id @default(autoincrement())
+  playlistId Int
+  groupId    Int
+  sharedAt   DateTime  @default(now())
+
+  playlist   Playlist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  group      UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, groupId])
+  @@index([groupId])
 }
 
 model PlaylistItem {

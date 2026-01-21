@@ -24,6 +24,14 @@ export interface PlaylistItemWithScene {
 }
 
 /**
+ * Simplified playlist item for preview thumbnails (only needs scene screenshot)
+ */
+export interface PlaylistPreviewItem {
+  sceneId: string;
+  scene?: Partial<Scene> | null;
+}
+
+/**
  * Playlist with item count and optional items
  * Uses Partial for optional fields since not all queries return all data
  */
@@ -69,6 +77,9 @@ export interface GetPlaylistParams extends Record<string, string> {
 
 export interface GetPlaylistResponse {
   playlist: PlaylistData;
+  isOwner?: boolean;
+  accessLevel?: "owner" | "shared";
+  sharedViaGroups?: string[];
 }
 
 // =============================================================================
@@ -196,4 +207,74 @@ export interface ReorderPlaylistRequest {
 export interface ReorderPlaylistResponse {
   success: true;
   message: string;
+}
+
+// =============================================================================
+// GET SHARED PLAYLISTS
+// =============================================================================
+
+/**
+ * GET /api/playlists/shared
+ * Get playlists shared with current user
+ */
+export interface SharedPlaylistData {
+  id: number;
+  name: string;
+  description: string | null;
+  sceneCount: number;
+  owner: { id: number; username: string };
+  sharedViaGroups: string[];
+  sharedAt: string;
+  // Preview items for thumbnail grid - uses Partial<Scene> from transformScene
+  items?: PlaylistPreviewItem[];
+}
+
+export interface GetSharedPlaylistsResponse {
+  playlists: SharedPlaylistData[];
+}
+
+// =============================================================================
+// GET PLAYLIST SHARES
+// =============================================================================
+
+/**
+ * GET /api/playlists/:id/shares
+ * Get sharing info for a playlist (owner only)
+ */
+export interface PlaylistShareInfo {
+  groupId: number;
+  groupName: string;
+  sharedAt: string;
+}
+
+export interface GetPlaylistSharesResponse {
+  shares: PlaylistShareInfo[];
+}
+
+// =============================================================================
+// UPDATE PLAYLIST SHARES
+// =============================================================================
+
+/**
+ * PUT /api/playlists/:id/shares
+ * Update sharing - set which groups (owner only, requires canShare)
+ */
+export interface UpdatePlaylistSharesRequest {
+  groupIds: number[];
+}
+
+export interface UpdatePlaylistSharesResponse {
+  shares: PlaylistShareInfo[];
+}
+
+// =============================================================================
+// DUPLICATE PLAYLIST
+// =============================================================================
+
+/**
+ * POST /api/playlists/:id/duplicate
+ * Create a copy of a shared playlist
+ */
+export interface DuplicatePlaylistResponse {
+  playlist: PlaylistData;
 }
