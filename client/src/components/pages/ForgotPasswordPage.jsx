@@ -42,8 +42,16 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[a-zA-Z]/.test(newPassword)) {
+      setError("Password must contain at least one letter");
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setError("Password must contain at least one number");
       return;
     }
 
@@ -149,8 +157,11 @@ const ForgotPasswordPage = () => {
                 className="w-full px-4 py-2 rounded-lg"
                 style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                 required
-                minLength={6}
+                minLength={8}
               />
+              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                8+ characters with at least one letter and one number
+              </p>
             </div>
             <div className="mb-6">
               <label htmlFor="confirmPassword" className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
@@ -164,7 +175,7 @@ const ForgotPasswordPage = () => {
                 className="w-full px-4 py-2 rounded-lg"
                 style={{ backgroundColor: "var(--bg-secondary)", border: "1px solid var(--border-color)", color: "var(--text-primary)" }}
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
             <Button type="submit" variant="primary" className="w-full" disabled={loading} loading={loading}>

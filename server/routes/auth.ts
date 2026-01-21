@@ -6,15 +6,22 @@ import {
   generateToken,
   setTokenCookie,
 } from "../middleware/auth.js";
+import { authRateLimiter } from "../middleware/rateLimiter.js";
+import {
+  checkAccountLockout,
+  recordFailedAttempt,
+  clearFailedAttempts,
+} from "../middleware/accountLockout.js";
 import prisma from "../prisma/singleton.js";
 import rankingComputeService from "../services/RankingComputeService.js";
 import { generateRecoveryKey } from "../utils/recoveryKey.js";
+import { validatePassword } from "../utils/passwordValidation.js";
 import { authenticated } from "../utils/routeHelpers.js";
 
 const router = express.Router();
 
 // Login endpoint
-router.post("/login", async (req, res) => {
+router.post("/login", authRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -22,6 +29,17 @@ router.post("/login", async (req, res) => {
       return res
         .status(400)
         .json({ error: "Username and password are required" });
+    }
+
+    // Check if account is locked out
+    const lockoutStatus = checkAccountLockout(username);
+    if (lockoutStatus.locked) {
+      const retryAfterSeconds = Math.ceil((lockoutStatus.remainingMs || 0) / 1000);
+      res.setHeader("Retry-After", retryAfterSeconds.toString());
+      return res.status(423).json({
+        error: "Account temporarily locked due to too many failed attempts",
+        retryAfterSeconds,
+      });
     }
 
     const user = await prisma.user.findUnique({
@@ -37,13 +55,18 @@ router.post("/login", async (req, res) => {
     });
 
     if (!user) {
+      recordFailedAttempt(username);
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
+      recordFailedAttempt(username);
       return res.status(401).json({ error: "Invalid credentials" });
     }
+
+    // Clear failed attempts on successful login
+    clearFailedAttempts(username);
 
     // Generate recovery key if user doesn't have one
     if (!user.recoveryKey) {
@@ -111,7 +134,7 @@ router.get(
 );
 
 // Forgot password - check username and get recovery method
-router.post("/forgot-password/init", async (req, res) => {
+router.post("/forgot-password/init", authRateLimiter, async (req, res) => {
   try {
     const { username } = req.body;
 
@@ -137,7 +160,7 @@ router.post("/forgot-password/init", async (req, res) => {
 });
 
 // Forgot password - verify recovery key and set new password
-router.post("/forgot-password/reset", async (req, res) => {
+router.post("/forgot-password/reset", authRateLimiter, async (req, res) => {
   try {
     const { username, recoveryKey, newPassword } = req.body;
 
@@ -145,10 +168,9 @@ router.post("/forgot-password/reset", async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "Password must be at least 6 characters" });
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.errors.join(". ") });
     }
 
     const user = await prisma.user.findUnique({
