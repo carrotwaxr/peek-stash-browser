@@ -7,6 +7,7 @@ import { initializeCache } from "./initializers/cache.js";
 import { initializeDatabase } from "./initializers/database.js";
 import { initializeStashInstances } from "./initializers/stashInstance.js";
 import { validateStartup } from "./initializers/validate.js";
+import { scheduleDownloadCleanup } from "./jobs/downloadCleanup.js";
 import { dataMigrationService } from "./services/DataMigrationService.js";
 import { stashInstanceManager } from "./services/StashInstanceManager.js";
 import { stashSyncService } from "./services/StashSyncService.js";
@@ -45,6 +46,9 @@ const main = async () => {
   // Start API server (needed for setup wizard if no Stash configured)
   const app = setupAPI();
   startServer(app);
+
+  // Schedule background jobs
+  scheduleDownloadCleanup();
 
   // Only initialize cache if we have Stash instances configured
   if (stashConfig.needsSetup) {
