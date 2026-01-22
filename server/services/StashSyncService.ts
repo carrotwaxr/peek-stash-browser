@@ -14,6 +14,8 @@
 
 import { EventEmitter } from "events";
 import type { Gallery, Group, Performer, Scene, Studio, Tag } from "../graphql/types.js";
+import { SortDirectionEnum, CriterionModifier } from "../graphql/generated/graphql.js";
+import type { FindFilterType, SceneMarkerFilterType } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 // Transform functions no longer needed - URLs transformed at read time
@@ -2412,17 +2414,17 @@ class StashSyncService extends EventEmitter {
       while (hasMore) {
         this.checkAbort();
 
-        const filter: { page: number; per_page: number; sort: string; direction: string } = {
+        const filter: FindFilterType = {
           page,
           per_page: this.PAGE_SIZE,
           sort: "updated_at",
-          direction: "ASC",
+          direction: SortDirectionEnum.Asc,
         };
 
-        const markerFilter: { updated_at?: { modifier: string; value: string } } = {};
+        const markerFilter: SceneMarkerFilterType = {};
         if (since && !isFullSync) {
           markerFilter.updated_at = {
-            modifier: "GREATER_THAN",
+            modifier: CriterionModifier.GreaterThan,
             value: formatTimestampForStash(since),
           };
         }
@@ -2490,7 +2492,6 @@ class StashSyncService extends EventEmitter {
           if (tagIds.length > 0) {
             await prisma.clipTag.createMany({
               data: tagIds.map((tagId) => ({ clipId: marker.id, tagId })),
-              skipDuplicates: true,
             });
           }
         }

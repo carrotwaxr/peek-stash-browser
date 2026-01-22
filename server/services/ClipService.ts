@@ -119,7 +119,7 @@ export class ClipService {
     }
 
     if (q) {
-      whereClause.title = { contains: q, mode: "insensitive" };
+      whereClause.title = { contains: q };
     }
 
     if (tagIds && tagIds.length > 0) {
