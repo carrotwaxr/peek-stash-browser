@@ -17,7 +17,11 @@ export default function ClipList({ clips, onClipClick, loading = false }) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="aspect-video bg-slate-700 rounded-lg animate-pulse" />
+          <div
+            key={i}
+            className="aspect-video rounded-lg animate-pulse"
+            style={{ backgroundColor: "var(--bg-tertiary)" }}
+          />
         ))}
       </div>
     );
@@ -25,7 +29,7 @@ export default function ClipList({ clips, onClipClick, loading = false }) {
 
   if (clips.length === 0) {
     return (
-      <div className="text-center py-8 text-slate-400">
+      <div className="text-center py-8" style={{ color: "var(--text-secondary)" }}>
         No clips available for this scene
       </div>
     );
@@ -35,16 +39,20 @@ export default function ClipList({ clips, onClipClick, loading = false }) {
     <div>
       {/* Header with toggle */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-slate-300">
+        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
           Clips ({filteredClips.length})
         </h3>
         {ungeneratedCount > 0 && (
-          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+          <label
+            className="flex items-center gap-2 text-xs cursor-pointer"
+            style={{ color: "var(--text-secondary)" }}
+          >
             <input
               type="checkbox"
               checked={showUngenerated}
               onChange={(e) => setShowUngenerated(e.target.checked)}
-              className="rounded border-slate-500"
+              className="rounded"
+              style={{ borderColor: "var(--border-color)" }}
             />
             Show all ({ungeneratedCount} without preview)
           </label>

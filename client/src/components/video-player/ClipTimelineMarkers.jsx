@@ -55,7 +55,7 @@ export default function ClipTimelineMarkers({
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             <div className="bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
               <div className="font-medium">{marker.title}</div>
-              <div className="text-slate-400">{formatDuration(marker.seconds)}</div>
+              <div style={{ color: "var(--text-secondary)" }}>{formatDuration(marker.seconds)}</div>
               {marker.tagName && (
                 <div
                   className="mt-0.5 text-xs"

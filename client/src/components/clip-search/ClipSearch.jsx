@@ -5,6 +5,7 @@ import {
   FilterPanel,
   FilterControl,
   Button,
+  Pagination,
 } from "../ui/index.js";
 import ClipGrid from "./ClipGrid.jsx";
 
@@ -103,7 +104,10 @@ export default function ClipSearch() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold">Clips</h1>
-        <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+        <label
+          className="flex items-center gap-2 text-sm cursor-pointer"
+          style={{ color: "var(--text-secondary)" }}
+        >
           <input
             type="checkbox"
             checked={showUngenerated}
@@ -111,7 +115,8 @@ export default function ClipSearch() {
               setShowUngenerated(e.target.checked);
               setPage(1);
             }}
-            className="rounded border-slate-500"
+            className="rounded"
+            style={{ borderColor: "var(--border-color)" }}
           />
           Show clips without previews
         </label>
@@ -195,7 +200,7 @@ export default function ClipSearch() {
 
       {/* Results count */}
       {!loading && (
-        <div className="text-sm text-slate-400 mb-4">
+        <div className="text-sm mb-4" style={{ color: "var(--text-secondary)" }}>
           {total} clip{total !== 1 ? "s" : ""} found
         </div>
       )}
@@ -205,24 +210,14 @@ export default function ClipSearch() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-8">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-4 py-2 bg-slate-700 rounded disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <span className="px-4 py-2 text-slate-400">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="px-4 py-2 bg-slate-700 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
+        <div className="mt-8">
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            totalCount={total}
+            showPerPageSelector={false}
+          />
         </div>
       )}
     </div>

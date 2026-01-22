@@ -26,7 +26,8 @@ const ClipCard = forwardRef(({ clip, onClick, showSceneTitle = true }, ref) => {
   return (
     <div
       ref={ref}
-      className="group relative rounded-lg overflow-hidden bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+      className="group relative rounded-lg overflow-hidden transition-colors cursor-pointer"
+      style={{ backgroundColor: "var(--bg-card)" }}
       onClick={handleClick}
     >
       {/* Thumbnail */}
@@ -39,8 +40,11 @@ const ClipCard = forwardRef(({ clip, onClick, showSceneTitle = true }, ref) => {
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-slate-700 flex items-center justify-center">
-            <span className="text-slate-500">No preview</span>
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{ backgroundColor: "var(--bg-tertiary)" }}
+          >
+            <span style={{ color: "var(--text-tertiary)" }}>No preview</span>
           </div>
         )}
 
@@ -75,7 +79,8 @@ const ClipCard = forwardRef(({ clip, onClick, showSceneTitle = true }, ref) => {
         {showSceneTitle && clip.scene?.title && (
           <Link
             to={`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`}
-            className="text-xs text-slate-400 hover:text-white truncate block"
+            className="text-xs truncate block hover:underline"
+            style={{ color: "var(--text-secondary)" }}
             onClick={(e) => e.stopPropagation()}
           >
             {clip.scene.title}
