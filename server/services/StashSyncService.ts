@@ -1196,6 +1196,12 @@ class StashSyncService extends EventEmitter {
             count = result.findImages.count;
             break;
           }
+          case "clip": {
+            const result = await stash.findSceneMarkers({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findSceneMarkers.scene_markers.map((m) => m.id);
+            count = result.findSceneMarkers.count;
+            break;
+          }
           default:
             logger.warn(`Unknown entity type for cleanup: ${entityType}`);
             return 0;
@@ -1322,6 +1328,12 @@ class StashSyncService extends EventEmitter {
           break;
         case "image":
           deletedCount = (await prisma.stashImage.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "clip":
+          deletedCount = (await prisma.stashClip.updateMany({
             where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
