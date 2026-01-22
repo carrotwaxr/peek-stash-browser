@@ -5,7 +5,9 @@ import "video.js/dist/video-js.css";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
+import { getClipsForScene } from "../../services/api.js";
 import "./VideoPlayer.css";
+import ClipTimelineMarkers from "./ClipTimelineMarkers.jsx";
 import { useOrientationFullscreen } from "./useOrientationFullscreen.js";
 import { useVideoPlayer } from "./useVideoPlayer.js";
 
@@ -46,6 +48,7 @@ const VideoPlayer = () => {
   const initialResumeTimeRef = useRef(null); // Capture resume time once
 
   const [enableCast, setEnableCast] = useState(true); // Default to true
+  const [clips, setClips] = useState([]);
 
   // Fetch user settings for cast preference
   useEffect(() => {
@@ -90,6 +93,31 @@ const VideoPlayer = () => {
   const videoWidth = firstFile?.width || 1920;
   const videoHeight = firstFile?.height || 1080;
   const aspectRatio = `${videoWidth} / ${videoHeight}`;
+
+  // Fetch clips when scene changes
+  useEffect(() => {
+    async function fetchClips() {
+      if (!scene?.id) {
+        setClips([]);
+        return;
+      }
+      try {
+        const response = await getClipsForScene(scene.id, true);
+        setClips(response.clips || []);
+      } catch (err) {
+        console.error("Failed to fetch clips for timeline", err);
+        setClips([]);
+      }
+    }
+    fetchClips();
+  }, [scene?.id]);
+
+  // Handler for marker clicks - seek to clip position
+  const handleMarkerClick = (seconds) => {
+    if (playerRef.current) {
+      playerRef.current.currentTime(seconds);
+    }
+  };
 
   // ============================================================================
   // WATCH HISTORY TRACKING
@@ -214,6 +242,15 @@ const VideoPlayer = () => {
               </span>
             </div>
           </div>
+        )}
+
+        {/* Clip timeline markers - positioned over Video.js progress bar */}
+        {clips.length > 0 && (
+          <ClipTimelineMarkers
+            clips={clips.filter((c) => c.isGenerated)}
+            duration={firstFile?.duration || 0}
+            onMarkerClick={handleMarkerClick}
+          />
         )}
       </div>
     </section>
