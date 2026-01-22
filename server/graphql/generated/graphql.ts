@@ -5436,6 +5436,14 @@ export type FindSceneIDsQueryVariables = Exact<{
 
 export type FindSceneIDsQuery = { findScenes: { count: number, scenes: Array<{ id: string }> } };
 
+export type FindSceneMarkersQueryVariables = Exact<{
+  filter?: InputMaybe<FindFilterType>;
+  scene_marker_filter?: InputMaybe<SceneMarkerFilterType>;
+}>;
+
+
+export type FindSceneMarkersQuery = { findSceneMarkers: { count: number, scene_markers: Array<{ id: string, title: string, seconds: number, end_seconds?: number | null, preview: string, screenshot: string, stream: string, created_at: string, updated_at: string, primary_tag: { id: string, name: string }, tags: Array<{ id: string, name: string }>, scene: { id: string } }> } };
+
 export type FindScenesQueryVariables = Exact<{
   filter?: InputMaybe<FindFilterType>;
   ids?: InputMaybe<Array<Scalars['ID']['input']> | Scalars['ID']['input']>;
@@ -6078,6 +6086,35 @@ export const FindSceneIDsDocument = gql`
     count
     scenes {
       id
+    }
+  }
+}
+    `;
+export const FindSceneMarkersDocument = gql`
+    query FindSceneMarkers($filter: FindFilterType, $scene_marker_filter: SceneMarkerFilterType) {
+  findSceneMarkers(filter: $filter, scene_marker_filter: $scene_marker_filter) {
+    count
+    scene_markers {
+      id
+      title
+      seconds
+      end_seconds
+      preview
+      screenshot
+      stream
+      created_at
+      updated_at
+      primary_tag {
+        id
+        name
+      }
+      tags {
+        id
+        name
+      }
+      scene {
+        id
+      }
     }
   }
 }
@@ -7042,6 +7079,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     FindSceneIDs(variables?: FindSceneIDsQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<FindSceneIDsQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<FindSceneIDsQuery>({ document: FindSceneIDsDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'FindSceneIDs', 'query', variables);
+    },
+    FindSceneMarkers(variables?: FindSceneMarkersQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<FindSceneMarkersQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<FindSceneMarkersQuery>({ document: FindSceneMarkersDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'FindSceneMarkers', 'query', variables);
     },
     FindScenes(variables?: FindScenesQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<FindScenesQuery> {
       return withWrapper((wrappedRequestHeaders) => client.request<FindScenesQuery>({ document: FindScenesDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'FindScenes', 'query', variables);
