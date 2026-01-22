@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
+  proxyClipPreview,
   proxyImage,
   proxyScenePreview,
   proxySceneWebp,
@@ -109,6 +110,9 @@ export const setupAPI = () => {
 
   // Image proxy route (public - no auth for performance)
   app.get("/api/proxy/image/:imageId/:type", proxyImage);
+
+  // Clip preview proxy route (public - no auth for performance)
+  app.get("/api/proxy/clip/:id/preview", proxyClipPreview);
 
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
