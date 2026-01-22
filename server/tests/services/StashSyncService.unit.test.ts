@@ -63,9 +63,12 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       findGroups: vi.fn().mockResolvedValue({ findGroups: { groups: [], count: 0 } }),
       findGalleries: vi.fn().mockResolvedValue({ findGalleries: { galleries: [], count: 0 } }),
       findScenesCompact: vi.fn().mockResolvedValue({ findScenes: { scenes: [], count: 0 } }),
+      findSceneMarkers: vi.fn().mockResolvedValue({ findSceneMarkers: { scene_markers: [], count: 0 } }),
       findImages: vi.fn().mockResolvedValue({ findImages: { images: [], count: 0 } }),
     })),
     hasInstances: vi.fn(() => true),
+    getBaseUrl: vi.fn(() => "http://localhost:9999"),
+    getApiKey: vi.fn(() => "test-api-key"),
   },
 }));
 
@@ -87,6 +90,13 @@ vi.mock("../../services/ExclusionComputationService.js", () => ({
   exclusionComputationService: {
     recomputeAllUsers: vi.fn().mockResolvedValue(undefined),
     recomputeForUser: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+// Mock clip preview prober
+vi.mock("../../services/ClipPreviewProber.js", () => ({
+  clipPreviewProber: {
+    probeBatch: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 

@@ -5,13 +5,15 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
+  proxyClipPreview,
   proxyImage,
   proxyScenePreview,
   proxySceneWebp,
   proxyStashMedia,
 } from "../controllers/proxy.js";
 import * as statsController from "../controllers/stats.js";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin, requireCacheReady } from "../middleware/auth.js";
+import { getClipsForScene } from "../controllers/clips.js";
 import authRoutes from "../routes/auth.js";
 import carouselRoutes from "../routes/carousel.js";
 import customThemeRoutes from "../routes/customTheme.js";
@@ -37,6 +39,7 @@ import videoRoutes from "../routes/video.js";
 import watchHistoryRoutes from "../routes/watchHistory.js";
 import userStatsRoutes from "../routes/userStats.js";
 import timelineRoutes from "../routes/timeline.js";
+import clipsRoutes from "../routes/clips.js";
 import { logger } from "../utils/logger.js";
 
 // ES module equivalent of __dirname
@@ -108,6 +111,9 @@ export const setupAPI = () => {
   // Image proxy route (public - no auth for performance)
   app.get("/api/proxy/image/:imageId/:type", proxyImage);
 
+  // Clip preview proxy route (public - no auth for performance)
+  app.get("/api/proxy/clip/:id/preview", proxyClipPreview);
+
   // Public authentication routes (no auth required for these)
   app.use("/api/auth", authRoutes);
 
@@ -158,6 +164,17 @@ export const setupAPI = () => {
 
   // Timeline routes (date distribution)
   app.use("/api/timeline", timelineRoutes);
+
+  // Clips routes (protected)
+  app.use("/api/clips", clipsRoutes);
+
+  // Scene clips endpoint (get clips for a specific scene)
+  app.get(
+    "/api/scenes/:id/clips",
+    authenticate,
+    requireCacheReady,
+    getClipsForScene
+  );
 
   // Library routes (all entities)
   app.use("/api/library", libraryScenesRoutes);

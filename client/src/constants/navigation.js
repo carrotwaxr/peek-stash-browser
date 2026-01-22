@@ -68,6 +68,13 @@ export const NAV_DEFINITIONS = [
     icon: ENTITY_ICON_NAMES.playlist,
     description: "Manage your custom playlists",
   },
+  {
+    key: "clips",
+    name: "Clips",
+    path: "/clips",
+    icon: ENTITY_ICON_NAMES.clip,
+    description: "Browse scene clips and markers",
+  },
 ];
 
 /**
@@ -84,6 +91,7 @@ export const LANDING_PAGE_OPTIONS = [
   { key: "galleries", label: "Galleries", path: "/galleries" },
   { key: "images", label: "Images", path: "/images" },
   { key: "playlists", label: "Playlists", path: "/playlists" },
+  { key: "clips", label: "Clips", path: "/clips" },
   { key: "recommended", label: "Recommended", path: "/recommended" },
   { key: "watch-history", label: "Watch History", path: "/watch-history" },
   { key: "user-stats", label: "User Stats", path: "/user-stats" },

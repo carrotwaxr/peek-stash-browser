@@ -656,6 +656,7 @@ model StashScene {
   tags       SceneTag[]
   groups     SceneGroup[]
   galleries  SceneGallery[]
+  clips      StashClip[]
 
   @@index([studioId])
   @@index([date])
@@ -783,6 +784,7 @@ model StashTag {
   // === Core fields ===
   name     String
   favorite Boolean @default(false)
+  color    String? // Hex color from Stash (e.g., "#ff0000")
 
   // === Counts (synced from Stash) ===
   sceneCount       Int @default(0)
@@ -817,6 +819,10 @@ model StashTag {
   studios    StudioTag[]
   galleries  GalleryTag[]
   groups     GroupTag[]
+
+  // Clip relations
+  clipsAsPrimary StashClip[]  @relation("ClipPrimaryTag")
+  clipTags       ClipTag[]    @relation("ClipTags")
 
   @@index([name])
   @@index([favorite])
@@ -962,6 +968,51 @@ model StashImage {
   @@index([deletedAt])
   @@index([title])
   @@index([deletedAt, stashCreatedAt(sort: Desc)])
+}
+
+model StashClip {
+  id              String   @id // Stash marker ID
+  stashInstanceId String?
+  sceneId         String
+  scene           StashScene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  // === Core fields ===
+  title           String?
+  seconds         Float    // Start position in video (seconds)
+  endSeconds      Float?   // Optional end position (seconds)
+
+  // === Tag relations ===
+  primaryTagId    String?
+  primaryTag      StashTag? @relation("ClipPrimaryTag", fields: [primaryTagId], references: [id])
+  tags            ClipTag[]
+
+  // === Preview generation status ===
+  previewPath     String?  // Stash preview URL path
+  screenshotPath  String?  // Stash screenshot URL path
+  streamPath      String?  // Stash stream URL path
+  isGenerated     Boolean  @default(false)
+  generationCheckedAt DateTime?
+
+  // === Sync metadata ===
+  stashCreatedAt  DateTime?
+  stashUpdatedAt  DateTime?
+  syncedAt        DateTime @default(now())
+  deletedAt       DateTime?
+
+  @@index([sceneId])
+  @@index([primaryTagId])
+  @@index([isGenerated, deletedAt])
+  @@index([deletedAt, stashCreatedAt(sort: Desc)])
+}
+
+model ClipTag {
+  clipId  String
+  tagId   String
+  clip    StashClip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  tag     StashTag  @relation("ClipTags", fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([clipId, tagId])
+  @@index([tagId])
 }
 
 // Junction tables for efficient many-to-many queries

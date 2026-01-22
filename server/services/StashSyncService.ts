@@ -14,6 +14,8 @@
 
 import { EventEmitter } from "events";
 import type { Gallery, Group, Performer, Scene, Studio, Tag } from "../graphql/types.js";
+import { SortDirectionEnum, CriterionModifier } from "../graphql/generated/graphql.js";
+import type { FindFilterType, SceneMarkerFilterType } from "../graphql/generated/graphql.js";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 // Transform functions no longer needed - URLs transformed at read time
@@ -24,6 +26,7 @@ import { stashInstanceManager } from "./StashInstanceManager.js";
 import { userStatsService } from "./UserStatsService.js";
 import { exclusionComputationService } from "./ExclusionComputationService.js";
 import { mergeReconciliationService } from "./MergeReconciliationService.js";
+import { clipPreviewProber } from "./ClipPreviewProber.js";
 
 export interface SyncProgress {
   entityType: string;
@@ -43,7 +46,7 @@ export interface SyncResult {
   maxUpdatedAt?: string;
 }
 
-type EntityType = "scene" | "performer" | "studio" | "tag" | "group" | "gallery" | "image";
+type EntityType = "scene" | "performer" | "studio" | "tag" | "group" | "gallery" | "image" | "clip";
 
 // Plural forms for entity types (for logging)
 const ENTITY_PLURALS: Record<EntityType, string> = {
@@ -54,6 +57,7 @@ const ENTITY_PLURALS: Record<EntityType, string> = {
   group: "groups",
   gallery: "galleries",
   image: "images",
+  clip: "clips",
 };
 
 // Constants for sync configuration
@@ -265,6 +269,12 @@ class StashSyncService extends EventEmitter {
       await this.saveSyncState(stashInstanceId, "full", result);
       this.checkAbort();
 
+      result = await this.syncClips(stashInstanceId, true);
+      result.deleted = await this.cleanupDeletedEntities("clip", stashInstanceId);
+      results.push(result);
+      await this.saveSyncState(stashInstanceId, "full", result);
+      this.checkAbort();
+
       result = await this.syncImages(stashInstanceId, true);
       result.deleted = await this.cleanupDeletedEntities("image", stashInstanceId);
       results.push(result);
@@ -352,6 +362,7 @@ class StashSyncService extends EventEmitter {
         "group",
         "gallery",
         "scene",
+        "clip",
         "image",
       ];
 
@@ -603,6 +614,8 @@ class StashSyncService extends EventEmitter {
         return this.syncGalleries(stashInstanceId, isFullSync, lastSyncTime);
       case "scene":
         return this.syncScenes(stashInstanceId, isFullSync, lastSyncTime);
+      case "clip":
+        return this.syncClips(stashInstanceId, isFullSync, lastSyncTime);
       case "image":
         return this.syncImages(stashInstanceId, isFullSync, lastSyncTime);
       default:
@@ -636,6 +649,7 @@ class StashSyncService extends EventEmitter {
         "group",
         "gallery",
         "scene",
+        "clip",
         "image",
       ];
 
@@ -1182,6 +1196,12 @@ class StashSyncService extends EventEmitter {
             count = result.findImages.count;
             break;
           }
+          case "clip": {
+            const result = await stash.findSceneMarkers({ filter: { per_page: CLEANUP_PAGE_SIZE, page } });
+            pageIds = result.findSceneMarkers.scene_markers.map((m) => m.id);
+            count = result.findSceneMarkers.count;
+            break;
+          }
           default:
             logger.warn(`Unknown entity type for cleanup: ${entityType}`);
             return 0;
@@ -1308,6 +1328,12 @@ class StashSyncService extends EventEmitter {
           break;
         case "image":
           deletedCount = (await prisma.stashImage.updateMany({
+            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            data: { deletedAt: now },
+          })).count;
+          break;
+        case "clip":
+          deletedCount = (await prisma.stashClip.updateMany({
             where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
@@ -1841,6 +1867,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(JSON.stringify(aliases))},
       ${this.escapeNullable(JSON.stringify(parentIds))},
       ${this.escapeNullable(tag.image_path)},
+      ${this.escapeNullable((tag as any).color)},
       ${tag.created_at ? `'${tag.created_at}'` : "NULL"},
       ${tag.updated_at ? `'${tag.updated_at}'` : "NULL"},
       datetime('now'),
@@ -1853,7 +1880,7 @@ class StashSyncService extends EventEmitter {
     INSERT INTO StashTag (
       id, stashInstanceId, name, favorite,
       sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
-      description, aliases, parentIds, imagePath, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+      description, aliases, parentIds, imagePath, color, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -1869,6 +1896,7 @@ class StashSyncService extends EventEmitter {
       aliases = excluded.aliases,
       parentIds = excluded.parentIds,
       imagePath = excluded.imagePath,
+      color = excluded.color,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
       syncedAt = excluded.syncedAt,
@@ -2366,6 +2394,157 @@ class StashSyncService extends EventEmitter {
         entityType: "image",
         phase: "error",
         current: totalSynced,
+        total: totalCount,
+        message: error instanceof Error ? error.message : String(error),
+      } as SyncProgress);
+      throw error;
+    }
+  }
+
+  /**
+   * Sync clips (scene markers) from Stash
+   */
+  async syncClips(stashInstanceId?: string, isFullSync = false, since?: string): Promise<SyncResult> {
+    logger.info("Syncing clips...");
+    const startTime = Date.now();
+    const client = stashInstanceManager.getDefault();
+    let synced = 0;
+    let totalCount = 0;
+    let maxUpdatedAt: string | undefined;
+
+    this.emit("progress", {
+      entityType: "clip",
+      phase: "fetching",
+      current: 0,
+      total: 0,
+    } as SyncProgress);
+
+    try {
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        this.checkAbort();
+
+        const filter: FindFilterType = {
+          page,
+          per_page: this.PAGE_SIZE,
+          sort: "updated_at",
+          direction: SortDirectionEnum.Asc,
+        };
+
+        const markerFilter: SceneMarkerFilterType = {};
+        if (since && !isFullSync) {
+          markerFilter.updated_at = {
+            modifier: CriterionModifier.GreaterThan,
+            value: formatTimestampForStash(since),
+          };
+        }
+
+        const result = await client.findSceneMarkers({
+          filter,
+          scene_marker_filter: Object.keys(markerFilter).length > 0 ? markerFilter : undefined,
+        });
+
+        const markers = result.findSceneMarkers.scene_markers;
+        totalCount = result.findSceneMarkers.count;
+
+        if (markers.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        // Track max updated_at for next incremental sync
+        const batchMax = getMaxUpdatedAt(markers);
+        if (batchMax) {
+          maxUpdatedAt = getMostRecentTimestamp(maxUpdatedAt || null, batchMax) || maxUpdatedAt;
+        }
+
+        // Build preview URLs for probing
+        const stashUrl = stashInstanceManager.getBaseUrl();
+        const apiKey = stashInstanceManager.getApiKey();
+        const previewUrls = markers.map((m) => `${stashUrl}${m.preview}?apikey=${apiKey}`);
+
+        // Probe previews in batch
+        const probeResults = await clipPreviewProber.probeBatch(previewUrls);
+
+        // Upsert clips
+        for (let i = 0; i < markers.length; i++) {
+          const marker = markers[i];
+          const previewUrl = previewUrls[i];
+
+          const clipData = {
+            stashInstanceId: stashInstanceId || null,
+            sceneId: marker.scene.id,
+            title: marker.title || null,
+            seconds: marker.seconds,
+            endSeconds: marker.end_seconds || null,
+            primaryTagId: marker.primary_tag.id,
+            previewPath: marker.preview,
+            screenshotPath: marker.screenshot,
+            streamPath: marker.stream,
+            isGenerated: probeResults.get(previewUrl) ?? false,
+            generationCheckedAt: new Date(),
+            stashCreatedAt: marker.created_at ? new Date(marker.created_at) : null,
+            stashUpdatedAt: marker.updated_at ? new Date(marker.updated_at) : null,
+            syncedAt: new Date(),
+            deletedAt: null,
+          };
+
+          await prisma.stashClip.upsert({
+            where: { id: marker.id },
+            create: { id: marker.id, ...clipData },
+            update: clipData,
+          });
+
+          // Sync clip tags (junction table)
+          await prisma.clipTag.deleteMany({ where: { clipId: marker.id } });
+
+          const tagIds = marker.tags.map((t) => t.id);
+          if (tagIds.length > 0) {
+            await prisma.clipTag.createMany({
+              data: tagIds.map((tagId) => ({ clipId: marker.id, tagId })),
+            });
+          }
+        }
+
+        synced += markers.length;
+        this.emit("progress", {
+          entityType: "clip",
+          phase: "processing",
+          current: synced,
+          total: totalCount,
+        } as SyncProgress);
+
+        logger.debug(`Clips: ${synced}/${totalCount} (${Math.round((synced / totalCount) * 100)}%)`);
+
+        if (synced >= totalCount) break;
+        page++;
+        hasMore = markers.length === this.PAGE_SIZE;
+      }
+
+      this.emit("progress", {
+        entityType: "clip",
+        phase: "complete",
+        current: synced,
+        total: synced,
+      } as SyncProgress);
+
+      const durationMs = Date.now() - startTime;
+      logger.info(`Clips synced: ${synced.toLocaleString()} in ${(durationMs / 1000).toFixed(1)}s`);
+
+      return {
+        entityType: "clip",
+        synced,
+        deleted: 0,
+        durationMs,
+        maxUpdatedAt,
+      };
+    } catch (error) {
+      this.emit("progress", {
+        entityType: "clip",
+        phase: "error",
+        current: synced,
         total: totalCount,
         message: error instanceof Error ? error.message : String(error),
       } as SyncProgress);

@@ -84,6 +84,7 @@ const Sidebar = ({ navPreferences = [] }) => {
     if (path.startsWith("/images")) return "Images";
     if (path.startsWith("/playlists") || path.startsWith("/playlist/"))
       return "Playlists";
+    if (path.startsWith("/clips")) return "Clips";
     if (path.startsWith("/watch-history")) return "Watch History";
     return null;
   };

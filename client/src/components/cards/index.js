@@ -1,3 +1,4 @@
+export { default as ClipCard } from "./ClipCard.jsx";
 export { default as GalleryCard } from "./GalleryCard.jsx";
 export { default as GroupCard } from "./GroupCard.jsx";
 export { default as ImageCard } from "./ImageCard.jsx";
