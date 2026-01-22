@@ -1841,6 +1841,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(JSON.stringify(aliases))},
       ${this.escapeNullable(JSON.stringify(parentIds))},
       ${this.escapeNullable(tag.image_path)},
+      ${this.escapeNullable((tag as any).color)},
       ${tag.created_at ? `'${tag.created_at}'` : "NULL"},
       ${tag.updated_at ? `'${tag.updated_at}'` : "NULL"},
       datetime('now'),
@@ -1853,7 +1854,7 @@ class StashSyncService extends EventEmitter {
     INSERT INTO StashTag (
       id, stashInstanceId, name, favorite,
       sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
-      description, aliases, parentIds, imagePath, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
+      description, aliases, parentIds, imagePath, color, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
       name = excluded.name,
@@ -1869,6 +1870,7 @@ class StashSyncService extends EventEmitter {
       aliases = excluded.aliases,
       parentIds = excluded.parentIds,
       imagePath = excluded.imagePath,
+      color = excluded.color,
       stashCreatedAt = excluded.stashCreatedAt,
       stashUpdatedAt = excluded.stashUpdatedAt,
       syncedAt = excluded.syncedAt,
