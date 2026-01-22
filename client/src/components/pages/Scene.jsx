@@ -67,6 +67,25 @@ const SceneContent = () => {
     setSimilarScenesCount(TAB_COUNT_LOADING);
   }, [scene?.id]);
 
+  // Seek to timestamp from URL query param (e.g., ?t=120 for 2 minutes)
+  useEffect(() => {
+    const startTime = searchParams.get('t');
+    if (startTime && scene?.id) {
+      const seconds = parseInt(startTime, 10);
+      if (!isNaN(seconds) && seconds > 0) {
+        // Small delay to ensure video player is ready
+        const timer = setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("seekToTime", {
+              detail: { seconds },
+            })
+          );
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [scene?.id, searchParams]);
+
   // Measure left column height and sync to sidebar
   useEffect(() => {
     if (!leftColumnRef.current) return;
@@ -338,7 +357,7 @@ const Scene = () => {
   // useVideoPlayerSources will switch to 480p if browser can't play the codec
   const initialQuality = "direct";
 
-  // Extract shouldAutoplay from location state (set by PlaylistDetail's Play button)
+  // Extract shouldAutoplay from location state (set by PlaylistDetail's Play button or clip cards)
   const shouldAutoplayFromState = stateToUse?.shouldAutoplay ?? false;
 
   return (

@@ -1,45 +1,65 @@
+import { getGridClasses } from "../../constants/grids.js";
 import ClipCard from "../cards/ClipCard.jsx";
-import { useNavigate } from "react-router-dom";
+import { SkeletonSceneCard } from "../ui/index.js";
 
-export default function ClipGrid({ clips, loading }) {
-  const navigate = useNavigate();
-
-  const handleClipClick = (clip) => {
-    navigate(`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`);
-  };
+/**
+ * ClipGrid - Grid display for clip entities
+ * Follows SceneGrid patterns for consistency
+ */
+const ClipGrid = ({
+  clips,
+  density = "medium",
+  loading = false,
+  onClipClick,
+  fromPageTitle,
+  emptyMessage = "No clips found",
+  emptyDescription = "Try adjusting your search filters",
+}) => {
+  // Use scene grid classes since clips have same 16:9 aspect ratio
+  const gridClasses = getGridClasses("scene", density);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      <div className={gridClasses}>
         {[...Array(12)].map((_, i) => (
-          <div
-            key={i}
-            className="aspect-video rounded-lg animate-pulse"
-            style={{ backgroundColor: "var(--bg-tertiary)" }}
-          />
+          <SkeletonSceneCard key={i} entityType="clip" />
         ))}
       </div>
     );
   }
 
-  if (clips.length === 0) {
+  if (!clips || clips.length === 0) {
     return (
-      <div className="text-center py-12" style={{ color: "var(--text-secondary)" }}>
-        No clips found matching your filters
+      <div className="flex items-center justify-center py-16">
+        <div className="text-center">
+          <div className="text-6xl mb-4" style={{ color: "var(--text-muted)" }}>
+            🎬
+          </div>
+          <h3
+            className="text-xl font-medium mb-2"
+            style={{ color: "var(--text-primary)" }}
+          >
+            {emptyMessage}
+          </h3>
+          <p style={{ color: "var(--text-secondary)" }}>{emptyDescription}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+    <div className={gridClasses}>
       {clips.map((clip) => (
         <ClipCard
           key={clip.id}
           clip={clip}
-          onClick={handleClipClick}
-          showSceneTitle
+          onClick={onClipClick}
+          fromPageTitle={fromPageTitle}
+          tabIndex={0}
         />
       ))}
     </div>
   );
-}
+};
+
+export default ClipGrid;

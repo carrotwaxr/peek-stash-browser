@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ClipCard from "../../../src/components/cards/ClipCard.jsx";
+import { CardDisplaySettingsProvider } from "../../../src/contexts/CardDisplaySettingsContext.jsx";
 
 // Mock the api module
 vi.mock("../../../src/services/api.js", () => ({
@@ -12,47 +13,43 @@ const mockClip = {
   id: "1",
   title: "Test Clip",
   seconds: 120,
+  endSeconds: 180,
   sceneId: "scene-1",
   isGenerated: true,
   primaryTag: { id: "tag-1", name: "Action", color: "#ff0000" },
+  tags: [],
   scene: { id: "scene-1", title: "Test Scene", pathScreenshot: "/screenshot.jpg" },
+};
+
+const renderWithProviders = (ui) => {
+  return render(
+    <MemoryRouter>
+      <CardDisplaySettingsProvider>{ui}</CardDisplaySettingsProvider>
+    </MemoryRouter>
+  );
 };
 
 describe("ClipCard", () => {
   it("renders clip title", () => {
-    render(
-      <MemoryRouter>
-        <ClipCard clip={mockClip} />
-      </MemoryRouter>
-    );
+    renderWithProviders(<ClipCard clip={mockClip} />);
     expect(screen.getByText("Test Clip")).toBeInTheDocument();
   });
 
-  it("shows formatted timestamp", () => {
-    render(
-      <MemoryRouter>
-        <ClipCard clip={mockClip} />
-      </MemoryRouter>
-    );
-    // 120 seconds = 2:00
-    expect(screen.getByText("2:00")).toBeInTheDocument();
+  it("shows formatted duration", () => {
+    renderWithProviders(<ClipCard clip={mockClip} />);
+    // endSeconds (180) - seconds (120) = 60 seconds = 1:00
+    expect(screen.getByText("1:00")).toBeInTheDocument();
   });
 
-  it("shows primary tag name", () => {
-    render(
-      <MemoryRouter>
-        <ClipCard clip={mockClip} />
-      </MemoryRouter>
-    );
-    expect(screen.getByText("Action")).toBeInTheDocument();
+  it("renders as a link to scene with timestamp", () => {
+    const { container } = renderWithProviders(<ClipCard clip={mockClip} />);
+    const link = container.querySelector("a");
+    expect(link).toHaveAttribute("href", "/scene/scene-1?t=120");
   });
 
-  it("shows scene title when showSceneTitle is true", () => {
-    render(
-      <MemoryRouter>
-        <ClipCard clip={mockClip} showSceneTitle={true} />
-      </MemoryRouter>
-    );
-    expect(screen.getByText("Test Scene")).toBeInTheDocument();
+  it("shows no preview badge when not generated", () => {
+    const ungeneratedClip = { ...mockClip, isGenerated: false };
+    renderWithProviders(<ClipCard clip={ungeneratedClip} />);
+    expect(screen.getByText("No preview")).toBeInTheDocument();
   });
 });

@@ -15,6 +15,11 @@ export interface ClipQueryOptions {
   q?: string;
 }
 
+/**
+ * Clip data returned to the client.
+ * Note: Raw Stash URLs (previewPath, screenshotPath, streamPath) are NOT exposed.
+ * The client uses proxy endpoints like /api/proxy/clip/:id/preview for media.
+ */
 export interface ClipWithRelations {
   id: string;
   sceneId: string;
@@ -22,10 +27,9 @@ export interface ClipWithRelations {
   seconds: number;
   endSeconds: number | null;
   primaryTagId: string | null;
-  previewPath: string | null;
-  screenshotPath: string | null;
-  streamPath: string | null;
   isGenerated: boolean;
+  stashCreatedAt: Date | null;
+  stashUpdatedAt: Date | null;
   primaryTag: { id: string; name: string; color: string | null } | null;
   tags: Array<{ id: string; name: string; color: string | null }>;
   scene: {
@@ -37,6 +41,80 @@ export interface ClipWithRelations {
 }
 
 export class ClipService {
+  /**
+   * Transform URL to proxy format
+   * Handles full URLs (http://...) by extracting path+query
+   */
+  private transformUrl(urlOrPath: string | null): string | null {
+    if (!urlOrPath) return null;
+
+    // If it's already a proxy URL, return as-is
+    if (urlOrPath.startsWith("/api/proxy/stash")) {
+      return urlOrPath;
+    }
+
+    // If it's a full URL (http://...), extract path + query
+    if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
+      try {
+        const url = new URL(urlOrPath);
+        const pathWithQuery = url.pathname + url.search;
+        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+      } catch {
+        // If URL parsing fails, treat as path
+        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+      }
+    }
+
+    // Assume it's a relative path
+    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+  }
+
+  /**
+   * Transform clip scene data to use proxy URLs
+   */
+  private transformClipScene(scene: { id: string; title: string | null; pathScreenshot: string | null; studioId: string | null }) {
+    return {
+      ...scene,
+      pathScreenshot: this.transformUrl(scene.pathScreenshot),
+    };
+  }
+
+  /**
+   * Transform a clip database record to the client-safe format.
+   * Strips raw Stash URLs and only includes fields the client needs.
+   */
+  private transformClip(
+    clip: {
+      id: string;
+      sceneId: string;
+      title: string | null;
+      seconds: number;
+      endSeconds: number | null;
+      primaryTagId: string | null;
+      isGenerated: boolean;
+      stashCreatedAt: Date | null;
+      stashUpdatedAt: Date | null;
+      primaryTag: { id: string; name: string; color: string | null } | null;
+      tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
+      scene: { id: string; title: string | null; pathScreenshot: string | null; studioId: string | null };
+    }
+  ): ClipWithRelations {
+    return {
+      id: clip.id,
+      sceneId: clip.sceneId,
+      title: clip.title,
+      seconds: clip.seconds,
+      endSeconds: clip.endSeconds,
+      primaryTagId: clip.primaryTagId,
+      isGenerated: clip.isGenerated,
+      stashCreatedAt: clip.stashCreatedAt,
+      stashUpdatedAt: clip.stashUpdatedAt,
+      primaryTag: clip.primaryTag,
+      tags: clip.tags.map((ct) => ct.tag),
+      scene: this.transformClipScene(clip.scene),
+    };
+  }
+
   /**
    * Get clips for a specific scene
    */
@@ -79,10 +157,7 @@ export class ClipService {
       orderBy: { seconds: "asc" },
     });
 
-    return clips.map((clip) => ({
-      ...clip,
-      tags: clip.tags.map((ct) => ct.tag),
-    }));
+    return clips.map((clip) => this.transformClip(clip));
   }
 
   /**
@@ -183,10 +258,7 @@ export class ClipService {
     ]);
 
     return {
-      clips: clips.map((clip) => ({
-        ...clip,
-        tags: clip.tags.map((ct) => ct.tag),
-      })),
+      clips: clips.map((clip) => this.transformClip(clip)),
       total,
     };
   }
@@ -219,10 +291,7 @@ export class ClipService {
 
     if (isExcluded) return null;
 
-    return {
-      ...clip,
-      tags: clip.tags.map((ct) => ct.tag),
-    };
+    return this.transformClip(clip);
   }
 }
 

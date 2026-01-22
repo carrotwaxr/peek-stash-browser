@@ -7,7 +7,6 @@ import { usePlaylistMediaKeys } from "../../hooks/useMediaKeys.js";
 import { useWatchHistory } from "../../hooks/useWatchHistory.js";
 import { getClipsForScene } from "../../services/api.js";
 import "./VideoPlayer.css";
-import ClipTimelineMarkers from "./ClipTimelineMarkers.jsx";
 import { useOrientationFullscreen } from "./useOrientationFullscreen.js";
 import { useVideoPlayer } from "./useVideoPlayer.js";
 
@@ -112,12 +111,23 @@ const VideoPlayer = () => {
     fetchClips();
   }, [scene?.id]);
 
-  // Handler for marker clicks - seek to clip position
-  const handleMarkerClick = (seconds) => {
-    if (playerRef.current) {
-      playerRef.current.currentTime(seconds);
+  // Add clip markers to timeline using the markers plugin
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    const markersPlugin = player.markers?.();
+    if (!markersPlugin) return;
+
+    // Clear existing markers before adding new ones
+    markersPlugin.clearMarkers();
+
+    // Filter to only generated clips and add to timeline
+    const generatedClips = clips.filter((c) => c.isGenerated);
+    if (generatedClips.length > 0) {
+      markersPlugin.addClipMarkers(generatedClips);
     }
-  };
+  }, [clips]);
 
   // ============================================================================
   // WATCH HISTORY TRACKING
@@ -244,14 +254,6 @@ const VideoPlayer = () => {
           </div>
         )}
 
-        {/* Clip timeline markers - positioned over Video.js progress bar */}
-        {clips.length > 0 && (
-          <ClipTimelineMarkers
-            clips={clips.filter((c) => c.isGenerated)}
-            duration={firstFile?.duration || 0}
-            onMarkerClick={handleMarkerClick}
-          />
-        )}
       </div>
     </section>
   );

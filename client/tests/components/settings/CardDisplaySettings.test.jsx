@@ -335,9 +335,10 @@ describe("CardDisplaySettings", () => {
     it("accordion buttons are accessible", () => {
       render(<CardDisplaySettings />);
 
-      // Buttons include: 7 entity type accordions + 3 zoom slider buttons (smaller, reset, larger)
+      // Buttons include: 8 entity type accordions (scene, performer, studio, tag, group, gallery, image, clip)
+      // + 3 zoom slider buttons (smaller, reset, larger)
       const buttons = screen.getAllByRole("button");
-      expect(buttons.length).toBe(10);
+      expect(buttons.length).toBe(11);
 
       // Each button should have text content (zoom buttons may have empty text but have aria-labels)
       buttons.forEach((button) => {

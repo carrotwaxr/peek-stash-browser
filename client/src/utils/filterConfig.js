@@ -124,6 +124,15 @@ export const IMAGE_SORT_OPTIONS = [
   { value: "updated_at", label: "Updated At" },
 ];
 
+// Clip sorting options (Peek server API)
+export const CLIP_SORT_OPTIONS = [
+  { value: "stashCreatedAt", label: "Created At" },
+  { value: "title", label: "Title" },
+  { value: "seconds", label: "Position in Scene" },
+  { value: "duration", label: "Duration" },
+  { value: "random", label: "Random" },
+];
+
 // Filter type options for different data types
 const RATING_OPTIONS = [
   { value: "1", label: "1 Star" },
@@ -1298,6 +1307,75 @@ export const IMAGE_FILTER_OPTIONS = [
     defaultValue: {},
     min: 0,
     max: 1000,
+  },
+];
+
+// Clip filter options (Peek server API)
+export const CLIP_FILTER_OPTIONS = [
+  // Common Filters
+  {
+    type: "section-header",
+    label: "Common Filters",
+    key: "section-common",
+    collapsible: true,
+    defaultOpen: true,
+  },
+  {
+    key: "tagIds",
+    label: "Clip Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Filter by clip tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "tagIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "sceneTagIds",
+    label: "Scene Tags",
+    type: "searchable-select",
+    entityType: "tags",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Filter by scene tags...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "sceneTagIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "performerIds",
+    label: "Performers",
+    type: "searchable-select",
+    entityType: "performers",
+    multi: true,
+    defaultValue: [],
+    placeholder: "Filter by performers...",
+    modifierOptions: MULTI_MODIFIER_OPTIONS,
+    modifierKey: "performerIdsModifier",
+    defaultModifier: "INCLUDES",
+  },
+  {
+    key: "studioId",
+    label: "Studio",
+    type: "searchable-select",
+    entityType: "studios",
+    multi: false,
+    defaultValue: "",
+    placeholder: "Filter by studio...",
+  },
+  {
+    key: "isGenerated",
+    label: "Has Preview",
+    type: "select",
+    defaultValue: "true",
+    options: [
+      { value: "true", label: "With preview only" },
+      { value: "false", label: "Without preview only" },
+      { value: "", label: "All clips" },
+    ],
+    placeholder: "Filter by preview status",
   },
 ];
 
@@ -2832,6 +2910,42 @@ export const buildImageFilter = (filters) => {
   }
 
   return imageFilter;
+};
+
+/**
+ * Build clip filter params for Peek server API
+ * Unlike other build*Filter functions that return GraphQL filter objects,
+ * this returns params for the Peek REST API's getClips endpoint.
+ */
+export const buildClipFilter = (filters) => {
+  const clipParams = {};
+
+  // Tag filters
+  if (filters.tagIds && filters.tagIds.length > 0) {
+    clipParams.tagIds = filters.tagIds;
+  }
+
+  // Scene tag filters
+  if (filters.sceneTagIds && filters.sceneTagIds.length > 0) {
+    clipParams.sceneTagIds = filters.sceneTagIds;
+  }
+
+  // Performer filters
+  if (filters.performerIds && filters.performerIds.length > 0) {
+    clipParams.performerIds = filters.performerIds;
+  }
+
+  // Studio filter (single value)
+  if (filters.studioId) {
+    clipParams.studioId = filters.studioId;
+  }
+
+  // isGenerated filter
+  if (filters.isGenerated !== undefined && filters.isGenerated !== "") {
+    clipParams.isGenerated = filters.isGenerated === "true" || filters.isGenerated === true;
+  }
+
+  return clipParams;
 };
 
 // ============================================================================

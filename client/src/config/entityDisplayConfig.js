@@ -249,6 +249,35 @@ export const ENTITY_DISPLAY_CONFIG = {
       "showMenu",
     ],
   },
+  clip: {
+    label: "Clip",
+    viewModes: [
+      { id: "grid", label: "Grid" },
+    ],
+    defaultSettings: {
+      defaultViewMode: "grid",
+      defaultGridDensity: "medium",
+      showSceneTitle: false,
+      showStudio: false,
+      showDate: false,
+      showRelationshipIndicators: true,
+      showRating: false,
+      showFavorite: false,
+      showOCounter: false,
+      showMenu: false,
+    },
+    availableSettings: [
+      "defaultGridDensity",
+      "showSceneTitle",
+      "showStudio",
+      "showDate",
+      "showRelationshipIndicators",
+      "showRating",
+      "showFavorite",
+      "showOCounter",
+      "showMenu",
+    ],
+  },
 };
 
 /**
@@ -285,6 +314,7 @@ export const SETTING_LABELS = {
   defaultGridDensity: "Default grid density",
   defaultWallZoom: "Default wall size",
   showCodeOnCard: "Show studio code on cards",
+  showSceneTitle: "Show scene title",
   showStudio: "Show studio name",
   showDate: "Show date",
   showDescriptionOnCard: "Show description on cards",
@@ -301,6 +331,7 @@ export const SETTING_LABELS = {
  */
 export const SETTING_DESCRIPTIONS = {
   showCodeOnCard: "Display scene codes (e.g., JAV codes) in card subtitles",
+  showSceneTitle: "Display parent scene title in card subtitles",
   showStudio: "Display studio name in card subtitles",
   showDate: "Display date in card subtitles",
   showRelationshipIndicators: "Display count badges for performers, tags, etc.",

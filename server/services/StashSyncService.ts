@@ -2461,9 +2461,9 @@ class StashSyncService extends EventEmitter {
         }
 
         // Build preview URLs for probing
-        const stashUrl = stashInstanceManager.getBaseUrl();
+        // Note: m.preview is already a full URL from Stash, just append API key
         const apiKey = stashInstanceManager.getApiKey();
-        const previewUrls = markers.map((m) => `${stashUrl}${m.preview}?apikey=${apiKey}`);
+        const previewUrls = markers.map((m) => `${m.preview}?apikey=${apiKey}`);
 
         // Probe previews in batch
         const probeResults = await clipPreviewProber.probeBatch(previewUrls);
