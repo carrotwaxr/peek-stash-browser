@@ -783,6 +783,7 @@ model StashTag {
   // === Core fields ===
   name     String
   favorite Boolean @default(false)
+  color    String? // Hex color from Stash (e.g., "#ff0000")
 
   // === Counts (synced from Stash) ===
   sceneCount       Int @default(0)
