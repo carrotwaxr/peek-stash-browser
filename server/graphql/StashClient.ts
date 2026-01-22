@@ -48,6 +48,8 @@ export class StashClient {
     this.sdk.FindGallery(...args);
   findImages = (...args: Parameters<ReturnType<typeof getSdk>["FindImages"]>) =>
     this.sdk.FindImages(...args);
+  findSceneMarkers = (...args: Parameters<ReturnType<typeof getSdk>["FindSceneMarkers"]>) =>
+    this.sdk.FindSceneMarkers(...args);
 
   // ID-only find operations (for cleanup/deletion detection)
   findSceneIDs = (...args: Parameters<ReturnType<typeof getSdk>["FindSceneIDs"]>) =>
