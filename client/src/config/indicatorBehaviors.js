@@ -74,6 +74,15 @@ export const INDICATOR_BEHAVIORS = {
     scenes: 'nav',
     images: 'nav',
   },
+  clip: {
+    performers: 'rich',
+    tags: 'rich',
+    studios: 'rich',
+    groups: 'rich',
+    galleries: 'rich',
+    scenes: 'nav',
+    images: 'nav',
+  },
 };
 
 /**

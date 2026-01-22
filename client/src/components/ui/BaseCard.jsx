@@ -54,8 +54,10 @@ export const BaseCard = forwardRef(
 
       // Events & behavior
       onClick,
+      onNavigate, // Custom navigation handler - if provided, prevents Link default and calls this instead
       className = "",
       fromPageTitle,
+      linkState = {},
       tabIndex,
       style,
       onFocus,
@@ -71,6 +73,17 @@ export const BaseCard = forwardRef(
       selectionMode,
       onToggleSelect,
     });
+
+    // Wrap navigation click handler to support custom navigation
+    const wrappedNavigationClick = (e) => {
+      // First let selection hook handle its logic
+      handleNavigationClick(e);
+      // If selection hook didn't prevent default and we have a custom navigate handler
+      if (!e.defaultPrevented && onNavigate) {
+        e.preventDefault();
+        onNavigate(e);
+      }
+    };
 
     // Keyboard navigation hook
     const { onKeyDown } = useCardKeyboardNav({
@@ -115,7 +128,8 @@ export const BaseCard = forwardRef(
           objectFit={objectFit}
           linkTo={linkTo}
           fromPageTitle={fromPageTitle}
-          onClickOverride={handleNavigationClick}
+          linkState={linkState}
+          onClickOverride={wrappedNavigationClick}
         >
           {/* Custom image content (e.g., sprite preview) */}
           {renderImageContent?.()}
@@ -129,7 +143,8 @@ export const BaseCard = forwardRef(
           subtitle={hideSubtitle ? null : subtitle}
           linkTo={linkTo}
           fromPageTitle={fromPageTitle}
-          onClickOverride={handleNavigationClick}
+          linkState={linkState}
+          onClickOverride={wrappedNavigationClick}
         />
 
         {/* After Title Slot (e.g., gender icon) */}

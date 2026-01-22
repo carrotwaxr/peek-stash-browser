@@ -1,107 +1,197 @@
 import { forwardRef, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { BaseCard } from "../ui/BaseCard.jsx";
+import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
+import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
+import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { formatDuration } from "../../utils/format.js";
-import { getClipPreviewUrl } from "../../services/api.js";
+import ClipCardPreview from "./ClipCardPreview.jsx";
 
 /**
  * ClipCard - Card for displaying clip entities
+ * Uses BaseCard for consistency with other entity cards
  */
-const ClipCard = forwardRef(({ clip, onClick, showSceneTitle = true }, ref) => {
-  const formattedTime = useMemo(() => {
-    return formatDuration(clip.seconds);
-  }, [clip.seconds]);
+const ClipCard = forwardRef(
+  (
+    {
+      clip,
+      onClick,
+      onFocus,
+      tabIndex = -1,
+      className = "",
+      fromPageTitle,
+      onHideSuccess,
+    },
+    ref
+  ) => {
+    const navigate = useNavigate();
+    const { getSettings } = useCardDisplaySettings();
+    const clipSettings = getSettings("clip");
 
-  const previewUrl = clip.isGenerated ? getClipPreviewUrl(clip.id) : null;
-  const fallbackUrl = clip.scene?.pathScreenshot
-    ? `/api/proxy/stash?path=${encodeURIComponent(clip.scene.pathScreenshot)}`
-    : null;
+    // Title is the clip title
+    const title = clip.title || "Untitled";
 
-  const handleClick = (e) => {
-    if (onClick) {
-      e.preventDefault();
-      onClick(clip);
-    }
-  };
+    // Build subtitle from scene title, studio, date (respecting settings)
+    const subtitle = useMemo(() => {
+      const parts = [];
 
-  return (
-    <div
-      ref={ref}
-      className="group relative rounded-lg overflow-hidden transition-colors cursor-pointer"
-      style={{ backgroundColor: "var(--bg-card)" }}
-      onClick={handleClick}
-    >
-      {/* Thumbnail */}
-      <div className="aspect-video relative">
-        {previewUrl || fallbackUrl ? (
-          <img
-            src={previewUrl || fallbackUrl}
-            alt={clip.title || "Clip"}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{ backgroundColor: "var(--bg-tertiary)" }}
-          >
-            <span style={{ color: "var(--text-tertiary)" }}>No preview</span>
+      if (clipSettings.showSceneTitle && clip.scene?.title) {
+        parts.push(clip.scene.title);
+      }
+
+      // Studio would need to be fetched from scene - currently not in API response
+      // if (clipSettings.showStudio && clip.scene?.studio?.name) {
+      //   parts.push(clip.scene.studio.name);
+      // }
+
+      // Date would need to be from scene - currently not in API response
+      // if (clipSettings.showDate && clip.scene?.date) {
+      //   parts.push(formatRelativeTime(clip.scene.date));
+      // }
+
+      return parts.length > 0 ? parts.join(" • ") : null;
+    }, [clip.scene, clipSettings]);
+
+    // Combine primary tag with additional tags for indicators
+    const allTags = useMemo(() => {
+      const tagMap = new Map();
+
+      if (clip.primaryTag) {
+        tagMap.set(clip.primaryTag.id, clip.primaryTag);
+      }
+
+      if (clip.tags) {
+        clip.tags.forEach((tag) => tagMap.set(tag.id, tag));
+      }
+
+      return Array.from(tagMap.values());
+    }, [clip.primaryTag, clip.tags]);
+
+    // Build indicators
+    const indicators = useMemo(() => {
+      const tagsTooltip =
+        getIndicatorBehavior("clip", "tags") === "rich" &&
+        allTags?.length > 0 && (
+          <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" />
+        );
+
+      // Performers would come from scene - need API enhancement
+      // const performersTooltip = getIndicatorBehavior("clip", "performers") === "rich" &&
+      //   clip.scene?.performers?.length > 0 && (
+      //     <TooltipEntityGrid
+      //       entityType="performer"
+      //       entities={clip.scene.performers}
+      //       title="Performers"
+      //     />
+      //   );
+
+      return [
+        // Performers indicator - needs API enhancement to include scene.performers
+        // {
+        //   type: "PERFORMERS",
+        //   count: clip.scene?.performers?.length || 0,
+        //   tooltipContent: performersTooltip,
+        //   onClick:
+        //     getIndicatorBehavior("clip", "performers") === "nav" &&
+        //     clip.scene?.performers?.length > 0
+        //       ? () => navigate(`/performers?sceneId=${clip.sceneId}`)
+        //       : undefined,
+        // },
+        {
+          type: "TAGS",
+          count: allTags?.length || 0,
+          tooltipContent: tagsTooltip,
+          onClick:
+            getIndicatorBehavior("clip", "tags") === "nav" &&
+            allTags?.length > 0
+              ? () => navigate(`/tags?sceneId=${clip.sceneId}`)
+              : undefined,
+        },
+      ];
+    }, [allTags, clip.sceneId, navigate]);
+
+    // Only show indicators if setting is enabled
+    const indicatorsToShow = clipSettings.showRelationshipIndicators
+      ? indicators
+      : [];
+
+    // Format clip duration for overlay
+    const formattedDuration = useMemo(() => {
+      if (clip.endSeconds != null && clip.seconds != null) {
+        return formatDuration(clip.endSeconds - clip.seconds);
+      }
+      return null;
+    }, [clip.seconds, clip.endSeconds]);
+
+    // Render slot: Animated preview + overlays (duration, tag dot, etc.)
+    const renderImageContent = () => (
+      <>
+        {/* Animated clip preview (handles its own image/video) */}
+        <ClipCardPreview clip={clip} />
+
+        {/* Duration badge */}
+        {formattedDuration && (
+          <div className="absolute bottom-2 right-2 bg-black/75 px-2 py-0.5 rounded text-xs font-medium z-10">
+            {formattedDuration}
           </div>
-        )}
-
-        {/* Timestamp badge */}
-        <div className="absolute bottom-2 right-2 bg-black/75 px-2 py-0.5 rounded text-xs font-medium">
-          {formattedTime}
-        </div>
-
-        {/* Primary tag dot */}
-        {clip.primaryTag && (
-          <div
-            className="absolute top-2 left-2 w-3 h-3 rounded-full border border-white/50"
-            style={{ backgroundColor: clip.primaryTag.color || "#ffffff" }}
-            title={clip.primaryTag.name}
-          />
         )}
 
         {/* Ungenerated indicator */}
         {!clip.isGenerated && (
-          <div className="absolute top-2 right-2 bg-yellow-500/80 px-1.5 py-0.5 rounded text-xs">
+          <div className="absolute top-2 right-2 bg-yellow-500/80 px-1.5 py-0.5 rounded text-xs z-10">
             No preview
           </div>
         )}
-      </div>
+      </>
+    );
 
-      {/* Info */}
-      <div className="p-2">
-        <h3 className="text-sm font-medium truncate" title={clip.title || "Untitled"}>
-          {clip.title || "Untitled"}
-        </h3>
+    // Handle navigation - navigate with autoplay state
+    const clipUrl = `/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`;
+    const handleNavigate = () => {
+      if (onClick) {
+        onClick(clip);
+      } else {
+        navigate(clipUrl, {
+          state: { fromPageTitle, shouldAutoplay: true },
+        });
+      }
+    };
 
-        {showSceneTitle && clip.scene?.title && (
-          <Link
-            to={`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`}
-            className="text-xs truncate block hover:underline"
-            style={{ color: "var(--text-secondary)" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {clip.scene.title}
-          </Link>
-        )}
-
-        {clip.primaryTag && (
-          <span
-            className="inline-block mt-1 px-1.5 py-0.5 rounded text-xs"
-            style={{
-              backgroundColor: `${clip.primaryTag.color || "#ffffff"}20`,
-              color: clip.primaryTag.color || "#ffffff",
-            }}
-          >
-            {clip.primaryTag.name}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-});
+    return (
+      <BaseCard
+        ref={ref}
+        entityType="clip"
+        entity={clip}
+        linkTo={clipUrl}
+        fromPageTitle={fromPageTitle}
+        // Content (imagePath not needed - ClipCardPreview handles image/video)
+        title={title}
+        subtitle={subtitle}
+        indicators={indicatorsToShow}
+        // Clips don't have descriptions
+        displayPreferences={{ showDescription: false }}
+        // Rating controls - clips could have their own ratings in future
+        ratingControlsProps={{
+          entityType: "clip",
+          entityId: clip.id,
+          entityTitle: title,
+          onHideSuccess,
+          showRating: clipSettings.showRating,
+          showFavorite: clipSettings.showFavorite,
+          showOCounter: clipSettings.showOCounter,
+          showMenu: clipSettings.showMenu,
+        }}
+        // Render slots
+        renderImageContent={renderImageContent}
+        // Standard props
+        className={className}
+        onNavigate={handleNavigate}
+        onFocus={onFocus}
+        tabIndex={tabIndex}
+      />
+    );
+  }
+);
 
 ClipCard.displayName = "ClipCard";
 

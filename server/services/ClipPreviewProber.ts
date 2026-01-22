@@ -20,7 +20,9 @@ export class ClipPreviewProber {
   }
 
   /**
-   * Probe a single preview URL using HEAD request.
+   * Probe a single preview URL using GET with Range header.
+   * Stash doesn't support HEAD requests (returns 405), so we use a Range request
+   * to fetch just 1 byte and parse the Content-Range header for total size.
    * Returns true if response indicates a real preview (>= 5KB).
    */
   async probePreviewUrl(url: string): Promise<boolean> {
@@ -31,15 +33,42 @@ export class ClipPreviewProber {
 
         const req = client.request(
           {
-            method: "HEAD",
+            method: "GET",
             hostname: urlObj.hostname,
             port: urlObj.port || (urlObj.protocol === "https:" ? 443 : 80),
             path: urlObj.pathname + urlObj.search,
+            headers: {
+              Range: "bytes=0-0",
+            },
             timeout: this.timeoutMs,
           },
           (res) => {
-            const contentLength = parseInt(res.headers["content-length"] || "0", 10);
-            resolve(contentLength >= MIN_PREVIEW_SIZE);
+            // Consume response body to prevent memory leak
+            res.resume();
+
+            // For 206 Partial Content, parse Content-Range for total size
+            // Format: "bytes 0-0/398136"
+            if (res.statusCode === 206) {
+              const contentRange = res.headers["content-range"];
+              if (contentRange) {
+                const match = contentRange.match(/\/(\d+)$/);
+                if (match) {
+                  const totalSize = parseInt(match[1], 10);
+                  resolve(totalSize >= MIN_PREVIEW_SIZE);
+                  return;
+                }
+              }
+            }
+
+            // For 200 OK (server doesn't support Range), use Content-Length
+            if (res.statusCode === 200) {
+              const contentLength = parseInt(res.headers["content-length"] || "0", 10);
+              resolve(contentLength >= MIN_PREVIEW_SIZE);
+              return;
+            }
+
+            // 404 or other errors mean not generated
+            resolve(false);
           }
         );
 

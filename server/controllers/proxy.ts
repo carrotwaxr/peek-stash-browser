@@ -349,8 +349,11 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
 };
 
 /**
- * Proxy clip preview/screenshot image
+ * Proxy clip preview video (MP4 stream)
  * GET /api/proxy/clip/:id/preview
+ *
+ * Returns the marker stream video for hover previews.
+ * Falls back to screenshot if stream is unavailable.
  */
 export const proxyClipPreview = async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -359,21 +362,22 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Missing clip ID" });
   }
 
-  // Get clip from database to find screenshot path
+  // Get clip from database - prefer streamPath for video, fallback to screenshotPath
   const clip = await prisma.stashClip.findFirst({
     where: { id },
-    select: { screenshotPath: true },
+    select: { streamPath: true, screenshotPath: true },
   });
 
-  if (!clip || !clip.screenshotPath) {
+  // Use streamPath (video) if available, otherwise screenshotPath (image)
+  const mediaPath = clip?.streamPath || clip?.screenshotPath;
+
+  if (!mediaPath) {
     return res.status(404).json({ error: "Clip preview not found" });
   }
 
-  let stashUrl: string;
   let apiKey: string;
 
   try {
-    stashUrl = stashInstanceManager.getBaseUrl();
     apiKey = stashInstanceManager.getApiKey();
   } catch {
     logger.error("No Stash instance configured");
@@ -384,11 +388,8 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
   await acquireConcurrencySlot();
 
   try {
-    // Construct full Stash URL with API key
-    // screenshotPath may already be a full URL or just a path
-    const isFullUrl = clip.screenshotPath.startsWith("http://") || clip.screenshotPath.startsWith("https://");
-    const baseUrl = isFullUrl ? clip.screenshotPath : `${stashUrl}${clip.screenshotPath}`;
-    const fullUrl = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}apikey=${apiKey}`;
+    // mediaPath is already a full URL from Stash, just append API key
+    const fullUrl = `${mediaPath}${mediaPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
 
     logger.debug("Proxying clip preview", {
       clipId: id,

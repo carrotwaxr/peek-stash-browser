@@ -84,6 +84,7 @@ export const CardImage = ({
   onClick,
   linkTo,
   fromPageTitle,
+  linkState = {},
   onClickOverride,
 }) => {
   const [ref, isVisible] = useLazyLoad();
@@ -163,11 +164,12 @@ export const CardImage = ({
 
   // If linkTo provided, wrap in Link; otherwise use div with onClick
   if (linkTo) {
+    const stateToPass = { fromPageTitle, ...linkState };
     return (
       <Link
         ref={ref}
         to={linkTo}
-        state={{ fromPageTitle }}
+        state={stateToPass}
         className={containerClasses}
         style={containerStyle}
         onClick={onClickOverride}
@@ -320,6 +322,7 @@ export const CardTitle = ({
   hideSubtitle = false,
   linkTo,
   fromPageTitle,
+  linkState = {},
   onClickOverride,
 }) => {
   const titleIsString = typeof title === "string";
@@ -346,7 +349,7 @@ export const CardTitle = ({
   const titleContent = linkTo ? (
     <Link
       to={linkTo}
-      state={{ fromPageTitle }}
+      state={{ fromPageTitle, ...linkState }}
       className="block hover:underline cursor-pointer"
       onClick={onClickOverride}
     >
@@ -372,7 +375,7 @@ export const CardTitle = ({
   const subtitleContent = linkTo && subtitleElement ? (
     <Link
       to={linkTo}
-      state={{ fromPageTitle }}
+      state={{ fromPageTitle, ...linkState }}
       className="block cursor-pointer"
       onClick={onClickOverride}
     >

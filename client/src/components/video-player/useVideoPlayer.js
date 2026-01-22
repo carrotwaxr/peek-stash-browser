@@ -591,7 +591,6 @@ export function useVideoPlayer({
 
   useEffect(() => {
     const player = playerRef.current;
-
     if (!player || !ready || !shouldAutoplay) return;
 
     const shouldResume = location.state?.shouldResume;

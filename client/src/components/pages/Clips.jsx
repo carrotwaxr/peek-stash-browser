@@ -11,8 +11,14 @@ const Clips = () => {
   useInitialFocus(pageRef, '[tabindex="0"]', true);
 
   return (
-    <div ref={pageRef} className="container mx-auto px-4 py-6">
-      <ClipSearch />
+    <div ref={pageRef}>
+      <ClipSearch
+        context="clip"
+        initialSort="stashCreatedAt"
+        subtitle="Browse your clip library"
+        title="All Clips"
+        fromPageTitle="Clips"
+      />
     </div>
   );
 };

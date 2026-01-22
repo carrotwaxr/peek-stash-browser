@@ -6,6 +6,8 @@ import { useUnitPreference } from "../../contexts/UnitPreferenceContext.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useFilterState } from "../../hooks/useFilterState.js";
 import {
+  CLIP_FILTER_OPTIONS,
+  CLIP_SORT_OPTIONS,
   GALLERY_FILTER_OPTIONS,
   GALLERY_SORT_OPTIONS,
   GROUP_FILTER_OPTIONS,
@@ -22,6 +24,7 @@ import {
   STUDIO_SORT_OPTIONS,
   TAG_FILTER_OPTIONS,
   TAG_SORT_OPTIONS,
+  buildClipFilter,
   buildGalleryFilter,
   buildGroupFilter,
   buildImageFilter,
@@ -59,6 +62,8 @@ const buildFilter = (artifactType, filters, unitPreference) => {
       return { gallery_filter: buildGalleryFilter(filters) };
     case "image":
       return { image_filter: buildImageFilter(filters) };
+    case "clip":
+      return { clip_filter: buildClipFilter(filters) };
     case "scene":
     default:
       return { scene_filter: buildSceneFilter(filters) };
@@ -79,6 +84,8 @@ const getSortOptions = (artifactType) => {
       return GALLERY_SORT_OPTIONS;
     case "image":
       return IMAGE_SORT_OPTIONS;
+    case "clip":
+      return CLIP_SORT_OPTIONS;
     case "scene":
     default:
       return SCENE_SORT_OPTIONS;
@@ -225,6 +232,8 @@ const SearchControls = ({
         return [...GALLERY_FILTER_OPTIONS];
       case "image":
         return [...IMAGE_FILTER_OPTIONS];
+      case "clip":
+        return [...CLIP_FILTER_OPTIONS];
       case "scene":
       default:
         return [...SCENE_FILTER_OPTIONS];
