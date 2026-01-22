@@ -39,7 +39,7 @@ const FolderView = ({
     }
   }, [currentPath, onFolderPathChange]);
 
-  // Update URL when path changes
+  // Update URL when path changes - also reset page to 1
   const setCurrentPath = useCallback(
     (newPath) => {
       setSearchParams((prev) => {
@@ -49,6 +49,8 @@ const FolderView = ({
         } else {
           next.delete("folderPath");
         }
+        // Reset to page 1 when navigating folders to avoid stale pagination state
+        next.delete("page");
         return next;
       });
     },

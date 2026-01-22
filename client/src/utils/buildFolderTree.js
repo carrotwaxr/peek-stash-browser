@@ -123,7 +123,9 @@ export function buildFolderTree(items, tags, currentPath = []) {
     }
   });
 
-  // Build folder nodes (only folders with content)
+  // Build folder nodes
+  // Show ALL folders from tag hierarchy that have content (pre-computed count > 0)
+  // This ensures folders appear even when current page has no items for them
   const folders = [];
 
   childTagIds.forEach((tagId) => {
@@ -131,13 +133,20 @@ export function buildFolderTree(items, tags, currentPath = []) {
     if (!tag) return;
 
     const folderItems = folderContents.get(tagId) || [];
-    if (folderItems.length === 0) return; // Hide empty folders
 
-    // Calculate total count (recursive)
-    const totalCount = folderItems.length;
+    // Get pre-computed count from tag (image_count, scene_count, or gallery_count)
+    // These are set by the backend during sync and represent the total items with this tag
+    const preComputedCount = tag.image_count || tag.scene_count || tag.gallery_count || 0;
 
-    // Get thumbnail
-    const thumbnail = tag.image_path || getItemThumbnail(folderItems[0]) || null;
+    // If no items on current page AND no pre-computed count, this folder is truly empty
+    if (folderItems.length === 0 && preComputedCount === 0) return;
+
+    // Use items count if available (more accurate for current page context)
+    // Fall back to pre-computed count when no items on current page
+    const totalCount = folderItems.length > 0 ? folderItems.length : preComputedCount;
+
+    // Get thumbnail - prefer tag image, then first item, then null
+    const thumbnail = tag.image_path || (folderItems[0] ? getItemThumbnail(folderItems[0]) : null);
 
     folders.push({
       id: tagId,
