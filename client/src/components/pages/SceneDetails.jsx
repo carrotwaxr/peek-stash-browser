@@ -54,6 +54,7 @@ const SceneDetails = ({
   // Clips state
   const [clips, setClips] = useState([]);
   const [clipsLoading, setClipsLoading] = useState(true);
+  const [showClips, setShowClips] = useState(false); // Collapsed by default
 
   // Fetch clips when scene changes
   useEffect(() => {
@@ -100,17 +101,6 @@ const SceneDetails = ({
     >
       {/* Clean layout inspired by YouTube - less card-based, more content-focused */}
       <div className="space-y-6">
-        {/* Clips section */}
-        {(clips.length > 0 || clipsLoading) && (
-          <div>
-            <ClipList
-              clips={clips}
-              onClipClick={handleClipClick}
-              loading={clipsLoading}
-            />
-          </div>
-        )}
-
         {/* Primary details section */}
         <div>
           <Paper>
@@ -293,6 +283,44 @@ const SceneDetails = ({
             </Paper.Body>
           </Paper>
         </div>
+
+        {/* Clips Section - Collapsible, collapsed by default */}
+        {(clips.length > 0 || clipsLoading) && (
+          <div>
+            <Paper>
+              <Paper.Header
+                className="cursor-pointer"
+                onClick={() => setShowClips(!showClips)}
+              >
+                <div className="flex items-center justify-between">
+                  <Paper.Title>
+                    Clips
+                    {!clipsLoading && clips.length > 0 && (
+                      <span
+                        className="ml-2 text-sm font-normal"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        ({clips.length})
+                      </span>
+                    )}
+                  </Paper.Title>
+                  <span style={{ color: "var(--text-secondary)" }}>
+                    {showClips ? "▼" : "▶"}
+                  </span>
+                </div>
+              </Paper.Header>
+              {showClips && (
+                <Paper.Body>
+                  <ClipList
+                    clips={clips}
+                    onClipClick={handleClipClick}
+                    loading={clipsLoading}
+                  />
+                </Paper.Body>
+              )}
+            </Paper>
+          </div>
+        )}
 
         {/* URLs/Links Section */}
         {scene.urls && scene.urls.length > 0 && (

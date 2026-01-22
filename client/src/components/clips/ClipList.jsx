@@ -37,12 +37,9 @@ export default function ClipList({ clips, onClipClick, loading = false }) {
 
   return (
     <div>
-      {/* Header with toggle */}
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-          Clips ({filteredClips.length})
-        </h3>
-        {ungeneratedCount > 0 && (
+      {/* Toggle for ungenerated clips */}
+      {ungeneratedCount > 0 && (
+        <div className="flex items-center justify-end mb-3">
           <label
             className="flex items-center gap-2 text-xs cursor-pointer"
             style={{ color: "var(--text-secondary)" }}
@@ -56,8 +53,8 @@ export default function ClipList({ clips, onClipClick, loading = false }) {
             />
             Show all ({ungeneratedCount} without preview)
           </label>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Clip grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">

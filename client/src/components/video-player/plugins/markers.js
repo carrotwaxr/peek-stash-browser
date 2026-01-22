@@ -94,6 +94,35 @@ class MarkersPlugin extends videojs.getPlugin("plugin") {
     markers.forEach(this.addDotMarker, this);
   }
 
+  /**
+   * Add clip markers to the timeline
+   * Clips are converted to marker format with generated colors based on tag names
+   * @param {Array} clips - Array of clip objects with seconds, title, and primaryTag
+   */
+  addClipMarkers(clips) {
+    if (!clips || clips.length === 0) return;
+
+    // Extract unique tag names and generate colors
+    const tagNames = [...new Set(
+      clips
+        .filter(clip => clip.primaryTag?.name)
+        .map(clip => clip.primaryTag.name)
+    )];
+
+    if (tagNames.length > 0) {
+      this.findColors(tagNames);
+    }
+
+    // Convert clips to marker format and add them
+    const markers = clips.map(clip => ({
+      seconds: clip.seconds,
+      title: clip.title || "Untitled",
+      primaryTag: clip.primaryTag,
+    }));
+
+    this.addDotMarkers(markers);
+  }
+
   renderRangeMarkers(markers, layer) {
     const duration = this.player.duration();
     const parent = this.player.el().querySelector(".vjs-progress-control");
