@@ -1,21 +1,70 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { getClips } from "../../services/api.js";
+import { useWallPlayback } from "../../hooks/useWallPlayback.js";
+import { useTableColumns } from "../../hooks/useTableColumns.js";
 import {
   SearchInput,
   FilterPanel,
   FilterControl,
   Button,
   Pagination,
+  SearchControls,
 } from "../ui/index.js";
+import { TableView, ColumnConfigPopover } from "../table/index.js";
+import WallView from "../wall/WallView.jsx";
 import ClipGrid from "./ClipGrid.jsx";
 
+// View modes available for clip search
+const VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "wall", label: "Wall view" },
+  { id: "table", label: "Table view" },
+];
+
+// Context settings for wall view preview behavior
+const WALL_VIEW_SETTINGS = [
+  {
+    key: "wallPlayback",
+    label: "Preview Behavior",
+    type: "select",
+    options: [
+      { value: "autoplay", label: "Autoplay All" },
+      { value: "hover", label: "Play on Hover" },
+      { value: "static", label: "Static Thumbnails" },
+    ],
+  },
+];
+
+// No-op for SearchControls query change - ClipSearch manages its own data fetching
+const noop = () => {};
+
 export default function ClipSearch() {
+  const navigate = useNavigate();
   const [clips, setClips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [showUngenerated, setShowUngenerated] = useState(false);
   const perPage = 24;
+
+  // Wall playback preference (shared with scenes)
+  const { wallPlayback, updateWallPlayback } = useWallPlayback();
+
+  // Table columns for table view
+  const {
+    allColumns,
+    visibleColumns,
+    visibleColumnIds,
+    columnOrder,
+    toggleColumn,
+    hideColumn,
+    moveColumn,
+    getColumnConfig,
+  } = useTableColumns("clip");
+
+  // Track current view mode for context settings
+  const [currentViewMode, setCurrentViewMode] = useState("grid");
 
   // Filter state
   const [filters, setFilters] = useState({
@@ -96,6 +145,19 @@ export default function ClipSearch() {
     setFilters((f) => ({ ...f, q: value }));
     setPage(1);
   };
+
+  // Handle clip click - navigate to scene at timestamp
+  const handleClipClick = useCallback(
+    (clip) => {
+      navigate(`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`);
+    },
+    [navigate]
+  );
+
+  // Context settings only shown in wall view
+  const contextSettings = useMemo(() => {
+    return currentViewMode === "wall" ? WALL_VIEW_SETTINGS : [];
+  }, [currentViewMode]);
 
   const totalPages = Math.ceil(total / perPage);
 
@@ -205,8 +267,68 @@ export default function ClipSearch() {
         </div>
       )}
 
-      {/* Grid */}
-      <ClipGrid clips={clips} loading={loading} />
+      {/* View Controls and Content - Using SearchControls for view mode/zoom/settings UI only */}
+      <SearchControls
+        artifactType="clip"
+        viewModes={VIEW_MODES}
+        onViewModeChange={setCurrentViewMode}
+        onQueryChange={noop}
+        wallPlayback={wallPlayback}
+        onWallPlaybackChange={updateWallPlayback}
+        contextSettings={contextSettings}
+        currentTableColumns={getColumnConfig()}
+        tableColumnsPopover={
+          <ColumnConfigPopover
+            allColumns={allColumns}
+            visibleColumnIds={visibleColumnIds}
+            columnOrder={columnOrder}
+            onToggleColumn={toggleColumn}
+            onMoveColumn={moveColumn}
+          />
+        }
+        totalCount={total}
+        totalPages={totalPages}
+        syncToUrl={false}
+      >
+        {({ viewMode, zoomLevel, gridDensity }) =>
+          viewMode === "table" ? (
+            <TableView
+              items={clips}
+              columns={visibleColumns}
+              sort={{ field: "stashCreatedAt", direction: "desc" }}
+              onHideColumn={hideColumn}
+              entityType="clip"
+              isLoading={loading}
+              columnsPopover={
+                <ColumnConfigPopover
+                  allColumns={allColumns}
+                  visibleColumnIds={visibleColumnIds}
+                  columnOrder={columnOrder}
+                  onToggleColumn={toggleColumn}
+                  onMoveColumn={moveColumn}
+                />
+              }
+            />
+          ) : viewMode === "wall" ? (
+            <WallView
+              items={clips}
+              entityType="clip"
+              zoomLevel={zoomLevel}
+              playbackMode={wallPlayback}
+              onItemClick={handleClipClick}
+              loading={loading}
+              emptyMessage="No clips found"
+            />
+          ) : (
+            <ClipGrid
+              clips={clips}
+              loading={loading}
+              density={gridDensity}
+              onClipClick={handleClipClick}
+            />
+          )
+        }
+      </SearchControls>
 
       {/* Pagination */}
       {totalPages > 1 && (

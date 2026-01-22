@@ -1,16 +1,22 @@
 import ClipCard from "../cards/ClipCard.jsx";
 import { useNavigate } from "react-router-dom";
+import { getGridClasses } from "../../constants/grids.js";
 
-export default function ClipGrid({ clips, loading }) {
+export default function ClipGrid({ clips, loading, density = "medium", onClipClick }) {
   const navigate = useNavigate();
+  const gridClasses = getGridClasses("scene", density);
 
   const handleClipClick = (clip) => {
-    navigate(`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`);
+    if (onClipClick) {
+      onClipClick(clip);
+    } else {
+      navigate(`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`);
+    }
   };
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      <div className={gridClasses}>
         {[...Array(12)].map((_, i) => (
           <div
             key={i}
@@ -31,7 +37,7 @@ export default function ClipGrid({ clips, loading }) {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+    <div className={gridClasses}>
       {clips.map((clip) => (
         <ClipCard
           key={clip.id}

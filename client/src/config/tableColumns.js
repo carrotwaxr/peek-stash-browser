@@ -551,6 +551,65 @@ export const GROUP_COLUMNS = [
   },
 ];
 
+export const CLIP_COLUMNS = [
+  {
+    id: "thumbnail",
+    label: "Thumbnail",
+    mandatory: false,
+    defaultVisible: true,
+    sortable: false,
+    width: "w-24",
+  },
+  {
+    id: "title",
+    label: "Title",
+    mandatory: true,
+    defaultVisible: true,
+    sortable: true,
+    width: "max-w-xs",
+  },
+  {
+    id: "scene",
+    label: "Scene",
+    mandatory: false,
+    defaultVisible: true,
+    sortable: false,
+    width: "max-w-40",
+  },
+  {
+    id: "primary_tag",
+    label: "Primary Tag",
+    mandatory: false,
+    defaultVisible: true,
+    sortable: false,
+    width: "w-32",
+  },
+  {
+    id: "start_time",
+    label: "Start Time",
+    mandatory: false,
+    defaultVisible: true,
+    sortable: true,
+    width: "w-24",
+  },
+  {
+    id: "duration",
+    label: "Duration",
+    mandatory: false,
+    defaultVisible: true,
+    sortable: false,
+    width: "w-24",
+  },
+  {
+    id: "tags",
+    label: "Tags",
+    mandatory: false,
+    defaultVisible: true,
+    sortable: false,
+    width: "max-w-40",
+  },
+];
+
 /**
  * Entity type to columns mapping
  */
@@ -569,6 +628,8 @@ const ENTITY_COLUMNS_MAP = {
   images: IMAGE_COLUMNS,
   group: GROUP_COLUMNS,
   groups: GROUP_COLUMNS,
+  clip: CLIP_COLUMNS,
+  clips: CLIP_COLUMNS,
 };
 
 /**

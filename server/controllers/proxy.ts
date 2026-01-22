@@ -385,7 +385,10 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
 
   try {
     // Construct full Stash URL with API key
-    const fullUrl = `${stashUrl}${clip.screenshotPath}${clip.screenshotPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
+    // screenshotPath may already be a full URL or just a path
+    const isFullUrl = clip.screenshotPath.startsWith("http://") || clip.screenshotPath.startsWith("https://");
+    const baseUrl = isFullUrl ? clip.screenshotPath : `${stashUrl}${clip.screenshotPath}`;
+    const fullUrl = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}apikey=${apiKey}`;
 
     logger.debug("Proxying clip preview", {
       clipId: id,

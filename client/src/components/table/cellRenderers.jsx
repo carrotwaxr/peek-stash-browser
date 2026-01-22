@@ -510,6 +510,82 @@ const groupRenderers = {
   },
 };
 
+/**
+ * TagBadge - Colored tag badge for clips
+ */
+const TagBadge = ({ tag }) => {
+  if (!tag) {
+    return <span style={{ color: "var(--text-muted)" }}>-</span>;
+  }
+
+  return (
+    <span
+      className="inline-block px-2 py-0.5 rounded text-xs"
+      style={{
+        backgroundColor: `${tag.color || "#ffffff"}20`,
+        color: tag.color || "var(--text-primary)",
+      }}
+    >
+      {tag.name}
+    </span>
+  );
+};
+
+/**
+ * Clip cell renderers
+ */
+const clipRenderers = {
+  title: (clip) => (
+    <LinkCell
+      text={clip.title || "Untitled"}
+      linkTo={`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`}
+    />
+  ),
+  thumbnail: (clip) => {
+    // Prefer clip preview, fall back to scene screenshot
+    const src = clip.isGenerated
+      ? `/api/proxy/clip/${clip.id}/preview`
+      : clip.scene?.pathScreenshot
+        ? `/api/proxy/stash?path=${encodeURIComponent(clip.scene.pathScreenshot)}`
+        : null;
+    return (
+      <ThumbnailCell
+        src={src}
+        alt={clip.title}
+        linkTo={`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`}
+        entityType="scene"
+      />
+    );
+  },
+  scene: (clip) => {
+    if (!clip.scene) {
+      return <span style={{ color: "var(--text-muted)" }}>-</span>;
+    }
+    return (
+      <LinkCell
+        text={clip.scene.title || `Scene ${clip.sceneId}`}
+        linkTo={`/scene/${clip.sceneId}`}
+      />
+    );
+  },
+  primary_tag: (clip) => <TagBadge tag={clip.primaryTag} />,
+  start_time: (clip) => formatDuration(clip.seconds),
+  duration: (clip) => {
+    if (clip.endSeconds && clip.seconds) {
+      return formatDuration(clip.endSeconds - clip.seconds);
+    }
+    return <span style={{ color: "var(--text-muted)" }}>-</span>;
+  },
+  tags: (clip) => {
+    const items = (clip.tags || []).map((t) => ({
+      id: t.tag?.id || t.id,
+      name: t.tag?.name || t.name,
+      linkTo: `/tag/${t.tag?.id || t.id}`,
+    }));
+    return <MultiValueCell items={items} />;
+  },
+};
+
 // ============================================================================
 // Main Export
 // ============================================================================
@@ -532,6 +608,8 @@ const entityRenderers = {
   images: imageRenderers,
   group: groupRenderers,
   groups: groupRenderers,
+  clip: clipRenderers,
+  clips: clipRenderers,
 };
 
 /**
