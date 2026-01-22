@@ -142,6 +142,21 @@ const VideoPlayer = () => {
   // Auto-fullscreen on mobile orientation change
   useOrientationFullscreen(playerRef, scene?.id, true);
 
+  // Listen for seekToTime events (e.g., from ClipList clicks)
+  useEffect(() => {
+    const handleSeekToTime = (event) => {
+      const { seconds } = event.detail;
+      if (playerRef.current && typeof seconds === "number") {
+        playerRef.current.currentTime(seconds);
+      }
+    };
+
+    window.addEventListener("seekToTime", handleSeekToTime);
+    return () => {
+      window.removeEventListener("seekToTime", handleSeekToTime);
+    };
+  }, []);
+
   return (
     <section className="video-container">
       {/*

@@ -1,6 +1,9 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { getClipsForScene } from "../../services/api.js";
+import ClipList from "../clips/ClipList.jsx";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
 
@@ -48,6 +51,38 @@ const SceneDetails = ({
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene");
 
+  // Clips state
+  const [clips, setClips] = useState([]);
+  const [clipsLoading, setClipsLoading] = useState(true);
+
+  // Fetch clips when scene changes
+  useEffect(() => {
+    async function fetchClips() {
+      if (!scene?.id) return;
+      setClipsLoading(true);
+      try {
+        const response = await getClipsForScene(scene.id, true);
+        setClips(response.clips || []);
+      } catch (err) {
+        console.error("Failed to fetch clips", err);
+        setClips([]);
+      } finally {
+        setClipsLoading(false);
+      }
+    }
+    fetchClips();
+  }, [scene?.id]);
+
+  // Handle clip click - dispatch event to seek video player
+  const handleClipClick = (clip) => {
+    // Dispatch custom event that VideoPlayer listens for
+    window.dispatchEvent(
+      new CustomEvent("seekToTime", {
+        detail: { seconds: clip.seconds },
+      })
+    );
+  };
+
   // Don't render if no scene data yet
   if (!scene) {
     return null;
@@ -65,6 +100,17 @@ const SceneDetails = ({
     >
       {/* Clean layout inspired by YouTube - less card-based, more content-focused */}
       <div className="space-y-6">
+        {/* Clips section */}
+        {(clips.length > 0 || clipsLoading) && (
+          <div>
+            <ClipList
+              clips={clips}
+              onClipClick={handleClipClick}
+              loading={clipsLoading}
+            />
+          </div>
+        )}
+
         {/* Primary details section */}
         <div>
           <Paper>
