@@ -875,3 +875,53 @@ export const updatePlaylistShares = (playlistId, groupIds) =>
  * @returns {Promise<{playlist: Object}>}
  */
 export const duplicatePlaylist = (playlistId) => apiPost(`/playlists/${playlistId}/duplicate`);
+
+// ============================================================================
+// Clips
+// ============================================================================
+
+/**
+ * Get clips with filtering
+ */
+export async function getClips(options = {}) {
+  const params = new URLSearchParams();
+
+  if (options.page) params.set("page", options.page);
+  if (options.perPage) params.set("perPage", options.perPage);
+  if (options.sortBy) params.set("sortBy", options.sortBy);
+  if (options.sortDir) params.set("sortDir", options.sortDir);
+  if (options.isGenerated !== undefined) params.set("isGenerated", options.isGenerated);
+  if (options.sceneId) params.set("sceneId", options.sceneId);
+  if (options.tagIds?.length) params.set("tagIds", options.tagIds.join(","));
+  if (options.sceneTagIds?.length) params.set("sceneTagIds", options.sceneTagIds.join(","));
+  if (options.performerIds?.length) params.set("performerIds", options.performerIds.join(","));
+  if (options.studioId) params.set("studioId", options.studioId);
+  if (options.q) params.set("q", options.q);
+
+  const queryString = params.toString();
+  return apiGet(`/clips${queryString ? `?${queryString}` : ""}`);
+}
+
+/**
+ * Get single clip
+ */
+export async function getClipById(id) {
+  return apiGet(`/clips/${id}`);
+}
+
+/**
+ * Get clips for a scene
+ */
+export async function getClipsForScene(sceneId, includeUngenerated = false) {
+  const params = new URLSearchParams();
+  if (includeUngenerated) params.set("includeUngenerated", "true");
+  const queryString = params.toString();
+  return apiGet(`/scenes/${sceneId}/clips${queryString ? `?${queryString}` : ""}`);
+}
+
+/**
+ * Get clip preview URL
+ */
+export function getClipPreviewUrl(clipId) {
+  return `/api/proxy/clip/${clipId}/preview`;
+}
