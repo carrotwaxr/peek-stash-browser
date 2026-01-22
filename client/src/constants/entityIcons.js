@@ -19,6 +19,7 @@ import {
   Image,
   Images,
   List,
+  Scissors,
   Tag,
   User,
   Users,
@@ -43,6 +44,7 @@ export const ENTITY_ICONS = {
 
   // Other
   playlist: List,
+  clip: Scissors,
 
   // Aliases for convenience
   collection: Film, // Same as group
@@ -63,6 +65,7 @@ export const ENTITY_ICON_NAMES = {
   gallery: "gallery-vertical",
   images: "images",
   playlist: "list",
+  clip: "scissors",
   collection: "film",
   movie: "film",
 };
@@ -79,6 +82,7 @@ export const ENTITY_LABELS = {
   image: { singular: "Image", plural: "Images" },
   gallery: { singular: "Gallery", plural: "Galleries" },
   playlist: { singular: "Playlist", plural: "Playlists" },
+  clip: { singular: "Clip", plural: "Clips" },
 };
 
 /**
