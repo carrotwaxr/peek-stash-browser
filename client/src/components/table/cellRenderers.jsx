@@ -511,23 +511,21 @@ const groupRenderers = {
 };
 
 /**
- * TagBadge - Colored tag badge for clips
+ * TagLinkCell - Tag displayed as a link with theme secondary color
  */
-const TagBadge = ({ tag }) => {
+const TagLinkCell = ({ tag }) => {
   if (!tag) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
 
   return (
-    <span
-      className="inline-block px-2 py-0.5 rounded text-xs"
-      style={{
-        backgroundColor: `${tag.color || "#ffffff"}20`,
-        color: tag.color || "var(--text-primary)",
-      }}
+    <Link
+      to={`/tag/${tag.id}`}
+      className="hover:underline"
+      style={{ color: "var(--accent-secondary)" }}
     >
       {tag.name}
-    </span>
+    </Link>
   );
 };
 
@@ -542,12 +540,10 @@ const clipRenderers = {
     />
   ),
   thumbnail: (clip) => {
-    // Prefer clip preview, fall back to scene screenshot
-    const src = clip.isGenerated
-      ? `/api/proxy/clip/${clip.id}/preview`
-      : clip.scene?.pathScreenshot
-        ? `/api/proxy/stash?path=${encodeURIComponent(clip.scene.pathScreenshot)}`
-        : null;
+    // Use scene screenshot for static thumbnail in table view
+    // (clip preview is video/mp4 which can't be displayed in an img tag)
+    // pathScreenshot is already a proxy URL from ClipService
+    const src = clip.scene?.pathScreenshot || null;
     return (
       <ThumbnailCell
         src={src}
@@ -568,7 +564,7 @@ const clipRenderers = {
       />
     );
   },
-  primary_tag: (clip) => <TagBadge tag={clip.primaryTag} />,
+  primary_tag: (clip) => <TagLinkCell tag={clip.primaryTag} />,
   start_time: (clip) => formatDuration(clip.seconds),
   duration: (clip) => {
     if (clip.endSeconds && clip.seconds) {

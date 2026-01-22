@@ -1,6 +1,8 @@
 import { useCallback, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
+import { useWallPlayback } from "../../hooks/useWallPlayback.js";
+import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { getClips } from "../../services/api.js";
 import {
   ErrorMessage,
@@ -8,7 +10,16 @@ import {
   PageLayout,
   SearchControls,
 } from "../ui/index.js";
+import { TableView, ColumnConfigPopover } from "../table/index.js";
+import WallView from "../wall/WallView.jsx";
 import ClipGrid from "./ClipGrid.jsx";
+
+// View modes available for clip search
+const VIEW_MODES = [
+  { id: "grid", label: "Grid view" },
+  { id: "wall", label: "Wall view" },
+  { id: "table", label: "Table view" },
+];
 
 /**
  * ClipSearch - Search component for clips
@@ -28,6 +39,21 @@ const ClipSearch = ({
   const [searchParams] = useSearchParams();
 
   const { data, isLoading, error, execute } = useCancellableQuery();
+
+  // Wall playback preference
+  const { wallPlayback, updateWallPlayback } = useWallPlayback();
+
+  // Table columns for table view
+  const {
+    allColumns,
+    visibleColumns,
+    visibleColumnIds,
+    columnOrder,
+    toggleColumn,
+    hideColumn,
+    moveColumn,
+    getColumnConfig,
+  } = useTableColumns("clip");
 
   // Track effective perPage from SearchControls state
   const [effectivePerPage, setEffectivePerPage] = useState(
@@ -124,18 +150,62 @@ const ClipSearch = ({
         totalPages={totalPages}
         totalCount={totalCount}
         syncToUrl={syncToUrl}
-      >
-        {({ gridDensity }) => (
-          <ClipGrid
-            clips={currentClips}
-            density={gridDensity}
-            loading={isLoading}
-            onClipClick={handleClipClick}
-            fromPageTitle={fromPageTitle}
-            emptyMessage="No clips found"
-            emptyDescription="Try adjusting your search filters"
+        supportsWallView={true}
+        viewModes={VIEW_MODES}
+        wallPlayback={wallPlayback}
+        onWallPlaybackChange={updateWallPlayback}
+        currentTableColumns={getColumnConfig()}
+        tableColumnsPopover={
+          <ColumnConfigPopover
+            allColumns={allColumns}
+            visibleColumnIds={visibleColumnIds}
+            columnOrder={columnOrder}
+            onToggleColumn={toggleColumn}
+            onMoveColumn={moveColumn}
           />
-        )}
+        }
+      >
+        {({ viewMode, zoomLevel, gridDensity }) =>
+          viewMode === "table" ? (
+            <TableView
+              items={currentClips}
+              columns={visibleColumns}
+              sort={{ field: "stashCreatedAt", direction: "desc" }}
+              onHideColumn={hideColumn}
+              entityType="clip"
+              isLoading={isLoading}
+              columnsPopover={
+                <ColumnConfigPopover
+                  allColumns={allColumns}
+                  visibleColumnIds={visibleColumnIds}
+                  columnOrder={columnOrder}
+                  onToggleColumn={toggleColumn}
+                  onMoveColumn={moveColumn}
+                />
+              }
+            />
+          ) : viewMode === "wall" ? (
+            <WallView
+              items={currentClips}
+              entityType="clip"
+              zoomLevel={zoomLevel}
+              playbackMode={wallPlayback}
+              onItemClick={handleClipClick}
+              loading={isLoading}
+              emptyMessage="No clips found"
+            />
+          ) : (
+            <ClipGrid
+              clips={currentClips}
+              density={gridDensity}
+              loading={isLoading}
+              onClipClick={handleClipClick}
+              fromPageTitle={fromPageTitle}
+              emptyMessage="No clips found"
+              emptyDescription="Try adjusting your search filters"
+            />
+          )
+        }
       </SearchControls>
     </PageLayout>
   );

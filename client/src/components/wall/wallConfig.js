@@ -76,12 +76,9 @@ export const wallConfig = {
 
   clip: {
     getImageUrl: (item) => {
-      // Prefer clip's own screenshot, fall back to scene screenshot
-      if (item.screenshotPath) {
-        return `/api/proxy/stash?path=${encodeURIComponent(item.screenshotPath)}`;
-      }
-      if (item.scene?.pathScreenshot) {
-        return `/api/proxy/stash?path=${encodeURIComponent(item.scene.pathScreenshot)}`;
+      // Use dedicated clip preview proxy endpoint - it handles the URL properly
+      if (item.id) {
+        return getClipPreviewUrl(item.id);
       }
       return null;
     },
