@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth.js';
 import { REDIRECT_STORAGE_KEY } from '../../services/api.js';
+import UserSetupModal from '../modals/UserSetupModal.jsx';
 
 const LoadingSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -59,12 +60,14 @@ export const LoginGuard = ({ children, setupStatus, checkingSetup }) => {
 /**
  * ProtectedRoute - Wraps all authenticated app routes
  * - If setup is NOT complete → redirect to "/setup"
- * - If user is NOT authenticated → redirect to "/login" (saves current URL for redirect after login)
+ * - If user is NOT authenticated → redirect to "/login"
+ * - If user hasn't completed first-login setup → show UserSetupModal
  * - Otherwise → render children
  */
 export const ProtectedRoute = ({ children, setupStatus, checkingSetup }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
+  const [setupComplete, setSetupComplete] = useState(false);
 
   if (isLoading || checkingSetup) {
     return <LoadingSpinner />;
@@ -75,12 +78,21 @@ export const ProtectedRoute = ({ children, setupStatus, checkingSetup }) => {
   }
 
   if (!isAuthenticated) {
-    // Save current URL for redirect after login (but not "/" since that's the default)
     const currentUrl = location.pathname + location.search;
     if (currentUrl !== "/" && currentUrl !== "/?") {
       sessionStorage.setItem(REDIRECT_STORAGE_KEY, currentUrl);
     }
     return <Navigate to="/login" replace />;
+  }
+
+  // Show first-login setup modal if user hasn't completed it
+  if (user && !user.setupCompleted && !setupComplete) {
+    return (
+      <>
+        {children}
+        <UserSetupModal onComplete={() => setSetupComplete(true)} />
+      </>
+    );
   }
 
   return children;
