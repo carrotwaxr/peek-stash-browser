@@ -107,100 +107,119 @@ const UserSetupModal = ({ onComplete }) => {
           </p>
         </div>
 
-        {error && (
+        {/* Error state - show retry if we failed to load data */}
+        {error && !recoveryKey && (
+          <div className="p-6 rounded-lg border text-center"
+               style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+            <p className="mb-4" style={{ color: "#ef4444" }}>{error}</p>
+            <Button
+              variant="secondary"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {/* Error during submit - show above form */}
+        {error && recoveryKey && (
           <div className="p-4 rounded border-l-4"
                style={{ backgroundColor: "var(--bg-card)", borderColor: "#ef4444" }}>
             <p style={{ color: "#ef4444" }}>{error}</p>
           </div>
         )}
 
-        {/* Recovery Key Section */}
-        <div className="p-6 rounded-lg border"
-             style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-          <h2 className="text-lg font-semibold mb-2"
-              style={{ color: "var(--text-primary)" }}>
-            Your Recovery Key
-          </h2>
-          <p className="text-sm mb-4"
-             style={{ color: "var(--text-secondary)" }}>
-            Save this somewhere safe - you'll need it if you forget your password
-          </p>
-
-          <div className="flex items-center gap-2">
-            <code className="flex-1 p-3 rounded font-mono text-sm break-all"
-                  style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)" }}>
-              {recoveryKey}
-            </code>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleCopyKey}
-              className="shrink-0"
-            >
-              {copied ? <Check size={16} /> : <Copy size={16} />}
-            </Button>
-          </div>
-        </div>
-
-        {/* Instance Selection Section */}
-        {showInstanceSelection && (
-          <div className="p-6 rounded-lg border"
-               style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
-            <div className="flex items-center gap-2 mb-2">
-              <Server size={20} style={{ color: "var(--text-primary)" }} />
-              <h2 className="text-lg font-semibold"
+        {/* Recovery Key Section - only show if we have data */}
+        {recoveryKey && (
+          <>
+            <div className="p-6 rounded-lg border"
+                 style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+              <h2 className="text-lg font-semibold mb-2"
                   style={{ color: "var(--text-primary)" }}>
-                Content Sources
+                Your Recovery Key
               </h2>
-            </div>
-            <p className="text-sm mb-4"
-               style={{ color: "var(--text-secondary)" }}>
-              Select which Stash servers to see content from
-            </p>
+              <p className="text-sm mb-4"
+                 style={{ color: "var(--text-secondary)" }}>
+                Save this somewhere safe - you'll need it if you forget your password
+              </p>
 
-            <div className="space-y-3">
-              {instances.map((instance) => (
-                <label
-                  key={instance.id}
-                  className="flex items-start gap-3 p-3 rounded cursor-pointer transition-colors"
-                  style={{ backgroundColor: "var(--bg-secondary)" }}
+              <div className="flex items-center gap-2">
+                <code className="flex-1 p-3 rounded font-mono text-sm break-all"
+                      style={{ backgroundColor: "var(--bg-secondary)", color: "var(--text-primary)" }}>
+                  {recoveryKey}
+                </code>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleCopyKey}
+                  className="shrink-0"
                 >
-                  <input
-                    type="checkbox"
-                    checked={selectedInstanceIds.includes(instance.id)}
-                    onChange={() => handleInstanceToggle(instance.id)}
-                    className="mt-1 w-4 h-4"
-                    style={{ accentColor: "var(--accent-primary)" }}
-                  />
-                  <div>
-                    <div className="font-medium"
-                         style={{ color: "var(--text-primary)" }}>
-                      {instance.name}
-                    </div>
-                    {instance.description && (
-                      <div className="text-sm"
-                           style={{ color: "var(--text-secondary)" }}>
-                        {instance.description}
-                      </div>
-                    )}
-                  </div>
-                </label>
-              ))}
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Complete Button */}
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
-          onClick={handleComplete}
-          disabled={submitting}
-          loading={submitting}
-        >
-          Get Started
-        </Button>
+            {/* Instance Selection Section */}
+            {showInstanceSelection && (
+              <div className="p-6 rounded-lg border"
+                   style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border-color)" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Server size={20} style={{ color: "var(--text-primary)" }} />
+                  <h2 className="text-lg font-semibold"
+                      style={{ color: "var(--text-primary)" }}>
+                    Content Sources
+                  </h2>
+                </div>
+                <p className="text-sm mb-4"
+                   style={{ color: "var(--text-secondary)" }}>
+                  Select which Stash servers to see content from
+                </p>
+
+                <div className="space-y-3">
+                  {instances.map((instance) => (
+                    <label
+                      key={instance.id}
+                      className="flex items-start gap-3 p-3 rounded cursor-pointer transition-colors"
+                      style={{ backgroundColor: "var(--bg-secondary)" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedInstanceIds.includes(instance.id)}
+                        onChange={() => handleInstanceToggle(instance.id)}
+                        className="mt-1 w-4 h-4"
+                        style={{ accentColor: "var(--accent-primary)" }}
+                      />
+                      <div>
+                        <div className="font-medium"
+                             style={{ color: "var(--text-primary)" }}>
+                          {instance.name}
+                        </div>
+                        {instance.description && (
+                          <div className="text-sm"
+                               style={{ color: "var(--text-secondary)" }}>
+                            {instance.description}
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Complete Button */}
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onClick={handleComplete}
+              disabled={submitting}
+              loading={submitting}
+            >
+              Get Started
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

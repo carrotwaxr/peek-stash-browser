@@ -51,6 +51,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
         role: true,
         landingPagePreference: true,
         recoveryKey: true,
+        setupCompleted: true,
       },
     });
 
@@ -99,6 +100,7 @@ router.post("/login", authRateLimiter, async (req, res) => {
         username: user.username,
         role: user.role,
         landingPagePreference: user.landingPagePreference || { pages: ["home"], randomize: false },
+        setupCompleted: user.setupCompleted,
       },
     });
   } catch (error) {
