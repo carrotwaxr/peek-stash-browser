@@ -8,6 +8,7 @@ import { resolveUserPermissions } from "../services/PermissionService.js";
 import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
+import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 
 /**
  * Carousel preference configuration
@@ -1333,6 +1334,9 @@ export const syncFromStash = async (
           let sceneWasCreated = false;
           let sceneWasUpdated = false;
 
+          // Get instanceId for the scene (use 'default' for direct Stash imports)
+          const sceneInstanceId = await getEntityInstanceId('scene', scene.id);
+
           // Rating sync
           if (
             syncOptions.scenes.rating &&
@@ -1342,11 +1346,12 @@ export const syncFromStash = async (
             const existing = existingRatingMap.get(scene.id);
             ratingUpserts.push({
               where: {
-                userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+                userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
               },
               update: { rating: scene.rating100 },
               create: {
                 userId: targetUserId,
+                instanceId: sceneInstanceId,
                 sceneId: scene.id,
                 rating: scene.rating100,
                 favorite: false,
@@ -1369,11 +1374,12 @@ export const syncFromStash = async (
             const existing = existingWatchMap.get(scene.id);
             watchUpserts.push({
               where: {
-                userId_sceneId: { userId: targetUserId, sceneId: scene.id },
+                userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
               },
               update: { oCount: scene.o_counter },
               create: {
                 userId: targetUserId,
+                instanceId: sceneInstanceId,
                 sceneId: scene.id,
                 oCount: scene.o_counter,
                 oHistory: [],
@@ -1482,6 +1488,7 @@ export const syncFromStash = async (
             : false;
 
           const existing = existingRatingMap.get(performer.id);
+          const performerInstanceId = await getEntityInstanceId('performer', performer.id);
 
           const updates: SyncUpdates = {};
           if (syncOptions.performers.rating) updates.rating = stashRating;
@@ -1489,14 +1496,16 @@ export const syncFromStash = async (
 
           upserts.push({
             where: {
-              userId_performerId: {
+              userId_instanceId_performerId: {
                 userId: targetUserId,
+                instanceId: performerInstanceId,
                 performerId: performer.id,
               },
             },
             update: updates,
             create: {
               userId: targetUserId,
+              instanceId: performerInstanceId,
               performerId: performer.id,
               rating: stashRating,
               favorite: stashFavorite,
@@ -1598,6 +1607,7 @@ export const syncFromStash = async (
             : false;
 
           const existing = existingRatingMap.get(studio.id);
+          const studioInstanceId = await getEntityInstanceId('studio', studio.id);
 
           const updates: SyncUpdates = {};
           if (syncOptions.studios.rating) updates.rating = stashRating;
@@ -1605,11 +1615,12 @@ export const syncFromStash = async (
 
           upserts.push({
             where: {
-              userId_studioId: { userId: targetUserId, studioId: studio.id },
+              userId_instanceId_studioId: { userId: targetUserId, instanceId: studioInstanceId, studioId: studio.id },
             },
             update: updates,
             create: {
               userId: targetUserId,
+              instanceId: studioInstanceId,
               studioId: studio.id,
               rating: stashRating,
               favorite: stashFavorite,
@@ -1674,12 +1685,14 @@ export const syncFromStash = async (
         for (const tag of batch) {
           const stashFavorite = tag.favorite || false;
           const existing = existingRatingMap.get(tag.id);
+          const tagInstanceId = await getEntityInstanceId('tag', tag.id);
 
           upserts.push({
-            where: { userId_tagId: { userId: targetUserId, tagId: tag.id } },
+            where: { userId_instanceId_tagId: { userId: targetUserId, instanceId: tagInstanceId, tagId: tag.id } },
             update: { favorite: stashFavorite },
             create: {
               userId: targetUserId,
+              instanceId: tagInstanceId,
               tagId: tag.id,
               rating: null, // Tags don't have ratings in Stash
               favorite: stashFavorite,
@@ -1741,14 +1754,16 @@ export const syncFromStash = async (
         for (const gallery of batch) {
           const stashRating = gallery.rating100;
           const existing = existingRatingMap.get(gallery.id);
+          const galleryInstanceId = await getEntityInstanceId('gallery', gallery.id);
 
           upserts.push({
             where: {
-              userId_galleryId: { userId: targetUserId, galleryId: gallery.id },
+              userId_instanceId_galleryId: { userId: targetUserId, instanceId: galleryInstanceId, galleryId: gallery.id },
             },
             update: { rating: stashRating },
             create: {
               userId: targetUserId,
+              instanceId: galleryInstanceId,
               galleryId: gallery.id,
               rating: stashRating,
               favorite: false, // Galleries don't have favorites
@@ -1810,14 +1825,16 @@ export const syncFromStash = async (
         for (const group of batch) {
           const stashRating = group.rating100;
           const existing = existingRatingMap.get(group.id);
+          const groupInstanceId = await getEntityInstanceId('group', group.id);
 
           upserts.push({
             where: {
-              userId_groupId: { userId: targetUserId, groupId: group.id },
+              userId_instanceId_groupId: { userId: targetUserId, instanceId: groupInstanceId, groupId: group.id },
             },
             update: { rating: stashRating },
             create: {
               userId: targetUserId,
+              instanceId: groupInstanceId,
               groupId: group.id,
               rating: stashRating,
               favorite: false, // Groups don't have favorites
@@ -2638,5 +2655,124 @@ export const adminRegenerateRecoveryKey = async (
   } catch (error) {
     console.error("Error regenerating user recovery key:", error);
     res.status(500).json({ error: "Failed to regenerate user recovery key" });
+  }
+};
+
+// =============================================================================
+// USER STASH INSTANCE SELECTION
+// =============================================================================
+
+/**
+ * Get user's selected Stash instances
+ * GET /api/user/stash-instances
+ *
+ * Returns:
+ * - selectedInstanceIds: IDs the user has selected (empty = all enabled)
+ * - availableInstances: All enabled instances for selection UI
+ */
+export const getUserStashInstances = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Get user's selected instances
+    const userSelections = await prisma.userStashInstance.findMany({
+      where: { userId },
+      select: { instanceId: true },
+    });
+    const selectedInstanceIds = userSelections.map((s) => s.instanceId);
+
+    // Get all enabled instances for the selection UI
+    const availableInstances = await prisma.stashInstance.findMany({
+      where: { enabled: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
+      orderBy: { priority: "asc" },
+    });
+
+    res.json({
+      selectedInstanceIds,
+      availableInstances,
+    });
+  } catch (error) {
+    console.error("Error getting user Stash instances:", error);
+    res.status(500).json({ error: "Failed to get Stash instance selection" });
+  }
+};
+
+/**
+ * Update user's Stash instance selection
+ * PUT /api/user/stash-instances
+ *
+ * Body: { instanceIds: string[] }
+ * - Empty array means "show all enabled instances" (clears all selections)
+ * - Non-empty array means "show only these instances"
+ */
+export const updateUserStashInstances = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { instanceIds } = req.body;
+    if (!Array.isArray(instanceIds)) {
+      return res.status(400).json({ error: "instanceIds must be an array" });
+    }
+
+    // Validate that all instance IDs exist and are enabled
+    if (instanceIds.length > 0) {
+      const validInstances = await prisma.stashInstance.findMany({
+        where: {
+          id: { in: instanceIds },
+          enabled: true,
+        },
+        select: { id: true },
+      });
+
+      const validIds = new Set(validInstances.map((i) => i.id));
+      const invalidIds = instanceIds.filter((id) => !validIds.has(id));
+
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          error: "Invalid instance IDs",
+          invalidIds,
+        });
+      }
+    }
+
+    // Delete existing selections
+    await prisma.userStashInstance.deleteMany({
+      where: { userId },
+    });
+
+    // Create new selections (if any)
+    if (instanceIds.length > 0) {
+      await prisma.userStashInstance.createMany({
+        data: instanceIds.map((instanceId) => ({
+          userId,
+          instanceId,
+        })),
+      });
+    }
+
+    res.json({
+      success: true,
+      selectedInstanceIds: instanceIds,
+    });
+  } catch (error) {
+    console.error("Error updating user Stash instances:", error);
+    res.status(500).json({ error: "Failed to update Stash instance selection" });
   }
 };

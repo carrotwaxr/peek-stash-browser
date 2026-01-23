@@ -21,6 +21,7 @@ export interface SceneQueryOptions {
   userId: number;
   filters?: PeekSceneFilter;
   applyExclusions?: boolean;  // Default true - use pre-computed exclusions
+  allowedInstanceIds?: string[];  // Multi-instance filtering - if provided, only return scenes from these instances
   sort: string;
   sortDirection: "ASC" | "DESC";
   page: number;
@@ -38,6 +39,7 @@ export interface SceneQueryResult {
 export interface SceneByIdsOptions {
   userId: number;
   ids: string[];
+  allowedInstanceIds?: string[];  // Multi-instance filtering
 }
 
 /**
@@ -94,6 +96,23 @@ class SceneQueryBuilder {
     return {
       sql: "s.deletedAt IS NULL",
       params: [],
+    };
+  }
+
+  /**
+   * Build instance filter clause for multi-instance support
+   * Filters scenes to only those from allowed Stash instances
+   */
+  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+    if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
+      // No instance filter - return all scenes
+      return { sql: "", params: [] };
+    }
+
+    const placeholders = allowedInstanceIds.map(() => "?").join(", ");
+    return {
+      sql: `(s.stashInstanceId IN (${placeholders}) OR s.stashInstanceId IS NULL)`,
+      params: allowedInstanceIds,
     };
   }
 
@@ -1159,13 +1178,19 @@ class SceneQueryBuilder {
 
   async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters } = options;
+    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, filters } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
 
     // Build WHERE clauses
     const whereClauses: FilterClause[] = [this.buildBaseWhere(applyExclusions)];
+
+    // Instance filter (multi-instance support)
+    const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
+    if (instanceFilter.sql) {
+      whereClauses.push(instanceFilter);
+    }
 
     // ID filter
     if (filters?.ids) {
@@ -1855,7 +1880,7 @@ class SceneQueryBuilder {
    * Used after scoring to fetch the final paginated results
    */
   async getByIds(options: SceneByIdsOptions): Promise<SceneQueryResult> {
-    const { userId, ids } = options;
+    const { userId, ids, allowedInstanceIds } = options;
 
     if (ids.length === 0) {
       return { scenes: [], total: 0 };
@@ -1868,6 +1893,7 @@ class SceneQueryBuilder {
         ids: { value: ids, modifier: "INCLUDES" },
       },
       applyExclusions: false, // IDs already filtered, don't double-exclude
+      allowedInstanceIds, // Pass through for multi-instance filtering
       sort: "created_at", // Default sort, results will be reordered by caller if needed
       sortDirection: "DESC",
       page: 1,

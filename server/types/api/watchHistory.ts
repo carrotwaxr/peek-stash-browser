@@ -25,6 +25,7 @@ export interface WatchHistoryData {
 export interface FullWatchHistoryRecord {
   id: number;
   userId: number;
+  instanceId: string | null;
   sceneId: string;
   playCount: number;
   playDuration: number;
@@ -44,6 +45,7 @@ export interface FullWatchHistoryRecord {
  * Periodic ping from video player to track playback progress
  */
 export interface PingWatchHistoryRequest {
+  instanceId?: string;
   sceneId: string;
   currentTime: number;
   quality?: string;
@@ -65,6 +67,7 @@ export interface PingWatchHistoryResponse {
  * Save resume time and play duration delta (called by track-activity plugin)
  */
 export interface SaveActivityRequest {
+  instanceId?: string;
   sceneId: string;
   resumeTime?: number;
   playDuration?: number;
@@ -84,6 +87,7 @@ export interface SaveActivityResponse {
  * Increment play count when minimum play percentage is reached
  */
 export interface IncrementPlayCountRequest {
+  instanceId?: string;
   sceneId: string;
 }
 
@@ -101,6 +105,7 @@ export interface IncrementPlayCountResponse {
  * Increment O counter for a scene
  */
 export interface IncrementOCounterRequest {
+  instanceId?: string;
   sceneId: string;
 }
 

@@ -13,6 +13,7 @@
  * Common request body for all rating updates
  */
 export interface UpdateRatingRequest {
+  instanceId?: string;
   rating?: number | null;
   favorite?: boolean;
 }
@@ -24,6 +25,7 @@ export interface UpdateRatingResponse {
   success: true;
   rating: {
     id: number;
+    instanceId: string | null;
     rating: number | null;
     favorite: boolean;
   };

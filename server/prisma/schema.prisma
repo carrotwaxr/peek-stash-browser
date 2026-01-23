@@ -80,6 +80,9 @@ model User {
 
   // Downloads
   downloads            Download[]
+
+  // Stash instance selection (which instances user sees content from)
+  stashInstances UserStashInstance[]
 }
 
 model UserGroup {
@@ -114,9 +117,10 @@ model UserGroupMembership {
 }
 
 model WatchHistory {
-  id      Int    @id @default(autoincrement())
-  userId  Int
-  sceneId String // Stash scene ID
+  id         Int     @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID (null for legacy single-instance data)
+  sceneId    String  // Stash scene ID
 
   // Playback tracking (syncs with Stash)
   playCount    Int       @default(0) // Number of 5+ minute sessions
@@ -139,7 +143,7 @@ model WatchHistory {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, sceneId])
+  @@unique([userId, instanceId, sceneId])
   @@index([userId])
   @@index([sceneId])
   @@index([lastPlayedAt])
@@ -180,13 +184,14 @@ model PlaylistShare {
 model PlaylistItem {
   id         Int      @id @default(autoincrement())
   playlistId Int
-  sceneId    String // Stash scene ID
+  instanceId String? // Stash instance ID (for cross-instance playlists)
+  sceneId    String  // Stash scene ID
   position   Int // Order in playlist
   addedAt    DateTime @default(now())
 
   playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
-  @@unique([playlistId, sceneId])
+  @@unique([playlistId, instanceId, sceneId])
   @@index([playlistId, position])
 }
 
@@ -205,17 +210,18 @@ model CustomTheme {
 }
 
 model SceneRating {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  sceneId   String // Stash scene ID
-  rating    Int? // 0-100, null if not rated
-  favorite  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID
+  sceneId    String  // Stash scene ID
+  rating     Int? // 0-100, null if not rated
+  favorite   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, sceneId])
+  @@unique([userId, instanceId, sceneId])
   @@index([userId])
   @@index([sceneId])
   @@index([favorite])
@@ -225,7 +231,8 @@ model SceneRating {
 model PerformerRating {
   id          Int      @id @default(autoincrement())
   userId      Int
-  performerId String // Stash performer ID
+  instanceId  String? // Stash instance ID
+  performerId String  // Stash performer ID
   rating      Int? // 0-100, null if not rated
   favorite    Boolean  @default(false)
   createdAt   DateTime @default(now())
@@ -233,7 +240,7 @@ model PerformerRating {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, performerId])
+  @@unique([userId, instanceId, performerId])
   @@index([userId])
   @@index([performerId])
   @@index([favorite])
@@ -241,17 +248,18 @@ model PerformerRating {
 }
 
 model StudioRating {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  studioId  String // Stash studio ID
-  rating    Int? // 0-100, null if not rated
-  favorite  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID
+  studioId   String  // Stash studio ID
+  rating     Int? // 0-100, null if not rated
+  favorite   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, studioId])
+  @@unique([userId, instanceId, studioId])
   @@index([userId])
   @@index([studioId])
   @@index([favorite])
@@ -259,17 +267,18 @@ model StudioRating {
 }
 
 model TagRating {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  tagId     String // Stash tag ID
-  rating    Int? // 0-100, null if not rated
-  favorite  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID
+  tagId      String  // Stash tag ID
+  rating     Int? // 0-100, null if not rated
+  favorite   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, tagId])
+  @@unique([userId, instanceId, tagId])
   @@index([userId])
   @@index([tagId])
   @@index([favorite])
@@ -277,17 +286,18 @@ model TagRating {
 }
 
 model GalleryRating {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  galleryId String // Stash gallery ID
-  rating    Int? // 0-100, null if not rated
-  favorite  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID
+  galleryId  String  // Stash gallery ID
+  rating     Int? // 0-100, null if not rated
+  favorite   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, galleryId])
+  @@unique([userId, instanceId, galleryId])
   @@index([userId])
   @@index([galleryId])
   @@index([favorite])
@@ -295,17 +305,18 @@ model GalleryRating {
 }
 
 model GroupRating {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  groupId   String // Stash group ID
-  rating    Int? // 0-100, null if not rated
-  favorite  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID
+  groupId    String  // Stash group ID
+  rating     Int? // 0-100, null if not rated
+  favorite   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, groupId])
+  @@unique([userId, instanceId, groupId])
   @@index([userId])
   @@index([groupId])
   @@index([favorite])
@@ -313,17 +324,18 @@ model GroupRating {
 }
 
 model ImageRating {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  imageId   String // Stash image ID
-  rating    Int? // 0-100, null if not rated
-  favorite  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID
+  imageId    String  // Stash image ID
+  rating     Int? // 0-100, null if not rated
+  favorite   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, imageId])
+  @@unique([userId, instanceId, imageId])
   @@index([userId])
   @@index([imageId])
   @@index([favorite])
@@ -331,9 +343,10 @@ model ImageRating {
 }
 
 model ImageViewHistory {
-  id      Int    @id @default(autoincrement())
-  userId  Int
-  imageId String // Stash image ID
+  id         Int     @id @default(autoincrement())
+  userId     Int
+  instanceId String? // Stash instance ID
+  imageId    String  // Stash image ID
 
   // View tracking (incremented when image is viewed in Lightbox)
   viewCount   Int      @default(0)
@@ -349,7 +362,7 @@ model ImageViewHistory {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, imageId])
+  @@unique([userId, instanceId, imageId])
   @@index([userId])
   @@index([imageId])
   @@index([lastViewedAt])
@@ -555,16 +568,36 @@ model DataMigration {
 }
 
 // Stash server instance configuration
-// Supports multiple Stash servers (multi-instance support in future commit)
+// Supports multiple Stash servers for aggregated library view
 model StashInstance {
-  id        String   @id @default(uuid()) // Immutable UUID, used in all references
-  name      String   @default("Default") // Display name only, can be renamed freely
-  url       String // GraphQL endpoint (e.g., http://stash:9999/graphql)
-  apiKey    String // API key for authentication
-  enabled   Boolean  @default(true) // Can disable without deleting
-  priority  Int      @default(0) // For ordering (lower = higher priority)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid()) // Immutable UUID, used in all references
+  name        String   @default("Default") // Display name only, can be renamed freely
+  description String? // Helps users understand what content is on this instance
+  url         String // GraphQL endpoint (e.g., http://stash:9999/graphql)
+  apiKey      String // API key for authentication
+  enabled     Boolean  @default(true) // Can disable without deleting
+  priority    Int      @default(0) // For ordering (lower = higher priority)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userSelections UserStashInstance[]
+}
+
+// Tracks which Stash instances each user wants to see content from
+// Users select instances during first-login setup (#321) or in User Preferences
+model UserStashInstance {
+  id         Int           @id @default(autoincrement())
+  userId     Int
+  instanceId String
+  createdAt  DateTime      @default(now())
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instance StashInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, instanceId])
+  @@index([userId])
+  @@index([instanceId])
 }
 
 // User-defined custom carousels for homepage
@@ -680,6 +713,9 @@ model StashPerformer {
   id              String  @id
   stashInstanceId String?
 
+  // === Deduplication (StashDB IDs) ===
+  stashIds String? // JSON array of {endpoint, stash_id} pairs
+
   // === Core fields ===
   name           String
   disambiguation String?
@@ -738,6 +774,9 @@ model StashStudio {
   id              String  @id
   stashInstanceId String?
 
+  // === Deduplication (StashDB IDs) ===
+  stashIds String? // JSON array of {endpoint, stash_id} pairs
+
   // === Core fields ===
   name      String
   parentId  String?
@@ -780,6 +819,9 @@ model StashStudio {
 model StashTag {
   id              String  @id
   stashInstanceId String?
+
+  // === Deduplication (StashDB IDs) ===
+  stashIds String? // JSON array of {endpoint, stash_id} pairs
 
   // === Core fields ===
   name     String

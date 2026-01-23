@@ -2,7 +2,7 @@
 
 **Status**: Design Complete (v3.5)
 **Created**: 2025-11-25
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-01-22
 
 ## Overview
 
@@ -83,61 +83,94 @@ Current user data (ratings, watch history, favorites) uses Stash entity IDs:
 
 ## Implementation Phases
 
-### Phase 1: Backend Multi-Instance Support
+### Phase 1: Database & Schema Foundation
+
+All database changes upfront so subsequent phases have the schema they need.
+
+1. **Create migration: multi-instance-schema**
+   - Add `description` field to `StashInstance`
+   - Create `UserStashInstance` join table (user ↔ instance selection)
+   - Add `instanceId` to `WatchHistory` (with default for existing data)
+   - Add `instanceId` to all rating tables (SceneRating, PerformerRating, etc.)
+   - Add `instanceId` to `PlaylistItem` for cross-instance playlists
+   - Update unique constraints to include `instanceId`
+2. **Add `instanceId` to normalized types** (NormalizedScene, NormalizedPerformer, etc.)
+3. **Update TypeScript interfaces** for API responses
+
+### Phase 2: Backend Multi-Instance Support
 
 1. **Remove single-instance enforcement** in StashInstanceManager
-2. **Add `instanceId` to normalized types** (NormalizedScene, NormalizedPerformer, etc.)
-3. **Update StashCacheManager** to fetch from all instances and merge
-4. **Update cache key strategy** to use `instanceId:entityId` composite
-5. **Add instance CRUD endpoints**:
-   - `GET /api/setup/stash-instances` - List all
-   - `POST /api/setup/stash-instance` - Create (admin only)
-   - `PUT /api/setup/stash-instance/:id` - Update
-   - `DELETE /api/setup/stash-instance/:id` - Delete
+2. **Update StashCacheManager** to fetch from all enabled instances and merge
+3. **Update cache key strategy** to use `instanceId:entityId` composite
+4. **Add instance CRUD endpoints**:
+   - `GET /api/setup/stash-instances` - List all (admin)
+   - `POST /api/setup/stash-instance` - Create (admin)
+   - `PUT /api/setup/stash-instance/:id` - Update (admin)
+   - `DELETE /api/setup/stash-instance/:id` - Delete (admin)
+5. **Add user instance selection endpoints** (for #321):
+   - `GET /api/user/stash-instances` - Get user's selected instances
+   - `PUT /api/user/stash-instances` - Update user's instance selection
 6. **Trigger cache rebuild** after any instance change
 
-### Phase 2: Entity Identification Refactor
+### Phase 3: Entity Routing & Controllers
 
-1. **Update all controllers** to handle composite entity references
-2. **Update proxy controller** to route to correct instance
+1. **Update all controllers** to handle composite entity references (`instanceId` + `entityId`)
+2. **Update proxy controller** to route image requests to correct instance
 3. **Update video controller** to stream from correct instance
-4. **Update user data tables** to include instanceId in composite keys
-5. **Create migration** for existing user data
+4. **Update library controller** to filter by user's selected instances
+5. **Update user data controllers** to include `instanceId` in all operations
 
-### Phase 3: Deduplication System
+### Phase 4: Deduplication System
 
-1. **Research StashDB ID availability** in Stash GraphQL schema
+1. **Fetch `stash_ids` arrays** from Stash for performers/studios/tags
 2. **Implement deduplication logic**:
-   - Fetch StashDB IDs for all entities
-   - Group entities by StashDB ID
-   - Designate primary instance for conflicts
-3. **Update UI** to show deduplicated entities
-4. **Handle entities without StashDB IDs** (keep separate)
+   - Match entities by `(endpoint, stash_id)` pairs
+   - Designate primary instance for conflicts (lowest priority number)
+3. **Surface conflicts to admin** in UI
+4. **Handle entities without stash_ids** (keep separate, no auto-dedupe)
 
-### Phase 4: UI Updates
+### Phase 5: UI Updates
 
-1. **Update StashInstanceSection** for full CRUD:
+1. **Update Server Settings > Stash Instances** for full CRUD:
    - List all instances with status indicators
    - Add Instance button with connection test
-   - Edit instance (name, URL, API key)
+   - Edit instance (name, description, URL, API key)
    - Delete instance with confirmation
    - Enable/disable toggle per instance
-2. **Update filters** to work across instances
-3. **Show instance badge** on entities (optional, for debugging)
+   - Reorder by priority (drag-drop or arrows)
+2. **Admin: View metadata conflicts** (deduplicated entities with mismatched data)
+3. **Show instance badge** on entities (optional, admin toggle for debugging)
 
 ## Database Schema Changes
 
 ```prisma
-// Already exists
+// Already exists - ADD description field
 model StashInstance {
-  id        String   @id @default(uuid())
-  name      String
-  url       String
-  apiKey    String
-  enabled   Boolean  @default(true)
-  priority  Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  description String?  // NEW - helps users understand what content is on this instance
+  url         String
+  apiKey      String
+  enabled     Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userSelections UserStashInstance[]
+}
+
+// NEW - tracks which instances each user wants to see content from
+// Users select instances during first-login setup (#321) or in User Preferences
+model UserStashInstance {
+  id         Int           @id @default(autoincrement())
+  userId     Int
+  instanceId String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instance   StashInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  createdAt  DateTime      @default(now())
+
+  @@unique([userId, instanceId])
 }
 
 // Needs update - add instanceId to composite unique
@@ -163,6 +196,14 @@ model SceneRating {
 
 // Similar changes for PerformerRating, StudioRating, etc.
 ```
+
+### User Instance Selection Behavior
+
+- **No rebuild needed** when user changes instance selection
+- Server cache stores ALL instances' content (fetched during startup/sync)
+- User filtering happens at query time based on `UserStashInstance` records
+- If user has no `UserStashInstance` records, they see content from ALL enabled instances (default behavior)
+- Admins manage which instances exist; users choose which ones they want to see
 
 ## Normalized Type Changes
 
@@ -306,14 +347,23 @@ Recommend users use Stash's built-in library merging features instead.
 - [StashDB Integration Docs](https://docs.stashapp.cc/)
 - Commit 1: `291b428` - Single instance database storage
 
-## Integration with v3.3
+## Integration with #321 (User Instance Selection)
 
-The first-login setup wizard (#321) introduced in v3.3 will be extended in v3.5:
+This feature provides the backend; #321 provides the UI for user instance selection.
 
-**v3.3 setup steps**:
-1. Choose recovery method
+**What this feature provides:**
+- `UserStashInstance` table storing user ↔ instance associations
+- `GET /api/user/stash-instances` - Get current user's selected instances
+- `PUT /api/user/stash-instances` - Update user's instance selection
+- Query-time filtering based on user's selections
 
-**v3.5 adds**:
-2. Select which Stash instances to use (if multi-instance enabled)
+**What #321 will implement:**
+- First-login setup wizard step: "Select which Stash instances to see content from"
+- User Preferences page: Instance selection management
+- UI calls the endpoints above
 
-Users can change their instance selection later in User Preferences.
+**Behavior:**
+- New users with no `UserStashInstance` records see ALL enabled instances (sensible default)
+- Users can opt out of specific instances via setup wizard or preferences
+- Changing selection takes effect immediately (no rebuild, just query-time filtering)
+- If an instance is disabled by admin, it's hidden from all users regardless of selection

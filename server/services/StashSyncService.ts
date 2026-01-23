@@ -1464,9 +1464,19 @@ class StashSyncService extends EventEmitter {
 
     const values = validPerformers
       .map((performer) => {
+        // Serialize stash_ids array to JSON for deduplication
+        const stashIds = (performer as any).stash_ids;
+        const stashIdsJson = stashIds && stashIds.length > 0
+          ? JSON.stringify(stashIds.map((s: { endpoint: string; stash_id: string }) => ({
+              endpoint: s.endpoint,
+              stash_id: s.stash_id,
+            })))
+          : null;
+
         return `(
       '${this.escape(performer.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
+      ${this.escapeNullable(stashIdsJson)},
       ${this.escapeNullable(performer.name)},
       ${this.escapeNullable(performer.disambiguation)},
       ${this.escapeNullable(performer.gender)},
@@ -1503,7 +1513,7 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashPerformer (
-      id, stashInstanceId, name, disambiguation, gender, birthdate, favorite,
+      id, stashInstanceId, stashIds, name, disambiguation, gender, birthdate, favorite,
       rating100, details, aliasList,
       country, ethnicity, hairColor, eyeColor, heightCm, weightKg, measurements, fakeTits,
       tattoos, piercings, careerLength, deathDate, url, imagePath,
@@ -1511,6 +1521,7 @@ class StashSyncService extends EventEmitter {
       stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
+      stashIds = excluded.stashIds,
       name = excluded.name,
       disambiguation = excluded.disambiguation,
       gender = excluded.gender,
@@ -1673,9 +1684,19 @@ class StashSyncService extends EventEmitter {
 
     const values = validStudios
       .map((studio) => {
+        // Serialize stash_ids array to JSON for deduplication
+        const stashIds = (studio as any).stash_ids;
+        const stashIdsJson = stashIds && stashIds.length > 0
+          ? JSON.stringify(stashIds.map((s: { endpoint: string; stash_id: string }) => ({
+              endpoint: s.endpoint,
+              stash_id: s.stash_id,
+            })))
+          : null;
+
         return `(
       '${this.escape(studio.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
+      ${this.escapeNullable(stashIdsJson)},
       ${this.escapeNullable(studio.name)},
       ${studio.parent_studio?.id ? `'${this.escape(studio.parent_studio.id)}'` : "NULL"},
       ${studio.favorite ? 1 : 0},
@@ -1698,12 +1719,13 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashStudio (
-      id, stashInstanceId, name, parentId, favorite, rating100,
+      id, stashInstanceId, stashIds, name, parentId, favorite, rating100,
       sceneCount, imageCount, galleryCount, performerCount, groupCount,
       details, url, imagePath, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
+      stashIds = excluded.stashIds,
       name = excluded.name,
       parentId = excluded.parentId,
       favorite = excluded.favorite,
@@ -1851,9 +1873,19 @@ class StashSyncService extends EventEmitter {
       .map((tag) => {
         const parentIds = tag.parents?.map((p) => p.id) || [];
         const aliases = (tag as any).aliases || [];
+        // Serialize stash_ids array to JSON for deduplication
+        const stashIds = (tag as any).stash_ids;
+        const stashIdsJson = stashIds && stashIds.length > 0
+          ? JSON.stringify(stashIds.map((s: { endpoint: string; stash_id: string }) => ({
+              endpoint: s.endpoint,
+              stash_id: s.stash_id,
+            })))
+          : null;
+
         return `(
       '${this.escape(tag.id)}',
       ${stashInstanceId ? `'${this.escape(stashInstanceId)}'` : "NULL"},
+      ${this.escapeNullable(stashIdsJson)},
       ${this.escapeNullable(tag.name)},
       ${tag.favorite ? 1 : 0},
       ${tag.scene_count ?? 0},
@@ -1878,11 +1910,12 @@ class StashSyncService extends EventEmitter {
 
     await prisma.$executeRawUnsafe(`
     INSERT INTO StashTag (
-      id, stashInstanceId, name, favorite,
+      id, stashInstanceId, stashIds, name, favorite,
       sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
       description, aliases, parentIds, imagePath, color, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
     ON CONFLICT(id) DO UPDATE SET
+      stashIds = excluded.stashIds,
       name = excluded.name,
       favorite = excluded.favorite,
       sceneCount = excluded.sceneCount,
@@ -3092,6 +3125,59 @@ class StashSyncService extends EventEmitter {
       logger.info(`Tag scene counts via performers computed in ${duration}ms`);
     } catch (error) {
       logger.error("Failed to compute tag scene counts via performers", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Clear all cached entities for a specific Stash instance.
+   * Used when an instance is deleted to clean up its cached data.
+   *
+   * Hard-deletes all entities with the given stashInstanceId.
+   */
+  async clearInstanceData(instanceId: string): Promise<void> {
+    logger.info(`Clearing all cached data for instance ${instanceId}...`);
+    const startTime = Date.now();
+
+    try {
+      // Delete in order to respect foreign key constraints
+      // Junction tables first, then entities
+      const results = await prisma.$transaction([
+        // Junction tables (depend on entity primary keys)
+        prisma.$executeRaw`DELETE FROM SceneTag WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ScenePerformer WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM SceneGroup WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM GalleryTag WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM GalleryPerformer WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ImageTag WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ImagePerformer WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ImageGallery WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM PerformerTag WHERE performerId IN (SELECT id FROM StashPerformer WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM GroupTag WHERE groupId IN (SELECT id FROM StashGroup WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM StudioTag WHERE studioId IN (SELECT id FROM StashStudio WHERE stashInstanceId = ${instanceId})`,
+
+        // Entity tables
+        prisma.$executeRaw`DELETE FROM StashClip WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashImage WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashGallery WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashScene WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashGroup WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashPerformer WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashStudio WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashTag WHERE stashInstanceId = ${instanceId}`,
+
+        // Sync state for this instance
+        prisma.syncState.deleteMany({ where: { stashInstanceId: instanceId } }),
+      ]);
+
+      const duration = Date.now() - startTime;
+      logger.info(`Cleared cached data for instance ${instanceId} in ${duration}ms`, {
+        operations: results.length,
+      });
+    } catch (error) {
+      logger.error(`Failed to clear cached data for instance ${instanceId}`, {
         error: error instanceof Error ? error.message : "Unknown error",
       });
       throw error;

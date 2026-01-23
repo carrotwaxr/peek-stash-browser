@@ -65,11 +65,35 @@ function getAgentForUrl(urlObj: URL): http.Agent | https.Agent {
 }
 
 /**
+ * Get credentials for a specific Stash instance
+ * @param instanceId - Optional instance ID. If not provided, uses default instance.
+ * @returns Object with baseUrl and apiKey
+ */
+function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey: string } {
+  if (instanceId) {
+    const instance = stashInstanceManager.get(instanceId);
+    if (!instance) {
+      throw new Error(`Stash instance not found: ${instanceId}`);
+    }
+    return {
+      baseUrl: stashInstanceManager.getBaseUrl(instanceId),
+      apiKey: stashInstanceManager.getApiKey(instanceId),
+    };
+  }
+  // Default instance
+  return {
+    baseUrl: stashInstanceManager.getBaseUrl(),
+    apiKey: stashInstanceManager.getApiKey(),
+  };
+}
+
+/**
  * Proxy scene video preview (MP4)
- * GET /api/proxy/scene/:id/preview
+ * GET /api/proxy/scene/:id/preview?instanceId=xxx
  */
 export const proxyScenePreview = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const instanceId = req.query.instanceId as string | undefined;
 
   if (!id) {
     return res.status(400).json({ error: "Missing scene ID" });
@@ -79,10 +103,11 @@ export const proxyScenePreview = async (req: Request, res: Response) => {
   let apiKey: string;
 
   try {
-    stashUrl = stashInstanceManager.getBaseUrl();
-    apiKey = stashInstanceManager.getApiKey();
-  } catch {
-    logger.error("No Stash instance configured");
+    const creds = getInstanceCredentials(instanceId);
+    stashUrl = creds.baseUrl;
+    apiKey = creds.apiKey;
+  } catch (error) {
+    logger.error("Failed to get Stash instance credentials", { error, instanceId });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -161,10 +186,11 @@ export const proxyScenePreview = async (req: Request, res: Response) => {
 
 /**
  * Proxy scene WebP animated preview
- * GET /api/proxy/scene/:id/webp
+ * GET /api/proxy/scene/:id/webp?instanceId=xxx
  */
 export const proxySceneWebp = async (req: Request, res: Response) => {
   const { id } = req.params;
+  const instanceId = req.query.instanceId as string | undefined;
 
   if (!id) {
     return res.status(400).json({ error: "Missing scene ID" });
@@ -174,10 +200,11 @@ export const proxySceneWebp = async (req: Request, res: Response) => {
   let apiKey: string;
 
   try {
-    stashUrl = stashInstanceManager.getBaseUrl();
-    apiKey = stashInstanceManager.getApiKey();
-  } catch {
-    logger.error("No Stash instance configured");
+    const creds = getInstanceCredentials(instanceId);
+    stashUrl = creds.baseUrl;
+    apiKey = creds.apiKey;
+  } catch (error) {
+    logger.error("Failed to get Stash instance credentials", { error, instanceId });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -257,9 +284,10 @@ export const proxySceneWebp = async (req: Request, res: Response) => {
 /**
  * Proxy Stash media requests to avoid exposing API keys to clients
  * Handles images, sprites, and other static media
+ * GET /api/proxy/stash?path=/xxx&instanceId=yyy
  */
 export const proxyStashMedia = async (req: Request, res: Response) => {
-  const { path } = req.query;
+  const { path, instanceId } = req.query;
 
   if (!path || typeof path !== "string") {
     return res
@@ -271,10 +299,11 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
   let apiKey: string;
 
   try {
-    stashUrl = stashInstanceManager.getBaseUrl();
-    apiKey = stashInstanceManager.getApiKey();
-  } catch {
-    logger.error("No Stash instance configured");
+    const creds = getInstanceCredentials(instanceId as string | undefined);
+    stashUrl = creds.baseUrl;
+    apiKey = creds.apiKey;
+  } catch (error) {
+    logger.error("Failed to get Stash instance credentials", { error, instanceId });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -354,6 +383,7 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
  *
  * Returns the marker stream video for hover previews.
  * Falls back to screenshot if stream is unavailable.
+ * Uses the clip's stashInstanceId to route to correct Stash server.
  */
 export const proxyClipPreview = async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -362,10 +392,10 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Missing clip ID" });
   }
 
-  // Get clip from database - prefer streamPath for video, fallback to screenshotPath
+  // Get clip from database - include stashInstanceId for routing
   const clip = await prisma.stashClip.findFirst({
     where: { id },
-    select: { streamPath: true, screenshotPath: true },
+    select: { streamPath: true, screenshotPath: true, stashInstanceId: true },
   });
 
   // Use streamPath (video) if available, otherwise screenshotPath (image)
@@ -378,9 +408,10 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
   let apiKey: string;
 
   try {
-    apiKey = stashInstanceManager.getApiKey();
-  } catch {
-    logger.error("No Stash instance configured");
+    const creds = getInstanceCredentials(clip.stashInstanceId ?? undefined);
+    apiKey = creds.apiKey;
+  } catch (error) {
+    logger.error("Failed to get Stash instance credentials", { error, instanceId: clip.stashInstanceId });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -457,6 +488,7 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
  * Proxy image requests by image ID and type
  * GET /api/proxy/image/:imageId/:type
  * :type = "thumbnail" | "preview" | "image"
+ * Uses the image's stashInstanceId to route to correct Stash server.
  */
 export const proxyImage = async (req: Request, res: Response) => {
   const { imageId, type } = req.params;
@@ -470,9 +502,15 @@ export const proxyImage = async (req: Request, res: Response) => {
     return res.status(400).json({ error: "Invalid image type. Must be: thumbnail, preview, or image" });
   }
 
-  // Get image from database
+  // Get image from database - include stashInstanceId for routing
   const image = await prisma.stashImage.findFirst({
     where: { id: imageId, deletedAt: null },
+    select: {
+      pathThumbnail: true,
+      pathPreview: true,
+      pathImage: true,
+      stashInstanceId: true,
+    },
   });
 
   if (!image) {
@@ -495,10 +533,11 @@ export const proxyImage = async (req: Request, res: Response) => {
   let apiKey: string;
 
   try {
-    stashUrl = stashInstanceManager.getBaseUrl();
-    apiKey = stashInstanceManager.getApiKey();
-  } catch {
-    logger.error("No Stash instance configured");
+    const creds = getInstanceCredentials(image.stashInstanceId ?? undefined);
+    stashUrl = creds.baseUrl;
+    apiKey = creds.apiKey;
+  } catch (error) {
+    logger.error("Failed to get Stash instance credentials", { error, instanceId: image.stashInstanceId });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 

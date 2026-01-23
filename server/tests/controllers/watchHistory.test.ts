@@ -161,9 +161,10 @@ describe("Watch History Controller", () => {
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId_sceneId: { userId: 1, sceneId: "123" } },
+          where: { userId_instanceId_sceneId: { userId: 1, instanceId: "default", sceneId: "123" } },
           create: expect.objectContaining({
             userId: 1,
+            instanceId: "default",
             sceneId: "123",
             playDuration: 10,
             resumeTime: 60,

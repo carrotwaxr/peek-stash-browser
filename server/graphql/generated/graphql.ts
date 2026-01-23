@@ -5426,7 +5426,7 @@ export type FindPerformersQueryVariables = Exact<{
 }>;
 
 
-export type FindPerformersQuery = { findPerformers: { count: number, performers: Array<{ alias_list: Array<string>, birthdate?: string | null, career_length?: string | null, circumcised?: CircumisedEnum | null, country?: string | null, created_at: string, death_date?: string | null, details?: string | null, disambiguation?: string | null, ethnicity?: string | null, eye_color?: string | null, fake_tits?: string | null, favorite: boolean, gallery_count: number, gender?: GenderEnum | null, group_count: number, hair_color?: string | null, height_cm?: number | null, id: string, image_count: number, image_path?: string | null, instagram?: string | null, measurements?: string | null, movie_count: number, name: string, o_counter?: number | null, penis_length?: number | null, piercings?: string | null, rating100?: number | null, scene_count: number, tattoos?: string | null, twitter?: string | null, updated_at: string, url?: string | null, urls?: Array<string> | null, weight?: number | null, tags: Array<{ id: string, name: string, description?: string | null, image_path?: string | null, favorite: boolean }> }> } };
+export type FindPerformersQuery = { findPerformers: { count: number, performers: Array<{ alias_list: Array<string>, birthdate?: string | null, career_length?: string | null, circumcised?: CircumisedEnum | null, country?: string | null, created_at: string, death_date?: string | null, details?: string | null, disambiguation?: string | null, ethnicity?: string | null, eye_color?: string | null, fake_tits?: string | null, favorite: boolean, gallery_count: number, gender?: GenderEnum | null, group_count: number, hair_color?: string | null, height_cm?: number | null, id: string, image_count: number, image_path?: string | null, instagram?: string | null, measurements?: string | null, movie_count: number, name: string, o_counter?: number | null, penis_length?: number | null, piercings?: string | null, rating100?: number | null, scene_count: number, tattoos?: string | null, twitter?: string | null, updated_at: string, url?: string | null, urls?: Array<string> | null, weight?: number | null, tags: Array<{ id: string, name: string, description?: string | null, image_path?: string | null, favorite: boolean }>, stash_ids: Array<{ endpoint: string, stash_id: string }> }> } };
 
 export type FindSceneIDsQueryVariables = Exact<{
   filter?: InputMaybe<FindFilterType>;
@@ -5479,7 +5479,7 @@ export type FindStudiosQueryVariables = Exact<{
 }>;
 
 
-export type FindStudiosQuery = { findStudios: { count: number, studios: Array<{ aliases: Array<string>, created_at: string, details?: string | null, favorite: boolean, gallery_count: number, group_count: number, id: string, image_count: number, image_path?: string | null, movie_count: number, name: string, performer_count: number, rating100?: number | null, scene_count: number, updated_at: string, url?: string | null, child_studios: Array<{ id: string, name: string }>, groups: Array<{ id: string, name: string }>, movies: Array<{ id: string, name: string }>, parent_studio?: { id: string, name: string, image_path?: string | null } | null, tags: Array<{ description?: string | null, id: string, name: string, image_path?: string | null, favorite: boolean }> }> } };
+export type FindStudiosQuery = { findStudios: { count: number, studios: Array<{ aliases: Array<string>, created_at: string, details?: string | null, favorite: boolean, gallery_count: number, group_count: number, id: string, image_count: number, image_path?: string | null, movie_count: number, name: string, performer_count: number, rating100?: number | null, scene_count: number, updated_at: string, url?: string | null, child_studios: Array<{ id: string, name: string }>, groups: Array<{ id: string, name: string }>, movies: Array<{ id: string, name: string }>, parent_studio?: { id: string, name: string, image_path?: string | null } | null, tags: Array<{ description?: string | null, id: string, name: string, image_path?: string | null, favorite: boolean }>, stash_ids: Array<{ endpoint: string, stash_id: string }> }> } };
 
 export type FindTagIDsQueryVariables = Exact<{
   filter?: InputMaybe<FindFilterType>;
@@ -5496,7 +5496,7 @@ export type FindTagsQueryVariables = Exact<{
 }>;
 
 
-export type FindTagsQuery = { findTags: { count: number, tags: Array<{ aliases: Array<string>, child_count: number, created_at: string, description?: string | null, favorite: boolean, gallery_count: number, group_count: number, id: string, image_count: number, image_path?: string | null, movie_count: number, name: string, parent_count: number, performer_count: number, scene_count: number, scene_marker_count: number, studio_count: number, updated_at: string, children: Array<{ id: string, name: string }>, parents: Array<{ id: string, name: string }> }> } };
+export type FindTagsQuery = { findTags: { count: number, tags: Array<{ aliases: Array<string>, child_count: number, created_at: string, description?: string | null, favorite: boolean, gallery_count: number, group_count: number, id: string, image_count: number, image_path?: string | null, movie_count: number, name: string, parent_count: number, performer_count: number, scene_count: number, scene_marker_count: number, studio_count: number, updated_at: string, children: Array<{ id: string, name: string }>, parents: Array<{ id: string, name: string }>, stash_ids: Array<{ endpoint: string, stash_id: string }> }> } };
 
 export type GalleryUpdateMutationVariables = Exact<{
   input: GalleryUpdateInput;
@@ -6076,6 +6076,10 @@ export const FindPerformersDocument = gql`
         image_path
         favorite
       }
+      stash_ids {
+        endpoint
+        stash_id
+      }
     }
   }
 }
@@ -6420,6 +6424,10 @@ export const FindStudiosDocument = gql`
       }
       updated_at
       url
+      stash_ids {
+        endpoint
+        stash_id
+      }
     }
   }
 }
@@ -6465,6 +6473,10 @@ export const FindTagsDocument = gql`
       scene_marker_count
       studio_count
       updated_at
+      stash_ids {
+        endpoint
+        stash_id
+      }
     }
   }
 }

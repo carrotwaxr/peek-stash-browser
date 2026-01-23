@@ -15,6 +15,7 @@ import type {
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
+import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 
 /**
  * IMPORTANT: Rating and Favorite Sync Policy
@@ -75,16 +76,19 @@ export async function updateSceneRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user sync settings and scene instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('scene', sceneId),
+    ]);
 
     // Upsert rating record in Peek DB
     const sceneRating = await prisma.sceneRating.upsert({
       where: {
-        userId_sceneId: { userId, sceneId },
+        userId_instanceId_sceneId: { userId, instanceId, sceneId },
       },
       update: {
         ...(rating !== undefined && { rating }),
@@ -92,6 +96,7 @@ export async function updateSceneRating(
       },
       create: {
         userId,
+        instanceId,
         sceneId,
         rating: rating ?? null,
         favorite: favorite ?? false,
@@ -169,16 +174,19 @@ export async function updatePerformerRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user sync settings and performer instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('performer', performerId),
+    ]);
 
     // Upsert rating record in Peek DB
     const performerRating = await prisma.performerRating.upsert({
       where: {
-        userId_performerId: { userId, performerId },
+        userId_instanceId_performerId: { userId, instanceId, performerId },
       },
       update: {
         ...(rating !== undefined && { rating }),
@@ -186,6 +194,7 @@ export async function updatePerformerRating(
       },
       create: {
         userId,
+        instanceId,
         performerId,
         rating: rating ?? null,
         favorite: favorite ?? false,
@@ -269,16 +278,19 @@ export async function updateStudioRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user sync settings and studio instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('studio', studioId),
+    ]);
 
     // Upsert rating record in Peek DB
     const studioRating = await prisma.studioRating.upsert({
       where: {
-        userId_studioId: { userId, studioId },
+        userId_instanceId_studioId: { userId, instanceId, studioId },
       },
       update: {
         ...(rating !== undefined && { rating }),
@@ -286,6 +298,7 @@ export async function updateStudioRating(
       },
       create: {
         userId,
+        instanceId,
         studioId,
         rating: rating ?? null,
         favorite: favorite ?? false,
@@ -369,16 +382,19 @@ export async function updateTagRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user sync settings and tag instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('tag', tagId),
+    ]);
 
     // Upsert rating record in Peek DB
     const tagRating = await prisma.tagRating.upsert({
       where: {
-        userId_tagId: { userId, tagId },
+        userId_instanceId_tagId: { userId, instanceId, tagId },
       },
       update: {
         ...(rating !== undefined && { rating }),
@@ -386,6 +402,7 @@ export async function updateTagRating(
       },
       create: {
         userId,
+        instanceId,
         tagId,
         rating: rating ?? null,
         favorite: favorite ?? false,
@@ -462,16 +479,19 @@ export async function updateGalleryRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user sync settings and gallery instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('gallery', galleryId),
+    ]);
 
     // Upsert rating record in Peek DB
     const galleryRating = await prisma.galleryRating.upsert({
       where: {
-        userId_galleryId: { userId, galleryId },
+        userId_instanceId_galleryId: { userId, instanceId, galleryId },
       },
       update: {
         ...(rating !== undefined && { rating }),
@@ -479,6 +499,7 @@ export async function updateGalleryRating(
       },
       create: {
         userId,
+        instanceId,
         galleryId,
         rating: rating ?? null,
         favorite: favorite ?? false,
@@ -560,16 +581,19 @@ export async function updateGroupRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user sync settings and group instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('group', groupId),
+    ]);
 
     // Upsert rating record in Peek DB
     const groupRating = await prisma.groupRating.upsert({
       where: {
-        userId_groupId: { userId, groupId },
+        userId_instanceId_groupId: { userId, instanceId, groupId },
       },
       update: {
         ...(rating !== undefined && { rating }),
@@ -577,6 +601,7 @@ export async function updateGroupRating(
       },
       create: {
         userId,
+        instanceId,
         groupId,
         rating: rating ?? null,
         favorite: favorite ?? false,
@@ -653,16 +678,19 @@ export async function updateImageRating(
       return res.status(400).json({ error: "Favorite must be a boolean" });
     }
 
-    // Get user sync settings
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user sync settings and image instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('image', imageId),
+    ]);
 
     // Upsert rating record in Peek DB
     const imageRating = await prisma.imageRating.upsert({
       where: {
-        userId_imageId: { userId, imageId },
+        userId_instanceId_imageId: { userId, instanceId, imageId },
       },
       update: {
         ...(rating !== undefined && { rating }),
@@ -670,6 +698,7 @@ export async function updateImageRating(
       },
       create: {
         userId,
+        instanceId,
         imageId,
         rating: rating ?? null,
         favorite: favorite ?? false,

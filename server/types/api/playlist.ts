@@ -17,6 +17,7 @@ import type { NormalizedScene } from "../index.js";
 export interface PlaylistItemWithScene {
   id: number;
   playlistId: number;
+  instanceId: string | null;
   sceneId: string;
   position: number;
   addedAt: Date;
@@ -27,6 +28,7 @@ export interface PlaylistItemWithScene {
  * Simplified playlist item for preview thumbnails (only needs scene screenshot)
  */
 export interface PlaylistPreviewItem {
+  instanceId: string | null;
   sceneId: string;
   scene?: Partial<Scene> | null;
 }
@@ -154,6 +156,7 @@ export interface AddSceneToPlaylistParams extends Record<string, string> {
 }
 
 export interface AddSceneToPlaylistRequest {
+  instanceId?: string;
   sceneId: string;
 }
 
@@ -161,6 +164,7 @@ export interface AddSceneToPlaylistResponse {
   item: {
     id: number;
     playlistId: number;
+    instanceId: string | null;
     sceneId: string;
     position: number;
     addedAt: Date;
@@ -199,6 +203,7 @@ export interface ReorderPlaylistParams extends Record<string, string> {
 
 export interface ReorderPlaylistRequest {
   items: Array<{
+    instanceId?: string;
     sceneId: string;
     position: number;
   }>;

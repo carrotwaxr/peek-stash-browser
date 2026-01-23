@@ -15,6 +15,7 @@ import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
@@ -92,10 +93,14 @@ export const findStudios = async (
     // Use SQL query builder - admins skip exclusions
     const applyExclusions = requestingUser?.role !== "ADMIN";
 
+    // Get user's allowed instance IDs for multi-instance filtering
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
     const { studios, total } = await studioQueryBuilder.execute({
       userId,
       filters: mergedFilter,
       applyExclusions,
+      allowedInstanceIds,
       sort: sortField,
       sortDirection,
       page,

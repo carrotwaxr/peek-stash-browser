@@ -131,3 +131,115 @@ export interface ResetSetupResponse {
     stashInstances: number;
   };
 }
+
+// =============================================================================
+// MULTI-INSTANCE MANAGEMENT (Admin only)
+// =============================================================================
+
+/**
+ * Stash instance data returned in responses
+ */
+export interface StashInstanceData {
+  id: string;
+  name: string;
+  description: string | null;
+  url: string;
+  enabled: boolean;
+  priority: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * GET /api/setup/stash-instances
+ * Get all Stash instances (admin only)
+ */
+export interface GetAllStashInstancesResponse {
+  instances: StashInstanceData[];
+}
+
+/**
+ * POST /api/setup/stash-instance
+ * Create a new Stash instance (admin only)
+ */
+export interface CreateStashInstanceRequest {
+  name: string;
+  description?: string;
+  url: string;
+  apiKey: string;
+  enabled?: boolean;
+  priority?: number;
+}
+
+export interface CreateStashInstanceResponse {
+  success: true;
+  instance: StashInstanceData;
+}
+
+/**
+ * PUT /api/setup/stash-instance/:id
+ * Update an existing Stash instance (admin only)
+ */
+export interface UpdateStashInstanceParams extends Record<string, string> {
+  id: string;
+}
+
+export interface UpdateStashInstanceRequest {
+  name?: string;
+  description?: string;
+  url?: string;
+  apiKey?: string;
+  enabled?: boolean;
+  priority?: number;
+}
+
+export interface UpdateStashInstanceResponse {
+  success: true;
+  instance: StashInstanceData;
+}
+
+/**
+ * DELETE /api/setup/stash-instance/:id
+ * Delete a Stash instance (admin only)
+ */
+export interface DeleteStashInstanceParams extends Record<string, string> {
+  id: string;
+}
+
+export interface DeleteStashInstanceResponse {
+  success: true;
+  message: string;
+}
+
+// =============================================================================
+// USER INSTANCE SELECTION
+// =============================================================================
+
+/**
+ * GET /api/user/stash-instances
+ * Get user's selected Stash instances
+ */
+export interface GetUserStashInstancesResponse {
+  /** Selected instance IDs (empty array means all enabled instances) */
+  selectedInstanceIds: string[];
+  /** All available enabled instances for selection UI */
+  availableInstances: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+  }>;
+}
+
+/**
+ * PUT /api/user/stash-instances
+ * Update user's instance selection
+ */
+export interface UpdateUserStashInstancesRequest {
+  /** Instance IDs to enable. Empty array means "show all enabled instances" */
+  instanceIds: string[];
+}
+
+export interface UpdateUserStashInstancesResponse {
+  success: true;
+  selectedInstanceIds: string[];
+}

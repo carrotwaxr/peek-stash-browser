@@ -28,6 +28,7 @@ import type {
  * This is the primary type used throughout the application for scenes.
  *
  * Additional fields:
+ * - instanceId: UUID of the Stash instance this scene belongs to
  * - rating: User's 1-5 star rating (null if unrated)
  * - rating100: User's 0-100 rating (null if unrated)
  * - favorite: Whether user favorited this scene
@@ -41,6 +42,9 @@ import type {
  * - last_o_at: ISO timestamp of last orgasm (null if never)
  */
 export type NormalizedScene = Scene & {
+  // Instance identification (for multi-instance support)
+  instanceId: string;
+
   // Rating fields
   rating: number | null;
   rating100: number | null;
@@ -73,6 +77,7 @@ export type NormalizedScene = Scene & {
  * Extends the base Performer type from Stash with Peek-specific user data.
  *
  * Additional fields:
+ * - instanceId: UUID of the Stash instance this performer belongs to
  * - rating: User's 1-5 star rating (null if unrated)
  * - favorite: Whether user favorited this performer
  * - o_counter: Aggregated orgasm count from scenes with this performer
@@ -81,6 +86,7 @@ export type NormalizedScene = Scene & {
  * - last_o_at: Most recent orgasm from any scene with this performer
  */
 export type NormalizedPerformer = Performer & {
+  instanceId: string;
   rating: number | null;
   favorite: boolean;
   o_counter: number;
@@ -95,12 +101,14 @@ export type NormalizedPerformer = Performer & {
  * Extends the base Studio type from Stash with Peek-specific user data.
  *
  * Additional fields:
+ * - instanceId: UUID of the Stash instance this studio belongs to
  * - rating: User's 1-5 star rating (null if unrated)
  * - favorite: Whether user favorited this studio
  * - o_counter: Aggregated orgasm count from scenes by this studio
  * - play_count: Aggregated play count from scenes by this studio
  */
 export type NormalizedStudio = Studio & {
+  instanceId: string;
   rating: number | null;
   favorite: boolean;
   o_counter: number;
@@ -113,6 +121,7 @@ export type NormalizedStudio = Studio & {
  * Extends the base Tag type from Stash with Peek-specific user data.
  *
  * Additional fields:
+ * - instanceId: UUID of the Stash instance this tag belongs to
  * - rating: User's 1-5 star rating (null if unrated)
  * - rating100: User's 0-100 rating (null if unrated) - alias for rating
  * - favorite: Whether user favorited this tag
@@ -122,6 +131,7 @@ export type NormalizedStudio = Studio & {
  * - scene_count_via_performers: Pre-computed count of scenes where a performer has this tag
  */
 export type NormalizedTag = Tag & {
+  instanceId: string;
   rating: number | null;
   rating100: number | null;
   favorite: boolean;
@@ -138,6 +148,7 @@ export type NormalizedTag = Tag & {
  * Overrides cover to be a simple string URL (Peek proxies the cover image).
  *
  * Additional/modified fields:
+ * - instanceId: UUID of the Stash instance this gallery belongs to
  * - cover: Proxied URL string (overrides base Image type)
  * - coverWidth: Width of cover image in pixels (from StashImage via coverImageId)
  * - coverHeight: Height of cover image in pixels (from StashImage via coverImageId)
@@ -145,6 +156,7 @@ export type NormalizedTag = Tag & {
  * - favorite: Whether user favorited this gallery
  */
 export type NormalizedGallery = Omit<Gallery, "cover"> & {
+  instanceId: string;
   cover: string | null;
   coverWidth: number | null;
   coverHeight: number | null;
@@ -158,10 +170,12 @@ export type NormalizedGallery = Omit<Gallery, "cover"> & {
  * Extends the base Group type from Stash with Peek-specific user data.
  *
  * Additional fields:
+ * - instanceId: UUID of the Stash instance this group belongs to
  * - rating: User's 1-5 star rating (null if unrated)
  * - favorite: Whether user favorited this group
  */
 export type NormalizedGroup = Group & {
+  instanceId: string;
   rating: number | null;
   favorite: boolean;
 };
@@ -172,6 +186,7 @@ export type NormalizedGroup = Group & {
  * Extends the base Image type from Stash with Peek-specific user data.
  *
  * Additional fields:
+ * - instanceId: UUID of the Stash instance this image belongs to
  * - rating: User's 1-5 star rating (null if unrated)
  * - rating100: User's 0-100 rating (null if unrated)
  * - favorite: Whether user favorited this image
@@ -180,6 +195,7 @@ export type NormalizedGroup = Group & {
  * - lastViewedAt: ISO timestamp of last view (null if never viewed)
  */
 export type NormalizedImage = Image & {
+  instanceId: string;
   rating: number | null;
   rating100: number | null;
   favorite: boolean;
@@ -194,6 +210,7 @@ export type NormalizedImage = Image & {
  */
 export interface SceneScoringData {
   id: string;
+  instanceId: string;
   studioId: string | null;
   performerIds: string[];
   tagIds: string[];

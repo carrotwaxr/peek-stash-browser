@@ -13,6 +13,7 @@ import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { galleryQueryBuilder } from "../../services/GalleryQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   NormalizedGallery,
   NormalizedPerformer,
@@ -228,11 +229,15 @@ export const findGalleries = async (
       ids: normalizedIds,
     };
 
+    // Get user's allowed instance IDs for multi-instance filtering
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
     // Use SQL-native query builder
     const { galleries, total } = await galleryQueryBuilder.execute({
       userId,
       filters: mergedFilter,
       applyExclusions,
+      allowedInstanceIds,
       sort: sortField,
       sortDirection,
       page,

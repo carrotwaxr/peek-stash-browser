@@ -15,6 +15,7 @@ import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
@@ -94,10 +95,14 @@ export const findTags = async (
     const isFetchingByIds = ids && Array.isArray(ids) && ids.length > 0;
     const applyExclusions = requestingUser?.role !== "ADMIN" && !isFetchingByIds;
 
+    // Get user's allowed instance IDs for multi-instance filtering
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
     const { tags, total } = await tagQueryBuilder.execute({
       userId,
       filters: mergedFilter,
       applyExclusions,
+      allowedInstanceIds,
       sort: sortField,
       sortDirection,
       page,
