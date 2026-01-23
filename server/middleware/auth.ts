@@ -27,6 +27,7 @@ export interface RequestUser {
   theme?: string | null;
   hideConfirmationDisabled?: boolean;
   landingPagePreference?: JsonValue;
+  setupCompleted?: boolean;
 }
 
 /**
@@ -96,6 +97,7 @@ const lookupUser = (where: Prisma.UserWhereUniqueInput) =>
       theme: true,
       hideConfirmationDisabled: true,
       landingPagePreference: true,
+      setupCompleted: true,
     },
   });
 

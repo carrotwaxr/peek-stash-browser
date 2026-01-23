@@ -3,6 +3,7 @@ import {
   adminRegenerateRecoveryKey,
   adminResetPassword,
   changePassword,
+  completeSetup,
   createUser,
   deleteFilterPreset,
   deleteUser,
@@ -14,6 +15,7 @@ import {
   getHiddenEntities,
   getHiddenEntityIds,
   getRecoveryKey,
+  getSetupStatus,
   getUserGroupMemberships,
   getUserPermissions,
   getUserRestrictions,
@@ -50,6 +52,10 @@ router.post("/change-password", authenticated(changePassword));
 // Recovery key routes
 router.get("/recovery-key", authenticated(getRecoveryKey));
 router.post("/recovery-key/regenerate", authenticated(regenerateRecoveryKey));
+
+// Setup wizard routes
+router.get("/setup-status", authenticated(getSetupStatus));
+router.post("/complete-setup", authenticated(completeSetup));
 
 // Filter preset routes
 router.get("/filter-presets", authenticated(getFilterPresets));

@@ -585,6 +585,23 @@ export const setupApi = {
   resetSetup: () => apiPost("/setup/reset", {}),
 };
 
+// User setup API (first-login setup wizard)
+export const userSetupApi = {
+  /**
+   * Get setup status for the current user
+   * @returns {Promise<{needsSetup: boolean, instances: Array}>}
+   */
+  getSetupStatus: () => apiGet("/user/setup-status"),
+
+  /**
+   * Complete user setup by selecting Stash instances
+   * @param {string[]} selectedInstanceIds - Array of Stash instance IDs to enable
+   * @returns {Promise<{success: boolean, user: Object}>}
+   */
+  completeSetup: (selectedInstanceIds) =>
+    apiPost("/user/complete-setup", { selectedInstanceIds }),
+};
+
 /**
  * Rating and favorite API endpoints
  */
