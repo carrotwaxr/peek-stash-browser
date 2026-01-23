@@ -2827,3 +2827,84 @@ export const getSetupStatus = async (
     res.status(500).json({ error: "Failed to get setup status" });
   }
 };
+
+/**
+ * Complete first-login setup
+ * POST /api/user/complete-setup
+ */
+export const completeSetup = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { selectedInstanceIds } = req.body;
+
+    // Check if multi-instance - require at least one selection
+    const instanceCount = await prisma.stashInstance.count({
+      where: { enabled: true },
+    });
+
+    if (instanceCount >= 2) {
+      if (
+        !Array.isArray(selectedInstanceIds) ||
+        selectedInstanceIds.length === 0
+      ) {
+        return res.status(400).json({
+          error: "At least one Stash instance must be selected",
+        });
+      }
+
+      // Validate instance IDs
+      const validInstances = await prisma.stashInstance.findMany({
+        where: {
+          id: { in: selectedInstanceIds },
+          enabled: true,
+        },
+        select: { id: true },
+      });
+
+      const validIds = new Set(validInstances.map((i) => i.id));
+      const invalidIds = selectedInstanceIds.filter(
+        (id: string) => !validIds.has(id)
+      );
+
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          error: "Invalid instance IDs",
+          invalidIds,
+        });
+      }
+
+      // Delete existing selections and create new ones
+      await prisma.userStashInstance.deleteMany({
+        where: { userId },
+      });
+
+      await prisma.userStashInstance.createMany({
+        data: selectedInstanceIds.map((instanceId: string) => ({
+          userId,
+          instanceId,
+        })),
+      });
+    }
+
+    // Mark setup as complete
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        setupCompleted: true,
+        setupCompletedAt: new Date(),
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error completing setup:", error);
+    res.status(500).json({ error: "Failed to complete setup" });
+  }
+};

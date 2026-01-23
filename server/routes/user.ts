@@ -3,6 +3,7 @@ import {
   adminRegenerateRecoveryKey,
   adminResetPassword,
   changePassword,
+  completeSetup,
   createUser,
   deleteFilterPreset,
   deleteUser,
@@ -54,6 +55,7 @@ router.post("/recovery-key/regenerate", authenticated(regenerateRecoveryKey));
 
 // Setup wizard routes
 router.get("/setup-status", authenticated(getSetupStatus));
+router.post("/complete-setup", authenticated(completeSetup));
 
 // Filter preset routes
 router.get("/filter-presets", authenticated(getFilterPresets));
