@@ -16,7 +16,7 @@ vi.mock("../../../src/services/api.js", () => ({
   apiPut: vi.fn(),
 }));
 
-import { apiGet, apiPut } from "../../../src/services/api.js";
+import { apiGet } from "../../../src/services/api.js";
 
 describe("ContentTab", () => {
   beforeEach(() => {
