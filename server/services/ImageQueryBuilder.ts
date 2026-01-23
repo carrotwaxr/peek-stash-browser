@@ -114,7 +114,7 @@ class ImageQueryBuilder {
     }
     const placeholders = allowedInstanceIds.map(() => "?").join(", ");
     return {
-      sql: `i.stashInstanceId IN (${placeholders})`,
+      sql: `(i.stashInstanceId IN (${placeholders}) OR i.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
     };
   }

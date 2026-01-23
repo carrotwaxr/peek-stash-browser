@@ -100,7 +100,7 @@ class PerformerQueryBuilder {
     }
     const placeholders = allowedInstanceIds.map(() => "?").join(", ");
     return {
-      sql: `p.stashInstanceId IN (${placeholders})`,
+      sql: `(p.stashInstanceId IN (${placeholders}) OR p.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
     };
   }

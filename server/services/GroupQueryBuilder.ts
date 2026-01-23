@@ -96,7 +96,7 @@ class GroupQueryBuilder {
     }
     const placeholders = allowedInstanceIds.map(() => "?").join(", ");
     return {
-      sql: `g.stashInstanceId IN (${placeholders})`,
+      sql: `(g.stashInstanceId IN (${placeholders}) OR g.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
     };
   }

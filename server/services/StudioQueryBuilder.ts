@@ -97,7 +97,7 @@ class StudioQueryBuilder {
     }
     const placeholders = allowedInstanceIds.map(() => "?").join(", ");
     return {
-      sql: `s.stashInstanceId IN (${placeholders})`,
+      sql: `(s.stashInstanceId IN (${placeholders}) OR s.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
     };
   }

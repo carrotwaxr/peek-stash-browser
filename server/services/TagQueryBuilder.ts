@@ -91,6 +91,7 @@ class TagQueryBuilder {
 
   /**
    * Build instance filter clause for multi-instance support
+   * Includes NULL stashInstanceId for backward compatibility with legacy data
    */
   private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
     if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
@@ -98,7 +99,7 @@ class TagQueryBuilder {
     }
     const placeholders = allowedInstanceIds.map(() => "?").join(", ");
     return {
-      sql: `t.stashInstanceId IN (${placeholders})`,
+      sql: `(t.stashInstanceId IN (${placeholders}) OR t.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
     };
   }
