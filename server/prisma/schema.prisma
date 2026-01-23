@@ -31,6 +31,10 @@ model User {
   cardDisplaySettings     Json? // Object with per-entity-type card display toggles: {scene: {showCodeOnCard, showDescriptionOnCard, ...}, performer: {...}, ...}
   landingPagePreference   Json? @default("{\"pages\":[\"home\"],\"randomize\":false}")
 
+  // First-login setup wizard tracking
+  setupCompleted    Boolean   @default(false)
+  setupCompletedAt  DateTime?
+
   // Watch history settings
   minimumPlayPercent Int     @default(20) // Percent of video to watch before incrementing play_count (0-100)
   syncToStash        Boolean @default(false) // Admin-only: Sync this user's activity to Stash
