@@ -2776,3 +2776,54 @@ export const updateUserStashInstances = async (
     res.status(500).json({ error: "Failed to update Stash instance selection" });
   }
 };
+
+/**
+ * Get setup status for first-login wizard
+ * GET /api/user/setup-status
+ */
+export const getSetupStatus = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        setupCompleted: true,
+        recoveryKey: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Get enabled instances for selection
+    const instances = await prisma.stashInstance.findMany({
+      where: { enabled: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
+      orderBy: { priority: "asc" },
+    });
+
+    const instanceCount = instances.length;
+
+    res.json({
+      setupCompleted: user.setupCompleted,
+      recoveryKey: user.recoveryKey,
+      instances,
+      instanceCount,
+    });
+  } catch (error) {
+    console.error("Error getting setup status:", error);
+    res.status(500).json({ error: "Failed to get setup status" });
+  }
+};
