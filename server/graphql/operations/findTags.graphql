@@ -32,6 +32,10 @@ query FindTags(
       scene_marker_count
       studio_count
       updated_at
+      stash_ids {
+        endpoint
+        stash_id
+      }
     }
   }
 }

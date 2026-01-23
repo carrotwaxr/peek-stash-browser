@@ -713,6 +713,9 @@ model StashPerformer {
   id              String  @id
   stashInstanceId String?
 
+  // === Deduplication (StashDB IDs) ===
+  stashIds String? // JSON array of {endpoint, stash_id} pairs
+
   // === Core fields ===
   name           String
   disambiguation String?
@@ -771,6 +774,9 @@ model StashStudio {
   id              String  @id
   stashInstanceId String?
 
+  // === Deduplication (StashDB IDs) ===
+  stashIds String? // JSON array of {endpoint, stash_id} pairs
+
   // === Core fields ===
   name      String
   parentId  String?
@@ -813,6 +819,9 @@ model StashStudio {
 model StashTag {
   id              String  @id
   stashInstanceId String?
+
+  // === Deduplication (StashDB IDs) ===
+  stashIds String? // JSON array of {endpoint, stash_id} pairs
 
   // === Core fields ===
   name     String

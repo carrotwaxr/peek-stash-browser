@@ -46,6 +46,10 @@ query FindStudios(
       }
       updated_at
       url
+      stash_ids {
+        endpoint
+        stash_id
+      }
     }
   }
 }

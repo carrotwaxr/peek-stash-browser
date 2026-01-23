@@ -55,6 +55,10 @@ query FindPerformers(
         image_path
         favorite
       }
+      stash_ids {
+        endpoint
+        stash_id
+      }
     }
   }
 }
