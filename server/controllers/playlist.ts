@@ -1,6 +1,7 @@
 import type { Scene } from "../graphql/types.js";
 import prisma from "../prisma/singleton.js";
 import { stashEntityService } from "../services/StashEntityService.js";
+import { getEntityInstanceId, getEntityInstanceIds } from "../utils/entityInstanceId.js";
 import { entityExclusionHelper } from "../services/EntityExclusionHelper.js";
 import { getPlaylistAccess, getUserGroups } from "../services/PlaylistAccessService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
@@ -209,7 +210,7 @@ export const getSharedPlaylists = async (
     // Fetch scene details for preview items from cache
     const playlistsWithScenes = await Promise.all(
       sharedPlaylists.map(async (p) => {
-        let itemsWithScenes: Array<{ sceneId: string; scene: ReturnType<typeof transformScene> | null }> = [];
+        let itemsWithScenes: Array<{ instanceId: string | null; sceneId: string; scene: ReturnType<typeof transformScene> | null }> = [];
 
         if (p.items.length > 0) {
           const sceneIds = p.items.map((item) => item.sceneId);
@@ -237,6 +238,7 @@ export const getSharedPlaylists = async (
 
             // Attach scene data to each playlist item
             itemsWithScenes = p.items.map((item) => ({
+              instanceId: item.instanceId,
               sceneId: item.sceneId,
               scene: sceneMap.get(item.sceneId) || null,
             }));
@@ -578,11 +580,15 @@ export const addSceneToPlaylist = async (
       return res.status(404).json({ error: "Playlist not found" });
     }
 
+    // Get scene instanceId
+    const instanceId = await getEntityInstanceId('scene', sceneId);
+
     // Check if scene already in playlist
     const existing = await prisma.playlistItem.findUnique({
       where: {
-        playlistId_sceneId: {
+        playlistId_instanceId_sceneId: {
           playlistId,
+          instanceId,
           sceneId,
         },
       },
@@ -599,6 +605,7 @@ export const addSceneToPlaylist = async (
     const item = await prisma.playlistItem.create({
       data: {
         playlistId,
+        instanceId,
         sceneId,
         position: nextPosition,
       },
@@ -643,11 +650,15 @@ export const removeSceneFromPlaylist = async (
       return res.status(404).json({ error: "Playlist not found" });
     }
 
+    // Get scene instanceId
+    const instanceId = await getEntityInstanceId('scene', sceneId);
+
     // Delete the item
     await prisma.playlistItem.delete({
       where: {
-        playlistId_sceneId: {
+        playlistId_instanceId_sceneId: {
           playlistId,
+          instanceId,
           sceneId,
         },
       },
@@ -697,13 +708,18 @@ export const reorderPlaylist = async (
       return res.status(404).json({ error: "Playlist not found" });
     }
 
+    // Get instanceIds for all scenes
+    const sceneIds = items.map((item) => item.sceneId);
+    const instanceIdMap = await getEntityInstanceIds('scene', sceneIds);
+
     // Update positions in a transaction
     await prisma.$transaction(
       items.map((item) =>
         prisma.playlistItem.update({
           where: {
-            playlistId_sceneId: {
+            playlistId_instanceId_sceneId: {
               playlistId,
+              instanceId: instanceIdMap.get(item.sceneId) || 'default',
               sceneId: item.sceneId,
             },
           },

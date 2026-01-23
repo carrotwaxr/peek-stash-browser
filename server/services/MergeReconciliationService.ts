@@ -7,6 +7,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
+import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 
 /**
  * Merge two JSON arrays (for oHistory and playHistory).
@@ -199,12 +200,18 @@ class MergeReconciliationService {
     matchedByPhash: string | null,
     reconciledBy: number | null
   ): Promise<{ success: boolean; mergeRecordId?: string }> {
+    // Get instanceIds for both scenes
+    const [sourceInstanceId, targetInstanceId] = await Promise.all([
+      getEntityInstanceId('scene', sourceSceneId),
+      getEntityInstanceId('scene', targetSceneId),
+    ]);
+
     const sourceHistory = await prisma.watchHistory.findUnique({
-      where: { userId_sceneId: { userId, sceneId: sourceSceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
     });
 
     const sourceRating = await prisma.sceneRating.findUnique({
-      where: { userId_sceneId: { userId, sceneId: sourceSceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
     });
 
     if (!sourceHistory && !sourceRating) {
@@ -214,13 +221,13 @@ class MergeReconciliationService {
     // Transfer WatchHistory
     if (sourceHistory) {
       const targetHistory = await prisma.watchHistory.findUnique({
-        where: { userId_sceneId: { userId, sceneId: targetSceneId } },
+        where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
       });
 
       if (targetHistory) {
         // Merge with existing
         await prisma.watchHistory.update({
-          where: { userId_sceneId: { userId, sceneId: targetSceneId } },
+          where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
           data: {
             playCount: targetHistory.playCount + sourceHistory.playCount,
             playDuration: targetHistory.playDuration + sourceHistory.playDuration,
@@ -236,6 +243,7 @@ class MergeReconciliationService {
         await prisma.watchHistory.create({
           data: {
             userId,
+            instanceId: targetInstanceId,
             sceneId: targetSceneId,
             playCount: sourceHistory.playCount,
             playDuration: sourceHistory.playDuration,
@@ -252,13 +260,13 @@ class MergeReconciliationService {
     // Transfer SceneRating
     if (sourceRating) {
       const targetRating = await prisma.sceneRating.findUnique({
-        where: { userId_sceneId: { userId, sceneId: targetSceneId } },
+        where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
       });
 
       if (targetRating) {
         // Merge: survivor wins for rating, OR for favorite
         await prisma.sceneRating.update({
-          where: { userId_sceneId: { userId, sceneId: targetSceneId } },
+          where: { userId_instanceId_sceneId: { userId, instanceId: targetInstanceId, sceneId: targetSceneId } },
           data: {
             rating: targetRating.rating ?? sourceRating.rating,
             favorite: targetRating.favorite || sourceRating.favorite,
@@ -269,6 +277,7 @@ class MergeReconciliationService {
         await prisma.sceneRating.create({
           data: {
             userId,
+            instanceId: targetInstanceId,
             sceneId: targetSceneId,
             rating: sourceRating.rating,
             favorite: sourceRating.favorite,
@@ -297,12 +306,12 @@ class MergeReconciliationService {
     // Delete source records after successful transfer
     if (sourceHistory) {
       await prisma.watchHistory.delete({
-        where: { userId_sceneId: { userId, sceneId: sourceSceneId } },
+        where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
       });
     }
     if (sourceRating) {
       await prisma.sceneRating.delete({
-        where: { userId_sceneId: { userId, sceneId: sourceSceneId } },
+        where: { userId_instanceId_sceneId: { userId, instanceId: sourceInstanceId, sceneId: sourceSceneId } },
       });
     }
 

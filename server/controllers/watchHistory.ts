@@ -21,6 +21,7 @@ import type {
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { userStatsService } from "../services/UserStatsService.js";
 import { logger } from "../utils/logger.js";
+import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 
 // Session tracking: prevent duplicate play_count increments per viewing session
 // Key format: "userId:sceneId"
@@ -72,12 +73,14 @@ export async function pingWatchHistory(
 
     // Get scene duration from cache
     let sceneDuration = 0;
+    let instanceId = 'default';
     try {
       const scene = await prisma.stashScene.findUnique({
         where: { id: sceneId },
-        select: { duration: true },
+        select: { duration: true, stashInstanceId: true },
       });
       sceneDuration = scene?.duration || 0;
+      instanceId = scene?.stashInstanceId || 'default';
     } catch (error) {
       logger.error("Failed to fetch scene duration from cache", {
         sceneId,
@@ -88,7 +91,7 @@ export async function pingWatchHistory(
 
     // Get or create watch history record
     let watchHistory = await prisma.watchHistory.findUnique({
-      where: { userId_sceneId: { userId, sceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
     });
 
     const now = new Date();
@@ -98,6 +101,7 @@ export async function pingWatchHistory(
       watchHistory = await prisma.watchHistory.create({
         data: {
           userId,
+          instanceId,
           sceneId,
           playCount: 0,
           playDuration: 0,
@@ -326,11 +330,14 @@ export async function incrementOCounter(
       return res.status(400).json({ error: "Missing required field: sceneId" });
     }
 
-    // Get user settings for syncToStash
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user settings for syncToStash and scene instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('scene', sceneId),
+    ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
@@ -338,7 +345,7 @@ export async function incrementOCounter(
 
     // Get or create watch history record
     let watchHistory = await prisma.watchHistory.findUnique({
-      where: { userId_sceneId: { userId, sceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
     });
 
     const now = new Date();
@@ -351,6 +358,7 @@ export async function incrementOCounter(
       watchHistory = await prisma.watchHistory.create({
         data: {
           userId,
+          instanceId,
           sceneId,
           playCount: 0,
           playDuration: 0,
@@ -454,8 +462,11 @@ export async function getWatchHistory(
       return res.status(401).json({ error: "User not authenticated" });
     }
 
+    // Get scene instanceId
+    const instanceId = await getEntityInstanceId('scene', sceneId);
+
     const watchHistory = await prisma.watchHistory.findUnique({
-      where: { userId_sceneId: { userId, sceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
     });
 
     if (!watchHistory) {
@@ -629,11 +640,14 @@ export async function saveActivity(
       playDuration: playDuration?.toFixed(2),
     });
 
-    // Get user settings for syncToStash
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user settings for syncToStash and scene instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('scene', sceneId),
+    ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
@@ -643,9 +657,10 @@ export async function saveActivity(
 
     // Use upsert to avoid race condition between concurrent saveActivity and incrementPlayCount calls
     const watchHistory = await prisma.watchHistory.upsert({
-      where: { userId_sceneId: { userId, sceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
       create: {
         userId,
+        instanceId,
         sceneId,
         playCount: 0,
         playDuration: playDuration || 0,
@@ -723,11 +738,14 @@ export async function incrementPlayCount(
 
     logger.info("Increment play count", { userId, sceneId });
 
-    // Get user settings for syncToStash
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user settings for syncToStash and scene instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('scene', sceneId),
+    ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
@@ -737,7 +755,7 @@ export async function incrementPlayCount(
 
     // First, get existing record to build play history (upsert doesn't support array append)
     const existing = await prisma.watchHistory.findUnique({
-      where: { userId_sceneId: { userId, sceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
     });
 
     const existingPlayHistory = existing
@@ -750,9 +768,10 @@ export async function incrementPlayCount(
 
     // Use upsert to avoid race condition between concurrent saveActivity and incrementPlayCount calls
     const watchHistory = await prisma.watchHistory.upsert({
-      where: { userId_sceneId: { userId, sceneId } },
+      where: { userId_instanceId_sceneId: { userId, instanceId, sceneId } },
       create: {
         userId,
+        instanceId,
         sceneId,
         playCount: 1,
         playDuration: 0,

@@ -11,6 +11,7 @@ import type {
   GetImageViewHistoryResponse,
 } from "../types/api/index.js";
 import { logger } from "../utils/logger.js";
+import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 
 /**
  * Increment O counter for an image
@@ -31,11 +32,14 @@ export async function incrementImageOCounter(
       return res.status(400).json({ error: "Missing required field: imageId" });
     }
 
-    // Get user settings for syncToStash
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { syncToStash: true },
-    });
+    // Get user settings for syncToStash and image instanceId
+    const [user, instanceId] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { syncToStash: true },
+      }),
+      getEntityInstanceId('image', imageId),
+    ]);
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
@@ -45,13 +49,14 @@ export async function incrementImageOCounter(
 
     // Get or create image view history record
     let viewHistory = await prisma.imageViewHistory.findUnique({
-      where: { userId_imageId: { userId, imageId } },
+      where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
     });
 
     if (!viewHistory) {
       viewHistory = await prisma.imageViewHistory.create({
         data: {
           userId,
+          instanceId,
           imageId,
           viewCount: 0,
           viewHistory: [],
@@ -114,17 +119,21 @@ export async function recordImageView(
       return res.status(400).json({ error: "Missing required field: imageId" });
     }
 
+    // Get image instanceId
+    const instanceId = await getEntityInstanceId('image', imageId);
+
     const now = new Date();
 
     // Get or create image view history record
     let viewHistory = await prisma.imageViewHistory.findUnique({
-      where: { userId_imageId: { userId, imageId } },
+      where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
     });
 
     if (!viewHistory) {
       viewHistory = await prisma.imageViewHistory.create({
         data: {
           userId,
+          instanceId,
           imageId,
           viewCount: 1,
           viewHistory: [now.toISOString()],
@@ -178,8 +187,11 @@ export async function getImageViewHistory(
       return res.status(400).json({ error: "Missing required parameter: imageId" });
     }
 
+    // Get image instanceId
+    const instanceId = await getEntityInstanceId('image', imageId);
+
     const viewHistory = await prisma.imageViewHistory.findUnique({
-      where: { userId_imageId: { userId, imageId } },
+      where: { userId_instanceId_imageId: { userId, instanceId, imageId } },
     });
 
     if (!viewHistory) {

@@ -189,6 +189,7 @@ class StashEntityService {
     const sql = `
       SELECT
         s.id,
+        s.stashInstanceId,
         s.studioId,
         s.oCounter,
         s.date,
@@ -203,6 +204,7 @@ class StashEntityService {
 
     const rows = await prisma.$queryRawUnsafe<Array<{
       id: string;
+      stashInstanceId: string;
       studioId: string | null;
       oCounter: number;
       date: string | null;
@@ -212,6 +214,7 @@ class StashEntityService {
 
     const result: SceneScoringData[] = rows.map(row => ({
       id: row.id,
+      instanceId: row.stashInstanceId,
       studioId: row.studioId,
       performerIds: row.performerIds ? row.performerIds.split(',').filter(Boolean) : [],
       tagIds: row.tagIds ? row.tagIds.split(',').filter(Boolean) : [],
