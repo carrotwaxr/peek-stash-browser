@@ -138,8 +138,14 @@ export function buildFolderTree(items, tags, currentPath = []) {
     // These are set by the backend during sync and represent the total items with this tag
     const preComputedCount = tag.image_count || tag.scene_count || tag.gallery_count || 0;
 
-    // If no items on current page AND no pre-computed count, this folder is truly empty
-    if (folderItems.length === 0 && preComputedCount === 0) return;
+    // Check if tag has children (it's a container/organizational tag)
+    const hasChildren = tag.children && tag.children.length > 0;
+
+    // If no items on current page AND no pre-computed count AND no children, this folder is truly empty
+    // Container tags (with children) should always show even if they have no direct content
+    if (folderItems.length === 0 && preComputedCount === 0 && !hasChildren) {
+      return;
+    }
 
     // Use items count if available (more accurate for current page context)
     // Fall back to pre-computed count when no items on current page

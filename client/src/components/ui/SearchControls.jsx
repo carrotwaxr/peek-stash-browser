@@ -556,6 +556,9 @@ const SearchControls = ({
   const handlePageChange = useCallback((page) => {
     setPage(page); // Hook handles URL sync
 
+    // Merge user filters with permanent filters (e.g., folder tag filter)
+    const mergedFilters = { ...permanentFilters, ...filters };
+
     // Trigger search with new page
     const query = {
       filter: {
@@ -565,7 +568,7 @@ const SearchControls = ({
         q: searchText,
         sort: getSortWithSeed(sortField),
       },
-      ...buildFilter(artifactType, filters, unitPreference),
+      ...buildFilter(artifactType, mergedFilters, unitPreference),
     };
 
     onQueryChange(query);
@@ -585,7 +588,7 @@ const SearchControls = ({
         }
       }
     }, 50);
-  }, [setPage, sortDirection, perPage, searchText, sortField, filters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
+  }, [setPage, sortDirection, perPage, searchText, sortField, filters, permanentFilters, artifactType, unitPreference, onQueryChange, getSortWithSeed]);
 
   // Expose pagination handler to parent via ref (for TV mode PageUp/PageDown)
   useEffect(() => {

@@ -134,11 +134,13 @@ const SceneSearch = ({
     }
 
     // Add folder tag filter when in folder view
+    // Use depth: 0 to get only scenes directly tagged with this folder (not children)
+    // Child folders are shown from tag hierarchy, scenes paginate separately
     if (currentViewMode === "folder" && folderTagFilter) {
       filters.tags = {
         value: [folderTagFilter],
         modifier: "INCLUDES",
-        depth: -1, // Include child tags (hierarchical)
+        depth: 0, // Exact tag match only - don't include child tags
       };
     }
 
