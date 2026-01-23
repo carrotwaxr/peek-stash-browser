@@ -70,15 +70,46 @@ describe("buildFolderTree - root level behavior", () => {
     expect(result.items).toHaveLength(0);
   });
 
-  it("hides empty folders", () => {
+  it("shows folders with pre-computed counts even when no items on current page", () => {
+    // Tag has image_count > 0 from pre-computed data, but no items on current page
     const tags = [
-      createTag("action", "Action"),
-      createTag("comedy", "Comedy"), // no items have this tag
+      { ...createTag("action", "Action"), image_count: 50 },
+      { ...createTag("comedy", "Comedy"), image_count: 30 }, // No items on page, but has content
+    ];
+    const items = [createItem("scene1", ["action"])]; // Only action has items on this page
+
+    const result = buildFolderTree(items, tags, []);
+
+    // Both folders should appear because comedy has image_count > 0
+    expect(result.folders).toHaveLength(2);
+    expect(result.folders.map(f => f.name).sort()).toEqual(["Action", "Comedy"]);
+  });
+
+  it("uses pre-computed count when no items on current page", () => {
+    const tags = [
+      { ...createTag("action", "Action"), image_count: 100 },
+      { ...createTag("comedy", "Comedy"), image_count: 50 }, // No items on page
     ];
     const items = [createItem("scene1", ["action"])];
 
     const result = buildFolderTree(items, tags, []);
 
+    const comedyFolder = result.folders.find(f => f.name === "Comedy");
+    expect(comedyFolder).toBeDefined();
+    // Should use pre-computed count since no items on page
+    expect(comedyFolder.totalCount).toBe(50);
+  });
+
+  it("hides folders that are truly empty (zero pre-computed count)", () => {
+    const tags = [
+      { ...createTag("action", "Action"), image_count: 50 },
+      { ...createTag("comedy", "Comedy"), image_count: 0 }, // Truly empty
+    ];
+    const items = [createItem("scene1", ["action"])];
+
+    const result = buildFolderTree(items, tags, []);
+
+    // Only action should appear - comedy is truly empty
     expect(result.folders).toHaveLength(1);
     expect(result.folders[0].name).toBe("Action");
   });
@@ -118,6 +149,42 @@ describe("buildFolderTree - root level behavior", () => {
     expect(result.folders).toHaveLength(1);
     expect(result.folders[0].name).toBe("Genre");
     expect(result.folders[0].totalCount).toBe(1);
+  });
+});
+
+describe("buildFolderTree - inside tag folder (with pre-computed counts)", () => {
+  it("shows child folders with pre-computed counts even when no items on current page", () => {
+    // Hierarchy: Photo -> Color, B&W
+    const photo = {
+      ...createTag("photo", "Photo", [], [{ id: "color", name: "Color" }, { id: "bw", name: "B&W" }]),
+      image_count: 100,
+    };
+    const color = {
+      ...createTag("color", "Color", [{ id: "photo", name: "Photo" }]),
+      image_count: 60,
+    };
+    const bw = {
+      ...createTag("bw", "B&W", [{ id: "photo", name: "Photo" }]),
+      image_count: 40, // No items on current page, but has content
+    };
+    const tags = [photo, color, bw];
+
+    // Only Color has items on this page
+    const items = [createItem("scene1", ["photo", "color"])];
+
+    const result = buildFolderTree(items, tags, ["photo"]);
+
+    // Both Color and B&W should appear because B&W has image_count > 0
+    expect(result.folders).toHaveLength(2);
+    expect(result.folders.map(f => f.name).sort()).toEqual(["B&W", "Color"]);
+
+    // B&W should use pre-computed count
+    const bwFolder = result.folders.find(f => f.name === "B&W");
+    expect(bwFolder.totalCount).toBe(40);
+
+    // Color should use item count (more accurate for current page)
+    const colorFolder = result.folders.find(f => f.name === "Color");
+    expect(colorFolder.totalCount).toBe(1);
   });
 });
 
