@@ -18,6 +18,7 @@ import {
   getUserPermissions,
   getUserRestrictions,
   getUserSettings,
+  getUserStashInstances,
   hideEntities,
   hideEntity,
   regenerateRecoveryKey,
@@ -31,6 +32,7 @@ import {
   updateUserRestrictions,
   updateUserRole,
   updateUserSettings,
+  updateUserStashInstances,
 } from "../controllers/user.js";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import { authenticated } from "../utils/routeHelpers.js";
@@ -143,5 +145,9 @@ router.get("/hidden-entities/ids", authenticated(getHiddenEntityIds)); // Get hi
 
 // Hide confirmation preference
 router.put("/hide-confirmation", authenticated(updateHideConfirmation)); // Update hide confirmation preference
+
+// Stash instance selection (for multi-instance support)
+router.get("/stash-instances", authenticated(getUserStashInstances)); // Get user's selected instances
+router.put("/stash-instances", authenticated(updateUserStashInstances)); // Update user's instance selection
 
 export default router;

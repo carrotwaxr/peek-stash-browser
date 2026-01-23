@@ -206,6 +206,20 @@ export type {
   GetStashInstanceResponse,
   ResetSetupRequest,
   ResetSetupResponse,
+  // Multi-instance management (admin)
+  StashInstanceData,
+  GetAllStashInstancesResponse,
+  CreateStashInstanceRequest,
+  CreateStashInstanceResponse,
+  UpdateStashInstanceParams,
+  UpdateStashInstanceRequest,
+  UpdateStashInstanceResponse,
+  DeleteStashInstanceParams,
+  DeleteStashInstanceResponse,
+  // User instance selection
+  GetUserStashInstancesResponse,
+  UpdateUserStashInstancesRequest,
+  UpdateUserStashInstancesResponse,
 } from "./setup.js";
 
 // User Stats endpoint types

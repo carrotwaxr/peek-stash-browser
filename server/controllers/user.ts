@@ -2640,3 +2640,122 @@ export const adminRegenerateRecoveryKey = async (
     res.status(500).json({ error: "Failed to regenerate user recovery key" });
   }
 };
+
+// =============================================================================
+// USER STASH INSTANCE SELECTION
+// =============================================================================
+
+/**
+ * Get user's selected Stash instances
+ * GET /api/user/stash-instances
+ *
+ * Returns:
+ * - selectedInstanceIds: IDs the user has selected (empty = all enabled)
+ * - availableInstances: All enabled instances for selection UI
+ */
+export const getUserStashInstances = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Get user's selected instances
+    const userSelections = await prisma.userStashInstance.findMany({
+      where: { userId },
+      select: { instanceId: true },
+    });
+    const selectedInstanceIds = userSelections.map((s) => s.instanceId);
+
+    // Get all enabled instances for the selection UI
+    const availableInstances = await prisma.stashInstance.findMany({
+      where: { enabled: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
+      orderBy: { priority: "asc" },
+    });
+
+    res.json({
+      selectedInstanceIds,
+      availableInstances,
+    });
+  } catch (error) {
+    console.error("Error getting user Stash instances:", error);
+    res.status(500).json({ error: "Failed to get Stash instance selection" });
+  }
+};
+
+/**
+ * Update user's Stash instance selection
+ * PUT /api/user/stash-instances
+ *
+ * Body: { instanceIds: string[] }
+ * - Empty array means "show all enabled instances" (clears all selections)
+ * - Non-empty array means "show only these instances"
+ */
+export const updateUserStashInstances = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { instanceIds } = req.body;
+    if (!Array.isArray(instanceIds)) {
+      return res.status(400).json({ error: "instanceIds must be an array" });
+    }
+
+    // Validate that all instance IDs exist and are enabled
+    if (instanceIds.length > 0) {
+      const validInstances = await prisma.stashInstance.findMany({
+        where: {
+          id: { in: instanceIds },
+          enabled: true,
+        },
+        select: { id: true },
+      });
+
+      const validIds = new Set(validInstances.map((i) => i.id));
+      const invalidIds = instanceIds.filter((id) => !validIds.has(id));
+
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          error: "Invalid instance IDs",
+          invalidIds,
+        });
+      }
+    }
+
+    // Delete existing selections
+    await prisma.userStashInstance.deleteMany({
+      where: { userId },
+    });
+
+    // Create new selections (if any)
+    if (instanceIds.length > 0) {
+      await prisma.userStashInstance.createMany({
+        data: instanceIds.map((instanceId) => ({
+          userId,
+          instanceId,
+        })),
+      });
+    }
+
+    res.json({
+      success: true,
+      selectedInstanceIds: instanceIds,
+    });
+  } catch (error) {
+    console.error("Error updating user Stash instances:", error);
+    res.status(500).json({ error: "Failed to update Stash instance selection" });
+  }
+};

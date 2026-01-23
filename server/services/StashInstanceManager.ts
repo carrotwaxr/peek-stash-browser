@@ -7,8 +7,8 @@ const prisma = new PrismaClient();
 /**
  * Manages Stash server instance connections.
  *
- * For Commit 1: Single instance only (enforced).
- * Future commits will enable multi-instance support.
+ * Supports multiple Stash instances for aggregated library view.
+ * Each instance is identified by a UUID and can be enabled/disabled.
  */
 class StashInstanceManager {
   private instances = new Map<string, StashClient>();
@@ -29,16 +29,6 @@ class StashInstanceManager {
       where: { enabled: true },
       orderBy: { priority: "asc" },
     });
-
-    // Commit 1: Enforce single instance limit
-    if (configs.length > 1) {
-      logger.error(
-        "Multiple Stash instances found but multi-instance support is not yet enabled"
-      );
-      throw new Error(
-        "Multiple Stash instances configured but not yet supported. Please disable all but one instance."
-      );
-    }
 
     if (configs.length === 0) {
       logger.warn("No Stash instances configured");
@@ -93,8 +83,8 @@ class StashInstanceManager {
   }
 
   /**
-   * Get the default (first/only) Stash instance.
-   * For Commit 1: This is the only way to get an instance.
+   * Get the default (highest priority) Stash instance.
+   * Returns the first enabled instance by priority order.
    */
   getDefault(): StashClient {
     const first = this.instances.values().next().value;
@@ -104,6 +94,21 @@ class StashInstanceManager {
       );
     }
     return first;
+  }
+
+  /**
+   * Get all enabled Stash instances as an array of [instanceId, client] tuples.
+   * Useful for iterating over all instances during sync or cache operations.
+   */
+  getAll(): Array<[string, StashClient]> {
+    return Array.from(this.instances.entries());
+  }
+
+  /**
+   * Get all enabled instance IDs.
+   */
+  getAllInstanceIds(): string[] {
+    return Array.from(this.instances.keys());
   }
 
   /**
@@ -119,10 +124,22 @@ class StashInstanceManager {
 
   /**
    * Get a Stash instance by ID.
-   * For Commit 1: Only one instance exists, but this prepares for multi-instance.
+   * Returns undefined if the instance doesn't exist or is disabled.
    */
   get(instanceId: string): StashClient | undefined {
     return this.instances.get(instanceId);
+  }
+
+  /**
+   * Get a Stash instance by ID, throwing if not found.
+   * Use this when the instance ID is expected to be valid.
+   */
+  getRequired(instanceId: string): StashClient {
+    const instance = this.instances.get(instanceId);
+    if (!instance) {
+      throw new Error(`Stash instance not found: ${instanceId}`);
+    }
+    return instance;
   }
 
   /**

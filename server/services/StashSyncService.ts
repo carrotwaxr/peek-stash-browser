@@ -3097,6 +3097,59 @@ class StashSyncService extends EventEmitter {
       throw error;
     }
   }
+
+  /**
+   * Clear all cached entities for a specific Stash instance.
+   * Used when an instance is deleted to clean up its cached data.
+   *
+   * Hard-deletes all entities with the given stashInstanceId.
+   */
+  async clearInstanceData(instanceId: string): Promise<void> {
+    logger.info(`Clearing all cached data for instance ${instanceId}...`);
+    const startTime = Date.now();
+
+    try {
+      // Delete in order to respect foreign key constraints
+      // Junction tables first, then entities
+      const results = await prisma.$transaction([
+        // Junction tables (depend on entity primary keys)
+        prisma.$executeRaw`DELETE FROM SceneTag WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ScenePerformer WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM SceneGroup WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM GalleryTag WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM GalleryPerformer WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ImageTag WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ImagePerformer WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM ImageGallery WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM PerformerTag WHERE performerId IN (SELECT id FROM StashPerformer WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM GroupTag WHERE groupId IN (SELECT id FROM StashGroup WHERE stashInstanceId = ${instanceId})`,
+        prisma.$executeRaw`DELETE FROM StudioTag WHERE studioId IN (SELECT id FROM StashStudio WHERE stashInstanceId = ${instanceId})`,
+
+        // Entity tables
+        prisma.$executeRaw`DELETE FROM StashClip WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashImage WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashGallery WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashScene WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashGroup WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashPerformer WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashStudio WHERE stashInstanceId = ${instanceId}`,
+        prisma.$executeRaw`DELETE FROM StashTag WHERE stashInstanceId = ${instanceId}`,
+
+        // Sync state for this instance
+        prisma.syncState.deleteMany({ where: { stashInstanceId: instanceId } }),
+      ]);
+
+      const duration = Date.now() - startTime;
+      logger.info(`Cleared cached data for instance ${instanceId} in ${duration}ms`, {
+        operations: results.length,
+      });
+    } catch (error) {
+      logger.error(`Failed to clear cached data for instance ${instanceId}`, {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
