@@ -13,6 +13,7 @@ import {
   imageQueryBuilder,
   type ImageFilter,
 } from "../../services/ImageQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
@@ -211,11 +212,15 @@ export const findImages = async (
     // Admins skip exclusions
     const applyExclusions = requestingUser?.role !== "ADMIN";
 
+    // Get user's allowed instance IDs for multi-instance filtering
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
     // Execute query
     const result = await imageQueryBuilder.execute({
       userId,
       filters,
       applyExclusions,
+      allowedInstanceIds,
       sort: sortField,
       sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
       page,

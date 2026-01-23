@@ -11,6 +11,7 @@ import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { groupQueryBuilder } from "../../services/GroupQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
@@ -172,11 +173,15 @@ export const findGroups = async (
       ids: normalizedIds,
     };
 
+    // Get user's allowed instance IDs for multi-instance filtering
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
     // Use SQL-native query builder
     const { groups, total } = await groupQueryBuilder.execute({
       userId,
       filters: mergedFilter,
       applyExclusions,
+      allowedInstanceIds,
       sort: sortField,
       sortDirection,
       page,

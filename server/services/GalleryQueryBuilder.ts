@@ -26,6 +26,7 @@ export interface GalleryQueryOptions {
   page: number;
   perPage: number;
   searchQuery?: string;
+  allowedInstanceIds?: string[];
 }
 
 // Query result
@@ -85,6 +86,20 @@ class GalleryQueryBuilder {
     return {
       sql: "g.deletedAt IS NULL",
       params: [],
+    };
+  }
+
+  /**
+   * Build instance filter clause for multi-instance support
+   */
+  private buildInstanceFilter(allowedInstanceIds: string[] | undefined): FilterClause {
+    if (!allowedInstanceIds || allowedInstanceIds.length === 0) {
+      return { sql: "", params: [] };
+    }
+    const placeholders = allowedInstanceIds.map(() => "?").join(", ");
+    return {
+      sql: `g.stashInstanceId IN (${placeholders})`,
+      params: allowedInstanceIds,
     };
   }
 
@@ -496,13 +511,19 @@ class GalleryQueryBuilder {
 
   async execute(options: GalleryQueryOptions): Promise<GalleryQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters, searchQuery } = options;
+    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
 
     // Build WHERE clauses
     const whereClauses: FilterClause[] = [this.buildBaseWhere(applyExclusions)];
+
+    // Instance filter (multi-instance support)
+    const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
+    if (instanceFilter.sql) {
+      whereClauses.push(instanceFilter);
+    }
 
     // Search query
     const searchFilter = this.buildSearchFilter(searchQuery);

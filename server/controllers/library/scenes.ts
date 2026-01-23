@@ -18,6 +18,7 @@ import { stashEntityService } from "../../services/StashEntityService.js";
 import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
+import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import {
   buildDerivedWeightsFromScoringData,
   buildImplicitWeightsFromRankings,
@@ -939,6 +940,9 @@ export const findScenes = async (
     if (USE_SQL_QUERY_BUILDER && !searchQuery) {
       logger.info("findScenes: using SQL query builder path");
 
+      // Get user's allowed instance IDs for multi-instance filtering
+      const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
       // Build filters object
       const filters: PeekSceneFilter = { ...scene_filter };
       if (ids && ids.length > 0) {
@@ -949,6 +953,7 @@ export const findScenes = async (
       const result = await sceneQueryBuilder.execute({
         userId,
         filters,
+        allowedInstanceIds,
         sort: sortField,
         sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
         page,
@@ -1324,10 +1329,14 @@ export const findSimilarScenes = async (
       });
     }
 
+    // Get user's allowed instance IDs for multi-instance filtering
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
     // Fetch full scene data via SceneQueryBuilder
     const { scenes } = await sceneQueryBuilder.getByIds({
       userId,
       ids: paginatedIds,
+      allowedInstanceIds,
     });
 
     // Preserve score order (getByIds may return in different order)
@@ -1626,10 +1635,14 @@ export const getRecommendedScenes = async (
     const endIndex = startIndex + perPage;
     const paginatedIds = cappedScenes.slice(startIndex, endIndex).map((s) => s.id);
 
-    // Phase 2: Fetch full scene data via SceneQueryBuilder
+    // Get user's allowed instance IDs for multi-instance filtering
+    const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
+
+    // Fetch full scene data via SceneQueryBuilder
     const { scenes } = await sceneQueryBuilder.getByIds({
       userId,
       ids: paginatedIds,
+      allowedInstanceIds,
     });
 
     // Preserve score order (getByIds returns in arbitrary order)
