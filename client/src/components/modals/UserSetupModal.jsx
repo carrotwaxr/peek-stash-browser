@@ -19,15 +19,15 @@ const UserSetupModal = ({ onComplete }) => {
   useEffect(() => {
     const fetchSetupStatus = async () => {
       try {
-        const response = await userSetupApi.getSetupStatus();
-        const { recoveryKey, instances, instanceCount } = response.data;
+        const data = await userSetupApi.getSetupStatus();
+        const { recoveryKey, instances, instanceCount } = data;
 
         setRecoveryKey(recoveryKey || "");
         setInstances(instances || []);
         setShowInstanceSelection(instanceCount >= 2);
 
         // Pre-select all instances
-        setSelectedInstanceIds(instances.map((i) => i.id));
+        setSelectedInstanceIds((instances || []).map((i) => i.id));
       } catch (err) {
         setError("Failed to load setup data");
         console.error("Setup status error:", err);

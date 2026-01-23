@@ -26,13 +26,12 @@ describe("UserSetupModal", () => {
   });
 
   it("displays recovery key from API", async () => {
+    // Mock returns data directly (not wrapped in .data like axios)
     userSetupApi.getSetupStatus.mockResolvedValue({
-      data: {
-        setupCompleted: false,
-        recoveryKey: "ABCD-1234-EFGH-5678",
-        instances: [],
-        instanceCount: 1,
-      },
+      setupCompleted: false,
+      recoveryKey: "ABCD-1234-EFGH-5678",
+      instances: [],
+      instanceCount: 1,
     });
 
     render(<UserSetupModal onComplete={vi.fn()} />);
@@ -44,15 +43,13 @@ describe("UserSetupModal", () => {
 
   it("shows instance selection when multiple instances exist", async () => {
     userSetupApi.getSetupStatus.mockResolvedValue({
-      data: {
-        setupCompleted: false,
-        recoveryKey: "ABCD-1234-EFGH-5678",
-        instances: [
-          { id: "inst-1", name: "Main Server", description: "Primary" },
-          { id: "inst-2", name: "Backup", description: "Archive" },
-        ],
-        instanceCount: 2,
-      },
+      setupCompleted: false,
+      recoveryKey: "ABCD-1234-EFGH-5678",
+      instances: [
+        { id: "inst-1", name: "Main Server", description: "Primary" },
+        { id: "inst-2", name: "Backup", description: "Archive" },
+      ],
+      instanceCount: 2,
     });
 
     render(<UserSetupModal onComplete={vi.fn()} />);
@@ -66,12 +63,10 @@ describe("UserSetupModal", () => {
 
   it("hides instance selection when only one instance exists", async () => {
     userSetupApi.getSetupStatus.mockResolvedValue({
-      data: {
-        setupCompleted: false,
-        recoveryKey: "ABCD-1234-EFGH-5678",
-        instances: [{ id: "inst-1", name: "Main", description: "" }],
-        instanceCount: 1,
-      },
+      setupCompleted: false,
+      recoveryKey: "ABCD-1234-EFGH-5678",
+      instances: [{ id: "inst-1", name: "Main", description: "" }],
+      instanceCount: 1,
     });
 
     render(<UserSetupModal onComplete={vi.fn()} />);
@@ -86,14 +81,12 @@ describe("UserSetupModal", () => {
   it("calls completeSetup and onComplete when clicking Get Started", async () => {
     const onComplete = vi.fn();
     userSetupApi.getSetupStatus.mockResolvedValue({
-      data: {
-        setupCompleted: false,
-        recoveryKey: "ABCD-1234-EFGH-5678",
-        instances: [],
-        instanceCount: 1,
-      },
+      setupCompleted: false,
+      recoveryKey: "ABCD-1234-EFGH-5678",
+      instances: [],
+      instanceCount: 1,
     });
-    userSetupApi.completeSetup.mockResolvedValue({ data: { success: true } });
+    userSetupApi.completeSetup.mockResolvedValue({ success: true });
 
     render(<UserSetupModal onComplete={onComplete} />);
 
