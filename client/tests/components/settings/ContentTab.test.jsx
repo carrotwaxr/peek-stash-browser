@@ -12,13 +12,11 @@ vi.mock("../../../src/hooks/useHiddenEntities.js", () => ({
 }));
 
 vi.mock("../../../src/services/api.js", () => ({
-  default: {
-    get: vi.fn(),
-    put: vi.fn(),
-  },
+  apiGet: vi.fn(),
+  apiPut: vi.fn(),
 }));
 
-import api from "../../../src/services/api.js";
+import { apiGet, apiPut } from "../../../src/services/api.js";
 
 describe("ContentTab", () => {
   beforeEach(() => {
@@ -26,14 +24,13 @@ describe("ContentTab", () => {
   });
 
   it("shows Content Sources section when multiple instances exist", async () => {
-    api.get.mockResolvedValue({
-      data: {
-        selectedInstanceIds: ["inst-1", "inst-2"],
-        availableInstances: [
-          { id: "inst-1", name: "Main", description: "Primary" },
-          { id: "inst-2", name: "Backup", description: "Archive" },
-        ],
-      },
+    // API returns data directly (not wrapped in .data)
+    apiGet.mockResolvedValue({
+      selectedInstanceIds: ["inst-1", "inst-2"],
+      availableInstances: [
+        { id: "inst-1", name: "Main", description: "Primary" },
+        { id: "inst-2", name: "Backup", description: "Archive" },
+      ],
     });
 
     render(
@@ -50,13 +47,11 @@ describe("ContentTab", () => {
   });
 
   it("hides Content Sources section when only one instance exists", async () => {
-    api.get.mockResolvedValue({
-      data: {
-        selectedInstanceIds: ["inst-1"],
-        availableInstances: [
-          { id: "inst-1", name: "Main", description: "Primary" },
-        ],
-      },
+    apiGet.mockResolvedValue({
+      selectedInstanceIds: ["inst-1"],
+      availableInstances: [
+        { id: "inst-1", name: "Main", description: "Primary" },
+      ],
     });
 
     render(

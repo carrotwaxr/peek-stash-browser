@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronRight, Server } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../../hooks/useHiddenEntities.js";
-import api from "../../../services/api.js";
+import { apiGet, apiPut } from "../../../services/api.js";
 
 const ContentTab = () => {
   const { hideConfirmationDisabled, updateHideConfirmation } = useHiddenEntities();
@@ -15,8 +15,8 @@ const ContentTab = () => {
   useEffect(() => {
     const fetchInstances = async () => {
       try {
-        const response = await api.get("/user/stash-instances");
-        const { selectedInstanceIds, availableInstances } = response.data;
+        const data = await apiGet("/user/stash-instances");
+        const { selectedInstanceIds, availableInstances } = data;
 
         setInstances(availableInstances || []);
         setSelectedIds(selectedInstanceIds || []);
@@ -41,7 +41,7 @@ const ContentTab = () => {
     setSaving(true);
 
     try {
-      await api.put("/user/stash-instances", { instanceIds: newSelectedIds });
+      await apiPut("/user/stash-instances", { instanceIds: newSelectedIds });
     } catch (err) {
       console.error("Failed to update instances:", err);
       // Revert on error
