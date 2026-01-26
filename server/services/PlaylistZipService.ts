@@ -125,7 +125,8 @@ export class PlaylistZipService {
 
       for (const item of playlist.items) {
         // Get scene with relations for NFO generation
-        const scene = await prisma.stashScene.findUnique({
+        // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+        const scene = await prisma.stashScene.findFirst({
           where: { id: item.sceneId },
           include: {
             performers: {
@@ -154,7 +155,8 @@ export class PlaylistZipService {
         // Get studio name if scene has a studio
         let studioName: string | undefined;
         if (scene.studioId) {
-          const studio = await prisma.stashStudio.findUnique({
+          // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+          const studio = await prisma.stashStudio.findFirst({
             where: { id: scene.studioId },
             select: { name: true },
           });

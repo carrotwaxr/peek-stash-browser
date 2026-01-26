@@ -37,7 +37,8 @@ async function main() {
   if (performers.length > 0) {
     console.log("\nTop 5 Performers:");
     for (const p of performers) {
-      const perf = await prisma.stashPerformer.findUnique({
+      // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+      const perf = await prisma.stashPerformer.findFirst({
         where: { id: p.entityId },
         select: { name: true },
       });

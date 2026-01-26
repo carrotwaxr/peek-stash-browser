@@ -75,7 +75,8 @@ export async function pingWatchHistory(
     let sceneDuration = 0;
     let instanceId = 'default';
     try {
-      const scene = await prisma.stashScene.findUnique({
+      // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+      const scene = await prisma.stashScene.findFirst({
         where: { id: sceneId },
         select: { duration: true, stashInstanceId: true },
       });

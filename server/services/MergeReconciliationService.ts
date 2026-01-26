@@ -138,7 +138,8 @@ class MergeReconciliationService {
    * Find potential phash matches for an orphaned scene.
    */
   async findPhashMatches(sceneId: string): Promise<PhashMatch[]> {
-    const scene = await prisma.stashScene.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const scene = await prisma.stashScene.findFirst({
       where: { id: sceneId },
       select: { phash: true, phashes: true },
     });

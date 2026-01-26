@@ -23,49 +23,50 @@ export async function getEntityInstanceId(
   try {
     switch (entityType) {
       case 'scene': {
-        const scene = await prisma.stashScene.findUnique({
+        // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+        const scene = await prisma.stashScene.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return scene?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'performer': {
-        const performer = await prisma.stashPerformer.findUnique({
+        const performer = await prisma.stashPerformer.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return performer?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'studio': {
-        const studio = await prisma.stashStudio.findUnique({
+        const studio = await prisma.stashStudio.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return studio?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'tag': {
-        const tag = await prisma.stashTag.findUnique({
+        const tag = await prisma.stashTag.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return tag?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'gallery': {
-        const gallery = await prisma.stashGallery.findUnique({
+        const gallery = await prisma.stashGallery.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return gallery?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'group': {
-        const group = await prisma.stashGroup.findUnique({
+        const group = await prisma.stashGroup.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return group?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'image': {
-        const image = await prisma.stashImage.findUnique({
+        const image = await prisma.stashImage.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });

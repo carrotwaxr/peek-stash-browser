@@ -31,7 +31,8 @@ export class DownloadService {
     userId: number,
     sceneId: string
   ): Promise<DownloadRecord> {
-    const scene = await prisma.stashScene.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const scene = await prisma.stashScene.findFirst({
       where: { id: sceneId },
       select: { id: true, title: true, filePath: true, fileSize: true },
     });
@@ -75,7 +76,8 @@ export class DownloadService {
     userId: number,
     imageId: string
   ): Promise<DownloadRecord> {
-    const image = await prisma.stashImage.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const image = await prisma.stashImage.findFirst({
       where: { id: imageId },
       select: { id: true, title: true, fileSize: true },
     });

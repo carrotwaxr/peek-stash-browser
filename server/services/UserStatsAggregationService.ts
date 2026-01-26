@@ -347,7 +347,8 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const scene = await prisma.stashScene.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const scene = await prisma.stashScene.findFirst({
       where: { id: result[0].sceneId },
       select: { id: true, title: true, filePath: true, pathScreenshot: true },
     });
@@ -392,7 +393,8 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const image = await prisma.stashImage.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const image = await prisma.stashImage.findFirst({
       where: { id: result[0].imageId },
       select: { id: true, title: true, filePath: true, pathThumbnail: true },
     });
@@ -435,7 +437,8 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const scene = await prisma.stashScene.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const scene = await prisma.stashScene.findFirst({
       where: { id: result[0].sceneId },
       select: { id: true, title: true, filePath: true, pathScreenshot: true },
     });
@@ -480,7 +483,8 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const performer = await prisma.stashPerformer.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const performer = await prisma.stashPerformer.findFirst({
       where: { id: result[0].performerId },
       select: { id: true, name: true, imagePath: true },
     });

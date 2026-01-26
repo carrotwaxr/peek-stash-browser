@@ -8,7 +8,7 @@ vi.mock("../../prisma/singleton.js", () => ({
   default: {
     $queryRaw: vi.fn(),
     stashScene: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(), // Changed from findUnique for composite primary key
       findMany: vi.fn(),
     },
     watchHistory: {
@@ -68,7 +68,7 @@ describe("MergeReconciliationService", () => {
 
   describe("findPhashMatches", () => {
     it("should find scenes with matching phash", async () => {
-      vi.mocked(prisma.stashScene.findUnique).mockResolvedValue({
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue({
         phash: "abc123",
         phashes: null,
       } as never);
@@ -86,7 +86,7 @@ describe("MergeReconciliationService", () => {
     });
 
     it("should return empty array if scene has no phash", async () => {
-      vi.mocked(prisma.stashScene.findUnique).mockResolvedValue({
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue({
         phash: null,
         phashes: null,
       } as never);
