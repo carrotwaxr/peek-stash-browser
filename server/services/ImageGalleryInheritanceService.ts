@@ -61,8 +61,8 @@ class ImageGalleryInheritanceService {
       SET studioId = (
         SELECT g.studioId
         FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId
-        WHERE ig.imageId = StashImage.id
+        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
+        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
           AND g.studioId IS NOT NULL
           AND g.deletedAt IS NULL
         ORDER BY ig.galleryId
@@ -70,10 +70,10 @@ class ImageGalleryInheritanceService {
       )
       WHERE studioId IS NULL
         AND deletedAt IS NULL
-        AND id IN (
-          SELECT ig.imageId
+        AND (id, stashInstanceId) IN (
+          SELECT ig.imageId, ig.imageInstanceId
           FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId
+          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.studioId IS NOT NULL AND g.deletedAt IS NULL
         )
     `;
@@ -84,8 +84,8 @@ class ImageGalleryInheritanceService {
       SET date = (
         SELECT g.date
         FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId
-        WHERE ig.imageId = StashImage.id
+        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
+        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
           AND g.date IS NOT NULL
           AND g.deletedAt IS NULL
         ORDER BY ig.galleryId
@@ -93,10 +93,10 @@ class ImageGalleryInheritanceService {
       )
       WHERE date IS NULL
         AND deletedAt IS NULL
-        AND id IN (
-          SELECT ig.imageId
+        AND (id, stashInstanceId) IN (
+          SELECT ig.imageId, ig.imageInstanceId
           FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId
+          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.date IS NOT NULL AND g.deletedAt IS NULL
         )
     `;
@@ -107,8 +107,8 @@ class ImageGalleryInheritanceService {
       SET photographer = (
         SELECT g.photographer
         FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId
-        WHERE ig.imageId = StashImage.id
+        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
+        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
           AND g.photographer IS NOT NULL
           AND g.deletedAt IS NULL
         ORDER BY ig.galleryId
@@ -116,10 +116,10 @@ class ImageGalleryInheritanceService {
       )
       WHERE photographer IS NULL
         AND deletedAt IS NULL
-        AND id IN (
-          SELECT ig.imageId
+        AND (id, stashInstanceId) IN (
+          SELECT ig.imageId, ig.imageInstanceId
           FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId
+          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.photographer IS NOT NULL AND g.deletedAt IS NULL
         )
     `;
@@ -130,8 +130,8 @@ class ImageGalleryInheritanceService {
       SET details = (
         SELECT g.details
         FROM ImageGallery ig
-        JOIN StashGallery g ON g.id = ig.galleryId
-        WHERE ig.imageId = StashImage.id
+        JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
+        WHERE ig.imageId = StashImage.id AND ig.imageInstanceId = StashImage.stashInstanceId
           AND g.details IS NOT NULL
           AND g.deletedAt IS NULL
         ORDER BY ig.galleryId
@@ -139,10 +139,10 @@ class ImageGalleryInheritanceService {
       )
       WHERE details IS NULL
         AND deletedAt IS NULL
-        AND id IN (
-          SELECT ig.imageId
+        AND (id, stashInstanceId) IN (
+          SELECT ig.imageId, ig.imageInstanceId
           FROM ImageGallery ig
-          JOIN StashGallery g ON g.id = ig.galleryId
+          JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
           WHERE g.details IS NOT NULL AND g.deletedAt IS NULL
         )
     `;
@@ -154,17 +154,18 @@ class ImageGalleryInheritanceService {
    */
   private async inheritPerformers(): Promise<void> {
     // Insert gallery performers for images that have no performers
+    // Junction tables now have composite keys: (imageId, imageInstanceId, performerId, performerInstanceId)
     await prisma.$executeRaw`
-      INSERT OR IGNORE INTO ImagePerformer (imageId, performerId)
-      SELECT DISTINCT ig.imageId, gp.performerId
+      INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId)
+      SELECT DISTINCT ig.imageId, ig.imageInstanceId, gp.performerId, gp.performerInstanceId
       FROM ImageGallery ig
-      JOIN GalleryPerformer gp ON gp.galleryId = ig.galleryId
-      JOIN StashImage i ON i.id = ig.imageId
-      JOIN StashGallery g ON g.id = ig.galleryId
+      JOIN GalleryPerformer gp ON gp.galleryId = ig.galleryId AND gp.galleryInstanceId = ig.galleryInstanceId
+      JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
+      JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
       WHERE i.deletedAt IS NULL
         AND g.deletedAt IS NULL
-        AND ig.imageId NOT IN (
-          SELECT DISTINCT imageId FROM ImagePerformer
+        AND (ig.imageId, ig.imageInstanceId) NOT IN (
+          SELECT DISTINCT imageId, imageInstanceId FROM ImagePerformer
         )
     `;
   }
@@ -175,17 +176,18 @@ class ImageGalleryInheritanceService {
    */
   private async inheritTags(): Promise<void> {
     // Insert gallery tags for images that have no tags
+    // Junction tables now have composite keys: (imageId, imageInstanceId, tagId, tagInstanceId)
     await prisma.$executeRaw`
-      INSERT OR IGNORE INTO ImageTag (imageId, tagId)
-      SELECT DISTINCT ig.imageId, gt.tagId
+      INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId)
+      SELECT DISTINCT ig.imageId, ig.imageInstanceId, gt.tagId, gt.tagInstanceId
       FROM ImageGallery ig
-      JOIN GalleryTag gt ON gt.galleryId = ig.galleryId
-      JOIN StashImage i ON i.id = ig.imageId
-      JOIN StashGallery g ON g.id = ig.galleryId
+      JOIN GalleryTag gt ON gt.galleryId = ig.galleryId AND gt.galleryInstanceId = ig.galleryInstanceId
+      JOIN StashImage i ON i.id = ig.imageId AND i.stashInstanceId = ig.imageInstanceId
+      JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
       WHERE i.deletedAt IS NULL
         AND g.deletedAt IS NULL
-        AND ig.imageId NOT IN (
-          SELECT DISTINCT imageId FROM ImageTag
+        AND (ig.imageId, ig.imageInstanceId) NOT IN (
+          SELECT DISTINCT imageId, imageInstanceId FROM ImageTag
         )
     `;
   }

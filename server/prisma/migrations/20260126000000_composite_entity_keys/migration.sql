@@ -128,6 +128,12 @@ UPDATE "ClipTag" SET
 -- STEP 3: Recreate StashScene with composite primary key
 -- ============================================================================
 
+-- Backfill NULL boolean/integer fields to defaults before copying
+UPDATE "StashScene" SET "organized" = 0 WHERE "organized" IS NULL;
+UPDATE "StashScene" SET "oCounter" = 0 WHERE "oCounter" IS NULL;
+UPDATE "StashScene" SET "playCount" = 0 WHERE "playCount" IS NULL;
+UPDATE "StashScene" SET "playDuration" = 0 WHERE "playDuration" IS NULL;
+
 -- Drop FTS triggers first (they reference StashScene)
 DROP TRIGGER IF EXISTS scene_fts_insert;
 DROP TRIGGER IF EXISTS scene_fts_delete;
@@ -175,7 +181,22 @@ CREATE TABLE "StashScene_new" (
     PRIMARY KEY ("id", "stashInstanceId")
 );
 
-INSERT INTO "StashScene_new" SELECT * FROM "StashScene";
+INSERT INTO "StashScene_new" (
+    "id", "stashInstanceId", "title", "code", "date", "studioId", "rating100", "duration",
+    "organized", "details", "director", "urls", "filePath", "fileBitRate", "fileFrameRate",
+    "fileWidth", "fileHeight", "fileVideoCodec", "fileAudioCodec", "fileSize",
+    "pathScreenshot", "pathPreview", "pathSprite", "pathVtt", "pathChaptersVtt",
+    "pathStream", "pathCaption", "streams", "oCounter", "playCount", "playDuration",
+    "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt", "inheritedTagIds", "phash", "phashes"
+)
+SELECT
+    "id", "stashInstanceId", "title", "code", "date", "studioId", "rating100", "duration",
+    "organized", "details", "director", "urls", "filePath", "fileBitRate", "fileFrameRate",
+    "fileWidth", "fileHeight", "fileVideoCodec", "fileAudioCodec", "fileSize",
+    "pathScreenshot", "pathPreview", "pathSprite", "pathVtt", "pathChaptersVtt",
+    "pathStream", "pathCaption", "streams", "oCounter", "playCount", "playDuration",
+    "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt", "inheritedTagIds", "phash", "phashes"
+FROM "StashScene";
 DROP TABLE "StashScene";
 ALTER TABLE "StashScene_new" RENAME TO "StashScene";
 
@@ -219,6 +240,13 @@ END;
 -- STEP 4: Recreate StashPerformer with composite primary key
 -- ============================================================================
 
+-- Backfill NULL boolean/integer fields to defaults before copying
+UPDATE "StashPerformer" SET "favorite" = 0 WHERE "favorite" IS NULL;
+UPDATE "StashPerformer" SET "sceneCount" = 0 WHERE "sceneCount" IS NULL;
+UPDATE "StashPerformer" SET "imageCount" = 0 WHERE "imageCount" IS NULL;
+UPDATE "StashPerformer" SET "galleryCount" = 0 WHERE "galleryCount" IS NULL;
+UPDATE "StashPerformer" SET "groupCount" = 0 WHERE "groupCount" IS NULL;
+
 CREATE TABLE "StashPerformer_new" (
     "id" TEXT NOT NULL,
     "stashInstanceId" TEXT NOT NULL DEFAULT 'default',
@@ -256,7 +284,22 @@ CREATE TABLE "StashPerformer_new" (
     PRIMARY KEY ("id", "stashInstanceId")
 );
 
-INSERT INTO "StashPerformer_new" SELECT * FROM "StashPerformer";
+INSERT INTO "StashPerformer_new" (
+    "id", "stashInstanceId", "stashIds", "name", "disambiguation", "gender", "birthdate",
+    "favorite", "rating100", "sceneCount", "imageCount", "galleryCount", "groupCount",
+    "details", "aliasList", "country", "ethnicity", "hairColor", "eyeColor",
+    "heightCm", "weightKg", "measurements", "fakeTits", "tattoos", "piercings",
+    "careerLength", "deathDate", "url", "imagePath", "stashCreatedAt", "stashUpdatedAt",
+    "syncedAt", "deletedAt"
+)
+SELECT
+    "id", "stashInstanceId", "stashIds", "name", "disambiguation", "gender", "birthdate",
+    "favorite", "rating100", "sceneCount", "imageCount", "galleryCount", "groupCount",
+    "details", "aliasList", "country", "ethnicity", "hairColor", "eyeColor",
+    "heightCm", "weightKg", "measurements", "fakeTits", "tattoos", "piercings",
+    "careerLength", "deathDate", "url", "imagePath", "stashCreatedAt", "stashUpdatedAt",
+    "syncedAt", "deletedAt"
+FROM "StashPerformer";
 DROP TABLE "StashPerformer";
 ALTER TABLE "StashPerformer_new" RENAME TO "StashPerformer";
 
@@ -272,6 +315,14 @@ CREATE INDEX "StashPerformer_stashInstanceId_idx" ON "StashPerformer"("stashInst
 -- ============================================================================
 -- STEP 5: Recreate StashStudio with composite primary key
 -- ============================================================================
+
+-- Backfill NULL boolean/integer fields to defaults before copying
+UPDATE "StashStudio" SET "favorite" = 0 WHERE "favorite" IS NULL;
+UPDATE "StashStudio" SET "sceneCount" = 0 WHERE "sceneCount" IS NULL;
+UPDATE "StashStudio" SET "imageCount" = 0 WHERE "imageCount" IS NULL;
+UPDATE "StashStudio" SET "galleryCount" = 0 WHERE "galleryCount" IS NULL;
+UPDATE "StashStudio" SET "performerCount" = 0 WHERE "performerCount" IS NULL;
+UPDATE "StashStudio" SET "groupCount" = 0 WHERE "groupCount" IS NULL;
 
 CREATE TABLE "StashStudio_new" (
     "id" TEXT NOT NULL,
@@ -296,7 +347,16 @@ CREATE TABLE "StashStudio_new" (
     PRIMARY KEY ("id", "stashInstanceId")
 );
 
-INSERT INTO "StashStudio_new" SELECT * FROM "StashStudio";
+INSERT INTO "StashStudio_new" (
+    "id", "stashInstanceId", "stashIds", "name", "parentId", "favorite", "rating100",
+    "sceneCount", "imageCount", "galleryCount", "performerCount", "groupCount",
+    "details", "url", "imagePath", "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+)
+SELECT
+    "id", "stashInstanceId", "stashIds", "name", "parentId", "favorite", "rating100",
+    "sceneCount", "imageCount", "galleryCount", "performerCount", "groupCount",
+    "details", "url", "imagePath", "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+FROM "StashStudio";
 DROP TABLE "StashStudio";
 ALTER TABLE "StashStudio_new" RENAME TO "StashStudio";
 
@@ -312,6 +372,17 @@ CREATE INDEX "StashStudio_stashInstanceId_idx" ON "StashStudio"("stashInstanceId
 -- ============================================================================
 -- STEP 6: Recreate StashTag with composite primary key
 -- ============================================================================
+
+-- Backfill NULL boolean/integer fields to defaults before copying
+UPDATE "StashTag" SET "favorite" = 0 WHERE "favorite" IS NULL;
+UPDATE "StashTag" SET "sceneCount" = 0 WHERE "sceneCount" IS NULL;
+UPDATE "StashTag" SET "imageCount" = 0 WHERE "imageCount" IS NULL;
+UPDATE "StashTag" SET "galleryCount" = 0 WHERE "galleryCount" IS NULL;
+UPDATE "StashTag" SET "performerCount" = 0 WHERE "performerCount" IS NULL;
+UPDATE "StashTag" SET "studioCount" = 0 WHERE "studioCount" IS NULL;
+UPDATE "StashTag" SET "groupCount" = 0 WHERE "groupCount" IS NULL;
+UPDATE "StashTag" SET "sceneMarkerCount" = 0 WHERE "sceneMarkerCount" IS NULL;
+UPDATE "StashTag" SET "sceneCountViaPerformers" = 0 WHERE "sceneCountViaPerformers" IS NULL;
 
 CREATE TABLE "StashTag_new" (
     "id" TEXT NOT NULL,
@@ -339,7 +410,20 @@ CREATE TABLE "StashTag_new" (
     PRIMARY KEY ("id", "stashInstanceId")
 );
 
-INSERT INTO "StashTag_new" SELECT * FROM "StashTag";
+INSERT INTO "StashTag_new" (
+    "id", "stashInstanceId", "stashIds", "name", "favorite", "color",
+    "sceneCount", "imageCount", "galleryCount", "performerCount", "studioCount",
+    "groupCount", "sceneMarkerCount", "sceneCountViaPerformers",
+    "description", "aliases", "parentIds", "imagePath",
+    "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+)
+SELECT
+    "id", "stashInstanceId", "stashIds", "name", "favorite", "color",
+    "sceneCount", "imageCount", "galleryCount", "performerCount", "studioCount",
+    "groupCount", "sceneMarkerCount", "sceneCountViaPerformers",
+    "description", "aliases", "parentIds", "imagePath",
+    "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+FROM "StashTag";
 DROP TABLE "StashTag";
 ALTER TABLE "StashTag_new" RENAME TO "StashTag";
 
@@ -353,6 +437,10 @@ CREATE INDEX "StashTag_stashInstanceId_idx" ON "StashTag"("stashInstanceId");
 -- ============================================================================
 -- STEP 7: Recreate StashGroup with composite primary key
 -- ============================================================================
+
+-- Backfill NULL integer fields to defaults before copying
+UPDATE "StashGroup" SET "sceneCount" = 0 WHERE "sceneCount" IS NULL;
+UPDATE "StashGroup" SET "performerCount" = 0 WHERE "performerCount" IS NULL;
 
 CREATE TABLE "StashGroup_new" (
     "id" TEXT NOT NULL,
@@ -376,7 +464,16 @@ CREATE TABLE "StashGroup_new" (
     PRIMARY KEY ("id", "stashInstanceId")
 );
 
-INSERT INTO "StashGroup_new" SELECT * FROM "StashGroup";
+INSERT INTO "StashGroup_new" (
+    "id", "stashInstanceId", "name", "date", "studioId", "rating100", "duration",
+    "sceneCount", "performerCount", "director", "synopsis", "urls",
+    "frontImagePath", "backImagePath", "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+)
+SELECT
+    "id", "stashInstanceId", "name", "date", "studioId", "rating100", "duration",
+    "sceneCount", "performerCount", "director", "synopsis", "urls",
+    "frontImagePath", "backImagePath", "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+FROM "StashGroup";
 DROP TABLE "StashGroup";
 ALTER TABLE "StashGroup_new" RENAME TO "StashGroup";
 
@@ -392,6 +489,9 @@ CREATE INDEX "StashGroup_stashInstanceId_idx" ON "StashGroup"("stashInstanceId")
 -- ============================================================================
 -- STEP 8: Recreate StashGallery with composite primary key
 -- ============================================================================
+
+-- Backfill NULL integer fields to defaults before copying
+UPDATE "StashGallery" SET "imageCount" = 0 WHERE "imageCount" IS NULL;
 
 CREATE TABLE "StashGallery_new" (
     "id" TEXT NOT NULL,
@@ -417,7 +517,16 @@ CREATE TABLE "StashGallery_new" (
     PRIMARY KEY ("id", "stashInstanceId")
 );
 
-INSERT INTO "StashGallery_new" SELECT * FROM "StashGallery";
+INSERT INTO "StashGallery_new" (
+    "id", "stashInstanceId", "title", "date", "studioId", "rating100", "coverImageId",
+    "imageCount", "details", "url", "code", "photographer", "urls",
+    "folderPath", "fileBasename", "coverPath", "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+)
+SELECT
+    "id", "stashInstanceId", "title", "date", "studioId", "rating100", "coverImageId",
+    "imageCount", "details", "url", "code", "photographer", "urls",
+    "folderPath", "fileBasename", "coverPath", "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+FROM "StashGallery";
 DROP TABLE "StashGallery";
 ALTER TABLE "StashGallery_new" RENAME TO "StashGallery";
 
@@ -435,6 +544,10 @@ CREATE INDEX "StashGallery_stashInstanceId_idx" ON "StashGallery"("stashInstance
 -- ============================================================================
 -- STEP 9: Recreate StashImage with composite primary key
 -- ============================================================================
+
+-- Backfill NULL boolean/integer fields to defaults before copying
+UPDATE "StashImage" SET "oCounter" = 0 WHERE "oCounter" IS NULL;
+UPDATE "StashImage" SET "organized" = 0 WHERE "organized" IS NULL;
 
 CREATE TABLE "StashImage_new" (
     "id" TEXT NOT NULL,
@@ -463,7 +576,18 @@ CREATE TABLE "StashImage_new" (
     PRIMARY KEY ("id", "stashInstanceId")
 );
 
-INSERT INTO "StashImage_new" SELECT * FROM "StashImage";
+INSERT INTO "StashImage_new" (
+    "id", "stashInstanceId", "title", "code", "details", "photographer", "urls",
+    "date", "studioId", "rating100", "oCounter", "organized", "filePath",
+    "width", "height", "fileSize", "pathThumbnail", "pathPreview", "pathImage",
+    "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+)
+SELECT
+    "id", "stashInstanceId", "title", "code", "details", "photographer", "urls",
+    "date", "studioId", "rating100", "oCounter", "organized", "filePath",
+    "width", "height", "fileSize", "pathThumbnail", "pathPreview", "pathImage",
+    "stashCreatedAt", "stashUpdatedAt", "syncedAt", "deletedAt"
+FROM "StashImage";
 DROP TABLE "StashImage";
 ALTER TABLE "StashImage_new" RENAME TO "StashImage";
 
@@ -480,6 +604,9 @@ CREATE INDEX "StashImage_stashInstanceId_idx" ON "StashImage"("stashInstanceId")
 -- ============================================================================
 -- STEP 10: Recreate StashClip with composite primary key
 -- ============================================================================
+
+-- Backfill NULL boolean fields to defaults before copying
+UPDATE "StashClip" SET "isGenerated" = 0 WHERE "isGenerated" IS NULL;
 
 CREATE TABLE "StashClip_new" (
     "id" TEXT NOT NULL,
