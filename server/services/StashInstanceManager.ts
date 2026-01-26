@@ -157,6 +157,17 @@ class StashInstanceManager {
   }
 
   /**
+   * Get all enabled instances with their configs.
+   * Used by sync service to iterate over all instances.
+   */
+  getAllEnabled(): Array<{ id: string; name: string }> {
+    return Array.from(this.configs.values()).map((c) => ({
+      id: c.id,
+      name: c.name,
+    }));
+  }
+
+  /**
    * Get the URL for a Stash instance (without /graphql suffix)
    * Used by proxy controllers to construct full URLs
    */
