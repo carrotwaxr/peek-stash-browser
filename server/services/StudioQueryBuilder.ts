@@ -56,7 +56,7 @@ class StudioQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashStudio s
-        LEFT JOIN StudioRating r ON s.id = r.studioId AND r.userId = ?
+        LEFT JOIN StudioRating r ON s.id = r.studioId AND s.stashInstanceId = r.instanceId AND r.userId = ?
         LEFT JOIN UserStudioStats us ON s.id = us.studioId AND us.userId = ?
     `.trim();
 
@@ -553,6 +553,7 @@ class StudioQueryBuilder {
   private transformRow(row: any): NormalizedStudio {
     const studio: any = {
       id: row.id,
+      instanceId: row.stashInstanceId,
       name: row.name,
       parent_studio: row.parentId ? { id: row.parentId, name: "" } : null,
       details: row.details || null,

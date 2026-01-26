@@ -57,8 +57,8 @@ class GalleryQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashGallery g
-        LEFT JOIN GalleryRating r ON g.id = r.galleryId AND r.userId = ?
-        LEFT JOIN StashImage ci ON g.coverImageId = ci.id
+        LEFT JOIN GalleryRating r ON g.id = r.galleryId AND g.stashInstanceId = r.instanceId AND r.userId = ?
+        LEFT JOIN StashImage ci ON g.coverImageId = ci.id AND g.stashInstanceId = ci.stashInstanceId
     `.trim();
 
     if (applyExclusions) {
@@ -717,6 +717,7 @@ class GalleryQueryBuilder {
 
     const gallery: any = {
       id: row.id,
+      instanceId: row.stashInstanceId,
       title: row.title || getGalleryFallbackTitle(row.folderPath, row.fileBasename),
       date: row.date || null,
       code: row.code || null,

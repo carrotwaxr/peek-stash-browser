@@ -149,10 +149,12 @@ export const findTags = async (
       // Get all tags for hierarchy lookup, then hydrate
       const allTags = await stashEntityService.getAllTags();
       const allHydrated = await hydrateTagRelationships(allTags);
-      hydratedTags = allHydrated.filter((t) => resultTags.some((r) => r.id === t.id));
+      hydratedTags = allHydrated.filter((t) =>
+        resultTags.some((r) => r.id === t.id && r.instanceId === t.instanceId)
+      );
       // Merge the computed counts back
       hydratedTags = hydratedTags.map((h) => {
-        const result = resultTags.find((r) => r.id === h.id);
+        const result = resultTags.find((r) => r.id === h.id && r.instanceId === h.instanceId);
         return result ? { ...h, ...result } : h;
       });
     } else {

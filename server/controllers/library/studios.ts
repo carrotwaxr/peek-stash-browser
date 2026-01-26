@@ -147,10 +147,14 @@ export const findStudios = async (
       // Get all studios for hierarchy lookup, then hydrate
       const allStudios = await stashEntityService.getAllStudios();
       const allHydrated = await hydrateStudioRelationships(allStudios);
-      hydratedStudios = allHydrated.filter((s) => resultStudios.some((r) => r.id === s.id));
+      // Filter by both id AND instanceId to handle multi-instance correctly
+      hydratedStudios = allHydrated.filter((s) =>
+        resultStudios.some((r) => r.id === s.id && r.instanceId === s.instanceId)
+      );
       // Merge the computed counts back (preserving hydrated parent_studio and child_studios)
       hydratedStudios = hydratedStudios.map((h) => {
-        const result = resultStudios.find((r) => r.id === h.id);
+        // Match by both id AND instanceId
+        const result = resultStudios.find((r) => r.id === h.id && r.instanceId === h.instanceId);
         if (!result) return h;
         return {
           ...result,

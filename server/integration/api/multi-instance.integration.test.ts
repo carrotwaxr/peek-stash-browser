@@ -145,9 +145,10 @@ describe("Multi-Instance Support", () => {
   });
 
   afterAll(async () => {
-    // Reset user instance selection to all
+    // Restore user instance selection to test-only (so subsequent tests aren't affected)
+    // Other tests expect to query only the test instance for consistent results
     await adminClient.put("/api/user/stash-instances", {
-      instanceIds: [],
+      instanceIds: [testInstanceId],
     });
     // Note: We don't remove the production instance - it's useful to keep for future test runs
   });

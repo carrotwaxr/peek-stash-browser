@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import { adminClient, guestClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 // Response type for /api/library/galleries
@@ -13,6 +13,8 @@ interface FindGalleriesResponse {
 describe("Gallery API", () => {
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    // Select only test instance to avoid ID collisions with other instances
+    await selectTestInstanceOnly();
   });
 
   describe("POST /api/library/galleries", () => {

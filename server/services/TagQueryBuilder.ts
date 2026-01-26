@@ -57,7 +57,7 @@ class TagQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashTag t
-        LEFT JOIN TagRating r ON t.id = r.tagId AND r.userId = ?
+        LEFT JOIN TagRating r ON t.id = r.tagId AND t.stashInstanceId = r.instanceId AND r.userId = ?
         LEFT JOIN UserTagStats us ON t.id = us.tagId AND us.userId = ?
     `.trim();
 
@@ -726,6 +726,7 @@ class TagQueryBuilder {
 
     const tag: any = {
       id: row.id,
+      instanceId: row.stashInstanceId,
       name: row.name,
       description: row.description || null,
       aliases: this.parseJsonArray(row.aliases),

@@ -73,8 +73,8 @@ class ImageQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashImage i
-        LEFT JOIN ImageRating r ON i.id = r.imageId AND r.userId = ?
-        LEFT JOIN ImageViewHistory v ON i.id = v.imageId AND v.userId = ?
+        LEFT JOIN ImageRating r ON i.id = r.imageId AND i.stashInstanceId = r.instanceId AND r.userId = ?
+        LEFT JOIN ImageViewHistory v ON i.id = v.imageId AND i.stashInstanceId = v.instanceId AND v.userId = ?
     `.trim();
 
     if (applyExclusions) {

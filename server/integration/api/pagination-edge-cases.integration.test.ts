@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 import { TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
@@ -46,6 +46,8 @@ interface FindTagsResponse {
 describe("Pagination Edge Cases", () => {
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    // Select only test instance for consistent pagination counts
+    await selectTestInstanceOnly();
   });
 
   describe("per_page variations", () => {

@@ -56,7 +56,7 @@ class GroupQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashGroup g
-        LEFT JOIN GroupRating r ON g.id = r.groupId AND r.userId = ?
+        LEFT JOIN GroupRating r ON g.id = r.groupId AND g.stashInstanceId = r.instanceId AND r.userId = ?
     `.trim();
 
     if (applyExclusions) {

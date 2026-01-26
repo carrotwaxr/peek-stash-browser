@@ -67,8 +67,8 @@ class SceneQueryBuilder {
   private buildFromClause(userId: number, applyExclusions: boolean = true): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashScene s
-        LEFT JOIN SceneRating r ON s.id = r.sceneId AND r.userId = ?
-        LEFT JOIN WatchHistory w ON s.id = w.sceneId AND w.userId = ?
+        LEFT JOIN SceneRating r ON s.id = r.sceneId AND s.stashInstanceId = r.instanceId AND r.userId = ?
+        LEFT JOIN WatchHistory w ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND w.userId = ?
     `.trim();
 
     if (applyExclusions) {
