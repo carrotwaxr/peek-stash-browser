@@ -20,10 +20,23 @@ export async function setup() {
   }
   dotenv.config({ path: envPath });
 
+  // Prefer STASH_TEST_* env vars for integration tests if available
+  // This allows running tests against a dedicated test Stash instance
+  if (process.env.STASH_TEST_URL && process.env.STASH_TEST_API_KEY) {
+    console.log("[Integration Tests] Using test Stash instance (STASH_TEST_*)");
+    // Save original (production) credentials for multi-instance tests
+    // These allow the test to add production as a second read-only instance
+    process.env.STASH_URL_ORIGINAL = process.env.STASH_URL;
+    process.env.STASH_API_KEY_ORIGINAL = process.env.STASH_API_KEY;
+    // Override with test instance for primary instance
+    process.env.STASH_URL = process.env.STASH_TEST_URL;
+    process.env.STASH_API_KEY = process.env.STASH_TEST_API_KEY;
+  }
+
   // Validate required env vars
   if (!process.env.STASH_URL || !process.env.STASH_API_KEY) {
     throw new Error(
-      "Integration tests require STASH_URL and STASH_API_KEY in .env"
+      "Integration tests require STASH_URL and STASH_API_KEY (or STASH_TEST_*) in .env"
     );
   }
 
