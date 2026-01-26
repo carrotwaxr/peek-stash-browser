@@ -180,8 +180,8 @@ describe("ImageQueryBuilder", () => {
       });
       // Set studio on image
       await prisma.stashImage.update({
-        where: { id: testImageIds[0] },
-        data: { studioId: "studio-1" },
+        where: { id_stashInstanceId: { id: testImageIds[0], stashInstanceId: "default" } },
+        data: { studioId: "studio-1", studioInstanceId: "default" },
       });
       // Link image to gallery
       await prisma.imageGallery.create({
