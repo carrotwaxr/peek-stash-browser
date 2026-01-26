@@ -117,6 +117,10 @@ export class StashClient {
   configuration = (...args: Parameters<ReturnType<typeof getSdk>["Configuration"]>) =>
     this.sdk.Configuration(...args);
 
+  // Version info
+  version = (...args: Parameters<ReturnType<typeof getSdk>["Version"]>) =>
+    this.sdk.Version(...args);
+
   // Metadata operations
   metadataScan = (...args: Parameters<ReturnType<typeof getSdk>["metadataScan"]>) =>
     this.sdk.metadataScan(...args);

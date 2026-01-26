@@ -12,11 +12,11 @@ vi.mock("../../prisma/singleton.js", () => ({
       delete: vi.fn(),
     },
     stashScene: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(), // Changed from findUnique for composite primary key
       findMany: vi.fn(),
     },
     stashImage: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(), // Changed from findUnique for composite primary key
     },
     playlist: {
       findUnique: vi.fn(),
@@ -42,7 +42,7 @@ describe("DownloadService", () => {
         fileSize: BigInt(1000000),
       };
 
-      vi.mocked(prisma.stashScene.findUnique).mockResolvedValue(mockScene as any);
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(mockScene as any);
       vi.mocked(prisma.download.create).mockResolvedValue({
         id: 1,
         userId: 1,
@@ -69,7 +69,7 @@ describe("DownloadService", () => {
     });
 
     it("should throw if scene not found", async () => {
-      vi.mocked(prisma.stashScene.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.stashScene.findFirst).mockResolvedValue(null);
 
       await expect(service.createSceneDownload(1, "unknown")).rejects.toThrow(
         "Scene not found"
@@ -85,7 +85,7 @@ describe("DownloadService", () => {
         fileSize: BigInt(500000),
       };
 
-      vi.mocked(prisma.stashImage.findUnique).mockResolvedValue(mockImage as any);
+      vi.mocked(prisma.stashImage.findFirst).mockResolvedValue(mockImage as any);
       vi.mocked(prisma.download.create).mockResolvedValue({
         id: 2,
         userId: 1,
@@ -112,7 +112,7 @@ describe("DownloadService", () => {
     });
 
     it("should throw if image not found", async () => {
-      vi.mocked(prisma.stashImage.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.stashImage.findFirst).mockResolvedValue(null);
 
       await expect(service.createImageDownload(1, "unknown")).rejects.toThrow(
         "Image not found"

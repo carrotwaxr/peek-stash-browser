@@ -179,6 +179,21 @@ class StashSyncService extends EventEmitter {
   private batchItemCount = 0; // Track items within current batch for progress logging
 
   /**
+   * Get the Stash client for the specified instance ID, or default if not specified.
+   * This ensures sync operations target the correct Stash instance.
+   */
+  private getStashClient(stashInstanceId?: string) {
+    if (stashInstanceId) {
+      const client = stashInstanceManager.get(stashInstanceId);
+      if (!client) {
+        throw new Error(`Stash instance not found: ${stashInstanceId}`);
+      }
+      return client;
+    }
+    return stashInstanceManager.getDefault();
+  }
+
+  /**
    * Escape a string for SQL, handling quotes
    */
   private escape(value: string): string {
@@ -214,6 +229,9 @@ class StashSyncService extends EventEmitter {
   /**
    * Full sync - fetches all entities from Stash
    * Used on first run or when incremental sync fails
+   *
+   * If stashInstanceId is provided, syncs only that instance.
+   * If not provided, syncs ALL enabled instances.
    */
   async fullSync(stashInstanceId?: string): Promise<SyncResult[]> {
     if (this.syncInProgress) {
@@ -222,11 +240,61 @@ class StashSyncService extends EventEmitter {
 
     this.syncInProgress = true;
     this.abortController = new AbortController();
+
+    try {
+      // If no instance specified, sync all enabled instances
+      if (!stashInstanceId) {
+        return await this.fullSyncAllInstances();
+      }
+      return await this.fullSyncInstance(stashInstanceId);
+    } finally {
+      this.syncInProgress = false;
+      this.abortController = null;
+    }
+  }
+
+  /**
+   * Full sync all enabled instances
+   * Note: Assumes syncInProgress is already set by caller
+   */
+  private async fullSyncAllInstances(): Promise<SyncResult[]> {
+    const enabledInstances = stashInstanceManager.getAllEnabled();
+
+    if (enabledInstances.length === 0) {
+      logger.warn("No enabled Stash instances to sync");
+      return [];
+    }
+
+    logger.info(`Starting full sync for ${enabledInstances.length} instance(s)...`);
+    const allResults: SyncResult[] = [];
+
+    for (const instance of enabledInstances) {
+      logger.info(`Syncing instance: ${instance.name} (${instance.id})`);
+      try {
+        const results = await this.fullSyncInstance(instance.id);
+        allResults.push(...results);
+      } catch (error) {
+        logger.error(`Failed to sync instance ${instance.name}`, {
+          instanceId: instance.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue with other instances
+      }
+    }
+
+    return allResults;
+  }
+
+  /**
+   * Full sync a single instance
+   * Note: Assumes syncInProgress is already set by caller
+   */
+  private async fullSyncInstance(stashInstanceId: string): Promise<SyncResult[]> {
     const startTime = Date.now();
     const results: SyncResult[] = [];
 
     try {
-      logger.info("Starting full sync...");
+      logger.info("Starting full sync...", { stashInstanceId });
 
       // Sync each entity type in order (dependencies first)
       // Tags must be synced first since other entities reference them via junction tables
@@ -328,9 +396,6 @@ class StashSyncService extends EventEmitter {
       }
 
       throw error;
-    } finally {
-      this.syncInProgress = false;
-      this.abortController = null;
     }
   }
 
@@ -348,11 +413,61 @@ class StashSyncService extends EventEmitter {
 
     this.syncInProgress = true;
     this.abortController = new AbortController();
+
+    try {
+      // If no instance specified, sync all enabled instances
+      if (!stashInstanceId) {
+        return await this.smartIncrementalSyncAllInstances();
+      }
+      return await this.smartIncrementalSyncInstance(stashInstanceId);
+    } finally {
+      this.syncInProgress = false;
+      this.abortController = null;
+    }
+  }
+
+  /**
+   * Smart incremental sync all enabled instances
+   * Note: Assumes syncInProgress is already set by caller
+   */
+  private async smartIncrementalSyncAllInstances(): Promise<SyncResult[]> {
+    const enabledInstances = stashInstanceManager.getAllEnabled();
+
+    if (enabledInstances.length === 0) {
+      logger.warn("No enabled Stash instances to sync");
+      return [];
+    }
+
+    logger.info(`Starting smart incremental sync for ${enabledInstances.length} instance(s)...`);
+    const allResults: SyncResult[] = [];
+
+    for (const instance of enabledInstances) {
+      logger.info(`Smart sync instance: ${instance.name} (${instance.id})`);
+      try {
+        const results = await this.smartIncrementalSyncInstance(instance.id);
+        allResults.push(...results);
+      } catch (error) {
+        logger.error(`Failed to smart sync instance ${instance.name}`, {
+          instanceId: instance.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue with other instances
+      }
+    }
+
+    return allResults;
+  }
+
+  /**
+   * Smart incremental sync a single instance
+   * Note: Assumes syncInProgress is already set by caller
+   */
+  private async smartIncrementalSyncInstance(stashInstanceId: string): Promise<SyncResult[]> {
     const startTime = Date.now();
     const results: SyncResult[] = [];
 
     try {
-      logger.info("Starting smart incremental sync...");
+      logger.info("Starting smart incremental sync...", { stashInstanceId });
 
       // Entity types in dependency order
       const entityTypes: EntityType[] = [
@@ -470,9 +585,6 @@ class StashSyncService extends EventEmitter {
       }
 
       throw error;
-    } finally {
-      this.syncInProgress = false;
-      this.abortController = null;
     }
   }
 
@@ -522,9 +634,9 @@ class StashSyncService extends EventEmitter {
   private async getChangeCount(
     entityType: EntityType,
     since: string,
-    _stashInstanceId?: string
+    stashInstanceId?: string
   ): Promise<number> {
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     const filter = {
       updated_at: { modifier: "GREATER_THAN", value: formatTimestampForStash(since) },
     };
@@ -765,12 +877,12 @@ class StashSyncService extends EventEmitter {
 
     if (action === "delete") {
       // Soft delete the entity
-      await this.softDeleteEntity(entityType, entityId);
+      await this.softDeleteEntity(entityType, entityId, stashInstanceId);
       return;
     }
 
     // Fetch and upsert the entity
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
 
     switch (entityType) {
       case "scene": {
@@ -838,7 +950,7 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     logger.info("Syncing scenes...");
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
@@ -945,13 +1057,14 @@ class StashSyncService extends EventEmitter {
     if (validScenes.length === 0) return;
 
     const sceneIds = validScenes.map((s) => s.id);
+    const instanceId = stashInstanceId || 'default';
 
     // Bulk delete all junction records for this batch
     await Promise.all([
-      prisma.scenePerformer.deleteMany({ where: { sceneId: { in: sceneIds } } }),
-      prisma.sceneTag.deleteMany({ where: { sceneId: { in: sceneIds } } }),
-      prisma.sceneGroup.deleteMany({ where: { sceneId: { in: sceneIds } } }),
-      prisma.sceneGallery.deleteMany({ where: { sceneId: { in: sceneIds } } }),
+      prisma.scenePerformer.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
+      prisma.sceneTag.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
+      prisma.sceneGroup.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
+      prisma.sceneGallery.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
     ]);
 
     // Build bulk scene upsert using raw SQL
@@ -1013,7 +1126,7 @@ class StashSyncService extends EventEmitter {
       streams, oCounter, playCount, playDuration, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt, phash, phashes
     ) VALUES ${sceneValues}
-    ON CONFLICT(id) DO UPDATE SET
+    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
       title = excluded.title,
       code = excluded.code,
       date = excluded.date,
@@ -1061,13 +1174,15 @@ class StashSyncService extends EventEmitter {
       for (const p of scene.performers || []) {
         if (validateEntityId(p.id)) {
           performerRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(p.id)}')`
+            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(p.id)}', '${this.escape(instanceId)}')`
           );
         }
       }
       for (const t of scene.tags || []) {
         if (validateEntityId(t.id)) {
-          tagRecords.push(`('${this.escape(scene.id)}', '${this.escape(t.id)}')`);
+          tagRecords.push(
+            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`
+          );
         }
       }
       for (const g of scene.groups || []) {
@@ -1075,14 +1190,14 @@ class StashSyncService extends EventEmitter {
         if (validateEntityId(groupObj.id)) {
           const index = (g as any).scene_index ?? "NULL";
           groupRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(groupObj.id)}', ${index})`
+            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(groupObj.id)}', '${this.escape(instanceId)}', ${index})`
           );
         }
       }
       for (const g of scene.galleries || []) {
         if (validateEntityId(g.id)) {
           galleryRecords.push(
-            `('${this.escape(scene.id)}', '${this.escape(g.id)}')`
+            `('${this.escape(scene.id)}', '${this.escape(instanceId)}', '${this.escape(g.id)}', '${this.escape(instanceId)}')`
           );
         }
       }
@@ -1094,28 +1209,28 @@ class StashSyncService extends EventEmitter {
     if (performerRecords.length > 0) {
       inserts.push(
         prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO ScenePerformer (sceneId, performerId) VALUES ${performerRecords.join(",")}`
+          `INSERT OR IGNORE INTO ScenePerformer (sceneId, sceneInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(",")}`
         )
       );
     }
     if (tagRecords.length > 0) {
       inserts.push(
         prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO SceneTag (sceneId, tagId) VALUES ${tagRecords.join(",")}`
+          `INSERT OR IGNORE INTO SceneTag (sceneId, sceneInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(",")}`
         )
       );
     }
     if (groupRecords.length > 0) {
       inserts.push(
         prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO SceneGroup (sceneId, groupId, sceneIndex) VALUES ${groupRecords.join(",")}`
+          `INSERT OR IGNORE INTO SceneGroup (sceneId, sceneInstanceId, groupId, groupInstanceId, sceneIndex) VALUES ${groupRecords.join(",")}`
         )
       );
     }
     if (galleryRecords.length > 0) {
       inserts.push(
         prisma.$executeRawUnsafe(
-          `INSERT OR IGNORE INTO SceneGallery (sceneId, galleryId) VALUES ${galleryRecords.join(",")}`
+          `INSERT OR IGNORE INTO SceneGallery (sceneId, sceneInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(",")}`
         )
       );
     }
@@ -1135,7 +1250,7 @@ class StashSyncService extends EventEmitter {
     const plural = ENTITY_PLURALS[entityType];
     logger.info(`Checking for deleted ${plural}...`);
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
 
     // Larger page size for ID-only fetches (IDs are small strings)
     const CLEANUP_PAGE_SIZE = 5000;
@@ -1282,10 +1397,11 @@ class StashSyncService extends EventEmitter {
 
             // Soft-delete in batches
             const deleteIds = scenesToDelete.map((s) => s.id);
+            const instanceId = stashInstanceId || 'default';
             for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
               const batch = deleteIds.slice(i, i + BATCH_SIZE);
               await prisma.stashScene.updateMany({
-                where: { id: { in: batch } },
+                where: { id: { in: batch }, stashInstanceId: instanceId },
                 data: { deletedAt: now },
               });
             }
@@ -1296,48 +1412,62 @@ class StashSyncService extends EventEmitter {
           await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS _stash_scene_ids`);
           break;
         }
-        case "performer":
+        case "performer": {
+          const cleanupInstanceId = stashInstanceId || 'default';
           deletedCount = (await prisma.stashPerformer.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
-        case "studio":
+        }
+        case "studio": {
+          const cleanupInstanceId = stashInstanceId || 'default';
           deletedCount = (await prisma.stashStudio.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
-        case "tag":
+        }
+        case "tag": {
+          const cleanupInstanceId = stashInstanceId || 'default';
           deletedCount = (await prisma.stashTag.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
-        case "group":
+        }
+        case "group": {
+          const cleanupInstanceId = stashInstanceId || 'default';
           deletedCount = (await prisma.stashGroup.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
-        case "gallery":
+        }
+        case "gallery": {
+          const cleanupInstanceId = stashInstanceId || 'default';
           deletedCount = (await prisma.stashGallery.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
-        case "image":
+        }
+        case "image": {
+          const cleanupInstanceId = stashInstanceId || 'default';
           deletedCount = (await prisma.stashImage.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
-        case "clip":
+        }
+        case "clip": {
+          const cleanupInstanceId = stashInstanceId || 'default';
           deletedCount = (await prisma.stashClip.updateMany({
-            where: { deletedAt: null, stashInstanceId: stashInstanceId ?? null, id: { notIn: stashIds } },
+            where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
           })).count;
           break;
+        }
       }
 
       if (deletedCount === 0) {
@@ -1369,7 +1499,7 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     logger.info("Syncing performers...");
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
@@ -1520,7 +1650,7 @@ class StashSyncService extends EventEmitter {
       sceneCount, imageCount, galleryCount, groupCount,
       stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
-    ON CONFLICT(id) DO UPDATE SET
+    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
       stashIds = excluded.stashIds,
       name = excluded.name,
       disambiguation = excluded.disambiguation,
@@ -1555,6 +1685,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync performer tags to PerformerTag junction table
+    const instanceId = stashInstanceId || 'default';
     for (const performer of validPerformers) {
       const performerTags = (performer as any).tags;
       if (performerTags && Array.isArray(performerTags) && performerTags.length > 0) {
@@ -1562,18 +1693,18 @@ class StashSyncService extends EventEmitter {
 
         // Delete existing tags for this performer
         await prisma.$executeRawUnsafe(
-          `DELETE FROM PerformerTag WHERE performerId = '${this.escape(performerId)}'`
+          `DELETE FROM PerformerTag WHERE performerId = '${this.escape(performerId)}' AND performerInstanceId = '${this.escape(instanceId)}'`
         );
 
         // Insert new tags (filter to valid tag IDs)
         const validTags = performerTags.filter((t: any) => t?.id && validateEntityId(t.id));
         if (validTags.length > 0) {
           const tagValues = validTags
-            .map((t: any) => `('${this.escape(performerId)}', '${this.escape(t.id)}')`)
+            .map((t: any) => `('${this.escape(performerId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
             .join(", ");
 
           await prisma.$executeRawUnsafe(
-            `INSERT OR IGNORE INTO PerformerTag (performerId, tagId) VALUES ${tagValues}`
+            `INSERT OR IGNORE INTO PerformerTag (performerId, performerInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
           );
         }
       }
@@ -1589,7 +1720,7 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     logger.info("Syncing studios...");
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
@@ -1724,7 +1855,7 @@ class StashSyncService extends EventEmitter {
       details, url, imagePath, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
-    ON CONFLICT(id) DO UPDATE SET
+    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
       stashIds = excluded.stashIds,
       name = excluded.name,
       parentId = excluded.parentId,
@@ -1745,6 +1876,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync studio tags to StudioTag junction table
+    const instanceId = stashInstanceId || 'default';
     for (const studio of validStudios) {
       const studioTags = (studio as any).tags;
       if (studioTags && Array.isArray(studioTags) && studioTags.length > 0) {
@@ -1752,18 +1884,18 @@ class StashSyncService extends EventEmitter {
 
         // Delete existing tags for this studio
         await prisma.$executeRawUnsafe(
-          `DELETE FROM StudioTag WHERE studioId = '${this.escape(studioId)}'`
+          `DELETE FROM StudioTag WHERE studioId = '${this.escape(studioId)}' AND studioInstanceId = '${this.escape(instanceId)}'`
         );
 
         // Insert new tags (filter to valid tag IDs)
         const validTags = studioTags.filter((t: any) => t?.id && validateEntityId(t.id));
         if (validTags.length > 0) {
           const tagValues = validTags
-            .map((t: any) => `('${this.escape(studioId)}', '${this.escape(t.id)}')`)
+            .map((t: any) => `('${this.escape(studioId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
             .join(", ");
 
           await prisma.$executeRawUnsafe(
-            `INSERT OR IGNORE INTO StudioTag (studioId, tagId) VALUES ${tagValues}`
+            `INSERT OR IGNORE INTO StudioTag (studioId, studioInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
           );
         }
       }
@@ -1779,7 +1911,7 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     logger.info("Syncing tags...");
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
@@ -1914,7 +2046,7 @@ class StashSyncService extends EventEmitter {
       sceneCount, imageCount, galleryCount, performerCount, studioCount, groupCount, sceneMarkerCount,
       description, aliases, parentIds, imagePath, color, stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
-    ON CONFLICT(id) DO UPDATE SET
+    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
       stashIds = excluded.stashIds,
       name = excluded.name,
       favorite = excluded.favorite,
@@ -1946,7 +2078,7 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     logger.info("Syncing groups...");
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
@@ -2070,7 +2202,7 @@ class StashSyncService extends EventEmitter {
       director, synopsis, urls, frontImagePath, backImagePath, stashCreatedAt,
       stashUpdatedAt, syncedAt, deletedAt
     ) VALUES ${values}
-    ON CONFLICT(id) DO UPDATE SET
+    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
       name = excluded.name,
       date = excluded.date,
       studioId = excluded.studioId,
@@ -2090,6 +2222,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync group tags to GroupTag junction table
+    const instanceId = stashInstanceId || 'default';
     for (const group of validGroups) {
       const groupTags = (group as any).tags;
       if (groupTags && Array.isArray(groupTags) && groupTags.length > 0) {
@@ -2097,18 +2230,18 @@ class StashSyncService extends EventEmitter {
 
         // Delete existing tags for this group
         await prisma.$executeRawUnsafe(
-          `DELETE FROM GroupTag WHERE groupId = '${this.escape(groupId)}'`
+          `DELETE FROM GroupTag WHERE groupId = '${this.escape(groupId)}' AND groupInstanceId = '${this.escape(instanceId)}'`
         );
 
         // Insert new tags (filter to valid tag IDs)
         const validTags = groupTags.filter((t: any) => t?.id && validateEntityId(t.id));
         if (validTags.length > 0) {
           const tagValues = validTags
-            .map((t: any) => `('${this.escape(groupId)}', '${this.escape(t.id)}')`)
+            .map((t: any) => `('${this.escape(groupId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
             .join(", ");
 
           await prisma.$executeRawUnsafe(
-            `INSERT OR IGNORE INTO GroupTag (groupId, tagId) VALUES ${tagValues}`
+            `INSERT OR IGNORE INTO GroupTag (groupId, groupInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
           );
         }
       }
@@ -2124,7 +2257,7 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     logger.info("Syncing galleries...");
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
@@ -2255,7 +2388,7 @@ class StashSyncService extends EventEmitter {
       details, url, code, photographer, urls, folderPath, fileBasename, coverPath, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt
     ) VALUES ${values}
-    ON CONFLICT(id) DO UPDATE SET
+    ON CONFLICT(id, stashInstanceId) DO UPDATE SET
       title = excluded.title,
       date = excluded.date,
       studioId = excluded.studioId,
@@ -2277,6 +2410,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync gallery performers (junction table)
+    const instanceId = stashInstanceId || 'default';
     const performerInserts: { galleryId: string; performerId: string }[] = [];
     for (const gallery of validGalleries) {
       if (gallery.performers && gallery.performers.length > 0) {
@@ -2294,17 +2428,17 @@ class StashSyncService extends EventEmitter {
     // Delete existing gallery-performer relationships for these galleries
     const galleryIds = validGalleries.map((g) => `'${this.escape(g.id)}'`).join(",");
     await prisma.$executeRawUnsafe(`
-      DELETE FROM GalleryPerformer WHERE galleryId IN (${galleryIds})
+      DELETE FROM GalleryPerformer WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${this.escape(instanceId)}'
     `);
 
     // Insert new gallery-performer relationships
     if (performerInserts.length > 0) {
       const performerValues = performerInserts
-        .map((p) => `('${this.escape(p.galleryId)}', '${this.escape(p.performerId)}')`)
+        .map((p) => `('${this.escape(p.galleryId)}', '${this.escape(instanceId)}', '${this.escape(p.performerId)}', '${this.escape(instanceId)}')`)
         .join(",\n");
 
       await prisma.$executeRawUnsafe(`
-        INSERT OR IGNORE INTO GalleryPerformer (galleryId, performerId)
+        INSERT OR IGNORE INTO GalleryPerformer (galleryId, galleryInstanceId, performerId, performerInstanceId)
         VALUES ${performerValues}
       `);
     }
@@ -2327,17 +2461,17 @@ class StashSyncService extends EventEmitter {
 
     // Delete existing gallery-tag relationships for these galleries
     await prisma.$executeRawUnsafe(`
-      DELETE FROM GalleryTag WHERE galleryId IN (${galleryIds})
+      DELETE FROM GalleryTag WHERE galleryId IN (${galleryIds}) AND galleryInstanceId = '${this.escape(instanceId)}'
     `);
 
     // Insert new gallery-tag relationships
     if (tagInserts.length > 0) {
       const tagValues = tagInserts
-        .map((t) => `('${this.escape(t.galleryId)}', '${this.escape(t.tagId)}')`)
+        .map((t) => `('${this.escape(t.galleryId)}', '${this.escape(instanceId)}', '${this.escape(t.tagId)}', '${this.escape(instanceId)}')`)
         .join(",\n");
 
       await prisma.$executeRawUnsafe(`
-        INSERT OR IGNORE INTO GalleryTag (galleryId, tagId)
+        INSERT OR IGNORE INTO GalleryTag (galleryId, galleryInstanceId, tagId, tagInstanceId)
         VALUES ${tagValues}
       `);
     }
@@ -2352,7 +2486,7 @@ class StashSyncService extends EventEmitter {
   ): Promise<SyncResult> {
     logger.info("Syncing images...");
     const startTime = Date.now();
-    const stash = stashInstanceManager.getDefault();
+    const stash = this.getStashClient(stashInstanceId);
     let page = 1;
     let totalSynced = 0;
     let totalCount = 0;
@@ -2440,7 +2574,7 @@ class StashSyncService extends EventEmitter {
   async syncClips(stashInstanceId?: string, isFullSync = false, since?: string): Promise<SyncResult> {
     logger.info("Syncing clips...");
     const startTime = Date.now();
-    const client = stashInstanceManager.getDefault();
+    const client = this.getStashClient(stashInstanceId);
     let synced = 0;
     let totalCount = 0;
     let maxUpdatedAt: string | undefined;
@@ -2502,12 +2636,12 @@ class StashSyncService extends EventEmitter {
         const probeResults = await clipPreviewProber.probeBatch(previewUrls);
 
         // Upsert clips
+        const instanceId = stashInstanceId || 'default';
         for (let i = 0; i < markers.length; i++) {
           const marker = markers[i];
           const previewUrl = previewUrls[i];
 
           const clipData = {
-            stashInstanceId: stashInstanceId || null,
             sceneId: marker.scene.id,
             title: marker.title || null,
             seconds: marker.seconds,
@@ -2525,19 +2659,32 @@ class StashSyncService extends EventEmitter {
           };
 
           await prisma.stashClip.upsert({
-            where: { id: marker.id },
-            create: { id: marker.id, ...clipData },
+            where: {
+              id_stashInstanceId: {
+                id: marker.id,
+                stashInstanceId: instanceId,
+              },
+            },
+            create: { id: marker.id, stashInstanceId: instanceId, ...clipData },
             update: clipData,
           });
 
           // Sync clip tags (junction table)
-          await prisma.clipTag.deleteMany({ where: { clipId: marker.id } });
+          await prisma.clipTag.deleteMany({
+            where: {
+              clipId: marker.id,
+              clipInstanceId: instanceId,
+            },
+          });
 
           const tagIds = marker.tags.map((t) => t.id);
           if (tagIds.length > 0) {
-            await prisma.clipTag.createMany({
-              data: tagIds.map((tagId) => ({ clipId: marker.id, tagId })),
-            });
+            const tagValues = tagIds
+              .map((tagId) => `('${this.escape(marker.id)}', '${this.escape(instanceId)}', '${this.escape(tagId)}', '${this.escape(instanceId)}')`)
+              .join(", ");
+            await prisma.$executeRawUnsafe(
+              `INSERT OR IGNORE INTO ClipTag (clipId, clipInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+            );
           }
         }
 
@@ -2594,12 +2741,13 @@ class StashSyncService extends EventEmitter {
     if (validImages.length === 0) return;
 
     const imageIds = validImages.map((i: any) => i.id);
+    const instanceId = stashInstanceId || 'default';
 
     // Bulk delete junction records
     await Promise.all([
-      prisma.imagePerformer.deleteMany({ where: { imageId: { in: imageIds } } }),
-      prisma.imageTag.deleteMany({ where: { imageId: { in: imageIds } } }),
-      prisma.imageGallery.deleteMany({ where: { imageId: { in: imageIds } } }),
+      prisma.imagePerformer.deleteMany({ where: { imageId: { in: imageIds }, imageInstanceId: instanceId } }),
+      prisma.imageTag.deleteMany({ where: { imageId: { in: imageIds }, imageInstanceId: instanceId } }),
+      prisma.imageGallery.deleteMany({ where: { imageId: { in: imageIds }, imageInstanceId: instanceId } }),
     ]);
 
     // Build bulk image upsert
@@ -2639,7 +2787,7 @@ class StashSyncService extends EventEmitter {
         filePath, width, height, fileSize, pathThumbnail, pathPreview, pathImage,
         stashCreatedAt, stashUpdatedAt, syncedAt, deletedAt
       ) VALUES ${values}
-      ON CONFLICT(id) DO UPDATE SET
+      ON CONFLICT(id, stashInstanceId) DO UPDATE SET
         title = excluded.title,
         code = excluded.code,
         details = excluded.details,
@@ -2671,17 +2819,17 @@ class StashSyncService extends EventEmitter {
     for (const image of validImages) {
       for (const p of image.performers || []) {
         if (validateEntityId(p.id)) {
-          performerRecords.push(`('${this.escape(image.id)}', '${this.escape(p.id)}')`);
+          performerRecords.push(`('${this.escape(image.id)}', '${this.escape(instanceId)}', '${this.escape(p.id)}', '${this.escape(instanceId)}')`);
         }
       }
       for (const t of image.tags || []) {
         if (validateEntityId(t.id)) {
-          tagRecords.push(`('${this.escape(image.id)}', '${this.escape(t.id)}')`);
+          tagRecords.push(`('${this.escape(image.id)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`);
         }
       }
       for (const g of image.galleries || []) {
         if (validateEntityId(g.id)) {
-          galleryRecords.push(`('${this.escape(image.id)}', '${this.escape(g.id)}')`);
+          galleryRecords.push(`('${this.escape(image.id)}', '${this.escape(instanceId)}', '${this.escape(g.id)}', '${this.escape(instanceId)}')`);
         }
       }
     }
@@ -2691,184 +2839,21 @@ class StashSyncService extends EventEmitter {
 
     if (performerRecords.length > 0) {
       inserts.push(prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ImagePerformer (imageId, performerId) VALUES ${performerRecords.join(',')}`
+        `INSERT OR IGNORE INTO ImagePerformer (imageId, imageInstanceId, performerId, performerInstanceId) VALUES ${performerRecords.join(',')}`
       ));
     }
     if (tagRecords.length > 0) {
       inserts.push(prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ImageTag (imageId, tagId) VALUES ${tagRecords.join(',')}`
+        `INSERT OR IGNORE INTO ImageTag (imageId, imageInstanceId, tagId, tagInstanceId) VALUES ${tagRecords.join(',')}`
       ));
     }
     if (galleryRecords.length > 0) {
       inserts.push(prisma.$executeRawUnsafe(
-        `INSERT OR IGNORE INTO ImageGallery (imageId, galleryId) VALUES ${galleryRecords.join(',')}`
+        `INSERT OR IGNORE INTO ImageGallery (imageId, imageInstanceId, galleryId, galleryInstanceId) VALUES ${galleryRecords.join(',')}`
       ));
     }
 
     await Promise.all(inserts);
-  }
-
-  // ==================== Junction Table Sync ====================
-  // These methods use raw SQL INSERT OR IGNORE for performance:
-  // - Handles duplicates (existing relationships) silently
-  // - Handles FK constraint violations (orphaned references) silently
-  // - Much faster than individual upserts for batch operations
-
-  private async syncScenePerformers(sceneId: string, performers: any[]): Promise<void> {
-    if (performers.length === 0) {
-      // Delete all if no performers
-      await prisma.scenePerformer.deleteMany({ where: { sceneId } });
-      return;
-    }
-
-    const newPerformerIds = performers.map((p: any) => p.id);
-
-    // Delete removed performers
-    await prisma.scenePerformer.deleteMany({
-      where: {
-        sceneId,
-        performerId: { notIn: newPerformerIds },
-      },
-    });
-
-    // Batch insert with INSERT OR IGNORE (handles duplicates and FK violations)
-    const values = performers.map((p: any) => `('${sceneId}', '${p.id}')`).join(", ");
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "ScenePerformer" ("sceneId", "performerId") VALUES ${values}`
-    );
-  }
-
-  private async syncSceneTags(sceneId: string, tags: any[]): Promise<void> {
-    if (tags.length === 0) {
-      await prisma.sceneTag.deleteMany({ where: { sceneId } });
-      return;
-    }
-
-    const newTagIds = tags.map((t: any) => t.id);
-
-    await prisma.sceneTag.deleteMany({
-      where: {
-        sceneId,
-        tagId: { notIn: newTagIds },
-      },
-    });
-
-    const values = tags.map((t: any) => `('${sceneId}', '${t.id}')`).join(", ");
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "SceneTag" ("sceneId", "tagId") VALUES ${values}`
-    );
-  }
-
-  private async syncSceneGroups(sceneId: string, groups: any[]): Promise<void> {
-    if (groups.length === 0) {
-      await prisma.sceneGroup.deleteMany({ where: { sceneId } });
-      return;
-    }
-
-    const newGroupIds = groups.map((g: any) => (g.group || g).id);
-
-    await prisma.sceneGroup.deleteMany({
-      where: {
-        sceneId,
-        groupId: { notIn: newGroupIds },
-      },
-    });
-
-    // SceneGroup has sceneIndex field, use INSERT OR REPLACE to update it
-    const values = groups
-      .map((g: any) => {
-        const groupObj = g.group || g;
-        const sceneIndex = g.scene_index ?? "NULL";
-        return `('${sceneId}', '${groupObj.id}', ${sceneIndex})`;
-      })
-      .join(", ");
-    await prisma.$executeRawUnsafe(
-      `INSERT OR REPLACE INTO "SceneGroup" ("sceneId", "groupId", "sceneIndex") VALUES ${values}`
-    );
-  }
-
-  private async syncSceneGalleries(sceneId: string, galleries: any[]): Promise<void> {
-    if (galleries.length === 0) {
-      await prisma.sceneGallery.deleteMany({ where: { sceneId } });
-      return;
-    }
-
-    const newGalleryIds = galleries.map((g: any) => g.id);
-
-    await prisma.sceneGallery.deleteMany({
-      where: {
-        sceneId,
-        galleryId: { notIn: newGalleryIds },
-      },
-    });
-
-    const values = galleries.map((g: any) => `('${sceneId}', '${g.id}')`).join(", ");
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "SceneGallery" ("sceneId", "galleryId") VALUES ${values}`
-    );
-  }
-
-  private async syncImagePerformers(imageId: string, performers: any[]): Promise<void> {
-    if (performers.length === 0) {
-      await prisma.imagePerformer.deleteMany({ where: { imageId } });
-      return;
-    }
-
-    const newPerformerIds = performers.map((p: any) => p.id);
-
-    await prisma.imagePerformer.deleteMany({
-      where: {
-        imageId,
-        performerId: { notIn: newPerformerIds },
-      },
-    });
-
-    const values = performers.map((p: any) => `('${imageId}', '${p.id}')`).join(", ");
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "ImagePerformer" ("imageId", "performerId") VALUES ${values}`
-    );
-  }
-
-  private async syncImageTags(imageId: string, tags: any[]): Promise<void> {
-    if (tags.length === 0) {
-      await prisma.imageTag.deleteMany({ where: { imageId } });
-      return;
-    }
-
-    const newTagIds = tags.map((t: any) => t.id);
-
-    await prisma.imageTag.deleteMany({
-      where: {
-        imageId,
-        tagId: { notIn: newTagIds },
-      },
-    });
-
-    const values = tags.map((t: any) => `('${imageId}', '${t.id}')`).join(", ");
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "ImageTag" ("imageId", "tagId") VALUES ${values}`
-    );
-  }
-
-  private async syncImageGalleries(imageId: string, galleries: any[]): Promise<void> {
-    if (galleries.length === 0) {
-      await prisma.imageGallery.deleteMany({ where: { imageId } });
-      return;
-    }
-
-    const newGalleryIds = galleries.map((g: any) => g.id);
-
-    await prisma.imageGallery.deleteMany({
-      where: {
-        imageId,
-        galleryId: { notIn: newGalleryIds },
-      },
-    });
-
-    const values = galleries.map((g: any) => `('${imageId}', '${g.id}')`).join(", ");
-    await prisma.$executeRawUnsafe(
-      `INSERT OR IGNORE INTO "ImageGallery" ("imageId", "galleryId") VALUES ${values}`
-    );
   }
 
   // ==================== Helper Methods ====================
@@ -2879,49 +2864,56 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async softDeleteEntity(entityType: EntityType, entityId: string): Promise<void> {
+  private async softDeleteEntity(entityType: EntityType, entityId: string, stashInstanceId?: string): Promise<void> {
     const now = new Date();
+    const instanceId = stashInstanceId || 'default';
 
     switch (entityType) {
       case "scene":
         await prisma.stashScene.update({
-          where: { id: entityId },
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
           data: { deletedAt: now },
         });
         break;
       case "performer":
         await prisma.stashPerformer.update({
-          where: { id: entityId },
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
           data: { deletedAt: now },
         });
         break;
       case "studio":
         await prisma.stashStudio.update({
-          where: { id: entityId },
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
           data: { deletedAt: now },
         });
         break;
       case "tag":
         await prisma.stashTag.update({
-          where: { id: entityId },
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
           data: { deletedAt: now },
         });
         break;
       case "group":
         await prisma.stashGroup.update({
-          where: { id: entityId },
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
           data: { deletedAt: now },
         });
         break;
       case "gallery":
         await prisma.stashGallery.update({
-          where: { id: entityId },
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
           data: { deletedAt: now },
         });
         break;
       case "image":
         await prisma.stashImage.update({
-          where: { id: entityId },
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
+          data: { deletedAt: now },
+        });
+        break;
+      case "clip":
+        await prisma.stashClip.update({
+          where: { id_stashInstanceId: { id: entityId, stashInstanceId: instanceId } },
           data: { deletedAt: now },
         });
         break;
@@ -3109,14 +3101,15 @@ class StashSyncService extends EventEmitter {
       // 1. Finds all distinct scenes where a performer has a given tag
       // 2. Groups by tagId to get counts
       // 3. Updates all tags in one batch
+      // Note: Joins include instanceId matching for multi-instance support
       await prisma.$executeRaw`
         UPDATE StashTag
         SET sceneCountViaPerformers = COALESCE((
           SELECT COUNT(DISTINCT sp.sceneId)
           FROM PerformerTag pt
-          JOIN ScenePerformer sp ON sp.performerId = pt.performerId
-          JOIN StashScene s ON s.id = sp.sceneId AND s.deletedAt IS NULL
-          WHERE pt.tagId = StashTag.id
+          JOIN ScenePerformer sp ON sp.performerId = pt.performerId AND sp.performerInstanceId = pt.performerInstanceId
+          JOIN StashScene s ON s.id = sp.sceneId AND s.stashInstanceId = sp.sceneInstanceId AND s.deletedAt IS NULL
+          WHERE pt.tagId = StashTag.id AND pt.tagInstanceId = StashTag.stashInstanceId
         ), 0)
         WHERE StashTag.deletedAt IS NULL
       `;

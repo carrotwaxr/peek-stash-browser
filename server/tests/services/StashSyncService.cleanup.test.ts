@@ -259,7 +259,7 @@ describe("StashSyncService Cleanup", () => {
       expect(result).toBe(2);
       // New implementation uses batched IN clauses for scenes to delete
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ["4", "5"] } },
+        where: { id: { in: ["4", "5"] }, stashInstanceId: "default" },
         data: { deletedAt: expect.any(Date) },
       });
     });
@@ -274,7 +274,7 @@ describe("StashSyncService Cleanup", () => {
 
       expect(result).toBe(5);
       expect(prisma.stashPerformer.updateMany).toHaveBeenCalledWith({
-        where: { deletedAt: null, stashInstanceId: null, id: { notIn: ["p1", "p2"] } },
+        where: { deletedAt: null, stashInstanceId: "default", id: { notIn: ["p1", "p2"] } },
         data: { deletedAt: expect.any(Date) },
       });
     });
@@ -358,7 +358,7 @@ describe("StashSyncService Cleanup", () => {
       // New implementation uses batched IN clauses - first batch has IDs 1-100
       const expectedIds = Array.from({ length: 100 }, (_, i) => String(i + 1));
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: expectedIds } },
+        where: { id: { in: expectedIds }, stashInstanceId: "default" },
         data: { deletedAt: expect.any(Date) },
       });
     });

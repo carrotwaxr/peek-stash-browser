@@ -139,11 +139,17 @@ export function applyBooleanFilter<T extends Record<string, unknown>>(
  */
 export function buildSceneIndexedWhere(
   filters: Record<string, any> | undefined,
-  hiddenSceneIds?: string[]
+  hiddenSceneIds?: string[],
+  stashInstanceIds?: string[]
 ): Prisma.StashSceneWhereInput {
   let where: Prisma.StashSceneWhereInput = {
     deletedAt: null,
   };
+
+  // Filter by stash instance(s) for multi-instance support
+  if (stashInstanceIds && stashInstanceIds.length > 0) {
+    where.stashInstanceId = { in: stashInstanceIds };
+  }
 
   // Exclude hidden scenes
   if (hiddenSceneIds && hiddenSceneIds.length > 0) {
@@ -185,11 +191,17 @@ export function buildSceneIndexedWhere(
  */
 export function buildPerformerIndexedWhere(
   filters: Record<string, any> | undefined,
-  hiddenPerformerIds?: string[]
+  hiddenPerformerIds?: string[],
+  stashInstanceIds?: string[]
 ): Prisma.StashPerformerWhereInput {
   let where: Prisma.StashPerformerWhereInput = {
     deletedAt: null,
   };
+
+  // Filter by stash instance(s) for multi-instance support
+  if (stashInstanceIds && stashInstanceIds.length > 0) {
+    where.stashInstanceId = { in: stashInstanceIds };
+  }
 
   // Exclude hidden performers
   if (hiddenPerformerIds && hiddenPerformerIds.length > 0) {
@@ -231,11 +243,17 @@ export function buildPerformerIndexedWhere(
  */
 export function buildStudioIndexedWhere(
   filters: Record<string, any> | undefined,
-  hiddenStudioIds?: string[]
+  hiddenStudioIds?: string[],
+  stashInstanceIds?: string[]
 ): Prisma.StashStudioWhereInput {
   let where: Prisma.StashStudioWhereInput = {
     deletedAt: null,
   };
+
+  // Filter by stash instance(s) for multi-instance support
+  if (stashInstanceIds && stashInstanceIds.length > 0) {
+    where.stashInstanceId = { in: stashInstanceIds };
+  }
 
   // Exclude hidden studios
   if (hiddenStudioIds && hiddenStudioIds.length > 0) {
@@ -284,11 +302,17 @@ export function buildStudioIndexedWhere(
  */
 export function buildTagIndexedWhere(
   filters: Record<string, any> | undefined,
-  hiddenTagIds?: string[]
+  hiddenTagIds?: string[],
+  stashInstanceIds?: string[]
 ): Prisma.StashTagWhereInput {
   let where: Prisma.StashTagWhereInput = {
     deletedAt: null,
   };
+
+  // Filter by stash instance(s) for multi-instance support
+  if (stashInstanceIds && stashInstanceIds.length > 0) {
+    where.stashInstanceId = { in: stashInstanceIds };
+  }
 
   // Exclude hidden tags
   if (hiddenTagIds && hiddenTagIds.length > 0) {
@@ -320,11 +344,17 @@ export function buildTagIndexedWhere(
  */
 export function buildGroupIndexedWhere(
   filters: Record<string, any> | undefined,
-  hiddenGroupIds?: string[]
+  hiddenGroupIds?: string[],
+  stashInstanceIds?: string[]
 ): Prisma.StashGroupWhereInput {
   let where: Prisma.StashGroupWhereInput = {
     deletedAt: null,
   };
+
+  // Filter by stash instance(s) for multi-instance support
+  if (stashInstanceIds && stashInstanceIds.length > 0) {
+    where.stashInstanceId = { in: stashInstanceIds };
+  }
 
   // Exclude hidden groups
   if (hiddenGroupIds && hiddenGroupIds.length > 0) {
@@ -361,11 +391,17 @@ export function buildGroupIndexedWhere(
  */
 export function buildGalleryIndexedWhere(
   filters: Record<string, any> | undefined,
-  hiddenGalleryIds?: string[]
+  hiddenGalleryIds?: string[],
+  stashInstanceIds?: string[]
 ): Prisma.StashGalleryWhereInput {
   let where: Prisma.StashGalleryWhereInput = {
     deletedAt: null,
   };
+
+  // Filter by stash instance(s) for multi-instance support
+  if (stashInstanceIds && stashInstanceIds.length > 0) {
+    where.stashInstanceId = { in: stashInstanceIds };
+  }
 
   // Exclude hidden galleries
   if (hiddenGalleryIds && hiddenGalleryIds.length > 0) {

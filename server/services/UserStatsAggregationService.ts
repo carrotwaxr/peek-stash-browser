@@ -28,8 +28,10 @@ import type {
 /**
  * Transform a Stash URL/path to a proxy URL
  * All Stash URLs must be proxied to avoid leaking the API key to clients
+ * @param urlOrPath - The URL or path to transform
+ * @param instanceId - Optional Stash instance ID for multi-instance routing
  */
-export function transformUrl(urlOrPath: string | null): string | null {
+export function transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
   if (!urlOrPath) return null;
 
   // If it's already a proxy URL, return as-is
@@ -37,20 +39,29 @@ export function transformUrl(urlOrPath: string | null): string | null {
     return urlOrPath;
   }
 
+  let proxyPath: string;
+
   // If it's a full URL (http://...), extract path + query
   if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
     try {
       const url = new URL(urlOrPath);
       const pathWithQuery = url.pathname + url.search;
-      return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
     } catch {
       // If URL parsing fails, treat as path
-      return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
+  } else {
+    // Otherwise treat as path and encode it
+    proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
   }
 
-  // Otherwise treat as path and encode it
-  return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+  // Add instanceId for multi-instance routing
+  if (instanceId) {
+    proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+  }
+
+  return proxyPath;
 }
 
 class UserStatsAggregationService {
@@ -190,10 +201,10 @@ class UserStatsAggregationService {
 
     if (rankings.length === 0) return [];
 
-    // Fetch scene details
+    // Fetch scene details including stashInstanceId for proxy routing
     const scenes = await prisma.stashScene.findMany({
       where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, title: true, filePath: true, pathScreenshot: true },
+      select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
     });
 
     const sceneMap = new Map(scenes.map((s) => [s.id, s]));
@@ -204,7 +215,7 @@ class UserStatsAggregationService {
         id: r.entityId,
         title: scene?.title ?? null,
         filePath: scene?.filePath ?? null,
-        imageUrl: transformUrl(scene?.pathScreenshot ?? null),
+        imageUrl: transformUrl(scene?.pathScreenshot ?? null, scene?.stashInstanceId),
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -226,10 +237,10 @@ class UserStatsAggregationService {
 
     if (rankings.length === 0) return [];
 
-    // Fetch performer details
+    // Fetch performer details including stashInstanceId for proxy routing
     const performers = await prisma.stashPerformer.findMany({
       where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, name: true, imagePath: true },
+      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
     });
 
     const performerMap = new Map(performers.map((p) => [p.id, p]));
@@ -239,7 +250,7 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: performer?.name ?? "Unknown",
-        imageUrl: transformUrl(performer?.imagePath ?? null),
+        imageUrl: transformUrl(performer?.imagePath ?? null, performer?.stashInstanceId),
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -261,10 +272,10 @@ class UserStatsAggregationService {
 
     if (rankings.length === 0) return [];
 
-    // Fetch studio details
+    // Fetch studio details including stashInstanceId for proxy routing
     const studios = await prisma.stashStudio.findMany({
       where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, name: true, imagePath: true },
+      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
     });
 
     const studioMap = new Map(studios.map((s) => [s.id, s]));
@@ -274,7 +285,7 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: studio?.name ?? "Unknown",
-        imageUrl: transformUrl(studio?.imagePath ?? null),
+        imageUrl: transformUrl(studio?.imagePath ?? null, studio?.stashInstanceId),
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -296,10 +307,10 @@ class UserStatsAggregationService {
 
     if (rankings.length === 0) return [];
 
-    // Fetch tag details
+    // Fetch tag details including stashInstanceId for proxy routing
     const tags = await prisma.stashTag.findMany({
       where: { id: { in: rankings.map((r) => r.entityId) } },
-      select: { id: true, name: true, imagePath: true },
+      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
     });
 
     const tagMap = new Map(tags.map((t) => [t.id, t]));
@@ -309,7 +320,7 @@ class UserStatsAggregationService {
       return {
         id: r.entityId,
         name: tag?.name ?? "Unknown",
-        imageUrl: transformUrl(tag?.imagePath ?? null),
+        imageUrl: transformUrl(tag?.imagePath ?? null, tag?.stashInstanceId),
         playCount: r.playCount,
         playDuration: Math.round(r.playDuration),
         oCount: r.oCount,
@@ -347,9 +358,10 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const scene = await prisma.stashScene.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const scene = await prisma.stashScene.findFirst({
       where: { id: result[0].sceneId },
-      select: { id: true, title: true, filePath: true, pathScreenshot: true },
+      select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
     });
 
     if (!scene) return null;
@@ -358,7 +370,7 @@ class UserStatsAggregationService {
       id: scene.id,
       title: scene.title ?? null,
       filePath: scene.filePath ?? null,
-      imageUrl: transformUrl(scene.pathScreenshot),
+      imageUrl: transformUrl(scene.pathScreenshot, scene.stashInstanceId),
       playCount: result[0].playCount,
     };
   }
@@ -392,9 +404,10 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const image = await prisma.stashImage.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const image = await prisma.stashImage.findFirst({
       where: { id: result[0].imageId },
-      select: { id: true, title: true, filePath: true, pathThumbnail: true },
+      select: { id: true, title: true, filePath: true, pathThumbnail: true, stashInstanceId: true },
     });
 
     if (!image) return null;
@@ -403,7 +416,7 @@ class UserStatsAggregationService {
       id: image.id,
       title: image.title ?? null,
       filePath: image.filePath ?? null,
-      imageUrl: transformUrl(image.pathThumbnail),
+      imageUrl: transformUrl(image.pathThumbnail, image.stashInstanceId),
       viewCount: result[0].viewCount,
     };
   }
@@ -435,9 +448,10 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const scene = await prisma.stashScene.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const scene = await prisma.stashScene.findFirst({
       where: { id: result[0].sceneId },
-      select: { id: true, title: true, filePath: true, pathScreenshot: true },
+      select: { id: true, title: true, filePath: true, pathScreenshot: true, stashInstanceId: true },
     });
 
     if (!scene) return null;
@@ -446,7 +460,7 @@ class UserStatsAggregationService {
       id: scene.id,
       title: scene.title ?? null,
       filePath: scene.filePath ?? null,
-      imageUrl: transformUrl(scene.pathScreenshot),
+      imageUrl: transformUrl(scene.pathScreenshot, scene.stashInstanceId),
       oCount: result[0].oCount,
     };
   }
@@ -480,9 +494,10 @@ class UserStatsAggregationService {
 
     if (result.length === 0) return null;
 
-    const performer = await prisma.stashPerformer.findUnique({
+    // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+    const performer = await prisma.stashPerformer.findFirst({
       where: { id: result[0].performerId },
-      select: { id: true, name: true, imagePath: true },
+      select: { id: true, name: true, imagePath: true, stashInstanceId: true },
     });
 
     if (!performer) return null;
@@ -490,7 +505,7 @@ class UserStatsAggregationService {
     return {
       id: performer.id,
       name: performer.name ?? "Unknown",
-      imageUrl: transformUrl(performer.imagePath),
+      imageUrl: transformUrl(performer.imagePath, performer.stashInstanceId),
       oCount: result[0].oCounter,
     };
   }

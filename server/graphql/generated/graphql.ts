@@ -5648,6 +5648,11 @@ export type TagsDestroyMutationVariables = Exact<{
 
 export type TagsDestroyMutation = { tagsDestroy: boolean };
 
+export type VersionQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type VersionQuery = { version: { version?: string | null, hash: string, build_time: string } };
+
 
 export const ConfigurationDocument = gql`
     query Configuration {
@@ -7048,6 +7053,15 @@ export const TagsDestroyDocument = gql`
   tagsDestroy(ids: $ids)
 }
     `;
+export const VersionDocument = gql`
+    query Version {
+  version {
+    version
+    hash
+    build_time
+  }
+}
+    `;
 
 export type SdkFunctionWrapper = <T>(action: (requestHeaders?:Record<string, string>) => Promise<T>, operationName: string, operationType?: string, variables?: any) => Promise<T>;
 
@@ -7175,6 +7189,9 @@ export function getSdk(client: GraphQLClient, withWrapper: SdkFunctionWrapper = 
     },
     tagsDestroy(variables: TagsDestroyMutationVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<TagsDestroyMutation> {
       return withWrapper((wrappedRequestHeaders) => client.request<TagsDestroyMutation>({ document: TagsDestroyDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'tagsDestroy', 'mutation', variables);
+    },
+    Version(variables?: VersionQueryVariables, requestHeaders?: GraphQLClientRequestHeaders, signal?: RequestInit['signal']): Promise<VersionQuery> {
+      return withWrapper((wrappedRequestHeaders) => client.request<VersionQuery>({ document: VersionDocument, variables, requestHeaders: { ...requestHeaders, ...wrappedRequestHeaders }, signal }), 'Version', 'query', variables);
     }
   };
 }

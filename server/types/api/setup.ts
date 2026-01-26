@@ -63,6 +63,7 @@ export interface TestStashConnectionResponse {
   message?: string;
   error?: string;
   details?: string;
+  version?: string;
 }
 
 // =============================================================================

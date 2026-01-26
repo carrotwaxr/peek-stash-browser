@@ -41,7 +41,7 @@ export interface GroupQueryResult {
 class GroupQueryBuilder {
   // Column list for SELECT - all StashGroup fields plus user data
   private readonly SELECT_COLUMNS = `
-    g.id, g.name, g.date, g.studioId, g.rating100 AS stashRating100,
+    g.id, g.stashInstanceId, g.name, g.date, g.studioId, g.rating100 AS stashRating100,
     g.duration, g.sceneCount, g.performerCount,
     g.director, g.synopsis, g.urls,
     g.frontImagePath, g.backImagePath,
@@ -56,7 +56,7 @@ class GroupQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashGroup g
-        LEFT JOIN GroupRating r ON g.id = r.groupId AND r.userId = ?
+        LEFT JOIN GroupRating r ON g.id = r.groupId AND g.stashInstanceId = r.instanceId AND r.userId = ?
     `.trim();
 
     if (applyExclusions) {
@@ -260,7 +260,7 @@ class GroupQueryBuilder {
         return {
           sql: `g.id IN (
             SELECT sg.groupId FROM SceneGroup sg
-            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId
+            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
             WHERE sp.performerId IN (${placeholders})
           )`,
           params: ids,
@@ -270,7 +270,7 @@ class GroupQueryBuilder {
         return {
           sql: `g.id IN (
             SELECT sg.groupId FROM SceneGroup sg
-            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId
+            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
             WHERE sp.performerId IN (${placeholders})
             GROUP BY sg.groupId
             HAVING COUNT(DISTINCT sp.performerId) = ?
@@ -282,7 +282,7 @@ class GroupQueryBuilder {
         return {
           sql: `g.id NOT IN (
             SELECT sg.groupId FROM SceneGroup sg
-            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId
+            JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
             WHERE sp.performerId IN (${placeholders})
           )`,
           params: ids,
@@ -735,9 +735,9 @@ class GroupQueryBuilder {
       performer_count: row.performerCount || 0,
       duration: row.duration || 0,
 
-      // Image paths - transform to proxy URLs
-      front_image_path: this.transformUrl(row.frontImagePath),
-      back_image_path: this.transformUrl(row.backImagePath),
+      // Image paths - transform to proxy URLs with instanceId for multi-instance routing
+      front_image_path: this.transformUrl(row.frontImagePath, row.stashInstanceId),
+      back_image_path: this.transformUrl(row.backImagePath, row.stashInstanceId),
 
       // Timestamps
       created_at: row.stashCreatedAt?.toISOString?.() || row.stashCreatedAt || null,
@@ -809,29 +809,29 @@ class GroupQueryBuilder {
       galleryIds.length > 0 ? prisma.stashGallery.findMany({ where: { id: { in: galleryIds } } }) : [],
     ]);
 
-    // Build lookup maps
+    // Build lookup maps with instanceId for multi-instance routing
     const tagsById = new Map(tags.map((t) => [t.id, {
       id: t.id,
       name: t.name,
-      image_path: this.transformUrl(t.imagePath),
+      image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
     }]));
 
     const studiosById = new Map(studios.map((s) => [s.id, {
       id: s.id,
       name: s.name,
-      image_path: this.transformUrl(s.imagePath),
+      image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
     }]));
 
     const performersById = new Map(performers.map((p) => [p.id, {
       id: p.id,
       name: p.name,
-      image_path: this.transformUrl(p.imagePath),
+      image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
     }]));
 
     const galleriesById = new Map(galleries.map((g) => [g.id, {
       id: g.id,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
-      cover: this.transformUrl(g.coverPath),
+      cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
     // Build group -> tags map
@@ -898,25 +898,35 @@ class GroupQueryBuilder {
 
   /**
    * Transform a Stash URL/path to a proxy URL
+   * @param urlOrPath - The URL or path to transform
+   * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null): string | null {
+  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
     if (!urlOrPath) return null;
 
     if (urlOrPath.startsWith("/api/proxy/stash")) {
       return urlOrPath;
     }
 
+    let proxyPath: string;
+
     if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
       try {
         const url = new URL(urlOrPath);
         const pathWithQuery = url.pathname + url.search;
-        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
       } catch {
-        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
       }
+    } else {
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    if (instanceId) {
+      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+    }
+
+    return proxyPath;
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient } from "../helpers/testClient.js";
+import { adminClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 /**
@@ -36,6 +36,8 @@ interface FindImagesResponse {
 describe("Image Filters", () => {
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    // Select only test instance to avoid ID collisions with other instances
+    await selectTestInstanceOnly();
   });
 
   describe("favorite filter", () => {

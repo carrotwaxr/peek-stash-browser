@@ -41,7 +41,7 @@ export interface PerformerQueryResult {
 class PerformerQueryBuilder {
   // Column list for SELECT - all StashPerformer fields plus user data
   private readonly SELECT_COLUMNS = `
-    p.id, p.name, p.disambiguation, p.gender, p.birthdate, p.favorite AS stashFavorite,
+    p.id, p.stashInstanceId, p.name, p.disambiguation, p.gender, p.birthdate, p.favorite AS stashFavorite,
     p.rating100 AS stashRating100, p.sceneCount, p.imageCount, p.galleryCount, p.groupCount,
     p.details, p.aliasList, p.country, p.ethnicity, p.hairColor, p.eyeColor,
     p.heightCm, p.weightKg, p.measurements, p.fakeTits, p.tattoos, p.piercings,
@@ -59,7 +59,7 @@ class PerformerQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashPerformer p
-        LEFT JOIN PerformerRating r ON p.id = r.performerId AND r.userId = ?
+        LEFT JOIN PerformerRating r ON p.id = r.performerId AND p.stashInstanceId = r.instanceId AND r.userId = ?
         LEFT JOIN UserPerformerStats s ON p.id = s.performerId AND s.userId = ?
     `.trim();
 
@@ -327,7 +327,7 @@ class PerformerQueryBuilder {
           sql: `p.id IN (
             SELECT DISTINCT sp.performerId
             FROM ScenePerformer sp
-            JOIN SceneGroup sg ON sp.sceneId = sg.sceneId
+            JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
             WHERE sg.groupId IN (${placeholders})
           )`,
           params: ids,
@@ -338,7 +338,7 @@ class PerformerQueryBuilder {
           sql: `p.id NOT IN (
             SELECT DISTINCT sp.performerId
             FROM ScenePerformer sp
-            JOIN SceneGroup sg ON sp.sceneId = sg.sceneId
+            JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
             WHERE sg.groupId IN (${placeholders})
           )`,
           params: ids,
@@ -1012,8 +1012,8 @@ class PerformerQueryBuilder {
       death_date: row.deathDate || null,
       url: row.url || null,
 
-      // Image path - transform to proxy URL
-      image_path: this.transformUrl(row.imagePath),
+      // Image path - transform to proxy URL with instanceId for multi-instance routing
+      image_path: this.transformUrl(row.imagePath, row.stashInstanceId),
 
       // Counts
       scene_count: row.sceneCount || 0,
@@ -1119,29 +1119,29 @@ class PerformerQueryBuilder {
         : [],
     ]);
 
-    // Build lookup maps with minimal tooltip data
+    // Build lookup maps with minimal tooltip data, including instanceId for multi-instance routing
     const tagsById = new Map(tags.map((t) => [t.id, {
       id: t.id,
       name: t.name,
-      image_path: this.transformUrl(t.imagePath),
+      image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
     }]));
 
     const groupsById = new Map(groups.map((g) => [g.id, {
       id: g.id,
       name: g.name,
-      front_image_path: this.transformUrl(g.frontImagePath),
+      front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
     }]));
 
     const galleriesById = new Map(galleries.map((g) => [g.id, {
       id: g.id,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
-      cover: this.transformUrl(g.coverPath),
+      cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
     const studiosById = new Map(studios.map((s) => [s.id, {
       id: s.id,
       name: s.name,
-      image_path: this.transformUrl(s.imagePath),
+      image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
     }]));
 
     // Build performer -> scene mapping
@@ -1231,25 +1231,35 @@ class PerformerQueryBuilder {
 
   /**
    * Transform a Stash URL/path to a proxy URL
+   * @param urlOrPath - The URL or path to transform
+   * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null): string | null {
+  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
     if (!urlOrPath) return null;
 
     if (urlOrPath.startsWith("/api/proxy/stash")) {
       return urlOrPath;
     }
 
+    let proxyPath: string;
+
     if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
       try {
         const url = new URL(urlOrPath);
         const pathWithQuery = url.pathname + url.search;
-        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
       } catch {
-        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
       }
+    } else {
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    if (instanceId) {
+      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+    }
+
+    return proxyPath;
   }
 }
 

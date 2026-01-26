@@ -4,6 +4,7 @@ import prisma from "../../services/../prisma/singleton.js";
 
 describe("ImageQueryBuilder", () => {
   const testUserId = 9999;
+  const testInstanceId = "test-instance-iqb";
 
   // Use numeric string IDs to match real Stash IDs (which are numeric)
   const testImageIds = ["999001", "999002", "999003"];
@@ -31,9 +32,9 @@ describe("ImageQueryBuilder", () => {
     // Create test images with numeric string IDs (matching Stash's ID format)
     await prisma.stashImage.createMany({
       data: [
-        { id: testImageIds[0], title: "Image One", stashCreatedAt: new Date("2024-01-01") },
-        { id: testImageIds[1], title: "Image Two", stashCreatedAt: new Date("2024-01-02") },
-        { id: testImageIds[2], title: "Image Three", stashCreatedAt: new Date("2024-01-03") },
+        { id: testImageIds[0], stashInstanceId: testInstanceId, title: "Image One", stashCreatedAt: new Date("2024-01-01") },
+        { id: testImageIds[1], stashInstanceId: testInstanceId, title: "Image Two", stashCreatedAt: new Date("2024-01-02") },
+        { id: testImageIds[2], stashInstanceId: testInstanceId, title: "Image Three", stashCreatedAt: new Date("2024-01-03") },
       ],
     });
   });
@@ -78,15 +79,15 @@ describe("ImageQueryBuilder", () => {
       // Add user ratings
       await prisma.imageRating.createMany({
         data: [
-          { userId: testUserId, imageId: testImageIds[0], rating: 80, favorite: true },
-          { userId: testUserId, imageId: testImageIds[1], rating: 40, favorite: false },
+          { userId: testUserId, instanceId: testInstanceId, imageId: testImageIds[0], rating: 80, favorite: true },
+          { userId: testUserId, instanceId: testInstanceId, imageId: testImageIds[1], rating: 40, favorite: false },
         ],
       });
       // Add view history
       await prisma.imageViewHistory.createMany({
         data: [
-          { userId: testUserId, imageId: testImageIds[0], oCount: 5, viewCount: 10 },
-          { userId: testUserId, imageId: testImageIds[2], oCount: 2, viewCount: 3 },
+          { userId: testUserId, instanceId: testInstanceId, imageId: testImageIds[0], oCount: 5, viewCount: 10 },
+          { userId: testUserId, instanceId: testInstanceId, imageId: testImageIds[2], oCount: 2, viewCount: 3 },
         ],
       });
     });
@@ -144,48 +145,48 @@ describe("ImageQueryBuilder", () => {
       // Create performers
       await prisma.stashPerformer.createMany({
         data: [
-          { id: "perf-1", name: "Performer One" },
-          { id: "perf-2", name: "Performer Two" },
+          { id: "perf-1", stashInstanceId: testInstanceId, name: "Performer One" },
+          { id: "perf-2", stashInstanceId: testInstanceId, name: "Performer Two" },
         ],
       });
       // Create tags
       await prisma.stashTag.createMany({
         data: [
-          { id: "tag-1", name: "Tag One" },
-          { id: "tag-2", name: "Tag Two" },
+          { id: "tag-1", stashInstanceId: testInstanceId, name: "Tag One" },
+          { id: "tag-2", stashInstanceId: testInstanceId, name: "Tag Two" },
         ],
       });
       // Create studio
       await prisma.stashStudio.create({
-        data: { id: "studio-1", name: "Studio One" },
+        data: { id: "studio-1", stashInstanceId: testInstanceId, name: "Studio One" },
       });
       // Create gallery
       await prisma.stashGallery.create({
-        data: { id: "gallery-1", title: "Gallery One" },
+        data: { id: "gallery-1", stashInstanceId: testInstanceId, title: "Gallery One" },
       });
 
       // Link performers to images
       await prisma.imagePerformer.createMany({
         data: [
-          { imageId: testImageIds[0], performerId: "perf-1" },
-          { imageId: testImageIds[1], performerId: "perf-2" },
+          { imageId: testImageIds[0], imageInstanceId: testInstanceId, performerId: "perf-1", performerInstanceId: testInstanceId },
+          { imageId: testImageIds[1], imageInstanceId: testInstanceId, performerId: "perf-2", performerInstanceId: testInstanceId },
         ],
       });
       // Link tags to images
       await prisma.imageTag.createMany({
         data: [
-          { imageId: testImageIds[0], tagId: "tag-1" },
-          { imageId: testImageIds[1], tagId: "tag-2" },
+          { imageId: testImageIds[0], imageInstanceId: testInstanceId, tagId: "tag-1", tagInstanceId: testInstanceId },
+          { imageId: testImageIds[1], imageInstanceId: testInstanceId, tagId: "tag-2", tagInstanceId: testInstanceId },
         ],
       });
       // Set studio on image
       await prisma.stashImage.update({
-        where: { id: testImageIds[0] },
-        data: { studioId: "studio-1" },
+        where: { id_stashInstanceId: { id: testImageIds[0], stashInstanceId: testInstanceId } },
+        data: { studioId: "studio-1", studioInstanceId: testInstanceId },
       });
       // Link image to gallery
       await prisma.imageGallery.create({
-        data: { imageId: testImageIds[0], galleryId: "gallery-1" },
+        data: { imageId: testImageIds[0], imageInstanceId: testInstanceId, galleryId: "gallery-1", galleryInstanceId: testInstanceId },
       });
     });
 
@@ -334,7 +335,7 @@ describe("ImageQueryBuilder", () => {
   describe("getByIds", () => {
     it("returns images by IDs with user data", async () => {
       await prisma.imageRating.create({
-        data: { userId: testUserId, imageId: "999001", rating: 90, favorite: true },
+        data: { userId: testUserId, instanceId: testInstanceId, imageId: "999001", rating: 90, favorite: true },
       });
 
       const result = await imageQueryBuilder.getByIds({

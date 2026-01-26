@@ -205,10 +205,21 @@ export const testStashConnection = async (
       const result = await testStash.configuration();
 
       if (result && result.configuration) {
-        logger.info("Stash connection test successful");
+        // Also fetch the version
+        let versionString: string | undefined;
+        try {
+          const versionResult = await testStash.version();
+          versionString = versionResult.version.version || undefined;
+        } catch (versionError) {
+          // Version fetch failed, but connection is still valid
+          logger.warn("Failed to fetch Stash version", { error: versionError });
+        }
+
+        logger.info("Stash connection test successful", { version: versionString });
         res.json({
           success: true,
           message: "Connection successful",
+          version: versionString,
         });
       } else {
         res.status(500).json({

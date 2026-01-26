@@ -59,7 +59,7 @@ describe("ImageGalleryInheritanceService", () => {
       await imageGalleryInheritanceService.applyGalleryInheritance();
 
       // Verify image inherited studio
-      const image = await prisma.stashImage.findUnique({
+      const image = await prisma.stashImage.findFirst({
         where: { id: `${PREFIX}image-1` },
       });
       expect(image?.studioId).toBe(`${PREFIX}studio-1`);
@@ -93,7 +93,7 @@ describe("ImageGalleryInheritanceService", () => {
       await imageGalleryInheritanceService.applyGalleryInheritance();
 
       // Verify image kept its own studio
-      const image = await prisma.stashImage.findUnique({
+      const image = await prisma.stashImage.findFirst({
         where: { id: `${PREFIX}image-1` },
       });
       expect(image?.studioId).toBe(`${PREFIX}studio-2`);
@@ -244,7 +244,7 @@ describe("ImageGalleryInheritanceService", () => {
       await imageGalleryInheritanceService.applyGalleryInheritance();
 
       // Verify image got studio from first gallery
-      const image = await prisma.stashImage.findUnique({
+      const image = await prisma.stashImage.findFirst({
         where: { id: `${PREFIX}image-1` },
       });
       expect(image?.studioId).toBe(`${PREFIX}studio-1`);
@@ -260,7 +260,7 @@ describe("ImageGalleryInheritanceService", () => {
       await imageGalleryInheritanceService.applyGalleryInheritance();
 
       // Verify image unchanged
-      const image = await prisma.stashImage.findUnique({
+      const image = await prisma.stashImage.findFirst({
         where: { id: `${PREFIX}image-1` },
       });
       expect(image?.studioId).toBeNull();

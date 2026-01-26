@@ -18,6 +18,7 @@ import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
+import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -146,10 +147,14 @@ export const findStudios = async (
       // Get all studios for hierarchy lookup, then hydrate
       const allStudios = await stashEntityService.getAllStudios();
       const allHydrated = await hydrateStudioRelationships(allStudios);
-      hydratedStudios = allHydrated.filter((s) => resultStudios.some((r) => r.id === s.id));
+      // Filter by both id AND instanceId to handle multi-instance correctly
+      hydratedStudios = allHydrated.filter((s) =>
+        resultStudios.some((r) => r.id === s.id && r.instanceId === s.instanceId)
+      );
       // Merge the computed counts back (preserving hydrated parent_studio and child_studios)
       hydratedStudios = hydratedStudios.map((h) => {
-        const result = resultStudios.find((r) => r.id === h.id);
+        // Match by both id AND instanceId
+        const result = resultStudios.find((r) => r.id === h.id && r.instanceId === h.instanceId);
         if (!result) return h;
         return {
           ...result,
@@ -469,7 +474,14 @@ export const findStudiosMinimal = async (
       paginatedStudios = studios.slice(0, perPage);
     }
 
-    const minimal = paginatedStudios.map((s) => ({ id: s.id, name: s.name }));
+    // Disambiguate names for entities with same name across different instances
+    // Only non-default instances get suffixed with instance name when duplicates exist
+    const entitiesWithInstance = paginatedStudios.map((s) => ({
+      id: s.id,
+      name: s.name,
+      instanceId: s.instanceId,
+    }));
+    const minimal = disambiguateEntityNames(entitiesWithInstance);
 
     res.json({
       studios: minimal,

@@ -89,25 +89,35 @@ function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey:
 
 /**
  * Proxy scene video preview (MP4)
- * GET /api/proxy/scene/:id/preview?instanceId=xxx
+ * GET /api/proxy/scene/:id/preview
+ * Uses the scene's stashInstanceId to route to correct Stash server.
  */
 export const proxyScenePreview = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const instanceId = req.query.instanceId as string | undefined;
 
   if (!id) {
     return res.status(400).json({ error: "Missing scene ID" });
+  }
+
+  // Get scene from database to find its stashInstanceId
+  const scene = await prisma.stashScene.findFirst({
+    where: { id, deletedAt: null },
+    select: { stashInstanceId: true },
+  });
+
+  if (!scene) {
+    return res.status(404).json({ error: "Scene not found" });
   }
 
   let stashUrl: string;
   let apiKey: string;
 
   try {
-    const creds = getInstanceCredentials(instanceId);
+    const creds = getInstanceCredentials(scene.stashInstanceId ?? undefined);
     stashUrl = creds.baseUrl;
     apiKey = creds.apiKey;
   } catch (error) {
-    logger.error("Failed to get Stash instance credentials", { error, instanceId });
+    logger.error("Failed to get Stash instance credentials", { error, instanceId: scene.stashInstanceId });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
@@ -186,25 +196,35 @@ export const proxyScenePreview = async (req: Request, res: Response) => {
 
 /**
  * Proxy scene WebP animated preview
- * GET /api/proxy/scene/:id/webp?instanceId=xxx
+ * GET /api/proxy/scene/:id/webp
+ * Uses the scene's stashInstanceId to route to correct Stash server.
  */
 export const proxySceneWebp = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const instanceId = req.query.instanceId as string | undefined;
 
   if (!id) {
     return res.status(400).json({ error: "Missing scene ID" });
+  }
+
+  // Get scene from database to find its stashInstanceId
+  const scene = await prisma.stashScene.findFirst({
+    where: { id, deletedAt: null },
+    select: { stashInstanceId: true },
+  });
+
+  if (!scene) {
+    return res.status(404).json({ error: "Scene not found" });
   }
 
   let stashUrl: string;
   let apiKey: string;
 
   try {
-    const creds = getInstanceCredentials(instanceId);
+    const creds = getInstanceCredentials(scene.stashInstanceId ?? undefined);
     stashUrl = creds.baseUrl;
     apiKey = creds.apiKey;
   } catch (error) {
-    logger.error("Failed to get Stash instance credentials", { error, instanceId });
+    logger.error("Failed to get Stash instance credentials", { error, instanceId: scene.stashInstanceId });
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 

@@ -41,7 +41,7 @@ export interface StudioQueryResult {
 class StudioQueryBuilder {
   // Column list for SELECT - all StashStudio fields plus user data
   private readonly SELECT_COLUMNS = `
-    s.id, s.name, s.parentId, s.favorite AS stashFavorite, s.rating100 AS stashRating100,
+    s.id, s.stashInstanceId, s.name, s.parentId, s.favorite AS stashFavorite, s.rating100 AS stashRating100,
     s.sceneCount, s.imageCount, s.galleryCount, s.performerCount, s.groupCount,
     s.details, s.url, s.imagePath,
     s.stashCreatedAt, s.stashUpdatedAt,
@@ -56,7 +56,7 @@ class StudioQueryBuilder {
   ): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashStudio s
-        LEFT JOIN StudioRating r ON s.id = r.studioId AND r.userId = ?
+        LEFT JOIN StudioRating r ON s.id = r.studioId AND s.stashInstanceId = r.instanceId AND r.userId = ?
         LEFT JOIN UserStudioStats us ON s.id = us.studioId AND us.userId = ?
     `.trim();
 
@@ -553,13 +553,14 @@ class StudioQueryBuilder {
   private transformRow(row: any): NormalizedStudio {
     const studio: any = {
       id: row.id,
+      instanceId: row.stashInstanceId,
       name: row.name,
       parent_studio: row.parentId ? { id: row.parentId, name: "" } : null,
       details: row.details || null,
       url: row.url || null,
 
-      // Image path - transform to proxy URL
-      image_path: this.transformUrl(row.imagePath),
+      // Image path - transform to proxy URL with instanceId for multi-instance routing
+      image_path: this.transformUrl(row.imagePath, row.stashInstanceId),
 
       // Counts
       scene_count: row.sceneCount || 0,
@@ -644,29 +645,29 @@ class StudioQueryBuilder {
       galleryIds.length > 0 ? prisma.stashGallery.findMany({ where: { id: { in: galleryIds } } }) : [],
     ]);
 
-    // Build lookup maps
+    // Build lookup maps with instanceId for multi-instance routing
     const tagsById = new Map(tags.map((t) => [t.id, {
       id: t.id,
       name: t.name,
-      image_path: this.transformUrl(t.imagePath),
+      image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
     }]));
 
     const performersById = new Map(performers.map((p) => [p.id, {
       id: p.id,
       name: p.name,
-      image_path: this.transformUrl(p.imagePath),
+      image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
     }]));
 
     const groupsById = new Map(groups.map((g) => [g.id, {
       id: g.id,
       name: g.name,
-      front_image_path: this.transformUrl(g.frontImagePath),
+      front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
     }]));
 
     const galleriesById = new Map(galleries.map((g) => [g.id, {
       id: g.id,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
-      cover: this.transformUrl(g.coverPath),
+      cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
     // Build scene -> studio mapping
@@ -723,25 +724,35 @@ class StudioQueryBuilder {
 
   /**
    * Transform a Stash URL/path to a proxy URL
+   * @param urlOrPath - The URL or path to transform
+   * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null): string | null {
+  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
     if (!urlOrPath) return null;
 
     if (urlOrPath.startsWith("/api/proxy/stash")) {
       return urlOrPath;
     }
 
+    let proxyPath: string;
+
     if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
       try {
         const url = new URL(urlOrPath);
         const pathWithQuery = url.pathname + url.search;
-        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
       } catch {
-        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
       }
+    } else {
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    if (instanceId) {
+      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+    }
+
+    return proxyPath;
   }
 }
 

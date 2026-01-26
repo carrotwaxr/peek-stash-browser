@@ -7,6 +7,7 @@
  */
 
 import prisma from "../prisma/singleton.js";
+import { stashInstanceManager } from "../services/StashInstanceManager.js";
 
 type EntityType = 'scene' | 'performer' | 'studio' | 'tag' | 'gallery' | 'group' | 'image';
 
@@ -23,49 +24,50 @@ export async function getEntityInstanceId(
   try {
     switch (entityType) {
       case 'scene': {
-        const scene = await prisma.stashScene.findUnique({
+        // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
+        const scene = await prisma.stashScene.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return scene?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'performer': {
-        const performer = await prisma.stashPerformer.findUnique({
+        const performer = await prisma.stashPerformer.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return performer?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'studio': {
-        const studio = await prisma.stashStudio.findUnique({
+        const studio = await prisma.stashStudio.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return studio?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'tag': {
-        const tag = await prisma.stashTag.findUnique({
+        const tag = await prisma.stashTag.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return tag?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'gallery': {
-        const gallery = await prisma.stashGallery.findUnique({
+        const gallery = await prisma.stashGallery.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return gallery?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'group': {
-        const group = await prisma.stashGroup.findUnique({
+        const group = await prisma.stashGroup.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
         return group?.stashInstanceId || DEFAULT_INSTANCE_ID;
       }
       case 'image': {
-        const image = await prisma.stashImage.findUnique({
+        const image = await prisma.stashImage.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
@@ -164,4 +166,88 @@ export async function getEntityInstanceIds(
   });
 
   return result;
+}
+
+/**
+ * Entity with instanceId for name disambiguation
+ */
+interface EntityWithInstance {
+  id: string;
+  name: string;
+  instanceId: string;
+}
+
+/**
+ * Minimal entity result with optional instance name disambiguation
+ */
+interface MinimalEntityResult {
+  id: string;
+  name: string;
+}
+
+/**
+ * Disambiguate entity names for filter dropdowns when multiple instances
+ * have entities with the same name.
+ *
+ * Rules:
+ * - Only add instance name suffix if there are duplicates with the same name
+ * - Only suffix non-default instances (default = lowest priority)
+ * - Format: "Entity Name (Instance Name)"
+ *
+ * @param entities - Array of entities with id, name, and instanceId
+ * @returns Array of minimal entities with disambiguated names
+ */
+export function disambiguateEntityNames(entities: EntityWithInstance[]): MinimalEntityResult[] {
+  // Get all instance configs to determine priorities
+  const instances = stashInstanceManager.getAllConfigs();
+
+  // If only one instance or no instances, no disambiguation needed
+  if (instances.length <= 1) {
+    return entities.map(e => ({ id: e.id, name: e.name }));
+  }
+
+  // Find the default instance (lowest priority number)
+  const defaultInstanceId = instances.reduce((minInst, inst) =>
+    inst.priority < minInst.priority ? inst : minInst
+  ).id;
+
+  // Build instance name lookup
+  const instanceNames = new Map<string, string>();
+  instances.forEach(inst => instanceNames.set(inst.id, inst.name));
+
+  // Group entities by name (case-insensitive) to find duplicates
+  const nameGroups = new Map<string, EntityWithInstance[]>();
+  entities.forEach(entity => {
+    const normalizedName = (entity.name || "").toLowerCase();
+    const group = nameGroups.get(normalizedName) || [];
+    group.push(entity);
+    nameGroups.set(normalizedName, group);
+  });
+
+  // Find names that have duplicates across different instances
+  const duplicatedNames = new Set<string>();
+  nameGroups.forEach((group, normalizedName) => {
+    const uniqueInstances = new Set(group.map(e => e.instanceId));
+    if (uniqueInstances.size > 1) {
+      duplicatedNames.add(normalizedName);
+    }
+  });
+
+  // Build result with disambiguated names
+  return entities.map(entity => {
+    const normalizedName = (entity.name || "").toLowerCase();
+    const hasDuplicates = duplicatedNames.has(normalizedName);
+    const isNonDefault = entity.instanceId !== defaultInstanceId;
+
+    // Only suffix if there are duplicates AND this is a non-default instance
+    if (hasDuplicates && isNonDefault) {
+      const instanceName = instanceNames.get(entity.instanceId) || entity.instanceId;
+      return {
+        id: entity.id,
+        name: `${entity.name} (${instanceName})`,
+      };
+    }
+
+    return { id: entity.id, name: entity.name };
+  });
 }

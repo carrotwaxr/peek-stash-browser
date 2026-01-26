@@ -19,7 +19,12 @@ const ContentTab = () => {
         const { selectedInstanceIds, availableInstances } = data;
 
         setInstances(availableInstances || []);
-        setSelectedIds(selectedInstanceIds || []);
+        // If user has no explicit selections (empty array), default to all instances checked
+        // This matches the backend behavior where empty = "show all enabled instances"
+        const effectiveSelection = selectedInstanceIds?.length > 0
+          ? selectedInstanceIds
+          : (availableInstances || []).map((i) => i.id);
+        setSelectedIds(effectiveSelection);
         setShowInstanceSection((availableInstances?.length || 0) >= 2);
       } catch (err) {
         console.error("Failed to fetch instances:", err);

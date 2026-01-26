@@ -48,7 +48,7 @@ export interface SceneByIdsOptions {
 class SceneQueryBuilder {
   // Column list for SELECT - all StashScene fields plus user data
   private readonly SELECT_COLUMNS = `
-    s.id, s.title, s.code, s.date, s.studioId, s.rating100 AS stashRating100,
+    s.id, s.stashInstanceId, s.title, s.code, s.date, s.studioId, s.rating100 AS stashRating100,
     s.duration, s.organized, s.details, s.director, s.urls, s.filePath, s.fileBitRate,
     s.fileFrameRate, s.fileWidth, s.fileHeight, s.fileVideoCodec,
     s.fileAudioCodec, s.fileSize, s.pathScreenshot, s.pathPreview,
@@ -67,8 +67,8 @@ class SceneQueryBuilder {
   private buildFromClause(userId: number, applyExclusions: boolean = true): { sql: string; params: number[] } {
     const baseJoins = `
         FROM StashScene s
-        LEFT JOIN SceneRating r ON s.id = r.sceneId AND r.userId = ?
-        LEFT JOIN WatchHistory w ON s.id = w.sceneId AND w.userId = ?
+        LEFT JOIN SceneRating r ON s.id = r.sceneId AND s.stashInstanceId = r.instanceId AND r.userId = ?
+        LEFT JOIN WatchHistory w ON s.id = w.sceneId AND s.stashInstanceId = w.instanceId AND w.userId = ?
     `.trim();
 
     if (applyExclusions) {
@@ -134,26 +134,21 @@ class SceneQueryBuilder {
       case "INCLUDES":
         // Scene has ANY of these performers
         return {
-          sql: `s.id IN (SELECT sceneId FROM ScenePerformer WHERE performerId IN (${placeholders}))`,
+          sql: `EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId IN (${placeholders}))`,
           params: ids,
         };
 
       case "INCLUDES_ALL":
         // Scene has ALL of these performers
         return {
-          sql: `s.id IN (
-            SELECT sceneId FROM ScenePerformer
-            WHERE performerId IN (${placeholders})
-            GROUP BY sceneId
-            HAVING COUNT(DISTINCT performerId) = ?
-          )`,
+          sql: `(SELECT COUNT(DISTINCT sp.performerId) FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId IN (${placeholders})) = ?`,
           params: [...ids, ids.length],
         };
 
       case "EXCLUDES":
         // Scene has NONE of these performers
         return {
-          sql: `s.id NOT IN (SELECT sceneId FROM ScenePerformer WHERE performerId IN (${placeholders}))`,
+          sql: `NOT EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId IN (${placeholders}))`,
           params: ids,
         };
 
@@ -179,24 +174,19 @@ class SceneQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `s.id IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
+          sql: `EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders}))`,
           params: ids,
         };
 
       case "INCLUDES_ALL":
         return {
-          sql: `s.id IN (
-            SELECT sceneId FROM SceneTag
-            WHERE tagId IN (${placeholders})
-            GROUP BY sceneId
-            HAVING COUNT(DISTINCT tagId) = ?
-          )`,
+          sql: `(SELECT COUNT(DISTINCT st.tagId) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders})) = ?`,
           params: [...ids, ids.length],
         };
 
       case "EXCLUDES":
         return {
-          sql: `s.id NOT IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders}))`,
+          sql: `NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders}))`,
           params: ids,
         };
 
@@ -252,24 +242,19 @@ class SceneQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `s.id IN (SELECT sceneId FROM SceneGroup WHERE groupId IN (${placeholders}))`,
+          sql: `EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND sg.groupId IN (${placeholders}))`,
           params: ids,
         };
 
       case "INCLUDES_ALL":
         return {
-          sql: `s.id IN (
-            SELECT sceneId FROM SceneGroup
-            WHERE groupId IN (${placeholders})
-            GROUP BY sceneId
-            HAVING COUNT(DISTINCT groupId) = ?
-          )`,
+          sql: `(SELECT COUNT(DISTINCT sg.groupId) FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND sg.groupId IN (${placeholders})) = ?`,
           params: [...ids, ids.length],
         };
 
       case "EXCLUDES":
         return {
-          sql: `s.id NOT IN (SELECT sceneId FROM SceneGroup WHERE groupId IN (${placeholders}))`,
+          sql: `NOT EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND sg.groupId IN (${placeholders}))`,
           params: ids,
         };
 
@@ -871,7 +856,7 @@ class SceneQueryBuilder {
 
     const { value, value2, modifier = "EQUALS" } = filter;
     const subquery =
-      "(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id)";
+      "(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId)";
 
     switch (modifier) {
       case "EQUALS":
@@ -906,7 +891,7 @@ class SceneQueryBuilder {
     }
 
     const { value, value2, modifier = "EQUALS" } = filter;
-    const subquery = "(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id)";
+    const subquery = "(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId)";
 
     switch (modifier) {
       case "EQUALS":
@@ -933,10 +918,10 @@ class SceneQueryBuilder {
    */
   private buildPerformerFavoriteFilter(userId: number): FilterClause {
     return {
-      sql: `s.id IN (
-        SELECT sp.sceneId FROM ScenePerformer sp
+      sql: `EXISTS (
+        SELECT 1 FROM ScenePerformer sp
         JOIN PerformerRating pr ON sp.performerId = pr.performerId AND pr.userId = ?
-        WHERE pr.favorite = 1
+        WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND pr.favorite = 1
       )`,
       params: [userId],
     };
@@ -962,10 +947,10 @@ class SceneQueryBuilder {
    */
   private buildTagFavoriteFilter(userId: number): FilterClause {
     return {
-      sql: `s.id IN (
-        SELECT st.sceneId FROM SceneTag st
+      sql: `EXISTS (
+        SELECT 1 FROM SceneTag st
         JOIN TagRating tr ON st.tagId = tr.tagId AND tr.userId = ?
-        WHERE tr.favorite = 1
+        WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND tr.favorite = 1
       )`,
       params: [userId],
     };
@@ -993,8 +978,8 @@ class SceneQueryBuilder {
         CAST((julianday(COALESCE(s.date, date('now'))) - julianday(p.birthdate)) / 365.25 AS INTEGER)
       )
       FROM ScenePerformer sp
-      JOIN StashPerformer p ON sp.performerId = p.id
-      WHERE sp.sceneId = s.id AND p.birthdate IS NOT NULL
+      JOIN StashPerformer p ON sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
+      WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND p.birthdate IS NOT NULL
     )`;
 
     switch (modifier) {
@@ -1091,7 +1076,7 @@ class SceneQueryBuilder {
       case "INCLUDES":
         // Match if tag is in direct tags OR in inherited tags
         return {
-          sql: `(s.id IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders})) OR (${inheritedTagCheck}))`,
+          sql: `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders})) OR (${inheritedTagCheck}))`,
           params: [...ids, ...ids],
         };
 
@@ -1099,7 +1084,7 @@ class SceneQueryBuilder {
         // Match if ALL tags are present (in direct tags OR inherited tags)
         // For each tag, check if it's in SceneTag OR in inheritedTagIds
         const allTagChecks = ids.map(() =>
-          `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) WHERE json_each.value = ?))`
+          `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) WHERE json_each.value = ?))`
         ).join(" AND ");
         // Flatten params: for each id, we need it twice (once for SceneTag, once for json_each)
         const allTagParams = ids.flatMap(id => [id, id]);
@@ -1112,7 +1097,7 @@ class SceneQueryBuilder {
       case "EXCLUDES":
         // Exclude if tag is in direct tags OR in inherited tags
         return {
-          sql: `(s.id NOT IN (SELECT sceneId FROM SceneTag WHERE tagId IN (${placeholders})) AND NOT (${inheritedTagCheck}))`,
+          sql: `(NOT EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId IN (${placeholders})) AND NOT (${inheritedTagCheck}))`,
           params: [...ids, ...ids],
         };
 
@@ -1148,8 +1133,8 @@ class SceneQueryBuilder {
       bitrate: `s.fileBitRate ${dir}`,
       framerate: `s.fileFrameRate ${dir}`,
       path: `s.filePath ${dir}`,
-      performer_count: `(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id) ${dir}`,
-      tag_count: `(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id) ${dir}`,
+      performer_count: `(SELECT COUNT(*) FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId) ${dir}`,
+      tag_count: `(SELECT COUNT(*) FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId) ${dir}`,
 
       // User ratings (from SceneRating table)
       rating: `COALESCE(r.rating, 0) ${dir}`,
@@ -1576,15 +1561,15 @@ class SceneQueryBuilder {
         size: row.fileSize ? Number(row.fileSize) : null,
       }] : [],
 
-      // Paths - transform to proxy URLs
+      // Paths - transform to proxy URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(row.pathScreenshot),
-        preview: this.transformUrl(row.pathPreview),
-        stream: this.transformUrl(row.pathStream),
-        sprite: this.transformUrl(row.pathSprite),
-        vtt: this.transformUrl(row.pathVtt),
-        chapters_vtt: this.transformUrl(row.pathChaptersVtt),
-        caption: this.transformUrl(row.pathCaption),
+        screenshot: this.transformUrl(row.pathScreenshot, row.stashInstanceId),
+        preview: this.transformUrl(row.pathPreview, row.stashInstanceId),
+        stream: this.transformUrl(row.pathStream, row.stashInstanceId),
+        sprite: this.transformUrl(row.pathSprite, row.stashInstanceId),
+        vtt: this.transformUrl(row.pathVtt, row.stashInstanceId),
+        chapters_vtt: this.transformUrl(row.pathChaptersVtt, row.stashInstanceId),
+        caption: this.transformUrl(row.pathCaption, row.stashInstanceId),
       },
 
       // Parse sceneStreams from JSON
@@ -1771,13 +1756,14 @@ class SceneQueryBuilder {
   }
 
   // Helper transforms for Stash entities - all image URLs need proxy treatment
+  // Each entity includes its stashInstanceId for multi-instance routing
   private transformStashPerformer(p: any): any {
     return {
       id: p.id,
       name: p.name,
       disambiguation: p.disambiguation,
       gender: p.gender,
-      image_path: this.transformUrl(p.imagePath),
+      image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
       favorite: p.favorite,
       rating100: p.rating100,
     };
@@ -1787,7 +1773,7 @@ class SceneQueryBuilder {
     return {
       id: t.id,
       name: t.name,
-      image_path: this.transformUrl(t.imagePath),
+      image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
       favorite: t.favorite,
     };
   }
@@ -1796,7 +1782,7 @@ class SceneQueryBuilder {
     return {
       id: s.id,
       name: s.name,
-      image_path: this.transformUrl(s.imagePath),
+      image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
       favorite: s.favorite,
       parent_studio: s.parentId ? { id: s.parentId } : null,
     };
@@ -1806,13 +1792,13 @@ class SceneQueryBuilder {
     return {
       id: g.id,
       name: g.name,
-      front_image_path: this.transformUrl(g.frontImagePath),
-      back_image_path: this.transformUrl(g.backImagePath),
+      front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
+      back_image_path: this.transformUrl(g.backImagePath, g.stashInstanceId),
     };
   }
 
   private transformStashGallery(g: any): any {
-    const coverUrl = g.coverPath ? this.transformUrl(g.coverPath) : null;
+    const coverUrl = g.coverPath ? this.transformUrl(g.coverPath, g.stashInstanceId) : null;
     return {
       id: g.id,
       title: g.title,
@@ -1850,8 +1836,10 @@ class SceneQueryBuilder {
 
   /**
    * Transform a Stash URL/path to a proxy URL
+   * @param urlOrPath - The URL or path to transform
+   * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null): string | null {
+  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
     if (!urlOrPath) return null;
 
     // If it's already a proxy URL, return as-is
@@ -1859,20 +1847,30 @@ class SceneQueryBuilder {
       return urlOrPath;
     }
 
+    // Build base proxy URL
+    let proxyPath: string;
+
     // If it's a full URL (http://...), extract path + query
     if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
       try {
         const url = new URL(urlOrPath);
         const pathWithQuery = url.pathname + url.search;
-        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
       } catch {
         // If URL parsing fails, treat as path
-        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
       }
+    } else {
+      // Otherwise treat as path and encode it
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    // Otherwise treat as path and encode it
-    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    // Add instanceId for multi-instance routing
+    if (instanceId) {
+      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+    }
+
+    return proxyPath;
   }
 
   /**

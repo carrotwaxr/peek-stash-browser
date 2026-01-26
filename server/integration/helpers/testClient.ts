@@ -128,3 +128,55 @@ export class TestClient {
 // Singleton instances for common use cases
 export const adminClient = new TestClient();
 export const guestClient = new TestClient();
+
+// Cached test instance ID for multi-instance filtering
+let cachedTestInstanceId: string | null = null;
+
+/**
+ * Select only the primary test instance for the current user.
+ * This ensures tests that query by ID only get results from the test instance,
+ * not from other instances (e.g., production) that may have been added.
+ *
+ * Call this in beforeAll for tests that filter by specific entity IDs.
+ */
+export async function selectTestInstanceOnly(): Promise<string> {
+  if (cachedTestInstanceId) {
+    await adminClient.put("/api/user/stash-instances", {
+      instanceIds: [cachedTestInstanceId],
+    });
+    return cachedTestInstanceId;
+  }
+
+  // Get all instances
+  const instancesResponse = await adminClient.get<{
+    instances: Array<{ id: string; name: string; priority: number }>;
+  }>("/api/setup/stash-instances");
+
+  if (!instancesResponse.ok || !instancesResponse.data.instances?.length) {
+    throw new Error("No Stash instances configured");
+  }
+
+  // Find the test instance (highest priority / first configured)
+  const testInstance = instancesResponse.data.instances.reduce((a, b) =>
+    a.priority < b.priority ? a : b
+  );
+
+  cachedTestInstanceId = testInstance.id;
+
+  // Set user's instance selection to only test instance
+  await adminClient.put("/api/user/stash-instances", {
+    instanceIds: [cachedTestInstanceId],
+  });
+
+  return cachedTestInstanceId;
+}
+
+/**
+ * Reset user instance selection to all instances.
+ * Call this in afterAll if you need to restore default behavior.
+ */
+export async function selectAllInstances(): Promise<void> {
+  await adminClient.put("/api/user/stash-instances", {
+    instanceIds: [],
+  });
+}

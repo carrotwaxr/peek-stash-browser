@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { adminClient, guestClient } from "../helpers/testClient.js";
+import { adminClient, guestClient, selectTestInstanceOnly } from "../helpers/testClient.js";
 import { TEST_ENTITIES, TEST_ADMIN } from "../fixtures/testEntities.js";
 
 // Response type for /api/library/studios
@@ -20,6 +20,8 @@ interface FindStudiosResponse {
 describe("Studio API", () => {
   beforeAll(async () => {
     await adminClient.login(TEST_ADMIN.username, TEST_ADMIN.password);
+    // Select only test instance to avoid ID collisions with other instances
+    await selectTestInstanceOnly();
   });
 
   describe("POST /api/library/studios", () => {
@@ -47,8 +49,13 @@ describe("Studio API", () => {
       });
 
       expect(response.ok).toBe(true);
-      expect(response.data.findStudios.studios).toHaveLength(1);
-      expect(response.data.findStudios.studios[0].id).toBe(TEST_ENTITIES.studioWithScenes);
+      // With multi-instance, same ID can exist in multiple instances
+      expect(response.data.findStudios.studios.length).toBeGreaterThanOrEqual(1);
+      // Verify at least one result has the expected ID
+      const matchingStudio = response.data.findStudios.studios.find(
+        (s) => s.id === TEST_ENTITIES.studioWithScenes
+      );
+      expect(matchingStudio).toBeDefined();
     });
 
     it("returns studio with tooltip entity data (tags, performers, groups, galleries)", async () => {
