@@ -21,9 +21,10 @@ import type {
   NormalizedPerformer,
   PeekPerformerFilter,
 } from "../../types/index.js";
+import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
+import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
-import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 
 /**
  * Parse a career_length string into years of career duration.
@@ -828,10 +829,14 @@ export const findPerformersMinimal = async (
       paginatedPerformers = performers.slice(0, perPage);
     }
 
-    const minimal = paginatedPerformers.map((p) => ({
+    // Disambiguate names for entities with same name across different instances
+    // Only non-default instances get suffixed with instance name when duplicates exist
+    const entitiesWithInstance = paginatedPerformers.map((p) => ({
       id: p.id,
       name: p.name,
+      instanceId: p.instanceId,
     }));
+    const minimal = disambiguateEntityNames(entitiesWithInstance);
 
     res.json({
       performers: minimal,

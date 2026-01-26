@@ -196,8 +196,8 @@ class StashEntityService {
         COALESCE(GROUP_CONCAT(DISTINCT sp.performerId), '') as performerIds,
         COALESCE(GROUP_CONCAT(DISTINCT st.tagId), '') as tagIds
       FROM StashScene s
-      LEFT JOIN ScenePerformer sp ON s.id = sp.sceneId
-      LEFT JOIN SceneTag st ON s.id = st.sceneId
+      LEFT JOIN ScenePerformer sp ON s.id = sp.sceneId AND s.stashInstanceId = sp.sceneInstanceId
+      LEFT JOIN SceneTag st ON s.id = st.sceneId AND s.stashInstanceId = st.sceneInstanceId
       WHERE s.deletedAt IS NULL
       GROUP BY s.id
     `;
@@ -258,13 +258,14 @@ class StashEntityService {
     // SQL query to find candidate scenes sharing performers, tags, or studio
     // Uses UNION ALL to combine weighted matches, then groups and sums weights
     // Includes date for secondary sorting
+    // Note: Performer and tag matching is instance-aware (same ID + same instance)
     const sql = `
       WITH candidates AS (
         -- Scenes sharing performers (weight: 3 per match)
         SELECT sp2.sceneId, 3 as weight
         FROM ScenePerformer sp1
-        JOIN ScenePerformer sp2 ON sp2.performerId = sp1.performerId
-        JOIN StashScene s ON s.id = sp2.sceneId AND s.deletedAt IS NULL
+        JOIN ScenePerformer sp2 ON sp2.performerId = sp1.performerId AND sp2.performerInstanceId = sp1.performerInstanceId
+        JOIN StashScene s ON s.id = sp2.sceneId AND s.stashInstanceId = sp2.sceneInstanceId AND s.deletedAt IS NULL
         WHERE sp1.sceneId = ?
           AND sp2.sceneId != ?
 
@@ -283,8 +284,8 @@ class StashEntityService {
         -- Scenes sharing tags (weight: 1 per match)
         SELECT st2.sceneId, 1 as weight
         FROM SceneTag st1
-        JOIN SceneTag st2 ON st2.tagId = st1.tagId
-        JOIN StashScene s ON s.id = st2.sceneId AND s.deletedAt IS NULL
+        JOIN SceneTag st2 ON st2.tagId = st1.tagId AND st2.tagInstanceId = st1.tagInstanceId
+        JOIN StashScene s ON s.id = st2.sceneId AND s.stashInstanceId = st2.sceneInstanceId AND s.deletedAt IS NULL
         WHERE st1.sceneId = ?
           AND st2.sceneId != ?
       )
@@ -783,8 +784,8 @@ class StashEntityService {
     const groupCountResult = await prisma.$queryRaw<{ count: number }[]>`
       SELECT COUNT(DISTINCT sg.groupId) as count
       FROM ScenePerformer sp
-      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId
-      INNER JOIN StashScene s ON sp.sceneId = s.id
+      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
+      INNER JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
       WHERE sp.performerId = ${id}
         AND s.deletedAt IS NULL
     `;
@@ -1254,8 +1255,8 @@ class StashEntityService {
     const performerCountResult = await prisma.$queryRaw<{ count: number }[]>`
       SELECT COUNT(DISTINCT sp.performerId) as count
       FROM SceneGroup sg
-      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId
-      INNER JOIN StashScene s ON sg.sceneId = s.id
+      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
+      INNER JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
       WHERE sg.groupId = ${id}
         AND s.deletedAt IS NULL
     `;
@@ -1573,7 +1574,7 @@ class StashEntityService {
     const results = await prisma.$queryRaw<{ performerId: string }[]>`
       SELECT DISTINCT sp.performerId
       FROM ScenePerformer sp
-      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId
+      INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
       WHERE sg.groupId IN (${Prisma.join(groupIds)})
     `;
     logger.debug(`getPerformerIdsByGroups: ${Date.now() - startTime}ms, groups=${groupIds.length}, performers=${results.length}`);
@@ -1593,7 +1594,7 @@ class StashEntityService {
     const results = await prisma.$queryRaw<{ groupId: string }[]>`
       SELECT DISTINCT sg.groupId
       FROM SceneGroup sg
-      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId
+      INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
       WHERE sp.performerId IN (${Prisma.join(performerIds)})
     `;
     logger.debug(`getGroupIdsByPerformers: ${Date.now() - startTime}ms, performers=${performerIds.length}, groups=${results.length}`);
@@ -1630,15 +1631,15 @@ class StashEntityService {
         size: scene.fileSize ? Number(scene.fileSize) : null,
       }] : [],
 
-      // Transformed URLs
+      // Transformed URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(scene.pathScreenshot),
-        preview: this.transformUrl(scene.pathPreview),
-        sprite: this.transformUrl(scene.pathSprite),
-        vtt: this.transformUrl(scene.pathVtt),
-        chapters_vtt: this.transformUrl(scene.pathChaptersVtt),
-        stream: this.transformUrl(scene.pathStream),
-        caption: this.transformUrl(scene.pathCaption),
+        screenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+        preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
+        sprite: this.transformUrl(scene.pathSprite, scene.stashInstanceId),
+        vtt: this.transformUrl(scene.pathVtt, scene.stashInstanceId),
+        chapters_vtt: this.transformUrl(scene.pathChaptersVtt, scene.stashInstanceId),
+        stream: this.transformUrl(scene.pathStream, scene.stashInstanceId),
+        caption: this.transformUrl(scene.pathCaption, scene.stashInstanceId),
       },
 
       // Generate streams on-demand (no longer stored in DB)
@@ -1697,15 +1698,15 @@ class StashEntityService {
         size: scene.fileSize ? Number(scene.fileSize) : null,
       }] : [],
 
-      // Transformed URLs
+      // Transformed URLs with instanceId for multi-instance routing
       paths: {
-        screenshot: this.transformUrl(scene.pathScreenshot),
-        preview: this.transformUrl(scene.pathPreview),
-        sprite: this.transformUrl(scene.pathSprite),
-        vtt: this.transformUrl(scene.pathVtt),
-        chapters_vtt: this.transformUrl(scene.pathChaptersVtt),
-        stream: this.transformUrl(scene.pathStream),
-        caption: this.transformUrl(scene.pathCaption),
+        screenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
+        preview: this.transformUrl(scene.pathPreview, scene.stashInstanceId),
+        sprite: this.transformUrl(scene.pathSprite, scene.stashInstanceId),
+        vtt: this.transformUrl(scene.pathVtt, scene.stashInstanceId),
+        chapters_vtt: this.transformUrl(scene.pathChaptersVtt, scene.stashInstanceId),
+        stream: this.transformUrl(scene.pathStream, scene.stashInstanceId),
+        caption: this.transformUrl(scene.pathCaption, scene.stashInstanceId),
       },
 
       // Empty sceneStreams for browse - generated on demand for playback
@@ -1811,11 +1812,12 @@ class StashEntityService {
     const tags = performer.tags?.map((pt: any) => ({
       id: pt.tagId,
       name: pt.tag?.name || "Unknown",
-      image_path: pt.tag?.imagePath ? this.transformUrl(pt.tag.imagePath) : null,
+      image_path: pt.tag?.imagePath ? this.transformUrl(pt.tag.imagePath, pt.tag.stashInstanceId) : null,
     })) || [];
     return {
       ...DEFAULT_PERFORMER_USER_FIELDS,
       id: performer.id,
+      instanceId: performer.stashInstanceId,
       name: performer.name,
       disambiguation: performer.disambiguation,
       gender: performer.gender,
@@ -1843,7 +1845,7 @@ class StashEntityService {
       url: performer.url,
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      image_path: this.transformUrl(performer.imagePath),
+      image_path: this.transformUrl(performer.imagePath, performer.stashInstanceId),
       created_at: performer.stashCreatedAt?.toISOString() ?? null,
       updated_at: performer.stashUpdatedAt?.toISOString() ?? null,
     } as unknown as NormalizedPerformer;
@@ -1854,11 +1856,12 @@ class StashEntityService {
     const tags = studio.tags?.map((st: any) => ({
       id: st.tagId,
       name: st.tag?.name || "Unknown",
-      image_path: st.tag?.imagePath ? this.transformUrl(st.tag.imagePath) : null,
+      image_path: st.tag?.imagePath ? this.transformUrl(st.tag.imagePath, st.tag.stashInstanceId) : null,
     })) || [];
     return {
       ...DEFAULT_STUDIO_USER_FIELDS,
       id: studio.id,
+      instanceId: studio.stashInstanceId,
       name: studio.name,
       parent_studio: studio.parentId ? { id: studio.parentId } : null,
       favorite: studio.favorite ?? false,
@@ -1872,7 +1875,7 @@ class StashEntityService {
       url: studio.url,
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      image_path: this.transformUrl(studio.imagePath),
+      image_path: this.transformUrl(studio.imagePath, studio.stashInstanceId),
       created_at: studio.stashCreatedAt?.toISOString() ?? null,
       updated_at: studio.stashUpdatedAt?.toISOString() ?? null,
     } as unknown as NormalizedStudio;
@@ -1882,6 +1885,7 @@ class StashEntityService {
     return {
       ...DEFAULT_TAG_USER_FIELDS,
       id: tag.id,
+      instanceId: tag.stashInstanceId,
       name: tag.name,
       favorite: tag.favorite ?? false,
       scene_count: tag.sceneCount ?? 0,
@@ -1895,7 +1899,7 @@ class StashEntityService {
       description: tag.description,
       aliases: tag.aliases ? JSON.parse(tag.aliases) : [],
       parents: tag.parentIds ? JSON.parse(tag.parentIds).map((id: string) => ({ id })) : [],
-      image_path: this.transformUrl(tag.imagePath),
+      image_path: this.transformUrl(tag.imagePath, tag.stashInstanceId),
       created_at: tag.stashCreatedAt?.toISOString() ?? null,
       updated_at: tag.stashUpdatedAt?.toISOString() ?? null,
     } as unknown as NormalizedTag;
@@ -1906,7 +1910,7 @@ class StashEntityService {
     const tags = group.tags?.map((gt: any) => ({
       id: gt.tagId,
       name: gt.tag?.name || "Unknown",
-      image_path: gt.tag?.imagePath ? this.transformUrl(gt.tag.imagePath) : null,
+      image_path: gt.tag?.imagePath ? this.transformUrl(gt.tag.imagePath, gt.tag.stashInstanceId) : null,
     })) || [];
     return {
       ...DEFAULT_GROUP_USER_FIELDS,
@@ -1923,21 +1927,21 @@ class StashEntityService {
       urls: group.urls ? JSON.parse(group.urls) : [],
       // Tags from junction table relation - will be hydrated with names in controller
       tags,
-      front_image_path: this.transformUrl(group.frontImagePath),
-      back_image_path: this.transformUrl(group.backImagePath),
+      front_image_path: this.transformUrl(group.frontImagePath, group.stashInstanceId),
+      back_image_path: this.transformUrl(group.backImagePath, group.stashInstanceId),
       created_at: group.stashCreatedAt?.toISOString() ?? null,
       updated_at: group.stashUpdatedAt?.toISOString() ?? null,
     } as unknown as NormalizedGroup;
   }
 
   private transformGallery(gallery: any): NormalizedGallery {
-    const coverUrl = this.transformUrl(gallery.coverPath);
+    const coverUrl = this.transformUrl(gallery.coverPath, gallery.stashInstanceId);
     // Extract tags from junction table relation (if included) or empty array
     // Include image_path for TooltipEntityGrid display
     const tags = gallery.tags?.map((gt: any) => ({
       id: gt.tagId,
       name: gt.tag?.name || "Unknown",
-      image_path: this.transformUrl(gt.tag?.imagePath),
+      image_path: this.transformUrl(gt.tag?.imagePath, gt.tag?.stashInstanceId),
     })) || [];
 
     // Transform performers from junction table
@@ -1946,7 +1950,7 @@ class StashEntityService {
       id: gp.performer.id,
       name: gp.performer.name,
       gender: gp.performer.gender,
-      image_path: this.transformUrl(gp.performer.imagePath),
+      image_path: this.transformUrl(gp.performer.imagePath, gp.performer.stashInstanceId),
     })) || [];
 
     // Transform scenes from junction table
@@ -1955,7 +1959,7 @@ class StashEntityService {
       id: gs.scene.id,
       title: gs.scene.title,
       paths: {
-        screenshot: this.transformUrl(gs.scene.pathScreenshot),
+        screenshot: this.transformUrl(gs.scene.pathScreenshot, gs.scene.stashInstanceId),
       },
     })) || [];
 
@@ -1995,7 +1999,7 @@ class StashEntityService {
       id: ip.performer.id,
       name: ip.performer.name,
       gender: ip.performer.gender,
-      image_path: this.transformUrl(ip.performer.imagePath),
+      image_path: this.transformUrl(ip.performer.imagePath, ip.performer.stashInstanceId),
     }));
 
     // Transform tags from junction table
@@ -2012,7 +2016,7 @@ class StashEntityService {
       details: ig.gallery.details,
       photographer: ig.gallery.photographer,
       urls: ig.gallery.urls ? JSON.parse(ig.gallery.urls) : [],
-      cover: this.transformUrl(ig.gallery.coverPath),
+      cover: this.transformUrl(ig.gallery.coverPath, ig.gallery.stashInstanceId),
       studioId: ig.gallery.studioId,
       // Include studio object for inheritance
       studio: ig.gallery.studio ? {
@@ -2023,7 +2027,7 @@ class StashEntityService {
         id: gp.performer.id,
         name: gp.performer.name,
         gender: gp.performer.gender,
-        image_path: this.transformUrl(gp.performer.imagePath),
+        image_path: this.transformUrl(gp.performer.imagePath, gp.performer.stashInstanceId),
       })),
       tags: (ig.gallery.tags ?? []).map((gt: any) => ({
         id: gt.tag.id,
@@ -2075,7 +2079,12 @@ class StashEntityService {
     };
   }
 
-  private transformUrl(urlOrPath: string | null): string | null {
+  /**
+   * Transform a Stash URL/path to a proxy URL
+   * @param urlOrPath - The URL or path to transform
+   * @param instanceId - Optional Stash instance ID for multi-instance routing
+   */
+  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
     if (!urlOrPath) return null;
 
     // If it's already a proxy URL, return as-is
@@ -2083,20 +2092,29 @@ class StashEntityService {
       return urlOrPath;
     }
 
+    let proxyPath: string;
+
     // If it's a full URL (http://...), extract path + query
     if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
       try {
         const url = new URL(urlOrPath);
         const pathWithQuery = url.pathname + url.search;
-        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
       } catch {
         // If URL parsing fails, treat as path
-        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
       }
+    } else {
+      // Otherwise treat as path and encode it
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    // Otherwise treat as path and encode it
-    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    // Add instanceId for multi-instance routing
+    if (instanceId) {
+      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+    }
+
+    return proxyPath;
   }
 }
 

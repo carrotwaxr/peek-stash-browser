@@ -56,27 +56,27 @@ export class TimelineService {
 
     if (entityType === "scene") {
       if (filters?.performerId) {
-        joins.push(`INNER JOIN ScenePerformer sp ON sp.sceneId = ${config.alias}.id`);
+        joins.push(`INNER JOIN ScenePerformer sp ON sp.sceneId = ${config.alias}.id AND sp.sceneInstanceId = ${config.alias}.stashInstanceId`);
         whereConditions.push(`sp.performerId = ?`);
       }
       if (filters?.tagId) {
-        joins.push(`INNER JOIN SceneTag st ON st.sceneId = ${config.alias}.id`);
+        joins.push(`INNER JOIN SceneTag st ON st.sceneId = ${config.alias}.id AND st.sceneInstanceId = ${config.alias}.stashInstanceId`);
         whereConditions.push(`st.tagId = ?`);
       }
       if (filters?.studioId) {
         whereConditions.push(`${config.alias}.studioId = ?`);
       }
       if (filters?.groupId) {
-        joins.push(`INNER JOIN SceneGroup sg ON sg.sceneId = ${config.alias}.id`);
+        joins.push(`INNER JOIN SceneGroup sg ON sg.sceneId = ${config.alias}.id AND sg.sceneInstanceId = ${config.alias}.stashInstanceId`);
         whereConditions.push(`sg.groupId = ?`);
       }
     } else if (entityType === "gallery") {
       if (filters?.performerId) {
-        joins.push(`INNER JOIN GalleryPerformer gp ON gp.galleryId = ${config.alias}.id`);
+        joins.push(`INNER JOIN GalleryPerformer gp ON gp.galleryId = ${config.alias}.id AND gp.galleryInstanceId = ${config.alias}.stashInstanceId`);
         whereConditions.push(`gp.performerId = ?`);
       }
       if (filters?.tagId) {
-        joins.push(`INNER JOIN GalleryTag gt ON gt.galleryId = ${config.alias}.id`);
+        joins.push(`INNER JOIN GalleryTag gt ON gt.galleryId = ${config.alias}.id AND gt.galleryInstanceId = ${config.alias}.stashInstanceId`);
         whereConditions.push(`gt.tagId = ?`);
       }
       if (filters?.studioId) {
@@ -84,11 +84,11 @@ export class TimelineService {
       }
     } else if (entityType === "image") {
       if (filters?.performerId) {
-        joins.push(`INNER JOIN ImagePerformer ip ON ip.imageId = ${config.alias}.id`);
+        joins.push(`INNER JOIN ImagePerformer ip ON ip.imageId = ${config.alias}.id AND ip.imageInstanceId = ${config.alias}.stashInstanceId`);
         whereConditions.push(`ip.performerId = ?`);
       }
       if (filters?.tagId) {
-        joins.push(`INNER JOIN ImageTag it ON it.imageId = ${config.alias}.id`);
+        joins.push(`INNER JOIN ImageTag it ON it.imageId = ${config.alias}.id AND it.imageInstanceId = ${config.alias}.stashInstanceId`);
         whereConditions.push(`it.tagId = ?`);
       }
       if (filters?.studioId) {

@@ -3101,14 +3101,15 @@ class StashSyncService extends EventEmitter {
       // 1. Finds all distinct scenes where a performer has a given tag
       // 2. Groups by tagId to get counts
       // 3. Updates all tags in one batch
+      // Note: Joins include instanceId matching for multi-instance support
       await prisma.$executeRaw`
         UPDATE StashTag
         SET sceneCountViaPerformers = COALESCE((
           SELECT COUNT(DISTINCT sp.sceneId)
           FROM PerformerTag pt
-          JOIN ScenePerformer sp ON sp.performerId = pt.performerId
-          JOIN StashScene s ON s.id = sp.sceneId AND s.deletedAt IS NULL
-          WHERE pt.tagId = StashTag.id
+          JOIN ScenePerformer sp ON sp.performerId = pt.performerId AND sp.performerInstanceId = pt.performerInstanceId
+          JOIN StashScene s ON s.id = sp.sceneId AND s.stashInstanceId = sp.sceneInstanceId AND s.deletedAt IS NULL
+          WHERE pt.tagId = StashTag.id AND pt.tagInstanceId = StashTag.stashInstanceId
         ), 0)
         WHERE StashTag.deletedAt IS NULL
       `;

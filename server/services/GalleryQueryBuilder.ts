@@ -41,7 +41,7 @@ export interface GalleryQueryResult {
 class GalleryQueryBuilder {
   // Column list for SELECT - all StashGallery fields plus user data
   private readonly SELECT_COLUMNS = `
-    g.id, g.title, g.date, g.studioId, g.rating100 AS stashRating100,
+    g.id, g.stashInstanceId, g.title, g.date, g.studioId, g.rating100 AS stashRating100,
     g.imageCount, g.coverImageId,
     g.details, g.url, g.code, g.photographer, g.urls,
     g.folderPath, g.fileBasename, g.coverPath,
@@ -258,24 +258,19 @@ class GalleryQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `g.id IN (SELECT galleryId FROM GalleryPerformer WHERE performerId IN (${placeholders}))`,
+          sql: `EXISTS (SELECT 1 FROM GalleryPerformer gp WHERE gp.galleryId = g.id AND gp.galleryInstanceId = g.stashInstanceId AND gp.performerId IN (${placeholders}))`,
           params: ids,
         };
 
       case "INCLUDES_ALL":
         return {
-          sql: `g.id IN (
-            SELECT galleryId FROM GalleryPerformer
-            WHERE performerId IN (${placeholders})
-            GROUP BY galleryId
-            HAVING COUNT(DISTINCT performerId) = ?
-          )`,
+          sql: `(SELECT COUNT(DISTINCT gp.performerId) FROM GalleryPerformer gp WHERE gp.galleryId = g.id AND gp.galleryInstanceId = g.stashInstanceId AND gp.performerId IN (${placeholders})) = ?`,
           params: [...ids, ids.length],
         };
 
       case "EXCLUDES":
         return {
-          sql: `g.id NOT IN (SELECT galleryId FROM GalleryPerformer WHERE performerId IN (${placeholders}))`,
+          sql: `NOT EXISTS (SELECT 1 FROM GalleryPerformer gp WHERE gp.galleryId = g.id AND gp.galleryInstanceId = g.stashInstanceId AND gp.performerId IN (${placeholders}))`,
           params: ids,
         };
 
@@ -307,24 +302,19 @@ class GalleryQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `g.id IN (SELECT galleryId FROM GalleryTag WHERE tagId IN (${placeholders}))`,
+          sql: `EXISTS (SELECT 1 FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId AND gt.tagId IN (${placeholders}))`,
           params: ids,
         };
 
       case "INCLUDES_ALL":
         return {
-          sql: `g.id IN (
-            SELECT galleryId FROM GalleryTag
-            WHERE tagId IN (${placeholders})
-            GROUP BY galleryId
-            HAVING COUNT(DISTINCT tagId) = ?
-          )`,
+          sql: `(SELECT COUNT(DISTINCT gt.tagId) FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId AND gt.tagId IN (${placeholders})) = ?`,
           params: [...ids, ids.length],
         };
 
       case "EXCLUDES":
         return {
-          sql: `g.id NOT IN (SELECT galleryId FROM GalleryTag WHERE tagId IN (${placeholders}))`,
+          sql: `NOT EXISTS (SELECT 1 FROM GalleryTag gt WHERE gt.galleryId = g.id AND gt.galleryInstanceId = g.stashInstanceId AND gt.tagId IN (${placeholders}))`,
           params: ids,
         };
 
@@ -741,8 +731,8 @@ class GalleryQueryBuilder {
       // File paths
       folder: row.folderPath ? { path: row.folderPath } : null,
 
-      // Cover path - transform to proxy URL
-      cover: this.transformUrl(row.coverPath),
+      // Cover path - transform to proxy URL with instanceId for multi-instance routing
+      cover: this.transformUrl(row.coverPath, row.stashInstanceId),
 
       // Cover dimensions (from StashImage via coverImageId)
       coverWidth: row.coverWidth || null,
@@ -809,13 +799,13 @@ class GalleryQueryBuilder {
         : [],
     ]);
 
-    // Build lookup maps
+    // Build lookup maps with instanceId for multi-instance routing
     const performersById = new Map<string, any>();
     for (const performer of performers) {
       performersById.set(performer.id, {
         id: performer.id,
         name: performer.name,
-        image_path: this.transformUrl(performer.imagePath),
+        image_path: this.transformUrl(performer.imagePath, performer.stashInstanceId),
         gender: performer.gender,
       });
     }
@@ -825,7 +815,7 @@ class GalleryQueryBuilder {
       tagsById.set(tag.id, {
         id: tag.id,
         name: tag.name,
-        image_path: this.transformUrl(tag.imagePath),
+        image_path: this.transformUrl(tag.imagePath, tag.stashInstanceId),
       });
     }
 
@@ -834,7 +824,7 @@ class GalleryQueryBuilder {
       studiosById.set(studio.id, {
         id: studio.id,
         name: studio.name,
-        image_path: this.transformUrl(studio.imagePath),
+        image_path: this.transformUrl(studio.imagePath, studio.stashInstanceId),
       });
     }
 
@@ -874,25 +864,35 @@ class GalleryQueryBuilder {
 
   /**
    * Transform a Stash URL/path to a proxy URL
+   * @param urlOrPath - The URL or path to transform
+   * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null): string | null {
+  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
     if (!urlOrPath) return null;
 
     if (urlOrPath.startsWith("/api/proxy/stash")) {
       return urlOrPath;
     }
 
+    let proxyPath: string;
+
     if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
       try {
         const url = new URL(urlOrPath);
         const pathWithQuery = url.pathname + url.search;
-        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
       } catch {
-        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
       }
+    } else {
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    if (instanceId) {
+      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+    }
+
+    return proxyPath;
   }
 }
 

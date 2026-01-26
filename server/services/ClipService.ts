@@ -44,8 +44,10 @@ export class ClipService {
   /**
    * Transform URL to proxy format
    * Handles full URLs (http://...) by extracting path+query
+   * @param urlOrPath - The URL or path to transform
+   * @param instanceId - Optional Stash instance ID for multi-instance routing
    */
-  private transformUrl(urlOrPath: string | null): string | null {
+  private transformUrl(urlOrPath: string | null, instanceId?: string | null): string | null {
     if (!urlOrPath) return null;
 
     // If it's already a proxy URL, return as-is
@@ -53,29 +55,38 @@ export class ClipService {
       return urlOrPath;
     }
 
+    let proxyPath: string;
+
     // If it's a full URL (http://...), extract path + query
     if (urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://")) {
       try {
         const url = new URL(urlOrPath);
         const pathWithQuery = url.pathname + url.search;
-        return `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(pathWithQuery)}`;
       } catch {
         // If URL parsing fails, treat as path
-        return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+        proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
       }
+    } else {
+      // Assume it's a relative path
+      proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    // Assume it's a relative path
-    return `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
+    // Add instanceId for multi-instance routing
+    if (instanceId) {
+      proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
+    }
+
+    return proxyPath;
   }
 
   /**
    * Transform clip scene data to use proxy URLs
    */
-  private transformClipScene(scene: { id: string; title: string | null; pathScreenshot: string | null; studioId: string | null }) {
+  private transformClipScene(scene: { id: string; title: string | null; pathScreenshot: string | null; studioId: string | null; stashInstanceId?: string | null }) {
     return {
       ...scene,
-      pathScreenshot: this.transformUrl(scene.pathScreenshot),
+      pathScreenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
     };
   }
 

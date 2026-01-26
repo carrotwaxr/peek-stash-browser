@@ -18,6 +18,7 @@ import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
+import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -469,7 +470,14 @@ export const findStudiosMinimal = async (
       paginatedStudios = studios.slice(0, perPage);
     }
 
-    const minimal = paginatedStudios.map((s) => ({ id: s.id, name: s.name }));
+    // Disambiguate names for entities with same name across different instances
+    // Only non-default instances get suffixed with instance name when duplicates exist
+    const entitiesWithInstance = paginatedStudios.map((s) => ({
+      id: s.id,
+      name: s.name,
+      instanceId: s.instanceId,
+    }));
+    const minimal = disambiguateEntityNames(entitiesWithInstance);
 
     res.json({
       studios: minimal,
