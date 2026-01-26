@@ -631,8 +631,8 @@ model UserCarousel {
 // ============================================================================
 
 model StashScene {
-  id              String  @id // Stash scene ID
-  stashInstanceId String? // Which Stash server
+  id              String  // Stash scene ID
+  stashInstanceId String  @default("default") // Which Stash server
 
   // === Core fields (indexed) ===
   title     String?
@@ -711,11 +711,12 @@ model StashScene {
   @@index([deletedAt, date(sort: Desc)], map: "StashScene_browse_date_idx")
   @@index([deletedAt, title], map: "StashScene_browse_title_idx")
   @@index([deletedAt, duration(sort: Desc)], map: "StashScene_browse_duration_idx")
+  @@id([id, stashInstanceId])
 }
 
 model StashPerformer {
-  id              String  @id
-  stashInstanceId String?
+  id              String
+  stashInstanceId String  @default("default")
 
   // === Deduplication (StashDB IDs) ===
   stashIds String? // JSON array of {endpoint, stash_id} pairs
@@ -772,11 +773,12 @@ model StashPerformer {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@id([id, stashInstanceId])
 }
 
 model StashStudio {
-  id              String  @id
-  stashInstanceId String?
+  id              String
+  stashInstanceId String  @default("default")
 
   // === Deduplication (StashDB IDs) ===
   stashIds String? // JSON array of {endpoint, stash_id} pairs
@@ -818,11 +820,12 @@ model StashStudio {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@id([id, stashInstanceId])
 }
 
 model StashTag {
-  id              String  @id
-  stashInstanceId String?
+  id              String
+  stashInstanceId String  @default("default")
 
   // === Deduplication (StashDB IDs) ===
   stashIds String? // JSON array of {endpoint, stash_id} pairs
@@ -874,11 +877,12 @@ model StashTag {
   @@index([favorite])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@id([id, stashInstanceId])
 }
 
 model StashGroup {
-  id              String  @id
-  stashInstanceId String?
+  id              String
+  stashInstanceId String  @default("default")
 
   // === Core fields ===
   name      String
@@ -916,18 +920,20 @@ model StashGroup {
   @@index([rating100])
   @@index([stashUpdatedAt])
   @@index([deletedAt])
+  @@id([id, stashInstanceId])
 }
 
 model StashGallery {
-  id              String  @id
-  stashInstanceId String?
+  id              String
+  stashInstanceId String  @default("default")
 
   // === Core fields ===
-  title        String?
-  date         String?
-  studioId     String?
-  rating100    Int?
-  coverImageId String? // Stash image ID of the cover image (for dimension lookup)
+  title            String?
+  date             String?
+  studioId         String?
+  studioInstanceId String? @default("default")
+  rating100        Int?
+  coverImageId     String? // Stash image ID of the cover image (for dimension lookup)
 
   // === Counts (synced from Stash) ===
   imageCount Int @default(0)
@@ -953,7 +959,7 @@ model StashGallery {
   deletedAt      DateTime?
 
   // === Relations ===
-  studio     StashStudio?     @relation(fields: [studioId], references: [id])
+  studio     StashStudio?     @relation(fields: [studioId, studioInstanceId], references: [id, stashInstanceId])
   scenes     SceneGallery[]
   images     ImageGallery[]
   performers GalleryPerformer[]
@@ -966,23 +972,25 @@ model StashGallery {
   @@index([stashUpdatedAt])
   @@index([deletedAt])
   @@index([coverImageId])
+  @@id([id, stashInstanceId])
 }
 
 model StashImage {
-  id              String  @id
-  stashInstanceId String?
+  id              String
+  stashInstanceId String  @default("default")
 
   // === Core fields ===
-  title        String?
-  code         String?
-  details      String?
-  photographer String?
-  urls         String? // JSON array of URLs
-  date         String?
-  studioId     String?
-  rating100    Int?
-  oCounter     Int     @default(0)
-  organized    Boolean @default(false)
+  title            String?
+  code             String?
+  details          String?
+  photographer     String?
+  urls             String? // JSON array of URLs
+  date             String?
+  studioId         String?
+  studioInstanceId String? @default("default")
+  rating100        Int?
+  oCounter         Int     @default(0)
+  organized        Boolean @default(false)
 
   // === File metadata ===
   filePath String? // Image file path
@@ -1002,7 +1010,7 @@ model StashImage {
   deletedAt      DateTime?
 
   // === Relations ===
-  studio     StashStudio?     @relation(fields: [studioId], references: [id])
+  studio     StashStudio?     @relation(fields: [studioId, studioInstanceId], references: [id, stashInstanceId])
   performers ImagePerformer[]
   tags       ImageTag[]
   galleries  ImageGallery[]
@@ -1014,13 +1022,15 @@ model StashImage {
   @@index([deletedAt])
   @@index([title])
   @@index([deletedAt, stashCreatedAt(sort: Desc)])
+  @@id([id, stashInstanceId])
 }
 
 model StashClip {
-  id              String   @id // Stash marker ID
-  stashInstanceId String?
+  id              String   // Stash marker ID
+  stashInstanceId String   @default("default")
   sceneId         String
-  scene           StashScene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  sceneInstanceId String   @default("default")
+  scene           StashScene @relation(fields: [sceneId, sceneInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
   // === Core fields ===
   title           String?
@@ -1028,9 +1038,10 @@ model StashClip {
   endSeconds      Float?   // Optional end position (seconds)
 
   // === Tag relations ===
-  primaryTagId    String?
-  primaryTag      StashTag? @relation("ClipPrimaryTag", fields: [primaryTagId], references: [id])
-  tags            ClipTag[]
+  primaryTagId         String?
+  primaryTagInstanceId String?  @default("default")
+  primaryTag           StashTag? @relation("ClipPrimaryTag", fields: [primaryTagId, primaryTagInstanceId], references: [id, stashInstanceId])
+  tags                 ClipTag[]
 
   // === Preview generation status ===
   previewPath     String?  // Stash preview URL path
@@ -1049,141 +1060,168 @@ model StashClip {
   @@index([primaryTagId])
   @@index([isGenerated, deletedAt])
   @@index([deletedAt, stashCreatedAt(sort: Desc)])
+  @@id([id, stashInstanceId])
 }
 
 model ClipTag {
-  clipId  String
-  tagId   String
-  clip    StashClip @relation(fields: [clipId], references: [id], onDelete: Cascade)
-  tag     StashTag  @relation("ClipTags", fields: [tagId], references: [id], onDelete: Cascade)
+  clipId             String
+  clipInstanceId     String @default("default")
+  tagId              String
+  tagInstanceId      String @default("default")
+  clip               StashClip @relation(fields: [clipId, clipInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  tag                StashTag  @relation("ClipTags", fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([clipId, tagId])
-  @@index([tagId])
+  @@id([clipId, clipInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
 }
 
 // Junction tables for efficient many-to-many queries
 
 model ScenePerformer {
-  sceneId     String
-  performerId String
-  scene       StashScene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  sceneId             String
+  sceneInstanceId     String @default("default")
+  performerId         String
+  performerInstanceId String @default("default")
+  scene               StashScene     @relation(fields: [sceneId, sceneInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  performer           StashPerformer @relation(fields: [performerId, performerInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([sceneId, performerId])
-  @@index([performerId])
+  @@id([sceneId, sceneInstanceId, performerId, performerInstanceId])
+  @@index([performerId, performerInstanceId])
 }
 
 model SceneTag {
-  sceneId String
-  tagId   String
-  scene   StashScene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  tag     StashTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  sceneId         String
+  sceneInstanceId String @default("default")
+  tagId           String
+  tagInstanceId   String @default("default")
+  scene           StashScene @relation(fields: [sceneId, sceneInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  tag             StashTag   @relation(fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([sceneId, tagId])
-  @@index([tagId])
+  @@id([sceneId, sceneInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
 }
 
 model SceneGroup {
-  sceneId    String
-  groupId    String
-  sceneIndex Int?
-  scene      StashScene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  group      StashGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sceneId         String
+  sceneInstanceId String @default("default")
+  groupId         String
+  groupInstanceId String @default("default")
+  sceneIndex      Int?
+  scene           StashScene @relation(fields: [sceneId, sceneInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  group           StashGroup @relation(fields: [groupId, groupInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([sceneId, groupId])
-  @@index([groupId])
+  @@id([sceneId, sceneInstanceId, groupId, groupInstanceId])
+  @@index([groupId, groupInstanceId])
 }
 
 model SceneGallery {
-  sceneId   String
-  galleryId String
-  scene     StashScene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
-  gallery   StashGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  sceneId           String
+  sceneInstanceId   String @default("default")
+  galleryId         String
+  galleryInstanceId String @default("default")
+  scene             StashScene   @relation(fields: [sceneId, sceneInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  gallery           StashGallery @relation(fields: [galleryId, galleryInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([sceneId, galleryId])
-  @@index([galleryId])
+  @@id([sceneId, sceneInstanceId, galleryId, galleryInstanceId])
+  @@index([galleryId, galleryInstanceId])
 }
 
 model ImagePerformer {
-  imageId     String
-  performerId String
-  image       StashImage     @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  imageId             String
+  imageInstanceId     String @default("default")
+  performerId         String
+  performerInstanceId String @default("default")
+  image               StashImage     @relation(fields: [imageId, imageInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  performer           StashPerformer @relation(fields: [performerId, performerInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([imageId, performerId])
-  @@index([performerId])
-  @@index([imageId])
+  @@id([imageId, imageInstanceId, performerId, performerInstanceId])
+  @@index([performerId, performerInstanceId])
+  @@index([imageId, imageInstanceId])
 }
 
 model ImageTag {
-  imageId String
-  tagId   String
-  image   StashImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  tag     StashTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  imageId         String
+  imageInstanceId String @default("default")
+  tagId           String
+  tagInstanceId   String @default("default")
+  image           StashImage @relation(fields: [imageId, imageInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  tag             StashTag   @relation(fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([imageId, tagId])
-  @@index([tagId])
-  @@index([imageId])
+  @@id([imageId, imageInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
+  @@index([imageId, imageInstanceId])
 }
 
 model ImageGallery {
-  imageId   String
-  galleryId String
-  image     StashImage   @relation(fields: [imageId], references: [id], onDelete: Cascade)
-  gallery   StashGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  imageId           String
+  imageInstanceId   String @default("default")
+  galleryId         String
+  galleryInstanceId String @default("default")
+  image             StashImage   @relation(fields: [imageId, imageInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  gallery           StashGallery @relation(fields: [galleryId, galleryInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([imageId, galleryId])
-  @@index([galleryId])
+  @@id([imageId, imageInstanceId, galleryId, galleryInstanceId])
+  @@index([galleryId, galleryInstanceId])
 }
 
 model GalleryPerformer {
-  galleryId   String
-  performerId String
-  gallery     StashGallery   @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  galleryId           String
+  galleryInstanceId   String @default("default")
+  performerId         String
+  performerInstanceId String @default("default")
+  gallery             StashGallery   @relation(fields: [galleryId, galleryInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  performer           StashPerformer @relation(fields: [performerId, performerInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([galleryId, performerId])
-  @@index([performerId])
+  @@id([galleryId, galleryInstanceId, performerId, performerInstanceId])
+  @@index([performerId, performerInstanceId])
 }
 
 model PerformerTag {
-  performerId String
-  tagId       String
-  performer   StashPerformer @relation(fields: [performerId], references: [id], onDelete: Cascade)
-  tag         StashTag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  performerId         String
+  performerInstanceId String @default("default")
+  tagId               String
+  tagInstanceId       String @default("default")
+  performer           StashPerformer @relation(fields: [performerId, performerInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  tag                 StashTag       @relation(fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([performerId, tagId])
-  @@index([tagId])
+  @@id([performerId, performerInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
 }
 
 model StudioTag {
-  studioId String
-  tagId    String
-  studio   StashStudio @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  tag      StashTag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  studioId         String
+  studioInstanceId String @default("default")
+  tagId            String
+  tagInstanceId    String @default("default")
+  studio           StashStudio @relation(fields: [studioId, studioInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  tag              StashTag    @relation(fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([studioId, tagId])
-  @@index([tagId])
+  @@id([studioId, studioInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
 }
 
 model GalleryTag {
-  galleryId String
-  tagId     String
-  gallery   StashGallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
-  tag       StashTag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  galleryId         String
+  galleryInstanceId String @default("default")
+  tagId             String
+  tagInstanceId     String @default("default")
+  gallery           StashGallery @relation(fields: [galleryId, galleryInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  tag               StashTag     @relation(fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([galleryId, tagId])
-  @@index([tagId])
+  @@id([galleryId, galleryInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
 }
 
 model GroupTag {
-  groupId String
-  tagId   String
-  group   StashGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  tag     StashTag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  groupId         String
+  groupInstanceId String @default("default")
+  tagId           String
+  tagInstanceId   String @default("default")
+  group           StashGroup @relation(fields: [groupId, groupInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
+  tag             StashTag   @relation(fields: [tagId, tagInstanceId], references: [id, stashInstanceId], onDelete: Cascade)
 
-  @@id([groupId, tagId])
-  @@index([tagId])
+  @@id([groupId, groupInstanceId, tagId, tagInstanceId])
+  @@index([tagId, tagInstanceId])
 }
 
 // Sync state tracking per entity type
