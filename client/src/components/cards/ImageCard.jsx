@@ -56,6 +56,7 @@ const ImageCard = forwardRef(
           entityType="performer"
           entities={effectivePerformers}
           title="Performers"
+          parentInstanceId={image.instanceId}
         />
       );
 
@@ -65,6 +66,7 @@ const ImageCard = forwardRef(
           entityType="tag"
           entities={effectiveTags}
           title="Tags"
+          parentInstanceId={image.instanceId}
         />
       );
 
@@ -75,6 +77,7 @@ const ImageCard = forwardRef(
           entityType="gallery"
           entities={galleries}
           title="Galleries"
+          parentInstanceId={image.instanceId}
         />
       );
 

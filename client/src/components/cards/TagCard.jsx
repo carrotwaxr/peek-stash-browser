@@ -26,22 +26,22 @@ const TagCard = forwardRef(
     const indicators = useMemo(() => {
       const performersTooltip = getIndicatorBehavior('tag', 'performers') === 'rich' &&
         tag.performers?.length > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={tag.performers} title="Performers" />
+          <TooltipEntityGrid entityType="performer" entities={tag.performers} title="Performers" parentInstanceId={tag.instanceId} />
         );
 
       const studiosTooltip = getIndicatorBehavior('tag', 'studios') === 'rich' &&
         tag.studios?.length > 0 && (
-          <TooltipEntityGrid entityType="studio" entities={tag.studios} title="Studios" />
+          <TooltipEntityGrid entityType="studio" entities={tag.studios} title="Studios" parentInstanceId={tag.instanceId} />
         );
 
       const groupsTooltip = getIndicatorBehavior('tag', 'groups') === 'rich' &&
         tag.groups?.length > 0 && (
-          <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" />
+          <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" parentInstanceId={tag.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('tag', 'galleries') === 'rich' &&
         tag.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={tag.galleries} title="Galleries" />
+          <TooltipEntityGrid entityType="gallery" entities={tag.galleries} title="Galleries" parentInstanceId={tag.instanceId} />
         );
 
       return [

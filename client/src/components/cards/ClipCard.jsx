@@ -75,7 +75,7 @@ const ClipCard = forwardRef(
       const tagsTooltip =
         getIndicatorBehavior("clip", "tags") === "rich" &&
         allTags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" />
+          <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" parentInstanceId={clip.scene?.instanceId} />
         );
 
       // Performers would come from scene - need API enhancement
@@ -111,7 +111,7 @@ const ClipCard = forwardRef(
               : undefined,
         },
       ];
-    }, [allTags, clip.sceneId, navigate]);
+    }, [allTags, clip.sceneId, clip.scene?.instanceId, navigate]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = clipSettings.showRelationshipIndicators

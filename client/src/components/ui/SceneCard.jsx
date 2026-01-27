@@ -115,6 +115,7 @@ const SceneCard = forwardRef(
             entityType="performer"
             entities={scene.performers}
             title="Performers"
+            parentInstanceId={scene.instanceId}
           />
         );
 
@@ -124,12 +125,18 @@ const SceneCard = forwardRef(
             entityType="group"
             entities={scene.groups}
             title="Collections"
+            parentInstanceId={scene.instanceId}
           />
         );
 
       const tagsTooltip = getIndicatorBehavior('scene', 'tags') === 'rich' &&
         allTags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={allTags} title="Tags" />
+          <TooltipEntityGrid
+            entityType="tag"
+            entities={allTags}
+            title="Tags"
+            parentInstanceId={scene.instanceId}
+          />
         );
 
       const galleriesTooltip = getIndicatorBehavior('scene', 'galleries') === 'rich' &&
@@ -138,6 +145,7 @@ const SceneCard = forwardRef(
             entityType="gallery"
             entities={scene.galleries}
             title="Galleries"
+            parentInstanceId={scene.instanceId}
           />
         );
 

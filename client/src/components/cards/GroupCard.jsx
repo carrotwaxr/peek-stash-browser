@@ -35,17 +35,17 @@ const GroupCard = forwardRef(
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('group', 'tags') === 'rich' &&
         group.tags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={group.tags} title="Tags" />
+          <TooltipEntityGrid entityType="tag" entities={group.tags} title="Tags" parentInstanceId={group.instanceId} />
         );
 
       const performersTooltip = getIndicatorBehavior('group', 'performers') === 'rich' &&
         group.performers?.length > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" />
+          <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" parentInstanceId={group.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('group', 'galleries') === 'rich' &&
         group.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={group.galleries} title="Galleries" />
+          <TooltipEntityGrid entityType="gallery" entities={group.galleries} title="Galleries" parentInstanceId={group.instanceId} />
         );
 
       return [

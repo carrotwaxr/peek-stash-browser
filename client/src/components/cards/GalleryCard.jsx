@@ -40,6 +40,7 @@ const GalleryCard = forwardRef(
           entityType="performer"
           entities={gallery.performers}
           title="Performers"
+          parentInstanceId={gallery.instanceId}
         />
       );
 
@@ -49,6 +50,7 @@ const GalleryCard = forwardRef(
           entityType="tag"
           entities={gallery.tags}
           title="Tags"
+          parentInstanceId={gallery.instanceId}
         />
       );
 
@@ -59,6 +61,7 @@ const GalleryCard = forwardRef(
           entityType="scene"
           entities={gallery.scenes}
           title="Scenes"
+          parentInstanceId={gallery.instanceId}
         />
       );
 

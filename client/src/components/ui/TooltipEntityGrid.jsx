@@ -10,8 +10,9 @@ import { getEntityPath } from "../../utils/entityLinks.js";
  * @param {string} entityType - Type of entity (performer, tag, studio, group, gallery)
  * @param {Array} entities - Array of entities to display
  * @param {string} title - Grid title (e.g., "Performers", "Tags")
+ * @param {string} parentInstanceId - Instance ID from parent entity (fallback when entities don't have their own)
  */
-export const TooltipEntityGrid = ({ entityType, entities, title }) => {
+export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceId }) => {
   const { hasMultipleInstances } = useConfig();
 
   if (!entities || entities.length === 0) return null;
@@ -37,8 +38,12 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
   };
 
   // Get link path for entity using centralized utility
+  // If entity doesn't have instanceId, use parentInstanceId as fallback
   const getLinkPath = (entity) => {
-    return getEntityPath(entityType, entity, hasMultipleInstances);
+    const entityWithInstance = entity.instanceId
+      ? entity
+      : { ...entity, instanceId: parentInstanceId };
+    return getEntityPath(entityType, entityWithInstance, hasMultipleInstances);
   };
 
   // Get image path for entity
