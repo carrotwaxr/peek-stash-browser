@@ -262,7 +262,7 @@ export const getCaption = async (req: Request, res: Response) => {
       return res.status(400).send("Missing lang or type parameter");
     }
 
-    logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId || 'default'}`);
+    logger.info(`[CAPTION] Request: scene=${sceneId}, lang=${lang}, type=${type}, instanceId=${instanceId || '(not specified)'}`);
 
     // Get Stash instance configuration
     let stashUrl: string;

@@ -592,7 +592,7 @@ class StashSyncService extends EventEmitter {
    * Get sync state for a specific entity type
    */
   private async getEntitySyncState(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     entityType: EntityType
   ): Promise<{
     lastFullSyncTimestamp: string | null;
@@ -709,7 +709,7 @@ class StashSyncService extends EventEmitter {
    */
   private async syncEntityType(
     entityType: EntityType,
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -747,11 +747,61 @@ class StashSyncService extends EventEmitter {
 
     this.syncInProgress = true;
     this.abortController = new AbortController();
+
+    try {
+      // If no instance specified, sync all enabled instances
+      if (!stashInstanceId) {
+        return await this.incrementalSyncAllInstances();
+      }
+      return await this.incrementalSyncInstance(stashInstanceId);
+    } finally {
+      this.syncInProgress = false;
+      this.abortController = null;
+    }
+  }
+
+  /**
+   * Incremental sync all enabled instances
+   * Note: Assumes syncInProgress is already set by caller
+   */
+  private async incrementalSyncAllInstances(): Promise<SyncResult[]> {
+    const enabledInstances = stashInstanceManager.getAllEnabled();
+
+    if (enabledInstances.length === 0) {
+      logger.warn("No enabled Stash instances to sync");
+      return [];
+    }
+
+    logger.info(`Starting incremental sync for ${enabledInstances.length} instance(s)...`);
+    const allResults: SyncResult[] = [];
+
+    for (const instance of enabledInstances) {
+      logger.info(`Incremental sync instance: ${instance.name} (${instance.id})`);
+      try {
+        const results = await this.incrementalSyncInstance(instance.id);
+        allResults.push(...results);
+      } catch (error) {
+        logger.error(`Failed to incremental sync instance ${instance.name}`, {
+          instanceId: instance.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue with other instances
+      }
+    }
+
+    return allResults;
+  }
+
+  /**
+   * Incremental sync a single instance
+   * Note: Assumes syncInProgress is already set by caller
+   */
+  private async incrementalSyncInstance(stashInstanceId: string): Promise<SyncResult[]> {
     const startTime = Date.now();
     const results: SyncResult[] = [];
 
     try {
-      logger.info("Starting incremental sync with per-entity timestamps...");
+      logger.info("Starting incremental sync with per-entity timestamps...", { stashInstanceId });
 
       // Entity types in dependency order (tags first since others reference them)
       const entityTypes: EntityType[] = [
@@ -857,9 +907,6 @@ class StashSyncService extends EventEmitter {
       }
 
       throw error;
-    } finally {
-      this.syncInProgress = false;
-      this.abortController = null;
     }
   }
 
@@ -873,23 +920,30 @@ class StashSyncService extends EventEmitter {
     action: "create" | "update" | "delete",
     stashInstanceId?: string
   ): Promise<void> {
-    logger.info("Single entity sync", { entityType, entityId, action });
+    // Resolve instance ID - use first enabled instance if not specified
+    const instanceId = stashInstanceId ?? this.getFirstEnabledInstanceId();
+    if (!instanceId) {
+      logger.warn("Cannot sync single entity: no enabled Stash instances");
+      return;
+    }
+
+    logger.info("Single entity sync", { entityType, entityId, action, instanceId });
 
     if (action === "delete") {
       // Soft delete the entity
-      await this.softDeleteEntity(entityType, entityId, stashInstanceId);
+      await this.softDeleteEntity(entityType, entityId, instanceId);
       return;
     }
 
     // Fetch and upsert the entity
-    const stash = this.getStashClient(stashInstanceId);
+    const stash = this.getStashClient(instanceId);
 
     switch (entityType) {
       case "scene": {
         // Use findScenes with ids filter for single scene
         const result = await stash.findScenes({ ids: [entityId] });
         if (result.findScenes.scenes.length > 0) {
-          await this.processScenesBatch(result.findScenes.scenes as Scene[], stashInstanceId, 0, 1);
+          await this.processScenesBatch(result.findScenes.scenes as Scene[], instanceId, 0, 1);
         }
         break;
       }
@@ -898,7 +952,7 @@ class StashSyncService extends EventEmitter {
         if (result.findPerformers.performers.length > 0) {
           await this.processPerformersBatch(
             result.findPerformers.performers as Performer[],
-            stashInstanceId
+            instanceId
           );
         }
         break;
@@ -906,45 +960,53 @@ class StashSyncService extends EventEmitter {
       case "studio": {
         const result = await stash.findStudios({ ids: [entityId] });
         if (result.findStudios.studios.length > 0) {
-          await this.processStudiosBatch(result.findStudios.studios as Studio[], stashInstanceId);
+          await this.processStudiosBatch(result.findStudios.studios as Studio[], instanceId);
         }
         break;
       }
       case "tag": {
         const result = await stash.findTags({ ids: [entityId] });
         if (result.findTags.tags.length > 0) {
-          await this.processTagsBatch(result.findTags.tags as Tag[], stashInstanceId);
+          await this.processTagsBatch(result.findTags.tags as Tag[], instanceId);
         }
         break;
       }
       case "group": {
         const result = await stash.findGroup({ id: entityId });
         if (result.findGroup) {
-          await this.processGroupsBatch([result.findGroup as Group], stashInstanceId);
+          await this.processGroupsBatch([result.findGroup as Group], instanceId);
         }
         break;
       }
       case "gallery": {
         const result = await stash.findGallery({ id: entityId });
         if (result.findGallery) {
-          await this.processGalleriesBatch([result.findGallery as Gallery], stashInstanceId);
+          await this.processGalleriesBatch([result.findGallery as Gallery], instanceId);
         }
         break;
       }
       case "image": {
         const result = await stash.findImages({ image_ids: [parseInt(entityId, 10)] });
         if (result.findImages.images.length > 0) {
-          await this.processImagesBatch(result.findImages.images, stashInstanceId);
+          await this.processImagesBatch(result.findImages.images, instanceId);
         }
         break;
       }
     }
   }
 
+  /**
+   * Get the ID of the first enabled Stash instance
+   */
+  private getFirstEnabledInstanceId(): string | undefined {
+    const enabledInstances = stashInstanceManager.getAllEnabled();
+    return enabledInstances.length > 0 ? enabledInstances[0].id : undefined;
+  }
+
   // ==================== Scene Sync ====================
 
   private async syncScenes(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -1041,7 +1103,7 @@ class StashSyncService extends EventEmitter {
 
   private async processScenesBatch(
     scenes: Scene[],
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     _batchStart: number,
     _totalCount: number
   ): Promise<void> {
@@ -1057,7 +1119,7 @@ class StashSyncService extends EventEmitter {
     if (validScenes.length === 0) return;
 
     const sceneIds = validScenes.map((s) => s.id);
-    const instanceId = stashInstanceId || 'default';
+    const instanceId = stashInstanceId;
 
     // Bulk delete all junction records for this batch
     await Promise.all([
@@ -1246,7 +1308,7 @@ class StashSyncService extends EventEmitter {
    * Fetches all entity IDs from Stash using pagination and soft-deletes any
    * entities in Peek that are not present in Stash (due to deletion or merge).
    */
-  private async cleanupDeletedEntities(entityType: EntityType, stashInstanceId?: string): Promise<number> {
+  private async cleanupDeletedEntities(entityType: EntityType, stashInstanceId: string): Promise<number> {
     const plural = ENTITY_PLURALS[entityType];
     logger.info(`Checking for deleted ${plural}...`);
     const startTime = Date.now();
@@ -1397,7 +1459,7 @@ class StashSyncService extends EventEmitter {
 
             // Soft-delete in batches
             const deleteIds = scenesToDelete.map((s) => s.id);
-            const instanceId = stashInstanceId || 'default';
+            const instanceId = stashInstanceId;
             for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
               const batch = deleteIds.slice(i, i + BATCH_SIZE);
               await prisma.stashScene.updateMany({
@@ -1413,7 +1475,7 @@ class StashSyncService extends EventEmitter {
           break;
         }
         case "performer": {
-          const cleanupInstanceId = stashInstanceId || 'default';
+          const cleanupInstanceId = stashInstanceId;
           deletedCount = (await prisma.stashPerformer.updateMany({
             where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
@@ -1421,7 +1483,7 @@ class StashSyncService extends EventEmitter {
           break;
         }
         case "studio": {
-          const cleanupInstanceId = stashInstanceId || 'default';
+          const cleanupInstanceId = stashInstanceId;
           deletedCount = (await prisma.stashStudio.updateMany({
             where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
@@ -1429,7 +1491,7 @@ class StashSyncService extends EventEmitter {
           break;
         }
         case "tag": {
-          const cleanupInstanceId = stashInstanceId || 'default';
+          const cleanupInstanceId = stashInstanceId;
           deletedCount = (await prisma.stashTag.updateMany({
             where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
@@ -1437,7 +1499,7 @@ class StashSyncService extends EventEmitter {
           break;
         }
         case "group": {
-          const cleanupInstanceId = stashInstanceId || 'default';
+          const cleanupInstanceId = stashInstanceId;
           deletedCount = (await prisma.stashGroup.updateMany({
             where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
@@ -1445,7 +1507,7 @@ class StashSyncService extends EventEmitter {
           break;
         }
         case "gallery": {
-          const cleanupInstanceId = stashInstanceId || 'default';
+          const cleanupInstanceId = stashInstanceId;
           deletedCount = (await prisma.stashGallery.updateMany({
             where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
@@ -1453,7 +1515,7 @@ class StashSyncService extends EventEmitter {
           break;
         }
         case "image": {
-          const cleanupInstanceId = stashInstanceId || 'default';
+          const cleanupInstanceId = stashInstanceId;
           deletedCount = (await prisma.stashImage.updateMany({
             where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
@@ -1461,7 +1523,7 @@ class StashSyncService extends EventEmitter {
           break;
         }
         case "clip": {
-          const cleanupInstanceId = stashInstanceId || 'default';
+          const cleanupInstanceId = stashInstanceId;
           deletedCount = (await prisma.stashClip.updateMany({
             where: { deletedAt: null, stashInstanceId: cleanupInstanceId, id: { notIn: stashIds } },
             data: { deletedAt: now },
@@ -1493,7 +1555,7 @@ class StashSyncService extends EventEmitter {
   // ==================== Performer Sync ====================
 
   private async syncPerformers(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -1583,7 +1645,7 @@ class StashSyncService extends EventEmitter {
 
   private async processPerformersBatch(
     performers: Performer[],
-    stashInstanceId?: string
+    stashInstanceId: string
   ): Promise<void> {
     // Skip empty batches
     if (performers.length === 0) return;
@@ -1685,7 +1747,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync performer tags to PerformerTag junction table
-    const instanceId = stashInstanceId || 'default';
+    const instanceId = stashInstanceId;
     for (const performer of validPerformers) {
       const performerTags = (performer as any).tags;
       if (performerTags && Array.isArray(performerTags) && performerTags.length > 0) {
@@ -1714,7 +1776,7 @@ class StashSyncService extends EventEmitter {
   // ==================== Studio Sync ====================
 
   private async syncStudios(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -1804,7 +1866,7 @@ class StashSyncService extends EventEmitter {
 
   private async processStudiosBatch(
     studios: Studio[],
-    stashInstanceId?: string
+    stashInstanceId: string
   ): Promise<void> {
     // Skip empty batches
     if (studios.length === 0) return;
@@ -1876,7 +1938,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync studio tags to StudioTag junction table
-    const instanceId = stashInstanceId || 'default';
+    const instanceId = stashInstanceId;
     for (const studio of validStudios) {
       const studioTags = (studio as any).tags;
       if (studioTags && Array.isArray(studioTags) && studioTags.length > 0) {
@@ -1905,7 +1967,7 @@ class StashSyncService extends EventEmitter {
   // ==================== Tag Sync ====================
 
   private async syncTags(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -1993,7 +2055,7 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async processTagsBatch(tags: Tag[], stashInstanceId?: string): Promise<void> {
+  private async processTagsBatch(tags: Tag[], stashInstanceId: string): Promise<void> {
     // Skip empty batches
     if (tags.length === 0) return;
 
@@ -2072,7 +2134,7 @@ class StashSyncService extends EventEmitter {
   // ==================== Group Sync ====================
 
   private async syncGroups(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -2160,7 +2222,7 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async processGroupsBatch(groups: Group[], stashInstanceId?: string): Promise<void> {
+  private async processGroupsBatch(groups: Group[], stashInstanceId: string): Promise<void> {
     // Skip empty batches
     if (groups.length === 0) return;
 
@@ -2222,7 +2284,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync group tags to GroupTag junction table
-    const instanceId = stashInstanceId || 'default';
+    const instanceId = stashInstanceId;
     for (const group of validGroups) {
       const groupTags = (group as any).tags;
       if (groupTags && Array.isArray(groupTags) && groupTags.length > 0) {
@@ -2251,7 +2313,7 @@ class StashSyncService extends EventEmitter {
   // ==================== Gallery Sync ====================
 
   private async syncGalleries(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -2341,7 +2403,7 @@ class StashSyncService extends EventEmitter {
 
   private async processGalleriesBatch(
     galleries: Gallery[],
-    stashInstanceId?: string
+    stashInstanceId: string
   ): Promise<void> {
     // Skip empty batches
     if (galleries.length === 0) return;
@@ -2410,7 +2472,7 @@ class StashSyncService extends EventEmitter {
   `);
 
     // Sync gallery performers (junction table)
-    const instanceId = stashInstanceId || 'default';
+    const instanceId = stashInstanceId;
     const performerInserts: { galleryId: string; performerId: string }[] = [];
     for (const gallery of validGalleries) {
       if (gallery.performers && gallery.performers.length > 0) {
@@ -2480,7 +2542,7 @@ class StashSyncService extends EventEmitter {
   // ==================== Image Sync ====================
 
   private async syncImages(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     isFullSync: boolean,
     lastSyncTime?: string
   ): Promise<SyncResult> {
@@ -2571,7 +2633,7 @@ class StashSyncService extends EventEmitter {
   /**
    * Sync clips (scene markers) from Stash
    */
-  async syncClips(stashInstanceId?: string, isFullSync = false, since?: string): Promise<SyncResult> {
+  async syncClips(stashInstanceId: string, isFullSync = false, since?: string): Promise<SyncResult> {
     logger.info("Syncing clips...");
     const startTime = Date.now();
     const client = this.getStashClient(stashInstanceId);
@@ -2636,17 +2698,19 @@ class StashSyncService extends EventEmitter {
         const probeResults = await clipPreviewProber.probeBatch(previewUrls);
 
         // Upsert clips
-        const instanceId = stashInstanceId || 'default';
+        const instanceId = stashInstanceId;
         for (let i = 0; i < markers.length; i++) {
           const marker = markers[i];
           const previewUrl = previewUrls[i];
 
           const clipData = {
             sceneId: marker.scene.id,
+            sceneInstanceId: instanceId,
             title: marker.title || null,
             seconds: marker.seconds,
             endSeconds: marker.end_seconds || null,
             primaryTagId: marker.primary_tag.id,
+            primaryTagInstanceId: instanceId,
             previewPath: marker.preview,
             screenshotPath: marker.screenshot,
             streamPath: marker.stream,
@@ -2732,7 +2796,7 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async processImagesBatch(images: any[], stashInstanceId?: string): Promise<void> {
+  private async processImagesBatch(images: any[], stashInstanceId: string): Promise<void> {
     // Skip empty batches
     if (images.length === 0) return;
 
@@ -2741,7 +2805,7 @@ class StashSyncService extends EventEmitter {
     if (validImages.length === 0) return;
 
     const imageIds = validImages.map((i: any) => i.id);
-    const instanceId = stashInstanceId || 'default';
+    const instanceId = stashInstanceId;
 
     // Bulk delete junction records
     await Promise.all([
@@ -2864,9 +2928,9 @@ class StashSyncService extends EventEmitter {
     }
   }
 
-  private async softDeleteEntity(entityType: EntityType, entityId: string, stashInstanceId?: string): Promise<void> {
+  private async softDeleteEntity(entityType: EntityType, entityId: string, stashInstanceId: string): Promise<void> {
     const now = new Date();
-    const instanceId = stashInstanceId || 'default';
+    const instanceId = stashInstanceId;
 
     switch (entityType) {
       case "scene":
@@ -2933,11 +2997,11 @@ class StashSyncService extends EventEmitter {
    * Without maxUpdatedAt from synced entities, we have no reliable timestamp to store.
    */
   private async saveSyncState(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     syncType: "full" | "incremental",
     result: SyncResult
   ): Promise<void> {
-    const instanceId = stashInstanceId ?? null;
+    const instanceId = stashInstanceId;
 
     // Actual time (real UTC) for display purposes
     const actualTime = new Date();
@@ -2998,12 +3062,12 @@ class StashSyncService extends EventEmitter {
   }
 
   private async updateAllSyncStates(
-    stashInstanceId: string | undefined,
+    stashInstanceId: string,
     syncType: "full" | "incremental",
     results: SyncResult[],
     _totalDurationMs: number
   ): Promise<void> {
-    const instanceId = stashInstanceId ?? null;
+    const instanceId = stashInstanceId;
 
     for (const result of results) {
       // Actual time (real UTC) for display purposes

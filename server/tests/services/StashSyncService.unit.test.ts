@@ -54,18 +54,22 @@ vi.mock("../../prisma/singleton.js", () => ({
 }));
 
 // Mock the stash instance manager
+const mockStashClient = {
+  findTags: vi.fn().mockResolvedValue({ findTags: { tags: [], count: 0 } }),
+  findStudios: vi.fn().mockResolvedValue({ findStudios: { studios: [], count: 0 } }),
+  findPerformers: vi.fn().mockResolvedValue({ findPerformers: { performers: [], count: 0 } }),
+  findGroups: vi.fn().mockResolvedValue({ findGroups: { groups: [], count: 0 } }),
+  findGalleries: vi.fn().mockResolvedValue({ findGalleries: { galleries: [], count: 0 } }),
+  findScenesCompact: vi.fn().mockResolvedValue({ findScenes: { scenes: [], count: 0 } }),
+  findSceneMarkers: vi.fn().mockResolvedValue({ findSceneMarkers: { scene_markers: [], count: 0 } }),
+  findImages: vi.fn().mockResolvedValue({ findImages: { images: [], count: 0 } }),
+};
+
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
-    getDefault: vi.fn(() => ({
-      findTags: vi.fn().mockResolvedValue({ findTags: { tags: [], count: 0 } }),
-      findStudios: vi.fn().mockResolvedValue({ findStudios: { studios: [], count: 0 } }),
-      findPerformers: vi.fn().mockResolvedValue({ findPerformers: { performers: [], count: 0 } }),
-      findGroups: vi.fn().mockResolvedValue({ findGroups: { groups: [], count: 0 } }),
-      findGalleries: vi.fn().mockResolvedValue({ findGalleries: { galleries: [], count: 0 } }),
-      findScenesCompact: vi.fn().mockResolvedValue({ findScenes: { scenes: [], count: 0 } }),
-      findSceneMarkers: vi.fn().mockResolvedValue({ findSceneMarkers: { scene_markers: [], count: 0 } }),
-      findImages: vi.fn().mockResolvedValue({ findImages: { images: [], count: 0 } }),
-    })),
+    getDefault: vi.fn(() => mockStashClient),
+    get: vi.fn(() => mockStashClient),
+    getAllEnabled: vi.fn(() => [{ id: "test-instance-uuid", name: "Test Instance" }]),
     hasInstances: vi.fn(() => true),
     getBaseUrl: vi.fn(() => "http://localhost:9999"),
     getApiKey: vi.fn(() => "test-api-key"),

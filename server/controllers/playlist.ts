@@ -719,7 +719,7 @@ export const reorderPlaylist = async (
           where: {
             playlistId_instanceId_sceneId: {
               playlistId,
-              instanceId: instanceIdMap.get(item.sceneId) || 'default',
+              instanceId: instanceIdMap.get(item.sceneId)!,
               sceneId: item.sceneId,
             },
           },
