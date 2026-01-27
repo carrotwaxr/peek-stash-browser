@@ -70,7 +70,8 @@ function getAgentForUrl(urlObj: URL): http.Agent | https.Agent {
  * @returns Object with baseUrl and apiKey
  */
 function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey: string } {
-  if (instanceId) {
+  // Treat "default" the same as undefined - use the default instance
+  if (instanceId && instanceId !== "default") {
     const instance = stashInstanceManager.get(instanceId);
     if (!instance) {
       throw new Error(`Stash instance not found: ${instanceId}`);
