@@ -1746,30 +1746,40 @@ class StashSyncService extends EventEmitter {
       deletedAt = NULL
   `);
 
-    // Sync performer tags to PerformerTag junction table
+    // Sync performer tags to PerformerTag junction table (batched for performance)
     const instanceId = stashInstanceId;
+
+    // Collect all tag relationships for batch insert
+    const tagInserts: { performerId: string; tagId: string }[] = [];
     for (const performer of validPerformers) {
       const performerTags = (performer as any).tags;
       if (performerTags && Array.isArray(performerTags) && performerTags.length > 0) {
-        const performerId = performer.id;
-
-        // Delete existing tags for this performer
-        await prisma.$executeRawUnsafe(
-          `DELETE FROM PerformerTag WHERE performerId = '${this.escape(performerId)}' AND performerInstanceId = '${this.escape(instanceId)}'`
-        );
-
-        // Insert new tags (filter to valid tag IDs)
-        const validTags = performerTags.filter((t: any) => t?.id && validateEntityId(t.id));
-        if (validTags.length > 0) {
-          const tagValues = validTags
-            .map((t: any) => `('${this.escape(performerId)}', '${this.escape(instanceId)}', '${this.escape(t.id)}', '${this.escape(instanceId)}')`)
-            .join(", ");
-
-          await prisma.$executeRawUnsafe(
-            `INSERT OR IGNORE INTO PerformerTag (performerId, performerInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
-          );
+        for (const tag of performerTags) {
+          if (tag?.id && validateEntityId(tag.id)) {
+            tagInserts.push({
+              performerId: performer.id,
+              tagId: tag.id,
+            });
+          }
         }
       }
+    }
+
+    // Bulk delete existing tags for all performers in this batch
+    const performerIds = validPerformers.map((p) => `'${this.escape(p.id)}'`).join(",");
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM PerformerTag WHERE performerId IN (${performerIds}) AND performerInstanceId = '${this.escape(instanceId)}'`
+    );
+
+    // Bulk insert all new tags
+    if (tagInserts.length > 0) {
+      const tagValues = tagInserts
+        .map((t) => `('${this.escape(t.performerId)}', '${this.escape(instanceId)}', '${this.escape(t.tagId)}', '${this.escape(instanceId)}')`)
+        .join(", ");
+
+      await prisma.$executeRawUnsafe(
+        `INSERT OR IGNORE INTO PerformerTag (performerId, performerInstanceId, tagId, tagInstanceId) VALUES ${tagValues}`
+      );
     }
   }
 
