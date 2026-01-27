@@ -1,5 +1,4 @@
-import prisma from "../prisma/singleton.js";
-import { Prisma } from "@prisma/client";
+import { clipQueryBuilder, ClipQueryOptions as QueryBuilderOptions, ClipWithRelations as RawClipWithRelations } from "./ClipQueryBuilder.js";
 
 export interface ClipQueryOptions {
   page?: number;
@@ -72,8 +71,8 @@ export class ClipService {
       proxyPath = `/api/proxy/stash?path=${encodeURIComponent(urlOrPath)}`;
     }
 
-    // Add instanceId for multi-instance routing
-    if (instanceId) {
+    // Add instanceId for multi-instance routing (skip "default" - proxy handles that automatically)
+    if (instanceId && instanceId !== "default") {
       proxyPath += `&instanceId=${encodeURIComponent(instanceId)}`;
     }
 
@@ -81,48 +80,17 @@ export class ClipService {
   }
 
   /**
-   * Transform clip scene data to use proxy URLs
+   * Transform clip from query builder to client-safe format with proxy URLs
    */
-  private transformClipScene(scene: { id: string; title: string | null; pathScreenshot: string | null; studioId: string | null; stashInstanceId?: string | null }) {
+  private transformClip(clip: RawClipWithRelations): ClipWithRelations {
     return {
-      ...scene,
-      pathScreenshot: this.transformUrl(scene.pathScreenshot, scene.stashInstanceId),
-    };
-  }
-
-  /**
-   * Transform a clip database record to the client-safe format.
-   * Strips raw Stash URLs and only includes fields the client needs.
-   */
-  private transformClip(
-    clip: {
-      id: string;
-      sceneId: string;
-      title: string | null;
-      seconds: number;
-      endSeconds: number | null;
-      primaryTagId: string | null;
-      isGenerated: boolean;
-      stashCreatedAt: Date | null;
-      stashUpdatedAt: Date | null;
-      primaryTag: { id: string; name: string; color: string | null } | null;
-      tags: Array<{ tag: { id: string; name: string; color: string | null } }>;
-      scene: { id: string; title: string | null; pathScreenshot: string | null; studioId: string | null };
-    }
-  ): ClipWithRelations {
-    return {
-      id: clip.id,
-      sceneId: clip.sceneId,
-      title: clip.title,
-      seconds: clip.seconds,
-      endSeconds: clip.endSeconds,
-      primaryTagId: clip.primaryTagId,
-      isGenerated: clip.isGenerated,
-      stashCreatedAt: clip.stashCreatedAt,
-      stashUpdatedAt: clip.stashUpdatedAt,
-      primaryTag: clip.primaryTag,
-      tags: clip.tags.map((ct) => ct.tag),
-      scene: this.transformClipScene(clip.scene),
+      ...clip,
+      scene: {
+        id: clip.scene.id,
+        title: clip.scene.title,
+        pathScreenshot: this.transformUrl(clip.scene.pathScreenshot, clip.scene.stashInstanceId),
+        studioId: clip.scene.studioId,
+      },
     };
   }
 
@@ -134,143 +102,28 @@ export class ClipService {
     userId: number,
     includeUngenerated = false
   ): Promise<ClipWithRelations[]> {
-    const whereClause: Prisma.StashClipWhereInput = {
-      sceneId,
-      deletedAt: null,
-    };
-
-    if (!includeUngenerated) {
-      whereClause.isGenerated = true;
-    }
-
-    // Check if scene is excluded for this user
-    const isExcluded = await prisma.userExcludedEntity.findFirst({
-      where: { userId, entityType: "scene", entityId: sceneId },
-    });
-
-    if (isExcluded) {
-      return [];
-    }
-
-    const clips = await prisma.stashClip.findMany({
-      where: whereClause,
-      include: {
-        primaryTag: { select: { id: true, name: true, color: true } },
-        tags: {
-          include: {
-            tag: { select: { id: true, name: true, color: true } },
-          },
-        },
-        scene: {
-          select: { id: true, title: true, pathScreenshot: true, studioId: true },
-        },
-      },
-      orderBy: { seconds: "asc" },
-    });
-
+    const clips = await clipQueryBuilder.getClipsForScene(sceneId, userId, includeUngenerated);
     return clips.map((clip) => this.transformClip(clip));
   }
 
   /**
    * Get clips with filtering and pagination
+   * Uses SQL-native query builder with JOIN-based exclusions to avoid P2029 parameter limit errors
    */
   async getClips(
     userId: number,
     options: ClipQueryOptions = {}
   ): Promise<{ clips: ClipWithRelations[]; total: number }> {
-    const {
-      page = 1,
-      perPage = 24,
-      sortBy = "stashCreatedAt",
-      sortDir = "desc",
-      isGenerated,
-      sceneId,
-      tagIds,
-      sceneTagIds,
-      performerIds,
-      studioId,
-      q,
-    } = options;
-
-    const whereClause: Prisma.StashClipWhereInput = {
-      deletedAt: null,
+    const queryOptions: QueryBuilderOptions = {
+      userId,
+      ...options,
     };
 
-    if (isGenerated !== undefined) {
-      whereClause.isGenerated = isGenerated;
-    }
-
-    if (sceneId) {
-      whereClause.sceneId = sceneId;
-    }
-
-    if (q) {
-      whereClause.title = { contains: q };
-    }
-
-    if (tagIds && tagIds.length > 0) {
-      whereClause.OR = [
-        { primaryTagId: { in: tagIds } },
-        { tags: { some: { tagId: { in: tagIds } } } },
-      ];
-    }
-
-    // Scene-level filters
-    const sceneFilters: Prisma.StashSceneWhereInput = {};
-
-    if (sceneTagIds && sceneTagIds.length > 0) {
-      sceneFilters.tags = { some: { tagId: { in: sceneTagIds } } };
-    }
-
-    if (performerIds && performerIds.length > 0) {
-      sceneFilters.performers = { some: { performerId: { in: performerIds } } };
-    }
-
-    if (studioId) {
-      sceneFilters.studioId = studioId;
-    }
-
-    if (Object.keys(sceneFilters).length > 0) {
-      whereClause.scene = sceneFilters;
-    }
-
-    // Exclude clips from excluded scenes
-    const excludedSceneIds = await prisma.userExcludedEntity.findMany({
-      where: { userId, entityType: "scene" },
-      select: { entityId: true },
-    });
-
-    if (excludedSceneIds.length > 0) {
-      whereClause.sceneId = {
-        ...((typeof whereClause.sceneId === 'object' ? whereClause.sceneId : {}) as object),
-        notIn: excludedSceneIds.map((e) => e.entityId),
-      };
-    }
-
-    const [clips, total] = await Promise.all([
-      prisma.stashClip.findMany({
-        where: whereClause,
-        include: {
-          primaryTag: { select: { id: true, name: true, color: true } },
-          tags: {
-            include: {
-              tag: { select: { id: true, name: true, color: true } },
-            },
-          },
-          scene: {
-            select: { id: true, title: true, pathScreenshot: true, studioId: true },
-          },
-        },
-        orderBy: { [sortBy]: sortDir },
-        skip: (page - 1) * perPage,
-        take: perPage,
-      }),
-      prisma.stashClip.count({ where: whereClause }),
-    ]);
+    const result = await clipQueryBuilder.getClips(queryOptions);
 
     return {
-      clips: clips.map((clip) => this.transformClip(clip)),
-      total,
+      clips: result.clips.map((clip) => this.transformClip(clip)),
+      total: result.total,
     };
   }
 
@@ -278,30 +131,8 @@ export class ClipService {
    * Get a single clip by ID
    */
   async getClipById(clipId: string, userId: number): Promise<ClipWithRelations | null> {
-    const clip = await prisma.stashClip.findFirst({
-      where: { id: clipId, deletedAt: null },
-      include: {
-        primaryTag: { select: { id: true, name: true, color: true } },
-        tags: {
-          include: {
-            tag: { select: { id: true, name: true, color: true } },
-          },
-        },
-        scene: {
-          select: { id: true, title: true, pathScreenshot: true, studioId: true },
-        },
-      },
-    });
-
+    const clip = await clipQueryBuilder.getClipById(clipId, userId);
     if (!clip) return null;
-
-    // Check if scene is excluded
-    const isExcluded = await prisma.userExcludedEntity.findFirst({
-      where: { userId, entityType: "scene", entityId: clip.sceneId },
-    });
-
-    if (isExcluded) return null;
-
     return this.transformClip(clip);
   }
 }
