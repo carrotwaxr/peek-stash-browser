@@ -936,9 +936,9 @@ export const findScenes = async (
     const mergedFilter: PeekSceneFilter = { ...scene_filter, ids: normalizedIds };
     const _requestingUser = req.user;
 
-    // NEW: Use SQL query builder if enabled
-    if (USE_SQL_QUERY_BUILDER && !searchQuery) {
-      logger.info("findScenes: using SQL query builder path");
+    // NEW: Use SQL query builder if enabled (now supports text search too)
+    if (USE_SQL_QUERY_BUILDER) {
+      logger.info("findScenes: using SQL query builder path", { hasSearchQuery: !!searchQuery });
 
       // Get user's allowed instance IDs for multi-instance filtering
       const allowedInstanceIds = await getUserAllowedInstanceIds(userId);
@@ -959,6 +959,7 @@ export const findScenes = async (
         page,
         perPage,
         randomSeed: sortField === 'random' ? randomSeed : userId,
+        searchQuery: searchQuery || undefined,
       });
 
       // Add streamability info
