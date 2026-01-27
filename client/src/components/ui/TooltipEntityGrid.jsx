@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * Responsive grid item for entity tooltips
@@ -10,6 +12,8 @@ import { Link } from "react-router-dom";
  * @param {string} title - Grid title (e.g., "Performers", "Tags")
  */
 export const TooltipEntityGrid = ({ entityType, entities, title }) => {
+  const { hasMultipleInstances } = useConfig();
+
   if (!entities || entities.length === 0) return null;
 
   // Determine aspect ratio based on entity type (match useEntityImageAspectRatio hook)
@@ -32,16 +36,9 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
     return "rounded";
   };
 
-  // Get link path for entity
+  // Get link path for entity using centralized utility
   const getLinkPath = (entity) => {
-    const pathMap = {
-      performer: `/performer/${entity.id}`,
-      tag: `/tag/${entity.id}`,
-      studio: `/studio/${entity.id}`,
-      group: `/collection/${entity.id}`,
-      gallery: `/gallery/${entity.id}`,
-    };
-    return pathMap[entityType] || "#";
+    return getEntityPath(entityType, entity, hasMultipleInstances);
   };
 
   // Get image path for entity
