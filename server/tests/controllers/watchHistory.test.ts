@@ -27,6 +27,12 @@ vi.mock("../../prisma/singleton.js", () => ({
     user: {
       findUnique: vi.fn(),
     },
+    stashScene: {
+      findFirst: vi.fn().mockResolvedValue({
+        duration: 600,
+        stashInstanceId: "test-instance",
+      }),
+    },
     userPerformerStats: {
       deleteMany: vi.fn(),
     },
@@ -53,6 +59,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       sceneAddPlay: vi.fn().mockResolvedValue({ sceneAddPlay: { count: 1, history: [] } }),
       sceneIncrementO: vi.fn().mockResolvedValue({ sceneIncrementO: 1 }),
     })),
+    getAllConfigs: vi.fn(() => [{ id: "test-instance", name: "Test", priority: 0 }]),
   },
 }));
 
@@ -161,10 +168,10 @@ describe("Watch History Controller", () => {
 
       expect(mockPrisma.watchHistory.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId_instanceId_sceneId: { userId: 1, instanceId: "default", sceneId: "123" } },
+          where: { userId_instanceId_sceneId: { userId: 1, instanceId: "test-instance", sceneId: "123" } },
           create: expect.objectContaining({
             userId: 1,
-            instanceId: "default",
+            instanceId: "test-instance",
             sceneId: "123",
             playDuration: 10,
             resumeTime: 60,

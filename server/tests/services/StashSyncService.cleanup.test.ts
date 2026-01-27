@@ -86,6 +86,15 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
       findGalleryIDs: mockFindGalleryIDs,
       findImageIDs: mockFindImageIDs,
     })),
+    get: vi.fn(() => ({
+      findSceneIDs: mockFindSceneIDs,
+      findPerformerIDs: mockFindPerformerIDs,
+      findStudioIDs: mockFindStudioIDs,
+      findTagIDs: mockFindTagIDs,
+      findGroupIDs: mockFindGroupIDs,
+      findGalleryIDs: mockFindGalleryIDs,
+      findImageIDs: mockFindImageIDs,
+    })),
     initialize: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -254,12 +263,12 @@ describe("StashSyncService Cleanup", () => {
       ]);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 2 });
 
-      const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
+      const result = await (stashSyncService as any).cleanupDeletedEntities("scene", "test-instance");
 
       expect(result).toBe(2);
       // New implementation uses batched IN clauses for scenes to delete
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ["4", "5"] }, stashInstanceId: "default" },
+        where: { id: { in: ["4", "5"] }, stashInstanceId: "test-instance" },
         data: { deletedAt: expect.any(Date) },
       });
     });
@@ -270,11 +279,11 @@ describe("StashSyncService Cleanup", () => {
       });
       vi.mocked(prisma.stashPerformer.updateMany).mockResolvedValue({ count: 5 });
 
-      const result = await (stashSyncService as any).cleanupDeletedEntities("performer");
+      const result = await (stashSyncService as any).cleanupDeletedEntities("performer", "test-instance");
 
       expect(result).toBe(5);
       expect(prisma.stashPerformer.updateMany).toHaveBeenCalledWith({
-        where: { deletedAt: null, stashInstanceId: "default", id: { notIn: ["p1", "p2"] } },
+        where: { deletedAt: null, stashInstanceId: "test-instance", id: { notIn: ["p1", "p2"] } },
         data: { deletedAt: expect.any(Date) },
       });
     });
@@ -352,13 +361,13 @@ describe("StashSyncService Cleanup", () => {
       vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue(localScenes);
       vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 100 });
 
-      const result = await (stashSyncService as any).cleanupDeletedEntities("scene");
+      const result = await (stashSyncService as any).cleanupDeletedEntities("scene", "test-instance");
 
       expect(result).toBe(100);
       // New implementation uses batched IN clauses - first batch has IDs 1-100
       const expectedIds = Array.from({ length: 100 }, (_, i) => String(i + 1));
       expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: expectedIds }, stashInstanceId: "default" },
+        where: { id: { in: expectedIds }, stashInstanceId: "test-instance" },
         data: { deletedAt: expect.any(Date) },
       });
     });

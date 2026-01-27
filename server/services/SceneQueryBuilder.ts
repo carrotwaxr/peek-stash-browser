@@ -1112,8 +1112,10 @@ class SceneQueryBuilder {
 
     // Build inherited tag check using json_each to search the JSON array
     // inheritedTagIds is stored as JSON string like '["284","313"]'
+    // IMPORTANT: Also verify the tag exists in the scene's instance to prevent cross-instance pollution
+    // Different instances can have different tags with the same ID
     const inheritedTagCheck = ids.map(() =>
-      `EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) WHERE json_each.value = ?)`
+      `EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL))`
     ).join(" OR ");
 
     switch (modifier) {
@@ -1126,9 +1128,9 @@ class SceneQueryBuilder {
 
       case "INCLUDES_ALL": {
         // Match if ALL tags are present (in direct tags OR inherited tags)
-        // For each tag, check if it's in SceneTag OR in inheritedTagIds
+        // For each tag, check if it's in SceneTag OR in inheritedTagIds (with instance validation)
         const allTagChecks = ids.map(() =>
-          `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) WHERE json_each.value = ?))`
+          `(EXISTS (SELECT 1 FROM SceneTag st WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND st.tagId = ?) OR EXISTS (SELECT 1 FROM json_each(s.inheritedTagIds) je WHERE je.value = ? AND EXISTS (SELECT 1 FROM StashTag t WHERE t.id = je.value AND t.stashInstanceId = s.stashInstanceId AND t.deletedAt IS NULL)))`
         ).join(" AND ");
         // Flatten params: for each id, we need it twice (once for SceneTag, once for json_each)
         const allTagParams = ids.flatMap(id => [id, id]);
@@ -1569,6 +1571,7 @@ class SceneQueryBuilder {
     // Create scene object with studioId preserved for population
     const scene: any = {
       id: row.id,
+      instanceId: row.stashInstanceId,
       title: row.title || getSceneFallbackTitle(row.filePath),
       code: row.code || null,
       date: row.date || null,
@@ -1653,13 +1656,22 @@ class SceneQueryBuilder {
     if (scenes.length === 0) return;
 
     // Build scene keys with instanceId for multi-instance support
-    // Normalize null/undefined instanceIds to "default" for legacy data
-    const normalizeInstanceId = (id: string | null | undefined): string => id || "default";
+    // All scenes should have valid instanceIds after migration
+    const normalizeInstanceId = (id: string | null | undefined): string => {
+      if (!id) {
+        throw new Error('Scene has null/undefined instanceId - this should not happen after migration');
+      }
+      return id;
+    };
 
     const sceneIds = scenes.map((s) => s.id);
     const sceneInstanceIds = [...new Set(scenes.map((s) => normalizeInstanceId(s.instanceId)))];
-    const studioIds = scenes.map((s) => (s as any).studioId).filter(Boolean) as string[];
-    const studioInstanceId = sceneInstanceIds[0]; // Studios come from same instance as scenes
+    // Collect unique (studioId, instanceId) pairs - each scene's studio comes from its own instance
+    const studioKeys = [...new Map(
+      scenes
+        .filter((s) => (s as any).studioId)
+        .map((s) => [`${(s as any).studioId}:${normalizeInstanceId(s.instanceId)}`, { id: (s as any).studioId, instanceId: normalizeInstanceId(s.instanceId) }])
+    ).values()];
 
     // Batch load all relations in parallel
     // Filter by both sceneId AND sceneInstanceId for multi-instance correctness
@@ -1744,9 +1756,9 @@ class SceneQueryBuilder {
       id: k.id,
       stashInstanceId: k.instanceId,
     }));
-    const studioOrConditions = studioIds.map((id) => ({
-      id,
-      stashInstanceId: studioInstanceId,
+    const studioOrConditions = studioKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
     }));
 
     // Load actual entities (only those that exist) using composite key lookups

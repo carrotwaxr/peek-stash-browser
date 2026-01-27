@@ -8,82 +8,136 @@
 
 import prisma from "../prisma/singleton.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
+import { logger } from "./logger.js";
 
 type EntityType = 'scene' | 'performer' | 'studio' | 'tag' | 'gallery' | 'group' | 'image';
 
-const DEFAULT_INSTANCE_ID = 'default';
+/**
+ * Get the fallback instance ID (primary/default instance's UUID).
+ * This is used when an entity is not found in the database.
+ * Returns undefined if no instances are configured.
+ */
+function getFallbackInstanceId(): string | undefined {
+  const configs = stashInstanceManager.getAllConfigs();
+  if (configs.length === 0) {
+    return undefined;
+  }
+  // Return the first (highest priority) instance's ID
+  return configs[0].id;
+}
 
 /**
  * Get the instanceId for an entity by looking it up in the database.
- * Returns 'default' if the entity is not found or has no instanceId.
+ * If the entity is not found, falls back to the primary instance's UUID and logs a warning.
+ * Throws an error if no Stash instances are configured.
  */
 export async function getEntityInstanceId(
   entityType: EntityType,
   entityId: string
 ): Promise<string> {
+  const fallbackId = getFallbackInstanceId();
+
+  if (!fallbackId) {
+    throw new Error(`Cannot get instanceId for ${entityType} ${entityId}: No Stash instances configured`);
+  }
+
   try {
     switch (entityType) {
       case 'scene': {
-        // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
         const scene = await prisma.stashScene.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
-        return scene?.stashInstanceId || DEFAULT_INSTANCE_ID;
+        if (scene?.stashInstanceId) {
+          return scene.stashInstanceId;
+        }
+        break;
       }
       case 'performer': {
         const performer = await prisma.stashPerformer.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
-        return performer?.stashInstanceId || DEFAULT_INSTANCE_ID;
+        if (performer?.stashInstanceId) {
+          return performer.stashInstanceId;
+        }
+        break;
       }
       case 'studio': {
         const studio = await prisma.stashStudio.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
-        return studio?.stashInstanceId || DEFAULT_INSTANCE_ID;
+        if (studio?.stashInstanceId) {
+          return studio.stashInstanceId;
+        }
+        break;
       }
       case 'tag': {
         const tag = await prisma.stashTag.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
-        return tag?.stashInstanceId || DEFAULT_INSTANCE_ID;
+        if (tag?.stashInstanceId) {
+          return tag.stashInstanceId;
+        }
+        break;
       }
       case 'gallery': {
         const gallery = await prisma.stashGallery.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
-        return gallery?.stashInstanceId || DEFAULT_INSTANCE_ID;
+        if (gallery?.stashInstanceId) {
+          return gallery.stashInstanceId;
+        }
+        break;
       }
       case 'group': {
         const group = await prisma.stashGroup.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
-        return group?.stashInstanceId || DEFAULT_INSTANCE_ID;
+        if (group?.stashInstanceId) {
+          return group.stashInstanceId;
+        }
+        break;
       }
       case 'image': {
         const image = await prisma.stashImage.findFirst({
           where: { id: entityId },
           select: { stashInstanceId: true },
         });
-        return image?.stashInstanceId || DEFAULT_INSTANCE_ID;
+        if (image?.stashInstanceId) {
+          return image.stashInstanceId;
+        }
+        break;
       }
-      default:
-        return DEFAULT_INSTANCE_ID;
     }
-  } catch {
-    return DEFAULT_INSTANCE_ID;
+
+    // Entity not found - log warning and use fallback
+    logger.warn(`Entity not found in database, using fallback instance`, {
+      entityType,
+      entityId,
+      fallbackInstanceId: fallbackId,
+    });
+    return fallbackId;
+  } catch (error) {
+    logger.error(`Error looking up entity instanceId, using fallback`, {
+      entityType,
+      entityId,
+      fallbackInstanceId: fallbackId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return fallbackId;
   }
 }
 
 /**
  * Batch get instanceIds for multiple entities of the same type.
  * Returns a Map of entityId -> instanceId.
+ * Uses the primary instance's UUID as fallback for any entities not found.
+ * Throws an error if no Stash instances are configured.
  */
 export async function getEntityInstanceIds(
   entityType: EntityType,
@@ -95,6 +149,12 @@ export async function getEntityInstanceIds(
     return result;
   }
 
+  const fallbackId = getFallbackInstanceId();
+
+  if (!fallbackId) {
+    throw new Error(`Cannot get instanceIds for ${entityType}: No Stash instances configured`);
+  }
+
   try {
     switch (entityType) {
       case 'scene': {
@@ -102,7 +162,11 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
-        scenes.forEach(s => result.set(s.id, s.stashInstanceId || DEFAULT_INSTANCE_ID));
+        scenes.forEach(s => {
+          if (s.stashInstanceId) {
+            result.set(s.id, s.stashInstanceId);
+          }
+        });
         break;
       }
       case 'performer': {
@@ -110,7 +174,11 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
-        performers.forEach(p => result.set(p.id, p.stashInstanceId || DEFAULT_INSTANCE_ID));
+        performers.forEach(p => {
+          if (p.stashInstanceId) {
+            result.set(p.id, p.stashInstanceId);
+          }
+        });
         break;
       }
       case 'studio': {
@@ -118,7 +186,11 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
-        studios.forEach(s => result.set(s.id, s.stashInstanceId || DEFAULT_INSTANCE_ID));
+        studios.forEach(s => {
+          if (s.stashInstanceId) {
+            result.set(s.id, s.stashInstanceId);
+          }
+        });
         break;
       }
       case 'tag': {
@@ -126,7 +198,11 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
-        tags.forEach(t => result.set(t.id, t.stashInstanceId || DEFAULT_INSTANCE_ID));
+        tags.forEach(t => {
+          if (t.stashInstanceId) {
+            result.set(t.id, t.stashInstanceId);
+          }
+        });
         break;
       }
       case 'gallery': {
@@ -134,7 +210,11 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
-        galleries.forEach(g => result.set(g.id, g.stashInstanceId || DEFAULT_INSTANCE_ID));
+        galleries.forEach(g => {
+          if (g.stashInstanceId) {
+            result.set(g.id, g.stashInstanceId);
+          }
+        });
         break;
       }
       case 'group': {
@@ -142,7 +222,11 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
-        groups.forEach(g => result.set(g.id, g.stashInstanceId || DEFAULT_INSTANCE_ID));
+        groups.forEach(g => {
+          if (g.stashInstanceId) {
+            result.set(g.id, g.stashInstanceId);
+          }
+        });
         break;
       }
       case 'image': {
@@ -150,20 +234,39 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
-        images.forEach(i => result.set(i.id, i.stashInstanceId || DEFAULT_INSTANCE_ID));
+        images.forEach(i => {
+          if (i.stashInstanceId) {
+            result.set(i.id, i.stashInstanceId);
+          }
+        });
         break;
       }
     }
-  } catch {
-    // On error, return empty map - callers will use default
+  } catch (error) {
+    logger.error(`Error looking up entity instanceIds`, {
+      entityType,
+      entityCount: entityIds.length,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
-  // Fill in defaults for any missing IDs
+  // Fill in fallback for any missing IDs and log warnings
+  const missingIds: string[] = [];
   entityIds.forEach(id => {
     if (!result.has(id)) {
-      result.set(id, DEFAULT_INSTANCE_ID);
+      result.set(id, fallbackId);
+      missingIds.push(id);
     }
   });
+
+  if (missingIds.length > 0) {
+    logger.warn(`Some entities not found in database, using fallback instance`, {
+      entityType,
+      missingCount: missingIds.length,
+      missingIds: missingIds.slice(0, 10), // Only log first 10 to avoid spam
+      fallbackInstanceId: fallbackId,
+    });
+  }
 
   return result;
 }

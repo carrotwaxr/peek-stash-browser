@@ -433,26 +433,37 @@ class ImageQueryBuilder {
 
   /**
    * Hydrate image rows with related entities
+   * Uses raw SQL to handle orphaned junction records gracefully
    */
   private async hydrateImages(rows: any[]): Promise<any[]> {
     if (rows.length === 0) return [];
 
     const imageIds = rows.map((r) => r.id);
+    const imageIdPlaceholders = imageIds.map(() => "?").join(",");
 
-    // Fetch all related data in parallel
+    // Fetch all related data in parallel using raw SQL to handle orphaned records
     const [performers, tags, galleries, studios] = await Promise.all([
-      prisma.imagePerformer.findMany({
-        where: { imageId: { in: imageIds } },
-        include: { performer: true },
-      }),
-      prisma.imageTag.findMany({
-        where: { imageId: { in: imageIds } },
-        include: { tag: true },
-      }),
-      prisma.imageGallery.findMany({
-        where: { imageId: { in: imageIds } },
-        include: { gallery: true },
-      }),
+      // Performers - join with existence check
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT ip.imageId, p.*
+        FROM ImagePerformer ip
+        INNER JOIN StashPerformer p ON p.id = ip.performerId AND p.stashInstanceId = ip.performerInstanceId
+        WHERE ip.imageId IN (${imageIdPlaceholders}) AND p.deletedAt IS NULL
+      `, ...imageIds),
+      // Tags - join with existence check (handles orphaned ImageTag records)
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT it.imageId, t.*
+        FROM ImageTag it
+        INNER JOIN StashTag t ON t.id = it.tagId AND t.stashInstanceId = it.tagInstanceId
+        WHERE it.imageId IN (${imageIdPlaceholders}) AND t.deletedAt IS NULL
+      `, ...imageIds),
+      // Galleries - join with existence check
+      prisma.$queryRawUnsafe<any[]>(`
+        SELECT ig.imageId, g.*
+        FROM ImageGallery ig
+        INNER JOIN StashGallery g ON g.id = ig.galleryId AND g.stashInstanceId = ig.galleryInstanceId
+        WHERE ig.imageId IN (${imageIdPlaceholders}) AND g.deletedAt IS NULL
+      `, ...imageIds),
       prisma.stashStudio.findMany({
         where: { id: { in: rows.map((r) => r.studioId).filter(Boolean) } },
       }),
@@ -461,35 +472,52 @@ class ImageQueryBuilder {
     // Build lookup maps with transformed URLs including instanceId for multi-instance routing
     // Note: Frontend expects snake_case field names (image_path) and paths.cover for galleries
     const performersByImage = new Map<string, any[]>();
-    for (const ip of performers) {
-      if (!performersByImage.has(ip.imageId)) {
-        performersByImage.set(ip.imageId, []);
+    for (const row of performers) {
+      const imageId = row.imageId;
+      if (!performersByImage.has(imageId)) {
+        performersByImage.set(imageId, []);
       }
-      performersByImage.get(ip.imageId)!.push({
-        ...ip.performer,
-        image_path: this.transformUrl(ip.performer.imagePath, ip.performer.stashInstanceId),
+      performersByImage.get(imageId)!.push({
+        id: row.id,
+        stashInstanceId: row.stashInstanceId,
+        name: row.name,
+        disambiguation: row.disambiguation,
+        gender: row.gender,
+        favorite: row.favorite,
+        rating100: row.rating100,
+        imagePath: row.imagePath,
+        image_path: this.transformUrl(row.imagePath, row.stashInstanceId),
       });
     }
 
     const tagsByImage = new Map<string, any[]>();
-    for (const it of tags) {
-      if (!tagsByImage.has(it.imageId)) {
-        tagsByImage.set(it.imageId, []);
+    for (const row of tags) {
+      const imageId = row.imageId;
+      if (!tagsByImage.has(imageId)) {
+        tagsByImage.set(imageId, []);
       }
-      tagsByImage.get(it.imageId)!.push({
-        ...it.tag,
-        image_path: this.transformUrl(it.tag.imagePath, it.tag.stashInstanceId),
+      tagsByImage.get(imageId)!.push({
+        id: row.id,
+        stashInstanceId: row.stashInstanceId,
+        name: row.name,
+        favorite: row.favorite,
+        imagePath: row.imagePath,
+        image_path: this.transformUrl(row.imagePath, row.stashInstanceId),
       });
     }
 
     const galleriesByImage = new Map<string, any[]>();
-    for (const ig of galleries) {
-      if (!galleriesByImage.has(ig.imageId)) {
-        galleriesByImage.set(ig.imageId, []);
+    for (const row of galleries) {
+      const imageId = row.imageId;
+      if (!galleriesByImage.has(imageId)) {
+        galleriesByImage.set(imageId, []);
       }
-      galleriesByImage.get(ig.imageId)!.push({
-        ...ig.gallery,
-        cover: this.transformUrl(ig.gallery.coverPath, ig.gallery.stashInstanceId),
+      galleriesByImage.get(imageId)!.push({
+        id: row.id,
+        stashInstanceId: row.stashInstanceId,
+        title: row.title,
+        coverPath: row.coverPath,
+        cover: this.transformUrl(row.coverPath, row.stashInstanceId),
       });
     }
 

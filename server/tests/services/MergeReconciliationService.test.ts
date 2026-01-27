@@ -3,6 +3,21 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+// Mock stashInstanceManager to provide a default instance for entityInstanceId lookups
+vi.mock("../../services/StashInstanceManager.js", () => ({
+  stashInstanceManager: {
+    getDefault: vi.fn().mockReturnValue({
+      id: "test-instance",
+      name: "Test",
+      url: "http://localhost:9999/graphql",
+      apiKey: "test-key",
+    }),
+    getAllConfigs: vi.fn().mockReturnValue([{ id: "test-instance", name: "Test", priority: 0 }]),
+    getAllEnabled: vi.fn().mockReturnValue([]),
+    hasInstances: vi.fn().mockReturnValue(true),
+  },
+}));
+
 // Mock prisma
 vi.mock("../../prisma/singleton.js", () => ({
   default: {

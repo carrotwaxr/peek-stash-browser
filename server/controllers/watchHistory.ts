@@ -73,7 +73,7 @@ export async function pingWatchHistory(
 
     // Get scene duration from cache
     let sceneDuration = 0;
-    let instanceId = 'default';
+    let instanceId: string;
     try {
       // Use findFirst since composite primary key [id, stashInstanceId] requires both fields for findUnique
       const scene = await prisma.stashScene.findFirst({
@@ -81,13 +81,16 @@ export async function pingWatchHistory(
         select: { duration: true, stashInstanceId: true },
       });
       sceneDuration = scene?.duration || 0;
-      instanceId = scene?.stashInstanceId || 'default';
+      // Get instanceId from scene, or fall back to looking it up
+      instanceId = scene?.stashInstanceId || await getEntityInstanceId('scene', sceneId);
     } catch (error) {
       logger.error("Failed to fetch scene duration from cache", {
         sceneId,
         error,
       });
       // Continue without duration - won't be able to calculate percentages
+      // Still need to get instanceId for watch history
+      instanceId = await getEntityInstanceId('scene', sceneId);
     }
 
     // Get or create watch history record
