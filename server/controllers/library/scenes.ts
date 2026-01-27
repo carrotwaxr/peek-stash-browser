@@ -949,11 +949,15 @@ export const findScenes = async (
         filters.ids = { value: ids, modifier: "INCLUDES" };
       }
 
+      // Extract specific instance ID for disambiguation (from scene_filter.instance_id)
+      const specificInstanceId = (scene_filter as any)?.instance_id as string | undefined;
+
       // Execute query (applyExclusions defaults to true)
       const result = await sceneQueryBuilder.execute({
         userId,
         filters,
         allowedInstanceIds,
+        specificInstanceId,
         sort: sortField,
         sortDirection: sortDirection.toUpperCase() as "ASC" | "DESC",
         page,

@@ -166,6 +166,9 @@ export const findPerformers = async (
       ids: normalizedIds,
     };
 
+    // Extract specific instance ID for disambiguation (from performer_filter.instance_id)
+    const specificInstanceId = (performer_filter as any)?.instance_id as string | undefined;
+
     // Use SQL query builder - admins skip exclusions
     const applyExclusions = requestingUser?.role !== "ADMIN";
 
@@ -177,6 +180,7 @@ export const findPerformers = async (
       filters: mergedFilter,
       applyExclusions,
       allowedInstanceIds,
+      specificInstanceId,
       sort: sortField,
       sortDirection,
       page,

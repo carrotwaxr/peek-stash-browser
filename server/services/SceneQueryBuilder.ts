@@ -21,7 +21,8 @@ export interface SceneQueryOptions {
   userId: number;
   filters?: PeekSceneFilter;
   applyExclusions?: boolean;  // Default true - use pre-computed exclusions
-  allowedInstanceIds?: string[];  // Multi-instance filtering - if provided, only return scenes from these instances
+  allowedInstanceIds?: string[];  // Multi-instance filtering - array of instances the user can access
+  specificInstanceId?: string;  // Single instance filter for disambiguation on detail pages
   sort: string;
   sortDirection: "ASC" | "DESC";
   page: number;
@@ -114,6 +115,20 @@ class SceneQueryBuilder {
     return {
       sql: `(s.stashInstanceId IN (${placeholders}) OR s.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
+    };
+  }
+
+  /**
+   * Build filter for a specific instance ID (for disambiguation on detail pages)
+   * This is different from allowedInstanceIds - it filters to exactly one instance.
+   */
+  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+    if (!instanceId) {
+      return { sql: "", params: [] };
+    }
+    return {
+      sql: `s.stashInstanceId = ?`,
+      params: [instanceId],
     };
   }
 
@@ -1209,7 +1224,7 @@ class SceneQueryBuilder {
 
   async execute(options: SceneQueryOptions): Promise<SceneQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, filters } = options;
+    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, specificInstanceId, filters } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -1221,6 +1236,14 @@ class SceneQueryBuilder {
     const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
     if (instanceFilter.sql) {
       whereClauses.push(instanceFilter);
+    }
+
+    // Specific instance filter (for disambiguation on detail pages)
+    if (specificInstanceId) {
+      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      if (specificFilter.sql) {
+        whereClauses.push(specificFilter);
+      }
     }
 
     // ID filter
