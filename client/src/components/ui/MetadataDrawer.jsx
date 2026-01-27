@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import FavoriteButton from "./FavoriteButton.jsx";
 import OCounterButton from "./OCounterButton.jsx";
 import RatingBadge from "./RatingBadge.jsx";
@@ -24,6 +26,7 @@ const MetadataDrawer = ({
 }) => {
   const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
   const ratingBadgeRef = useRef(null);
+  const { hasMultipleInstances } = useConfig();
 
   if (!open || !image) return null;
 
@@ -121,7 +124,7 @@ const MetadataDrawer = ({
             >
               {effectiveStudio ? (
                 <Link
-                  to={`/studio/${effectiveStudio.id}`}
+                  to={getEntityPath('studio', effectiveStudio, hasMultipleInstances)}
                   className="hover:underline hover:text-blue-400"
                   onClick={onClose}
                 >
@@ -154,7 +157,7 @@ const MetadataDrawer = ({
                 {effectivePerformers.map((performer) => (
                   <Link
                     key={performer.id}
-                    to={`/performer/${performer.id}`}
+                    to={getEntityPath('performer', performer, hasMultipleInstances)}
                     className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                     onClick={onClose}
                   >

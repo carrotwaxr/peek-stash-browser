@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { getClipsForScene } from "../../services/api.js";
 import ClipList from "../clips/ClipList.jsx";
 import { LazyThumbnail, Paper, SectionLink, TagChips } from "../ui/index.js";
 import { formatBitRate, formatFileSize } from "../../utils/format.js";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 const formatDuration = (seconds) => {
   if (!seconds) return "Unknown";
@@ -50,6 +52,7 @@ const SceneDetails = ({
   const { scene, sceneLoading, compatibility } = useScenePlayer();
   const { getSettings } = useCardDisplaySettings();
   const sceneSettings = getSettings("scene");
+  const { hasMultipleInstances } = useConfig();
 
   // Clips state
   const [clips, setClips] = useState([]);
@@ -128,7 +131,7 @@ const SceneDetails = ({
                         Studio
                       </h3>
                       <Link
-                        to={`/studio/${scene.studio.id}`}
+                        to={getEntityPath('studio', scene.studio, hasMultipleInstances)}
                         className="text-base hover:underline hover:text-blue-400"
                         style={{ color: "var(--text-primary)" }}
                       >
@@ -240,7 +243,7 @@ const SceneDetails = ({
                       {scene.performers.map((performer) => (
                         <Link
                           key={performer.id}
-                          to={`/performer/${performer.id}`}
+                          to={getEntityPath('performer', performer, hasMultipleInstances)}
                           className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                         >
                           <LazyThumbnail

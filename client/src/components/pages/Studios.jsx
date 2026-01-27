@@ -6,6 +6,8 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { useTableColumns } from "../../hooks/useTableColumns.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
 import { StudioCard } from "../cards/index.js";
 import {
@@ -27,6 +29,7 @@ const Studios = () => {
   usePageTitle("Studios");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { hasMultipleInstances } = useConfig();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = 3;
@@ -72,7 +75,7 @@ const Studios = () => {
     columns,
     totalPages,
     onItemSelect: (studio) =>
-      navigate(`/studio/${studio.id}`, {
+      navigate(getEntityPath('studio', studio, hasMultipleInstances), {
         state: { fromPageTitle: "Studios" },
       }),
   });

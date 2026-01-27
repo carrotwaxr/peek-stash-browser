@@ -10,6 +10,8 @@ import { useAsyncData } from "../../hooks/useApi.js";
 import { useAuth } from "../../hooks/useAuth.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
 import {
   carouselRulesToFilterState,
@@ -82,6 +84,7 @@ const Home = () => {
   usePageTitle("Home");
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasMultipleInstances } = useConfig();
   const carouselQueries = useHomeCarouselQueries(SCENES_PER_CAROUSEL);
   const [carouselPreferences, setCarouselPreferences] = useState([]);
   const [customCarousels, setCustomCarousels] = useState([]);
@@ -124,7 +127,7 @@ const Home = () => {
   const createSceneClickHandler = (scenes, carouselTitle) => (scene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-    navigate(`/scene/${scene.id}`, {
+    navigate(getEntityPath('scene', scene, hasMultipleInstances), {
       state: {
         scene,
         fromPageTitle: "Home",

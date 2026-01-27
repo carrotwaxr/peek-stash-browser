@@ -4,6 +4,8 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * StudioCard - Card for displaying studio entities
@@ -13,6 +15,7 @@ const StudioCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const studioSettings = getSettings("studio");
+    const { hasMultipleInstances } = useConfig();
 
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('studio', 'tags') === 'rich' &&
@@ -86,7 +89,7 @@ const StudioCard = forwardRef(
         imagePath={studio.image_path}
         title={studio.name}
         description={studio.details}
-        linkTo={`/studio/${studio.id}`}
+        linkTo={getEntityPath('studio', studio, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

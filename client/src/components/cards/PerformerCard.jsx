@@ -5,6 +5,8 @@ import GenderIcon from "../ui/GenderIcon.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * PerformerCard - Card for displaying performer entities
@@ -15,6 +17,7 @@ const PerformerCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const performerSettings = getSettings("performer");
+    const { hasMultipleInstances } = useConfig();
 
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('performer', 'tags') === 'rich' &&
@@ -86,7 +89,7 @@ const PerformerCard = forwardRef(
             <GenderIcon gender={performer.gender} size={16} />
           </div>
         }
-        linkTo={`/performer/${performer.id}`}
+        linkTo={getEntityPath('performer', performer, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={isTVMode ? tabIndex : -1}
         description={performer.details}

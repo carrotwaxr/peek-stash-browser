@@ -6,7 +6,9 @@ import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
@@ -35,6 +37,9 @@ const TagDetail = () => {
   // Card display settings
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("tag");
+
+  // Get multi-instance config
+  const { hasMultipleInstances } = useConfig();
 
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
@@ -229,7 +234,7 @@ const TagDetail = () => {
         {/* Full Width Sections - Statistics, Parents, Children, Aliases */}
         <div className="space-y-6 mb-8">
           <TagStats tag={tag} tagId={tagId} />
-          <TagDetails tag={tag} />
+          <TagDetails tag={tag} hasMultipleInstances={hasMultipleInstances} />
         </div>
 
         {/* Tabbed Content Section */}
@@ -518,7 +523,7 @@ const TagStats = ({ tag, tagId: _tagId }) => { // eslint-disable-line no-unused-
 };
 
 // Tag Details Component (Parent Tags, Child Tags, Aliases)
-const TagDetails = ({ tag }) => {
+const TagDetails = ({ tag, hasMultipleInstances }) => {
   return (
     <>
       {tag?.parents && tag.parents.length > 0 && (
@@ -530,7 +535,7 @@ const TagDetails = ({ tag }) => {
               return (
                 <Link
                   key={parent.id}
-                  to={`/tag/${parent.id}`}
+                  to={getEntityPath('tag', parent, hasMultipleInstances)}
                   className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
                   style={{
                     backgroundColor: `hsl(${hue}, 70%, 45%)`,
@@ -554,7 +559,7 @@ const TagDetails = ({ tag }) => {
               return (
                 <Link
                   key={child.id}
-                  to={`/tag/${child.id}`}
+                  to={getEntityPath('tag', child, hasMultipleInstances)}
                   className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
                   style={{
                     backgroundColor: `hsl(${hue}, 70%, 45%)`,

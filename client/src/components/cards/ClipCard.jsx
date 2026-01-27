@@ -4,6 +4,8 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getScenePathWithTime } from "../../utils/entityLinks.js";
 import { formatDuration } from "../../utils/format.js";
 import ClipCardPreview from "./ClipCardPreview.jsx";
 
@@ -27,6 +29,7 @@ const ClipCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const clipSettings = getSettings("clip");
+    const { hasMultipleInstances } = useConfig();
 
     // Title is the clip title
     const title = clip.title || "Untitled";
@@ -146,7 +149,7 @@ const ClipCard = forwardRef(
     );
 
     // Handle navigation - navigate with autoplay state
-    const clipUrl = `/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`;
+    const clipUrl = getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, hasMultipleInstances);
     const handleNavigate = () => {
       if (onClick) {
         onClick(clip);

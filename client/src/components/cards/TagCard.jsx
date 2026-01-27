@@ -4,6 +4,8 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * TagCard - Card for displaying tag entities
@@ -13,6 +15,7 @@ const TagCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const tagSettings = getSettings("tag");
+    const { hasMultipleInstances } = useConfig();
 
     // Build subtitle from child count
     const subtitle =
@@ -93,7 +96,7 @@ const TagCard = forwardRef(
         title={tag.name}
         subtitle={subtitle}
         description={tag.description}
-        linkTo={`/tag/${tag.id}`}
+        linkTo={getEntityPath('tag', tag, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

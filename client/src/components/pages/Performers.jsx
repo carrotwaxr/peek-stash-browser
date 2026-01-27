@@ -7,6 +7,8 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { useTableColumns } from "../../hooks/useTableColumns.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
 import {
   SyncProgressBanner,
@@ -28,6 +30,7 @@ const Performers = () => {
   usePageTitle("Performers");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { hasMultipleInstances } = useConfig();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = useGridColumns("performers");
@@ -74,7 +77,7 @@ const Performers = () => {
     columns,
     totalPages,
     onItemSelect: (performer) =>
-      navigate(`/performer/${performer.id}`, {
+      navigate(getEntityPath('performer', performer, hasMultipleInstances), {
         state: { fromPageTitle: "Performers" },
       }),
   });

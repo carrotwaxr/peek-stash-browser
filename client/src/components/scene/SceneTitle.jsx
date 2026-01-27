@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { formatRelativeTime } from "../../utils/date.js";
 import { getSceneTitle } from "../../utils/format.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * Scene title with link and subtitle (studio • code • date)
@@ -15,6 +17,7 @@ const SceneTitle = ({
   dateClassName = "",
   maxLines = null, // Optional: limit title to specific number of lines
 }) => {
+  const { hasMultipleInstances } = useConfig();
   const title = getSceneTitle(scene);
   const date = scene.date ? formatRelativeTime(scene.date) : null;
 
@@ -84,7 +87,7 @@ const SceneTitle = ({
   return (
     <div>
       <Link
-        to={`/scene/${scene.id}`}
+        to={getEntityPath('scene', scene, hasMultipleInstances)}
         state={linkState}
         onClick={handleClick}
         className={`font-semibold hover:underline block ${titleClassName}`}

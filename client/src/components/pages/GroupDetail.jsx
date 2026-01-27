@@ -5,8 +5,10 @@ import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import { formatDuration } from "../../utils/format.js";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
@@ -34,6 +36,9 @@ const GroupDetail = () => {
   // Card display settings
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("group");
+
+  // Get multi-instance config
+  const { hasMultipleInstances } = useConfig();
 
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
@@ -175,7 +180,7 @@ const GroupDetail = () => {
         {/* Full Width Sections - Statistics, Studio, Tags, Parent/Sub Collections */}
         <div className="space-y-6 mb-8">
           <GroupStats group={group} />
-          <GroupDetails group={group} />
+          <GroupDetails group={group} hasMultipleInstances={hasMultipleInstances} />
         </div>
 
         {/* Tabbed Content Section */}
@@ -419,13 +424,13 @@ const GroupStats = ({ group }) => {
 };
 
 // Group Details Component (Studio, Tags, Parent/Sub Collections)
-const GroupDetails = ({ group }) => {
+const GroupDetails = ({ group, hasMultipleInstances }) => {
   return (
     <>
       {group?.studio && (
         <Card title="Studio">
           <Link
-            to={`/studio/${group.studio.id}`}
+            to={getEntityPath('studio', group.studio, hasMultipleInstances)}
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
             {group.studio.image_path && (
@@ -457,7 +462,7 @@ const GroupDetails = ({ group }) => {
             {group.containing_groups.map((cg) => (
               <Link
                 key={cg.group.id}
-                to={`/collection/${cg.group.id}`}
+                to={getEntityPath('group', cg.group, hasMultipleInstances)}
                 className="block p-2 rounded hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center justify-between">
@@ -488,7 +493,7 @@ const GroupDetails = ({ group }) => {
             {group.sub_groups.map((sg) => (
               <Link
                 key={sg.group.id}
-                to={`/collection/${sg.group.id}`}
+                to={getEntityPath('group', sg.group, hasMultipleInstances)}
                 className="block p-2 rounded hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center justify-between">

@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { apiPost, duplicatePlaylist, getMyPermissions } from "../../services/api.js";
 import SharePlaylistModal from "../playlists/SharePlaylistModal.jsx";
 import { getSceneTitle } from "../../utils/format.js";
@@ -44,6 +46,7 @@ const api = axios.create({
 const PlaylistDetail = () => {
   const { playlistId } = useParams();
   const navigate = useNavigate();
+  const { hasMultipleInstances } = useConfig();
   const [playlist, setPlaylist] = useState(null);
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -261,7 +264,7 @@ const PlaylistDetail = () => {
       const startIndex = shuffle ? Math.floor(Math.random() * validScenes.length) : 0;
       const startScene = validScenes[startIndex];
 
-      navigate(`/scene/${startScene.sceneId}`, {
+      navigate(getEntityPath('scene', startScene.scene, hasMultipleInstances), {
         state: {
           scene: startScene.scene,
           shouldAutoplay: true, // Start playing immediately when entering from playlist

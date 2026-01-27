@@ -2,6 +2,7 @@ import { forwardRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
 import {
   formatDurationCompact,
   formatResolution,
@@ -10,6 +11,7 @@ import {
 } from "../../utils/format.js";
 import { formatRelativeTime } from "../../utils/date.js";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import BaseCard from "./BaseCard.jsx";
 import { SceneCardPreview, TooltipEntityGrid } from "./index.js";
 
@@ -85,6 +87,7 @@ const SceneCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const sceneSettings = getSettings("scene");
+    const { hasMultipleInstances } = useConfig();
 
     const title = getSceneTitle(scene);
     const description = getSceneDescription(scene);
@@ -275,7 +278,7 @@ const SceneCard = forwardRef(
         ref={ref}
         entityType="scene"
         entity={scene}
-        linkTo={`/scene/${scene.id}`}
+        linkTo={getEntityPath('scene', scene, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         // Selection mode - BaseCard handles all gesture/keyboard logic
         selectionMode={selectionMode}
