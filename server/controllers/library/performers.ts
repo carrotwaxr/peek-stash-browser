@@ -9,6 +9,7 @@ import type {
   UpdatePerformerRequest,
   UpdatePerformerResponse,
   ApiErrorResponse,
+  AmbiguousLookupResponse,
 } from "../../types/api/index.js";
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
@@ -143,7 +144,7 @@ export async function mergePerformersWithUserData(
  */
 export const findPerformers = async (
   req: TypedAuthRequest<FindPerformersRequest>,
-  res: TypedResponse<FindPerformersResponse | ApiErrorResponse>
+  res: TypedResponse<FindPerformersResponse | ApiErrorResponse | AmbiguousLookupResponse>
 ) => {
   try {
     const startTime = Date.now();
@@ -187,6 +188,25 @@ export const findPerformers = async (
       perPage,
       searchQuery,
     });
+
+    // Check for ambiguous results on single-ID lookups
+    // This happens when the same ID exists in multiple Stash instances
+    if (ids && ids.length === 1 && !specificInstanceId && performers.length > 1) {
+      logger.warn("Ambiguous performer lookup", {
+        id: ids[0],
+        matchCount: performers.length,
+        instances: performers.map(p => (p as any).instanceId),
+      });
+      return res.status(400).json({
+        error: "Ambiguous lookup",
+        message: `Multiple performers found with ID ${ids[0]}. Specify instance_id parameter.`,
+        matches: performers.map(p => ({
+          id: p.id,
+          name: p.name,
+          instanceId: (p as any).instanceId,
+        })),
+      });
+    }
 
     // For single-entity requests (detail pages), hydrate tags
     let resultPerformers = performers;

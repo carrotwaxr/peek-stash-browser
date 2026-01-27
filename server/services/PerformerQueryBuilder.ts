@@ -1015,6 +1015,7 @@ class PerformerQueryBuilder {
   private transformRow(row: any): NormalizedPerformer {
     const performer: any = {
       id: row.id,
+      instanceId: row.stashInstanceId,
       name: row.name,
       disambiguation: row.disambiguation || null,
       gender: row.gender || null,
