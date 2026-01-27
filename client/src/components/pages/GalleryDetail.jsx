@@ -44,6 +44,9 @@ const GalleryDetail = () => {
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("gallery");
 
+  // Get instance from URL query param for multi-stash support
+  const instanceId = searchParams.get("instance");
+
   // Get active tab from URL or default to 'images'
   const activeTab = searchParams.get('tab') || 'images';
 
@@ -86,7 +89,7 @@ const GalleryDetail = () => {
     const fetchGallery = async () => {
       try {
         setIsLoading(true);
-        const galleryData = await libraryApi.findGalleryById(galleryId);
+        const galleryData = await libraryApi.findGalleryById(galleryId, instanceId);
         setGallery(galleryData);
         setRating(galleryData.rating);
         setIsFavorite(galleryData.favorite || false);
@@ -98,7 +101,7 @@ const GalleryDetail = () => {
     };
 
     fetchGallery();
-  }, [galleryId]);
+  }, [galleryId, instanceId]);
 
   useEffect(() => {
     const fetchImages = async () => {

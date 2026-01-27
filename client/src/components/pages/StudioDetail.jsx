@@ -40,6 +40,9 @@ const StudioDetail = () => {
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("studio");
 
+  // Get instance from URL query param for multi-stash support
+  const instanceId = searchParams.get("instance");
+
   // Include sub-studios toggle state (from URL param or default false)
   const includeSubStudios = searchParams.get("includeSubStudios") === "true";
 
@@ -67,7 +70,7 @@ const StudioDetail = () => {
     const fetchStudio = async () => {
       try {
         setIsLoading(true);
-        const studioData = await getStudio(studioId);
+        const studioData = await libraryApi.findStudioById(studioId, instanceId);
         setStudio(studioData);
         setRating(studioData.rating);
         setIsFavorite(studioData.favorite || false);
@@ -79,7 +82,7 @@ const StudioDetail = () => {
     };
 
     fetchStudio();
-  }, [studioId]);
+  }, [studioId, instanceId]);
 
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
@@ -689,10 +692,6 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
       className="mt-6"
     />
   );
-};
-
-const getStudio = async (id) => {
-  return await libraryApi.findStudioById(id);
 };
 
 export default StudioDetail;

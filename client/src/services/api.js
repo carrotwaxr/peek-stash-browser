@@ -166,40 +166,60 @@ export const libraryApi = {
   /**
    * Find a single performer by ID
    * @param {string} id - Performer ID
+   * @param {string|null} instanceId - Optional Stash instance ID
    * @returns {Promise<Object|null>} Performer object or null if not found
    */
-  findPerformerById: async (id) => {
-    const result = await apiPost("/library/performers", { ids: [id] });
+  findPerformerById: async (id, instanceId = null) => {
+    const params = { ids: [id] };
+    if (instanceId) {
+      params.performer_filter = { instance_id: instanceId };
+    }
+    const result = await apiPost("/library/performers", params);
     return result?.findPerformers?.performers?.[0] || null;
   },
 
   /**
    * Find a single scene by ID
    * @param {string} id - Scene ID
+   * @param {string|null} instanceId - Optional Stash instance ID
    * @returns {Promise<Object|null>} Scene object or null if not found
    */
-  findSceneById: async (id) => {
-    const result = await apiPost("/library/scenes", { ids: [id] });
+  findSceneById: async (id, instanceId = null) => {
+    const params = { ids: [id] };
+    if (instanceId) {
+      params.scene_filter = { instance_id: instanceId };
+    }
+    const result = await apiPost("/library/scenes", params);
     return result?.findScenes?.scenes?.[0] || null;
   },
 
   /**
    * Find a single studio by ID
    * @param {string} id - Studio ID
+   * @param {string|null} instanceId - Optional Stash instance ID
    * @returns {Promise<Object|null>} Studio object or null if not found
    */
-  findStudioById: async (id) => {
-    const result = await apiPost("/library/studios", { ids: [id] });
+  findStudioById: async (id, instanceId = null) => {
+    const params = { ids: [id] };
+    if (instanceId) {
+      params.studio_filter = { instance_id: instanceId };
+    }
+    const result = await apiPost("/library/studios", params);
     return result?.findStudios?.studios?.[0] || null;
   },
 
   /**
    * Find a single tag by ID
    * @param {string} id - Tag ID
+   * @param {string|null} instanceId - Optional Stash instance ID
    * @returns {Promise<Object|null>} Tag object or null if not found
    */
-  findTagById: async (id) => {
-    const result = await apiPost("/library/tags", { ids: [id] });
+  findTagById: async (id, instanceId = null) => {
+    const params = { ids: [id] };
+    if (instanceId) {
+      params.tag_filter = { instance_id: instanceId };
+    }
+    const result = await apiPost("/library/tags", params);
     return result?.findTags?.tags?.[0] || null;
   },
 
@@ -249,10 +269,16 @@ export const libraryApi = {
   /**
    * Find a single gallery by ID
    * @param {string} id - Gallery ID
+   * @param {string|null} instanceId - Optional Stash instance ID
    * @returns {Promise<Object|null>} Gallery object or null if not found
    */
-  findGalleryById: async (id) => {
-    return apiGet(`/library/galleries/${id}`);
+  findGalleryById: async (id, instanceId = null) => {
+    const params = { ids: [id] };
+    if (instanceId) {
+      params.gallery_filter = { instance_id: instanceId };
+    }
+    const result = await apiPost("/library/galleries", params);
+    return result?.findGalleries?.galleries?.[0] || null;
   },
 
   /**
@@ -285,10 +311,15 @@ export const libraryApi = {
   /**
    * Find a single group by ID
    * @param {string} id - Group ID
+   * @param {string|null} instanceId - Optional Stash instance ID
    * @returns {Promise<Object|null>} Group object or null if not found
    */
-  findGroupById: async (id) => {
-    const result = await apiPost("/library/groups", { ids: [id] });
+  findGroupById: async (id, instanceId = null) => {
+    const params = { ids: [id] };
+    if (instanceId) {
+      params.group_filter = { instance_id: instanceId };
+    }
+    const result = await apiPost("/library/groups", params);
     return result?.findGroups?.groups?.[0] || null;
   },
 

@@ -35,6 +35,9 @@ const GroupDetail = () => {
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("group");
 
+  // Get instance from URL query param for multi-stash support
+  const instanceId = searchParams.get("instance");
+
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get('tab') || 'scenes';
 
@@ -45,7 +48,7 @@ const GroupDetail = () => {
     const fetchGroup = async () => {
       try {
         setIsLoading(true);
-        const groupData = await getGroup(groupId);
+        const groupData = await libraryApi.findGroupById(groupId, instanceId);
         setGroup(groupData);
         setRating(groupData.rating);
         setIsFavorite(groupData.favorite || false);
@@ -57,7 +60,7 @@ const GroupDetail = () => {
     };
 
     fetchGroup();
-  }, [groupId]);
+  }, [groupId, instanceId]);
 
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
@@ -536,10 +539,6 @@ const GroupDetails = ({ group }) => {
       )}
     </>
   );
-};
-
-const getGroup = async (id) => {
-  return await libraryApi.findGroupById(id);
 };
 
 export default GroupDetail;

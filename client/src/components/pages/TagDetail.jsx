@@ -36,6 +36,9 @@ const TagDetail = () => {
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("tag");
 
+  // Get instance from URL query param for multi-stash support
+  const instanceId = searchParams.get("instance");
+
   // Include sub-tags toggle state (from URL param or default false)
   const includeSubTags = searchParams.get('includeSubTags') === 'true';
 
@@ -63,7 +66,7 @@ const TagDetail = () => {
     const fetchTag = async () => {
       try {
         setIsLoading(true);
-        const tagData = await getTag(tagId);
+        const tagData = await libraryApi.findTagById(tagId, instanceId);
         setTag(tagData);
         setRating(tagData.rating);
         setIsFavorite(tagData.favorite || false);
@@ -75,7 +78,7 @@ const TagDetail = () => {
     };
 
     fetchTag();
-  }, [tagId]);
+  }, [tagId, instanceId]);
 
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
@@ -625,10 +628,6 @@ const ImagesTab = ({ tagId, tagName, includeSubTags = false }) => {
       className="mt-6"
     />
   );
-};
-
-const getTag = async (id) => {
-  return await libraryApi.findTagById(id);
 };
 
 export default TagDetail;
