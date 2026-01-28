@@ -160,6 +160,7 @@ const SceneContent = () => {
             </Button>
             <ExternalPlayerButton
               sceneId={scene?.id}
+              instanceId={scene?.instanceId}
               title={displayTitle}
             />
             <ViewInStashButton stashUrl={scene?.stashUrl} size={20} />
