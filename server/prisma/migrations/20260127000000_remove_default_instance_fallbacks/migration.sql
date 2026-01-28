@@ -14,6 +14,77 @@
 -- - A full sync runs on startup to ensure all data is correct
 
 -- ============================================================================
+-- STEP 0: Delete duplicate entries that would conflict after update
+-- ============================================================================
+-- Before updating 'default'/NULL entries to the primary instance UUID, we must
+-- delete any entries where the same entity ID already exists for that instance.
+-- This prevents UNIQUE constraint violations on the composite primary key.
+
+DELETE FROM "StashScene"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashScene" s2
+    WHERE s2.id = "StashScene".id
+      AND s2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+DELETE FROM "StashPerformer"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashPerformer" p2
+    WHERE p2.id = "StashPerformer".id
+      AND p2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+DELETE FROM "StashStudio"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashStudio" s2
+    WHERE s2.id = "StashStudio".id
+      AND s2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+DELETE FROM "StashTag"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashTag" t2
+    WHERE t2.id = "StashTag".id
+      AND t2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+DELETE FROM "StashGroup"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashGroup" g2
+    WHERE g2.id = "StashGroup".id
+      AND g2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+DELETE FROM "StashGallery"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashGallery" g2
+    WHERE g2.id = "StashGallery".id
+      AND g2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+DELETE FROM "StashImage"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashImage" i2
+    WHERE i2.id = "StashImage".id
+      AND i2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+DELETE FROM "StashClip"
+WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StashClip" c2
+    WHERE c2.id = "StashClip".id
+      AND c2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- ============================================================================
 -- STEP 1: Update entity tables - replace 'default' with actual StashInstance ID
 -- ============================================================================
 
