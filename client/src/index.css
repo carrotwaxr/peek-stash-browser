@@ -158,3 +158,103 @@ a:focus-visible,
     transform: translate3d(0, 0, 0);
   }
 }
+
+/* Card text scaling based on grid density
+   Uses CSS custom properties set on the grid container.
+   Cards inherit these and adjust their text sizes accordingly. */
+
+/* Default (medium density) - base sizes (close to original) */
+.card-grid-responsive {
+  --card-title-size: 0.9375rem;     /* 15px */
+  --card-subtitle-size: 0.8125rem;  /* 13px */
+  --card-description-size: 0.8125rem;/* 13px */
+  --card-indicator-size: 0.6875rem; /* 11px */
+  --card-padding: 0.5rem;           /* p-2 */
+  --card-image-margin: 0.75rem;     /* mb-3 */
+  --card-title-margin: 0.5rem;      /* mb-2 */
+  --card-rating-icon-size: 18px;
+  --card-rating-gap: 0.5rem;
+}
+
+/* Small density - compact text for more cards */
+.density-small {
+  --card-title-size: 0.8125rem;     /* 13px */
+  --card-subtitle-size: 0.75rem;    /* 12px */
+  --card-description-size: 0.75rem; /* 12px */
+  --card-indicator-size: 0.625rem;  /* 10px */
+  --card-padding: 0.375rem;         /* smaller padding */
+  --card-image-margin: 0.5rem;      /* mb-2 */
+  --card-title-margin: 0.375rem;    /* smaller margin */
+  --card-rating-icon-size: 14px;
+  --card-rating-gap: 0.25rem;
+}
+
+/* Large density - more readable text for fewer cards */
+.density-large {
+  --card-title-size: 1rem;          /* 16px - text-base (original) */
+  --card-subtitle-size: 0.875rem;   /* 14px - text-sm (original) */
+  --card-description-size: 0.875rem;/* 14px - text-sm (original) */
+  --card-indicator-size: 0.75rem;   /* 12px - text-xs */
+  --card-padding: 0.625rem;         /* slightly more padding */
+  --card-image-margin: 0.875rem;    /* slightly more margin */
+  --card-title-margin: 0.625rem;    /* slightly more margin */
+  --card-rating-icon-size: 20px;
+  --card-rating-gap: 0.5rem;
+}
+
+/* Apply scaled text sizes to card elements */
+.card-grid-responsive .card-title {
+  font-size: var(--card-title-size);
+}
+
+.card-grid-responsive .card-subtitle {
+  font-size: var(--card-subtitle-size);
+}
+
+.card-grid-responsive .card-description {
+  font-size: var(--card-description-size);
+}
+
+.card-grid-responsive .card-indicator-text {
+  font-size: var(--card-indicator-size);
+}
+
+/* Scale indicator icons with density */
+.density-small .card-indicator-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.density-medium .card-indicator-icon,
+.card-grid-responsive .card-indicator-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.density-large .card-indicator-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Scale rating row elements with density */
+.card-grid-responsive .card-rating-row {
+  gap: var(--card-rating-gap);
+}
+
+.card-grid-responsive .card-rating-icons {
+  gap: var(--card-rating-gap);
+}
+
+/* Scale all SVG icons within rating row */
+.card-grid-responsive .card-rating-icons svg {
+  width: var(--card-rating-icon-size) !important;
+  height: var(--card-rating-icon-size) !important;
+}
+
+/* Scale rating badge text */
+.card-grid-responsive .card-rating-row button:first-child {
+  font-size: var(--card-indicator-size);
+  padding: 0.125rem 0.375rem;
+  min-width: auto;
+}
+

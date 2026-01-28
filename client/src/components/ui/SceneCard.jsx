@@ -302,6 +302,7 @@ const SceneCard = forwardRef(
         ratingControlsProps={!hideRatingControls && {
           entityType: "scene",
           entityId: scene.id,
+          instanceId: scene.instanceId,
           initialRating: scene.rating,
           initialFavorite: scene.favorite || false,
           initialOCounter: scene.o_counter,

@@ -1162,10 +1162,16 @@ class StashEntityService {
 
   /**
    * Get gallery by ID with computed counts
+   * @param id - Gallery ID
+   * @param instanceId - Optional Stash instance ID for multi-instance support
    */
-  async getGallery(id: string): Promise<NormalizedGallery | null> {
+  async getGallery(id: string, instanceId?: string): Promise<NormalizedGallery | null> {
     const cached = await prisma.stashGallery.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
+      },
       include: {
         performers: { include: { performer: true } },
         tags: { include: { tag: true } },

@@ -487,6 +487,7 @@ export const getGalleryImages = async (
   try {
     const { galleryId } = req.params;
     const userId = req.user?.id;
+    const instanceId = req.query.instance;
 
     // Pagination parameters (optional - defaults to loading all for backwards compat)
     const page = parseInt(req.query.page as string) || 1;
@@ -497,12 +498,13 @@ export const getGalleryImages = async (
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Fetch the gallery data for inheritance context
-    const gallery = await stashEntityService.getGallery(galleryId);
+    // Fetch the gallery data for inheritance context (with instanceId for multi-stash support)
+    const gallery = await stashEntityService.getGallery(galleryId, instanceId);
 
-    // Build query options
+    // Build query options (filter by instanceId if provided for multi-stash support)
     const whereClause = {
       deletedAt: null,
+      ...(instanceId && { stashInstanceId: instanceId }),
       galleries: {
         some: { galleryId },
       },

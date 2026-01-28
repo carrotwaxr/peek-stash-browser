@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Droplets, Eye } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons.js";
 import Tooltip from "./Tooltip";
@@ -67,13 +66,6 @@ export const CardCountIndicators = ({
   showZeroCounts = false,
   size = 20,
 }) => {
-  const { textSize } = useMemo(() => {
-    if (size <= 16) return { textSize: "xs" };
-    if (size <= 20) return { textSize: "sm" };
-    if (size <= 24) return { textSize: "base" };
-    return { textSize: "lg" };
-  }, [size]);
-
   return (
     <div className="flex flex-wrap items-center justify-center gap-4">
       {indicators.map((indicator, index) => {
@@ -88,7 +80,6 @@ export const CardCountIndicators = ({
             icon={knownIndicatorProps.icon}
             iconColor={knownIndicatorProps.iconColor}
             iconSize={size}
-            textSize={textSize}
             tooltipContent={indicator.tooltipContent}
             label={knownIndicatorProps.label}
             onClick={indicator.onClick}
@@ -104,7 +95,6 @@ const CardCountIndicator = ({
   icon,
   iconColor = "var(--accent-secondary)",
   iconSize = 20,
-  textSize = "sm",
   tooltipContent = null,
   label = null,
   onClick = null,
@@ -123,13 +113,13 @@ const CardCountIndicator = ({
       }}
     >
       <span
-        className="flex items-center justify-center"
+        className="flex items-center justify-center card-indicator-icon"
         style={{ color: iconColor }}
       >
         <Icon size={iconSize} />
       </span>
       <span
-        className={`text-${textSize}`}
+        className="card-indicator-text"
         style={{ color: "var(--text-muted)" }}
       >
         {count}

@@ -330,7 +330,7 @@ export const CardTitle = ({
   // String titles use MarqueeText for auto-scroll on overflow
   const titleElement = titleIsString ? (
     <MarqueeText
-      className="font-semibold leading-tight"
+      className="card-title font-semibold leading-tight"
       style={{ color: "var(--text-primary)" }}
     >
       {title}
@@ -338,7 +338,7 @@ export const CardTitle = ({
   ) : (
     // ReactNode titles (like PerformerCard with gender icon) render as-is
     <div
-      className="font-semibold leading-tight text-center overflow-hidden whitespace-nowrap text-ellipsis"
+      className="card-title font-semibold leading-tight text-center overflow-hidden whitespace-nowrap text-ellipsis"
       style={{ color: "var(--text-primary)" }}
     >
       {title}
@@ -365,7 +365,7 @@ export const CardTitle = ({
   // Subtitle also uses MarqueeText for consistency
   const subtitleElement = shouldShowSubtitle ? (
     <MarqueeText
-      className="text-sm leading-tight"
+      className="card-subtitle leading-tight"
       style={{ color: "var(--text-muted)" }}
     >
       {subtitle}
@@ -499,6 +499,9 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
  * Card rating and favorite row - uses compact height when only menu is visible
  * Shows rating badge (left), O counter (center-right), and favorite button (right)
  * O Counter is interactive for scenes and images, display-only for other entities
+ * @param {string} entityType - Type of entity (scene, performer, etc.)
+ * @param {string} entityId - Entity ID
+ * @param {string|null} instanceId - Stash instance ID for multi-instance support
  * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
  * @param {Function} onOCounterChange - Callback when O counter changes (for parent to update state)
  * @param {Function} onRatingChange - Callback when rating changes (for parent to update state)
@@ -511,6 +514,7 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
 export const CardRatingRow = ({
   entityType,
   entityId,
+  instanceId = null,
   initialRating,
   initialFavorite,
   initialOCounter,
@@ -549,7 +553,7 @@ export const CardRatingRow = ({
   const handleRatingSave = async (newRating) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating(entityType, entityId, newRating);
+      await libraryApi.updateRating(entityType, entityId, newRating, instanceId);
       // Notify parent of the change
       onRatingChange?.(entityId, newRating);
     } catch (error) {
@@ -561,7 +565,7 @@ export const CardRatingRow = ({
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite(entityType, entityId, newValue);
+      await libraryApi.updateFavorite(entityType, entityId, newValue, instanceId);
       // Notify parent of the change
       onFavoriteChange?.(entityId, newValue);
     } catch (error) {
@@ -650,7 +654,7 @@ export const CardRatingRow = ({
   return (
     <>
       <div
-        className="flex justify-between items-center w-full my-1"
+        className="card-rating-row flex justify-between items-center w-full my-1"
         style={{ height: hasVisibleControls ? "2rem" : "1.5rem" }}
       >
         {/* Left side: Rating badge */}
@@ -665,7 +669,7 @@ export const CardRatingRow = ({
         </div>
 
         {/* Right side: O Counter + Favorite + EntityMenu */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center card-rating-icons">
           {showOCounter && (
             <OCounterButton
               sceneId={entityType === "scene" ? entityId : null}

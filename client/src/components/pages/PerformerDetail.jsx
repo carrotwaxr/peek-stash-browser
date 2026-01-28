@@ -71,7 +71,7 @@ const PerformerDetail = () => {
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("performer", performerId, newRating);
+      await libraryApi.updateRating("performer", performerId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating(performer.rating); // Revert on error
@@ -81,7 +81,7 @@ const PerformerDetail = () => {
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("performer", performerId, newValue);
+      await libraryApi.updateFavorite("performer", performerId, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite(performer.favorite || false); // Revert on error

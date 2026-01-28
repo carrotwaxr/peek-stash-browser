@@ -98,6 +98,7 @@ const PerformerCard = forwardRef(
         displayPreferences={{ showDescription: performerSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: performer.id,
+          instanceId: performer.instanceId,
           initialRating: performer.rating,
           initialFavorite: performer.favorite || false,
           initialOCounter: performer.o_counter,

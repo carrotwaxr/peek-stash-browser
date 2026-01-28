@@ -92,7 +92,7 @@ const StudioDetail = () => {
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("studio", studioId, newRating);
+      await libraryApi.updateRating("studio", studioId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating(studio.rating);
@@ -102,7 +102,7 @@ const StudioDetail = () => {
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("studio", studioId, newValue);
+      await libraryApi.updateFavorite("studio", studioId, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite(studio.favorite || false);

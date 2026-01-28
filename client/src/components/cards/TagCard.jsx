@@ -105,6 +105,7 @@ const TagCard = forwardRef(
           tag.rating100 !== undefined
             ? {
                 entityId: tag.id,
+                instanceId: tag.instanceId,
                 initialRating: tag.rating100,
                 initialFavorite: tag.favorite || false,
                 initialOCounter: tag.o_counter,
