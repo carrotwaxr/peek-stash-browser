@@ -182,6 +182,7 @@ const SceneSearch = ({
         repeat: "none",
         scenes: currentScenes.map((s, idx) => ({
           sceneId: s.id,
+          instanceId: s.instanceId,
           scene: s,
           position: idx,
         })),
