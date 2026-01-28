@@ -129,7 +129,7 @@ const OCounterButton = ({
 
       {/* Count with scale animation */}
       <span
-        className={`${config.text} font-medium transition-all ${
+        className={`card-counter-text ${config.text} font-medium transition-all ${
           isAnimating ? "scale-110 font-bold" : "scale-100"
         }`}
         style={{

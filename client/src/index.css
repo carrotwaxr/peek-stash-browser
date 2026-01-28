@@ -251,6 +251,11 @@ a:focus-visible,
   height: var(--card-rating-icon-size) !important;
 }
 
+/* Scale counter text (O counter, play count) within rating row */
+.card-grid-responsive .card-rating-icons .card-counter-text {
+  font-size: var(--card-indicator-size);
+}
+
 /* Scale rating badge text */
 .card-grid-responsive .card-rating-row button:first-child {
   font-size: var(--card-indicator-size);

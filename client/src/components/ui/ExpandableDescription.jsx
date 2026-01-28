@@ -12,7 +12,7 @@ import { useTruncationDetection } from "../../hooks/useTruncationDetection";
  * - This ensures "more" appears at the end of the text regardless of line count
  */
 export const ExpandableDescription = ({ description, maxLines = 3 }) => {
-  const [ref, isTruncated] = useTruncationDetection();
+  const [ref] = useTruncationDetection();
   const [isExpanded, setIsExpanded] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
 
