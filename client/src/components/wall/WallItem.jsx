@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks.js";
 
 /**
  * Individual item in the WallView with hover overlay and optional video preview.
@@ -7,11 +9,13 @@ import { Link } from "react-router-dom";
 const WallItem = ({
   item,
   config,
+  entityType,
   width,
   height,
   playbackMode = "autoplay", // "autoplay" | "hover" | "static"
   onClick,
 }) => {
+  const { hasMultipleInstances } = useConfig();
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const [isHovering, setIsHovering] = useState(false);
@@ -24,8 +28,13 @@ const WallItem = ({
   const previewUrl = config.getPreviewUrl(item);
   const title = config.getTitle(item);
   const subtitle = config.getSubtitle(item);
-  const linkPath = config.getLinkPath(item);
   const hasPreview = config.hasPreview && previewUrl;
+
+  // Compute link path with multi-instance support
+  // Clips are special: they link to scene with timestamp
+  const linkPath = entityType === "clip"
+    ? getScenePathWithTime({ id: item.sceneId, instanceId: item.instanceId }, item.seconds, hasMultipleInstances)
+    : getEntityPath(entityType, item, hasMultipleInstances);
 
   // Intersection Observer for autoplay mode
   useEffect(() => {

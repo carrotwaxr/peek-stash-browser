@@ -4,6 +4,8 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * Format resolution string from width/height
@@ -26,6 +28,7 @@ const ImageCard = forwardRef(
   ({ image, onClick, fromPageTitle, tabIndex, onHideSuccess, onOCounterChange, onRatingChange, onFavoriteChange, ...rest }, ref) => {
     const { getSettings } = useCardDisplaySettings();
     const imageSettings = getSettings("image");
+    const { hasMultipleInstances } = useConfig();
     // Get effective metadata (inherits from galleries if image doesn't have its own)
     const { effectivePerformers, effectiveTags, effectiveStudio, effectiveDate } = getEffectiveImageMetadata(image);
 
@@ -140,7 +143,7 @@ const ImageCard = forwardRef(
         subtitle={subtitle}
         description={image.details}
         onClick={handleClick}
-        linkTo={onClick ? undefined : `/image/${image.id}`}
+        linkTo={onClick ? undefined : getEntityPath('image', image, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

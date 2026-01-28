@@ -7,6 +7,8 @@ import {
 } from "react";
 import axios from "axios";
 import { initialState, scenePlayerReducer } from "./scenePlayerReducer.js";
+import { useConfig } from "./ConfigContext.jsx";
+import { getEntityPath } from "../utils/entityLinks.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -28,6 +30,7 @@ export function ScenePlayerProvider({
   initialShouldAutoplay = false,
 }) {
   const [state, dispatch] = useReducer(scenePlayerReducer, initialState);
+  const { hasMultipleInstances } = useConfig();
 
   // Initialize context from props
   useEffect(() => {
@@ -136,12 +139,14 @@ export function ScenePlayerProvider({
   // Update URL when navigating playlist (without React Router navigation)
   useEffect(() => {
     if (state.playlist && state.scene) {
-      const newUrl = `/scene/${state.scene.id}`;
-      if (window.location.pathname !== newUrl) {
+      const newUrl = getEntityPath('scene', state.scene, hasMultipleInstances);
+      // Compare pathname + search to handle instance query param
+      const currentFullPath = window.location.pathname + window.location.search;
+      if (currentFullPath !== newUrl) {
         window.history.replaceState(null, "", newUrl);
       }
     }
-  }, [state.scene, state.playlist]);
+  }, [state.scene, state.playlist, hasMultipleInstances]);
 
   // ============================================================================
   // CONTEXT VALUE

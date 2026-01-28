@@ -22,8 +22,10 @@ export function ConfigProvider({ children }) {
     const fetchConfig = async () => {
       try {
         const status = await setupApi.getSetupStatus();
+        // stashInstanceCount > 1 means multiple Stash instances are configured
+        const hasMultiple = (status.stashInstanceCount || 0) > 1;
         setConfig({
-          hasMultipleInstances: status.hasMultipleInstances || false,
+          hasMultipleInstances: hasMultiple,
           isLoading: false,
         });
       } catch (error) {
