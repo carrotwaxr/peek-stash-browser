@@ -57,7 +57,7 @@ vi.mock("../../prisma/singleton.js", () => ({
       findFirst: vi.fn(),
       count: vi.fn(),
     },
-    stashSceneMarker: {
+    stashClip: {
       count: vi.fn(),
     },
     // Junction table mocks for count queries
@@ -585,7 +585,7 @@ describe("StashEntityService", () => {
       getMock(prisma.stashGallery.count).mockResolvedValue(50);
       getMock(prisma.stashGroup.count).mockResolvedValue(25);
       getMock(prisma.stashImage.count).mockResolvedValue(2000);
-      getMock(prisma.stashSceneMarker.count).mockResolvedValue(150);
+      getMock(prisma.stashClip.count).mockResolvedValue(150);
 
       const stats = await stashEntityService.getStats();
 

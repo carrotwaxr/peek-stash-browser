@@ -1433,10 +1433,10 @@ class StashEntityService {
   }
 
   /**
-   * Get total clip (scene marker) count
+   * Get total clip count
    */
   async getClipCount(): Promise<number> {
-    return prisma.stashSceneMarker.count();
+    return prisma.stashClip.count();
   }
 
   // ==================== Stats/Aggregation Queries ====================
