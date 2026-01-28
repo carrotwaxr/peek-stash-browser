@@ -14,7 +14,78 @@
 -- - A full sync runs on startup to ensure all data is correct
 
 -- ============================================================================
--- STEP 0: Delete duplicate entries that would conflict after update
+-- STEP 0A: Deduplicate 'default' vs NULL entries within entity tables
+-- ============================================================================
+-- When the same entity ID exists with BOTH 'default' AND NULL stashInstanceId,
+-- delete the NULL entries (keep 'default' as it's more explicit about legacy).
+-- This prevents conflicts when both would be updated to the same UUID.
+
+DELETE FROM "StashScene"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashScene" s2
+    WHERE s2.id = "StashScene".id
+      AND s2.stashInstanceId = 'default'
+  );
+
+DELETE FROM "StashPerformer"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashPerformer" p2
+    WHERE p2.id = "StashPerformer".id
+      AND p2.stashInstanceId = 'default'
+  );
+
+DELETE FROM "StashStudio"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashStudio" s2
+    WHERE s2.id = "StashStudio".id
+      AND s2.stashInstanceId = 'default'
+  );
+
+DELETE FROM "StashTag"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashTag" t2
+    WHERE t2.id = "StashTag".id
+      AND t2.stashInstanceId = 'default'
+  );
+
+DELETE FROM "StashGroup"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashGroup" g2
+    WHERE g2.id = "StashGroup".id
+      AND g2.stashInstanceId = 'default'
+  );
+
+DELETE FROM "StashGallery"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashGallery" g2
+    WHERE g2.id = "StashGallery".id
+      AND g2.stashInstanceId = 'default'
+  );
+
+DELETE FROM "StashImage"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashImage" i2
+    WHERE i2.id = "StashImage".id
+      AND i2.stashInstanceId = 'default'
+  );
+
+DELETE FROM "StashClip"
+WHERE "stashInstanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StashClip" c2
+    WHERE c2.id = "StashClip".id
+      AND c2.stashInstanceId = 'default'
+  );
+
+-- ============================================================================
+-- STEP 0B: Delete entries that conflict with existing real UUID entries
 -- ============================================================================
 -- Before updating 'default'/NULL entries to the primary instance UUID, we must
 -- delete any entries where the same entity ID already exists for that instance.
@@ -83,6 +154,272 @@ WHERE ("stashInstanceId" = 'default' OR "stashInstanceId" IS NULL)
     WHERE c2.id = "StashClip".id
       AND c2.stashInstanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
   );
+
+-- ============================================================================
+-- STEP 0C: Handle user data tables - Ratings and Watch History
+-- ============================================================================
+-- These tables contain user-generated data that won't be rebuilt by sync.
+-- We need to deduplicate and update them carefully.
+
+-- SceneRating: Dedupe 'default' vs NULL (keep 'default')
+DELETE FROM "SceneRating"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "SceneRating" r2
+    WHERE r2.userId = "SceneRating".userId
+      AND r2.sceneId = "SceneRating".sceneId
+      AND r2.instanceId = 'default'
+  );
+
+-- SceneRating: Delete if real UUID already exists
+DELETE FROM "SceneRating"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "SceneRating" r2
+    WHERE r2.userId = "SceneRating".userId
+      AND r2.sceneId = "SceneRating".sceneId
+      AND r2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- SceneRating: Update remaining legacy entries
+UPDATE "SceneRating"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- PerformerRating: Dedupe 'default' vs NULL
+DELETE FROM "PerformerRating"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "PerformerRating" r2
+    WHERE r2.userId = "PerformerRating".userId
+      AND r2.performerId = "PerformerRating".performerId
+      AND r2.instanceId = 'default'
+  );
+
+-- PerformerRating: Delete if real UUID already exists
+DELETE FROM "PerformerRating"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "PerformerRating" r2
+    WHERE r2.userId = "PerformerRating".userId
+      AND r2.performerId = "PerformerRating".performerId
+      AND r2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- PerformerRating: Update remaining
+UPDATE "PerformerRating"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- StudioRating: Dedupe 'default' vs NULL
+DELETE FROM "StudioRating"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "StudioRating" r2
+    WHERE r2.userId = "StudioRating".userId
+      AND r2.studioId = "StudioRating".studioId
+      AND r2.instanceId = 'default'
+  );
+
+-- StudioRating: Delete if real UUID already exists
+DELETE FROM "StudioRating"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "StudioRating" r2
+    WHERE r2.userId = "StudioRating".userId
+      AND r2.studioId = "StudioRating".studioId
+      AND r2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- StudioRating: Update remaining
+UPDATE "StudioRating"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- TagRating: Dedupe 'default' vs NULL
+DELETE FROM "TagRating"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "TagRating" r2
+    WHERE r2.userId = "TagRating".userId
+      AND r2.tagId = "TagRating".tagId
+      AND r2.instanceId = 'default'
+  );
+
+-- TagRating: Delete if real UUID already exists
+DELETE FROM "TagRating"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "TagRating" r2
+    WHERE r2.userId = "TagRating".userId
+      AND r2.tagId = "TagRating".tagId
+      AND r2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- TagRating: Update remaining
+UPDATE "TagRating"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- GalleryRating: Dedupe 'default' vs NULL
+DELETE FROM "GalleryRating"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "GalleryRating" r2
+    WHERE r2.userId = "GalleryRating".userId
+      AND r2.galleryId = "GalleryRating".galleryId
+      AND r2.instanceId = 'default'
+  );
+
+-- GalleryRating: Delete if real UUID already exists
+DELETE FROM "GalleryRating"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "GalleryRating" r2
+    WHERE r2.userId = "GalleryRating".userId
+      AND r2.galleryId = "GalleryRating".galleryId
+      AND r2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- GalleryRating: Update remaining
+UPDATE "GalleryRating"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- GroupRating: Dedupe 'default' vs NULL
+DELETE FROM "GroupRating"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "GroupRating" r2
+    WHERE r2.userId = "GroupRating".userId
+      AND r2.groupId = "GroupRating".groupId
+      AND r2.instanceId = 'default'
+  );
+
+-- GroupRating: Delete if real UUID already exists
+DELETE FROM "GroupRating"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "GroupRating" r2
+    WHERE r2.userId = "GroupRating".userId
+      AND r2.groupId = "GroupRating".groupId
+      AND r2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- GroupRating: Update remaining
+UPDATE "GroupRating"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- ImageRating: Dedupe 'default' vs NULL
+DELETE FROM "ImageRating"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "ImageRating" r2
+    WHERE r2.userId = "ImageRating".userId
+      AND r2.imageId = "ImageRating".imageId
+      AND r2.instanceId = 'default'
+  );
+
+-- ImageRating: Delete if real UUID already exists
+DELETE FROM "ImageRating"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "ImageRating" r2
+    WHERE r2.userId = "ImageRating".userId
+      AND r2.imageId = "ImageRating".imageId
+      AND r2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- ImageRating: Update remaining
+UPDATE "ImageRating"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- WatchHistory: Dedupe 'default' vs NULL
+DELETE FROM "WatchHistory"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "WatchHistory" w2
+    WHERE w2.userId = "WatchHistory".userId
+      AND w2.sceneId = "WatchHistory".sceneId
+      AND w2.instanceId = 'default'
+  );
+
+-- WatchHistory: Delete if real UUID already exists
+DELETE FROM "WatchHistory"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "WatchHistory" w2
+    WHERE w2.userId = "WatchHistory".userId
+      AND w2.sceneId = "WatchHistory".sceneId
+      AND w2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- WatchHistory: Update remaining
+UPDATE "WatchHistory"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- PlaylistItem: Dedupe 'default' vs NULL (unique by playlistId + sceneId)
+DELETE FROM "PlaylistItem"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "PlaylistItem" p2
+    WHERE p2.playlistId = "PlaylistItem".playlistId
+      AND p2.sceneId = "PlaylistItem".sceneId
+      AND p2.instanceId = 'default'
+  );
+
+-- PlaylistItem: Delete if real UUID already exists
+DELETE FROM "PlaylistItem"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "PlaylistItem" p2
+    WHERE p2.playlistId = "PlaylistItem".playlistId
+      AND p2.sceneId = "PlaylistItem".sceneId
+      AND p2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- PlaylistItem: Update remaining
+UPDATE "PlaylistItem"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
+
+-- ImageViewHistory: Dedupe 'default' vs NULL
+DELETE FROM "ImageViewHistory"
+WHERE "instanceId" IS NULL
+  AND EXISTS (
+    SELECT 1 FROM "ImageViewHistory" h2
+    WHERE h2.userId = "ImageViewHistory".userId
+      AND h2.imageId = "ImageViewHistory".imageId
+      AND h2.instanceId = 'default'
+  );
+
+-- ImageViewHistory: Delete if real UUID already exists
+DELETE FROM "ImageViewHistory"
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (
+    SELECT 1 FROM "ImageViewHistory" h2
+    WHERE h2.userId = "ImageViewHistory".userId
+      AND h2.imageId = "ImageViewHistory".imageId
+      AND h2.instanceId = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+  );
+
+-- ImageViewHistory: Update remaining
+UPDATE "ImageViewHistory"
+SET "instanceId" = (SELECT "id" FROM "StashInstance" ORDER BY "priority" ASC LIMIT 1)
+WHERE ("instanceId" = 'default' OR "instanceId" IS NULL)
+  AND EXISTS (SELECT 1 FROM "StashInstance");
 
 -- ============================================================================
 -- STEP 1: Update entity tables - replace 'default' with actual StashInstance ID
