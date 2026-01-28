@@ -20,6 +20,7 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import rankingComputeService from "../../services/RankingComputeService.js";
 import {
   buildDerivedWeightsFromScoringData,
   buildImplicitWeightsFromRankings,
@@ -1437,6 +1438,24 @@ export const getRecommendedScenes = async (
       }),
     ]);
 
+    // Check if rankings are stale (>1 hour since last compute)
+    // Recompute in background without blocking current request
+    const lastRanking = await prisma.userEntityRanking.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: { updatedAt: true }
+    });
+
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const isStale = !lastRanking ||
+      (Date.now() - lastRanking.updatedAt.getTime() > ONE_HOUR_MS);
+
+    if (isStale) {
+      rankingComputeService.recomputeAllRankings(userId).catch(err => {
+        logger.error("Background ranking recompute failed", { userId, error: (err as Error).message });
+      });
+    }
+
     // Build sets of favorite and highly-rated entities
     const favoritePerformers = new Set(
       performerRatings.filter((r) => r.favorite).map((r) => r.performerId)
@@ -1627,7 +1646,9 @@ export const getRecommendedScenes = async (
 
       // Use seeded random for consistent shuffle order per user
       // This prevents duplicates across pages while maintaining diversity
-      const rng = new SeededRandom(userId);
+      // Seed changes daily for fresh shuffle order
+      const daySeed = Math.floor(Date.now() / 86400000);
+      const rng = new SeededRandom(userId + daySeed);
 
       // Randomize within each tier and combine
       for (const tier of tiers) {
