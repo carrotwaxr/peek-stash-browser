@@ -1,4 +1,6 @@
 import { Link } from "react-router-dom";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * Responsive grid item for entity tooltips
@@ -8,8 +10,11 @@ import { Link } from "react-router-dom";
  * @param {string} entityType - Type of entity (performer, tag, studio, group, gallery)
  * @param {Array} entities - Array of entities to display
  * @param {string} title - Grid title (e.g., "Performers", "Tags")
+ * @param {string} parentInstanceId - Instance ID from parent entity (fallback when entities don't have their own)
  */
-export const TooltipEntityGrid = ({ entityType, entities, title }) => {
+export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceId }) => {
+  const { hasMultipleInstances } = useConfig();
+
   if (!entities || entities.length === 0) return null;
 
   // Determine aspect ratio based on entity type (match useEntityImageAspectRatio hook)
@@ -32,16 +37,13 @@ export const TooltipEntityGrid = ({ entityType, entities, title }) => {
     return "rounded";
   };
 
-  // Get link path for entity
+  // Get link path for entity using centralized utility
+  // If entity doesn't have instanceId, use parentInstanceId as fallback
   const getLinkPath = (entity) => {
-    const pathMap = {
-      performer: `/performer/${entity.id}`,
-      tag: `/tag/${entity.id}`,
-      studio: `/studio/${entity.id}`,
-      group: `/collection/${entity.id}`,
-      gallery: `/gallery/${entity.id}`,
-    };
-    return pathMap[entityType] || "#";
+    const entityWithInstance = entity.instanceId
+      ? entity
+      : { ...entity, instanceId: parentInstanceId };
+    return getEntityPath(entityType, entityWithInstance, hasMultipleInstances);
   };
 
   // Get image path for entity

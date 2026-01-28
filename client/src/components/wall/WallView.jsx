@@ -83,6 +83,7 @@ const WallView = ({
               key={photo.key}
               item={photo._item}
               config={config}
+              entityType={entityType}
               width={width}
               height={height}
               playbackMode={playbackMode}

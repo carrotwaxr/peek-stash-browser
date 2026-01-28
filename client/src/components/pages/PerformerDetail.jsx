@@ -41,6 +41,9 @@ const PerformerDetail = () => {
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("performer");
 
+  // Get instance from URL query param for multi-stash support
+  const instanceId = searchParams.get("instance");
+
   // Get active tab from URL or default to 'scenes'
   const activeTab = searchParams.get('tab') || 'scenes';
 
@@ -51,7 +54,7 @@ const PerformerDetail = () => {
     const fetchPerformer = async () => {
       try {
         setIsLoading(true);
-        const performerData = await getPerformer(performerId);
+        const performerData = await libraryApi.findPerformerById(performerId, instanceId);
         setPerformer(performerData);
         setRating(performerData.rating);
         setIsFavorite(performerData.favorite || false);
@@ -63,7 +66,7 @@ const PerformerDetail = () => {
     };
 
     fetchPerformer();
-  }, [performerId]);
+  }, [performerId, instanceId]);
 
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
@@ -738,10 +741,6 @@ const ImagesTab = ({ performerId, performerName }) => {
       className="mt-6"
     />
   );
-};
-
-const getPerformer = async (id) => {
-  return await libraryApi.findPerformerById(id);
 };
 
 export default PerformerDetail;

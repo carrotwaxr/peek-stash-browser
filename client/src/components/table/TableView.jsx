@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import TableHeader from "./TableHeader.jsx";
 import { getCellRenderer } from "./cellRenderers.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
 
 /**
  * TableView - Main table view component for displaying entity lists
@@ -25,6 +26,8 @@ const TableView = ({
   isLoading = false,
   columnsPopover,
 }) => {
+  const { hasMultipleInstances } = useConfig();
+
   // Context menu state: { columnId, x, y } or null
   const [contextMenu, setContextMenu] = useState(null);
 
@@ -142,7 +145,7 @@ const TableView = ({
       >
         {columnsPopover && <td className="w-10 px-2 py-2" />}
         {columns.map((column) => {
-          const renderer = getCellRenderer(column.id, entityType);
+          const renderer = getCellRenderer(column.id, entityType, { hasMultipleInstances });
           const hasMaxWidth = column.width?.startsWith("max-w");
           return (
             <td

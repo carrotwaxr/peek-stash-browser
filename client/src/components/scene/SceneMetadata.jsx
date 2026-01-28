@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
 import { CardCountIndicators } from "../ui/index.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * Combine direct tags with inherited tags from server
@@ -21,6 +23,8 @@ const getAllTags = (scene) => {
  * Scene metadata: performers and tags with image-rich tooltips
  */
 const SceneMetadata = ({ scene }) => {
+  const { hasMultipleInstances } = useConfig();
+
   // Get merged and deduped tags
   const allTags = getAllTags(scene);
   // Performer tooltip content with images in a grid
@@ -31,7 +35,7 @@ const SceneMetadata = ({ scene }) => {
         {scene.performers.map((performer) => (
           <Link
             key={performer.id}
-            to={`/performer/${performer.id}`}
+            to={getEntityPath('performer', performer, hasMultipleInstances)}
             className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
@@ -64,7 +68,7 @@ const SceneMetadata = ({ scene }) => {
         {allTags.map((tag) => (
           <Link
             key={tag.id}
-            to={`/tag/${tag.id}`}
+            to={getEntityPath('tag', tag, hasMultipleInstances)}
             className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
@@ -97,7 +101,7 @@ const SceneMetadata = ({ scene }) => {
         {scene.groups.map((group) => (
           <Link
             key={group.id}
-            to={`/collection/${group.id}`}
+            to={getEntityPath('group', group, hasMultipleInstances)}
             className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
             onClick={(e) => e.stopPropagation()}
           >

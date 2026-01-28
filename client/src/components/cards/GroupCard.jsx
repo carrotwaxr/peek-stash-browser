@@ -4,6 +4,8 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * GroupCard - Card for displaying group/collection entities
@@ -13,6 +15,7 @@ const GroupCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const groupSettings = getSettings("group");
+    const { hasMultipleInstances } = useConfig();
 
     // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
@@ -32,17 +35,17 @@ const GroupCard = forwardRef(
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('group', 'tags') === 'rich' &&
         group.tags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={group.tags} title="Tags" />
+          <TooltipEntityGrid entityType="tag" entities={group.tags} title="Tags" parentInstanceId={group.instanceId} />
         );
 
       const performersTooltip = getIndicatorBehavior('group', 'performers') === 'rich' &&
         group.performers?.length > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" />
+          <TooltipEntityGrid entityType="performer" entities={group.performers} title="Performers" parentInstanceId={group.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('group', 'galleries') === 'rich' &&
         group.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={group.galleries} title="Galleries" />
+          <TooltipEntityGrid entityType="gallery" entities={group.galleries} title="Galleries" parentInstanceId={group.instanceId} />
         );
 
       return [
@@ -91,7 +94,7 @@ const GroupCard = forwardRef(
         title={group.name}
         subtitle={subtitle}
         description={group.description}
-        linkTo={`/collection/${group.id}`}
+        linkTo={getEntityPath('group', group, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

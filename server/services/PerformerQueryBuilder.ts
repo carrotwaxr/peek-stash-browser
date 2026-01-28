@@ -21,7 +21,8 @@ export interface PerformerQueryOptions {
   userId: number;
   filters?: PeekPerformerFilter;
   applyExclusions?: boolean; // Default true - use pre-computed exclusions
-  allowedInstanceIds?: string[]; // Multi-instance filtering
+  allowedInstanceIds?: string[]; // Multi-instance filtering - array of instances the user can access
+  specificInstanceId?: string; // Single instance filter for disambiguation on detail pages
   sort: string;
   sortDirection: "ASC" | "DESC";
   page: number;
@@ -102,6 +103,20 @@ class PerformerQueryBuilder {
     return {
       sql: `(p.stashInstanceId IN (${placeholders}) OR p.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
+    };
+  }
+
+  /**
+   * Build filter for a specific instance ID (for disambiguation on detail pages)
+   * This is different from allowedInstanceIds - it filters to exactly one instance.
+   */
+  private buildSpecificInstanceFilter(instanceId: string | undefined): FilterClause {
+    if (!instanceId) {
+      return { sql: "", params: [] };
+    }
+    return {
+      sql: `p.stashInstanceId = ?`,
+      params: [instanceId],
     };
   }
 
@@ -649,7 +664,7 @@ class PerformerQueryBuilder {
 
   async execute(options: PerformerQueryOptions): Promise<PerformerQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, filters, searchQuery } = options;
+    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, specificInstanceId, filters, searchQuery } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -661,6 +676,14 @@ class PerformerQueryBuilder {
     const instanceFilter = this.buildInstanceFilter(allowedInstanceIds);
     if (instanceFilter.sql) {
       whereClauses.push(instanceFilter);
+    }
+
+    // Specific instance filter (for disambiguation on detail pages)
+    if (specificInstanceId) {
+      const specificFilter = this.buildSpecificInstanceFilter(specificInstanceId);
+      if (specificFilter.sql) {
+        whereClauses.push(specificFilter);
+      }
     }
 
     // Search query
@@ -992,6 +1015,7 @@ class PerformerQueryBuilder {
   private transformRow(row: any): NormalizedPerformer {
     const performer: any = {
       id: row.id,
+      instanceId: row.stashInstanceId,
       name: row.name,
       disambiguation: row.disambiguation || null,
       gender: row.gender || null,

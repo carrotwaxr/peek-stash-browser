@@ -5,6 +5,8 @@ import GenderIcon from "../ui/GenderIcon.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * PerformerCard - Card for displaying performer entities
@@ -15,26 +17,27 @@ const PerformerCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const performerSettings = getSettings("performer");
+    const { hasMultipleInstances } = useConfig();
 
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('performer', 'tags') === 'rich' &&
         performer.tags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={performer.tags} title="Tags" />
+          <TooltipEntityGrid entityType="tag" entities={performer.tags} title="Tags" parentInstanceId={performer.instanceId} />
         );
 
       const groupsTooltip = getIndicatorBehavior('performer', 'groups') === 'rich' &&
         performer.groups?.length > 0 && (
-          <TooltipEntityGrid entityType="group" entities={performer.groups} title="Collections" />
+          <TooltipEntityGrid entityType="group" entities={performer.groups} title="Collections" parentInstanceId={performer.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('performer', 'galleries') === 'rich' &&
         performer.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={performer.galleries} title="Galleries" />
+          <TooltipEntityGrid entityType="gallery" entities={performer.galleries} title="Galleries" parentInstanceId={performer.instanceId} />
         );
 
       const studiosTooltip = getIndicatorBehavior('performer', 'studios') === 'rich' &&
         performer.studios?.length > 0 && (
-          <TooltipEntityGrid entityType="studio" entities={performer.studios} title="Studios" />
+          <TooltipEntityGrid entityType="studio" entities={performer.studios} title="Studios" parentInstanceId={performer.instanceId} />
         );
 
       return [
@@ -86,7 +89,7 @@ const PerformerCard = forwardRef(
             <GenderIcon gender={performer.gender} size={16} />
           </div>
         }
-        linkTo={`/performer/${performer.id}`}
+        linkTo={getEntityPath('performer', performer, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={isTVMode ? tabIndex : -1}
         description={performer.details}

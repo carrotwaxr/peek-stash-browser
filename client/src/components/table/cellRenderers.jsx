@@ -11,6 +11,7 @@ import {
   formatDate,
   calculateAge,
 } from "./formatters.js";
+import { getEntityPath, getScenePathWithTime } from "../../utils/entityLinks.js";
 
 // ============================================================================
 // Cell Components
@@ -182,41 +183,42 @@ const SimpleValueCell = ({ value }) => {
 
 /**
  * Scene cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const sceneRenderers = {
-  title: (scene) => (
-    <LinkCell text={scene.title || `Scene ${scene.id}`} linkTo={`/scene/${scene.id}`} />
+  title: (scene, options = {}) => (
+    <LinkCell text={scene.title || `Scene ${scene.id}`} linkTo={getEntityPath('scene', scene, options.hasMultipleInstances)} />
   ),
-  preview: (scene) => (
+  preview: (scene, options = {}) => (
     <ThumbnailCell
       src={scene.paths?.screenshot || scene.image_path}
       alt={scene.title}
-      linkTo={`/scene/${scene.id}`}
+      linkTo={getEntityPath('scene', scene, options.hasMultipleInstances)}
       entityType="scene"
     />
   ),
   date: (scene) => formatDate(scene.date),
   duration: (scene) => formatDuration(scene.files?.[0]?.duration || scene.file?.duration || scene.duration),
   rating: (scene) => <RatingCell rating={scene.rating100 ?? scene.rating} />,
-  studio: (scene) => {
+  studio: (scene, options = {}) => {
     if (!scene.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={scene.studio.name} linkTo={`/studio/${scene.studio.id}`} />;
+    return <LinkCell text={scene.studio.name} linkTo={getEntityPath('studio', scene.studio, options.hasMultipleInstances)} />;
   },
-  performers: (scene) => {
+  performers: (scene, options = {}) => {
     const items = (scene.performers || []).map((p) => ({
       id: p.id,
       name: p.name,
-      linkTo: `/performer/${p.id}`,
+      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
-  tags: (scene) => {
+  tags: (scene, options = {}) => {
     const items = (scene.tags || []).map((t) => ({
       id: t.id,
       name: t.name,
-      linkTo: `/tag/${t.id}`,
+      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -236,16 +238,17 @@ const sceneRenderers = {
 
 /**
  * Performer cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const performerRenderers = {
-  name: (performer) => (
-    <LinkCell text={performer.name} linkTo={`/performer/${performer.id}`} />
+  name: (performer, options = {}) => (
+    <LinkCell text={performer.name} linkTo={getEntityPath('performer', performer, options.hasMultipleInstances)} />
   ),
-  image: (performer) => (
+  image: (performer, options = {}) => (
     <ThumbnailCell
       src={performer.image_path}
       alt={performer.name}
-      linkTo={`/performer/${performer.id}`}
+      linkTo={getEntityPath('performer', performer, options.hasMultipleInstances)}
       entityType="performer"
     />
   ),
@@ -312,27 +315,28 @@ const StudioLogoCell = ({ src, alt = "", linkTo }) => {
 
 /**
  * Studio cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const studioRenderers = {
-  name: (studio) => (
-    <LinkCell text={studio.name} linkTo={`/studio/${studio.id}`} />
+  name: (studio, options = {}) => (
+    <LinkCell text={studio.name} linkTo={getEntityPath('studio', studio, options.hasMultipleInstances)} />
   ),
-  image: (studio) => (
+  image: (studio, options = {}) => (
     <StudioLogoCell
       src={studio.image_path}
       alt={studio.name}
-      linkTo={`/studio/${studio.id}`}
+      linkTo={getEntityPath('studio', studio, options.hasMultipleInstances)}
     />
   ),
   rating: (studio) => <RatingCell rating={studio.rating100 ?? studio.rating} />,
-  parent_studio: (studio) => {
+  parent_studio: (studio, options = {}) => {
     if (!studio.parent_studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
     return (
       <LinkCell
         text={studio.parent_studio.name}
-        linkTo={`/studio/${studio.parent_studio.id}`}
+        linkTo={getEntityPath('studio', studio.parent_studio, options.hasMultipleInstances)}
       />
     );
   },
@@ -342,14 +346,15 @@ const studioRenderers = {
 
 /**
  * Tag cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const tagRenderers = {
-  name: (tag) => <LinkCell text={tag.name} linkTo={`/tag/${tag.id}`} />,
-  image: (tag) => (
+  name: (tag, options = {}) => <LinkCell text={tag.name} linkTo={getEntityPath('tag', tag, options.hasMultipleInstances)} />,
+  image: (tag, options = {}) => (
     <ThumbnailCell
       src={tag.image_path}
       alt={tag.name}
-      linkTo={`/tag/${tag.id}`}
+      linkTo={getEntityPath('tag', tag, options.hasMultipleInstances)}
       entityType="tag"
     />
   ),
@@ -362,43 +367,44 @@ const tagRenderers = {
 
 /**
  * Gallery cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const galleryRenderers = {
-  title: (gallery) => (
+  title: (gallery, options = {}) => (
     <LinkCell
       text={gallery.title || `Gallery ${gallery.id}`}
-      linkTo={`/gallery/${gallery.id}`}
+      linkTo={getEntityPath('gallery', gallery, options.hasMultipleInstances)}
     />
   ),
-  cover: (gallery) => (
+  cover: (gallery, options = {}) => (
     <ThumbnailCell
       src={gallery.cover}
       alt={gallery.title}
-      linkTo={`/gallery/${gallery.id}`}
+      linkTo={getEntityPath('gallery', gallery, options.hasMultipleInstances)}
       entityType="gallery"
     />
   ),
   date: (gallery) => formatDate(gallery.date),
   rating: (gallery) => <RatingCell rating={gallery.rating100 ?? gallery.rating} />,
-  studio: (gallery) => {
+  studio: (gallery, options = {}) => {
     if (!gallery.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={gallery.studio.name} linkTo={`/studio/${gallery.studio.id}`} />;
+    return <LinkCell text={gallery.studio.name} linkTo={getEntityPath('studio', gallery.studio, options.hasMultipleInstances)} />;
   },
-  performers: (gallery) => {
+  performers: (gallery, options = {}) => {
     const items = (gallery.performers || []).map((p) => ({
       id: p.id,
       name: p.name,
-      linkTo: `/performer/${p.id}`,
+      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
-  tags: (gallery) => {
+  tags: (gallery, options = {}) => {
     const items = (gallery.tags || []).map((t) => ({
       id: t.id,
       name: t.name,
-      linkTo: `/tag/${t.id}`,
+      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -411,42 +417,43 @@ const galleryRenderers = {
 
 /**
  * Image cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const imageRenderers = {
-  title: (image) => (
+  title: (image, options = {}) => (
     <LinkCell
       text={image.title || image.path?.split(/[\\/]/).pop() || `Image ${image.id}`}
-      linkTo={`/image/${image.id}`}
+      linkTo={getEntityPath('image', image, options.hasMultipleInstances)}
     />
   ),
-  image: (image) => (
+  image: (image, options = {}) => (
     <ThumbnailCell
       src={image.paths?.thumbnail || image.image_path}
       alt={image.title}
-      linkTo={`/image/${image.id}`}
+      linkTo={getEntityPath('image', image, options.hasMultipleInstances)}
       entityType="image"
     />
   ),
   rating: (image) => <RatingCell rating={image.rating100 ?? image.rating} />,
-  studio: (image) => {
+  studio: (image, options = {}) => {
     if (!image.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={image.studio.name} linkTo={`/studio/${image.studio.id}`} />;
+    return <LinkCell text={image.studio.name} linkTo={getEntityPath('studio', image.studio, options.hasMultipleInstances)} />;
   },
-  performers: (image) => {
+  performers: (image, options = {}) => {
     const items = (image.performers || []).map((p) => ({
       id: p.id,
       name: p.name,
-      linkTo: `/performer/${p.id}`,
+      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
-  tags: (image) => {
+  tags: (image, options = {}) => {
     const items = (image.tags || []).map((t) => ({
       id: t.id,
       name: t.name,
-      linkTo: `/tag/${t.id}`,
+      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -467,44 +474,45 @@ const imageRenderers = {
 
 /**
  * Group cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const groupRenderers = {
-  name: (group) => (
-    <LinkCell text={group.name} linkTo={`/collection/${group.id}`} />
+  name: (group, options = {}) => (
+    <LinkCell text={group.name} linkTo={getEntityPath('group', group, options.hasMultipleInstances)} />
   ),
-  image: (group) => (
+  image: (group, options = {}) => (
     <ThumbnailCell
       src={group.front_image_path}
       alt={group.name}
-      linkTo={`/collection/${group.id}`}
+      linkTo={getEntityPath('group', group, options.hasMultipleInstances)}
       entityType="group"
     />
   ),
   rating: (group) => <RatingCell rating={group.rating100 ?? group.rating} />,
-  studio: (group) => {
+  studio: (group, options = {}) => {
     if (!group.studio) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
-    return <LinkCell text={group.studio.name} linkTo={`/studio/${group.studio.id}`} />;
+    return <LinkCell text={group.studio.name} linkTo={getEntityPath('studio', group.studio, options.hasMultipleInstances)} />;
   },
   date: (group) => formatDate(group.date),
   duration: (group) => formatDuration(group.duration),
   scene_count: (group) => <SimpleValueCell value={group.scene_count} />,
-  performers: (group) => {
+  performers: (group, options = {}) => {
     // Groups don't have performers directly, but scenes in group do
     // This would need API support to aggregate performers across scenes
     const items = (group.performers || []).map((p) => ({
       id: p.id,
       name: p.name,
-      linkTo: `/performer/${p.id}`,
+      linkTo: getEntityPath('performer', p, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
-  tags: (group) => {
+  tags: (group, options = {}) => {
     const items = (group.tags || []).map((t) => ({
       id: t.id,
       name: t.name,
-      linkTo: `/tag/${t.id}`,
+      linkTo: getEntityPath('tag', t, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -512,15 +520,18 @@ const groupRenderers = {
 
 /**
  * TagLinkCell - Tag displayed as a link with theme secondary color
+ * @param {Object} props
+ * @param {Object} props.tag - Tag object
+ * @param {boolean} props.hasMultipleInstances - Whether multiple instances are configured
  */
-const TagLinkCell = ({ tag }) => {
+const TagLinkCell = ({ tag, hasMultipleInstances }) => {
   if (!tag) {
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   }
 
   return (
     <Link
-      to={`/tag/${tag.id}`}
+      to={getEntityPath('tag', tag, hasMultipleInstances)}
       className="hover:underline"
       style={{ color: "var(--accent-secondary)" }}
     >
@@ -531,15 +542,16 @@ const TagLinkCell = ({ tag }) => {
 
 /**
  * Clip cell renderers
+ * @param {Object} options - Options object with hasMultipleInstances flag
  */
 const clipRenderers = {
-  title: (clip) => (
+  title: (clip, options = {}) => (
     <LinkCell
       text={clip.title || "Untitled"}
-      linkTo={`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`}
+      linkTo={getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, options.hasMultipleInstances)}
     />
   ),
-  thumbnail: (clip) => {
+  thumbnail: (clip, options = {}) => {
     // Use scene screenshot for static thumbnail in table view
     // (clip preview is video/mp4 which can't be displayed in an img tag)
     // pathScreenshot is already a proxy URL from ClipService
@@ -548,23 +560,23 @@ const clipRenderers = {
       <ThumbnailCell
         src={src}
         alt={clip.title}
-        linkTo={`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`}
+        linkTo={getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, options.hasMultipleInstances)}
         entityType="scene"
       />
     );
   },
-  scene: (clip) => {
+  scene: (clip, options = {}) => {
     if (!clip.scene) {
       return <span style={{ color: "var(--text-muted)" }}>-</span>;
     }
     return (
       <LinkCell
         text={clip.scene.title || `Scene ${clip.sceneId}`}
-        linkTo={`/scene/${clip.sceneId}`}
+        linkTo={getEntityPath('scene', { id: clip.sceneId, instanceId: clip.instanceId }, options.hasMultipleInstances)}
       />
     );
   },
-  primary_tag: (clip) => <TagLinkCell tag={clip.primaryTag} />,
+  primary_tag: (clip, options = {}) => <TagLinkCell tag={clip.primaryTag} hasMultipleInstances={options.hasMultipleInstances} />,
   start_time: (clip) => formatDuration(clip.seconds),
   duration: (clip) => {
     if (clip.endSeconds && clip.seconds) {
@@ -572,11 +584,11 @@ const clipRenderers = {
     }
     return <span style={{ color: "var(--text-muted)" }}>-</span>;
   },
-  tags: (clip) => {
+  tags: (clip, options = {}) => {
     const items = (clip.tags || []).map((t) => ({
       id: t.tag?.id || t.id,
       name: t.tag?.name || t.name,
-      linkTo: `/tag/${t.tag?.id || t.id}`,
+      linkTo: getEntityPath('tag', { id: t.tag?.id || t.id, instanceId: t.tag?.instanceId || t.instanceId }, options.hasMultipleInstances),
     }));
     return <MultiValueCell items={items} />;
   },
@@ -612,9 +624,10 @@ const entityRenderers = {
  * Get a cell renderer function for a specific column and entity type
  * @param {string} columnId - The column ID
  * @param {string} entityType - The entity type (scene, performer, studio, tag, gallery, image, group)
+ * @param {Object} options - Options to pass to the renderer (e.g., { hasMultipleInstances: boolean })
  * @returns {Function} A function (entity) => ReactNode
  */
-export const getCellRenderer = (columnId, entityType) => {
+export const getCellRenderer = (columnId, entityType, options = {}) => {
   const normalizedType = entityType?.toLowerCase();
   const renderers = entityRenderers[normalizedType];
 
@@ -630,7 +643,8 @@ export const getCellRenderer = (columnId, entityType) => {
     return (entity) => <SimpleValueCell value={entity[columnId]} />;
   }
 
-  return renderer;
+  // Return a wrapper function that passes options to the renderer
+  return (entity) => renderer(entity, options);
 };
 
 export default getCellRenderer;

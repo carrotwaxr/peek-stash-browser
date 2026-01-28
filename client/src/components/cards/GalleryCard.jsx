@@ -5,6 +5,8 @@ import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * GalleryCard - Card for displaying gallery entities
@@ -14,6 +16,7 @@ const GalleryCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const gallerySettings = getSettings("gallery");
+    const { hasMultipleInstances } = useConfig();
 
     // Build subtitle from studio and date (respecting settings)
     const subtitle = (() => {
@@ -37,6 +40,7 @@ const GalleryCard = forwardRef(
           entityType="performer"
           entities={gallery.performers}
           title="Performers"
+          parentInstanceId={gallery.instanceId}
         />
       );
 
@@ -46,6 +50,7 @@ const GalleryCard = forwardRef(
           entityType="tag"
           entities={gallery.tags}
           title="Tags"
+          parentInstanceId={gallery.instanceId}
         />
       );
 
@@ -56,6 +61,7 @@ const GalleryCard = forwardRef(
           entityType="scene"
           entities={gallery.scenes}
           title="Scenes"
+          parentInstanceId={gallery.instanceId}
         />
       );
 
@@ -106,7 +112,7 @@ const GalleryCard = forwardRef(
         title={galleryTitle(gallery)}
         subtitle={subtitle}
         description={gallery.description}
-        linkTo={`/gallery/${gallery.id}`}
+        linkTo={getEntityPath('gallery', gallery, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

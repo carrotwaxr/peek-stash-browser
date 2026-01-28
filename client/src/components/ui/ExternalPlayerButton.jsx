@@ -19,11 +19,13 @@ import { showSuccess, showError } from "../../utils/toast.jsx";
  *
  * @param {Object} props
  * @param {string} props.sceneId - The scene ID to build the stream URL
+ * @param {string} props.instanceId - The instance ID for multi-instance support
  * @param {string} props.title - The scene title (used for Android intent)
  * @param {string} [props.className] - Additional CSS classes
  */
 export default function ExternalPlayerButton({
   sceneId,
+  instanceId,
   title,
   className = "",
 }) {
@@ -39,7 +41,7 @@ export default function ExternalPlayerButton({
   // Build the direct stream URL (original file, no transcoding)
   // This needs to be an absolute URL for external players
   const streamUrl = sceneId
-    ? `${window.location.origin}/api/scene/${sceneId}/proxy-stream/stream`
+    ? `${window.location.origin}/api/scene/${sceneId}/proxy-stream/stream${instanceId ? `?instanceId=${encodeURIComponent(instanceId)}` : ''}`
     : null;
 
   /**

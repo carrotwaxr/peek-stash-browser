@@ -8,6 +8,8 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { useTableColumns } from "../../hooks/useTableColumns.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
 import { TagCard } from "../cards/index.js";
 import { TagHierarchyView } from "../tags/index.js";
@@ -31,6 +33,7 @@ const Tags = () => {
   usePageTitle("Tags");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { hasMultipleInstances } = useConfig();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = useGridColumns("tags");
@@ -96,7 +99,7 @@ const Tags = () => {
     columns,
     totalPages,
     onItemSelect: (tag) =>
-      navigate(`/tag/${tag.id}`, {
+      navigate(getEntityPath('tag', tag, hasMultipleInstances), {
         state: { fromPageTitle: "Tags" },
       }),
   });

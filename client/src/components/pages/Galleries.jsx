@@ -8,6 +8,8 @@ import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js"
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { useWallPlayback } from "../../hooks/useWallPlayback.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
 import { GalleryCard } from "../cards/index.js";
 import {
@@ -36,6 +38,7 @@ const Galleries = () => {
   usePageTitle("Galleries");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { hasMultipleInstances } = useConfig();
   const pageRef = useRef(null);
   const gridRef = useRef(null);
   const columns = useGridColumns("galleries");
@@ -99,11 +102,11 @@ const Galleries = () => {
 
   const handleGalleryClick = useCallback(
     (gallery) => {
-      navigate(`/gallery/${gallery.id}`, {
+      navigate(getEntityPath('gallery', gallery, hasMultipleInstances), {
         state: { fromPageTitle: "Galleries" },
       });
     },
-    [navigate]
+    [navigate, hasMultipleInstances]
   );
 
   const currentGalleries = data?.galleries || [];

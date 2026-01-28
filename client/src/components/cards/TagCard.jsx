@@ -4,6 +4,8 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * TagCard - Card for displaying tag entities
@@ -13,6 +15,7 @@ const TagCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const tagSettings = getSettings("tag");
+    const { hasMultipleInstances } = useConfig();
 
     // Build subtitle from child count
     const subtitle =
@@ -23,22 +26,22 @@ const TagCard = forwardRef(
     const indicators = useMemo(() => {
       const performersTooltip = getIndicatorBehavior('tag', 'performers') === 'rich' &&
         tag.performers?.length > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={tag.performers} title="Performers" />
+          <TooltipEntityGrid entityType="performer" entities={tag.performers} title="Performers" parentInstanceId={tag.instanceId} />
         );
 
       const studiosTooltip = getIndicatorBehavior('tag', 'studios') === 'rich' &&
         tag.studios?.length > 0 && (
-          <TooltipEntityGrid entityType="studio" entities={tag.studios} title="Studios" />
+          <TooltipEntityGrid entityType="studio" entities={tag.studios} title="Studios" parentInstanceId={tag.instanceId} />
         );
 
       const groupsTooltip = getIndicatorBehavior('tag', 'groups') === 'rich' &&
         tag.groups?.length > 0 && (
-          <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" />
+          <TooltipEntityGrid entityType="group" entities={tag.groups} title="Collections" parentInstanceId={tag.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('tag', 'galleries') === 'rich' &&
         tag.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={tag.galleries} title="Galleries" />
+          <TooltipEntityGrid entityType="gallery" entities={tag.galleries} title="Galleries" parentInstanceId={tag.instanceId} />
         );
 
       return [
@@ -93,7 +96,7 @@ const TagCard = forwardRef(
         title={tag.name}
         subtitle={subtitle}
         description={tag.description}
-        linkTo={`/tag/${tag.id}`}
+        linkTo={getEntityPath('tag', tag, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}
