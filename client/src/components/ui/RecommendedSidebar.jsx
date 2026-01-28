@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { getSceneTitle } from "../../utils/format.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { useLazyLoad } from "./CardComponents.jsx";
 
 /**
@@ -12,6 +14,7 @@ import { useLazyLoad } from "./CardComponents.jsx";
  */
 const RecommendedSidebar = ({ sceneId, maxHeight }) => {
   const navigate = useNavigate();
+  const { hasMultipleInstances } = useConfig();
   const [scenes, setScenes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,7 +47,7 @@ const RecommendedSidebar = ({ sceneId, maxHeight }) => {
 
   const handleSceneClick = (scene) => {
     // Navigate to scene - this will trigger auto-playlist generation from similar scenes
-    navigate(`/scene/${scene.id}`, {
+    navigate(getEntityPath('scene', scene, hasMultipleInstances), {
       state: {
         scene,
         fromPageTitle: "Recommended",

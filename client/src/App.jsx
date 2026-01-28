@@ -6,6 +6,7 @@ import ForgotPasswordPage from "./components/pages/ForgotPasswordPage.jsx";
 import SetupWizard from "./components/pages/SetupWizard.jsx";
 import { GlobalLayout } from "./components/ui/index.js";
 import { AuthProvider } from "./contexts/AuthContext.jsx";
+import { ConfigProvider } from "./contexts/ConfigContext.jsx";
 import { TVModeProvider } from "./contexts/TVModeProvider.jsx";
 import { UnitPreferenceProvider } from "./contexts/UnitPreferenceProvider.jsx";
 import { CardDisplaySettingsProvider } from "./contexts/CardDisplaySettingsContext.jsx";
@@ -392,22 +393,24 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <UnitPreferenceProvider>
-          <TVModeProvider>
-            <CardDisplaySettingsProvider>
-              <AppContent />
-              <Toaster
-                position="bottom-center"
-                toastOptions={{
-                  duration: 3000,
-                  style: {
-                    padding: "0",
-                  },
-                }}
-              />
-            </CardDisplaySettingsProvider>
-          </TVModeProvider>
-        </UnitPreferenceProvider>
+        <ConfigProvider>
+          <UnitPreferenceProvider>
+            <TVModeProvider>
+              <CardDisplaySettingsProvider>
+                <AppContent />
+                <Toaster
+                  position="bottom-center"
+                  toastOptions={{
+                    duration: 3000,
+                    style: {
+                      padding: "0",
+                    },
+                  }}
+                />
+              </CardDisplaySettingsProvider>
+            </TVModeProvider>
+          </UnitPreferenceProvider>
+        </ConfigProvider>
       </AuthProvider>
     </ThemeProvider>
   );

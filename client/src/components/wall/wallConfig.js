@@ -38,7 +38,6 @@ export const wallConfig = {
       if (item.date) parts.push(formatDate(item.date));
       return parts.join(" • ");
     },
-    getLinkPath: (item) => `/scene/${item.id}`,
     hasPreview: true,
   },
 
@@ -55,7 +54,6 @@ export const wallConfig = {
     },
     getTitle: (item) => item.title || "Untitled Gallery",
     getSubtitle: (item) => `${item.image_count || 0} images`,
-    getLinkPath: (item) => `/gallery/${item.id}`,
     hasPreview: false,
   },
 
@@ -70,7 +68,6 @@ export const wallConfig = {
     },
     getTitle: (item) => item.title || item.files?.[0]?.basename || "Untitled",
     getSubtitle: (item) => formatResolution(item.width, item.height),
-    getLinkPath: (item) => `/image/${item.id}`,
     hasPreview: false,
   },
 
@@ -98,7 +95,6 @@ export const wallConfig = {
       if (item.primaryTag?.name) parts.push(item.primaryTag.name);
       return parts.join(" • ");
     },
-    getLinkPath: (item) => `/scene/${item.sceneId}?t=${Math.floor(item.seconds)}`,
     hasPreview: true,
   },
 };

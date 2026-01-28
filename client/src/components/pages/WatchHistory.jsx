@@ -308,6 +308,7 @@ const WatchHistory = () => {
                     repeat: "none",
                     scenes: scenes.map((s, idx) => ({
                       sceneId: s.id,
+                      instanceId: s.instanceId,
                       scene: s,
                       position: idx,
                     })),

@@ -9,7 +9,9 @@ import { useNavigationState } from "../../hooks/useNavigationState.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
@@ -40,6 +42,12 @@ const StudioDetail = () => {
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("studio");
 
+  // Get multi-instance config
+  const { hasMultipleInstances } = useConfig();
+
+  // Get instance from URL query param for multi-stash support
+  const instanceId = searchParams.get("instance");
+
   // Include sub-studios toggle state (from URL param or default false)
   const includeSubStudios = searchParams.get("includeSubStudios") === "true";
 
@@ -67,7 +75,7 @@ const StudioDetail = () => {
     const fetchStudio = async () => {
       try {
         setIsLoading(true);
-        const studioData = await getStudio(studioId);
+        const studioData = await libraryApi.findStudioById(studioId, instanceId);
         setStudio(studioData);
         setRating(studioData.rating);
         setIsFavorite(studioData.favorite || false);
@@ -79,7 +87,7 @@ const StudioDetail = () => {
     };
 
     fetchStudio();
-  }, [studioId]);
+  }, [studioId, instanceId]);
 
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
@@ -194,7 +202,7 @@ const StudioDetail = () => {
         {/* Full Width Sections - Statistics, Parent Studio, Tags, Website */}
         <div className="space-y-6 mb-8">
           <StudioStats studio={studio} studioId={studioId} />
-          <StudioDetails studio={studio} settings={settings} />
+          <StudioDetails studio={studio} settings={settings} hasMultipleInstances={hasMultipleInstances} />
         </div>
 
         {/* Tabbed Content Section */}
@@ -496,7 +504,7 @@ const StudioStats = ({ studio, studioId: _studioId }) => { // eslint-disable-lin
 };
 
 // Studio Details Component
-const StudioDetails = ({ studio, settings }) => {
+const StudioDetails = ({ studio, settings, hasMultipleInstances }) => {
   const showDetails = settings?.showDescriptionOnDetail !== false;
 
   return (
@@ -542,7 +550,7 @@ const StudioDetails = ({ studio, settings }) => {
       {studio?.parent_studio?.id && (
         <Card title="Parent Studio">
           <Link
-            to={`/studio/${studio.parent_studio.id}`}
+            to={getEntityPath('studio', studio.parent_studio, hasMultipleInstances)}
             className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
             style={{
               backgroundColor: "var(--accent-primary)",
@@ -559,7 +567,7 @@ const StudioDetails = ({ studio, settings }) => {
             {studio.child_studios.map((child) => (
               <Link
                 key={child.id}
-                to={`/studio/${child.id}`}
+                to={getEntityPath('studio', child, hasMultipleInstances)}
                 className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
                 style={{
                   color: "var(--text-primary)" }}
@@ -689,10 +697,6 @@ const ImagesTab = ({ studioId, studioName, includeSubStudios = false }) => {
       className="mt-6"
     />
   );
-};
-
-const getStudio = async (id) => {
-  return await libraryApi.findStudioById(id);
 };
 
 export default StudioDetail;

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PlayCircle } from "lucide-react";
 import { useAllWatchHistory } from "../../hooks/useWatchHistory.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
 import SceneCarousel from "./SceneCarousel.jsx";
 
@@ -15,6 +17,7 @@ const ContinueWatchingCarousel = ({
   onInitializing,
 }) => {
   const navigate = useNavigate();
+  const { hasMultipleInstances } = useConfig();
   const {
     data: watchHistoryList,
     loading: loadingHistory,
@@ -132,7 +135,7 @@ const ContinueWatchingCarousel = ({
   const handleSceneClick = (scene) => {
     const currentIndex = scenes.findIndex((s) => s.id === scene.id);
 
-    navigate(`/scene/${scene.id}`, {
+    navigate(getEntityPath('scene', scene, hasMultipleInstances), {
       state: {
         scene,
         fromPageTitle: "Home",
@@ -144,6 +147,7 @@ const ContinueWatchingCarousel = ({
           repeat: "none",
           scenes: scenes.map((s, idx) => ({
             sceneId: s.id,
+            instanceId: s.instanceId,
             scene: s,
             position: idx,
           })),

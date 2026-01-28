@@ -26,6 +26,27 @@ airplay(videojs);
 chromecast(videojs);
 
 /**
+ * Build video stream URL with optional instanceId for multi-instance support
+ * @param {string} sceneId - Scene ID
+ * @param {string} path - Stream path (e.g., "stream", "stream.m3u8", "proxy-stream/stream.m3u8")
+ * @param {string|null} instanceId - Optional instance ID for disambiguation
+ * @param {Object} params - Additional query parameters
+ * @returns {string} Full URL with instanceId if provided
+ */
+function buildStreamUrl(sceneId, path, instanceId, params = {}) {
+  const url = new URL(`/api/scene/${sceneId}/${path}`, window.location.origin);
+  if (instanceId) {
+    url.searchParams.set('instanceId', instanceId);
+  }
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      url.searchParams.set(key, value);
+    }
+  });
+  return url.pathname + url.search;
+}
+
+/**
  * Retry a function with exponential backoff
  * @param {Function} fn - Async function to retry
  * @param {number} maxAttempts - Maximum number of attempts (default: 3)
@@ -412,7 +433,7 @@ export function useVideoPlayer({
         '360p': 'LOW',
       };
       const resolution = qualityToResolution[bestQuality] || 'STANDARD_HD';
-      const hlsUrl = `/api/scene/${scene.id}/proxy-stream/stream.m3u8?resolution=${resolution}`;
+      const hlsUrl = buildStreamUrl(scene.id, 'proxy-stream/stream.m3u8', scene.instanceId, { resolution });
 
       console.log(`[AUTO-FALLBACK] Trying next source: '${bestQuality} Transcode'`);
 
@@ -517,7 +538,11 @@ export function useVideoPlayer({
           url.searchParams.delete('apikey');
           url.searchParams.delete('ApiKey');
           url.searchParams.delete('APIKEY');
-          const queryString = url.search; // "?resolution=STANDARD_HD" or "" (without apikey)
+          // Add instanceId for multi-instance support
+          if (scene.instanceId) {
+            url.searchParams.set('instanceId', scene.instanceId);
+          }
+          const queryString = url.search; // "?resolution=STANDARD_HD&instanceId=..." or ""
 
           // Rewrite to Peek's proxy endpoint
           const proxiedUrl = `/api/scene/${scene.id}/proxy-stream/${streamPath}${queryString}`;
@@ -538,8 +563,9 @@ export function useVideoPlayer({
       console.warn('[VideoPlayer] No sceneStreams available, falling back to legacy Direct stream');
       // Fallback: Use legacy Direct stream if sceneStreams not available
       // This maintains backward compatibility during transition
+      const directUrl = buildStreamUrl(scene.id, 'stream', scene.instanceId);
       sources.push({
-        src: `/api/scene/${scene.id}/stream`,
+        src: directUrl,
         label: "Direct",
       });
     }

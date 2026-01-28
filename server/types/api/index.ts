@@ -15,6 +15,7 @@ export type {
   ApiErrorResponse,
   ApiSuccessResponse,
   CacheNotReadyResponse,
+  AmbiguousLookupResponse,
 } from "./common.js";
 
 // Express typed helpers

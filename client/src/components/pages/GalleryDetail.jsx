@@ -6,9 +6,11 @@ import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { usePaginatedLightbox } from "../../hooks/usePaginatedLightbox.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
 import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
 import {
   Button,
@@ -43,6 +45,12 @@ const GalleryDetail = () => {
   // Card display settings
   const { getSettings } = useCardDisplaySettings();
   const settings = getSettings("gallery");
+
+  // Get multi-instance config
+  const { hasMultipleInstances } = useConfig();
+
+  // Get instance from URL query param for multi-stash support
+  const instanceId = searchParams.get("instance");
 
   // Get active tab from URL or default to 'images'
   const activeTab = searchParams.get('tab') || 'images';
@@ -86,7 +94,7 @@ const GalleryDetail = () => {
     const fetchGallery = async () => {
       try {
         setIsLoading(true);
-        const galleryData = await libraryApi.findGalleryById(galleryId);
+        const galleryData = await libraryApi.findGalleryById(galleryId, instanceId);
         setGallery(galleryData);
         setRating(galleryData.rating);
         setIsFavorite(galleryData.favorite || false);
@@ -98,7 +106,7 @@ const GalleryDetail = () => {
     };
 
     fetchGallery();
-  }, [galleryId]);
+  }, [galleryId, instanceId]);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -221,7 +229,7 @@ const GalleryDetail = () => {
                 {gallery.studio && (
                   <>
                     <Link
-                      to={`/studio/${gallery.studio.id}`}
+                      to={getEntityPath('studio', gallery.studio, hasMultipleInstances)}
                       className="hover:underline"
                       style={{ color: "var(--accent-primary)" }}
                     >
@@ -296,7 +304,7 @@ const GalleryDetail = () => {
                 {gallery.performers.map((performer) => (
                   <Link
                     key={performer.id}
-                    to={`/performer/${performer.id}`}
+                    to={getEntityPath('performer', performer, hasMultipleInstances)}
                     className="flex flex-col items-center flex-shrink-0 group w-[120px]"
                   >
                     <div

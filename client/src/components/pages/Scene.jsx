@@ -160,6 +160,7 @@ const SceneContent = () => {
             </Button>
             <ExternalPlayerButton
               sceneId={scene?.id}
+              instanceId={scene?.instanceId}
               title={displayTitle}
             />
             <ViewInStashButton stashUrl={scene?.stashUrl} size={20} />
@@ -285,6 +286,10 @@ const Scene = () => {
   const { sceneId } = useParams();
   const location = useLocation();
 
+  // Extract instance ID from URL query params for multi-instance support
+  const searchParams = new URLSearchParams(location.search);
+  const instanceId = searchParams.get('instance');
+
   // Capture location state in a ref to preserve it across re-renders
   // React Router sometimes loses state on initial render, so we store it once it arrives
   const locationStateRef = useRef(null);
@@ -363,6 +368,7 @@ const Scene = () => {
   return (
     <ScenePlayerProvider
       sceneId={sceneId}
+      instanceId={instanceId}
       playlist={playlist}
       shouldResume={shouldResume}
       compatibility={compatibility}

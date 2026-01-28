@@ -42,10 +42,6 @@ describe("wallConfig", () => {
       expect(subtitle).toContain("Studio Name");
     });
 
-    it("returns correct link path", () => {
-      expect(config.getLinkPath({ id: "123" })).toBe("/scene/123");
-    });
-
     it("has preview enabled", () => {
       expect(config.hasPreview).toBe(true);
     });
@@ -114,10 +110,6 @@ describe("wallConfig", () => {
       expect(config.getSubtitle({})).toBe("0 images");
     });
 
-    it("returns correct link path", () => {
-      expect(config.getLinkPath({ id: "456" })).toBe("/gallery/456");
-    });
-
     it("has preview disabled", () => {
       expect(config.hasPreview).toBe(false);
     });
@@ -159,10 +151,6 @@ describe("wallConfig", () => {
 
     it("returns null subtitle when no dimensions", () => {
       expect(config.getSubtitle({})).toBeNull();
-    });
-
-    it("returns correct link path", () => {
-      expect(config.getLinkPath({ id: "789" })).toBe("/image/789");
     });
 
     it("has preview disabled", () => {

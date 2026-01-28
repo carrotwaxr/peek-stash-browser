@@ -4,6 +4,8 @@ import { BaseCard } from "../ui/BaseCard.jsx";
 import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * StudioCard - Card for displaying studio entities
@@ -13,26 +15,27 @@ const StudioCard = forwardRef(
     const navigate = useNavigate();
     const { getSettings } = useCardDisplaySettings();
     const studioSettings = getSettings("studio");
+    const { hasMultipleInstances } = useConfig();
 
     const indicators = useMemo(() => {
       const tagsTooltip = getIndicatorBehavior('studio', 'tags') === 'rich' &&
         studio.tags?.length > 0 && (
-          <TooltipEntityGrid entityType="tag" entities={studio.tags} title="Tags" />
+          <TooltipEntityGrid entityType="tag" entities={studio.tags} title="Tags" parentInstanceId={studio.instanceId} />
         );
 
       const performersTooltip = getIndicatorBehavior('studio', 'performers') === 'rich' &&
         studio.performers?.length > 0 && (
-          <TooltipEntityGrid entityType="performer" entities={studio.performers} title="Performers" />
+          <TooltipEntityGrid entityType="performer" entities={studio.performers} title="Performers" parentInstanceId={studio.instanceId} />
         );
 
       const groupsTooltip = getIndicatorBehavior('studio', 'groups') === 'rich' &&
         studio.groups?.length > 0 && (
-          <TooltipEntityGrid entityType="group" entities={studio.groups} title="Collections" />
+          <TooltipEntityGrid entityType="group" entities={studio.groups} title="Collections" parentInstanceId={studio.instanceId} />
         );
 
       const galleriesTooltip = getIndicatorBehavior('studio', 'galleries') === 'rich' &&
         studio.galleries?.length > 0 && (
-          <TooltipEntityGrid entityType="gallery" entities={studio.galleries} title="Galleries" />
+          <TooltipEntityGrid entityType="gallery" entities={studio.galleries} title="Galleries" parentInstanceId={studio.instanceId} />
         );
 
       return [
@@ -86,7 +89,7 @@ const StudioCard = forwardRef(
         imagePath={studio.image_path}
         title={studio.name}
         description={studio.details}
-        linkTo={`/studio/${studio.id}`}
+        linkTo={getEntityPath('studio', studio, hasMultipleInstances)}
         fromPageTitle={fromPageTitle}
         tabIndex={tabIndex}
         indicators={indicatorsToShow}

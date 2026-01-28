@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRelativeTime } from "../../utils/date.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import {
   SceneDescription,
   SceneMetadata,
@@ -32,6 +34,7 @@ const SceneListItem = ({
   showSessionOIndicator = false, // Show if O was clicked in the last session
 }) => {
   const navigate = useNavigate();
+  const { hasMultipleInstances } = useConfig();
 
   // Track if viewport is mobile-width for scroll-based preview autoplay
   // Uses md breakpoint (768px) since list items stack vertically below this
@@ -124,7 +127,7 @@ const SceneListItem = ({
         }
       }
 
-      navigate(`/scene/${scene.id}`, { state: linkState });
+      navigate(getEntityPath('scene', scene, hasMultipleInstances), { state: linkState });
     }
   };
 

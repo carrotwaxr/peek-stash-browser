@@ -52,7 +52,7 @@ export async function updateSceneRating(
   try {
     const userId = req.user?.id;
     const { sceneId } = req.params;
-    const { rating, favorite } = req.body;
+    const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -77,12 +77,15 @@ export async function updateSceneRating(
     }
 
     // Get user sync settings and scene instanceId
+    // If instanceId is provided in request, use it directly; otherwise look up from DB
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('scene', sceneId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('scene', sceneId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -150,7 +153,7 @@ export async function updatePerformerRating(
   try {
     const userId = req.user?.id;
     const { performerId } = req.params;
-    const { rating, favorite } = req.body;
+    const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -175,12 +178,15 @@ export async function updatePerformerRating(
     }
 
     // Get user sync settings and performer instanceId
+    // If instanceId is provided in request, use it directly; otherwise look up from DB
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('performer', performerId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('performer', performerId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -254,7 +260,7 @@ export async function updateStudioRating(
   try {
     const userId = req.user?.id;
     const { studioId } = req.params;
-    const { rating, favorite } = req.body;
+    const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -279,12 +285,15 @@ export async function updateStudioRating(
     }
 
     // Get user sync settings and studio instanceId
+    // If instanceId is provided in request, use it directly; otherwise look up from DB
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('studio', studioId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('studio', studioId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -358,7 +367,7 @@ export async function updateTagRating(
   try {
     const userId = req.user?.id;
     const { tagId } = req.params;
-    const { rating, favorite } = req.body;
+    const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -383,12 +392,15 @@ export async function updateTagRating(
     }
 
     // Get user sync settings and tag instanceId
+    // If instanceId is provided in request, use it directly; otherwise look up from DB
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('tag', tagId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('tag', tagId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -455,7 +467,7 @@ export async function updateGalleryRating(
   try {
     const userId = req.user?.id;
     const { galleryId } = req.params;
-    const { rating, favorite } = req.body;
+    const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -480,12 +492,15 @@ export async function updateGalleryRating(
     }
 
     // Get user sync settings and gallery instanceId
+    // If instanceId is provided in request, use it directly; otherwise look up from DB
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('gallery', galleryId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('gallery', galleryId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -557,7 +572,7 @@ export async function updateGroupRating(
   try {
     const userId = req.user?.id;
     const { groupId } = req.params;
-    const { rating, favorite } = req.body;
+    const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -582,12 +597,15 @@ export async function updateGroupRating(
     }
 
     // Get user sync settings and group instanceId
+    // If instanceId is provided in request, use it directly; otherwise look up from DB
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('group', groupId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('group', groupId),
     ]);
 
     // Upsert rating record in Peek DB
@@ -654,7 +672,7 @@ export async function updateImageRating(
   try {
     const userId = req.user?.id;
     const { imageId } = req.params;
-    const { rating, favorite } = req.body;
+    const { rating, favorite, instanceId: requestInstanceId } = req.body;
 
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
@@ -679,12 +697,15 @@ export async function updateImageRating(
     }
 
     // Get user sync settings and image instanceId
+    // If instanceId is provided in request, use it directly; otherwise look up from DB
     const [user, instanceId] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { syncToStash: true },
       }),
-      getEntityInstanceId('image', imageId),
+      requestInstanceId
+        ? Promise.resolve(requestInstanceId)
+        : getEntityInstanceId('image', imageId),
     ]);
 
     // Upsert rating record in Peek DB

@@ -40,6 +40,21 @@ export interface ApiErrorResponse {
 }
 
 /**
+ * Ambiguous lookup response (400)
+ * Returned when a single-ID lookup matches entities in multiple Stash instances
+ */
+export interface AmbiguousLookupResponse {
+  error: "Ambiguous lookup";
+  message: string;
+  matches: Array<{
+    id: string;
+    name?: string | null;
+    title?: string | null;
+    instanceId: string;
+  }>;
+}
+
+/**
  * Standard success response with optional message
  */
 export interface ApiSuccessResponse {

@@ -13,6 +13,7 @@
  * Common request body for all rating updates
  */
 export interface UpdateRatingRequest {
+  /** Optional Stash instance ID - for multi-instance disambiguation when the same entity ID exists in multiple instances */
   instanceId?: string;
   rating?: number | null;
   favorite?: boolean;

@@ -1,9 +1,12 @@
 import { Link } from "react-router-dom";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 /**
  * Renders a list of tag chips, sorted alphabetically
  */
 const TagChips = ({ tags }) => {
+  const { hasMultipleInstances } = useConfig();
   if (!tags || tags.length === 0) return null;
 
   // Filter out invalid tags and sort alphabetically by name (case-insensitive)
@@ -22,7 +25,7 @@ const TagChips = ({ tags }) => {
         return (
           <Link
             key={tag.id}
-            to={`/tag/${tag.id}`}
+            to={getEntityPath('tag', tag, hasMultipleInstances)}
             className="px-3 py-1 rounded-full text-sm font-medium transition-opacity hover:opacity-80"
             style={{
               backgroundColor: `hsl(${hue}, 70%, 45%)`,

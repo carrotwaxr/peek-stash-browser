@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { useWallPlayback } from "../../hooks/useWallPlayback.js";
 import { useTableColumns } from "../../hooks/useTableColumns.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getScenePathWithTime } from "../../utils/entityLinks.js";
 import { getClips } from "../../services/api.js";
 import {
   ErrorMessage,
@@ -37,6 +39,7 @@ const ClipSearch = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { hasMultipleInstances } = useConfig();
 
   const { data, isLoading, error, execute } = useCancellableQuery();
 
@@ -121,7 +124,7 @@ const ClipSearch = ({
   );
 
   const handleClipClick = (clip) => {
-    navigate(`/scene/${clip.sceneId}?t=${Math.floor(clip.seconds)}`, {
+    navigate(getScenePathWithTime({ id: clip.sceneId, instanceId: clip.instanceId }, clip.seconds, hasMultipleInstances), {
       state: { fromPageTitle, shouldAutoplay: true },
     });
   };

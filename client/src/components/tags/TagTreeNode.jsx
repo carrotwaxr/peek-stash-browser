@@ -7,6 +7,8 @@ import {
   Droplets,
 } from "lucide-react";
 import { ENTITY_ICONS } from "../../constants/entityIcons.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 
 // Color utilities matching CardCountIndicators
 const hueify = (color, direction = "lighter", amount = 12) => {
@@ -63,6 +65,7 @@ const TagTreeNode = forwardRef(
     ref
   ) => {
     const navigate = useNavigate();
+    const { hasMultipleInstances } = useConfig();
     const hasChildren = tag.children && tag.children.length > 0;
     const isFocused = focusedId === tag.id;
 
@@ -80,27 +83,27 @@ const TagTreeNode = forwardRef(
     const handleDoubleClick = useCallback(
       (e) => {
         e.stopPropagation();
-        navigate(`/tag/${tag.id}`, { state: { fromPageTitle: "Tags" } });
+        navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
       },
-      [navigate, tag.id]
+      [navigate, tag, hasMultipleInstances]
     );
 
     const handleNavigateClick = useCallback(
       (e) => {
         e.stopPropagation();
-        navigate(`/tag/${tag.id}`, { state: { fromPageTitle: "Tags" } });
+        navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
       },
-      [navigate, tag.id]
+      [navigate, tag, hasMultipleInstances]
     );
 
     const handleKeyDown = useCallback(
       (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          navigate(`/tag/${tag.id}`, { state: { fromPageTitle: "Tags" } });
+          navigate(getEntityPath('tag', tag, hasMultipleInstances), { state: { fromPageTitle: "Tags" } });
         }
       },
-      [navigate, tag.id]
+      [navigate, tag, hasMultipleInstances]
     );
 
     // Subtitle: child count or nothing

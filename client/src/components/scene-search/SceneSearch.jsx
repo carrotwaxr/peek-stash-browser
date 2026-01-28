@@ -5,6 +5,8 @@ import { useGridPageTVNavigation } from "../../hooks/useGridPageTVNavigation.js"
 import { useCancellableQuery } from "../../hooks/useCancellableQuery.js";
 import { useTableColumns } from "../../hooks/useTableColumns.js";
 import { useWallPlayback } from "../../hooks/useWallPlayback.js";
+import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
 import {
   SceneCard,
@@ -64,6 +66,7 @@ const SceneSearch = ({
 }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { hasMultipleInstances } = useConfig();
 
   const columns = useGridColumns("scenes");
   const { wallPlayback, updateWallPlayback } = useWallPlayback();
@@ -179,6 +182,7 @@ const SceneSearch = ({
         repeat: "none",
         scenes: currentScenes.map((s, idx) => ({
           sceneId: s.id,
+          instanceId: s.instanceId,
           scene: s,
           position: idx,
         })),
@@ -191,7 +195,7 @@ const SceneSearch = ({
       navigationState.fromPageTitle = fromPageTitle;
     }
 
-    navigate(`/scene/${scene.id}`, { state: navigationState });
+    navigate(getEntityPath('scene', scene, hasMultipleInstances), { state: navigationState });
     return true; // Prevent fallback navigation in SceneCard
   };
 
