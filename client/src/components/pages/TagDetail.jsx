@@ -88,7 +88,7 @@ const TagDetail = () => {
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("tag", tagId, newRating);
+      await libraryApi.updateRating("tag", tagId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating(tag.rating);
@@ -98,7 +98,7 @@ const TagDetail = () => {
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("tag", tagId, newValue);
+      await libraryApi.updateFavorite("tag", tagId, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite(tag.favorite || false);

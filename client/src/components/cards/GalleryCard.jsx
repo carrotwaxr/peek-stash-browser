@@ -119,6 +119,7 @@ const GalleryCard = forwardRef(
         displayPreferences={{ showDescription: gallerySettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: gallery.id,
+          instanceId: gallery.instanceId,
           initialRating: gallery.rating100,
           initialFavorite: gallery.favorite || false,
           onHideSuccess,

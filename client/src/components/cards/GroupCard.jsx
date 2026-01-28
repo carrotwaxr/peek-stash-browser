@@ -101,6 +101,7 @@ const GroupCard = forwardRef(
         displayPreferences={{ showDescription: groupSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: group.id,
+          instanceId: group.instanceId,
           initialRating: group.rating100,
           initialFavorite: group.favorite || false,
           onHideSuccess,

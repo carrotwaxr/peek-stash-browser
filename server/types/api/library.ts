@@ -300,6 +300,7 @@ export interface GetGalleryImagesQuery
   extends Record<string, string | undefined> {
   page?: string;
   per_page?: string;
+  instance?: string;
 }
 
 /**

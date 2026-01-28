@@ -499,6 +499,9 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
  * Card rating and favorite row - uses compact height when only menu is visible
  * Shows rating badge (left), O counter (center-right), and favorite button (right)
  * O Counter is interactive for scenes and images, display-only for other entities
+ * @param {string} entityType - Type of entity (scene, performer, etc.)
+ * @param {string} entityId - Entity ID
+ * @param {string|null} instanceId - Stash instance ID for multi-instance support
  * @param {Function} onHideSuccess - Callback when entity is successfully hidden (for parent to update state)
  * @param {Function} onOCounterChange - Callback when O counter changes (for parent to update state)
  * @param {Function} onRatingChange - Callback when rating changes (for parent to update state)
@@ -511,6 +514,7 @@ export const CardMenuRow = ({ entityType, entityId, entityTitle, onHideSuccess }
 export const CardRatingRow = ({
   entityType,
   entityId,
+  instanceId = null,
   initialRating,
   initialFavorite,
   initialOCounter,
@@ -549,7 +553,7 @@ export const CardRatingRow = ({
   const handleRatingSave = async (newRating) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating(entityType, entityId, newRating);
+      await libraryApi.updateRating(entityType, entityId, newRating, instanceId);
       // Notify parent of the change
       onRatingChange?.(entityId, newRating);
     } catch (error) {
@@ -561,7 +565,7 @@ export const CardRatingRow = ({
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite(entityType, entityId, newValue);
+      await libraryApi.updateFavorite(entityType, entityId, newValue, instanceId);
       // Notify parent of the change
       onFavoriteChange?.(entityId, newValue);
     } catch (error) {

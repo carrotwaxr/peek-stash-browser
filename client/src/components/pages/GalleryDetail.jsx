@@ -74,9 +74,10 @@ const GalleryDetail = () => {
     const data = await libraryApi.getGalleryImages(galleryId, {
       page,
       per_page: PER_PAGE,
+      instanceId,
     });
     return { images: data.images || [] };
-  }, [galleryId]);
+  }, [galleryId, instanceId]);
 
   // Paginated lightbox state and handlers
   const lightbox = usePaginatedLightbox({
@@ -115,6 +116,7 @@ const GalleryDetail = () => {
         const data = await libraryApi.getGalleryImages(galleryId, {
           page: lightbox.currentPage,
           per_page: PER_PAGE,
+          instanceId,
         });
         setImages(data.images || []);
         setTotalCount(data.pagination?.total || data.images?.length || 0);
@@ -130,12 +132,12 @@ const GalleryDetail = () => {
 
     fetchImages();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryId, lightbox.currentPage]);
+  }, [galleryId, instanceId, lightbox.currentPage]);
 
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("gallery", galleryId, newRating);
+      await libraryApi.updateRating("gallery", galleryId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating(gallery.rating);
@@ -145,7 +147,7 @@ const GalleryDetail = () => {
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("gallery", galleryId, newValue);
+      await libraryApi.updateFavorite("gallery", galleryId, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite(gallery.favorite || false);

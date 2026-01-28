@@ -96,6 +96,7 @@ const StudioCard = forwardRef(
         displayPreferences={{ showDescription: studioSettings.showDescriptionOnCard }}
         ratingControlsProps={{
           entityId: studio.id,
+          instanceId: studio.instanceId,
           initialRating: studio.rating100,
           initialFavorite: studio.favorite || false,
           initialOCounter: studio.o_counter,

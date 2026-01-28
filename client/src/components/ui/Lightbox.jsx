@@ -206,7 +206,7 @@ const Lightbox = ({
       }
 
       try {
-        await libraryApi.updateRating("image", currentImage.id, newRating);
+        await libraryApi.updateRating("image", currentImage.id, newRating, currentImage.instanceId);
       } catch (error) {
         console.error("Failed to update image rating:", error);
         // Revert on error
@@ -241,7 +241,7 @@ const Lightbox = ({
       }
 
       try {
-        await libraryApi.updateFavorite("image", currentImage.id, newFavorite);
+        await libraryApi.updateFavorite("image", currentImage.id, newFavorite, currentImage.instanceId);
       } catch (error) {
         console.error("Failed to update image favorite:", error);
         // Revert on error

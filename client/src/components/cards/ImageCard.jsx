@@ -152,6 +152,7 @@ const ImageCard = forwardRef(
           image.rating100 !== undefined || image.favorite !== undefined || image.oCounter !== undefined
             ? {
                 entityId: image.id,
+                instanceId: image.instanceId,
                 initialRating: image.rating100,
                 initialFavorite: image.favorite || false,
                 initialOCounter: image.oCounter ?? 0,

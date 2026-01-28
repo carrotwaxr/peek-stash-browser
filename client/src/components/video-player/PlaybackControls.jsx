@@ -57,7 +57,7 @@ const PlaybackControls = () => {
     setRating(newRating);
 
     try {
-      await libraryApi.updateRating("scene", scene.id, newRating);
+      await libraryApi.updateRating("scene", scene.id, newRating, scene.instanceId);
     } catch (error) {
       console.error("Failed to update scene rating:", error);
       setRating(previousRating);
@@ -72,7 +72,7 @@ const PlaybackControls = () => {
     setIsFavorite(newFavorite);
 
     try {
-      await libraryApi.updateFavorite("scene", scene.id, newFavorite);
+      await libraryApi.updateFavorite("scene", scene.id, newFavorite, scene.instanceId);
     } catch (error) {
       console.error("Failed to update scene favorite:", error);
       setIsFavorite(previousFavorite);

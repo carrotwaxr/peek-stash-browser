@@ -70,7 +70,7 @@ const GroupDetail = () => {
   const handleRatingChange = async (newRating) => {
     setRating(newRating);
     try {
-      await libraryApi.updateRating("group", groupId, newRating);
+      await libraryApi.updateRating("group", groupId, newRating, instanceId);
     } catch (error) {
       console.error("Failed to update rating:", error);
       setRating(group.rating);
@@ -80,7 +80,7 @@ const GroupDetail = () => {
   const handleFavoriteChange = async (newValue) => {
     setIsFavorite(newValue);
     try {
-      await libraryApi.updateFavorite("group", groupId, newValue);
+      await libraryApi.updateFavorite("group", groupId, newValue, instanceId);
     } catch (error) {
       console.error("Failed to update favorite:", error);
       setIsFavorite(group.favorite || false);
