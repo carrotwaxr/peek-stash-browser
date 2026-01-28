@@ -23,6 +23,7 @@ const ScenePlayerContext = createContext(null);
 export function ScenePlayerProvider({
   children,
   sceneId,
+  instanceId = null,
   playlist = null,
   shouldResume = false,
   compatibility = null,
@@ -50,12 +51,17 @@ export function ScenePlayerProvider({
   // ACTION CREATORS (with side effects)
   // ============================================================================
 
-  const loadScene = useCallback(async (sceneIdToLoad) => {
+  const loadScene = useCallback(async (sceneIdToLoad, sceneInstanceId) => {
     dispatch({ type: "LOAD_SCENE_START" });
     try {
-      const response = await api.post("/library/scenes", {
+      const requestBody = {
         ids: [sceneIdToLoad],
-      });
+      };
+      // Include instance_id for disambiguation when multiple instances exist
+      if (sceneInstanceId) {
+        requestBody.scene_filter = { instance_id: sceneInstanceId };
+      }
+      const response = await api.post("/library/scenes", requestBody);
       const scene = response.data?.findScenes?.scenes?.[0];
 
       if (!scene) {
@@ -127,14 +133,15 @@ export function ScenePlayerProvider({
 
   // Load scene when sceneId or currentIndex changes
   useEffect(() => {
-    const effectiveSceneId = state.playlist
-      ? state.playlist.scenes[state.currentIndex]?.sceneId
-      : sceneId;
+    const playlistScene = state.playlist?.scenes?.[state.currentIndex];
+    const effectiveSceneId = playlistScene?.sceneId || sceneId;
+    // For playlists, get instanceId from playlist entry; otherwise use prop
+    const effectiveInstanceId = playlistScene?.instanceId || instanceId;
 
     if (effectiveSceneId) {
-      loadScene(effectiveSceneId);
+      loadScene(effectiveSceneId, effectiveInstanceId);
     }
-  }, [sceneId, state.currentIndex, state.playlist, loadScene]);
+  }, [sceneId, instanceId, state.currentIndex, state.playlist, loadScene]);
 
   // Update URL when navigating playlist (without React Router navigation)
   useEffect(() => {
