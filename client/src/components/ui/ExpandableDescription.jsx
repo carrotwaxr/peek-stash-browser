@@ -12,7 +12,7 @@ import { useTruncationDetection } from "../../hooks/useTruncationDetection";
  * - This ensures "more" appears at the end of the text regardless of line count
  */
 export const ExpandableDescription = ({ description, maxLines = 3 }) => {
-  const [ref, isTruncated] = useTruncationDetection();
+  const [ref] = useTruncationDetection();
   const [isExpanded, setIsExpanded] = useState(false);
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0 });
 
@@ -64,20 +64,10 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
           2. Text flows around it naturally
           3. "more" button positioned over the spacer
         */}
-        {isTruncated && (
-          <span
-            style={{
-              float: "right",
-              width: "4rem",
-              height: descriptionHeight,
-              // Shape-outside creates space only on the last line
-              shapeOutside: `inset(calc(${descriptionHeight} - 1.5rem) 0 0 0)`,
-            }}
-          />
-        )}
         <p
           ref={ref}
           className="card-description leading-relaxed m-0"
+          onClick={handleMoreClick}
           style={{
             color: "var(--text-muted)",
             display: "-webkit-box",
@@ -88,31 +78,11 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
         >
           {description}
         </p>
-        {isTruncated && (
-          <button
-            onClick={handleMoreClick}
-            className="absolute card-description hover:underline"
-            style={{
-              color: "var(--accent-primary)",
-              backgroundColor: "var(--bg-card)",
-              bottom: 0,
-              right: 0,
-              paddingLeft: "0.5rem",
-              // Gradient fade from transparent to bg-card for smooth transition
-              background: "linear-gradient(to right, transparent, var(--bg-card) 30%)",
-            }}
-          >
-            ...more
-          </button>
-        )}
       </div>
 
       {isExpanded &&
         createPortal(
-          <div
-            className="fixed inset-0 z-[9998]"
-            onClick={handleBackdropClick}
-          >
+          <div className="fixed inset-0 z-[9998]" onClick={handleBackdropClick}>
             <div
               className="fixed z-[9999] px-4 py-3 text-sm rounded-lg shadow-xl max-w-[80%] lg:max-w-[60%] max-h-[60vh] overflow-y-auto"
               style={{
