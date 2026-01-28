@@ -12,6 +12,7 @@ export interface ClipQueryOptions {
   performerIds?: string[];
   studioId?: string;
   q?: string;
+  randomSeed?: number; // Seed for consistent random ordering
 }
 
 /**

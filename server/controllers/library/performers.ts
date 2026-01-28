@@ -25,6 +25,7 @@ import type {
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
+import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -152,11 +153,14 @@ export const findPerformers = async (
     const requestingUser = req.user;
     const { filter, performer_filter, ids } = req.body;
 
-    const sortField = filter?.sort || "name";
+    const sortFieldRaw = filter?.sort || "name";
     const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
+
+    // Parse random sort to extract seed for consistent pagination
+    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
 
     // Merge root-level ids with performer_filter
     const normalizedIds = ids
@@ -187,6 +191,7 @@ export const findPerformers = async (
       page,
       perPage,
       searchQuery,
+      randomSeed,
     });
 
     // Check for ambiguous results on single-ID lookups

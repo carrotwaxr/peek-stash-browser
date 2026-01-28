@@ -27,6 +27,7 @@ export interface GalleryQueryOptions {
   perPage: number;
   searchQuery?: string;
   allowedInstanceIds?: string[];
+  randomSeed?: number; // Seed for consistent random ordering
 }
 
 // Query result
@@ -464,8 +465,9 @@ class GalleryQueryBuilder {
   /**
    * Build ORDER BY clause
    */
-  private buildSortClause(sort: string, direction: "ASC" | "DESC"): string {
+  private buildSortClause(sort: string, direction: "ASC" | "DESC", randomSeed?: number): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
+    const seed = randomSeed || 12345;
 
     // Extract folder name from path: '/images/My Gallery' -> 'My Gallery'
     const folderNameExpr = `REPLACE(REPLACE(g.folderPath, RTRIM(g.folderPath, REPLACE(g.folderPath, '/', '')), ''), '/', '')`;
@@ -486,8 +488,8 @@ class GalleryQueryBuilder {
       rating: `COALESCE(r.rating, 0) ${dir}`,
       rating100: `COALESCE(r.rating, 0) ${dir}`,
 
-      // Random
-      random: `RANDOM() ${dir}`,
+      // Random - seeded formula matching Stash's algorithm, prevents SQLite integer overflow
+      random: `(((((g.id + ${seed}) % 2147483647) * ((g.id + ${seed}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((g.id + ${seed}) * 1047483763 % 2147483647)) % 2147483647) ${dir}`,
     };
 
     const sortExpr = sortMap[sort] || sortMap["title"];
@@ -501,7 +503,7 @@ class GalleryQueryBuilder {
 
   async execute(options: GalleryQueryOptions): Promise<GalleryQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds } = options;
+    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, randomSeed } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -618,7 +620,7 @@ class GalleryQueryBuilder {
     const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build sort clause
-    const sortClause = this.buildSortClause(options.sort, options.sortDirection);
+    const sortClause = this.buildSortClause(options.sort, options.sortDirection, randomSeed);
 
     // Build full query
     const offset = (page - 1) * perPage;

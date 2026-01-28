@@ -27,6 +27,7 @@ export interface TagQueryOptions {
   perPage: number;
   searchQuery?: string;
   allowedInstanceIds?: string[];
+  randomSeed?: number; // Seed for consistent random ordering
 }
 
 // Query result
@@ -448,8 +449,9 @@ class TagQueryBuilder {
   /**
    * Build ORDER BY clause
    */
-  private buildSortClause(sort: string, direction: "ASC" | "DESC"): string {
+  private buildSortClause(sort: string, direction: "ASC" | "DESC", randomSeed?: number): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
+    const seed = randomSeed || 12345;
 
     const sortMap: Record<string, string> = {
       // Tag metadata - use COLLATE NOCASE for case-insensitive sorting
@@ -475,8 +477,8 @@ class TagQueryBuilder {
       o_counter: `COALESCE(us.oCounter, 0) ${dir}`,
       play_count: `COALESCE(us.playCount, 0) ${dir}`,
 
-      // Random
-      random: `RANDOM() ${dir}`,
+      // Random - seeded formula matching Stash's algorithm, prevents SQLite integer overflow
+      random: `(((((t.id + ${seed}) % 2147483647) * ((t.id + ${seed}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((t.id + ${seed}) * 1047483763 % 2147483647)) % 2147483647) ${dir}`,
     };
 
     const sortExpr = sortMap[sort] || sortMap["name"];
@@ -490,7 +492,7 @@ class TagQueryBuilder {
 
   async execute(options: TagQueryOptions): Promise<TagQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds } = options;
+    const { userId, page, perPage, applyExclusions = true, filters, searchQuery, allowedInstanceIds, randomSeed } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -631,7 +633,7 @@ class TagQueryBuilder {
     const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build sort clause
-    const sortClause = this.buildSortClause(options.sort, options.sortDirection);
+    const sortClause = this.buildSortClause(options.sort, options.sortDirection, randomSeed);
 
     // Build full query
     const offset = (page - 1) * perPage;

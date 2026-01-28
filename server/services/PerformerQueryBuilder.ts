@@ -28,6 +28,7 @@ export interface PerformerQueryOptions {
   page: number;
   perPage: number;
   searchQuery?: string;
+  randomSeed?: number; // Seed for consistent random ordering
 }
 
 // Query result
@@ -621,8 +622,9 @@ class PerformerQueryBuilder {
   /**
    * Build ORDER BY clause
    */
-  private buildSortClause(sort: string, direction: "ASC" | "DESC"): string {
+  private buildSortClause(sort: string, direction: "ASC" | "DESC", randomSeed?: number): string {
     const dir = direction === "ASC" ? "ASC" : "DESC";
+    const seed = randomSeed || 12345;
 
     const sortMap: Record<string, string> = {
       // Performer metadata - use COLLATE NOCASE for case-insensitive sorting
@@ -649,8 +651,8 @@ class PerformerQueryBuilder {
       last_played_at: `s.lastPlayedAt ${dir}`,
       last_o_at: `s.lastOAt ${dir}`,
 
-      // Random
-      random: `RANDOM() ${dir}`,
+      // Random - seeded formula matching Stash's algorithm, prevents SQLite integer overflow
+      random: `(((((p.id + ${seed}) % 2147483647) * ((p.id + ${seed}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((p.id + ${seed}) * 1047483763 % 2147483647)) % 2147483647) ${dir}`,
     };
 
     const sortExpr = sortMap[sort] || sortMap["name"];
@@ -664,7 +666,7 @@ class PerformerQueryBuilder {
 
   async execute(options: PerformerQueryOptions): Promise<PerformerQueryResult> {
     const startTime = Date.now();
-    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, specificInstanceId, filters, searchQuery } = options;
+    const { userId, page, perPage, applyExclusions = true, allowedInstanceIds, specificInstanceId, filters, searchQuery, randomSeed } = options;
 
     // Build FROM clause with optional exclusion JOIN
     const fromClause = this.buildFromClause(userId, applyExclusions);
@@ -925,7 +927,7 @@ class PerformerQueryBuilder {
     const whereParams = whereClauses.flatMap((c) => c.params);
 
     // Build sort clause
-    const sortClause = this.buildSortClause(options.sort, options.sortDirection);
+    const sortClause = this.buildSortClause(options.sort, options.sortDirection, randomSeed);
 
     // Build full query
     const offset = (page - 1) * perPage;

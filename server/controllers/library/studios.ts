@@ -21,6 +21,7 @@ import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
+import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -76,11 +77,14 @@ export const findStudios = async (
     const requestingUser = req.user;
     const { filter, studio_filter, ids } = req.body;
 
-    const sortField = filter?.sort || "name";
+    const sortFieldRaw = filter?.sort || "name";
     const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
+
+    // Parse random sort to extract seed for consistent pagination
+    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
 
     // Merge root-level ids with studio_filter
     const normalizedIds = ids
@@ -107,6 +111,7 @@ export const findStudios = async (
       page,
       perPage,
       searchQuery,
+      randomSeed,
     });
 
     // For single-entity requests (detail pages), get studio with computed counts
