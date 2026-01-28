@@ -23,7 +23,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
   if (!description) {
     return (
       <div
-        className="text-sm my-1 w-full"
+        className="card-description my-1 w-full"
         style={{ height: descriptionHeight }}
       />
     );
@@ -77,7 +77,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
         )}
         <p
           ref={ref}
-          className="text-sm leading-relaxed m-0"
+          className="card-description leading-relaxed m-0"
           style={{
             color: "var(--text-muted)",
             display: "-webkit-box",
@@ -91,7 +91,7 @@ export const ExpandableDescription = ({ description, maxLines = 3 }) => {
         {isTruncated && (
           <button
             onClick={handleMoreClick}
-            className="absolute text-sm hover:underline"
+            className="absolute card-description hover:underline"
             style={{
               color: "var(--accent-primary)",
               backgroundColor: "var(--bg-card)",

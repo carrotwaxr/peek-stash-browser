@@ -330,7 +330,7 @@ export const CardTitle = ({
   // String titles use MarqueeText for auto-scroll on overflow
   const titleElement = titleIsString ? (
     <MarqueeText
-      className="font-semibold leading-tight"
+      className="card-title font-semibold leading-tight"
       style={{ color: "var(--text-primary)" }}
     >
       {title}
@@ -338,7 +338,7 @@ export const CardTitle = ({
   ) : (
     // ReactNode titles (like PerformerCard with gender icon) render as-is
     <div
-      className="font-semibold leading-tight text-center overflow-hidden whitespace-nowrap text-ellipsis"
+      className="card-title font-semibold leading-tight text-center overflow-hidden whitespace-nowrap text-ellipsis"
       style={{ color: "var(--text-primary)" }}
     >
       {title}
@@ -365,7 +365,7 @@ export const CardTitle = ({
   // Subtitle also uses MarqueeText for consistency
   const subtitleElement = shouldShowSubtitle ? (
     <MarqueeText
-      className="text-sm leading-tight"
+      className="card-subtitle leading-tight"
       style={{ color: "var(--text-muted)" }}
     >
       {subtitle}
@@ -650,7 +650,7 @@ export const CardRatingRow = ({
   return (
     <>
       <div
-        className="flex justify-between items-center w-full my-1"
+        className="card-rating-row flex justify-between items-center w-full my-1"
         style={{ height: hasVisibleControls ? "2rem" : "1.5rem" }}
       >
         {/* Left side: Rating badge */}
@@ -665,7 +665,7 @@ export const CardRatingRow = ({
         </div>
 
         {/* Right side: O Counter + Favorite + EntityMenu */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center card-rating-icons">
           {showOCounter && (
             <OCounterButton
               sceneId={entityType === "scene" ? entityId : null}

@@ -89,38 +89,44 @@ export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceI
   };
 
   // Calculate max width based on entity count to prevent excessive whitespace
+  // Reduced sizes for more compact tooltips at all densities
   const getMaxWidth = () => {
     const count = entities.length;
-    if (count === 1) return "max-w-[180px]"; // Single item: very narrow
-    if (count === 2) return "max-w-[380px]"; // Two items: narrower
-    if (count === 3) return "max-w-[580px]"; // Three items: medium
-    return "max-w-[780px]"; // 4+ items: full responsive width
+    if (count === 1) return "max-w-[120px]"; // Single item: compact
+    if (count === 2) return "max-w-[260px]"; // Two items: compact
+    if (count === 3) return "max-w-[400px]"; // Three items: compact
+    return "max-w-[540px]"; // 4+ items: still responsive
+  };
+
+  // Calculate item width for consistent sizing
+  const getItemWidth = () => {
+    return "w-[100px]"; // Fixed compact width for all items
   };
 
   return (
     <div className={getMaxWidth()}>
       {/* Title */}
       <div
-        className="font-semibold mb-2 text-sm"
+        className="font-medium mb-1.5 text-xs"
         style={{ color: "var(--text-primary)" }}
       >
         {title}
       </div>
 
-      {/* Responsive grid: columns adapt to entity count */}
+      {/* Responsive grid: columns adapt to entity count, compact sizing */}
       <div
-        className={`grid ${getGridColumns()} gap-2 max-h-[60vh] overflow-y-auto pr-2`}
+        className={`grid ${getGridColumns()} gap-1.5 max-h-[50vh] overflow-y-auto pr-1`}
       >
         {entities.map((entity) => (
           <Link
             key={entity.id}
             to={getLinkPath(entity)}
-            className="flex flex-col items-center p-1.5 rounded hover:bg-white/10 transition-colors"
+            className={`flex flex-col items-center p-1 rounded hover:bg-white/10 transition-colors ${getItemWidth()}`}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Image container with aspect ratio */}
+            {/* Image container with aspect ratio - compact sizing */}
             <div
-              className={`w-full mb-1.5 ${imageRadius} overflow-hidden`}
+              className={`w-full mb-1 ${imageRadius} overflow-hidden`}
               style={{
                 aspectRatio,
                 backgroundColor: "var(--bg-secondary)",
@@ -135,14 +141,14 @@ export const TooltipEntityGrid = ({ entityType, entities, title, parentInstanceI
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-2xl">{fallbackEmoji}</span>
+                  <span className="text-lg">{fallbackEmoji}</span>
                 </div>
               )}
             </div>
 
-            {/* Name below image */}
+            {/* Name below image - smaller text */}
             <span
-              className="text-xs text-center line-clamp-2 w-full px-0.5"
+              className="text-[10px] text-center line-clamp-2 w-full leading-tight"
               style={{ color: "var(--text-primary)" }}
               title={getDisplayName(entity)}
             >
