@@ -1070,6 +1070,7 @@ model ClipTag {
 
   @@id([clipId, clipInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
+  @@index([clipId, clipInstanceId])
 }
 
 // Junction tables for efficient many-to-many queries
@@ -1085,6 +1086,7 @@ model ScenePerformer {
 
   @@id([sceneId, sceneInstanceId, performerId, performerInstanceId])
   @@index([performerId, performerInstanceId])
+  @@index([sceneId, sceneInstanceId])
 }
 
 model SceneTag {
@@ -1098,6 +1100,7 @@ model SceneTag {
 
   @@id([sceneId, sceneInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
+  @@index([sceneId, sceneInstanceId])
 }
 
 model SceneGroup {
@@ -1112,6 +1115,7 @@ model SceneGroup {
 
   @@id([sceneId, sceneInstanceId, groupId, groupInstanceId])
   @@index([groupId, groupInstanceId])
+  @@index([sceneId, sceneInstanceId])
 }
 
 model SceneGallery {
@@ -1125,6 +1129,7 @@ model SceneGallery {
 
   @@id([sceneId, sceneInstanceId, galleryId, galleryInstanceId])
   @@index([galleryId, galleryInstanceId])
+  @@index([sceneId, sceneInstanceId])
 }
 
 model ImagePerformer {
@@ -1166,6 +1171,7 @@ model ImageGallery {
 
   @@id([imageId, imageInstanceId, galleryId, galleryInstanceId])
   @@index([galleryId, galleryInstanceId])
+  @@index([imageId, imageInstanceId])
 }
 
 model GalleryPerformer {
@@ -1179,6 +1185,7 @@ model GalleryPerformer {
 
   @@id([galleryId, galleryInstanceId, performerId, performerInstanceId])
   @@index([performerId, performerInstanceId])
+  @@index([galleryId, galleryInstanceId])
 }
 
 model PerformerTag {
@@ -1192,6 +1199,7 @@ model PerformerTag {
 
   @@id([performerId, performerInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
+  @@index([performerId, performerInstanceId])
 }
 
 model StudioTag {
@@ -1205,6 +1213,7 @@ model StudioTag {
 
   @@id([studioId, studioInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
+  @@index([studioId, studioInstanceId])
 }
 
 model GalleryTag {
@@ -1218,6 +1227,7 @@ model GalleryTag {
 
   @@id([galleryId, galleryInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
+  @@index([galleryId, galleryInstanceId])
 }
 
 model GroupTag {
@@ -1231,6 +1241,7 @@ model GroupTag {
 
   @@id([groupId, groupInstanceId, tagId, tagInstanceId])
   @@index([tagId, tagInstanceId])
+  @@index([groupId, groupInstanceId])
 }
 
 // Sync state tracking per entity type
