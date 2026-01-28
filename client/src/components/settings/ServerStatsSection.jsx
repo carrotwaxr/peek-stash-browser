@@ -130,7 +130,7 @@ const ServerStatsSection = () => {
               {stats.cache?.isRefreshing ? "Syncing..." : "Full Sync"}
             </Button>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-3">
             <StatCard
               label="Scenes"
               value={(stats.cache?.counts?.scenes || 0).toLocaleString()}
@@ -170,6 +170,12 @@ const ServerStatsSection = () => {
             <StatCard
               label="Images"
               value={(stats.cache?.counts?.images || 0).toLocaleString()}
+              valueColor="var(--accent-primary)"
+              compact
+            />
+            <StatCard
+              label="Clips"
+              value={(stats.cache?.counts?.clips || 0).toLocaleString()}
               valueColor="var(--accent-primary)"
               compact
             />

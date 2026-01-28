@@ -31,6 +31,7 @@ export const getStats = async (req: Request, res: Response) => {
           galleries: counts.galleries,
           groups: counts.groups,
           images: counts.images,
+          clips: counts.clips,
         },
         estimatedCacheSize: "N/A (SQLite)", // Size now in DB
       };
@@ -42,7 +43,7 @@ export const getStats = async (req: Request, res: Response) => {
         isInitialized: false,
         isRefreshing: false,
         lastRefreshed: null,
-        counts: { scenes: 0, performers: 0, studios: 0, tags: 0, galleries: 0, groups: 0, images: 0 },
+        counts: { scenes: 0, performers: 0, studios: 0, tags: 0, galleries: 0, groups: 0, images: 0, clips: 0 },
         estimatedCacheSize: "0 MB",
       };
     }
@@ -150,7 +151,7 @@ export const getStats = async (req: Request, res: Response) => {
         isInitialized: false,
         isRefreshing: false,
         lastRefreshed: null,
-        counts: { scenes: 0, performers: 0, studios: 0, tags: 0 },
+        counts: { scenes: 0, performers: 0, studios: 0, tags: 0, galleries: 0, groups: 0, images: 0, clips: 0 },
         estimatedSize: "0 MB",
       },
       database: { size: "0 B", sizeBytes: 0, path: "" },
