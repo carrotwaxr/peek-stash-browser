@@ -1122,12 +1122,27 @@ class StashSyncService extends EventEmitter {
     const instanceId = stashInstanceId;
 
     // Bulk delete all junction records for this batch
-    await Promise.all([
-      prisma.scenePerformer.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
-      prisma.sceneTag.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
-      prisma.sceneGroup.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
-      prisma.sceneGallery.deleteMany({ where: { sceneId: { in: sceneIds }, sceneInstanceId: instanceId } }),
-    ]);
+    // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
+    // and includes extended timeout for large libraries
+    const sceneIdList = sceneIds.map((id) => `'${this.escape(id)}'`).join(",");
+    const escapedInstanceId = this.escape(instanceId);
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(
+          `DELETE FROM ScenePerformer WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+        );
+        await tx.$executeRawUnsafe(
+          `DELETE FROM SceneTag WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+        );
+        await tx.$executeRawUnsafe(
+          `DELETE FROM SceneGroup WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+        );
+        await tx.$executeRawUnsafe(
+          `DELETE FROM SceneGallery WHERE sceneId IN (${sceneIdList}) AND sceneInstanceId = '${escapedInstanceId}'`
+        );
+      },
+      { timeout: 60000 } // 60 second timeout for large batches
+    );
 
     // Build bulk scene upsert using raw SQL
     const sceneValues = validScenes
@@ -2818,11 +2833,24 @@ class StashSyncService extends EventEmitter {
     const instanceId = stashInstanceId;
 
     // Bulk delete junction records
-    await Promise.all([
-      prisma.imagePerformer.deleteMany({ where: { imageId: { in: imageIds }, imageInstanceId: instanceId } }),
-      prisma.imageTag.deleteMany({ where: { imageId: { in: imageIds }, imageInstanceId: instanceId } }),
-      prisma.imageGallery.deleteMany({ where: { imageId: { in: imageIds }, imageInstanceId: instanceId } }),
-    ]);
+    // Uses sequential raw SQL in a transaction to avoid SQLite lock contention
+    // and includes extended timeout for large libraries
+    const imageIdList = imageIds.map((id: string) => `'${this.escape(id)}'`).join(",");
+    const escapedInstanceId = this.escape(instanceId);
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRawUnsafe(
+          `DELETE FROM ImagePerformer WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
+        );
+        await tx.$executeRawUnsafe(
+          `DELETE FROM ImageTag WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
+        );
+        await tx.$executeRawUnsafe(
+          `DELETE FROM ImageGallery WHERE imageId IN (${imageIdList}) AND imageInstanceId = '${escapedInstanceId}'`
+        );
+      },
+      { timeout: 60000 } // 60 second timeout for large batches
+    );
 
     // Build bulk image upsert
     const values = validImages.map((image: any) => {
@@ -3211,38 +3239,42 @@ class StashSyncService extends EventEmitter {
     try {
       // Delete in order to respect foreign key constraints
       // Junction tables first, then entities
-      const results = await prisma.$transaction([
-        // Junction tables (depend on entity primary keys)
-        prisma.$executeRaw`DELETE FROM SceneTag WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM ScenePerformer WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM SceneGroup WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM GalleryTag WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM GalleryPerformer WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM ImageTag WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM ImagePerformer WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM ImageGallery WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM PerformerTag WHERE performerId IN (SELECT id FROM StashPerformer WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM GroupTag WHERE groupId IN (SELECT id FROM StashGroup WHERE stashInstanceId = ${instanceId})`,
-        prisma.$executeRaw`DELETE FROM StudioTag WHERE studioId IN (SELECT id FROM StashStudio WHERE stashInstanceId = ${instanceId})`,
+      // Uses interactive transaction for extended timeout support
+      await prisma.$transaction(
+        async (tx) => {
+          // Junction tables (depend on entity primary keys)
+          await tx.$executeRaw`DELETE FROM SceneTag WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM ScenePerformer WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM SceneGroup WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM SceneGallery WHERE sceneId IN (SELECT id FROM StashScene WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM GalleryTag WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM GalleryPerformer WHERE galleryId IN (SELECT id FROM StashGallery WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM ImageTag WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM ImagePerformer WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM ImageGallery WHERE imageId IN (SELECT id FROM StashImage WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM PerformerTag WHERE performerId IN (SELECT id FROM StashPerformer WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM GroupTag WHERE groupId IN (SELECT id FROM StashGroup WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM StudioTag WHERE studioId IN (SELECT id FROM StashStudio WHERE stashInstanceId = ${instanceId})`;
+          await tx.$executeRaw`DELETE FROM ClipTag WHERE clipId IN (SELECT id FROM StashClip WHERE stashInstanceId = ${instanceId})`;
 
-        // Entity tables
-        prisma.$executeRaw`DELETE FROM StashClip WHERE stashInstanceId = ${instanceId}`,
-        prisma.$executeRaw`DELETE FROM StashImage WHERE stashInstanceId = ${instanceId}`,
-        prisma.$executeRaw`DELETE FROM StashGallery WHERE stashInstanceId = ${instanceId}`,
-        prisma.$executeRaw`DELETE FROM StashScene WHERE stashInstanceId = ${instanceId}`,
-        prisma.$executeRaw`DELETE FROM StashGroup WHERE stashInstanceId = ${instanceId}`,
-        prisma.$executeRaw`DELETE FROM StashPerformer WHERE stashInstanceId = ${instanceId}`,
-        prisma.$executeRaw`DELETE FROM StashStudio WHERE stashInstanceId = ${instanceId}`,
-        prisma.$executeRaw`DELETE FROM StashTag WHERE stashInstanceId = ${instanceId}`,
+          // Entity tables
+          await tx.$executeRaw`DELETE FROM StashClip WHERE stashInstanceId = ${instanceId}`;
+          await tx.$executeRaw`DELETE FROM StashImage WHERE stashInstanceId = ${instanceId}`;
+          await tx.$executeRaw`DELETE FROM StashGallery WHERE stashInstanceId = ${instanceId}`;
+          await tx.$executeRaw`DELETE FROM StashScene WHERE stashInstanceId = ${instanceId}`;
+          await tx.$executeRaw`DELETE FROM StashGroup WHERE stashInstanceId = ${instanceId}`;
+          await tx.$executeRaw`DELETE FROM StashPerformer WHERE stashInstanceId = ${instanceId}`;
+          await tx.$executeRaw`DELETE FROM StashStudio WHERE stashInstanceId = ${instanceId}`;
+          await tx.$executeRaw`DELETE FROM StashTag WHERE stashInstanceId = ${instanceId}`;
 
-        // Sync state for this instance
-        prisma.syncState.deleteMany({ where: { stashInstanceId: instanceId } }),
-      ]);
+          // Sync state for this instance
+          await tx.syncState.deleteMany({ where: { stashInstanceId: instanceId } });
+        },
+        { timeout: 120000 } // 120 second timeout for clearing large instances
+      );
 
       const duration = Date.now() - startTime;
-      logger.info(`Cleared cached data for instance ${instanceId} in ${duration}ms`, {
-        operations: results.length,
-      });
+      logger.info(`Cleared cached data for instance ${instanceId} in ${duration}ms`);
     } catch (error) {
       logger.error(`Failed to clear cached data for instance ${instanceId}`, {
         error: error instanceof Error ? error.message : "Unknown error",
