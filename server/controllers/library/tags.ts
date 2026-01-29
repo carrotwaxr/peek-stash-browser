@@ -21,6 +21,7 @@ import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
 import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
+import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -76,11 +77,14 @@ export const findTags = async (
     const requestingUser = req.user;
     const { filter, tag_filter, ids } = req.body;
 
-    const sortField = filter?.sort || "name";
+    const sortFieldRaw = filter?.sort || "name";
     const sortDirection = (filter?.direction || "ASC").toUpperCase() as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
+
+    // Parse random sort to extract seed for consistent pagination
+    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
 
     // Merge root-level ids with tag_filter
     const normalizedIds = ids
@@ -109,6 +113,7 @@ export const findTags = async (
       page,
       perPage,
       searchQuery,
+      randomSeed,
     });
 
     // For single-entity requests (detail pages), get tag with computed counts

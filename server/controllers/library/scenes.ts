@@ -20,6 +20,7 @@ import { stashInstanceManager } from "../../services/StashInstanceManager.js";
 import { entityExclusionHelper } from "../../services/EntityExclusionHelper.js";
 import { sceneQueryBuilder } from "../../services/SceneQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
+import rankingComputeService from "../../services/RankingComputeService.js";
 import {
   buildDerivedWeightsFromScoringData,
   buildImplicitWeightsFromRankings,
@@ -34,38 +35,11 @@ import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
+import { SeededRandom, parseRandomSort, generateDailySeed } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 // Feature flag for SQL query builder
 const USE_SQL_QUERY_BUILDER = process.env.USE_SQL_QUERY_BUILDER !== "false";
-
-/**
- * Seeded random number generator for consistent shuffling per user
- * Uses a simple LCG (Linear Congruential Generator) algorithm
- */
-class SeededRandom {
-  private seed: number;
-
-  constructor(seed: number) {
-    this.seed = seed;
-  }
-
-  /**
-   * Generate next random number between 0 and 1
-   */
-  next(): number {
-    // LCG parameters (same as java.util.Random)
-    this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff;
-    return this.seed / 0x7fffffff;
-  }
-
-  /**
-   * Generate random integer between 0 (inclusive) and max (exclusive)
-   */
-  nextInt(max: number): number {
-    return Math.floor(this.next() * max);
-  }
-}
 
 /**
  * Merge user-specific data into scenes
@@ -914,21 +888,8 @@ export const findScenes = async (
     const perPage = filter?.per_page || 40;
     const searchQuery = filter?.q || "";
 
-    // Parse random_<seed> format (e.g., "random_12345678")
-    let randomSeed: number | undefined;
-    let sortField = sortFieldRaw;
-
-    if (sortFieldRaw.startsWith('random_')) {
-      const seedStr = sortFieldRaw.slice(7); // Remove "random_" prefix
-      const parsedSeed = parseInt(seedStr, 10);
-      if (!isNaN(parsedSeed)) {
-        randomSeed = parsedSeed % 1e8; // Cap at 10^8 like Stash does
-        sortField = 'random';
-      }
-    } else if (sortFieldRaw === 'random') {
-      // Plain "random" without seed - generate time-based seed
-      randomSeed = (userId + Date.now()) % 1e8;
-    }
+    // Parse random sort with seed
+    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, userId);
 
     // Normalize ids to PeekSceneFilter format
     const normalizedIds = ids
@@ -1437,6 +1398,24 @@ export const getRecommendedScenes = async (
       }),
     ]);
 
+    // Check if rankings are stale (>1 hour since last compute)
+    // Recompute in background without blocking current request
+    const lastRanking = await prisma.userEntityRanking.findFirst({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: { updatedAt: true }
+    });
+
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const isStale = !lastRanking ||
+      (Date.now() - lastRanking.updatedAt.getTime() > ONE_HOUR_MS);
+
+    if (isStale) {
+      rankingComputeService.recomputeAllRankings(userId).catch(err => {
+        logger.error("Background ranking recompute failed", { userId, error: (err as Error).message });
+      });
+    }
+
     // Build sets of favorite and highly-rated entities
     const favoritePerformers = new Set(
       performerRatings.filter((r) => r.favorite).map((r) => r.performerId)
@@ -1627,7 +1606,8 @@ export const getRecommendedScenes = async (
 
       // Use seeded random for consistent shuffle order per user
       // This prevents duplicates across pages while maintaining diversity
-      const rng = new SeededRandom(userId);
+      // Seed changes daily for fresh shuffle order
+      const rng = new SeededRandom(generateDailySeed(userId));
 
       // Randomize within each tier and combine
       for (const tier of tiers) {

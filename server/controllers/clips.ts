@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { clipService } from "../services/ClipService.js";
 import { logger } from "../utils/logger.js";
 import { AuthenticatedRequest } from "../middleware/auth.js";
+import { parseRandomSort } from "../utils/seededRandom.js";
 
 /**
  * GET /api/clips
@@ -13,7 +14,7 @@ export const getClips = async (req: Request, res: Response) => {
     const {
       page = "1",
       perPage = "24",
-      sortBy = "stashCreatedAt",
+      sortBy: sortByRaw = "stashCreatedAt",
       sortDir = "desc",
       isGenerated = "true",
       sceneId,
@@ -24,10 +25,13 @@ export const getClips = async (req: Request, res: Response) => {
       q,
     } = req.query;
 
+    // Parse random sort to extract seed for consistent pagination
+    const { sortField: sortBy, randomSeed } = parseRandomSort(sortByRaw as string, userId);
+
     const result = await clipService.getClips(userId, {
       page: parseInt(page as string, 10),
       perPage: parseInt(perPage as string, 10),
-      sortBy: sortBy as string,
+      sortBy,
       sortDir: sortDir as "asc" | "desc",
       isGenerated: isGenerated === "true",
       sceneId: sceneId as string | undefined,
@@ -38,6 +42,7 @@ export const getClips = async (req: Request, res: Response) => {
         : undefined,
       studioId: studioId as string | undefined,
       q: q as string | undefined,
+      randomSeed,
     });
 
     res.json({

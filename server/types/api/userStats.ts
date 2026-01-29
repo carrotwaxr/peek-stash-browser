@@ -19,6 +19,7 @@ export interface LibraryStats {
   tagCount: number;
   galleryCount: number;
   imageCount: number;
+  clipCount: number;
 }
 
 // =============================================================================

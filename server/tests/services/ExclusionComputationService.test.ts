@@ -51,6 +51,9 @@ vi.mock("../../prisma/singleton.js", () => ({
     stashImage: {
       count: vi.fn(),
     },
+    stashClip: {
+      count: vi.fn(),
+    },
     sceneTag: {
       findMany: vi.fn(),
     },

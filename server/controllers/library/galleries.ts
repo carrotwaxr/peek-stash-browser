@@ -22,6 +22,7 @@ import {
 } from "../../types/index.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
+import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 import { mergePerformersWithUserData } from "./performers.js";
 import { mergeStudiosWithUserData } from "./studios.js";
@@ -210,7 +211,7 @@ export const findGalleries = async (
     const userId = req.user?.id;
     const { filter, gallery_filter, ids } = req.body;
 
-    const sortField = filter?.sort || "title";
+    const sortFieldRaw = filter?.sort || "title";
     const sortDirection = (filter?.direction || "ASC") as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
@@ -219,6 +220,9 @@ export const findGalleries = async (
     // Admins skip exclusions to see everything
     const requestingUser = req.user;
     const applyExclusions = requestingUser?.role !== "ADMIN";
+
+    // Parse random sort to extract seed for consistent pagination
+    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
 
     // Merge root-level ids with gallery_filter
     const normalizedIds = ids
@@ -243,6 +247,7 @@ export const findGalleries = async (
       page,
       perPage,
       searchQuery,
+      randomSeed,
     });
 
     // For single-entity requests (detail pages), get gallery with computed counts

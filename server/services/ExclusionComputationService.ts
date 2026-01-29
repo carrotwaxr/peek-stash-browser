@@ -748,7 +748,7 @@ class ExclusionComputationService {
     userId: number,
     tx: TransactionClient
   ): Promise<void> {
-    const entityTypes = ["scene", "performer", "studio", "tag", "group", "gallery", "image"];
+    const entityTypes = ["scene", "performer", "studio", "tag", "group", "gallery", "image", "clip"];
 
     for (const entityType of entityTypes) {
       const total = await this.getEntityCount(entityType, tx);
@@ -788,6 +788,8 @@ class ExclusionComputationService {
         return tx.stashGallery.count({ where: { deletedAt: null } });
       case "image":
         return tx.stashImage.count({ where: { deletedAt: null } });
+      case "clip":
+        return tx.stashClip.count({ where: { deletedAt: null } });
       default:
         return 0;
     }

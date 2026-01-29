@@ -15,6 +15,7 @@ import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js
 import type { NormalizedGroup, PeekGroupFilter } from "../../types/index.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
+import { parseRandomSort } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
 
 /**
@@ -154,7 +155,7 @@ export const findGroups = async (
     const userId = req.user?.id;
     const { filter, group_filter, ids } = req.body;
 
-    const sortField = filter?.sort || "name";
+    const sortFieldRaw = filter?.sort || "name";
     const sortDirection = (filter?.direction || "ASC") as "ASC" | "DESC";
     const page = filter?.page || 1;
     const perPage = filter?.per_page || 40;
@@ -163,6 +164,9 @@ export const findGroups = async (
     // Admins skip exclusions to see everything
     const requestingUser = req.user;
     const applyExclusions = requestingUser?.role !== "ADMIN";
+
+    // Parse random sort to extract seed for consistent pagination
+    const { sortField, randomSeed } = parseRandomSort(sortFieldRaw, requestingUser.id);
 
     // Merge root-level ids with group_filter
     const normalizedIds = ids
@@ -187,6 +191,7 @@ export const findGroups = async (
       page,
       perPage,
       searchQuery,
+      randomSeed,
     });
 
     // For single-entity requests (detail pages), get group with computed counts

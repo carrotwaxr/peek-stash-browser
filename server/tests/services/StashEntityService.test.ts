@@ -57,6 +57,9 @@ vi.mock("../../prisma/singleton.js", () => ({
       findFirst: vi.fn(),
       count: vi.fn(),
     },
+    stashClip: {
+      count: vi.fn(),
+    },
     // Junction table mocks for count queries
     scenePerformer: {
       count: vi.fn(),
@@ -582,6 +585,7 @@ describe("StashEntityService", () => {
       getMock(prisma.stashGallery.count).mockResolvedValue(50);
       getMock(prisma.stashGroup.count).mockResolvedValue(25);
       getMock(prisma.stashImage.count).mockResolvedValue(2000);
+      getMock(prisma.stashClip.count).mockResolvedValue(150);
 
       const stats = await stashEntityService.getStats();
 
@@ -592,6 +596,7 @@ describe("StashEntityService", () => {
       expect(stats.galleries).toBe(50);
       expect(stats.groups).toBe(25);
       expect(stats.images).toBe(2000);
+      expect(stats.clips).toBe(150);
     });
 
     it("should return true for isReady when sync state exists with lastFullSyncTimestamp", async () => {

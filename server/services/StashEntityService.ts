@@ -1432,6 +1432,13 @@ class StashEntityService {
     });
   }
 
+  /**
+   * Get total clip count
+   */
+  async getClipCount(): Promise<number> {
+    return prisma.stashClip.count();
+  }
+
   // ==================== Stats/Aggregation Queries ====================
 
   /**
@@ -1445,8 +1452,9 @@ class StashEntityService {
     galleries: number;
     groups: number;
     images: number;
+    clips: number;
   }> {
-    const [scenes, performers, studios, tags, galleries, groups, images] =
+    const [scenes, performers, studios, tags, galleries, groups, images, clips] =
       await Promise.all([
         this.getSceneCount(),
         this.getPerformerCount(),
@@ -1455,9 +1463,10 @@ class StashEntityService {
         this.getGalleryCount(),
         this.getGroupCount(),
         this.getImageCount(),
+        this.getClipCount(),
       ]);
 
-    return { scenes, performers, studios, tags, galleries, groups, images };
+    return { scenes, performers, studios, tags, galleries, groups, images, clips };
   }
 
   /**

@@ -28,6 +28,7 @@ export interface ClipQueryOptions {
   studioId?: string;
   q?: string;
   allowedInstanceIds?: string[];
+  randomSeed?: number; // Seed for consistent random ordering
 }
 
 // Clip with relations (matches ClipService interface)
@@ -239,17 +240,22 @@ class ClipQueryBuilder {
   /**
    * Build ORDER BY clause
    */
-  private buildOrderBy(sortBy: string, sortDir: "asc" | "desc"): string {
+  private buildOrderBy(sortBy: string, sortDir: "asc" | "desc", randomSeed?: number): string {
+    const direction = sortDir.toUpperCase();
+    const seed = randomSeed || 12345;
+
     const validColumns: Record<string, string> = {
       stashCreatedAt: "c.stashCreatedAt",
       stashUpdatedAt: "c.stashUpdatedAt",
       title: "c.title",
       seconds: "c.seconds",
       sceneTitle: "s.title",
+      duration: "(c.endSeconds - c.seconds)",
+      // Random - seeded formula matching Stash's algorithm, prevents SQLite integer overflow
+      random: `(((((c.id + ${seed}) % 2147483647) * ((c.id + ${seed}) % 2147483647) % 2147483647) * 52959209 % 2147483647 + ((c.id + ${seed}) * 1047483763 % 2147483647)) % 2147483647)`,
     };
 
     const column = validColumns[sortBy] || "c.stashCreatedAt";
-    const direction = sortDir.toUpperCase();
 
     return `ORDER BY ${column} ${direction}`;
   }
@@ -364,6 +370,7 @@ class ClipQueryBuilder {
       studioId,
       q,
       allowedInstanceIds,
+      randomSeed,
     } = options;
 
     // Build query components
@@ -383,7 +390,7 @@ class ClipQueryBuilder {
     ]);
 
     const whereClause = filters.sql ? `WHERE ${filters.sql}` : "";
-    const orderBy = this.buildOrderBy(sortBy, sortDir);
+    const orderBy = this.buildOrderBy(sortBy, sortDir, randomSeed);
     const offset = (page - 1) * perPage;
 
     // Build full queries
