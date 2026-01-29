@@ -126,6 +126,7 @@ class UserStatsAggregationService {
       tagCount: statsMap.get("tag") ?? 0,
       galleryCount: statsMap.get("gallery") ?? 0,
       imageCount: statsMap.get("image") ?? 0,
+      clipCount: statsMap.get("clip") ?? 0,
     };
   }
 
