@@ -924,6 +924,7 @@ export const saveFilterPreset = async (
         "tag",
         "group",
         "gallery",
+        "clip",
       ];
       if (!validContexts.includes(context)) {
         return res.status(400).json({ error: "Invalid context" });
