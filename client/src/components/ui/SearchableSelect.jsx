@@ -29,6 +29,7 @@ const SearchableSelect = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(false);
   // Initialize selectedItems as empty - will be populated by useEffect when value has items
   const [selectedItems, setSelectedItems] = useState(() => {
     // Ensure we start with empty array if value is empty/undefined
@@ -136,9 +137,14 @@ const SearchableSelect = ({
         }
 
         // Cache miss or incomplete - fetch by IDs from API in background
-        const results = await fetchItemsByIds(valueArray);
-        if (results && results.length > 0) {
-          setSelectedItems(results);
+        setIsLoadingInitial(true);
+        try {
+          const results = await fetchItemsByIds(valueArray);
+          if (results && results.length > 0) {
+            setSelectedItems(results);
+          }
+        } finally {
+          setIsLoadingInitial(false);
         }
       } catch (error) {
         console.error("Error loading selected names:", error);
@@ -327,7 +333,11 @@ const SearchableSelect = ({
       >
         <div className="flex flex-wrap gap-1 flex-1">
           {selectedItems.length === 0 ? (
-            <span style={{ color: "var(--text-muted)" }}>{placeholder}</span>
+            isLoadingInitial ? (
+              <span style={{ color: "var(--text-muted)" }}>Loading...</span>
+            ) : (
+              <span style={{ color: "var(--text-muted)" }}>{placeholder}</span>
+            )
           ) : multi ? (
             selectedItems.map((item) => (
               <span
