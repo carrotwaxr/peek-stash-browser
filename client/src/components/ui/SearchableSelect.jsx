@@ -42,6 +42,8 @@ const SearchableSelect = ({
 
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+  const prevEntityTypeRef = useRef(entityType);
+  const prevCountFilterContextRef = useRef(countFilterContext);
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   // Fetch items by specific IDs (use full endpoints which support ID filtering)
@@ -230,6 +232,23 @@ const SearchableSelect = ({
       loadOptions("");
     }
   }, [isOpen, options.length, loadOptions]);
+
+  // Reset options when entityType or countFilterContext changes
+  useEffect(() => {
+    if (
+      prevEntityTypeRef.current !== entityType ||
+      prevCountFilterContextRef.current !== countFilterContext
+    ) {
+      // Clear options to force reload
+      setOptions([]);
+      setSelectedItems([]);
+      setSearchTerm("");
+
+      // Update refs
+      prevEntityTypeRef.current = entityType;
+      prevCountFilterContextRef.current = countFilterContext;
+    }
+  }, [entityType, countFilterContext]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
