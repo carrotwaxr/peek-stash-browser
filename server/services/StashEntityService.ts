@@ -1439,6 +1439,18 @@ class StashEntityService {
     return prisma.stashClip.count();
   }
 
+  /**
+   * Get count of clips that have isGenerated=false (need preview generation)
+   */
+  async getUngeneratedClipCount(): Promise<number> {
+    return prisma.stashClip.count({
+      where: {
+        isGenerated: false,
+        deletedAt: null,
+      },
+    });
+  }
+
   // ==================== Stats/Aggregation Queries ====================
 
   /**
@@ -1453,8 +1465,9 @@ class StashEntityService {
     groups: number;
     images: number;
     clips: number;
+    ungeneratedClips: number;
   }> {
-    const [scenes, performers, studios, tags, galleries, groups, images, clips] =
+    const [scenes, performers, studios, tags, galleries, groups, images, clips, ungeneratedClips] =
       await Promise.all([
         this.getSceneCount(),
         this.getPerformerCount(),
@@ -1464,9 +1477,10 @@ class StashEntityService {
         this.getGroupCount(),
         this.getImageCount(),
         this.getClipCount(),
+        this.getUngeneratedClipCount(),
       ]);
 
-    return { scenes, performers, studios, tags, galleries, groups, images, clips };
+    return { scenes, performers, studios, tags, galleries, groups, images, clips, ungeneratedClips };
   }
 
   /**
