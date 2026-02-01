@@ -55,6 +55,7 @@ const FilterPresets = ({
   currentZoomLevel = "medium",
   currentGridDensity = "medium",
   currentTableColumns = null,
+  currentPerPage = 24,
   onLoadPreset,
 }) => {
   // Use context if provided, otherwise fall back to artifactType
@@ -125,6 +126,7 @@ const FilterPresets = ({
         zoomLevel: currentZoomLevel,
         gridDensity: currentGridDensity,
         tableColumns: currentViewMode === "table" ? currentTableColumns : null,
+        perPage: currentPerPage,
         setAsDefault,
       });
 
@@ -160,6 +162,7 @@ const FilterPresets = ({
       zoomLevel: preset.zoomLevel || "medium",
       gridDensity: preset.gridDensity || "medium",
       tableColumns: preset.tableColumns || null,
+      perPage: preset.perPage || null,
     });
     setIsDropdownOpen(false);
     setSuccess(`Preset "${preset.name}" loaded!`);
