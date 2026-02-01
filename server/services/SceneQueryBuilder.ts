@@ -1653,6 +1653,9 @@ class SceneQueryBuilder {
       // Parse sceneStreams from JSON
       sceneStreams: this.parseSceneStreams(row.streams),
 
+      // Caption metadata for multi-language subtitle support
+      captions: row.captions ? JSON.parse(row.captions) : [],
+
       // Relations - populated separately after query
       studio: null,
       performers: [],
