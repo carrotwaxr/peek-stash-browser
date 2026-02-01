@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   LucideArrowLeft,
   LucideArrowLeftToLine,
@@ -28,6 +28,43 @@ const Pagination = ({
   onEscapeDown,
 }) => {
   const { isTVMode } = useTVMode();
+  const [perPageInput, setPerPageInput] = useState(String(perPage));
+  const [perPageError, setPerPageError] = useState(false);
+
+  // Sync input when perPage prop changes
+  useEffect(() => {
+    setPerPageInput(String(perPage));
+    setPerPageError(false);
+  }, [perPage]);
+
+  const handlePerPageChange = (value) => {
+    setPerPageInput(value);
+
+    const num = parseInt(value, 10);
+    if (isNaN(num) || num < 1 || num > 500) {
+      setPerPageError(true);
+      return;
+    }
+
+    setPerPageError(false);
+  };
+
+  const handlePerPageSubmit = () => {
+    const num = parseInt(perPageInput, 10);
+    if (!isNaN(num) && num >= 1 && num <= 500 && num !== perPage) {
+      onPerPageChange(num);
+    } else {
+      // Reset to current value if invalid
+      setPerPageInput(String(perPage));
+      setPerPageError(false);
+    }
+  };
+
+  const handlePerPageKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.target.blur(); // Triggers onBlur which calls handlePerPageSubmit
+    }
+  };
 
   // Pagination zone items: First, Prev, PageSelect, Next, Last, PerPageSelect
   const paginationItems = useMemo(() => {
@@ -52,10 +89,13 @@ const Pagination = ({
       const element = document.querySelector(`[data-tv-pagination-item="${item.id}"]`);
       if (element) {
         element.click();
-        // For dropdowns, focus them so user can interact
-        if (item.id === "page-select" || item.id === "per-page") {
+        // For inputs/dropdowns, focus them so user can interact
+        if (item.id === "page-select") {
           const select = element.querySelector("select");
           if (select) select.focus();
+        } else if (item.id === "per-page") {
+          const input = element.querySelector("input");
+          if (input) input.focus();
         }
       }
     },
@@ -64,8 +104,6 @@ const Pagination = ({
   });
   // Don't render if no pages at all
   if (!totalPages || totalPages < 1) return null;
-
-  const perPageOptions = [12, 24, 36, 48, 60, 72, 84, 96, 108, 120];
 
   // Generate array of all page numbers for dropdown
   const allPages = Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -195,24 +233,23 @@ const Pagination = ({
               ref={(el) => paginationNav.setItemRef(5, el)}
               className={paginationNav.isFocused(5) ? "keyboard-focus" : ""}
             >
-              <select
+              <input
                 id="perPage"
-                value={perPage}
-                onChange={(e) => onPerPageChange(parseInt(e.target.value))}
-                className="px-2 sm:px-3 py-1 rounded text-sm font-medium transition-colors"
+                type="number"
+                min="1"
+                max="500"
+                value={perPageInput}
+                onChange={(e) => handlePerPageChange(e.target.value)}
+                onBlur={handlePerPageSubmit}
+                onKeyDown={handlePerPageKeyDown}
+                className="w-16 sm:w-20 px-2 sm:px-3 py-1 rounded text-sm font-medium transition-colors text-center"
                 style={{
                   backgroundColor: "var(--bg-card)",
-                  color: "var(--text-primary)",
-                  border: "1px solid var(--border-color)",
+                  color: perPageError ? "var(--status-error)" : "var(--text-primary)",
+                  border: `1px solid ${perPageError ? "var(--status-error)" : "var(--border-color)"}`,
                   height: "1.8rem",
                 }}
-              >
-                {perPageOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           </div>
         )}
