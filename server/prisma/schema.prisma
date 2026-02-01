@@ -665,7 +665,10 @@ model StashScene {
   pathVtt         String? // VTT chapter path
   pathChaptersVtt String? // Chapters VTT path
   pathStream      String? // Primary stream path
-  pathCaption     String? // Caption path
+  pathCaption     String? // Caption path (deprecated - use captions array)
+
+  // === Caption metadata (for multi-language support) ===
+  captions String? // JSON: [{language_code, caption_type}]
 
   // === Stream data (small JSON array) ===
   streams String? // JSON: [{url, mime_type, label}]

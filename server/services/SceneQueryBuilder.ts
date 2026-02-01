@@ -54,7 +54,7 @@ class SceneQueryBuilder {
     s.duration, s.organized, s.details, s.director, s.urls, s.filePath, s.fileBitRate,
     s.fileFrameRate, s.fileWidth, s.fileHeight, s.fileVideoCodec,
     s.fileAudioCodec, s.fileSize, s.pathScreenshot, s.pathPreview,
-    s.pathSprite, s.pathVtt, s.pathChaptersVtt, s.pathStream, s.pathCaption,
+    s.pathSprite, s.pathVtt, s.pathChaptersVtt, s.pathStream, s.pathCaption, s.captions,
     s.streams, s.inheritedTagIds,
     s.oCounter AS stashOCounter, s.playCount AS stashPlayCount,
     s.playDuration AS stashPlayDuration, s.stashCreatedAt, s.stashUpdatedAt,

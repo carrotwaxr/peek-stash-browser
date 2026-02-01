@@ -145,6 +145,7 @@ const mockCachedScene = {
   pathChaptersVtt: null,
   pathStream: null,
   pathCaption: null,
+  captions: null,
   streams: "[]",
   stashCreatedAt: new Date("2024-01-01T00:00:00Z"),
   stashUpdatedAt: new Date("2024-01-02T00:00:00Z"),
