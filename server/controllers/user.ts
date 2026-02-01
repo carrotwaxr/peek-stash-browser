@@ -889,6 +889,7 @@ export const saveFilterPreset = async (
       viewMode,
       zoomLevel,
       tableColumns,
+      perPage,
       setAsDefault,
     } = req.body;
 
@@ -951,6 +952,7 @@ export const saveFilterPreset = async (
       viewMode: viewMode || "grid",
       zoomLevel: zoomLevel || "medium",
       tableColumns: tableColumns || null,
+      perPage: perPage || null,
       createdAt: new Date().toISOString(),
     };
 

@@ -533,12 +533,15 @@ const SearchControls = ({
       // This ensures fresh randomization each time a preset is loaded
       resetRandomSeed();
 
+      // Use preset's perPage if available, otherwise keep current
+      const effectivePerPage = preset.perPage || perPage;
+
       // Trigger search with preset values
       const query = {
         filter: {
           direction: preset.direction,
           page: 1,
-          per_page: perPage,
+          per_page: effectivePerPage,
           q: searchText,
           sort: getSortWithSeed(preset.sort),
         },
@@ -871,6 +874,7 @@ const SearchControls = ({
             currentZoomLevel={zoomLevel}
             currentGridDensity={gridDensity}
             currentTableColumns={currentTableColumns}
+            currentPerPage={perPage}
             permanentFilters={permanentFilters}
             onLoadPreset={handleLoadPreset}
           />

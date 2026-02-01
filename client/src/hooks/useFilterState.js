@@ -352,9 +352,11 @@ export const useFilterState = ({
     const newZoomLevel = preset.zoomLevel || defaultZoomLevel;
     const newGridDensity = preset.gridDensity || defaultGridDensity;
     const newTableColumns = preset.tableColumns || null;
+    // Only update perPage if preset has it (null = don't change)
+    const newPerPage = preset.perPage || pagination.perPage;
     setFiltersState(newFilters);
     setSortState({ field: preset.sort, direction: preset.direction });
-    setPaginationState((prev) => ({ ...prev, page: 1 }));
+    setPaginationState((prev) => ({ ...prev, page: 1, perPage: newPerPage }));
     setViewModeState(newViewMode);
     setZoomLevelState(newZoomLevel);
     setGridDensityState(newGridDensity);
@@ -364,7 +366,7 @@ export const useFilterState = ({
     syncToUrlParams({
       filters: newFilters,
       sort: { field: preset.sort, direction: preset.direction },
-      pagination: { ...pagination, page: 1 },
+      pagination: { ...pagination, page: 1, perPage: newPerPage },
       searchText,
       viewMode: newViewMode,
       zoomLevel: newZoomLevel,

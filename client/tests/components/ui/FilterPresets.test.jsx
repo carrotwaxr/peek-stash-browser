@@ -150,6 +150,7 @@ describe("FilterPresets", () => {
         zoomLevel: "medium",
         gridDensity: "medium",
         tableColumns: null,
+        perPage: null,
       });
     });
 
@@ -188,6 +189,7 @@ describe("FilterPresets", () => {
         zoomLevel: "medium",
         gridDensity: "medium",
         tableColumns: null,
+        perPage: null,
       });
     });
 
@@ -276,6 +278,7 @@ describe("FilterPresets", () => {
           zoomLevel: "medium",
           gridDensity: "medium",
           tableColumns: null,
+          perPage: 24,
           setAsDefault: false,
         });
       });

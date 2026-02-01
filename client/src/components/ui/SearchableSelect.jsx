@@ -29,6 +29,7 @@ const SearchableSelect = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(false);
   // Initialize selectedItems as empty - will be populated by useEffect when value has items
   const [selectedItems, setSelectedItems] = useState(() => {
     // Ensure we start with empty array if value is empty/undefined
@@ -42,6 +43,8 @@ const SearchableSelect = ({
 
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+  const prevEntityTypeRef = useRef(entityType);
+  const prevCountFilterContextRef = useRef(countFilterContext);
   const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
 
   // Fetch items by specific IDs (use full endpoints which support ID filtering)
@@ -134,9 +137,14 @@ const SearchableSelect = ({
         }
 
         // Cache miss or incomplete - fetch by IDs from API in background
-        const results = await fetchItemsByIds(valueArray);
-        if (results && results.length > 0) {
-          setSelectedItems(results);
+        setIsLoadingInitial(true);
+        try {
+          const results = await fetchItemsByIds(valueArray);
+          if (results && results.length > 0) {
+            setSelectedItems(results);
+          }
+        } finally {
+          setIsLoadingInitial(false);
         }
       } catch (error) {
         console.error("Error loading selected names:", error);
@@ -231,6 +239,23 @@ const SearchableSelect = ({
     }
   }, [isOpen, options.length, loadOptions]);
 
+  // Reset options when entityType or countFilterContext changes
+  useEffect(() => {
+    if (
+      prevEntityTypeRef.current !== entityType ||
+      prevCountFilterContextRef.current !== countFilterContext
+    ) {
+      // Clear options to force reload
+      setOptions([]);
+      setSelectedItems([]);
+      setSearchTerm("");
+
+      // Update refs
+      prevEntityTypeRef.current = entityType;
+      prevCountFilterContextRef.current = countFilterContext;
+    }
+  }, [entityType, countFilterContext]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -308,7 +333,11 @@ const SearchableSelect = ({
       >
         <div className="flex flex-wrap gap-1 flex-1">
           {selectedItems.length === 0 ? (
-            <span style={{ color: "var(--text-muted)" }}>{placeholder}</span>
+            isLoadingInitial ? (
+              <span style={{ color: "var(--text-muted)" }}>Loading...</span>
+            ) : (
+              <span style={{ color: "var(--text-muted)" }}>{placeholder}</span>
+            )
           ) : multi ? (
             selectedItems.map((item) => (
               <span

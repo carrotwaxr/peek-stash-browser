@@ -215,34 +215,61 @@ describe("Pagination", () => {
   });
 
   describe("Per-Page Selector", () => {
-    it("calls onPerPageChange when per-page value changed", async () => {
+    it("calls onPerPageChange when per-page value changed and blurred", async () => {
       const user = userEvent.setup();
       const onPerPageChange = vi.fn();
       render(<Pagination {...defaultProps} perPage={24} onPerPageChange={onPerPageChange} />);
 
-      const perPageSelect = screen.getByLabelText("Per Page:");
-      await user.selectOptions(perPageSelect, "48");
+      const perPageInput = screen.getByLabelText("Per Page:");
+      await user.clear(perPageInput);
+      await user.type(perPageInput, "48");
+      await user.tab(); // Trigger blur to submit
 
       expect(onPerPageChange).toHaveBeenCalledWith(48);
     });
 
-    it("displays correct per-page options", () => {
-      render(<Pagination {...defaultProps} />);
+    it("calls onPerPageChange when Enter pressed", async () => {
+      const user = userEvent.setup();
+      const onPerPageChange = vi.fn();
+      render(<Pagination {...defaultProps} perPage={24} onPerPageChange={onPerPageChange} />);
 
-      const perPageSelect = screen.getByLabelText("Per Page:");
-      const options = Array.from(perPageSelect.options).map((opt) => opt.value);
+      const perPageInput = screen.getByLabelText("Per Page:");
+      await user.clear(perPageInput);
+      await user.type(perPageInput, "100{Enter}");
 
-      expect(options).toContain("12");
-      expect(options).toContain("24");
-      expect(options).toContain("48");
-      expect(options).toContain("120");
+      expect(onPerPageChange).toHaveBeenCalledWith(100);
     });
 
-    it("shows current per-page value as selected", () => {
+    it("accepts values between 1 and 500", () => {
+      render(<Pagination {...defaultProps} perPage={250} />);
+
+      const perPageInput = screen.getByLabelText("Per Page:");
+      expect(perPageInput).toHaveAttribute("type", "number");
+      expect(perPageInput).toHaveAttribute("min", "1");
+      expect(perPageInput).toHaveAttribute("max", "500");
+    });
+
+    it("shows current per-page value", () => {
       render(<Pagination {...defaultProps} perPage={48} />);
 
-      const perPageSelect = screen.getByLabelText("Per Page:");
-      expect(perPageSelect).toHaveValue("48");
+      const perPageInput = screen.getByLabelText("Per Page:");
+      expect(perPageInput).toHaveValue(48);
+    });
+
+    it("resets to current value on invalid input", async () => {
+      const user = userEvent.setup();
+      const onPerPageChange = vi.fn();
+      render(<Pagination {...defaultProps} perPage={24} onPerPageChange={onPerPageChange} />);
+
+      const perPageInput = screen.getByLabelText("Per Page:");
+      await user.clear(perPageInput);
+      await user.type(perPageInput, "0"); // Invalid (below min)
+      await user.tab(); // Trigger blur
+
+      // Should not call onPerPageChange for invalid values
+      expect(onPerPageChange).not.toHaveBeenCalled();
+      // Input should reset to current value
+      expect(perPageInput).toHaveValue(24);
     });
   });
 
