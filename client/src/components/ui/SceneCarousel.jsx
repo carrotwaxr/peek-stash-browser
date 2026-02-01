@@ -65,13 +65,9 @@ const SceneCarousel = ({
         >
           {title}
         </h2>
-        <div className="flex gap-4 overflow-hidden py-4">
+        <div className="grid grid-flow-col auto-cols-[280px] gap-4 overflow-hidden py-4">
           {[...Array(6)].map((_, i) => (
-            <div
-              key={i}
-              className="flex-shrink-0"
-              style={{ width: "280px", minWidth: "280px" }}
-            >
+            <div key={i}>
               <SkeletonSceneCard />
             </div>
           ))}
@@ -171,7 +167,7 @@ const SceneCarousel = ({
       <div className="relative overflow-visible">
         <div
           ref={scrollContainerRef}
-          className="flex gap-4 overflow-x-auto scrollbar-hide py-4"
+          className="grid grid-flow-col auto-cols-[280px] gap-4 overflow-x-auto scrollbar-hide py-4"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
@@ -180,11 +176,7 @@ const SceneCarousel = ({
           onScroll={checkScrollButtons}
         >
           {scenes.map((scene) => (
-            <div
-              key={scene.id}
-              className="flex-shrink-0"
-              style={{ width: "280px", minWidth: "280px" }}
-            >
+            <div key={scene.id}>
               <SceneCard
                 scene={scene}
                 onClick={onSceneClick}
