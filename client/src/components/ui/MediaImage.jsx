@@ -77,6 +77,7 @@ const MediaImage = ({
         loop
         muted
         playsInline
+        aria-hidden="true"
         className={className}
         style={style}
         onError={handleVideoError}

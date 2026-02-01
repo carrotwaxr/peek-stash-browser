@@ -178,6 +178,7 @@ export const CardImage = ({
                 loop
                 muted
                 playsInline
+                aria-hidden="true"
                 className={`absolute inset-0 w-full h-full transition-opacity duration-200 ${
                   isLoaded ? "opacity-100" : "opacity-0"
                 }`}

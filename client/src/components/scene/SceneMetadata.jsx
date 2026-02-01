@@ -44,7 +44,7 @@ const TagThumbnailLink = ({ tag, hasMultipleInstances }) => {
           className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: "var(--bg-secondary)" }}
         >
-          <span className="text-2xl">🏷️</span>
+          <span className="text-2xl font-bold" style={{ color: "var(--text-muted)" }}>T</span>
         </div>
       )}
       <span className="text-sm truncate flex-1">{tag.name}</span>
