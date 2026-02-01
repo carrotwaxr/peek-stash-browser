@@ -551,7 +551,37 @@ const UserEditModalContent = ({
               </div>
             </section>
 
-            {/* Section 4: Account Actions */}
+            {/* Section 4: Content Restrictions */}
+            <section>
+              <h3
+                className="text-sm font-medium mb-3 flex items-center gap-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <Lock size={16} />
+                Content Restrictions
+              </h3>
+              <div
+                className="p-4 rounded-lg"
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                }}
+              >
+                <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>
+                  Manage content restrictions for this user. Restrictions control which content is visible based on collections, tags, studios, and galleries.
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowContentRestrictionsModal(true)}
+                >
+                  <Lock size={14} className="mr-1" />
+                  Manage Restrictions
+                </Button>
+              </div>
+            </section>
+
+            {/* Section 5: Account Actions */}
             <section>
               <h3
                 className="text-sm font-medium mb-3 flex items-center gap-2"
@@ -635,36 +665,6 @@ const UserEditModalContent = ({
                     )}
                   </div>
                 )}
-              </div>
-            </section>
-
-            {/* Section 5: Content Restrictions */}
-            <section>
-              <h3
-                className="text-sm font-medium mb-3 flex items-center gap-2"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                <Lock size={16} />
-                Content Restrictions
-              </h3>
-              <div
-                className="p-4 rounded-lg"
-                style={{
-                  backgroundColor: "var(--bg-secondary)",
-                  border: "1px solid var(--border-color)",
-                }}
-              >
-                <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>
-                  Manage content restrictions for this user. Restrictions control which content is visible based on collections, tags, studios, and galleries.
-                </p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowContentRestrictionsModal(true)}
-                >
-                  <Lock size={14} className="mr-1" />
-                  Manage Restrictions
-                </Button>
               </div>
             </section>
           </div>

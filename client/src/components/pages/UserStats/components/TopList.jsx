@@ -66,25 +66,9 @@ const TopList = ({
   const isPortrait = ["performer", "gallery", "group"].includes(entityType);
 
   /**
-   * Format the primary stat based on sort mode
+   * Get all stats for display, with sort-relevant stat first
    */
-  const getPrimaryStat = (item) => {
-    switch (sortBy) {
-      case "oCount":
-        return `${item.oCount} Os`;
-      case "playCount":
-        return `${item.playCount} plays`;
-      case "engagement":
-      default:
-        // Format score as percentage (0-100 percentile)
-        return `${Math.round(item.score)}%`;
-    }
-  };
-
-  /**
-   * Get the secondary stats (excluding the primary one)
-   */
-  const getSecondaryStats = (item) => {
+  const getStats = (item) => {
     const duration =
       item.playDuration > 0
         ? formatDurationHumanReadable(item.playDuration, {
@@ -92,15 +76,27 @@ const TopList = ({
           })
         : null;
 
+    const playCount = `${item.playCount ?? 0} plays`;
+    const oCount = item.oCount > 0 ? `${item.oCount} Os` : null;
+    const engagement = `Top ${Math.round(item.score ?? 0)}%`;
+
+    // Build parts with sort-relevant stat first
     const parts = [];
-    if (duration) parts.push(duration);
-    if (sortBy !== "playCount") parts.push(`${item.playCount} plays`);
-    if (sortBy !== "oCount" && item.oCount > 0) parts.push(`${item.oCount} Os`);
-    if (sortBy === "engagement" || sortBy === "oCount" || sortBy === "playCount") {
-      // Show score when not sorting by engagement
-      if (sortBy !== "engagement") {
-        parts.push(`${Math.round(item.score)}% eng`);
-      }
+
+    if (sortBy === "playCount") {
+      parts.push(playCount);
+      if (duration) parts.push(duration);
+      if (oCount) parts.push(oCount);
+    } else if (sortBy === "oCount") {
+      if (oCount) parts.push(oCount);
+      if (duration) parts.push(duration);
+      parts.push(playCount);
+    } else {
+      // engagement sort
+      parts.push(engagement);
+      if (duration) parts.push(duration);
+      parts.push(playCount);
+      if (oCount) parts.push(oCount);
     }
 
     return parts.join(" \u2022 ");
@@ -184,22 +180,14 @@ const TopList = ({
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="text-base font-medium truncate"
-                    style={{ color: "var(--text-primary)" }}
-                  >
-                    {displayName}
-                  </span>
-                  <span
-                    className="text-sm font-semibold flex-shrink-0"
-                    style={{ color: "var(--primary-color)" }}
-                  >
-                    {getPrimaryStat(item)}
-                  </span>
+                <div
+                  className="text-base font-medium truncate"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  {displayName}
                 </div>
                 <div className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  {getSecondaryStats(item)}
+                  {getStats(item)}
                 </div>
               </div>
             </Link>
