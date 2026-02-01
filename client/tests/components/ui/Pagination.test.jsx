@@ -215,61 +215,112 @@ describe("Pagination", () => {
   });
 
   describe("Per-Page Selector", () => {
-    it("calls onPerPageChange when per-page value changed and blurred", async () => {
+    it("calls onPerPageChange when preset selected from dropdown", async () => {
       const user = userEvent.setup();
       const onPerPageChange = vi.fn();
       render(<Pagination {...defaultProps} perPage={24} onPerPageChange={onPerPageChange} />);
 
-      const perPageInput = screen.getByLabelText("Per Page:");
-      await user.clear(perPageInput);
-      await user.type(perPageInput, "48");
-      await user.tab(); // Trigger blur to submit
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      await user.selectOptions(perPageSelect, "48");
 
       expect(onPerPageChange).toHaveBeenCalledWith(48);
     });
 
-    it("calls onPerPageChange when Enter pressed", async () => {
+    it("shows custom input when Custom option selected", async () => {
+      const user = userEvent.setup();
+      render(<Pagination {...defaultProps} perPage={24} />);
+
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      await user.selectOptions(perPageSelect, "custom");
+
+      // Custom input should now be visible
+      expect(screen.getByPlaceholderText("1-500")).toBeInTheDocument();
+    });
+
+    it("calls onPerPageChange with custom value on blur", async () => {
       const user = userEvent.setup();
       const onPerPageChange = vi.fn();
       render(<Pagination {...defaultProps} perPage={24} onPerPageChange={onPerPageChange} />);
 
-      const perPageInput = screen.getByLabelText("Per Page:");
-      await user.clear(perPageInput);
-      await user.type(perPageInput, "100{Enter}");
+      // Select custom option first
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      await user.selectOptions(perPageSelect, "custom");
+
+      // Type in custom input and blur
+      const customInput = screen.getByPlaceholderText("1-500");
+      await user.clear(customInput);
+      await user.type(customInput, "100");
+      await user.tab();
 
       expect(onPerPageChange).toHaveBeenCalledWith(100);
     });
 
-    it("accepts values between 1 and 500", () => {
-      render(<Pagination {...defaultProps} perPage={250} />);
-
-      const perPageInput = screen.getByLabelText("Per Page:");
-      expect(perPageInput).toHaveAttribute("type", "number");
-      expect(perPageInput).toHaveAttribute("min", "1");
-      expect(perPageInput).toHaveAttribute("max", "500");
-    });
-
-    it("shows current per-page value", () => {
-      render(<Pagination {...defaultProps} perPage={48} />);
-
-      const perPageInput = screen.getByLabelText("Per Page:");
-      expect(perPageInput).toHaveValue(48);
-    });
-
-    it("resets to current value on invalid input", async () => {
+    it("calls onPerPageChange with custom value on Enter", async () => {
       const user = userEvent.setup();
       const onPerPageChange = vi.fn();
       render(<Pagination {...defaultProps} perPage={24} onPerPageChange={onPerPageChange} />);
 
-      const perPageInput = screen.getByLabelText("Per Page:");
-      await user.clear(perPageInput);
-      await user.type(perPageInput, "0"); // Invalid (below min)
-      await user.tab(); // Trigger blur
+      // Select custom option first
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      await user.selectOptions(perPageSelect, "custom");
+
+      // Type in custom input and press Enter
+      const customInput = screen.getByPlaceholderText("1-500");
+      await user.clear(customInput);
+      await user.type(customInput, "75{Enter}");
+
+      expect(onPerPageChange).toHaveBeenCalledWith(75);
+    });
+
+    it("shows preset dropdown with current value selected", () => {
+      render(<Pagination {...defaultProps} perPage={48} />);
+
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      expect(perPageSelect).toHaveValue("48");
+    });
+
+    it("shows Custom selected for non-preset values", () => {
+      render(<Pagination {...defaultProps} perPage={100} />);
+
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      expect(perPageSelect).toHaveValue("custom");
+      // Custom input should show the current value
+      expect(screen.getByPlaceholderText("1-500")).toHaveValue("100");
+    });
+
+    it("resets custom input on invalid value", async () => {
+      const user = userEvent.setup();
+      const onPerPageChange = vi.fn();
+      render(<Pagination {...defaultProps} perPage={24} onPerPageChange={onPerPageChange} />);
+
+      // Select custom option
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      await user.selectOptions(perPageSelect, "custom");
+
+      // Type invalid value and blur
+      const customInput = screen.getByPlaceholderText("1-500");
+      await user.clear(customInput);
+      await user.type(customInput, "0");
+      await user.tab();
 
       // Should not call onPerPageChange for invalid values
       expect(onPerPageChange).not.toHaveBeenCalled();
       // Input should reset to current value
-      expect(perPageInput).toHaveValue(24);
+      expect(customInput).toHaveValue("24");
+    });
+
+    it("has preset options 12, 24, 48, 96, 120", () => {
+      render(<Pagination {...defaultProps} perPage={24} />);
+
+      const perPageSelect = screen.getByLabelText("Per Page:");
+      const options = Array.from(perPageSelect.options).map(o => o.value);
+
+      expect(options).toContain("12");
+      expect(options).toContain("24");
+      expect(options).toContain("48");
+      expect(options).toContain("96");
+      expect(options).toContain("120");
+      expect(options).toContain("custom");
     });
   });
 

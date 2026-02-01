@@ -1,16 +1,36 @@
 // client/src/components/pages/UserStats/UserStats.jsx
 
 import { useState } from "react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Info } from "lucide-react";
 import { usePageTitle } from "../../../hooks/usePageTitle.js";
 import { useUserStats } from "../../../hooks/useUserStats.js";
-import { PageHeader, PageLayout, LoadingSpinner } from "../../ui/index.js";
+import { PageHeader, PageLayout, LoadingSpinner, Tooltip } from "../../ui/index.js";
 import {
   LibraryOverview,
   EngagementTotals,
   TopList,
   HighlightCard,
 } from "./components/index.js";
+
+/**
+ * Info content explaining sort options
+ */
+const SortInfoContent = () => (
+  <div className="text-sm max-w-xs">
+    <p className="font-semibold mb-2">Sort Options</p>
+    <ul className="space-y-2">
+      <li>
+        <span className="font-medium">Engagement:</span> Percentile rank combining O-count (weighted 5x), watch duration, and play count, normalized by how often you see this content.
+      </li>
+      <li>
+        <span className="font-medium">O-Count:</span> Total Os recorded for scenes featuring this entity.
+      </li>
+      <li>
+        <span className="font-medium">Play Count:</span> Total times scenes featuring this entity were played.
+      </li>
+    </ul>
+  </div>
+);
 
 const UserStats = () => {
   usePageTitle("My Stats");
@@ -90,14 +110,25 @@ const UserStats = () => {
 
             {/* Top Lists */}
             <section>
-              <h2
-                className="text-lg font-semibold mb-4"
-                style={{ color: "var(--text-primary)" }}
-              >
-                Top Content
-              </h2>
+              <div className="flex items-center gap-2 mb-4">
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--text-primary)" }}
+                >
+                  Top Content
+                </h2>
+                <Tooltip content={<SortInfoContent />} position="right">
+                  <button
+                    className="p-1 rounded-full hover:bg-[var(--bg-secondary)] transition-colors"
+                    aria-label="Sort options info"
+                  >
+                    <Info size={16} style={{ color: "var(--text-muted)" }} />
+                  </button>
+                </Tooltip>
+              </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <TopList
+                  key={`scenes-${sortBy}`}
                   title="Top Scenes"
                   items={data.topScenes}
                   linkPrefix="/scene"
@@ -106,6 +137,7 @@ const UserStats = () => {
                   onSortChange={setSortBy}
                 />
                 <TopList
+                  key={`performers-${sortBy}`}
                   title="Top Performers"
                   items={data.topPerformers}
                   linkPrefix="/performer"
@@ -114,6 +146,7 @@ const UserStats = () => {
                   onSortChange={setSortBy}
                 />
                 <TopList
+                  key={`studios-${sortBy}`}
                   title="Top Studios"
                   items={data.topStudios}
                   linkPrefix="/studio"
@@ -122,6 +155,7 @@ const UserStats = () => {
                   onSortChange={setSortBy}
                 />
                 <TopList
+                  key={`tags-${sortBy}`}
                   title="Top Tags"
                   items={data.topTags}
                   linkPrefix="/tag"

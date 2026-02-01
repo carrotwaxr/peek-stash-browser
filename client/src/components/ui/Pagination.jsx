@@ -12,6 +12,9 @@ import { useHorizontalNavigation } from "../../hooks/useHorizontalNavigation.js"
 /**
  * Reusable pagination component
  */
+// Common per-page presets
+const PER_PAGE_PRESETS = [12, 24, 48, 96, 120];
+
 const Pagination = ({
   currentPage = 1,
   totalPages,
@@ -28,41 +31,72 @@ const Pagination = ({
   onEscapeDown,
 }) => {
   const { isTVMode } = useTVMode();
-  const [perPageInput, setPerPageInput] = useState(String(perPage));
-  const [perPageError, setPerPageError] = useState(false);
+  const [customInput, setCustomInput] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customError, setCustomError] = useState(false);
 
-  // Sync input when perPage prop changes
+  // Determine if current perPage is a preset or custom
+  const isPreset = PER_PAGE_PRESETS.includes(perPage);
+
+  // Sync custom input visibility when perPage changes externally
   useEffect(() => {
-    setPerPageInput(String(perPage));
-    setPerPageError(false);
-  }, [perPage]);
-
-  const handlePerPageChange = (value) => {
-    setPerPageInput(value);
-
-    const num = parseInt(value, 10);
-    if (isNaN(num) || num < 1 || num > 500) {
-      setPerPageError(true);
-      return;
+    if (isPreset) {
+      setShowCustomInput(false);
+      setCustomInput("");
+      setCustomError(false);
+    } else {
+      setShowCustomInput(true);
+      setCustomInput(String(perPage));
+      setCustomError(false);
     }
+  }, [perPage, isPreset]);
 
-    setPerPageError(false);
+  const handlePresetChange = (value) => {
+    if (value === "custom") {
+      setShowCustomInput(true);
+      setCustomInput(String(perPage));
+      // Focus the input after render
+      setTimeout(() => {
+        document.getElementById("perPageCustom")?.focus();
+      }, 0);
+    } else {
+      const num = parseInt(value, 10);
+      if (!isNaN(num) && num !== perPage) {
+        onPerPageChange(num);
+      }
+      setShowCustomInput(false);
+      setCustomInput("");
+      setCustomError(false);
+    }
   };
 
-  const handlePerPageSubmit = () => {
-    const num = parseInt(perPageInput, 10);
+  const handleCustomInputChange = (value) => {
+    setCustomInput(value);
+    const num = parseInt(value, 10);
+    setCustomError(isNaN(num) || num < 1 || num > 500);
+  };
+
+  const handleCustomSubmit = () => {
+    const num = parseInt(customInput, 10);
     if (!isNaN(num) && num >= 1 && num <= 500 && num !== perPage) {
       onPerPageChange(num);
-    } else {
+    } else if (isNaN(num) || num < 1 || num > 500) {
       // Reset to current value if invalid
-      setPerPageInput(String(perPage));
-      setPerPageError(false);
+      setCustomInput(String(perPage));
+      setCustomError(false);
     }
   };
 
-  const handlePerPageKeyDown = (e) => {
+  const handleCustomKeyDown = (e) => {
     if (e.key === "Enter") {
-      e.target.blur(); // Triggers onBlur which calls handlePerPageSubmit
+      e.target.blur();
+    } else if (e.key === "Escape") {
+      // Cancel custom input, revert to preset if possible
+      if (isPreset) {
+        setShowCustomInput(false);
+        setCustomInput("");
+        setCustomError(false);
+      }
     }
   };
 
@@ -231,25 +265,50 @@ const Pagination = ({
             <div
               data-tv-pagination-item="per-page"
               ref={(el) => paginationNav.setItemRef(5, el)}
-              className={paginationNav.isFocused(5) ? "keyboard-focus" : ""}
+              className={`flex items-center gap-1 ${paginationNav.isFocused(5) ? "keyboard-focus" : ""}`}
             >
-              <input
+              {/* Preset dropdown */}
+              <select
                 id="perPage"
-                type="number"
-                min="1"
-                max="500"
-                value={perPageInput}
-                onChange={(e) => handlePerPageChange(e.target.value)}
-                onBlur={handlePerPageSubmit}
-                onKeyDown={handlePerPageKeyDown}
-                className="w-16 sm:w-20 px-2 sm:px-3 py-1 rounded text-sm font-medium transition-colors text-center"
+                value={showCustomInput ? "custom" : perPage}
+                onChange={(e) => handlePresetChange(e.target.value)}
+                className="px-2 py-1 rounded text-sm font-medium transition-colors"
                 style={{
                   backgroundColor: "var(--bg-card)",
-                  color: perPageError ? "var(--status-error)" : "var(--text-primary)",
-                  border: `1px solid ${perPageError ? "var(--status-error)" : "var(--border-color)"}`,
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-color)",
                   height: "1.8rem",
                 }}
-              />
+              >
+                {PER_PAGE_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>
+                    {preset}
+                  </option>
+                ))}
+                <option value="custom">Custom...</option>
+              </select>
+
+              {/* Custom input (shown when custom value selected) */}
+              {showCustomInput && (
+                <input
+                  id="perPageCustom"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={customInput}
+                  onChange={(e) => handleCustomInputChange(e.target.value)}
+                  onBlur={handleCustomSubmit}
+                  onKeyDown={handleCustomKeyDown}
+                  placeholder="1-500"
+                  className="w-14 px-2 py-1 rounded text-sm font-medium transition-colors text-center"
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    color: customError ? "var(--status-error)" : "var(--text-primary)",
+                    border: `1px solid ${customError ? "var(--status-error)" : "var(--border-color)"}`,
+                    height: "1.8rem",
+                  }}
+                />
+              )}
             </div>
           </div>
         )}

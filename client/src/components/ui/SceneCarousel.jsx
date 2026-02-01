@@ -167,7 +167,7 @@ const SceneCarousel = ({
       <div className="relative overflow-visible">
         <div
           ref={scrollContainerRef}
-          className="grid grid-flow-col auto-cols-[280px] gap-4 overflow-x-auto scrollbar-hide py-4"
+          className="grid grid-flow-col auto-cols-[280px] items-stretch gap-4 overflow-x-auto scrollbar-hide py-4"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
@@ -176,7 +176,7 @@ const SceneCarousel = ({
           onScroll={checkScrollButtons}
         >
           {scenes.map((scene) => (
-            <div key={scene.id}>
+            <div key={scene.id} className="h-full">
               <SceneCard
                 scene={scene}
                 onClick={onSceneClick}
@@ -184,6 +184,7 @@ const SceneCarousel = ({
                 isSelected={selectedScenes.some((s) => s.id === scene.id)}
                 onToggleSelect={onToggleSelect}
                 selectionMode={selectedScenes.length > 0}
+                className="h-full"
               />
             </div>
           ))}

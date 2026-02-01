@@ -1,6 +1,6 @@
 // client/src/hooks/useUserStats.js
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useAuth } from "./useAuth.js";
 import { apiGet } from "../services/api.js";
 
@@ -20,15 +20,19 @@ export function useUserStats({ sortBy = "engagement" } = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const isInitialLoad = useRef(true);
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = useCallback(async (showLoading = true) => {
     if (!isAuthenticated) {
       setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load, not on sort changes
+      if (showLoading) {
+        setLoading(true);
+      }
       setError(null);
       const params = new URLSearchParams();
       if (sortBy && sortBy !== "engagement") {
@@ -47,7 +51,9 @@ export function useUserStats({ sortBy = "engagement" } = {}) {
   }, [isAuthenticated, sortBy]);
 
   useEffect(() => {
-    fetchStats();
+    // Show loading only on initial load
+    fetchStats(isInitialLoad.current);
+    isInitialLoad.current = false;
   }, [fetchStats]);
 
   return { data, loading, error, refresh: fetchStats };
