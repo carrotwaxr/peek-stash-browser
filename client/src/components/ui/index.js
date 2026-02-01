@@ -40,6 +40,7 @@ export { default as InfoMessage } from "./InfoMessage.jsx";
 export { default as LazyThumbnail } from "./LazyThumbnail.jsx";
 export { default as Lightbox } from "./Lightbox.jsx";
 export { default as LoadingSpinner } from "./LoadingSpinner.jsx";
+export { default as MediaImage } from "./MediaImage.jsx";
 export { default as Navigation } from "./Navigation.jsx";
 export { default as OCounterButton } from "./OCounterButton.jsx";
 export { default as PageHeader } from "./PageHeader.jsx";

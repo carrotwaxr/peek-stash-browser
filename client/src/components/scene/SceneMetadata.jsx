@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CardCountIndicators } from "../ui/index.js";
+import { CardCountIndicators, MediaImage } from "../ui/index.js";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { getEntityPath } from "../../utils/entityLinks.js";
 
@@ -17,6 +18,38 @@ const getAllTags = (scene) => {
     scene.inheritedTags.forEach((tag) => tagMap.set(tag.id, tag));
   }
   return Array.from(tagMap.values());
+};
+
+/**
+ * Tag thumbnail link component that handles video tag images
+ */
+const TagThumbnailLink = ({ tag, hasMultipleInstances }) => {
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
+
+  return (
+    <Link
+      to={getEntityPath('tag', tag, hasMultipleInstances)}
+      className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {tag.image_path && !showPlaceholder ? (
+        <MediaImage
+          src={tag.image_path}
+          alt={tag.name}
+          className="w-16 h-16 rounded object-cover flex-shrink-0"
+          onError={() => setShowPlaceholder(true)}
+        />
+      ) : (
+        <div
+          className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: "var(--bg-secondary)" }}
+        >
+          <span className="text-2xl font-bold" style={{ color: "var(--text-muted)" }}>T</span>
+        </div>
+      )}
+      <span className="text-sm truncate flex-1">{tag.name}</span>
+    </Link>
+  );
 };
 
 /**
@@ -66,28 +99,7 @@ const SceneMetadata = ({ scene }) => {
       <div className="font-semibold mb-3 text-base">Tags</div>
       <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2">
         {allTags.map((tag) => (
-          <Link
-            key={tag.id}
-            to={getEntityPath('tag', tag, hasMultipleInstances)}
-            className="flex items-center gap-3 p-2 rounded hover:bg-white/10 transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {tag.image_path ? (
-              <img
-                src={tag.image_path}
-                alt={tag.name}
-                className="w-16 h-16 rounded object-cover flex-shrink-0"
-              />
-            ) : (
-              <div
-                className="w-16 h-16 rounded flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: "var(--bg-secondary)" }}
-              >
-                <span className="text-2xl">🏷️</span>
-              </div>
-            )}
-            <span className="text-sm truncate flex-1">{tag.name}</span>
-          </Link>
+          <TagThumbnailLink key={tag.id} tag={tag} hasMultipleInstances={hasMultipleInstances} />
         ))}
       </div>
     </div>

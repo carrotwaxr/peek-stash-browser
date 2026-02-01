@@ -12,6 +12,18 @@
  */
 
 import prisma from "../prisma/singleton.js";
+
+/**
+ * Valid sort options for top lists
+ */
+export type TopListSortBy = "engagement" | "oCount" | "playCount";
+
+/**
+ * Options for getUserStats
+ */
+export interface UserStatsOptions {
+  sortBy?: TopListSortBy;
+}
 import type {
   UserStatsResponse,
   LibraryStats,
@@ -68,8 +80,12 @@ class UserStatsAggregationService {
   /**
    * Get all user stats in a single call
    * Top lists read from pre-computed UserEntityRanking table
+   * @param userId - The user ID
+   * @param options - Optional parameters for customization
    */
-  async getUserStats(userId: number): Promise<UserStatsResponse> {
+  async getUserStats(userId: number, options: UserStatsOptions = {}): Promise<UserStatsResponse> {
+    const { sortBy = "engagement" } = options;
+
     const [
       library,
       engagement,
@@ -84,10 +100,10 @@ class UserStatsAggregationService {
     ] = await Promise.all([
       this.getLibraryStats(userId),
       this.getEngagementStats(userId),
-      this.getTopScenes(userId, 10),
-      this.getTopPerformers(userId, 10),
-      this.getTopStudios(userId, 10),
-      this.getTopTags(userId, 10),
+      this.getTopScenes(userId, 10, sortBy),
+      this.getTopPerformers(userId, 10, sortBy),
+      this.getTopStudios(userId, 10, sortBy),
+      this.getTopTags(userId, 10, sortBy),
       this.getMostWatchedScene(userId),
       this.getMostViewedImage(userId),
       this.getMostOdScene(userId),
@@ -190,13 +206,28 @@ class UserStatsAggregationService {
   }
 
   /**
-   * Get top scenes by percentile rank from pre-computed rankings
+   * Map sortBy option to Prisma orderBy field
    */
-  private async getTopScenes(userId: number, limit: number): Promise<TopScene[]> {
+  private getSortField(sortBy: TopListSortBy): "percentileRank" | "oCount" | "playCount" {
+    switch (sortBy) {
+      case "oCount":
+        return "oCount";
+      case "playCount":
+        return "playCount";
+      case "engagement":
+      default:
+        return "percentileRank";
+    }
+  }
+
+  /**
+   * Get top scenes by the specified sort order from pre-computed rankings
+   */
+  private async getTopScenes(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopScene[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "scene" },
-      orderBy: { percentileRank: "desc" },
+      orderBy: { [this.getSortField(sortBy)]: "desc" },
       take: limit,
     });
 
@@ -226,13 +257,13 @@ class UserStatsAggregationService {
   }
 
   /**
-   * Get top performers by percentile rank from pre-computed rankings
+   * Get top performers by the specified sort order from pre-computed rankings
    */
-  private async getTopPerformers(userId: number, limit: number): Promise<TopPerformer[]> {
+  private async getTopPerformers(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopPerformer[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "performer" },
-      orderBy: { percentileRank: "desc" },
+      orderBy: { [this.getSortField(sortBy)]: "desc" },
       take: limit,
     });
 
@@ -261,13 +292,13 @@ class UserStatsAggregationService {
   }
 
   /**
-   * Get top studios by percentile rank from pre-computed rankings
+   * Get top studios by the specified sort order from pre-computed rankings
    */
-  private async getTopStudios(userId: number, limit: number): Promise<TopStudio[]> {
+  private async getTopStudios(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopStudio[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "studio" },
-      orderBy: { percentileRank: "desc" },
+      orderBy: { [this.getSortField(sortBy)]: "desc" },
       take: limit,
     });
 
@@ -296,13 +327,13 @@ class UserStatsAggregationService {
   }
 
   /**
-   * Get top tags by percentile rank from pre-computed rankings
+   * Get top tags by the specified sort order from pre-computed rankings
    */
-  private async getTopTags(userId: number, limit: number): Promise<TopTag[]> {
+  private async getTopTags(userId: number, limit: number, sortBy: TopListSortBy = "engagement"): Promise<TopTag[]> {
     // Query pre-computed rankings
     const rankings = await prisma.userEntityRanking.findMany({
       where: { userId, entityType: "tag" },
-      orderBy: { percentileRank: "desc" },
+      orderBy: { [this.getSortField(sortBy)]: "desc" },
       take: limit,
     });
 

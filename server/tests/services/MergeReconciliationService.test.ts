@@ -42,6 +42,12 @@ vi.mock("../../prisma/singleton.js", () => ({
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    playlistItem: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      delete: vi.fn(),
+      update: vi.fn(),
+    },
     mergeRecord: {
       create: vi.fn(),
     },
@@ -130,6 +136,7 @@ describe("MergeReconciliationService", () => {
 
       vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
       vi.mocked(prisma.watchHistory.create).mockResolvedValue({} as never);
+      vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
       vi.mocked(prisma.mergeRecord.create).mockResolvedValue({ id: "mr-1" } as never);
 
       const result = await mergeReconciliationService.transferUserData(
@@ -178,6 +185,7 @@ describe("MergeReconciliationService", () => {
 
       vi.mocked(prisma.sceneRating.findUnique).mockResolvedValue(null);
       vi.mocked(prisma.watchHistory.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
       vi.mocked(prisma.mergeRecord.create).mockResolvedValue({ id: "mr-1" } as never);
 
       const result = await mergeReconciliationService.transferUserData(
@@ -217,6 +225,7 @@ describe("MergeReconciliationService", () => {
         } as never);
 
       vi.mocked(prisma.sceneRating.update).mockResolvedValue({} as never);
+      vi.mocked(prisma.playlistItem.findMany).mockResolvedValue([]);
       vi.mocked(prisma.mergeRecord.create).mockResolvedValue({ id: "mr-1" } as never);
 
       await mergeReconciliationService.transferUserData("source", "target", 1, null, null);

@@ -3190,6 +3190,77 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * Re-probe clips that were synced before previews were generated.
+   * Finds all clips with isGenerated=false and re-checks their preview URLs.
+   * Updates any clips that now have valid previews.
+   *
+   * @param stashInstanceId - The instance ID to re-probe clips for
+   * @returns Object with counts of checked and updated clips
+   */
+  async reProbeUngeneratedClips(stashInstanceId: string): Promise<{ checked: number; updated: number }> {
+    logger.info("Re-probing ungenerated clips...", { stashInstanceId });
+    const startTime = Date.now();
+
+    // Find all clips with isGenerated=false for this instance
+    const clips = await prisma.stashClip.findMany({
+      where: {
+        stashInstanceId,
+        isGenerated: false,
+        deletedAt: null,
+      },
+      select: { id: true, previewPath: true },
+    });
+
+    if (clips.length === 0) {
+      logger.info("No ungenerated clips to re-probe");
+      return { checked: 0, updated: 0 };
+    }
+
+    logger.info(`Found ${clips.length} ungenerated clips to re-probe`);
+
+    // Build preview URLs with API key
+    const apiKey = stashInstanceManager.getApiKey(stashInstanceId);
+    const urlMap = new Map<string, string>();
+    for (const clip of clips) {
+      if (clip.previewPath) {
+        const url = `${clip.previewPath}?apikey=${apiKey}`;
+        urlMap.set(url, clip.id);
+      }
+    }
+
+    // Probe in batches using ClipPreviewProber
+    const results = await clipPreviewProber.probeBatch(Array.from(urlMap.keys()));
+
+    // Update clips that are now generated
+    let updated = 0;
+    for (const [url, isGenerated] of results) {
+      if (isGenerated) {
+        const clipId = urlMap.get(url);
+        if (clipId) {
+          await prisma.stashClip.update({
+            where: {
+              id_stashInstanceId: {
+                id: clipId,
+                stashInstanceId,
+              },
+            },
+            data: {
+              isGenerated: true,
+              generationCheckedAt: new Date(),
+            },
+          });
+          updated++;
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    logger.info(`Re-probe complete: ${updated}/${clips.length} clips now have previews (${duration}ms)`);
+
+    return { checked: clips.length, updated };
+  }
+
+  /**
    * Compute sceneCountViaPerformers for all tags using SQL.
    * This counts scenes where a performer in the scene has this tag.
    * Called after sync completes to pre-compute the value for fast retrieval.

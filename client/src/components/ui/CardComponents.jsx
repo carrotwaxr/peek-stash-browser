@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
 import { libraryApi } from "../../services/api";
@@ -90,8 +90,40 @@ export const CardImage = ({
   const [ref, isVisible] = useLazyLoad();
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isVideo, setIsVideo] = useState(false);
+
+  // Reset state when src changes
+  useEffect(() => {
+    setHasError(false);
+    setIsLoaded(false);
+    setIsVideo(false);
+  }, [src]);
 
   const showPlaceholder = !src || hasError;
+
+  // Handle image error - check if it's actually a video file
+  const handleImageError = useCallback(async () => {
+    if (!src) {
+      setHasError(true);
+      return;
+    }
+
+    // Check Content-Type via HEAD request to determine if it's actually a video
+    // This handles cases where tag images are video files (.mp4, .webm)
+    try {
+      const res = await fetch(src, { method: "HEAD" });
+      const contentType = res.headers.get("Content-Type");
+
+      if (contentType?.startsWith("video/")) {
+        setIsVideo(true);
+        return;
+      }
+    } catch {
+      // Network error or CORS issue - fall through to error state
+    }
+
+    setHasError(true);
+  }, [src]);
 
   const getPlaceholderIcon = () => {
     const icons = {
@@ -137,18 +169,35 @@ export const CardImage = ({
               style={{ backgroundColor: "var(--bg-tertiary)" }}
             />
           )}
-          {/* Actual image - only render when visible for lazy loading */}
+          {/* Actual media - only render when visible for lazy loading */}
           {isVisible && (
-            <img
-              src={src}
-              alt={alt}
-              className={`absolute inset-0 w-full h-full transition-opacity duration-200 ${
-                isLoaded ? "opacity-100" : "opacity-0"
-              }`}
-              style={{ objectFit }}
-              onLoad={() => setIsLoaded(true)}
-              onError={() => setHasError(true)}
-            />
+            isVideo ? (
+              <video
+                src={src}
+                autoPlay
+                loop
+                muted
+                playsInline
+                aria-hidden="true"
+                className={`absolute inset-0 w-full h-full transition-opacity duration-200 ${
+                  isLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                style={{ objectFit }}
+                onLoadedData={() => setIsLoaded(true)}
+                onError={() => setHasError(true)}
+              />
+            ) : (
+              <img
+                src={src}
+                alt={alt}
+                className={`absolute inset-0 w-full h-full transition-opacity duration-200 ${
+                  isLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                style={{ objectFit }}
+                onLoad={() => setIsLoaded(true)}
+                onError={handleImageError}
+              />
+            )
           )}
         </>
       )}

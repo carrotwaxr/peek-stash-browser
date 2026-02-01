@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Clock, Cpu, Database, HardDrive, RefreshCw } from "lucide-react";
+import { Clock, Cpu, Database, HardDrive, RefreshCw, Film } from "lucide-react";
 import { Button, Paper } from "../ui/index.js";
+import { useAuth } from "../../hooks/useAuth.js";
 
 const api = axios.create({
   baseURL: "/api",
@@ -9,9 +10,13 @@ const api = axios.create({
 });
 
 const ServerStatsSection = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshingCache, setRefreshingCache] = useState(false);
+  const [reprobingClips, setReprobingClips] = useState(false);
+  const [reprobeResult, setReprobeResult] = useState(null);
 
   const loadStats = async () => {
     try {
@@ -36,6 +41,29 @@ const ServerStatsSection = () => {
       // Silently fail - will show error in console
     } finally {
       setRefreshingCache(false);
+    }
+  };
+
+  const reprobeClips = async () => {
+    try {
+      setReprobingClips(true);
+      setReprobeResult(null);
+      const response = await api.post("/sync/reprobe-clips");
+      setReprobeResult({
+        success: true,
+        checked: response.data.checked,
+        updated: response.data.updated,
+      });
+      // Reload stats to reflect updated counts
+      loadStats();
+    } catch (err) {
+      console.error("Failed to re-probe clips:", err);
+      setReprobeResult({
+        success: false,
+        message: err.response?.data?.message || "Failed to re-probe clips",
+      });
+    } finally {
+      setReprobingClips(false);
     }
   };
 
@@ -203,6 +231,70 @@ const ServerStatsSection = () => {
             </div>
           </div>
         </div>
+
+        {/* Clips Maintenance Section - show if there are ungenerated clips */}
+        {isAdmin && stats.cache?.counts?.ungeneratedClips > 0 && (
+          <>
+            <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3
+                    className="text-sm font-semibold"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    Clips Maintenance
+                  </h3>
+                  <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                    {stats.cache.counts.ungeneratedClips.toLocaleString()} clip{stats.cache.counts.ungeneratedClips !== 1 ? "s" : ""} pending preview generation
+                  </p>
+                </div>
+                <Button
+                  onClick={reprobeClips}
+                  disabled={reprobingClips || stats.cache?.isRefreshing}
+                  variant="secondary"
+                  size="sm"
+                  icon={
+                    <Film
+                      className={`w-4 h-4 ${reprobingClips ? "animate-pulse" : ""}`}
+                    />
+                  }
+                >
+                  {reprobingClips ? "Re-probing..." : "Re-probe Clips"}
+                </Button>
+              </div>
+              <div
+                className="p-3 rounded-lg text-sm"
+                style={{
+                  backgroundColor: "rgba(59, 130, 246, 0.1)",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                <p>
+                  Some clips were synced before their previews were generated in Stash.
+                  Click &quot;Re-probe Clips&quot; to check if previews are now available.
+                </p>
+              </div>
+              {reprobeResult && (
+                <div
+                  className="mt-3 p-3 rounded-lg text-sm"
+                  style={{
+                    backgroundColor: reprobeResult.success
+                      ? "rgba(34, 197, 94, 0.1)"
+                      : "rgba(239, 68, 68, 0.1)",
+                    color: reprobeResult.success
+                      ? "rgb(34, 197, 94)"
+                      : "rgb(239, 68, 68)",
+                  }}
+                >
+                  {reprobeResult.success
+                    ? `Checked ${reprobeResult.checked.toLocaleString()} clips, ${reprobeResult.updated.toLocaleString()} now have previews`
+                    : reprobeResult.message}
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
 

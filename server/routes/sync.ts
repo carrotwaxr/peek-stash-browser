@@ -183,6 +183,57 @@ router.post(
 );
 
 /**
+ * POST /api/sync/reprobe-clips
+ * Re-probe clips that were synced before previews were generated (admin only)
+ *
+ * Body: { instanceId?: string }
+ * If instanceId is not provided, uses the first enabled instance
+ */
+router.post(
+  "/reprobe-clips",
+  requireAdmin,
+  authenticated(async (req, res) => {
+    try {
+      if (stashSyncService.isSyncing()) {
+        return res.status(409).json({
+          error: "Sync in progress",
+          message: "Cannot re-probe clips while a sync is running",
+        });
+      }
+
+      const { instanceId } = req.body;
+
+      // If no instance specified, get the first enabled instance
+      const { stashInstanceManager } = await import("../services/StashInstanceManager.js");
+      let targetInstanceId = instanceId;
+      if (!targetInstanceId) {
+        const enabledInstances = stashInstanceManager.getAllEnabled();
+        if (enabledInstances.length === 0) {
+          return res.status(400).json({
+            error: "No Stash instances",
+            message: "No enabled Stash instances found",
+          });
+        }
+        targetInstanceId = enabledInstances[0].id;
+      }
+
+      const result = await stashSyncService.reProbeUngeneratedClips(targetInstanceId);
+
+      res.json({
+        ok: true,
+        ...result,
+        message: `Re-probed ${result.checked} clips, ${result.updated} now have previews`,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to re-probe clips",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  })
+);
+
+/**
  * PUT /api/sync/settings
  * Update sync settings (admin only)
  *

@@ -12,10 +12,10 @@ import {
  */
 const getFallbackIcon = (entityType) => {
   const icons = {
-    performer: "👤",
-    studio: "🎬",
-    tag: "🏷️",
-    scene: "🎬",
+    performer: "P",
+    studio: "S",
+    tag: "T",
+    scene: "V",
   };
   return icons[entityType] || "?";
 };
@@ -31,14 +31,33 @@ const getDisplayName = (item) => {
 };
 
 /**
+ * Sort options with labels
+ */
+const SORT_OPTIONS = [
+  { value: "engagement", label: "Engagement" },
+  { value: "oCount", label: "O-Count" },
+  { value: "playCount", label: "Play Count" },
+];
+
+/**
  * Ranked list of top items
  * All items use consistent row height - landscape images pillarboxed to match portrait height
  * @param {string} entityType - Type of entity for aspect ratio (performer, studio, tag, scene)
+ * @param {string} sortBy - Current sort mode: "engagement", "oCount", or "playCount"
+ * @param {function} onSortChange - Callback when sort mode changes
  */
 // Fixed height for 5 visible items (each row ~72px with padding)
 const LIST_HEIGHT = "360px";
 
-const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage = true }) => {
+const TopList = ({
+  title,
+  items,
+  linkPrefix,
+  entityType = "performer",
+  showImage = true,
+  sortBy = "engagement",
+  onSortChange,
+}) => {
   if (!items || items.length === 0) {
     return null;
   }
@@ -46,10 +65,51 @@ const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage
   const fallbackIcon = getFallbackIcon(entityType);
   const isPortrait = ["performer", "gallery", "group"].includes(entityType);
 
+  /**
+   * Format the primary stat based on sort mode
+   */
+  const getPrimaryStat = (item) => {
+    switch (sortBy) {
+      case "oCount":
+        return `${item.oCount} Os`;
+      case "playCount":
+        return `${item.playCount} plays`;
+      case "engagement":
+      default:
+        // Format score as percentage (0-100 percentile)
+        return `${Math.round(item.score)}%`;
+    }
+  };
+
+  /**
+   * Get the secondary stats (excluding the primary one)
+   */
+  const getSecondaryStats = (item) => {
+    const duration =
+      item.playDuration > 0
+        ? formatDurationHumanReadable(item.playDuration, {
+            includeDays: false,
+          })
+        : null;
+
+    const parts = [];
+    if (duration) parts.push(duration);
+    if (sortBy !== "playCount") parts.push(`${item.playCount} plays`);
+    if (sortBy !== "oCount" && item.oCount > 0) parts.push(`${item.oCount} Os`);
+    if (sortBy === "engagement" || sortBy === "oCount" || sortBy === "playCount") {
+      // Show score when not sorting by engagement
+      if (sortBy !== "engagement") {
+        parts.push(`${Math.round(item.score)}% eng`);
+      }
+    }
+
+    return parts.join(" \u2022 ");
+  };
+
   return (
     <Paper padding="none">
       <div
-        className="px-4 py-3 border-b"
+        className="px-4 py-3 border-b flex items-center justify-between"
         style={{ borderColor: "var(--border-color)" }}
       >
         <h3
@@ -58,6 +118,24 @@ const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage
         >
           {title}
         </h3>
+        {onSortChange && (
+          <select
+            value={sortBy}
+            onChange={(e) => onSortChange(e.target.value)}
+            className="text-sm px-2 py-1 rounded border cursor-pointer"
+            style={{
+              backgroundColor: "var(--bg-secondary)",
+              borderColor: "var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
       <div
         className="divide-y overflow-y-auto"
@@ -67,12 +145,6 @@ const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage
         }}
       >
         {items.map((item, index) => {
-          const duration =
-            item.playDuration > 0
-              ? formatDurationHumanReadable(item.playDuration, {
-                  includeDays: false,
-                })
-              : null;
           const displayName = getDisplayName(item);
 
           return (
@@ -112,16 +184,22 @@ const TopList = ({ title, items, linkPrefix, entityType = "performer", showImage
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div
-                  className="text-base font-medium truncate"
-                  style={{ color: "var(--text-primary)" }}
-                >
-                  {displayName}
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-base font-medium truncate"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    {displayName}
+                  </span>
+                  <span
+                    className="text-sm font-semibold flex-shrink-0"
+                    style={{ color: "var(--primary-color)" }}
+                  >
+                    {getPrimaryStat(item)}
+                  </span>
                 </div>
                 <div className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
-                  {duration && <span>{duration} • </span>}
-                  {item.playCount} plays
-                  {item.oCount > 0 && ` • ${item.oCount} Os`}
+                  {getSecondaryStats(item)}
                 </div>
               </div>
             </Link>

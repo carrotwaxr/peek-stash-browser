@@ -287,6 +287,39 @@ class MergeReconciliationService {
       }
     }
 
+    // Transfer PlaylistItems for this user's playlists
+    const playlistItems = await prisma.playlistItem.findMany({
+      where: { sceneId: sourceSceneId },
+      include: { playlist: { select: { userId: true } } },
+    });
+
+    // Filter to only this user's playlist items
+    const userPlaylistItems = playlistItems.filter((item) => item.playlist.userId === userId);
+
+    for (const item of userPlaylistItems) {
+      // Check if target scene already exists in this playlist
+      const existing = await prisma.playlistItem.findFirst({
+        where: { playlistId: item.playlistId, sceneId: targetSceneId },
+      });
+
+      if (existing) {
+        // Delete orphaned item (target already present in playlist)
+        await prisma.playlistItem.delete({ where: { id: item.id } });
+        logger.debug(`Deleted duplicate playlist item ${item.id} (target scene ${targetSceneId} already in playlist ${item.playlistId})`);
+      } else {
+        // Update to point to target scene
+        await prisma.playlistItem.update({
+          where: { id: item.id },
+          data: { sceneId: targetSceneId, instanceId: targetInstanceId },
+        });
+        logger.debug(`Updated playlist item ${item.id} to point to target scene ${targetSceneId}`);
+      }
+    }
+
+    if (userPlaylistItems.length > 0) {
+      logger.info(`Transferred ${userPlaylistItems.length} playlist items from scene ${sourceSceneId} to ${targetSceneId} for user ${userId}`);
+    }
+
     // Create audit record
     const mergeRecord = await prisma.mergeRecord.create({
       data: {

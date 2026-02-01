@@ -1,5 +1,6 @@
 // client/src/components/pages/UserStats/UserStats.jsx
 
+import { useState } from "react";
 import { BarChart3 } from "lucide-react";
 import { usePageTitle } from "../../../hooks/usePageTitle.js";
 import { useUserStats } from "../../../hooks/useUserStats.js";
@@ -14,7 +15,10 @@ import {
 const UserStats = () => {
   usePageTitle("My Stats");
 
-  const { data, loading, error } = useUserStats();
+  // Sort state for top lists - shared across all lists
+  const [sortBy, setSortBy] = useState("engagement");
+
+  const { data, loading, error } = useUserStats({ sortBy });
 
   if (loading) {
     return (
@@ -98,24 +102,32 @@ const UserStats = () => {
                   items={data.topScenes}
                   linkPrefix="/scene"
                   entityType="scene"
+                  sortBy={sortBy}
+                  onSortChange={setSortBy}
                 />
                 <TopList
                   title="Top Performers"
                   items={data.topPerformers}
                   linkPrefix="/performer"
                   entityType="performer"
+                  sortBy={sortBy}
+                  onSortChange={setSortBy}
                 />
                 <TopList
                   title="Top Studios"
                   items={data.topStudios}
                   linkPrefix="/studio"
                   entityType="studio"
+                  sortBy={sortBy}
+                  onSortChange={setSortBy}
                 />
                 <TopList
                   title="Top Tags"
                   items={data.topTags}
                   linkPrefix="/tag"
                   entityType="tag"
+                  sortBy={sortBy}
+                  onSortChange={setSortBy}
                 />
               </div>
             </section>
