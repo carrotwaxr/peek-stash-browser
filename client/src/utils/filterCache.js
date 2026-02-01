@@ -24,13 +24,14 @@ const isCacheFresh = (timestamp) => {
 
 /**
  * Get cached data for an entity type
- * @param {"performers"|"studios"|"tags"} entityType
+ * @param {string} cacheKey - Cache key (e.g., "tags" or "tags_scenes")
  * @returns {{data: Array, timestamp: number}|null} Cached data or null if stale/missing
  */
-export const getCache = (entityType) => {
+export const getCache = (cacheKey) => {
   try {
-    const cacheKey = CACHE_KEYS[entityType];
-    const cached = localStorage.getItem(cacheKey);
+    // Support both simple keys (via CACHE_KEYS lookup) and composite keys (direct)
+    const storageKey = CACHE_KEYS[cacheKey] || `peek-${cacheKey}-cache`;
+    const cached = localStorage.getItem(storageKey);
 
     if (!cached) {
       return null;
@@ -41,33 +42,34 @@ export const getCache = (entityType) => {
     // Check if cache is still fresh
     if (!isCacheFresh(parsed.timestamp)) {
       // Remove stale cache
-      localStorage.removeItem(cacheKey);
+      localStorage.removeItem(storageKey);
       return null;
     }
 
     return parsed;
   } catch (error) {
-    console.error(`Error reading ${entityType} cache:`, error);
+    console.error(`Error reading ${cacheKey} cache:`, error);
     return null;
   }
 };
 
 /**
  * Set cache for an entity type
- * @param {"performers"|"studios"|"tags"} entityType
+ * @param {string} cacheKey - Cache key (e.g., "tags" or "tags_scenes")
  * @param {Array} data - Array of {id, name} objects
  */
-export const setCache = (entityType, data) => {
+export const setCache = (cacheKey, data) => {
   try {
-    const cacheKey = CACHE_KEYS[entityType];
+    // Support both simple keys (via CACHE_KEYS lookup) and composite keys (direct)
+    const storageKey = CACHE_KEYS[cacheKey] || `peek-${cacheKey}-cache`;
     const cacheData = {
       timestamp: Date.now(),
       data,
     };
 
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    localStorage.setItem(storageKey, JSON.stringify(cacheData));
   } catch (error) {
-    console.error(`Error setting ${entityType} cache:`, error);
+    console.error(`Error setting ${cacheKey} cache:`, error);
     // If quota exceeded, try to clear old caches
     if (error.name === "QuotaExceededError") {
       clearAllCaches();
