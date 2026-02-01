@@ -1,8 +1,9 @@
  
 import { useState, useEffect } from "react";
-import { User, X, Shield, Users, Key, Trash2 } from "lucide-react";
+import { User, X, Shield, Users, Key, Trash2, Lock } from "lucide-react";
 import { Button, Paper } from "../ui/index.js";
 import { getUserGroupMemberships, addGroupMember, removeGroupMember, getUserPermissions, updateUserPermissionOverrides, adminResetPassword, adminRegenerateRecoveryKey } from "../../services/api.js";
+import ContentRestrictionsModal from "./ContentRestrictionsModal.jsx";
 
 /**
  * UserEditModalContent - Inner component that handles the modal content
@@ -35,6 +36,9 @@ const UserEditModalContent = ({
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [generatedKey, setGeneratedKey] = useState(null);
+
+  // Content restrictions modal state
+  const [showContentRestrictionsModal, setShowContentRestrictionsModal] = useState(false);
 
   // Track what has changed for save
   const [hasChanges, setHasChanges] = useState(false);
@@ -633,8 +637,47 @@ const UserEditModalContent = ({
                 )}
               </div>
             </section>
+
+            {/* Section 5: Content Restrictions */}
+            <section>
+              <h3
+                className="text-sm font-medium mb-3 flex items-center gap-2"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <Lock size={16} />
+                Content Restrictions
+              </h3>
+              <div
+                className="p-4 rounded-lg"
+                style={{
+                  backgroundColor: "var(--bg-secondary)",
+                  border: "1px solid var(--border-color)",
+                }}
+              >
+                <p className="text-sm mb-3" style={{ color: "var(--text-muted)" }}>
+                  Manage content restrictions for this user. Restrictions control which content is visible based on collections, tags, studios, and galleries.
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowContentRestrictionsModal(true)}
+                >
+                  <Lock size={14} className="mr-1" />
+                  Manage Restrictions
+                </Button>
+              </div>
+            </section>
           </div>
         </Paper.Body>
+
+        {/* Content Restrictions Modal */}
+        {showContentRestrictionsModal && (
+          <ContentRestrictionsModal
+            user={user}
+            onClose={() => setShowContentRestrictionsModal(false)}
+            onSave={() => onMessage?.(`Content restrictions updated for ${user.username}`)}
+          />
+        )}
 
         {/* Footer with action buttons */}
         <div
