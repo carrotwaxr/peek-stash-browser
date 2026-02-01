@@ -1180,6 +1180,7 @@ class StashSyncService extends EventEmitter {
       ${this.escapeNullable(paths?.chapters_vtt)},
       ${this.escapeNullable(paths?.stream)},
       ${this.escapeNullable(paths?.caption)},
+      ${this.escapeNullable(JSON.stringify(scene.captions || []))},
       ${this.escapeNullable(JSON.stringify(scene.sceneStreams || []))},
       ${scene.o_counter ?? 0},
       ${scene.play_count ?? 0},
@@ -1199,7 +1200,7 @@ class StashSyncService extends EventEmitter {
       id, stashInstanceId, title, code, date, studioId, rating100, duration,
       organized, details, director, urls, filePath, fileBitRate, fileFrameRate, fileWidth,
       fileHeight, fileVideoCodec, fileAudioCodec, fileSize, pathScreenshot,
-      pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption,
+      pathPreview, pathSprite, pathVtt, pathChaptersVtt, pathStream, pathCaption, captions,
       streams, oCounter, playCount, playDuration, stashCreatedAt, stashUpdatedAt,
       syncedAt, deletedAt, phash, phashes
     ) VALUES ${sceneValues}
@@ -1229,6 +1230,7 @@ class StashSyncService extends EventEmitter {
       pathChaptersVtt = excluded.pathChaptersVtt,
       pathStream = excluded.pathStream,
       pathCaption = excluded.pathCaption,
+      captions = excluded.captions,
       streams = excluded.streams,
       oCounter = excluded.oCounter,
       playCount = excluded.playCount,

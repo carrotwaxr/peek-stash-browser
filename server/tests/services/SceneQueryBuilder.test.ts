@@ -29,6 +29,7 @@ describe("SceneQueryBuilder", () => {
         pathChaptersVtt: null,
         pathStream: "/stream.mp4",
         pathCaption: null,
+        captions: null,
         stashOCounter: 5,
         stashPlayCount: 10,
         stashPlayDuration: 7200.5,

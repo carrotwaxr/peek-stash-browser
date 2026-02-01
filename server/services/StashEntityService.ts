@@ -127,6 +127,7 @@ class StashEntityService {
     pathChaptersVtt: true,
     pathStream: true,
     pathCaption: true,
+    captions: true,
     // Explicitly NOT selecting: streams, data
     oCounter: true,
     playCount: true,
@@ -1674,6 +1675,9 @@ class StashEntityService {
       // Generate streams on-demand (no longer stored in DB)
       sceneStreams: this.generateSceneStreams(scene.id),
 
+      // Caption metadata for multi-language subtitle support
+      captions: scene.captions ? JSON.parse(scene.captions) : [],
+
       // Stash counters (override defaults)
       o_counter: scene.oCounter ?? 0,
       play_count: scene.playCount ?? 0,
@@ -1740,6 +1744,9 @@ class StashEntityService {
 
       // Empty sceneStreams for browse - generated on demand for playback
       sceneStreams: [],
+
+      // Caption metadata for multi-language subtitle support
+      captions: scene.captions ? JSON.parse(scene.captions) : [],
 
       // Stash counters (override defaults)
       o_counter: scene.oCounter ?? 0,
