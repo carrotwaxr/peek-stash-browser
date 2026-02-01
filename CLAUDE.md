@@ -59,13 +59,45 @@ The app requires Docker for FFmpeg and path mapping. Direct Node.js (`npm run de
 
 **Always use migrations, never `prisma db push`.**
 
+Key models: User, WatchHistory, Playlist, PlaylistItem, *Rating tables, PathMapping
+
+### Creating Migrations
+
+**Important:** Due to FTS (Full-Text Search) virtual tables in the schema, `prisma migrate dev` often fails with schema drift errors. Use this manual process instead:
+
 ```bash
 cd server
-npx prisma migrate dev --name descriptive_name  # Create migration
-npx prisma migrate deploy                        # Apply (production)
+
+# 1. Create migration directory with timestamp
+mkdir -p prisma/migrations/YYYYMMDD000000_descriptive_name
+
+# 2. Write the migration SQL manually
+cat > prisma/migrations/YYYYMMDD000000_descriptive_name/migration.sql << 'EOF'
+-- Description of what this migration does
+ALTER TABLE "TableName" ADD COLUMN "columnName" TEXT;
+EOF
+
+# 3. Update schema.prisma to match the migration
+
+# 4. Regenerate Prisma client
+npx prisma generate
+
+# 5. Apply migration to dev database
+npx prisma migrate deploy
+
+# 6. Run tests to verify
+npm test
 ```
 
-Key models: User, WatchHistory, Playlist, PlaylistItem, *Rating tables, PathMapping
+**Why manual migrations?** Prisma's introspection doesn't handle SQLite FTS virtual tables well, causing `prisma migrate dev` to detect false schema drift and request a database reset. The FTS tables are created via raw SQL in migrations and work correctly at runtime.
+
+### Applying Migrations
+
+```bash
+npx prisma migrate deploy  # Apply pending migrations (dev and production)
+```
+
+In Docker, migrations are applied automatically on container startup.
 
 ## Release Process
 
