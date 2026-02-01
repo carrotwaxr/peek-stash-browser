@@ -5,10 +5,17 @@ import { useAuth } from "./useAuth.js";
 import { apiGet } from "../services/api.js";
 
 /**
+ * Valid sort options for top lists
+ * @typedef {"engagement" | "oCount" | "playCount"} TopListSortBy
+ */
+
+/**
  * Hook for fetching user stats
+ * @param {Object} options - Hook options
+ * @param {TopListSortBy} [options.sortBy="engagement"] - Sort order for top lists
  * @returns {Object} { data, loading, error, refresh }
  */
-export function useUserStats() {
+export function useUserStats({ sortBy = "engagement" } = {}) {
   const { isAuthenticated } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +30,13 @@ export function useUserStats() {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiGet("/user-stats");
+      const params = new URLSearchParams();
+      if (sortBy && sortBy !== "engagement") {
+        params.set("sortBy", sortBy);
+      }
+      const queryString = params.toString();
+      const endpoint = queryString ? `/user-stats?${queryString}` : "/user-stats";
+      const response = await apiGet(endpoint);
       setData(response);
     } catch (err) {
       console.error("Error fetching user stats:", err);
@@ -31,7 +44,7 @@ export function useUserStats() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, sortBy]);
 
   useEffect(() => {
     fetchStats();
