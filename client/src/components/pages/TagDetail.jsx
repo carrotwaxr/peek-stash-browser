@@ -15,6 +15,7 @@ import {
   FavoriteButton,
   LazyImage,
   LoadingSpinner,
+  MediaImage,
   PageHeader,
   PaginatedImageGrid,
   RatingSlider,
@@ -390,7 +391,10 @@ const Card = ({ title, children }) => {
 };
 
 // Tag Image Component (16:9 aspect ratio to match tag cards)
+// Uses MediaImage to handle video tag images (e.g., from feederbox tag-import plugin)
 const TagImage = ({ tag }) => {
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
+
   return (
     <div
       className="rounded-lg w-full aspect-video overflow-hidden shadow-lg flex items-center justify-center"
@@ -399,11 +403,12 @@ const TagImage = ({ tag }) => {
         maxHeight: "80vh",
       }}
     >
-      {tag?.image_path ? (
-        <img
+      {tag?.image_path && !showPlaceholder ? (
+        <MediaImage
           src={tag.image_path}
           alt={tag.name}
           className="w-full h-full object-cover"
+          onError={() => setShowPlaceholder(true)}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
