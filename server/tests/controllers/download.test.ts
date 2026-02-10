@@ -35,6 +35,10 @@ vi.mock("../../utils/logger.js", () => ({
   },
 }));
 
+vi.mock("../../utils/streamProxy.js", () => ({
+  pipeResponseToClient: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../../services/StashInstanceManager.js", () => ({
   stashInstanceManager: {
     getBaseUrl: vi.fn(() => "http://stash:9999"),
@@ -54,10 +58,12 @@ import {
 import { downloadService } from "../../services/DownloadService.js";
 import { playlistZipService } from "../../services/PlaylistZipService.js";
 import { resolveUserPermissions } from "../../services/PermissionService.js";
+import { pipeResponseToClient } from "../../utils/streamProxy.js";
 
 const mockDownloadService = vi.mocked(downloadService);
 const mockPlaylistZipService = vi.mocked(playlistZipService);
 const mockResolveUserPermissions = vi.mocked(resolveUserPermissions);
+const mockPipeResponseToClient = vi.mocked(pipeResponseToClient);
 
 describe("Download Controller", () => {
   let mockRequest: Partial<AuthenticatedRequest>;
@@ -69,6 +75,7 @@ describe("Download Controller", () => {
   let responseSetHeader: ReturnType<typeof vi.fn>;
   let responseWrite: ReturnType<typeof vi.fn>;
   let responseEnd: ReturnType<typeof vi.fn>;
+  let responseOn: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,6 +85,7 @@ describe("Download Controller", () => {
     responseSetHeader = vi.fn();
     responseWrite = vi.fn();
     responseEnd = vi.fn();
+    responseOn = vi.fn();
     responseStatus = vi.fn(() => ({ json: responseJson }));
     mockResponse = {
       json: responseJson,
@@ -87,6 +95,7 @@ describe("Download Controller", () => {
       setHeader: responseSetHeader,
       write: responseWrite,
       end: responseEnd,
+      on: responseOn,
     };
 
     // Mock global fetch for scene/image downloads
@@ -426,24 +435,14 @@ describe("Download Controller", () => {
       };
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
-      // Mock fetch response with readable stream
-      const mockReader = {
-        read: vi
-          .fn()
-          .mockResolvedValueOnce({
-            done: false,
-            value: new Uint8Array([1, 2, 3]),
-          })
-          .mockResolvedValueOnce({ done: true, value: undefined }),
-      };
-      const mockBody = { getReader: () => mockReader };
+      // Mock fetch response
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
-        headers: new Map([
+        headers: new Headers([
           ["content-type", "video/mp4"],
           ["content-length", "1000"],
         ]),
-        body: mockBody,
+        body: new ReadableStream(),
       });
 
       await getDownloadFile(
@@ -453,13 +452,18 @@ describe("Download Controller", () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         "http://stash:9999/scene/scene-123/stream",
-        { headers: { ApiKey: "test-api-key" } }
+        { headers: { ApiKey: "test-api-key" }, signal: expect.any(AbortSignal) }
       );
       expect(responseSetHeader).toHaveBeenCalledWith(
         "Content-Disposition",
         'attachment; filename="test.mp4"'
       );
-      expect(responseEnd).toHaveBeenCalled();
+      expect(mockPipeResponseToClient).toHaveBeenCalledWith(
+        expect.objectContaining({ ok: true }),
+        mockResponse,
+        "[DOWNLOAD]",
+        ["content-type", "content-length"],
+      );
     });
 
     it("should proxy image with Content-Disposition for IMAGE downloads", async () => {
@@ -486,24 +490,14 @@ describe("Download Controller", () => {
       };
       mockDownloadService.getDownload.mockResolvedValue(mockDownload);
 
-      // Mock fetch response with readable stream
-      const mockReader = {
-        read: vi
-          .fn()
-          .mockResolvedValueOnce({
-            done: false,
-            value: new Uint8Array([1, 2, 3]),
-          })
-          .mockResolvedValueOnce({ done: true, value: undefined }),
-      };
-      const mockBody = { getReader: () => mockReader };
+      // Mock fetch response
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
         ok: true,
-        headers: new Map([
+        headers: new Headers([
           ["content-type", "image/jpeg"],
           ["content-length", "1000"],
         ]),
-        body: mockBody,
+        body: new ReadableStream(),
       });
 
       await getDownloadFile(
@@ -513,13 +507,18 @@ describe("Download Controller", () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         "http://stash:9999/image/image-456/image",
-        { headers: { ApiKey: "test-api-key" } }
+        { headers: { ApiKey: "test-api-key" }, signal: expect.any(AbortSignal) }
       );
       expect(responseSetHeader).toHaveBeenCalledWith(
         "Content-Disposition",
         'attachment; filename="test.jpg"'
       );
-      expect(responseEnd).toHaveBeenCalled();
+      expect(mockPipeResponseToClient).toHaveBeenCalledWith(
+        expect.objectContaining({ ok: true }),
+        mockResponse,
+        "[DOWNLOAD]",
+        ["content-type", "content-length"],
+      );
     });
 
     it("should return 400 if download is not completed", async () => {

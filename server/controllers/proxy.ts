@@ -88,6 +88,101 @@ function getInstanceCredentials(instanceId?: string): { baseUrl: string; apiKey:
   };
 }
 
+// =============================================================================
+// Shared proxy helper
+// =============================================================================
+
+interface ProxyOptions {
+  fullUrl: string;
+  res: Response;
+  label: string;
+  defaultCacheControl: string;
+  timeoutMs: number;
+}
+
+/**
+ * Shared helper that makes an HTTP(S) request to Stash and pipes the response
+ * to the Express client. Handles:
+ * - Connection pooling via keep-alive agents
+ * - Client disconnect cleanup (destroys upstream request)
+ * - Double-release guard for concurrency slots
+ * - Timeout handling
+ */
+function proxyHttpRequest({ fullUrl, res, label, defaultCacheControl, timeoutMs }: ProxyOptions): void {
+  let slotReleased = false;
+  const releaseOnce = () => {
+    if (!slotReleased) {
+      slotReleased = true;
+      releaseConcurrencySlot();
+    }
+  };
+
+  const urlObj = new URL(fullUrl);
+  const httpModule = urlObj.protocol === "https:" ? https : http;
+  const agent = getAgentForUrl(urlObj);
+
+  const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
+    // Forward response headers
+    if (proxyRes.headers["content-type"]) {
+      res.setHeader("Content-Type", proxyRes.headers["content-type"]);
+    }
+    if (proxyRes.headers["content-length"]) {
+      res.setHeader("Content-Length", proxyRes.headers["content-length"]);
+    }
+    if (proxyRes.headers["cache-control"]) {
+      res.setHeader("Cache-Control", proxyRes.headers["cache-control"]);
+    } else {
+      res.setHeader("Cache-Control", defaultCacheControl);
+    }
+
+    // Set status code
+    res.status(proxyRes.statusCode || 200);
+
+    // Stream response back to client
+    proxyRes.pipe(res);
+
+    // Release slot when response ends
+    proxyRes.on("end", releaseOnce);
+    proxyRes.on("error", releaseOnce);
+  });
+
+  // When the client disconnects (seek, refresh, navigate away),
+  // destroy the upstream request to stop downloading into memory.
+  res.on("close", () => {
+    if (!proxyReq.destroyed) {
+      proxyReq.destroy();
+    }
+    releaseOnce();
+  });
+
+  // Handle request errors
+  proxyReq.on("error", (error: Error) => {
+    releaseOnce();
+    // ECONNRESET is expected when we destroy the request on client disconnect
+    if ((error as NodeJS.ErrnoException).code === "ECONNRESET") {
+      logger.debug(`${label} Upstream request aborted (client disconnected)`);
+      return;
+    }
+    logger.error(`${label} Error`, { error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Proxy request failed" });
+    }
+  });
+
+  // Set timeout
+  proxyReq.setTimeout(timeoutMs, () => {
+    releaseOnce();
+    proxyReq.destroy();
+    if (!res.headersSent) {
+      res.status(504).json({ error: "Proxy request timeout" });
+    }
+  });
+}
+
+// =============================================================================
+// Proxy endpoints
+// =============================================================================
+
 /**
  * Proxy scene video preview (MP4)
  * GET /api/proxy/scene/:id/preview
@@ -122,11 +217,9 @@ export const proxyScenePreview = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
-  // Acquire concurrency slot before making request
   await acquireConcurrencySlot();
 
   try {
-    // Construct Stash scene preview URL
     const fullUrl = `${stashUrl}/scene/${id}/preview?apikey=${apiKey}`;
 
     logger.debug("Proxying scene preview", {
@@ -134,57 +227,12 @@ export const proxyScenePreview = async (req: Request, res: Response) => {
       url: fullUrl.replace(apiKey, "***"),
     });
 
-    // Parse URL to determine protocol
-    const urlObj = new URL(fullUrl);
-    const httpModule = urlObj.protocol === "https:" ? https : http;
-    const agent = getAgentForUrl(urlObj);
-
-    // Make request to Stash with connection pooling
-    const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
-      // Forward response headers
-      if (proxyRes.headers["content-type"]) {
-        res.setHeader("Content-Type", proxyRes.headers["content-type"]);
-      }
-      if (proxyRes.headers["content-length"]) {
-        res.setHeader("Content-Length", proxyRes.headers["content-length"]);
-      }
-      if (proxyRes.headers["cache-control"]) {
-        res.setHeader("Cache-Control", proxyRes.headers["cache-control"]);
-      } else {
-        // Cache video previews for 24 hours
-        res.setHeader("Cache-Control", "public, max-age=86400");
-      }
-
-      // Set status code
-      res.status(proxyRes.statusCode || 200);
-
-      // Stream response back to client
-      proxyRes.pipe(res);
-
-      // Release slot when response ends
-      proxyRes.on("end", releaseConcurrencySlot);
-      proxyRes.on("error", releaseConcurrencySlot);
-    });
-
-    // Handle request errors
-    proxyReq.on("error", (error: Error) => {
-      releaseConcurrencySlot();
-      logger.error("Error proxying scene preview", {
-        sceneId: id,
-        error: error.message,
-      });
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Proxy request failed" });
-      }
-    });
-
-    // Set timeout (longer for videos)
-    proxyReq.setTimeout(60000, () => {
-      releaseConcurrencySlot();
-      proxyReq.destroy();
-      if (!res.headersSent) {
-        res.status(504).json({ error: "Proxy request timeout" });
-      }
+    proxyHttpRequest({
+      fullUrl,
+      res,
+      label: "[PROXY scene preview]",
+      defaultCacheControl: "public, max-age=86400",
+      timeoutMs: 60000,
     });
   } catch (error) {
     releaseConcurrencySlot();
@@ -229,11 +277,9 @@ export const proxySceneWebp = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
-  // Acquire concurrency slot before making request
   await acquireConcurrencySlot();
 
   try {
-    // Construct Stash scene webp URL
     const fullUrl = `${stashUrl}/scene/${id}/webp?apikey=${apiKey}`;
 
     logger.debug("Proxying scene webp", {
@@ -241,57 +287,12 @@ export const proxySceneWebp = async (req: Request, res: Response) => {
       url: fullUrl.replace(apiKey, "***"),
     });
 
-    // Parse URL to determine protocol
-    const urlObj = new URL(fullUrl);
-    const httpModule = urlObj.protocol === "https:" ? https : http;
-    const agent = getAgentForUrl(urlObj);
-
-    // Make request to Stash with connection pooling
-    const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
-      // Forward response headers
-      if (proxyRes.headers["content-type"]) {
-        res.setHeader("Content-Type", proxyRes.headers["content-type"]);
-      }
-      if (proxyRes.headers["content-length"]) {
-        res.setHeader("Content-Length", proxyRes.headers["content-length"]);
-      }
-      if (proxyRes.headers["cache-control"]) {
-        res.setHeader("Cache-Control", proxyRes.headers["cache-control"]);
-      } else {
-        // Cache webp previews for 24 hours
-        res.setHeader("Cache-Control", "public, max-age=86400");
-      }
-
-      // Set status code
-      res.status(proxyRes.statusCode || 200);
-
-      // Stream response back to client
-      proxyRes.pipe(res);
-
-      // Release slot when response ends
-      proxyRes.on("end", releaseConcurrencySlot);
-      proxyRes.on("error", releaseConcurrencySlot);
-    });
-
-    // Handle request errors
-    proxyReq.on("error", (error: Error) => {
-      releaseConcurrencySlot();
-      logger.error("Error proxying scene webp", {
-        sceneId: id,
-        error: error.message,
-      });
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Proxy request failed" });
-      }
-    });
-
-    // Set timeout
-    proxyReq.setTimeout(60000, () => {
-      releaseConcurrencySlot();
-      proxyReq.destroy();
-      if (!res.headersSent) {
-        res.status(504).json({ error: "Proxy request timeout" });
-      }
+    proxyHttpRequest({
+      fullUrl,
+      res,
+      label: "[PROXY scene webp]",
+      defaultCacheControl: "public, max-age=86400",
+      timeoutMs: 60000,
     });
   } catch (error) {
     releaseConcurrencySlot();
@@ -328,11 +329,9 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
-  // Acquire concurrency slot before making request
   await acquireConcurrencySlot();
 
   try {
-    // Construct full Stash URL with API key
     const fullUrl = `${stashUrl}${path}${path.includes("?") ? "&" : "?"}apikey=${apiKey}`;
 
     logger.debug("Proxying Stash media request", {
@@ -340,54 +339,12 @@ export const proxyStashMedia = async (req: Request, res: Response) => {
       stashUrl: fullUrl.replace(apiKey, "***"),
     });
 
-    // Parse URL to determine protocol
-    const urlObj = new URL(fullUrl);
-    const httpModule = urlObj.protocol === "https:" ? https : http;
-    const agent = getAgentForUrl(urlObj);
-
-    // Make request to Stash with connection pooling
-    const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
-      // Forward response headers
-      if (proxyRes.headers["content-type"]) {
-        res.setHeader("Content-Type", proxyRes.headers["content-type"]);
-      }
-      if (proxyRes.headers["content-length"]) {
-        res.setHeader("Content-Length", proxyRes.headers["content-length"]);
-      }
-      if (proxyRes.headers["cache-control"]) {
-        res.setHeader("Cache-Control", proxyRes.headers["cache-control"]);
-      } else {
-        // Default cache policy for images
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      }
-
-      // Set status code
-      res.status(proxyRes.statusCode || 200);
-
-      // Stream response back to client
-      proxyRes.pipe(res);
-
-      // Release slot when response ends
-      proxyRes.on("end", releaseConcurrencySlot);
-      proxyRes.on("error", releaseConcurrencySlot);
-    });
-
-    // Handle request errors
-    proxyReq.on("error", (error: Error) => {
-      releaseConcurrencySlot();
-      logger.error("Error proxying Stash media", { error: error.message });
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Proxy request failed" });
-      }
-    });
-
-    // Set timeout
-    proxyReq.setTimeout(30000, () => {
-      releaseConcurrencySlot();
-      proxyReq.destroy();
-      if (!res.headersSent) {
-        res.status(504).json({ error: "Proxy request timeout" });
-      }
+    proxyHttpRequest({
+      fullUrl,
+      res,
+      label: "[PROXY stash media]",
+      defaultCacheControl: "public, max-age=31536000, immutable",
+      timeoutMs: 30000,
     });
   } catch (error) {
     releaseConcurrencySlot();
@@ -436,11 +393,9 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
-  // Acquire concurrency slot before making request
   await acquireConcurrencySlot();
 
   try {
-    // mediaPath is already a full URL from Stash, just append API key
     const fullUrl = `${mediaPath}${mediaPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
 
     logger.debug("Proxying clip preview", {
@@ -448,53 +403,12 @@ export const proxyClipPreview = async (req: Request, res: Response) => {
       url: fullUrl.replace(apiKey, "***"),
     });
 
-    // Parse URL to determine protocol
-    const urlObj = new URL(fullUrl);
-    const httpModule = urlObj.protocol === "https:" ? https : http;
-    const agent = getAgentForUrl(urlObj);
-
-    // Make request to Stash with connection pooling
-    const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
-      // Forward response headers
-      if (proxyRes.headers["content-type"]) {
-        res.setHeader("Content-Type", proxyRes.headers["content-type"]);
-      }
-      if (proxyRes.headers["content-length"]) {
-        res.setHeader("Content-Length", proxyRes.headers["content-length"]);
-      }
-      // Cache clip previews for 24 hours
-      res.setHeader("Cache-Control", "public, max-age=86400");
-
-      // Set status code
-      res.status(proxyRes.statusCode || 200);
-
-      // Stream response back to client
-      proxyRes.pipe(res);
-
-      // Release slot when response ends
-      proxyRes.on("end", releaseConcurrencySlot);
-      proxyRes.on("error", releaseConcurrencySlot);
-    });
-
-    // Handle request errors
-    proxyReq.on("error", (error: Error) => {
-      releaseConcurrencySlot();
-      logger.error("Error proxying clip preview", {
-        clipId: id,
-        error: error.message,
-      });
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Proxy request failed" });
-      }
-    });
-
-    // Set timeout
-    proxyReq.setTimeout(30000, () => {
-      releaseConcurrencySlot();
-      proxyReq.destroy();
-      if (!res.headersSent) {
-        res.status(504).json({ error: "Proxy request timeout" });
-      }
+    proxyHttpRequest({
+      fullUrl,
+      res,
+      label: "[PROXY clip preview]",
+      defaultCacheControl: "public, max-age=86400",
+      timeoutMs: 30000,
     });
   } catch (error) {
     releaseConcurrencySlot();
@@ -562,19 +476,15 @@ export const proxyImage = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Stash configuration missing" });
   }
 
-  // Acquire concurrency slot before making request
   await acquireConcurrencySlot();
 
   try {
-    // Construct full Stash URL with API key
     // Note: stashPath may already be a full URL (stored from Stash API response)
     // or it could be a relative path - handle both cases
     let fullUrl: string;
     if (stashPath.startsWith("http://") || stashPath.startsWith("https://")) {
-      // Already a full URL, just append API key
       fullUrl = `${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
     } else {
-      // Relative path, prepend base URL
       fullUrl = `${stashUrl}${stashPath}${stashPath.includes("?") ? "&" : "?"}apikey=${apiKey}`;
     }
 
@@ -584,39 +494,12 @@ export const proxyImage = async (req: Request, res: Response) => {
       url: fullUrl.replace(apiKey, "***"),
     });
 
-    const urlObj = new URL(fullUrl);
-    const httpModule = urlObj.protocol === "https:" ? https : http;
-    const agent = getAgentForUrl(urlObj);
-
-    const proxyReq = httpModule.get(fullUrl, { agent }, (proxyRes) => {
-      if (proxyRes.headers["content-type"]) {
-        res.setHeader("Content-Type", proxyRes.headers["content-type"]);
-      }
-      if (proxyRes.headers["content-length"]) {
-        res.setHeader("Content-Length", proxyRes.headers["content-length"]);
-      }
-      // Cache images for 24 hours
-      res.setHeader("Cache-Control", "public, max-age=86400");
-      res.status(proxyRes.statusCode || 200);
-      proxyRes.pipe(res);
-      proxyRes.on("end", releaseConcurrencySlot);
-      proxyRes.on("error", releaseConcurrencySlot);
-    });
-
-    proxyReq.on("error", (error: Error) => {
-      releaseConcurrencySlot();
-      logger.error("Error proxying image", { imageId, type, error: error.message });
-      if (!res.headersSent) {
-        res.status(500).json({ error: "Proxy request failed" });
-      }
-    });
-
-    proxyReq.setTimeout(30000, () => {
-      releaseConcurrencySlot();
-      proxyReq.destroy();
-      if (!res.headersSent) {
-        res.status(504).json({ error: "Proxy request timeout" });
-      }
+    proxyHttpRequest({
+      fullUrl,
+      res,
+      label: "[PROXY image]",
+      defaultCacheControl: "public, max-age=86400",
+      timeoutMs: 30000,
     });
   } catch (error) {
     releaseConcurrencySlot();

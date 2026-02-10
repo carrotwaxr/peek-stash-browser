@@ -6,6 +6,7 @@ import { playlistZipService } from "../services/PlaylistZipService.js";
 import { resolveUserPermissions } from "../services/PermissionService.js";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
+import { pipeResponseToClient } from "../utils/streamProxy.js";
 
 /**
  * Maximum playlist download size in MB (default: 10GB)
@@ -313,8 +314,13 @@ export async function getDownloadFile(
         const apiKey = stashInstanceManager.getApiKey();
         const sceneUrl = `${stashBaseUrl}/scene/${download.entityId}/stream`;
 
+        // Abort the upstream fetch if the client disconnects
+        const sceneAbort = new AbortController();
+        res.on("close", () => sceneAbort.abort());
+
         const sceneResponse = await fetch(sceneUrl, {
           headers: { ApiKey: apiKey },
+          signal: sceneAbort.signal,
         });
 
         if (!sceneResponse.ok) {
@@ -328,29 +334,11 @@ export async function getDownloadFile(
           "Content-Disposition",
           `attachment; filename="${download.fileName}"`
         );
-        const contentType = sceneResponse.headers.get("content-type");
-        if (contentType) {
-          res.setHeader("Content-Type", contentType);
-        }
-        const contentLength = sceneResponse.headers.get("content-length");
-        if (contentLength) {
-          res.setHeader("Content-Length", contentLength);
-        }
 
-        // Stream the response body
-        if (sceneResponse.body) {
-          const reader = sceneResponse.body.getReader();
-          const pump = async (): Promise<void> => {
-            const { done, value } = await reader.read();
-            if (done) {
-              res.end();
-              return;
-            }
-            res.write(Buffer.from(value));
-            return pump();
-          };
-          await pump();
-        }
+        await pipeResponseToClient(sceneResponse, res, "[DOWNLOAD]", [
+          "content-type",
+          "content-length",
+        ]);
         return;
       }
 
@@ -360,8 +348,13 @@ export async function getDownloadFile(
         const apiKey2 = stashInstanceManager.getApiKey();
         const imageUrl = `${stashBaseUrl2}/image/${download.entityId}/image`;
 
+        // Abort the upstream fetch if the client disconnects
+        const imageAbort = new AbortController();
+        res.on("close", () => imageAbort.abort());
+
         const imageResponse = await fetch(imageUrl, {
           headers: { ApiKey: apiKey2 },
+          signal: imageAbort.signal,
         });
 
         if (!imageResponse.ok) {
@@ -375,29 +368,11 @@ export async function getDownloadFile(
           "Content-Disposition",
           `attachment; filename="${download.fileName}"`
         );
-        const imgContentType = imageResponse.headers.get("content-type");
-        if (imgContentType) {
-          res.setHeader("Content-Type", imgContentType);
-        }
-        const imgContentLength = imageResponse.headers.get("content-length");
-        if (imgContentLength) {
-          res.setHeader("Content-Length", imgContentLength);
-        }
 
-        // Stream the response body
-        if (imageResponse.body) {
-          const reader = imageResponse.body.getReader();
-          const pump = async (): Promise<void> => {
-            const { done, value } = await reader.read();
-            if (done) {
-              res.end();
-              return;
-            }
-            res.write(Buffer.from(value));
-            return pump();
-          };
-          await pump();
-        }
+        await pipeResponseToClient(imageResponse, res, "[DOWNLOAD]", [
+          "content-type",
+          "content-length",
+        ]);
         return;
       }
 
