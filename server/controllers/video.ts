@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { stashInstanceManager } from "../services/StashInstanceManager.js";
 import { logger } from "../utils/logger.js";
+import { pipeResponseToClient } from "../utils/streamProxy.js";
 
 /**
  * Get credentials for a specific Stash instance
@@ -150,12 +151,18 @@ export const proxyStashStream = async (req: Request, res: Response) => {
 
     logger.info(`[PROXY] Proxying stream: ${req.url} -> ${stashUrl}`);
 
+    // Abort the upstream fetch if the client disconnects (seek, refresh, navigate away).
+    // This prevents orphaned connections from downloading entire files into memory.
+    const abortController = new AbortController();
+    res.on('close', () => abortController.abort());
+
     // Forward request to Stash using fetch
     const response = await fetch(stashUrl, {
       headers: {
         'ApiKey': apiKey,
         'Range': req.headers.range || '', // Forward range requests for seeking
       },
+      signal: abortController.signal,
     });
 
     if (!response.ok) {
@@ -187,7 +194,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
     // Forward status code
     res.status(response.status);
 
-    // Forward relevant headers from Stash
+    // Stream response body to client with proper backpressure and cleanup
     const headersToForward = [
       'content-type',
       'content-length',
@@ -198,38 +205,7 @@ export const proxyStashStream = async (req: Request, res: Response) => {
       'etag',
     ];
 
-    headersToForward.forEach(header => {
-      const value = response.headers.get(header);
-      if (value) {
-        res.setHeader(header, value);
-      }
-    });
-
-    // Stream response body to client
-    if (response.body) {
-      const reader = response.body.getReader();
-      const pump = async () => {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            if (!res.write(value)) {
-              // Backpressure - wait for drain
-              await new Promise(resolve => res.once('drain', resolve));
-            }
-          }
-          res.end();
-        } catch (error) {
-          logger.error("[PROXY] Error streaming response", { error });
-          if (!res.headersSent) {
-            res.status(500).send("Stream proxy error");
-          }
-        }
-      };
-      await pump();
-    } else {
-      res.end();
-    }
+    await pipeResponseToClient(response, res, "[PROXY]", headersToForward);
 
     logger.debug(`[PROXY] Stream proxied successfully: ${fullStreamPath}`);
   } catch (error) {
