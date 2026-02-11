@@ -47,9 +47,10 @@ export async function getEntityInstanceId(
         const scenes = await prisma.stashScene.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
         if (scenes.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first found`, {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
             entityType,
             entityId,
             instanceCount: scenes.length,
@@ -65,9 +66,10 @@ export async function getEntityInstanceId(
         const performers = await prisma.stashPerformer.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
         if (performers.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first found`, {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
             entityType,
             entityId,
             instanceCount: performers.length,
@@ -83,9 +85,10 @@ export async function getEntityInstanceId(
         const studios = await prisma.stashStudio.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
         if (studios.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first found`, {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
             entityType,
             entityId,
             instanceCount: studios.length,
@@ -101,9 +104,10 @@ export async function getEntityInstanceId(
         const tags = await prisma.stashTag.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
         if (tags.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first found`, {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
             entityType,
             entityId,
             instanceCount: tags.length,
@@ -119,9 +123,10 @@ export async function getEntityInstanceId(
         const galleries = await prisma.stashGallery.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
         if (galleries.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first found`, {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
             entityType,
             entityId,
             instanceCount: galleries.length,
@@ -137,9 +142,10 @@ export async function getEntityInstanceId(
         const groups = await prisma.stashGroup.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
         if (groups.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first found`, {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
             entityType,
             entityId,
             instanceCount: groups.length,
@@ -155,9 +161,10 @@ export async function getEntityInstanceId(
         const images = await prisma.stashImage.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
         if (images.length > 1) {
-          logger.warn(`Entity exists in multiple instances, using first found`, {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
             entityType,
             entityId,
             instanceCount: images.length,
@@ -212,7 +219,7 @@ function warnBatchDuplicates(
   // Log warnings for any IDs that appear in multiple instances
   for (const [entityId, instanceIds] of idGroups) {
     if (instanceIds.length > 1) {
-      logger.warn(`Batch lookup: entity exists in multiple instances, using first found`, {
+      logger.warn(`Batch lookup: entity exists in multiple instances, using first by ID order`, {
         entityType,
         entityId,
         instanceCount: instanceIds.length,

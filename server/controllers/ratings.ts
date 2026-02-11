@@ -112,10 +112,8 @@ export async function updateSceneRating(
     // Sync rating to Stash if enabled (only rating, NOT favorite for scenes)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.sceneUpdate({
             input: {
               id: sceneId,
@@ -222,10 +220,8 @@ export async function updatePerformerRating(
     // Sync to Stash if enabled (performer supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.performerUpdate({
             input: {
               id: performerId,
@@ -333,10 +329,8 @@ export async function updateStudioRating(
     // Sync to Stash if enabled (studio supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.studioUpdate({
             input: {
               id: studioId,
@@ -439,10 +433,8 @@ export async function updateTagRating(
     // Sync favorite only to Stash if enabled (tags don't have rating100 in Stash)
     if (user?.syncToStash && favorite !== undefined) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.tagUpdate({
             input: {
               id: tagId,
@@ -548,10 +540,8 @@ export async function updateGalleryRating(
     // Sync rating only to Stash if enabled (galleries don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.galleryUpdate({
             input: {
               id: galleryId,
@@ -652,10 +642,8 @@ export async function updateGroupRating(
     // Sync rating only to Stash if enabled (groups don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.groupUpdate({
             input: {
               id: groupId,
@@ -756,10 +744,8 @@ export async function updateImageRating(
     // Sync rating only to Stash if enabled (images don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.imageUpdate({
             input: {
               id: imageId,

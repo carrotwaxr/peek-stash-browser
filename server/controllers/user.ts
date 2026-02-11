@@ -1321,12 +1321,12 @@ export const syncFromStash = async (
             const [existingRatings, existingWatchHistory] = await Promise.all([
               syncOptions.scenes.rating
                 ? prisma.sceneRating.findMany({
-                    where: { userId: targetUserId, sceneId: { in: sceneIds } },
+                    where: { userId: targetUserId, instanceId: currentInstanceId, sceneId: { in: sceneIds } },
                   })
                 : Promise.resolve([]),
               syncOptions.scenes.oCounter
                 ? prisma.watchHistory.findMany({
-                    where: { userId: targetUserId, sceneId: { in: sceneIds } },
+                    where: { userId: targetUserId, instanceId: currentInstanceId, sceneId: { in: sceneIds } },
                   })
                 : Promise.resolve([]),
             ]);
@@ -1481,7 +1481,7 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.performerRating.findMany({
-              where: { userId: targetUserId, performerId: { in: performerIds } },
+              where: { userId: targetUserId, instanceId: currentInstanceId, performerId: { in: performerIds } },
             });
 
             const existingRatingMap = new Map(
@@ -1601,7 +1601,7 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.studioRating.findMany({
-              where: { userId: targetUserId, studioId: { in: studioIds } },
+              where: { userId: targetUserId, instanceId: currentInstanceId, studioId: { in: studioIds } },
             });
 
             const existingRatingMap = new Map(
@@ -1685,7 +1685,7 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.tagRating.findMany({
-              where: { userId: targetUserId, tagId: { in: tagIds } },
+              where: { userId: targetUserId, instanceId: currentInstanceId, tagId: { in: tagIds } },
             });
 
             const existingRatingMap = new Map(
@@ -1754,7 +1754,7 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.galleryRating.findMany({
-              where: { userId: targetUserId, galleryId: { in: galleryIds } },
+              where: { userId: targetUserId, instanceId: currentInstanceId, galleryId: { in: galleryIds } },
             });
 
             const existingRatingMap = new Map(
@@ -1825,7 +1825,7 @@ export const syncFromStash = async (
 
             // Fetch all existing records in one query
             const existingRatings = await prisma.groupRating.findMany({
-              where: { userId: targetUserId, groupId: { in: groupIds } },
+              where: { userId: targetUserId, instanceId: currentInstanceId, groupId: { in: groupIds } },
             });
 
             const existingRatingMap = new Map(

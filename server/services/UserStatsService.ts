@@ -2,6 +2,10 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { stashEntityService } from "./StashEntityService.js";
 
+// Separator for composite map keys (entityId + instanceId).
+// Using a character that won't appear in UUIDs or Stash numeric IDs.
+const KEY_SEP = "\0";
+
 /**
  * UserStatsService
  *
@@ -404,9 +408,9 @@ class UserStatsService {
         const lastOAt =
           oHistory.length > 0 ? new Date(oHistory[oHistory.length - 1]) : null;
 
-        // Aggregate performers (using composite key: performerId:instanceId)
+        // Aggregate performers (using composite key: performerId + instanceId)
         for (const performer of scene.performers || []) {
-          const statsKey = `${performer.id}:${whInstanceId}`;
+          const statsKey = `${performer.id}${KEY_SEP}${whInstanceId}`;
           const existing = performerStatsMap.get(statsKey) || {
             oCounter: 0,
             playCount: 0,
@@ -429,9 +433,9 @@ class UserStatsService {
           });
         }
 
-        // Aggregate studio (using composite key: studioId:instanceId)
+        // Aggregate studio (using composite key: studioId + instanceId)
         if (scene.studio) {
-          const statsKey = `${scene.studio.id}:${whInstanceId}`;
+          const statsKey = `${scene.studio.id}${KEY_SEP}${whInstanceId}`;
           const existing = studioStatsMap.get(statsKey) || {
             oCounter: 0,
             playCount: 0,
@@ -443,9 +447,9 @@ class UserStatsService {
           });
         }
 
-        // Aggregate tags (using composite key: tagId:instanceId)
+        // Aggregate tags (using composite key: tagId + instanceId)
         for (const tag of scene.tags || []) {
-          const statsKey = `${tag.id}:${whInstanceId}`;
+          const statsKey = `${tag.id}${KEY_SEP}${whInstanceId}`;
           const existing = tagStatsMap.get(statsKey) || {
             oCounter: 0,
             playCount: 0,
@@ -465,7 +469,7 @@ class UserStatsService {
         prisma.userPerformerStats.createMany({
           data: Array.from(performerStatsMap.entries()).map(
             ([key, stats]) => {
-              const [performerId, instanceId] = key.split(':');
+              const [performerId, instanceId] = key.split(KEY_SEP);
               return {
                 userId,
                 instanceId: instanceId || "",
@@ -482,7 +486,7 @@ class UserStatsService {
         prisma.userStudioStats.createMany({
           data: Array.from(studioStatsMap.entries()).map(
             ([key, stats]) => {
-              const [studioId, instanceId] = key.split(':');
+              const [studioId, instanceId] = key.split(KEY_SEP);
               return {
                 userId,
                 instanceId: instanceId || "",
@@ -496,7 +500,7 @@ class UserStatsService {
         // Tags
         prisma.userTagStats.createMany({
           data: Array.from(tagStatsMap.entries()).map(([key, stats]) => {
-            const [tagId, instanceId] = key.split(':');
+            const [tagId, instanceId] = key.split(KEY_SEP);
             return {
               userId,
               instanceId: instanceId || "",

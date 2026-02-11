@@ -261,10 +261,8 @@ export async function pingWatchHistory(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           // Save activity (resume time and play duration) on every ping
           await stash.sceneSaveActivity({
             id: sceneId,
@@ -421,10 +419,8 @@ export async function incrementOCounter(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           logger.info("Syncing O counter increment to Stash", { sceneId });
           const result = await stash.sceneIncrementO({ id: sceneId });
           logger.info("Successfully incremented O counter in Stash", {
@@ -695,10 +691,8 @@ export async function saveActivity(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash && playDuration) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           await stash.sceneSaveActivity({
             id: sceneId,
             resume_time: resumeTime,
@@ -821,10 +815,8 @@ export async function incrementPlayCount(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
-        const stash = stashInstanceManager.get(instanceId);
-        if (!stash) {
-          logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        } else {
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
           const addPlayResult = await stash.sceneAddPlay({
             id: sceneId,
             times: [now.toISOString()],
