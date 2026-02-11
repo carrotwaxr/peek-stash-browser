@@ -44,72 +44,135 @@ export async function getEntityInstanceId(
   try {
     switch (entityType) {
       case 'scene': {
-        const scene = await prisma.stashScene.findFirst({
+        const scenes = await prisma.stashScene.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
-        if (scene?.stashInstanceId) {
-          return scene.stashInstanceId;
+        if (scenes.length > 1) {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
+            entityType,
+            entityId,
+            instanceCount: scenes.length,
+            instanceIds: scenes.map(s => s.stashInstanceId),
+          });
+        }
+        if (scenes.length > 0 && scenes[0].stashInstanceId) {
+          return scenes[0].stashInstanceId;
         }
         break;
       }
       case 'performer': {
-        const performer = await prisma.stashPerformer.findFirst({
+        const performers = await prisma.stashPerformer.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
-        if (performer?.stashInstanceId) {
-          return performer.stashInstanceId;
+        if (performers.length > 1) {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
+            entityType,
+            entityId,
+            instanceCount: performers.length,
+            instanceIds: performers.map(p => p.stashInstanceId),
+          });
+        }
+        if (performers.length > 0 && performers[0].stashInstanceId) {
+          return performers[0].stashInstanceId;
         }
         break;
       }
       case 'studio': {
-        const studio = await prisma.stashStudio.findFirst({
+        const studios = await prisma.stashStudio.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
-        if (studio?.stashInstanceId) {
-          return studio.stashInstanceId;
+        if (studios.length > 1) {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
+            entityType,
+            entityId,
+            instanceCount: studios.length,
+            instanceIds: studios.map(s => s.stashInstanceId),
+          });
+        }
+        if (studios.length > 0 && studios[0].stashInstanceId) {
+          return studios[0].stashInstanceId;
         }
         break;
       }
       case 'tag': {
-        const tag = await prisma.stashTag.findFirst({
+        const tags = await prisma.stashTag.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
-        if (tag?.stashInstanceId) {
-          return tag.stashInstanceId;
+        if (tags.length > 1) {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
+            entityType,
+            entityId,
+            instanceCount: tags.length,
+            instanceIds: tags.map(t => t.stashInstanceId),
+          });
+        }
+        if (tags.length > 0 && tags[0].stashInstanceId) {
+          return tags[0].stashInstanceId;
         }
         break;
       }
       case 'gallery': {
-        const gallery = await prisma.stashGallery.findFirst({
+        const galleries = await prisma.stashGallery.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
-        if (gallery?.stashInstanceId) {
-          return gallery.stashInstanceId;
+        if (galleries.length > 1) {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
+            entityType,
+            entityId,
+            instanceCount: galleries.length,
+            instanceIds: galleries.map(g => g.stashInstanceId),
+          });
+        }
+        if (galleries.length > 0 && galleries[0].stashInstanceId) {
+          return galleries[0].stashInstanceId;
         }
         break;
       }
       case 'group': {
-        const group = await prisma.stashGroup.findFirst({
+        const groups = await prisma.stashGroup.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
-        if (group?.stashInstanceId) {
-          return group.stashInstanceId;
+        if (groups.length > 1) {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
+            entityType,
+            entityId,
+            instanceCount: groups.length,
+            instanceIds: groups.map(g => g.stashInstanceId),
+          });
+        }
+        if (groups.length > 0 && groups[0].stashInstanceId) {
+          return groups[0].stashInstanceId;
         }
         break;
       }
       case 'image': {
-        const image = await prisma.stashImage.findFirst({
+        const images = await prisma.stashImage.findMany({
           where: { id: entityId },
           select: { stashInstanceId: true },
+          orderBy: { stashInstanceId: 'asc' },
         });
-        if (image?.stashInstanceId) {
-          return image.stashInstanceId;
+        if (images.length > 1) {
+          logger.warn(`Entity exists in multiple instances, using first by ID order`, {
+            entityType,
+            entityId,
+            instanceCount: images.length,
+            instanceIds: images.map(i => i.stashInstanceId),
+          });
+        }
+        if (images.length > 0 && images[0].stashInstanceId) {
+          return images[0].stashInstanceId;
         }
         break;
       }
@@ -130,6 +193,39 @@ export async function getEntityInstanceId(
       error: error instanceof Error ? error.message : String(error),
     });
     return fallbackId;
+  }
+}
+
+/**
+ * Check batch query results for entity IDs that appear in multiple instances.
+ * Logs a warning for each duplicate to aid debugging multi-instance issues.
+ */
+function warnBatchDuplicates(
+  entityType: EntityType,
+  entities: Array<{ id: string; stashInstanceId: string | null }>
+): void {
+  // Group by entity ID to find duplicates
+  const idGroups = new Map<string, string[]>();
+  for (const entity of entities) {
+    if (!entity.stashInstanceId) continue;
+    const existing = idGroups.get(entity.id);
+    if (existing) {
+      existing.push(entity.stashInstanceId);
+    } else {
+      idGroups.set(entity.id, [entity.stashInstanceId]);
+    }
+  }
+
+  // Log warnings for any IDs that appear in multiple instances
+  for (const [entityId, instanceIds] of idGroups) {
+    if (instanceIds.length > 1) {
+      logger.warn(`Batch lookup: entity exists in multiple instances, using first by ID order`, {
+        entityType,
+        entityId,
+        instanceCount: instanceIds.length,
+        instanceIds,
+      });
+    }
   }
 }
 
@@ -162,6 +258,7 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
+        warnBatchDuplicates(entityType, scenes);
         scenes.forEach(s => {
           if (s.stashInstanceId) {
             result.set(s.id, s.stashInstanceId);
@@ -174,6 +271,7 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
+        warnBatchDuplicates(entityType, performers);
         performers.forEach(p => {
           if (p.stashInstanceId) {
             result.set(p.id, p.stashInstanceId);
@@ -186,6 +284,7 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
+        warnBatchDuplicates(entityType, studios);
         studios.forEach(s => {
           if (s.stashInstanceId) {
             result.set(s.id, s.stashInstanceId);
@@ -198,6 +297,7 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
+        warnBatchDuplicates(entityType, tags);
         tags.forEach(t => {
           if (t.stashInstanceId) {
             result.set(t.id, t.stashInstanceId);
@@ -210,6 +310,7 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
+        warnBatchDuplicates(entityType, galleries);
         galleries.forEach(g => {
           if (g.stashInstanceId) {
             result.set(g.id, g.stashInstanceId);
@@ -222,6 +323,7 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
+        warnBatchDuplicates(entityType, groups);
         groups.forEach(g => {
           if (g.stashInstanceId) {
             result.set(g.id, g.stashInstanceId);
@@ -234,6 +336,7 @@ export async function getEntityInstanceIds(
           where: { id: { in: entityIds } },
           select: { id: true, stashInstanceId: true },
         });
+        warnBatchDuplicates(entityType, images);
         images.forEach(i => {
           if (i.stashInstanceId) {
             result.set(i.id, i.stashInstanceId);

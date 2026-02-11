@@ -18,7 +18,7 @@ import { studioQueryBuilder } from "../../services/StudioQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedStudio, PeekStudioFilter } from "../../types/index.js";
-import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
+import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { hydrateStudioRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -510,7 +510,12 @@ export const updateStudio = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const stash = stashInstanceManager.getDefault();
+    const instanceId = await getEntityInstanceId('studio', id);
+    const stash = stashInstanceManager.get(instanceId);
+    if (!stash) {
+      return res.status(404).json({ error: "Stash instance not found for studio" });
+    }
+
     const updatedStudio = await stash.studioUpdate({
       input: {
         id,

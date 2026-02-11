@@ -112,17 +112,19 @@ export async function updateSceneRating(
     // Sync rating to Stash if enabled (only rating, NOT favorite for scenes)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.sceneUpdate({
-          input: {
-            id: sceneId,
-            rating100: rating,
-          },
-        });
-        logger.info("Successfully synced scene rating to Stash", {
-          sceneId,
-          rating,
-        });
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await stash.sceneUpdate({
+            input: {
+              id: sceneId,
+              rating100: rating,
+            },
+          });
+          logger.info("Successfully synced scene rating to Stash", {
+            sceneId,
+            rating,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync scene rating to Stash", {
           sceneId,
@@ -218,19 +220,21 @@ export async function updatePerformerRating(
     // Sync to Stash if enabled (performer supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.performerUpdate({
-          input: {
-            id: performerId,
-            ...(rating !== undefined && { rating100: rating }),
-            ...(favorite !== undefined && { favorite }),
-          },
-        });
-        logger.info("Successfully synced performer rating to Stash", {
-          performerId,
-          rating,
-          favorite,
-        });
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await stash.performerUpdate({
+            input: {
+              id: performerId,
+              ...(rating !== undefined && { rating100: rating }),
+              ...(favorite !== undefined && { favorite }),
+            },
+          });
+          logger.info("Successfully synced performer rating to Stash", {
+            performerId,
+            rating,
+            favorite,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync performer rating to Stash", {
           performerId,
@@ -325,19 +329,21 @@ export async function updateStudioRating(
     // Sync to Stash if enabled (studio supports both rating and favorite)
     if (user?.syncToStash && (rating !== undefined || favorite !== undefined)) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.studioUpdate({
-          input: {
-            id: studioId,
-            ...(rating !== undefined && { rating100: rating }),
-            ...(favorite !== undefined && { favorite }),
-          },
-        });
-        logger.info("Successfully synced studio rating to Stash", {
-          studioId,
-          rating,
-          favorite,
-        });
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await stash.studioUpdate({
+            input: {
+              id: studioId,
+              ...(rating !== undefined && { rating100: rating }),
+              ...(favorite !== undefined && { favorite }),
+            },
+          });
+          logger.info("Successfully synced studio rating to Stash", {
+            studioId,
+            rating,
+            favorite,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync studio rating to Stash", {
           studioId,
@@ -427,17 +433,19 @@ export async function updateTagRating(
     // Sync favorite only to Stash if enabled (tags don't have rating100 in Stash)
     if (user?.syncToStash && favorite !== undefined) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.tagUpdate({
-          input: {
-            id: tagId,
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await stash.tagUpdate({
+            input: {
+              id: tagId,
+              favorite,
+            },
+          });
+          logger.info("Successfully synced tag favorite to Stash", {
+            tagId,
             favorite,
-          },
-        });
-        logger.info("Successfully synced tag favorite to Stash", {
-          tagId,
-          favorite,
-        });
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync tag favorite to Stash", {
           tagId,
@@ -532,17 +540,19 @@ export async function updateGalleryRating(
     // Sync rating only to Stash if enabled (galleries don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.galleryUpdate({
-          input: {
-            id: galleryId,
-            rating100: rating,
-          },
-        });
-        logger.info("Successfully synced gallery rating to Stash", {
-          galleryId,
-          rating,
-        });
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await stash.galleryUpdate({
+            input: {
+              id: galleryId,
+              rating100: rating,
+            },
+          });
+          logger.info("Successfully synced gallery rating to Stash", {
+            galleryId,
+            rating,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync gallery rating to Stash", {
           galleryId,
@@ -632,17 +642,19 @@ export async function updateGroupRating(
     // Sync rating only to Stash if enabled (groups don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.groupUpdate({
-          input: {
-            id: groupId,
-            rating100: rating,
-          },
-        });
-        logger.info("Successfully synced group rating to Stash", {
-          groupId,
-          rating,
-        });
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await stash.groupUpdate({
+            input: {
+              id: groupId,
+              rating100: rating,
+            },
+          });
+          logger.info("Successfully synced group rating to Stash", {
+            groupId,
+            rating,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync group rating to Stash", {
           groupId,
@@ -732,17 +744,19 @@ export async function updateImageRating(
     // Sync rating only to Stash if enabled (images don't have favorite in Stash)
     if (user?.syncToStash && rating !== undefined) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.imageUpdate({
-          input: {
-            id: imageId,
-            rating100: rating,
-          },
-        });
-        logger.info("Successfully synced image rating to Stash", {
-          imageId,
-          rating,
-        });
+        const stash = stashInstanceManager.getForSync(instanceId);
+        if (stash) {
+          await stash.imageUpdate({
+            input: {
+              id: imageId,
+              rating100: rating,
+            },
+          });
+          logger.info("Successfully synced image rating to Stash", {
+            imageId,
+            rating,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync image rating to Stash", {
           imageId,

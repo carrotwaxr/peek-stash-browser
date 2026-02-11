@@ -394,6 +394,7 @@ model UserContentRestriction {
 model UserPerformerStats {
   id          Int    @id @default(autoincrement())
   userId      Int
+  instanceId  String @default("")
   performerId String // Stash performer ID
 
   // Aggregated statistics from all scenes featuring this performer
@@ -404,15 +405,17 @@ model UserPerformerStats {
 
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, performerId])
+  @@unique([userId, instanceId, performerId])
   @@index([userId])
   @@index([performerId])
+  @@index([instanceId])
 }
 
 model UserStudioStats {
-  id       Int    @id @default(autoincrement())
-  userId   Int
-  studioId String // Stash studio ID
+  id         Int    @id @default(autoincrement())
+  userId     Int
+  instanceId String @default("")
+  studioId   String // Stash studio ID
 
   // Aggregated statistics from all scenes produced by this studio
   oCounter  Int @default(0) // Total O counter increments
@@ -420,15 +423,17 @@ model UserStudioStats {
 
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, studioId])
+  @@unique([userId, instanceId, studioId])
   @@index([userId])
   @@index([studioId])
+  @@index([instanceId])
 }
 
 model UserTagStats {
-  id     Int    @id @default(autoincrement())
-  userId Int
-  tagId  String // Stash tag ID
+  id         Int    @id @default(autoincrement())
+  userId     Int
+  instanceId String @default("")
+  tagId      String // Stash tag ID
 
   // Aggregated statistics from all scenes tagged with this tag
   oCounter  Int @default(0) // Total O counter increments
@@ -436,9 +441,10 @@ model UserTagStats {
 
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, tagId])
+  @@unique([userId, instanceId, tagId])
   @@index([userId])
   @@index([tagId])
+  @@index([instanceId])
 }
 
 // Pre-computed percentile rankings for user stats "Top" lists
@@ -446,6 +452,7 @@ model UserTagStats {
 model UserEntityRanking {
   id         Int    @id @default(autoincrement())
   userId     Int
+  instanceId String @default("")
   entityType String // 'performer' | 'studio' | 'tag' | 'scene'
   entityId   String // Stash entity ID
 
@@ -462,9 +469,10 @@ model UserEntityRanking {
 
   updatedAt DateTime @updatedAt
 
-  @@unique([userId, entityType, entityId])
+  @@unique([userId, instanceId, entityType, entityId])
   @@index([userId, entityType, percentileRank(sort: Desc)])
   @@index([userId, entityType])
+  @@index([instanceId])
 }
 
 enum UserRole {

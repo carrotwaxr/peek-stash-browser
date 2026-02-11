@@ -8,7 +8,6 @@ import { resolveUserPermissions } from "../services/PermissionService.js";
 import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
-import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 
 /**
  * Carousel preference configuration
@@ -1215,11 +1214,15 @@ export const syncFromStash = async (
       groups: { rating: true }, // Groups only have rating, no favorite
     };
 
-    // Get Stash instance from manager
+    // Get Stash instances from manager
     const { stashInstanceManager } = await import(
       "../services/StashInstanceManager.js"
     );
-    const stash = stashInstanceManager.getDefault();
+    const allInstances = stashInstanceManager.getAll();
+
+    if (allInstances.length === 0) {
+      return res.status(400).json({ error: "No Stash instances configured" });
+    }
 
     const stats = {
       scenes: { checked: 0, updated: 0, created: 0 },
@@ -1262,609 +1265,620 @@ export const syncFromStash = async (
 
     logger.info("Syncing from Stash: Fetching entities in paginated batches...");
 
-    // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
-    if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
-      let sceneFilter: Record<string, unknown> = {};
+    for (const [currentInstanceId, stash] of allInstances) {
+      try {
+        logger.info(`Syncing from Stash instance ${currentInstanceId}...`);
 
-      // Determine which filter to use
-      if (syncOptions.scenes.rating && !syncOptions.scenes.oCounter) {
-        sceneFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
-      } else if (syncOptions.scenes.oCounter && !syncOptions.scenes.rating) {
-        sceneFilter = { o_counter: { value: 0, modifier: "GREATER_THAN" } };
-      }
-      // If both are selected, fetch all scenes (can't do OR in single query)
+        // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
+        if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
+          let sceneFilter: Record<string, unknown> = {};
 
-      // Build filter function for in-code filtering when both options selected
-      const sceneFilterFn =
-        syncOptions.scenes.rating && syncOptions.scenes.oCounter
-          ? (s: { rating100?: number | null; o_counter?: number | null }) =>
-              (s.rating100 !== null &&
-                s.rating100 !== undefined &&
-                s.rating100 > 0) ||
-              (s.o_counter !== null &&
-                s.o_counter !== undefined &&
-                s.o_counter > 0)
-          : () => true;
+          // Determine which filter to use
+          if (syncOptions.scenes.rating && !syncOptions.scenes.oCounter) {
+            sceneFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
+          } else if (syncOptions.scenes.oCounter && !syncOptions.scenes.rating) {
+            sceneFilter = { o_counter: { value: 0, modifier: "GREATER_THAN" } };
+          }
+          // If both are selected, fetch all scenes (can't do OR in single query)
 
-      const filteredScenes = await fetchPaginated(
-        async (page) => {
-          const result = await stash.findScenes({
-            filter: { page, per_page: PAGE_SIZE },
-            scene_filter:
-              Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined,
-          });
-          return {
-            items: result.findScenes.scenes,
-            count: result.findScenes.count,
-          };
-        },
-        sceneFilterFn
-      );
+          // Build filter function for in-code filtering when both options selected
+          const sceneFilterFn =
+            syncOptions.scenes.rating && syncOptions.scenes.oCounter
+              ? (s: { rating100?: number | null; o_counter?: number | null }) =>
+                  (s.rating100 !== null &&
+                    s.rating100 !== undefined &&
+                    s.rating100 > 0) ||
+                  (s.o_counter !== null &&
+                    s.o_counter !== undefined &&
+                    s.o_counter > 0)
+              : () => true;
+
+          const filteredScenes = await fetchPaginated(
+            async (page) => {
+              const result = await stash.findScenes({
+                filter: { page, per_page: PAGE_SIZE },
+                scene_filter:
+                  Object.keys(sceneFilter).length > 0 ? sceneFilter : undefined,
+              });
+              return {
+                items: result.findScenes.scenes,
+                count: result.findScenes.count,
+              };
+            },
+            sceneFilterFn
+          );
 
 
-      // Track unique scenes to avoid double-counting when syncing both rating and o_counter
-      const createdScenes = new Set<string>();
-      const updatedScenes = new Set<string>();
+          // Track unique scenes to avoid double-counting when syncing both rating and o_counter
+          const createdScenes = new Set<string>();
+          const updatedScenes = new Set<string>();
 
-      for (let i = 0; i < filteredScenes.length; i += BATCH_SIZE) {
-        const batch = filteredScenes.slice(i, i + BATCH_SIZE);
-        const sceneIds = batch.map((s) => s.id);
+          for (let i = 0; i < filteredScenes.length; i += BATCH_SIZE) {
+            const batch = filteredScenes.slice(i, i + BATCH_SIZE);
+            const sceneIds = batch.map((s) => s.id);
 
-        // Collect all existing records in one query
-        const [existingRatings, existingWatchHistory] = await Promise.all([
-          syncOptions.scenes.rating
-            ? prisma.sceneRating.findMany({
-                where: { userId: targetUserId, sceneId: { in: sceneIds } },
-              })
-            : Promise.resolve([]),
-          syncOptions.scenes.oCounter
-            ? prisma.watchHistory.findMany({
-                where: { userId: targetUserId, sceneId: { in: sceneIds } },
-              })
-            : Promise.resolve([]),
-        ]);
+            // Collect all existing records in one query
+            const [existingRatings, existingWatchHistory] = await Promise.all([
+              syncOptions.scenes.rating
+                ? prisma.sceneRating.findMany({
+                    where: { userId: targetUserId, instanceId: currentInstanceId, sceneId: { in: sceneIds } },
+                  })
+                : Promise.resolve([]),
+              syncOptions.scenes.oCounter
+                ? prisma.watchHistory.findMany({
+                    where: { userId: targetUserId, instanceId: currentInstanceId, sceneId: { in: sceneIds } },
+                  })
+                : Promise.resolve([]),
+            ]);
 
-        const existingRatingMap = new Map(
-          existingRatings.map((r) => [r.sceneId, r])
-        );
-        const existingWatchMap = new Map(
-          existingWatchHistory.map((w) => [w.sceneId, w])
-        );
+            const existingRatingMap = new Map(
+              existingRatings.map((r) => [r.sceneId, r])
+            );
+            const existingWatchMap = new Map(
+              existingWatchHistory.map((w) => [w.sceneId, w])
+            );
 
-        // Build bulk operations
-        const ratingUpserts: Parameters<typeof prisma.sceneRating.upsert>[0][] =
-          [];
-        const watchUpserts: Parameters<typeof prisma.watchHistory.upsert>[0][] =
-          [];
+            // Build bulk operations
+            const ratingUpserts: Parameters<typeof prisma.sceneRating.upsert>[0][] =
+              [];
+            const watchUpserts: Parameters<typeof prisma.watchHistory.upsert>[0][] =
+              [];
 
-        for (const scene of batch) {
-          let sceneWasCreated = false;
-          let sceneWasUpdated = false;
+            for (const scene of batch) {
+              let sceneWasCreated = false;
+              let sceneWasUpdated = false;
 
-          // Get instanceId for the scene (use 'default' for direct Stash imports)
-          const sceneInstanceId = await getEntityInstanceId('scene', scene.id);
+              const sceneInstanceId = currentInstanceId;
 
-          // Rating sync
-          if (
-            syncOptions.scenes.rating &&
-            scene.rating100 &&
-            scene.rating100 > 0
+              // Rating sync
+              if (
+                syncOptions.scenes.rating &&
+                scene.rating100 &&
+                scene.rating100 > 0
+              ) {
+                const existing = existingRatingMap.get(scene.id);
+                ratingUpserts.push({
+                  where: {
+                    userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
+                  },
+                  update: { rating: scene.rating100 },
+                  create: {
+                    userId: targetUserId,
+                    instanceId: sceneInstanceId,
+                    sceneId: scene.id,
+                    rating: scene.rating100,
+                    favorite: false,
+                  },
+                });
+
+                if (!existing) {
+                  sceneWasCreated = true;
+                } else if (existing.rating !== scene.rating100) {
+                  sceneWasUpdated = true;
+                }
+              }
+
+              // O-counter sync
+              if (
+                syncOptions.scenes.oCounter &&
+                scene.o_counter &&
+                scene.o_counter > 0
+              ) {
+                const existing = existingWatchMap.get(scene.id);
+                watchUpserts.push({
+                  where: {
+                    userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
+                  },
+                  update: { oCount: scene.o_counter },
+                  create: {
+                    userId: targetUserId,
+                    instanceId: sceneInstanceId,
+                    sceneId: scene.id,
+                    oCount: scene.o_counter,
+                    oHistory: [],
+                    playCount: 0,
+                    playDuration: 0,
+                    playHistory: [],
+                  },
+                });
+
+                if (!existing) {
+                  sceneWasCreated = true;
+                } else if (existing.oCount !== scene.o_counter) {
+                  sceneWasUpdated = true;
+                }
+              }
+
+              // Count each unique scene only once (not once per record type)
+              if (sceneWasCreated && !createdScenes.has(scene.id)) {
+                stats.scenes.created++;
+                createdScenes.add(scene.id);
+              }
+              if (sceneWasUpdated && !updatedScenes.has(scene.id)) {
+                stats.scenes.updated++;
+                updatedScenes.add(scene.id);
+              }
+            }
+
+            // Execute upserts in transaction
+            if (ratingUpserts.length > 0 || watchUpserts.length > 0) {
+              await prisma.$transaction([
+                ...ratingUpserts.map((u) => prisma.sceneRating.upsert(u)),
+                ...watchUpserts.map((u) => prisma.watchHistory.upsert(u)),
+              ]);
+            }
+
+            stats.scenes.checked += batch.length;
+          }
+        }
+
+        // 2. Sync Performers
+        if (syncOptions.performers.rating || syncOptions.performers.favorite) {
+          let performerFilter: Record<string, unknown> = {};
+
+          // Use GraphQL filter when only one option is selected
+          if (syncOptions.performers.rating && !syncOptions.performers.favorite) {
+            performerFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
+          } else if (
+            syncOptions.performers.favorite &&
+            !syncOptions.performers.rating
           ) {
-            const existing = existingRatingMap.get(scene.id);
-            ratingUpserts.push({
-              where: {
-                userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
-              },
-              update: { rating: scene.rating100 },
-              create: {
-                userId: targetUserId,
-                instanceId: sceneInstanceId,
-                sceneId: scene.id,
-                rating: scene.rating100,
-                favorite: false,
-              },
+            performerFilter = { filter_favorites: true };
+          }
+          // If both are selected, fetch all and filter in code (can't do OR in single query)
+
+          // Build filter function for in-code filtering when both options selected
+          const performerFilterFn =
+            syncOptions.performers.rating && syncOptions.performers.favorite
+              ? (p: { rating100?: number | null; favorite?: boolean }): boolean =>
+                  (p.rating100 !== null &&
+                    p.rating100 !== undefined &&
+                    p.rating100 > 0) ||
+                  !!p.favorite
+              : (): boolean => true;
+
+          const filteredPerformers = await fetchPaginated(
+            async (page) => {
+              const result = await stash.findPerformers({
+                filter: { page, per_page: PAGE_SIZE },
+                performer_filter:
+                  Object.keys(performerFilter).length > 0
+                    ? performerFilter
+                    : undefined,
+              });
+              return {
+                items: result.findPerformers.performers,
+                count: result.findPerformers.count,
+              };
+            },
+            performerFilterFn
+          );
+
+
+          for (let i = 0; i < filteredPerformers.length; i += BATCH_SIZE) {
+            const batch = filteredPerformers.slice(i, i + BATCH_SIZE);
+            const performerIds = batch.map((p) => p.id);
+
+            // Fetch all existing records in one query
+            const existingRatings = await prisma.performerRating.findMany({
+              where: { userId: targetUserId, instanceId: currentInstanceId, performerId: { in: performerIds } },
             });
 
-            if (!existing) {
-              sceneWasCreated = true;
-            } else if (existing.rating !== scene.rating100) {
-              sceneWasUpdated = true;
-            }
-          }
+            const existingRatingMap = new Map(
+              existingRatings.map((r) => [r.performerId, r])
+            );
 
-          // O-counter sync
-          if (
-            syncOptions.scenes.oCounter &&
-            scene.o_counter &&
-            scene.o_counter > 0
-          ) {
-            const existing = existingWatchMap.get(scene.id);
-            watchUpserts.push({
-              where: {
-                userId_instanceId_sceneId: { userId: targetUserId, instanceId: sceneInstanceId, sceneId: scene.id },
-              },
-              update: { oCount: scene.o_counter },
-              create: {
-                userId: targetUserId,
-                instanceId: sceneInstanceId,
-                sceneId: scene.id,
-                oCount: scene.o_counter,
-                oHistory: [],
-                playCount: 0,
-                playDuration: 0,
-                playHistory: [],
-              },
+            // Build bulk operations
+            const upserts: Parameters<typeof prisma.performerRating.upsert>[0][] =
+              [];
+
+            for (const performer of batch) {
+              const stashRating = syncOptions.performers.rating
+                ? performer.rating100
+                : null;
+              const stashFavorite = syncOptions.performers.favorite
+                ? performer.favorite || false
+                : false;
+
+              const existing = existingRatingMap.get(performer.id);
+              const performerInstanceId = currentInstanceId;
+
+              const updates: SyncUpdates = {};
+              if (syncOptions.performers.rating) updates.rating = stashRating;
+              if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
+
+              upserts.push({
+                where: {
+                  userId_instanceId_performerId: {
+                    userId: targetUserId,
+                    instanceId: performerInstanceId,
+                    performerId: performer.id,
+                  },
+                },
+                update: updates,
+                create: {
+                  userId: targetUserId,
+                  instanceId: performerInstanceId,
+                  performerId: performer.id,
+                  rating: stashRating,
+                  favorite: stashFavorite,
+                },
+              });
+
+              if (!existing) {
+                stats.performers.created++;
+              } else {
+                let needsUpdate = false;
+                if (
+                  syncOptions.performers.rating &&
+                  existing.rating !== stashRating
+                )
+                  needsUpdate = true;
+                if (
+                  syncOptions.performers.favorite &&
+                  existing.favorite !== stashFavorite
+                )
+                  needsUpdate = true;
+
+                if (needsUpdate) {
+                  stats.performers.updated++;
+                }
+              }
+            }
+
+            // Execute upserts in transaction
+            if (upserts.length > 0) {
+              await prisma.$transaction(
+                upserts.map((u) => prisma.performerRating.upsert(u))
+              );
+            }
+
+            stats.performers.checked += batch.length;
+          }
+        }
+
+        // 3. Sync Studios
+        if (syncOptions.studios.rating || syncOptions.studios.favorite) {
+          let studioFilter: Record<string, unknown> = {};
+
+          // Use GraphQL filter when only one option is selected
+          if (syncOptions.studios.rating && !syncOptions.studios.favorite) {
+            studioFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
+          } else if (syncOptions.studios.favorite && !syncOptions.studios.rating) {
+            studioFilter = { favorite: true };
+          }
+          // If both are selected, fetch all and filter in code (can't do OR in single query)
+
+          // Build filter function for in-code filtering when both options selected
+          const studioFilterFn =
+            syncOptions.studios.rating && syncOptions.studios.favorite
+              ? (s: { rating100?: number | null; favorite?: boolean }): boolean =>
+                  (s.rating100 !== null &&
+                    s.rating100 !== undefined &&
+                    s.rating100 > 0) ||
+                  !!s.favorite
+              : (): boolean => true;
+
+          const filteredStudios = await fetchPaginated(
+            async (page) => {
+              const result = await stash.findStudios({
+                filter: { page, per_page: PAGE_SIZE },
+                studio_filter:
+                  Object.keys(studioFilter).length > 0 ? studioFilter : undefined,
+              });
+              return {
+                items: result.findStudios.studios,
+                count: result.findStudios.count,
+              };
+            },
+            studioFilterFn
+          );
+
+
+          for (let i = 0; i < filteredStudios.length; i += BATCH_SIZE) {
+            const batch = filteredStudios.slice(i, i + BATCH_SIZE);
+            const studioIds = batch.map((s) => s.id);
+
+            // Fetch all existing records in one query
+            const existingRatings = await prisma.studioRating.findMany({
+              where: { userId: targetUserId, instanceId: currentInstanceId, studioId: { in: studioIds } },
             });
 
-            if (!existing) {
-              sceneWasCreated = true;
-            } else if (existing.oCount !== scene.o_counter) {
-              sceneWasUpdated = true;
+            const existingRatingMap = new Map(
+              existingRatings.map((r) => [r.studioId, r])
+            );
+
+            // Build bulk operations
+            const upserts: Parameters<typeof prisma.studioRating.upsert>[0][] = [];
+
+            for (const studio of batch) {
+              const stashRating = syncOptions.studios.rating
+                ? studio.rating100
+                : null;
+              const stashFavorite = syncOptions.studios.favorite
+                ? studio.favorite || false
+                : false;
+
+              const existing = existingRatingMap.get(studio.id);
+              const studioInstanceId = currentInstanceId;
+
+              const updates: SyncUpdates = {};
+              if (syncOptions.studios.rating) updates.rating = stashRating;
+              if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
+
+              upserts.push({
+                where: {
+                  userId_instanceId_studioId: { userId: targetUserId, instanceId: studioInstanceId, studioId: studio.id },
+                },
+                update: updates,
+                create: {
+                  userId: targetUserId,
+                  instanceId: studioInstanceId,
+                  studioId: studio.id,
+                  rating: stashRating,
+                  favorite: stashFavorite,
+                },
+              });
+
+              if (!existing) {
+                stats.studios.created++;
+              } else {
+                let needsUpdate = false;
+                if (syncOptions.studios.rating && existing.rating !== stashRating)
+                  needsUpdate = true;
+                if (
+                  syncOptions.studios.favorite &&
+                  existing.favorite !== stashFavorite
+                )
+                  needsUpdate = true;
+
+                if (needsUpdate) {
+                  stats.studios.updated++;
+                }
+              }
             }
-          }
 
-          // Count each unique scene only once (not once per record type)
-          if (sceneWasCreated && !createdScenes.has(scene.id)) {
-            stats.scenes.created++;
-            createdScenes.add(scene.id);
-          }
-          if (sceneWasUpdated && !updatedScenes.has(scene.id)) {
-            stats.scenes.updated++;
-            updatedScenes.add(scene.id);
-          }
-        }
-
-        // Execute upserts in transaction
-        if (ratingUpserts.length > 0 || watchUpserts.length > 0) {
-          await prisma.$transaction([
-            ...ratingUpserts.map((u) => prisma.sceneRating.upsert(u)),
-            ...watchUpserts.map((u) => prisma.watchHistory.upsert(u)),
-          ]);
-        }
-
-        stats.scenes.checked += batch.length;
-      }
-    }
-
-    // 2. Sync Performers
-    if (syncOptions.performers.rating || syncOptions.performers.favorite) {
-      let performerFilter: Record<string, unknown> = {};
-
-      // Use GraphQL filter when only one option is selected
-      if (syncOptions.performers.rating && !syncOptions.performers.favorite) {
-        performerFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
-      } else if (
-        syncOptions.performers.favorite &&
-        !syncOptions.performers.rating
-      ) {
-        performerFilter = { filter_favorites: true };
-      }
-      // If both are selected, fetch all and filter in code (can't do OR in single query)
-
-      // Build filter function for in-code filtering when both options selected
-      const performerFilterFn =
-        syncOptions.performers.rating && syncOptions.performers.favorite
-          ? (p: { rating100?: number | null; favorite?: boolean }): boolean =>
-              (p.rating100 !== null &&
-                p.rating100 !== undefined &&
-                p.rating100 > 0) ||
-              !!p.favorite
-          : (): boolean => true;
-
-      const filteredPerformers = await fetchPaginated(
-        async (page) => {
-          const result = await stash.findPerformers({
-            filter: { page, per_page: PAGE_SIZE },
-            performer_filter:
-              Object.keys(performerFilter).length > 0
-                ? performerFilter
-                : undefined,
-          });
-          return {
-            items: result.findPerformers.performers,
-            count: result.findPerformers.count,
-          };
-        },
-        performerFilterFn
-      );
-
-
-      for (let i = 0; i < filteredPerformers.length; i += BATCH_SIZE) {
-        const batch = filteredPerformers.slice(i, i + BATCH_SIZE);
-        const performerIds = batch.map((p) => p.id);
-
-        // Fetch all existing records in one query
-        const existingRatings = await prisma.performerRating.findMany({
-          where: { userId: targetUserId, performerId: { in: performerIds } },
-        });
-
-        const existingRatingMap = new Map(
-          existingRatings.map((r) => [r.performerId, r])
-        );
-
-        // Build bulk operations
-        const upserts: Parameters<typeof prisma.performerRating.upsert>[0][] =
-          [];
-
-        for (const performer of batch) {
-          const stashRating = syncOptions.performers.rating
-            ? performer.rating100
-            : null;
-          const stashFavorite = syncOptions.performers.favorite
-            ? performer.favorite || false
-            : false;
-
-          const existing = existingRatingMap.get(performer.id);
-          const performerInstanceId = await getEntityInstanceId('performer', performer.id);
-
-          const updates: SyncUpdates = {};
-          if (syncOptions.performers.rating) updates.rating = stashRating;
-          if (syncOptions.performers.favorite) updates.favorite = stashFavorite;
-
-          upserts.push({
-            where: {
-              userId_instanceId_performerId: {
-                userId: targetUserId,
-                instanceId: performerInstanceId,
-                performerId: performer.id,
-              },
-            },
-            update: updates,
-            create: {
-              userId: targetUserId,
-              instanceId: performerInstanceId,
-              performerId: performer.id,
-              rating: stashRating,
-              favorite: stashFavorite,
-            },
-          });
-
-          if (!existing) {
-            stats.performers.created++;
-          } else {
-            let needsUpdate = false;
-            if (
-              syncOptions.performers.rating &&
-              existing.rating !== stashRating
-            )
-              needsUpdate = true;
-            if (
-              syncOptions.performers.favorite &&
-              existing.favorite !== stashFavorite
-            )
-              needsUpdate = true;
-
-            if (needsUpdate) {
-              stats.performers.updated++;
+            // Execute upserts in transaction
+            if (upserts.length > 0) {
+              await prisma.$transaction(
+                upserts.map((u) => prisma.studioRating.upsert(u))
+              );
             }
+
+            stats.studios.checked += batch.length;
           }
         }
 
-        // Execute upserts in transaction
-        if (upserts.length > 0) {
-          await prisma.$transaction(
-            upserts.map((u) => prisma.performerRating.upsert(u))
-          );
-        }
-
-        stats.performers.checked += batch.length;
-      }
-    }
-
-    // 3. Sync Studios
-    if (syncOptions.studios.rating || syncOptions.studios.favorite) {
-      let studioFilter: Record<string, unknown> = {};
-
-      // Use GraphQL filter when only one option is selected
-      if (syncOptions.studios.rating && !syncOptions.studios.favorite) {
-        studioFilter = { rating100: { value: 0, modifier: "GREATER_THAN" } };
-      } else if (syncOptions.studios.favorite && !syncOptions.studios.rating) {
-        studioFilter = { favorite: true };
-      }
-      // If both are selected, fetch all and filter in code (can't do OR in single query)
-
-      // Build filter function for in-code filtering when both options selected
-      const studioFilterFn =
-        syncOptions.studios.rating && syncOptions.studios.favorite
-          ? (s: { rating100?: number | null; favorite?: boolean }): boolean =>
-              (s.rating100 !== null &&
-                s.rating100 !== undefined &&
-                s.rating100 > 0) ||
-              !!s.favorite
-          : (): boolean => true;
-
-      const filteredStudios = await fetchPaginated(
-        async (page) => {
-          const result = await stash.findStudios({
-            filter: { page, per_page: PAGE_SIZE },
-            studio_filter:
-              Object.keys(studioFilter).length > 0 ? studioFilter : undefined,
-          });
-          return {
-            items: result.findStudios.studios,
-            count: result.findStudios.count,
-          };
-        },
-        studioFilterFn
-      );
-
-
-      for (let i = 0; i < filteredStudios.length; i += BATCH_SIZE) {
-        const batch = filteredStudios.slice(i, i + BATCH_SIZE);
-        const studioIds = batch.map((s) => s.id);
-
-        // Fetch all existing records in one query
-        const existingRatings = await prisma.studioRating.findMany({
-          where: { userId: targetUserId, studioId: { in: studioIds } },
-        });
-
-        const existingRatingMap = new Map(
-          existingRatings.map((r) => [r.studioId, r])
-        );
-
-        // Build bulk operations
-        const upserts: Parameters<typeof prisma.studioRating.upsert>[0][] = [];
-
-        for (const studio of batch) {
-          const stashRating = syncOptions.studios.rating
-            ? studio.rating100
-            : null;
-          const stashFavorite = syncOptions.studios.favorite
-            ? studio.favorite || false
-            : false;
-
-          const existing = existingRatingMap.get(studio.id);
-          const studioInstanceId = await getEntityInstanceId('studio', studio.id);
-
-          const updates: SyncUpdates = {};
-          if (syncOptions.studios.rating) updates.rating = stashRating;
-          if (syncOptions.studios.favorite) updates.favorite = stashFavorite;
-
-          upserts.push({
-            where: {
-              userId_instanceId_studioId: { userId: targetUserId, instanceId: studioInstanceId, studioId: studio.id },
-            },
-            update: updates,
-            create: {
-              userId: targetUserId,
-              instanceId: studioInstanceId,
-              studioId: studio.id,
-              rating: stashRating,
-              favorite: stashFavorite,
-            },
+        // 4. Sync Tags - Only fetch favorited tags
+        if (syncOptions.tags.favorite) {
+          const tags = await fetchPaginated(async (page) => {
+            const result = await stash.findTags({
+              filter: { page, per_page: PAGE_SIZE },
+              tag_filter: { favorite: true },
+            });
+            return { items: result.findTags.tags, count: result.findTags.count };
           });
 
-          if (!existing) {
-            stats.studios.created++;
-          } else {
-            let needsUpdate = false;
-            if (syncOptions.studios.rating && existing.rating !== stashRating)
-              needsUpdate = true;
-            if (
-              syncOptions.studios.favorite &&
-              existing.favorite !== stashFavorite
-            )
-              needsUpdate = true;
+          for (let i = 0; i < tags.length; i += BATCH_SIZE) {
+            const batch = tags.slice(i, i + BATCH_SIZE);
+            const tagIds = batch.map((t) => t.id);
 
-            if (needsUpdate) {
-              stats.studios.updated++;
+            // Fetch all existing records in one query
+            const existingRatings = await prisma.tagRating.findMany({
+              where: { userId: targetUserId, instanceId: currentInstanceId, tagId: { in: tagIds } },
+            });
+
+            const existingRatingMap = new Map(
+              existingRatings.map((r) => [r.tagId, r])
+            );
+
+            // Build bulk operations
+            const upserts: Parameters<typeof prisma.tagRating.upsert>[0][] = [];
+
+            for (const tag of batch) {
+              const stashFavorite = tag.favorite || false;
+              const existing = existingRatingMap.get(tag.id);
+              const tagInstanceId = currentInstanceId;
+
+              upserts.push({
+                where: { userId_instanceId_tagId: { userId: targetUserId, instanceId: tagInstanceId, tagId: tag.id } },
+                update: { favorite: stashFavorite },
+                create: {
+                  userId: targetUserId,
+                  instanceId: tagInstanceId,
+                  tagId: tag.id,
+                  rating: null, // Tags don't have ratings in Stash
+                  favorite: stashFavorite,
+                },
+              });
+
+              if (!existing) {
+                stats.tags.created++;
+              } else if (existing.favorite !== stashFavorite) {
+                stats.tags.updated++;
+              }
             }
+
+            // Execute upserts in transaction
+            if (upserts.length > 0) {
+              await prisma.$transaction(
+                upserts.map((u) => prisma.tagRating.upsert(u))
+              );
+            }
+
+            stats.tags.checked += batch.length;
           }
         }
 
-        // Execute upserts in transaction
-        if (upserts.length > 0) {
-          await prisma.$transaction(
-            upserts.map((u) => prisma.studioRating.upsert(u))
-          );
-        }
-
-        stats.studios.checked += batch.length;
-      }
-    }
-
-    // 4. Sync Tags - Only fetch favorited tags
-    if (syncOptions.tags.favorite) {
-      const tags = await fetchPaginated(async (page) => {
-        const result = await stash.findTags({
-          filter: { page, per_page: PAGE_SIZE },
-          tag_filter: { favorite: true },
-        });
-        return { items: result.findTags.tags, count: result.findTags.count };
-      });
-
-      for (let i = 0; i < tags.length; i += BATCH_SIZE) {
-        const batch = tags.slice(i, i + BATCH_SIZE);
-        const tagIds = batch.map((t) => t.id);
-
-        // Fetch all existing records in one query
-        const existingRatings = await prisma.tagRating.findMany({
-          where: { userId: targetUserId, tagId: { in: tagIds } },
-        });
-
-        const existingRatingMap = new Map(
-          existingRatings.map((r) => [r.tagId, r])
-        );
-
-        // Build bulk operations
-        const upserts: Parameters<typeof prisma.tagRating.upsert>[0][] = [];
-
-        for (const tag of batch) {
-          const stashFavorite = tag.favorite || false;
-          const existing = existingRatingMap.get(tag.id);
-          const tagInstanceId = await getEntityInstanceId('tag', tag.id);
-
-          upserts.push({
-            where: { userId_instanceId_tagId: { userId: targetUserId, instanceId: tagInstanceId, tagId: tag.id } },
-            update: { favorite: stashFavorite },
-            create: {
-              userId: targetUserId,
-              instanceId: tagInstanceId,
-              tagId: tag.id,
-              rating: null, // Tags don't have ratings in Stash
-              favorite: stashFavorite,
+        // 5. Sync Galleries (rating only - no favorite in Stash)
+        if (syncOptions.galleries && syncOptions.galleries.rating) {
+          // Filter for rated galleries in code
+          const galleries = await fetchPaginated(
+            async (page) => {
+              const result = await stash.findGalleries({
+                filter: { page, per_page: PAGE_SIZE },
+                gallery_filter: undefined, // Fetch all galleries
+              });
+              return {
+                items: result.findGalleries.galleries,
+                count: result.findGalleries.count,
+              };
             },
-          });
+            (g: { rating100?: number | null }) =>
+              g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
+          );
 
-          if (!existing) {
-            stats.tags.created++;
-          } else if (existing.favorite !== stashFavorite) {
-            stats.tags.updated++;
+          for (let i = 0; i < galleries.length; i += BATCH_SIZE) {
+            const batch = galleries.slice(i, i + BATCH_SIZE);
+            const galleryIds = batch.map((g) => g.id);
+
+            // Fetch all existing records in one query
+            const existingRatings = await prisma.galleryRating.findMany({
+              where: { userId: targetUserId, instanceId: currentInstanceId, galleryId: { in: galleryIds } },
+            });
+
+            const existingRatingMap = new Map(
+              existingRatings.map((r) => [r.galleryId, r])
+            );
+
+            // Build bulk operations
+            const upserts: Parameters<typeof prisma.galleryRating.upsert>[0][] = [];
+
+            for (const gallery of batch) {
+              const stashRating = gallery.rating100;
+              const existing = existingRatingMap.get(gallery.id);
+              const galleryInstanceId = currentInstanceId;
+
+              upserts.push({
+                where: {
+                  userId_instanceId_galleryId: { userId: targetUserId, instanceId: galleryInstanceId, galleryId: gallery.id },
+                },
+                update: { rating: stashRating },
+                create: {
+                  userId: targetUserId,
+                  instanceId: galleryInstanceId,
+                  galleryId: gallery.id,
+                  rating: stashRating,
+                  favorite: false, // Galleries don't have favorites
+                },
+              });
+
+              if (!existing) {
+                stats.galleries.created++;
+              } else if (existing.rating !== stashRating) {
+                stats.galleries.updated++;
+              }
+            }
+
+            // Execute upserts in transaction
+            if (upserts.length > 0) {
+              await prisma.$transaction(
+                upserts.map((u) => prisma.galleryRating.upsert(u))
+              );
+            }
+
+            stats.galleries.checked += batch.length;
           }
         }
 
-        // Execute upserts in transaction
-        if (upserts.length > 0) {
-          await prisma.$transaction(
-            upserts.map((u) => prisma.tagRating.upsert(u))
+        // 6. Sync Groups/Collections (rating only - no favorite in Stash)
+        if (syncOptions.groups && syncOptions.groups.rating) {
+          // Filter for rated groups in code
+          const groups = await fetchPaginated(
+            async (page) => {
+              const result = await stash.findGroups({
+                filter: { page, per_page: PAGE_SIZE },
+                group_filter: undefined, // Fetch all groups
+              });
+              return {
+                items: result.findGroups.groups,
+                count: result.findGroups.count,
+              };
+            },
+            (g: { rating100?: number | null }) =>
+              g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
           );
-        }
 
-        stats.tags.checked += batch.length;
-      }
-    }
+          for (let i = 0; i < groups.length; i += BATCH_SIZE) {
+            const batch = groups.slice(i, i + BATCH_SIZE);
+            const groupIds = batch.map((g) => g.id);
 
-    // 5. Sync Galleries (rating only - no favorite in Stash)
-    if (syncOptions.galleries && syncOptions.galleries.rating) {
-      // Filter for rated galleries in code
-      const galleries = await fetchPaginated(
-        async (page) => {
-          const result = await stash.findGalleries({
-            filter: { page, per_page: PAGE_SIZE },
-            gallery_filter: undefined, // Fetch all galleries
-          });
-          return {
-            items: result.findGalleries.galleries,
-            count: result.findGalleries.count,
-          };
-        },
-        (g: { rating100?: number | null }) =>
-          g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
-      );
+            // Fetch all existing records in one query
+            const existingRatings = await prisma.groupRating.findMany({
+              where: { userId: targetUserId, instanceId: currentInstanceId, groupId: { in: groupIds } },
+            });
 
-      for (let i = 0; i < galleries.length; i += BATCH_SIZE) {
-        const batch = galleries.slice(i, i + BATCH_SIZE);
-        const galleryIds = batch.map((g) => g.id);
+            const existingRatingMap = new Map(
+              existingRatings.map((r) => [r.groupId, r])
+            );
 
-        // Fetch all existing records in one query
-        const existingRatings = await prisma.galleryRating.findMany({
-          where: { userId: targetUserId, galleryId: { in: galleryIds } },
-        });
+            // Build bulk operations
+            const upserts: Parameters<typeof prisma.groupRating.upsert>[0][] = [];
 
-        const existingRatingMap = new Map(
-          existingRatings.map((r) => [r.galleryId, r])
-        );
+            for (const group of batch) {
+              const stashRating = group.rating100;
+              const existing = existingRatingMap.get(group.id);
+              const groupInstanceId = currentInstanceId;
 
-        // Build bulk operations
-        const upserts: Parameters<typeof prisma.galleryRating.upsert>[0][] = [];
+              upserts.push({
+                where: {
+                  userId_instanceId_groupId: { userId: targetUserId, instanceId: groupInstanceId, groupId: group.id },
+                },
+                update: { rating: stashRating },
+                create: {
+                  userId: targetUserId,
+                  instanceId: groupInstanceId,
+                  groupId: group.id,
+                  rating: stashRating,
+                  favorite: false, // Groups don't have favorites
+                },
+              });
 
-        for (const gallery of batch) {
-          const stashRating = gallery.rating100;
-          const existing = existingRatingMap.get(gallery.id);
-          const galleryInstanceId = await getEntityInstanceId('gallery', gallery.id);
+              if (!existing) {
+                stats.groups.created++;
+              } else if (existing.rating !== stashRating) {
+                stats.groups.updated++;
+              }
+            }
 
-          upserts.push({
-            where: {
-              userId_instanceId_galleryId: { userId: targetUserId, instanceId: galleryInstanceId, galleryId: gallery.id },
-            },
-            update: { rating: stashRating },
-            create: {
-              userId: targetUserId,
-              instanceId: galleryInstanceId,
-              galleryId: gallery.id,
-              rating: stashRating,
-              favorite: false, // Galleries don't have favorites
-            },
-          });
+            // Execute upserts in transaction
+            if (upserts.length > 0) {
+              await prisma.$transaction(
+                upserts.map((u) => prisma.groupRating.upsert(u))
+              );
+            }
 
-          if (!existing) {
-            stats.galleries.created++;
-          } else if (existing.rating !== stashRating) {
-            stats.galleries.updated++;
+            stats.groups.checked += batch.length;
           }
         }
 
-        // Execute upserts in transaction
-        if (upserts.length > 0) {
-          await prisma.$transaction(
-            upserts.map((u) => prisma.galleryRating.upsert(u))
-          );
-        }
-
-        stats.galleries.checked += batch.length;
-      }
-    }
-
-    // 6. Sync Groups/Collections (rating only - no favorite in Stash)
-    if (syncOptions.groups && syncOptions.groups.rating) {
-      // Filter for rated groups in code
-      const groups = await fetchPaginated(
-        async (page) => {
-          const result = await stash.findGroups({
-            filter: { page, per_page: PAGE_SIZE },
-            group_filter: undefined, // Fetch all groups
-          });
-          return {
-            items: result.findGroups.groups,
-            count: result.findGroups.count,
-          };
-        },
-        (g: { rating100?: number | null }) =>
-          g.rating100 !== null && g.rating100 !== undefined && g.rating100 > 0
-      );
-
-      for (let i = 0; i < groups.length; i += BATCH_SIZE) {
-        const batch = groups.slice(i, i + BATCH_SIZE);
-        const groupIds = batch.map((g) => g.id);
-
-        // Fetch all existing records in one query
-        const existingRatings = await prisma.groupRating.findMany({
-          where: { userId: targetUserId, groupId: { in: groupIds } },
+      } catch (instanceError) {
+        logger.error(`Error syncing from Stash instance ${currentInstanceId}:`, {
+          error: instanceError instanceof Error ? instanceError.message : String(instanceError),
         });
-
-        const existingRatingMap = new Map(
-          existingRatings.map((r) => [r.groupId, r])
-        );
-
-        // Build bulk operations
-        const upserts: Parameters<typeof prisma.groupRating.upsert>[0][] = [];
-
-        for (const group of batch) {
-          const stashRating = group.rating100;
-          const existing = existingRatingMap.get(group.id);
-          const groupInstanceId = await getEntityInstanceId('group', group.id);
-
-          upserts.push({
-            where: {
-              userId_instanceId_groupId: { userId: targetUserId, instanceId: groupInstanceId, groupId: group.id },
-            },
-            update: { rating: stashRating },
-            create: {
-              userId: targetUserId,
-              instanceId: groupInstanceId,
-              groupId: group.id,
-              rating: stashRating,
-              favorite: false, // Groups don't have favorites
-            },
-          });
-
-          if (!existing) {
-            stats.groups.created++;
-          } else if (existing.rating !== stashRating) {
-            stats.groups.updated++;
-          }
-        }
-
-        // Execute upserts in transaction
-        if (upserts.length > 0) {
-          await prisma.$transaction(
-            upserts.map((u) => prisma.groupRating.upsert(u))
-          );
-        }
-
-        stats.groups.checked += batch.length;
+        // Continue with other instances
       }
-    }
+    } // end for...of allInstances
 
     logger.info("syncFromStash completed", {
       totalTime: `${Date.now() - startTime}ms`,

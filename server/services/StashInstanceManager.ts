@@ -131,6 +131,19 @@ class StashInstanceManager {
   }
 
   /**
+   * Get a Stash instance for sync operations.
+   * Returns null and logs a warning if not found, allowing callers to skip sync gracefully.
+   */
+  getForSync(instanceId: string): StashClient | null {
+    const instance = this.instances.get(instanceId);
+    if (!instance) {
+      logger.warn("Stash instance not found for sync, skipping", { instanceId });
+      return null;
+    }
+    return instance;
+  }
+
+  /**
    * Get a Stash instance by ID, throwing if not found.
    * Use this when the instance ID is expected to be valid.
    */
