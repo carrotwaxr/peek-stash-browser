@@ -260,37 +260,42 @@ export async function pingWatchHistory(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        // Save activity (resume time and play duration) on every ping
-        await stash.sceneSaveActivity({
-          id: sceneId,
-          resume_time: resumeTime,
-          playDuration: playbackDelta,
-        });
-
-        // Add play history timestamp if play_count was incremented
-        if (playCountIncremented) {
-          const addPlayResult = await stash.sceneAddPlay({
+        const stash = stashInstanceManager.get(instanceId);
+        if (!stash) {
+          logger.warn("Stash instance not found for sync, skipping", { instanceId });
+        }
+        if (stash) {
+          // Save activity (resume time and play duration) on every ping
+          await stash.sceneSaveActivity({
             id: sceneId,
-            times: [now.toISOString()],
+            resume_time: resumeTime,
+            playDuration: playbackDelta,
           });
 
-          logger.info("Added play timestamp to Stash", {
+          // Add play history timestamp if play_count was incremented
+          if (playCountIncremented) {
+            const addPlayResult = await stash.sceneAddPlay({
+              id: sceneId,
+              times: [now.toISOString()],
+            });
+
+            logger.info("Added play timestamp to Stash", {
+              userId,
+              sceneId,
+              stashPlayCount: addPlayResult.sceneAddPlay.count,
+              stashPlayHistory: addPlayResult.sceneAddPlay.history,
+              peekPlayCount: newPlayCount,
+            });
+          }
+
+          logger.info("Synced activity to Stash", {
             userId,
             sceneId,
-            stashPlayCount: addPlayResult.sceneAddPlay.count,
-            stashPlayHistory: addPlayResult.sceneAddPlay.history,
-            peekPlayCount: newPlayCount,
+            resumeTime,
+            playbackDelta,
+            playCountIncremented,
           });
         }
-
-        logger.info("Synced activity to Stash", {
-          userId,
-          sceneId,
-          resumeTime,
-          playbackDelta,
-          playCountIncremented,
-        });
       } catch (stashError) {
         // Don't fail the request if Stash sync fails - Peek DB is source of truth
         logger.error("Failed to sync activity to Stash", {
@@ -414,14 +419,19 @@ export async function incrementOCounter(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
-        logger.info("Syncing O counter increment to Stash", { sceneId });
-        const stash = stashInstanceManager.getDefault();
-        const result = await stash.sceneIncrementO({ id: sceneId });
-        logger.info("Successfully incremented O counter in Stash", {
-          sceneId,
-          stashGlobalCount: result.sceneIncrementO,
-          peekUserCount: watchHistory.oCount,
-        });
+        const stash = stashInstanceManager.get(instanceId);
+        if (!stash) {
+          logger.warn("Stash instance not found for sync, skipping", { instanceId });
+        }
+        if (stash) {
+          logger.info("Syncing O counter increment to Stash", { sceneId });
+          const result = await stash.sceneIncrementO({ id: sceneId });
+          logger.info("Successfully incremented O counter in Stash", {
+            sceneId,
+            stashGlobalCount: result.sceneIncrementO,
+            peekUserCount: watchHistory.oCount,
+          });
+        }
       } catch (stashError) {
         // Don't fail the request if Stash sync fails - Peek DB is source of truth
         logger.error("Failed to sync O counter increment to Stash", {
@@ -684,19 +694,24 @@ export async function saveActivity(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash && playDuration) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        await stash.sceneSaveActivity({
-          id: sceneId,
-          resume_time: resumeTime,
-          playDuration: playDuration,
-        });
+        const stash = stashInstanceManager.get(instanceId);
+        if (!stash) {
+          logger.warn("Stash instance not found for sync, skipping", { instanceId });
+        }
+        if (stash) {
+          await stash.sceneSaveActivity({
+            id: sceneId,
+            resume_time: resumeTime,
+            playDuration: playDuration,
+          });
 
-        logger.info("Synced activity to Stash", {
-          userId,
-          sceneId,
-          resumeTime,
-          playDuration,
-        });
+          logger.info("Synced activity to Stash", {
+            userId,
+            sceneId,
+            resumeTime,
+            playDuration,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync activity to Stash", {
           sceneId,
@@ -805,17 +820,22 @@ export async function incrementPlayCount(
     // Sync to Stash if user has sync enabled
     if (user.syncToStash) {
       try {
-        const stash = stashInstanceManager.getDefault();
-        const addPlayResult = await stash.sceneAddPlay({
-          id: sceneId,
-          times: [now.toISOString()],
-        });
+        const stash = stashInstanceManager.get(instanceId);
+        if (!stash) {
+          logger.warn("Stash instance not found for sync, skipping", { instanceId });
+        }
+        if (stash) {
+          const addPlayResult = await stash.sceneAddPlay({
+            id: sceneId,
+            times: [now.toISOString()],
+          });
 
-        logger.info("Synced play count to Stash", {
-          userId,
-          sceneId,
-          stashPlayCount: addPlayResult.sceneAddPlay.count,
-        });
+          logger.info("Synced play count to Stash", {
+            userId,
+            sceneId,
+            stashPlayCount: addPlayResult.sceneAddPlay.count,
+          });
+        }
       } catch (stashError) {
         logger.error("Failed to sync play count to Stash", {
           sceneId,
