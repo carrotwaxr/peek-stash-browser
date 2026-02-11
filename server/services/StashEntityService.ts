@@ -500,10 +500,16 @@ class StashEntityService {
 
   /**
    * Get scene by ID (includes related entities)
+   * @param id - Scene ID
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getScene(id: string): Promise<NormalizedScene | null> {
+  async getScene(id: string, instanceId?: string): Promise<NormalizedScene | null> {
     const cached = await prisma.stashScene.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
+      },
       include: {
         performers: { include: { performer: true } },
         tags: { include: { tag: true } },
@@ -528,12 +534,15 @@ class StashEntityService {
 
   /**
    * Get scenes by IDs
+   * @param ids - Array of scene IDs
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getScenesByIds(ids: string[]): Promise<NormalizedScene[]> {
+  async getScenesByIds(ids: string[], instanceId?: string): Promise<NormalizedScene[]> {
     const cached = await prisma.stashScene.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
       },
     });
 
@@ -544,14 +553,17 @@ class StashEntityService {
    * Get scenes by IDs with full relations (performers, tags, studio, groups, galleries)
    * Use this when you need the related entities, not just scene data.
    * This is more expensive than getScenesByIds due to the joins.
+   * @param ids - Array of scene IDs
+   * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getScenesByIdsWithRelations(ids: string[]): Promise<NormalizedScene[]> {
+  async getScenesByIdsWithRelations(ids: string[], instanceId?: string): Promise<NormalizedScene[]> {
     if (ids.length === 0) return [];
 
     const cached = await prisma.stashScene.findMany({
       where: {
         id: { in: ids },
         deletedAt: null,
+        ...(instanceId && { stashInstanceId: instanceId }),
       },
       include: {
         performers: { include: { performer: true } },
