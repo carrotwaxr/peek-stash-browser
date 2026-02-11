@@ -8,7 +8,6 @@ import { resolveUserPermissions } from "../services/PermissionService.js";
 import { logger } from "../utils/logger.js";
 import { generateRecoveryKey, formatRecoveryKey } from "../utils/recoveryKey.js";
 import { validatePassword } from "../utils/passwordValidation.js";
-import { getEntityInstanceId } from "../utils/entityInstanceId.js";
 
 /**
  * Carousel preference configuration
@@ -1215,11 +1214,15 @@ export const syncFromStash = async (
       groups: { rating: true }, // Groups only have rating, no favorite
     };
 
-    // Get Stash instance from manager
+    // Get Stash instances from manager
     const { stashInstanceManager } = await import(
       "../services/StashInstanceManager.js"
     );
-    const stash = stashInstanceManager.getDefault();
+    const allInstances = stashInstanceManager.getAll();
+
+    if (allInstances.length === 0) {
+      return res.status(400).json({ error: "No Stash instances configured" });
+    }
 
     const stats = {
       scenes: { checked: 0, updated: 0, created: 0 },
@@ -1261,6 +1264,10 @@ export const syncFromStash = async (
     }
 
     logger.info("Syncing from Stash: Fetching entities in paginated batches...");
+
+    for (const [currentInstanceId, stash] of allInstances) {
+      try {
+        logger.info(`Syncing from Stash instance ${currentInstanceId}...`);
 
     // 1. Sync Scenes - Fetch scenes with ratings and/or o_counter
     if (syncOptions.scenes.rating || syncOptions.scenes.oCounter) {
@@ -1341,8 +1348,7 @@ export const syncFromStash = async (
           let sceneWasCreated = false;
           let sceneWasUpdated = false;
 
-          // Get instanceId for the scene (use 'default' for direct Stash imports)
-          const sceneInstanceId = await getEntityInstanceId('scene', scene.id);
+          const sceneInstanceId = currentInstanceId;
 
           // Rating sync
           if (
@@ -1495,7 +1501,7 @@ export const syncFromStash = async (
             : false;
 
           const existing = existingRatingMap.get(performer.id);
-          const performerInstanceId = await getEntityInstanceId('performer', performer.id);
+          const performerInstanceId = currentInstanceId;
 
           const updates: SyncUpdates = {};
           if (syncOptions.performers.rating) updates.rating = stashRating;
@@ -1614,7 +1620,7 @@ export const syncFromStash = async (
             : false;
 
           const existing = existingRatingMap.get(studio.id);
-          const studioInstanceId = await getEntityInstanceId('studio', studio.id);
+          const studioInstanceId = currentInstanceId;
 
           const updates: SyncUpdates = {};
           if (syncOptions.studios.rating) updates.rating = stashRating;
@@ -1692,7 +1698,7 @@ export const syncFromStash = async (
         for (const tag of batch) {
           const stashFavorite = tag.favorite || false;
           const existing = existingRatingMap.get(tag.id);
-          const tagInstanceId = await getEntityInstanceId('tag', tag.id);
+          const tagInstanceId = currentInstanceId;
 
           upserts.push({
             where: { userId_instanceId_tagId: { userId: targetUserId, instanceId: tagInstanceId, tagId: tag.id } },
@@ -1761,7 +1767,7 @@ export const syncFromStash = async (
         for (const gallery of batch) {
           const stashRating = gallery.rating100;
           const existing = existingRatingMap.get(gallery.id);
-          const galleryInstanceId = await getEntityInstanceId('gallery', gallery.id);
+          const galleryInstanceId = currentInstanceId;
 
           upserts.push({
             where: {
@@ -1832,7 +1838,7 @@ export const syncFromStash = async (
         for (const group of batch) {
           const stashRating = group.rating100;
           const existing = existingRatingMap.get(group.id);
-          const groupInstanceId = await getEntityInstanceId('group', group.id);
+          const groupInstanceId = currentInstanceId;
 
           upserts.push({
             where: {
@@ -1865,6 +1871,14 @@ export const syncFromStash = async (
         stats.groups.checked += batch.length;
       }
     }
+
+      } catch (instanceError) {
+        logger.error(`Error syncing from Stash instance ${currentInstanceId}:`, {
+          error: instanceError instanceof Error ? instanceError.message : String(instanceError),
+        });
+        // Continue with other instances
+      }
+    } // end for...of allInstances
 
     logger.info("syncFromStash completed", {
       totalTime: `${Date.now() - startTime}ms`,
