@@ -138,7 +138,8 @@ class UserStatsService {
     oCountDelta: number,
     playCountDelta: number,
     lastPlayedAt?: Date,
-    lastOAt?: Date
+    lastOAt?: Date,
+    instanceId?: string
   ): Promise<void> {
     try {
       // Get scene from cache to find all related entities
@@ -146,6 +147,16 @@ class UserStatsService {
       if (!scene) {
         logger.warn("Scene not found in cache for stats update", { sceneId });
         return;
+      }
+
+      // Resolve instanceId: use provided value, or look up from DB, or default to ""
+      let resolvedInstanceId = instanceId || "";
+      if (!resolvedInstanceId) {
+        const sceneRecord = await prisma.stashScene.findFirst({
+          where: { id: sceneId },
+          select: { stashInstanceId: true },
+        });
+        resolvedInstanceId = sceneRecord?.stashInstanceId || "";
       }
 
       // Update performer stats
@@ -158,7 +169,8 @@ class UserStatsService {
               oCountDelta,
               playCountDelta,
               lastPlayedAt,
-              lastOAt
+              lastOAt,
+              resolvedInstanceId
             )
           )
         );
@@ -170,7 +182,8 @@ class UserStatsService {
           userId,
           scene.studio.id,
           oCountDelta,
-          playCountDelta
+          playCountDelta,
+          resolvedInstanceId
         );
       }
 
@@ -178,7 +191,7 @@ class UserStatsService {
       if (scene.tags && scene.tags.length > 0) {
         await Promise.all(
           scene.tags.map((tag) =>
-            this.updateTagStats(userId, tag.id, oCountDelta, playCountDelta)
+            this.updateTagStats(userId, tag.id, oCountDelta, playCountDelta, resolvedInstanceId)
           )
         );
       }
@@ -201,17 +214,20 @@ class UserStatsService {
     oCountDelta: number,
     playCountDelta: number,
     lastPlayedAt?: Date,
-    lastOAt?: Date
+    lastOAt?: Date,
+    instanceId: string = ""
   ): Promise<void> {
     await prisma.userPerformerStats.upsert({
       where: {
-        userId_performerId: {
+        userId_instanceId_performerId: {
           userId,
+          instanceId,
           performerId,
         },
       },
       create: {
         userId,
+        instanceId,
         performerId,
         oCounter: Math.max(0, oCountDelta),
         playCount: Math.max(0, playCountDelta),
@@ -246,17 +262,20 @@ class UserStatsService {
     userId: number,
     studioId: string,
     oCountDelta: number,
-    playCountDelta: number
+    playCountDelta: number,
+    instanceId: string = ""
   ): Promise<void> {
     await prisma.userStudioStats.upsert({
       where: {
-        userId_studioId: {
+        userId_instanceId_studioId: {
           userId,
+          instanceId,
           studioId,
         },
       },
       create: {
         userId,
+        instanceId,
         studioId,
         oCounter: Math.max(0, oCountDelta),
         playCount: Math.max(0, playCountDelta),
@@ -279,17 +298,20 @@ class UserStatsService {
     userId: number,
     tagId: string,
     oCountDelta: number,
-    playCountDelta: number
+    playCountDelta: number,
+    instanceId: string = ""
   ): Promise<void> {
     await prisma.userTagStats.upsert({
       where: {
-        userId_tagId: {
+        userId_instanceId_tagId: {
           userId,
+          instanceId,
           tagId,
         },
       },
       create: {
         userId,
+        instanceId,
         tagId,
         oCounter: Math.max(0, oCountDelta),
         playCount: Math.max(0, playCountDelta),
@@ -364,6 +386,9 @@ class UserStatsService {
         const scene = sceneMap.get(wh.sceneId);
         if (!scene) continue;
 
+        // Get instanceId from the watch history record
+        const whInstanceId = wh.instanceId || "";
+
         // Parse O history for timestamps
         const oHistory = Array.isArray(wh.oHistory)
           ? wh.oHistory
@@ -379,16 +404,17 @@ class UserStatsService {
         const lastOAt =
           oHistory.length > 0 ? new Date(oHistory[oHistory.length - 1]) : null;
 
-        // Aggregate performers
+        // Aggregate performers (using composite key: performerId:instanceId)
         for (const performer of scene.performers || []) {
-          const existing = performerStatsMap.get(performer.id) || {
+          const statsKey = `${performer.id}:${whInstanceId}`;
+          const existing = performerStatsMap.get(statsKey) || {
             oCounter: 0,
             playCount: 0,
             lastPlayedAt: null,
             lastOAt: null,
           };
 
-          performerStatsMap.set(performer.id, {
+          performerStatsMap.set(statsKey, {
             oCounter: existing.oCounter + (wh.oCount || 0),
             playCount: existing.playCount + (wh.playCount || 0),
             lastPlayedAt:
@@ -403,27 +429,29 @@ class UserStatsService {
           });
         }
 
-        // Aggregate studio
+        // Aggregate studio (using composite key: studioId:instanceId)
         if (scene.studio) {
-          const existing = studioStatsMap.get(scene.studio.id) || {
+          const statsKey = `${scene.studio.id}:${whInstanceId}`;
+          const existing = studioStatsMap.get(statsKey) || {
             oCounter: 0,
             playCount: 0,
           };
 
-          studioStatsMap.set(scene.studio.id, {
+          studioStatsMap.set(statsKey, {
             oCounter: existing.oCounter + (wh.oCount || 0),
             playCount: existing.playCount + (wh.playCount || 0),
           });
         }
 
-        // Aggregate tags
+        // Aggregate tags (using composite key: tagId:instanceId)
         for (const tag of scene.tags || []) {
-          const existing = tagStatsMap.get(tag.id) || {
+          const statsKey = `${tag.id}:${whInstanceId}`;
+          const existing = tagStatsMap.get(statsKey) || {
             oCounter: 0,
             playCount: 0,
           };
 
-          tagStatsMap.set(tag.id, {
+          tagStatsMap.set(statsKey, {
             oCounter: existing.oCounter + (wh.oCount || 0),
             playCount: existing.playCount + (wh.playCount || 0),
           });
@@ -436,35 +464,47 @@ class UserStatsService {
         // Performers
         prisma.userPerformerStats.createMany({
           data: Array.from(performerStatsMap.entries()).map(
-            ([performerId, stats]) => ({
-              userId,
-              performerId,
-              oCounter: stats.oCounter,
-              playCount: stats.playCount,
-              lastPlayedAt: stats.lastPlayedAt,
-              lastOAt: stats.lastOAt,
-            })
+            ([key, stats]) => {
+              const [performerId, instanceId] = key.split(':');
+              return {
+                userId,
+                instanceId: instanceId || "",
+                performerId,
+                oCounter: stats.oCounter,
+                playCount: stats.playCount,
+                lastPlayedAt: stats.lastPlayedAt,
+                lastOAt: stats.lastOAt,
+              };
+            }
           ),
         }),
         // Studios
         prisma.userStudioStats.createMany({
           data: Array.from(studioStatsMap.entries()).map(
-            ([studioId, stats]) => ({
-              userId,
-              studioId,
-              oCounter: stats.oCounter,
-              playCount: stats.playCount,
-            })
+            ([key, stats]) => {
+              const [studioId, instanceId] = key.split(':');
+              return {
+                userId,
+                instanceId: instanceId || "",
+                studioId,
+                oCounter: stats.oCounter,
+                playCount: stats.playCount,
+              };
+            }
           ),
         }),
         // Tags
         prisma.userTagStats.createMany({
-          data: Array.from(tagStatsMap.entries()).map(([tagId, stats]) => ({
-            userId,
-            tagId,
-            oCounter: stats.oCounter,
-            playCount: stats.playCount,
-          })),
+          data: Array.from(tagStatsMap.entries()).map(([key, stats]) => {
+            const [tagId, instanceId] = key.split(':');
+            return {
+              userId,
+              instanceId: instanceId || "",
+              tagId,
+              oCounter: stats.oCounter,
+              playCount: stats.playCount,
+            };
+          }),
         }),
       ]);
 

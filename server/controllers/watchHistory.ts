@@ -253,7 +253,8 @@ export async function pingWatchHistory(
         0, // oCountDelta (not changed in ping)
         1, // playCountDelta (increased by 1)
         now, // lastPlayedAt
-        undefined // lastOAt (not changed)
+        undefined, // lastOAt (not changed)
+        instanceId
       );
     }
 
@@ -399,7 +400,8 @@ export async function incrementOCounter(
         1, // oCountDelta (increased by 1)
         0, // playCountDelta (not changed)
         undefined, // lastPlayedAt (not changed)
-        now // lastOAt
+        now, // lastOAt
+        instanceId
       );
     }
 
@@ -412,7 +414,8 @@ export async function incrementOCounter(
         1, // oCountDelta
         0, // playCountDelta
         undefined, // lastPlayedAt (set above during create)
-        now // lastOAt
+        now, // lastOAt
+        instanceId
       );
     }
 
@@ -814,7 +817,8 @@ export async function incrementPlayCount(
       0, // oCountDelta
       1, // playCountDelta
       now, // lastPlayedAt
-      undefined // lastOAt
+      undefined, // lastOAt
+      instanceId
     );
 
     // Sync to Stash if user has sync enabled
