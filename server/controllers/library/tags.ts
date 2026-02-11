@@ -18,7 +18,7 @@ import { tagQueryBuilder } from "../../services/TagQueryBuilder.js";
 import { getUserAllowedInstanceIds } from "../../services/UserInstanceService.js";
 import { userStatsService } from "../../services/UserStatsService.js";
 import type { NormalizedTag, PeekTagFilter } from "../../types/index.js";
-import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
+import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { hydrateTagRelationships } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -717,7 +717,12 @@ export const updateTag = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const stash = stashInstanceManager.getDefault();
+    const instanceId = await getEntityInstanceId('tag', id);
+    const stash = stashInstanceManager.get(instanceId);
+    if (!stash) {
+      return res.status(404).json({ error: "Stash instance not found for tag" });
+    }
+
     const updatedTag = await stash.tagUpdate({
       input: {
         id,

@@ -34,6 +34,7 @@ import {
 import type { NormalizedScene, PeekSceneFilter } from "../../types/index.js";
 import { isSceneStreamable } from "../../utils/codecDetection.js";
 import { expandStudioIds, expandTagIds } from "../../utils/hierarchyUtils.js";
+import { getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { logger } from "../../utils/logger.js";
 import { SeededRandom, parseRandomSort, generateDailySeed } from "../../utils/seededRandom.js";
 import { buildStashEntityUrl } from "../../utils/stashUrl.js";
@@ -1229,7 +1230,12 @@ export const updateScene = async (
     const userId = req.user?.id;
     const updateData = req.body;
 
-    const stash = stashInstanceManager.getDefault();
+    const instanceId = await getEntityInstanceId('scene', id);
+    const stash = stashInstanceManager.get(instanceId);
+    if (!stash) {
+      return res.status(404).json({ error: "Stash instance not found for scene" });
+    }
+
     const updatedScene = await stash.sceneUpdate({
       input: {
         id,

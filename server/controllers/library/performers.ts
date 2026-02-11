@@ -22,7 +22,7 @@ import type {
   NormalizedPerformer,
   PeekPerformerFilter,
 } from "../../types/index.js";
-import { disambiguateEntityNames } from "../../utils/entityInstanceId.js";
+import { disambiguateEntityNames, getEntityInstanceId } from "../../utils/entityInstanceId.js";
 import { hydrateEntityTags } from "../../utils/hierarchyUtils.js";
 import { logger } from "../../utils/logger.js";
 import { parseRandomSort } from "../../utils/seededRandom.js";
@@ -889,7 +889,12 @@ export const updatePerformer = async (
     const { id } = req.params;
     const updateData = req.body;
 
-    const stash = stashInstanceManager.getDefault();
+    const instanceId = await getEntityInstanceId('performer', id);
+    const stash = stashInstanceManager.get(instanceId);
+    if (!stash) {
+      return res.status(404).json({ error: "Stash instance not found for performer" });
+    }
+
     const updatedPerformer = await stash.performerUpdate({
       input: {
         id,
