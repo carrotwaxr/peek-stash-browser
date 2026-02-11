@@ -264,8 +264,7 @@ export async function pingWatchHistory(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           // Save activity (resume time and play duration) on every ping
           await stash.sceneSaveActivity({
             id: sceneId,
@@ -425,8 +424,7 @@ export async function incrementOCounter(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           logger.info("Syncing O counter increment to Stash", { sceneId });
           const result = await stash.sceneIncrementO({ id: sceneId });
           logger.info("Successfully incremented O counter in Stash", {
@@ -700,8 +698,7 @@ export async function saveActivity(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.sceneSaveActivity({
             id: sceneId,
             resume_time: resumeTime,
@@ -827,8 +824,7 @@ export async function incrementPlayCount(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           const addPlayResult = await stash.sceneAddPlay({
             id: sceneId,
             times: [now.toISOString()],

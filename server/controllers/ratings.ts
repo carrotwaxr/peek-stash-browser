@@ -115,8 +115,7 @@ export async function updateSceneRating(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.sceneUpdate({
             input: {
               id: sceneId,
@@ -226,8 +225,7 @@ export async function updatePerformerRating(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.performerUpdate({
             input: {
               id: performerId,
@@ -338,8 +336,7 @@ export async function updateStudioRating(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.studioUpdate({
             input: {
               id: studioId,
@@ -445,8 +442,7 @@ export async function updateTagRating(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.tagUpdate({
             input: {
               id: tagId,
@@ -555,8 +551,7 @@ export async function updateGalleryRating(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.galleryUpdate({
             input: {
               id: galleryId,
@@ -660,8 +655,7 @@ export async function updateGroupRating(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.groupUpdate({
             input: {
               id: groupId,
@@ -765,8 +759,7 @@ export async function updateImageRating(
         const stash = stashInstanceManager.get(instanceId);
         if (!stash) {
           logger.warn("Stash instance not found for sync, skipping", { instanceId });
-        }
-        if (stash) {
+        } else {
           await stash.imageUpdate({
             input: {
               id: imageId,
