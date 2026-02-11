@@ -24,6 +24,7 @@ type EntityType = "performer" | "studio" | "tag" | "scene";
 
 interface RawEntityStats {
   entityId: string;
+  instanceId: string;
   playCount: number;
   oCount: number;
   playDuration: number;
@@ -112,6 +113,7 @@ class RankingComputeService {
       const engagementRate = engagementScore / Math.max(libraryPresence, 1);
       return {
         entityId: e.entityId,
+        instanceId: e.instanceId || "",
         playCount,
         oCount,
         playDuration,
@@ -169,6 +171,7 @@ class RankingComputeService {
       await tx.userEntityRanking.createMany({
         data: rankings.map((r) => ({
           userId,
+          instanceId: r.instanceId || "",
           entityType,
           entityId: r.entityId,
           playCount: r.playCount,
@@ -190,6 +193,7 @@ class RankingComputeService {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         ups.performerId as entityId,
+        ups.instanceId,
         ups.playCount,
         ups.oCounter as oCount,
         COALESCE(dur.totalDuration, 0) as playDuration,
@@ -226,6 +230,7 @@ class RankingComputeService {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         uss.studioId as entityId,
+        uss.instanceId,
         uss.playCount,
         uss.oCounter as oCount,
         COALESCE(dur.totalDuration, 0) as playDuration,
@@ -264,6 +269,7 @@ class RankingComputeService {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         uts.tagId as entityId,
+        uts.instanceId,
         uts.playCount,
         uts.oCounter as oCount,
         COALESCE(dur.totalDuration, 0) as playDuration,
@@ -301,6 +307,7 @@ class RankingComputeService {
     const stats = await prisma.$queryRaw<RawEntityStats[]>`
       SELECT
         w.sceneId as entityId,
+        COALESCE(w.instanceId, '') as instanceId,
         w.playCount,
         w.oCount,
         w.playDuration,
