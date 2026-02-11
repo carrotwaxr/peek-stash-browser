@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { getOrderedNavItems } from "../../constants/navigation.js";
-import useKeyboardShortcuts from "../../hooks/useKeyboardShortcuts.js";
+import { useKeyboardShortcuts } from "../../hooks/useKeyboardShortcuts.js";
 import { useScrollDirection } from "../../hooks/useScrollDirection.js";
 import { PeekLogo } from "../branding/PeekLogo.jsx";
 import { ThemedIcon } from "../icons/index.js";

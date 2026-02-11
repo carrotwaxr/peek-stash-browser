@@ -963,13 +963,6 @@ export async function getClips(options = {}) {
 }
 
 /**
- * Get single clip
- */
-export async function getClipById(id) {
-  return apiGet(`/clips/${id}`);
-}
-
-/**
  * Get clips for a scene
  */
 export async function getClipsForScene(sceneId, includeUngenerated = false) {

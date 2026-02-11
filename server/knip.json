@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["index.ts", "api.ts", "prisma/seed.ts"],
+  "entry": ["index.ts"],
   "project": ["**/*.ts"],
   "ignore": [
     "dist/**",
@@ -10,19 +10,7 @@
     "prisma/migrations/**"
   ],
   "ignoreDependencies": [
-    "@types/*",
-    "typescript",
-    "ts-node",
-    "nodemon",
-    "eslint",
-    "@typescript-eslint/eslint-plugin",
-    "@typescript-eslint/parser",
-    "vitest",
-    "@vitest/ui",
-    "@vitest/coverage-v8",
-    "prisma",
-    "depcheck",
-    "knip"
+    "@trivago/prettier-plugin-sort-imports"
   ],
   "ignoreExportsUsedInFile": true
 }

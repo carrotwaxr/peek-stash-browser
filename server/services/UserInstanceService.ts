@@ -86,7 +86,3 @@ export function buildInstanceFilterClause(
   };
 }
 
-export const userInstanceService = {
-  getUserAllowedInstanceIds,
-  buildInstanceFilterClause,
-};

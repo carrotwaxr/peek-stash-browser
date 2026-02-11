@@ -89,5 +89,3 @@ export function useImagesPagination({
     setImages: handleImagesUpdate,
   };
 }
-
-export default useImagesPagination;

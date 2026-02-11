@@ -183,5 +183,3 @@ export const useHiddenEntities = () => {
     hideConfirmationDisabled: user?.hideConfirmationDisabled || false,
   };
 };
-
-export default useHiddenEntities;

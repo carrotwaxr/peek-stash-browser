@@ -204,5 +204,3 @@ export const useVideoPlayerShortcuts = (
     },
   });
 };
-
-export default useKeyboardShortcuts;

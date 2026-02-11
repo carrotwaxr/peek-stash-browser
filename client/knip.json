@@ -1,8 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "src/main.jsx",
-    "vite.config.js"
+    "src/main.jsx"
   ],
   "project": [
     "src/**/*.{js,jsx,ts,tsx}"
@@ -14,17 +13,6 @@
     "**/*.spec.{js,jsx,ts,tsx}"
   ],
   "ignoreDependencies": [
-    "@vitejs/plugin-react",
-    "vite",
-    "eslint",
-    "vitest",
-    "@vitest/ui",
-    "@vitest/coverage-v8",
-    "happy-dom",
-    "depcheck",
-    "knip"
-  ],
-  "vite": {
-    "config": ["vite.config.js"]
-  }
+    "@trivago/prettier-plugin-sort-imports"
+  ]
 }

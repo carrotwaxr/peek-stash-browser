@@ -131,5 +131,3 @@ export const useScrollToCurrentItem = (currentIndex, options = {}) => {
     setCurrentItemRef,
   };
 };
-
-export default useScrollToCurrentItem;

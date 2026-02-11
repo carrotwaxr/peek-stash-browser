@@ -6,7 +6,6 @@
  * proxy endpoint.
  */
 import type {
-  Gallery,
   Group,
   Performer,
   Scene,
@@ -245,99 +244,6 @@ export const transformScene = <T extends Partial<Scene>>(scene: T): T => {
   } catch (error) {
     logger.error("Error transforming scene", { error });
     return scene; // Return original scene if transformation fails
-  }
-};
-
-/**
- * Transform complete gallery object to add API keys to all image URLs
- */
-export const transformGallery = <T extends Partial<Gallery>>(gallery: T): T => {
-  try {
-    const mutated = {
-      ...gallery,
-    } as T;
-
-    // Transform paths object if present
-    if (gallery.paths) {
-      mutated.paths = Object.entries(gallery.paths).reduce(
-        (acc, [key, val]) => {
-          acc[key] = appendApiKeyToUrl(val as string);
-          return acc;
-        },
-        {} as Record<string, string>
-      ) as T["paths"];
-    }
-
-    // Transform performers to add API key to image_path
-    if (gallery.performers && Array.isArray(gallery.performers)) {
-      mutated.performers = gallery.performers.map((p: NestedPerformer) =>
-        transformPerformer(p)
-      ) as T["performers"];
-    }
-
-    // Transform tags to add API key to image_path
-    if (gallery.tags && Array.isArray(gallery.tags)) {
-      mutated.tags = gallery.tags.map((t: NestedTagWithImage) =>
-        transformTag(t)
-      ) as T["tags"];
-    }
-
-    // Transform studio to add API key to image_path
-    if (gallery.studio) {
-      mutated.studio = transformStudio(gallery.studio) as T["studio"];
-    }
-
-    return mutated;
-  } catch (error) {
-    logger.error("Error transforming gallery", { error });
-    return gallery; // Return original gallery if transformation fails
-  }
-};
-
-/**
- * Transform image to add API keys to image URLs
- * Similar to transformGallery - handles paths object and nested entities
- */
-export const transformImage = (image: any): any => {
-  try {
-    const mutated = {
-      ...image,
-    };
-
-    // Transform paths object if present (thumbnail, image, etc.)
-    if (image.paths) {
-      mutated.paths = Object.entries(image.paths).reduce(
-        (acc, [key, val]) => {
-          acc[key] = appendApiKeyToUrl(val as string);
-          return acc;
-        },
-        {} as Record<string, string>
-      );
-    }
-
-    // Transform performers to add API key to image_path
-    if (image.performers && Array.isArray(image.performers)) {
-      mutated.performers = image.performers.map((p: any) =>
-        transformPerformer(p)
-      );
-    }
-
-    // Transform tags to add API key to image_path
-    if (image.tags && Array.isArray(image.tags)) {
-      mutated.tags = image.tags.map((t: any) =>
-        transformTag(t)
-      );
-    }
-
-    // Transform studio to add API key to image_path
-    if (image.studio) {
-      mutated.studio = transformStudio(image.studio);
-    }
-
-    return mutated;
-  } catch (error) {
-    logger.error("Error transforming image", { error });
-    return image; // Return original image if transformation fails
   }
 };
 

@@ -158,5 +158,3 @@ export const useRatingHotkeys = ({
     },
   });
 };
-
-export default useRatingHotkeys;

@@ -16,11 +16,6 @@ export const PaginationSchema = z.object({
 });
 
 /**
- * Date string in YYYY-MM-DD format
- */
-export const DateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable();
-
-/**
  * ISO timestamp string
  */
 export const TimestampSchema = z.string().datetime().nullable();

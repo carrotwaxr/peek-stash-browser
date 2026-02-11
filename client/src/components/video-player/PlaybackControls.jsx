@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useScenePlayer } from "../../contexts/ScenePlayerContext.jsx";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
-import useRatingHotkeys from "../../hooks/useRatingHotkeys.js";
+import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
 import { apiPost, getMyPermissions, libraryApi } from "../../services/api.js";
 import { showError, showSuccess } from "../../utils/toast.jsx";
 import { ThemedIcon } from "../icons/index.js";

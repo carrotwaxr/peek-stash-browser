@@ -63,7 +63,7 @@ export const showWarning = (message, options = {}) => {
   );
 };
 
-export const showInfo = (message, options = {}) => {
+const showInfo = (message, options = {}) => {
   return toast.custom(
     (t) => (
       <InfoMessage
@@ -84,7 +84,7 @@ export const showInfo = (message, options = {}) => {
  * Promise-based toast for async operations
  * Example: showPromise(fetchData(), { loading: 'Saving...', success: 'Saved!', error: 'Failed' })
  */
-export const showPromise = (promise, messages, options = {}) => {
+const showPromise = (promise, messages, options = {}) => {
   return toast.promise(
     promise,
     {

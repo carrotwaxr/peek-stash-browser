@@ -208,5 +208,3 @@ export function usePaginatedLightbox({
     prefetchImages,
   };
 }
-
-export default usePaginatedLightbox;
