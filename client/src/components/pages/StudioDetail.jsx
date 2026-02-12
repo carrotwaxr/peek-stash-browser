@@ -180,7 +180,7 @@ const StudioDetail = () => {
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
           {/* Left Column: Studio Image (1:1 for logos) */}
-          <div className="w-full lg:w-1/2 flex-shrink-0">
+          <div className="w-full lg:w-1/4 flex-shrink-0">
             <StudioImage studio={studio} />
           </div>
 
@@ -353,7 +353,7 @@ const StudioImage = ({ studio }) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "1/1",
         width: "100%",
-        maxHeight: "80vh" }}
+        maxHeight: "50vh" }}
     >
       {studio?.image_path ? (
         <img

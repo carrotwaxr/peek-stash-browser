@@ -157,8 +157,8 @@ const GroupDetail = () => {
 
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
-          {/* Left Column: Group Image with Front/Back Flipper (1:1) */}
-          <div className="w-full lg:w-1/2 flex-shrink-0">
+          {/* Left Column: Group Image with Front/Back Flipper (2:3 DVD cover) */}
+          <div className="w-full lg:w-1/3 flex-shrink-0">
             <GroupImageFlipper group={group} />
           </div>
 
@@ -265,14 +265,14 @@ const GroupImageFlipper = ({ group }) => {
   const displayImage = currentImage || fallbackImage;
 
   return (
-    <div className="relative w-full" style={{ maxHeight: "80vh" }}>
+    <div className="relative w-full" style={{ maxHeight: "50vh" }}>
       <div
         className="rounded-xl overflow-hidden shadow-lg flex items-center justify-center"
         style={{
           backgroundColor: "var(--bg-card)",
-          aspectRatio: "1/1",
+          aspectRatio: "2/3",
           width: "100%",
-          maxHeight: "80vh" }}
+          maxHeight: "50vh" }}
       >
         {displayImage ? (
           <img

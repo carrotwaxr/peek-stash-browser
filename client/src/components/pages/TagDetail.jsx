@@ -213,7 +213,7 @@ const TagDetail = () => {
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
           {/* Left Column: Tag Image (1:1) */}
-          <div className="w-full lg:w-1/2 flex-shrink-0">
+          <div className="w-full lg:w-2/5 flex-shrink-0">
             <TagImage tag={tag} />
           </div>
 
@@ -400,7 +400,7 @@ const TagImage = ({ tag }) => {
       className="rounded-lg w-full aspect-video overflow-hidden shadow-lg flex items-center justify-center"
       style={{
         backgroundColor: "var(--bg-card)",
-        maxHeight: "80vh",
+        maxHeight: "50vh",
       }}
     >
       {tag?.image_path && !showPlaceholder ? (
