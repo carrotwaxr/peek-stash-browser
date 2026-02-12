@@ -71,6 +71,7 @@ const PlaylistDetail = () => {
 
   // Selection state for multi-select (view mode only)
   const [selectedScenes, setSelectedScenes] = useState([]);
+  const [bulkRemoveConfirmOpen, setBulkRemoveConfirmOpen] = useState(false);
 
   const handleToggleSelect = useCallback((scene) => {
     setSelectedScenes((prev) => {
@@ -350,9 +351,12 @@ const PlaylistDetail = () => {
     }
   };
 
-  const handleBulkRemove = async () => {
-    const count = selectedScenes.length;
-    if (!window.confirm(`Remove ${count} scene${count !== 1 ? "s" : ""} from this playlist?`)) return;
+  const handleBulkRemoveClick = () => {
+    setBulkRemoveConfirmOpen(true);
+  };
+
+  const confirmBulkRemove = async () => {
+    setBulkRemoveConfirmOpen(false);
 
     let successCount = 0;
     let failCount = 0;
@@ -860,7 +864,7 @@ const PlaylistDetail = () => {
                 />
                 {isOwner && (
                   <Button
-                    onClick={handleBulkRemove}
+                    onClick={handleBulkRemoveClick}
                     variant="destructive"
                     size="sm"
                     className="flex items-center gap-1.5"
@@ -889,6 +893,18 @@ const PlaylistDetail = () => {
             ? getSceneTitle(sceneToRemove.scene)
             : "this scene"
         }" from the playlist?`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmStyle="danger"
+      />
+
+      {/* Bulk Remove Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={bulkRemoveConfirmOpen}
+        onClose={() => setBulkRemoveConfirmOpen(false)}
+        onConfirm={confirmBulkRemove}
+        title="Remove Scenes"
+        message={`Remove ${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""} from this playlist?`}
         confirmText="Remove"
         cancelText="Cancel"
         confirmStyle="danger"

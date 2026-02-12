@@ -9,13 +9,12 @@ import {
 } from "../../constants/carousels.js";
 import { useAsyncData } from "../../hooks/useApi.js";
 import { useAuth } from "../../hooks/useAuth.js";
-import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
+import { useHideBulkAction } from "../../hooks/useHideBulkAction.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import { libraryApi } from "../../services/api.js";
-import { showSuccess, showError } from "../../utils/toast.jsx";
 import {
   carouselRulesToFilterState,
   SCENE_FILTER_OPTIONS,
@@ -170,47 +169,11 @@ const Home = () => {
     setSelectedScenes([]);
   };
 
-  // Hide action state
-  const [hideDialogOpen, setHideDialogOpen] = useState(false);
-  const [isHiding, setIsHiding] = useState(false);
-  const { hideEntities, hideConfirmationDisabled } = useHiddenEntities();
-
-  const handleHideClick = () => {
-    if (hideConfirmationDisabled) {
-      handleHideConfirm(true);
-    } else {
-      setHideDialogOpen(true);
-    }
-  };
-
-  const handleHideConfirm = async (dontAskAgain) => {
-    setIsHiding(true);
-    setHideDialogOpen(false);
-
-    const entities = selectedScenes.map((scene) => ({
-      entityType: "scene",
-      entityId: scene.id,
-    }));
-
-    const result = await hideEntities({
-      entities,
-      skipConfirmation: dontAskAgain,
-    });
-
-    setIsHiding(false);
-
-    if (result.success) {
-      if (result.failCount === 0) {
-        showSuccess(`${result.successCount} scene${result.successCount !== 1 ? "s" : ""} hidden`);
-      } else {
-        showError(`Hidden ${result.successCount} scene${result.successCount !== 1 ? "s" : ""}, ${result.failCount} failed`);
-      }
-    } else {
-      showError("Failed to hide scenes. Please try again.");
-    }
-
-    handleClearSelection();
-  };
+  // Bulk hide action
+  const { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog } = useHideBulkAction({
+    selectedScenes,
+    onComplete: handleClearSelection,
+  });
 
   const handleInitializing = useCallback((initializing) => {
     if (initializing) {
@@ -394,7 +357,7 @@ const Home = () => {
           />
           <HideConfirmationDialog
             isOpen={hideDialogOpen}
-            onClose={() => setHideDialogOpen(false)}
+            onClose={closeHideDialog}
             onConfirm={handleHideConfirm}
             entityType="scene"
             entityName={`${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""}`}

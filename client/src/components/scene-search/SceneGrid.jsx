@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { LucideCheckSquare, LucideSquare, LucideEyeOff, LucidePlus } from "lucide-react";
 import { getGridClasses } from "../../constants/grids.js";
 import { useGridColumns } from "../../hooks/useGridColumns.js";
-import { useHiddenEntities } from "../../hooks/useHiddenEntities.js";
-import { showSuccess, showError } from "../../utils/toast.jsx";
+import { useHideBulkAction } from "../../hooks/useHideBulkAction.js";
 import {
   AddToPlaylistButton,
   BulkActionBar,
@@ -67,50 +66,12 @@ const SceneGrid = ({
     setSelectedScenes([]);
   };
 
-  // Hide action state
-  const [hideDialogOpen, setHideDialogOpen] = useState(false);
-  const [isHiding, setIsHiding] = useState(false);
-  const { hideEntities, hideConfirmationDisabled } = useHiddenEntities();
-
-  const handleHideClick = () => {
-    if (hideConfirmationDisabled) {
-      handleHideConfirm(true);
-    } else {
-      setHideDialogOpen(true);
-    }
-  };
-
-  const handleHideConfirm = async (dontAskAgain) => {
-    setIsHiding(true);
-    setHideDialogOpen(false);
-
-    const entities = selectedScenes.map((scene) => ({
-      entityType: "scene",
-      entityId: scene.id,
-    }));
-
-    const result = await hideEntities({
-      entities,
-      skipConfirmation: dontAskAgain,
-    });
-
-    setIsHiding(false);
-
-    if (result.success) {
-      for (const scene of selectedScenes) {
-        onHideSuccess?.(scene.id, "scene");
-      }
-      if (result.failCount === 0) {
-        showSuccess(`${result.successCount} scene${result.successCount !== 1 ? "s" : ""} hidden`);
-      } else {
-        showError(`Hidden ${result.successCount} scene${result.successCount !== 1 ? "s" : ""}, ${result.failCount} failed`);
-      }
-    } else {
-      showError("Failed to hide scenes. Please try again.");
-    }
-
-    handleClearSelection();
-  };
+  // Bulk hide action
+  const { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog } = useHideBulkAction({
+    selectedScenes,
+    onComplete: handleClearSelection,
+    onHideSuccess,
+  });
 
   // Set initial focus when grid loads and zone is active (only in TV mode)
   useEffect(() => {
@@ -255,7 +216,7 @@ const SceneGrid = ({
           />
           <HideConfirmationDialog
             isOpen={hideDialogOpen}
-            onClose={() => setHideDialogOpen(false)}
+            onClose={closeHideDialog}
             onConfirm={handleHideConfirm}
             entityType="scene"
             entityName={`${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""}`}
