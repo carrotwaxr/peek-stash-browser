@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRelativeTime } from "../../utils/date.js";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
+import { useCardSelection } from "../../hooks/useCardSelection.js";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import {
-  SceneDescription,
   SceneMetadata,
   SceneStats,
   SceneThumbnail,
   SceneTitle,
 } from "../scene/index.js";
+import { ExpandableDescription } from "./ExpandableDescription.jsx";
+import { getSceneDescription } from "../../utils/format.js";
 
 /**
  * Shared row-based scene list item component
@@ -32,9 +34,18 @@ const SceneListItem = ({
   exists = true,
   sceneId,
   showSessionOIndicator = false, // Show if O was clicked in the last session
+  isSelected = false,
+  onToggleSelect,
+  selectionMode = false,
 }) => {
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
+
+  const { selectionHandlers } = useCardSelection({
+    entity: scene,
+    selectionMode,
+    onToggleSelect,
+  });
 
   // Track if viewport is mobile-width for scroll-based preview autoplay
   // Uses md breakpoint (768px) since list items stack vertically below this
@@ -101,49 +112,86 @@ const SceneListItem = ({
       target.closest("a") ||
       target.closest('[role="button"]');
 
-    if (!isInteractive && exists && scene) {
-      // Check if there's a video player currently playing
-      // If navigating within a playlist while video is playing, autoplay the next one
-      const videoElements = document.querySelectorAll("video");
-      let isPlaying = false;
+    if (isInteractive) return;
 
-      videoElements.forEach((video) => {
-        if (!video.paused && !video.ended && video.readyState > 2) {
-          isPlaying = true;
-        }
-      });
-
-      if (isPlaying && linkState?.playlist) {
-        sessionStorage.setItem("videoPlayerAutoplay", "true");
-
-        // Also check if video is fullscreen
-        const isFullscreen =
-          document.fullscreenElement ||
-          document.webkitFullscreenElement ||
-          document.mozFullScreenElement ||
-          document.msFullscreenElement;
-        if (isFullscreen) {
-          sessionStorage.setItem("videoPlayerFullscreen", "true");
-        }
-      }
-
-      navigate(getEntityPath('scene', scene, hasMultipleInstances), { state: linkState });
+    // In selection mode, toggle selection instead of navigating
+    if (selectionMode && exists && scene) {
+      onToggleSelect?.(scene);
+      return;
     }
+
+    if (!exists || !scene) return;
+
+    // Check if there's a video player currently playing
+    // If navigating within a playlist while video is playing, autoplay the next one
+    const videoElements = document.querySelectorAll("video");
+    let isPlaying = false;
+
+    videoElements.forEach((video) => {
+      if (!video.paused && !video.ended && video.readyState > 2) {
+        isPlaying = true;
+      }
+    });
+
+    if (isPlaying && linkState?.playlist) {
+      sessionStorage.setItem("videoPlayerAutoplay", "true");
+
+      // Also check if video is fullscreen
+      const isFullscreen =
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement;
+      if (isFullscreen) {
+        sessionStorage.setItem("videoPlayerFullscreen", "true");
+      }
+    }
+
+    navigate(getEntityPath('scene', scene, hasMultipleInstances), { state: linkState });
   };
 
   return (
     <div
       onClick={handleClick}
+      {...selectionHandlers}
       className="rounded-lg border transition-all hover:shadow-lg"
       style={{
         backgroundColor: "var(--bg-card)",
-        border: "1px solid var(--border-color)",
+        border: isSelected ? "2px solid var(--selection-color)" : "1px solid var(--border-color)",
         opacity: exists ? 1 : 0.6,
-        cursor: exists ? "pointer" : "default",
+        cursor: selectionMode ? "pointer" : (exists ? "pointer" : "default"),
       }}
     >
       <div className="pt-2 px-2 pb-1 md:pt-4 md:px-4 md:pb-2">
         <div className="flex flex-col md:flex-row gap-3 md:gap-4">
+          {/* Selection Checkbox */}
+          {selectionMode && (
+            <div className="flex-shrink-0 flex items-center self-center">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToggleSelect?.(scene);
+                }}
+                className="w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
+                style={{
+                  backgroundColor: isSelected
+                    ? "var(--selection-color)"
+                    : "rgba(0, 0, 0, 0.5)",
+                  borderColor: isSelected
+                    ? "var(--selection-color)"
+                    : "rgba(255, 255, 255, 0.7)",
+                }}
+              >
+                {isSelected && (
+                  <svg className="w-5 h-5 sm:w-4 sm:h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Optional Drag Handle */}
           {dragHandle}
 
@@ -249,7 +297,14 @@ const SceneListItem = ({
                       </div>
 
                       {/* Description */}
-                      <SceneDescription scene={scene} className="mb-2" />
+                      {getSceneDescription(scene) && (
+                        <div className="mb-2">
+                          <ExpandableDescription
+                            description={getSceneDescription(scene)}
+                            maxLines={2}
+                          />
+                        </div>
+                      )}
 
                       {/* Performers & Tags */}
                       <SceneMetadata scene={scene} />

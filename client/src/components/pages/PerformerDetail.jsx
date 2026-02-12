@@ -160,7 +160,7 @@ const PerformerDetail = () => {
         {/* Two Column Layout - Image on left, Details on right (lg+) */}
         <div className="flex flex-col lg:flex-row gap-6 mb-8">
           {/* Left Column: Performer Image */}
-          <div className="w-full lg:w-1/2 flex-shrink-0">
+          <div className="w-full lg:w-1/3 flex-shrink-0">
             <PerformerImage performer={performer} />
           </div>
 
@@ -602,7 +602,7 @@ const PerformerImage = ({ performer }) => {
         backgroundColor: "var(--bg-card)",
         aspectRatio: "7/10",
         width: "100%",
-        maxHeight: "80vh" }}
+        maxHeight: "50vh" }}
     >
       {performer?.image_path ? (
         <img

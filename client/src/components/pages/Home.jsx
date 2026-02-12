@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import * as LucideIcons from "lucide-react";
+import { LucideEyeOff, LucidePlus } from "lucide-react";
 import {
   CAROUSEL_DEFINITIONS,
   migrateCarouselPreferences,
 } from "../../constants/carousels.js";
 import { useAsyncData } from "../../hooks/useApi.js";
 import { useAuth } from "../../hooks/useAuth.js";
+import { useHideBulkAction } from "../../hooks/useHideBulkAction.js";
 import { useHomeCarouselQueries } from "../../hooks/useHomeCarouselQueries.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
@@ -19,8 +21,11 @@ import {
 } from "../../utils/filterConfig.js";
 import { buildSearchParams } from "../../utils/urlParams.js";
 import {
+  AddToPlaylistButton,
   BulkActionBar,
+  Button,
   ContinueWatchingCarousel,
+  HideConfirmationDialog,
   LoadingSpinner,
   PageHeader,
   PageLayout,
@@ -163,6 +168,12 @@ const Home = () => {
   const handleClearSelection = () => {
     setSelectedScenes([]);
   };
+
+  // Bulk hide action
+  const { hideDialogOpen, isHiding, handleHideClick, handleHideConfirm, closeHideDialog } = useHideBulkAction({
+    selectedScenes,
+    onComplete: handleClearSelection,
+  });
 
   const handleInitializing = useCallback((initializing) => {
     if (initializing) {
@@ -309,10 +320,49 @@ const Home = () => {
 
       {/* Bulk Action Bar */}
       {selectedScenes.length > 0 && (
-        <BulkActionBar
-          selectedScenes={selectedScenes}
-          onClearSelection={handleClearSelection}
-        />
+        <>
+          <BulkActionBar
+            selectedScenes={selectedScenes}
+            onClearSelection={handleClearSelection}
+            actions={
+              <>
+                <Button
+                  onClick={handleHideClick}
+                  variant="secondary"
+                  size="sm"
+                  disabled={isHiding}
+                  className="flex items-center gap-1.5"
+                >
+                  <LucideEyeOff className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    {isHiding ? "Hiding..." : "Hide"}
+                  </span>
+                </Button>
+                <AddToPlaylistButton
+                  sceneIds={selectedScenes.map((s) => s.id)}
+                  buttonText={
+                    <span>
+                      <span className="hidden sm:inline">
+                        Add {selectedScenes.length} to Playlist
+                      </span>
+                      <span className="sm:hidden">Add to Playlist</span>
+                    </span>
+                  }
+                  icon={<LucidePlus className="w-4 h-4" />}
+                  dropdownPosition="above"
+                  onSuccess={handleClearSelection}
+                />
+              </>
+            }
+          />
+          <HideConfirmationDialog
+            isOpen={hideDialogOpen}
+            onClose={closeHideDialog}
+            onConfirm={handleHideConfirm}
+            entityType="scene"
+            entityName={`${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""}`}
+          />
+        </>
       )}
     </PageLayout>
   );

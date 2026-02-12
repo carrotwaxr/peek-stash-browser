@@ -12,11 +12,13 @@ import {
   Edit2,
   MoreVertical,
   Play,
+  Plus,
   Repeat,
   Repeat1,
   Save,
   Share2,
   Shuffle,
+  Trash2,
   X,
 } from "lucide-react";
 import { useNavigationState } from "../../hooks/useNavigationState.js";
@@ -30,6 +32,7 @@ import { showError, showSuccess } from "../../utils/toast.jsx";
 import { ThemedIcon } from "../icons/index.js";
 import {
   AddToPlaylistButton,
+  BulkActionBar,
   Button,
   ConfirmDialog,
   PageHeader,
@@ -66,11 +69,41 @@ const PlaylistDetail = () => {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
 
+  // Selection state for multi-select (view mode only)
+  const [selectedScenes, setSelectedScenes] = useState([]);
+  const [bulkRemoveConfirmOpen, setBulkRemoveConfirmOpen] = useState(false);
+
+  const handleToggleSelect = useCallback((scene) => {
+    setSelectedScenes((prev) => {
+      const isSelected = prev.some((s) => s.id === scene.id);
+      return isSelected
+        ? prev.filter((s) => s.id !== scene.id)
+        : [...prev, scene];
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedScenes(
+      scenes.filter((s) => s.exists && s.scene).map((s) => s.scene)
+    );
+  }, [scenes]);
+
+  const handleDeselectAll = useCallback(() => {
+    setSelectedScenes([]);
+  }, []);
+
   // Navigation state for back button
   const { goBack, backButtonText } = useNavigationState();
 
   // Set page title to playlist name
   usePageTitle(playlist?.name || "Playlist");
+
+  // Clear selection when entering edit or reorder mode
+  useEffect(() => {
+    if (isEditing || reorderMode) {
+      setSelectedScenes([]);
+    }
+  }, [isEditing, reorderMode]);
 
   useEffect(() => {
     loadPlaylist();
@@ -315,6 +348,36 @@ const PlaylistDetail = () => {
       showError("Failed to duplicate playlist");
     } finally {
       setDuplicating(false);
+    }
+  };
+
+  const handleBulkRemoveClick = () => {
+    setBulkRemoveConfirmOpen(true);
+  };
+
+  const confirmBulkRemove = async () => {
+    setBulkRemoveConfirmOpen(false);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const scene of selectedScenes) {
+      try {
+        await api.delete(`/playlists/${playlistId}/items/${scene.id}`);
+        successCount++;
+      } catch {
+        failCount++;
+      }
+    }
+
+    const removedIds = new Set(selectedScenes.map((s) => s.id));
+    setScenes((prev) => prev.filter((item) => !removedIds.has(item.scene?.id)));
+    setSelectedScenes([]);
+
+    if (failCount === 0) {
+      showSuccess(`Removed ${successCount} scene${successCount !== 1 ? "s" : ""} from playlist`);
+    } else {
+      showError(`Removed ${successCount}, ${failCount} failed`);
     }
   };
 
@@ -645,12 +708,25 @@ const PlaylistDetail = () => {
                 Use the position controls to reorder scenes. Click &quot;Save Order&quot; when done.
               </div>
             )}
+            {selectedScenes.length > 0 && !isEditing && !reorderMode && (
+              <div className="flex items-center justify-end gap-3">
+                <Button onClick={handleSelectAll} variant="primary" size="sm" className="font-medium">
+                  Select All ({scenes.filter(s => s.exists).length})
+                </Button>
+                <Button onClick={handleDeselectAll} variant="secondary" size="sm" className="font-medium">
+                  Deselect All
+                </Button>
+              </div>
+            )}
             {scenes.map((item, index) => (
               <SceneListItem
                 key={item.sceneId}
                 scene={item.scene}
                 exists={item.exists}
                 sceneId={item.sceneId}
+                isSelected={!isEditing && !reorderMode && selectedScenes.some((s) => s.id === item.scene?.id)}
+                onToggleSelect={!isEditing && !reorderMode ? handleToggleSelect : undefined}
+                selectionMode={!isEditing && !reorderMode && selectedScenes.length > 0}
                 linkState={{
                   scene: item.scene,
                   playlist: {
@@ -764,6 +840,43 @@ const PlaylistDetail = () => {
             ))}
           </div>
         )}
+
+        {selectedScenes.length > 0 && !isEditing && !reorderMode && (
+          <BulkActionBar
+            selectedScenes={selectedScenes}
+            onClearSelection={handleDeselectAll}
+            actions={
+              <>
+                <AddToPlaylistButton
+                  sceneIds={selectedScenes.map((s) => s.id)}
+                  buttonText={
+                    <span>
+                      <span className="hidden sm:inline">
+                        Add {selectedScenes.length} to Playlist
+                      </span>
+                      <span className="sm:hidden">Add to Playlist</span>
+                    </span>
+                  }
+                  icon={<Plus className="w-4 h-4" />}
+                  dropdownPosition="above"
+                  excludePlaylistIds={[parseInt(playlistId, 10)]}
+                  onSuccess={handleDeselectAll}
+                />
+                {isOwner && (
+                  <Button
+                    onClick={handleBulkRemoveClick}
+                    variant="destructive"
+                    size="sm"
+                    className="flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Remove</span>
+                  </Button>
+                )}
+              </>
+            }
+          />
+        )}
       </PageLayout>
 
       {/* Remove Scene Confirmation Dialog */}
@@ -780,6 +893,18 @@ const PlaylistDetail = () => {
             ? getSceneTitle(sceneToRemove.scene)
             : "this scene"
         }" from the playlist?`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmStyle="danger"
+      />
+
+      {/* Bulk Remove Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={bulkRemoveConfirmOpen}
+        onClose={() => setBulkRemoveConfirmOpen(false)}
+        onConfirm={confirmBulkRemove}
+        title="Remove Scenes"
+        message={`Remove ${selectedScenes.length} scene${selectedScenes.length !== 1 ? "s" : ""} from this playlist?`}
         confirmText="Remove"
         cancelText="Cancel"
         confirmStyle="danger"

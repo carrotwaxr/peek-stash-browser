@@ -399,7 +399,7 @@ function App() {
               <CardDisplaySettingsProvider>
                 <AppContent />
                 <Toaster
-                  position="bottom-center"
+                  position="top-right"
                   toastOptions={{
                     duration: 3000,
                     style: {
