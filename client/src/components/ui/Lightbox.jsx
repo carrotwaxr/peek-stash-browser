@@ -47,11 +47,13 @@ const Lightbox = ({
   });
   const controlsTimeoutRef = useRef(null);
 
-  // Reset index when initialIndex changes
+  // Reset index when initialIndex changes OR when lightbox opens
   useEffect(() => {
-    setCurrentIndex(initialIndex);
-    setImageLoaded(false);
-  }, [initialIndex]);
+    if (isOpen) {
+      setCurrentIndex(initialIndex);
+      setImageLoaded(false);
+    }
+  }, [initialIndex, isOpen]);
 
   // Track the current image ID to detect when images array changes during page transitions
   const currentImageId = images[currentIndex]?.id;

@@ -9,13 +9,12 @@ import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContex
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { libraryApi } from "../../services/api.js";
 import { galleryTitle } from "../../utils/gallery.js";
-import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import SceneSearch from "../scene-search/SceneSearch.jsx";
+import WallView from "../wall/WallView.jsx";
 import {
   Button,
   FavoriteButton,
-  LazyImage,
   Lightbox,
   LoadingSpinner,
   PageHeader,
@@ -382,44 +381,17 @@ const GalleryDetail = () => {
                 </div>
               )}
 
-              {imagesLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                  {[...Array(Math.min(PER_PAGE, gallery.image_count || 12))].map(
-                    (_, index) => (
-                      <div
-                        key={index}
-                        className="aspect-square rounded-lg animate-pulse"
-                        style={{
-                          backgroundColor: "var(--bg-tertiary)",
-                        }}
-                      />
-                    )
-                  )}
-                </div>
-              ) : images.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                  {images.map((image, index) => (
-                    <LazyImage
-                      key={image.id}
-                      src={image.paths?.thumbnail}
-                      alt={getImageTitle(image)}
-                      className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80 hover:scale-105 transition-all border"
-                      style={{
-                        backgroundColor: "var(--bg-secondary)",
-                        borderColor: "var(--border-color)",
-                      }}
-                      onClick={() => lightbox.openLightbox(index)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className="text-center py-12"
-                  style={{ color: "var(--text-muted)" }}
-                >
-                  No images found in this gallery
-                </div>
-              )}
+              <WallView
+                items={images}
+                entityType="image"
+                zoomLevel="medium"
+                onItemClick={(image) => {
+                  const index = images.findIndex((img) => img.id === image.id);
+                  lightbox.openLightbox(index >= 0 ? index : 0);
+                }}
+                loading={imagesLoading}
+                emptyMessage="No images found in this gallery"
+              />
 
               {/* Pagination - Bottom */}
               {lightbox.totalPages > 1 && (

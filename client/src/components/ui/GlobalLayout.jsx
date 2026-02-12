@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { migrateNavPreferences } from "../../constants/navigation.js";
 import { useGlobalNavigation } from "../../hooks/useGlobalNavigation.js";
+import useScrollRestoration from "../../hooks/useScrollRestoration.js";
 import { apiGet } from "../../services/api.js";
 import Sidebar from "./Sidebar.jsx";
 import TopBar from "./TopBar.jsx";
@@ -34,6 +35,7 @@ const GlobalLayout = ({ children }) => {
   }, []);
 
   useGlobalNavigation();
+  useScrollRestoration();
 
   return (
     <div className="layout-container min-h-screen">
