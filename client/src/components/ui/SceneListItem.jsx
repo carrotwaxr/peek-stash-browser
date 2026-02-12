@@ -4,12 +4,13 @@ import { formatRelativeTime } from "../../utils/date.js";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
 import { getEntityPath } from "../../utils/entityLinks.js";
 import {
-  SceneDescription,
   SceneMetadata,
   SceneStats,
   SceneThumbnail,
   SceneTitle,
 } from "../scene/index.js";
+import { ExpandableDescription } from "./ExpandableDescription.jsx";
+import { getSceneDescription } from "../../utils/format.js";
 
 /**
  * Shared row-based scene list item component
@@ -249,7 +250,14 @@ const SceneListItem = ({
                       </div>
 
                       {/* Description */}
-                      <SceneDescription scene={scene} className="mb-2" />
+                      {getSceneDescription(scene) && (
+                        <div className="mb-2">
+                          <ExpandableDescription
+                            description={getSceneDescription(scene)}
+                            maxLines={2}
+                          />
+                        </div>
+                      )}
 
                       {/* Performers & Tags */}
                       <SceneMetadata scene={scene} />
