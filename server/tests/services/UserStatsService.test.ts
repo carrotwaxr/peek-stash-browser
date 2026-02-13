@@ -626,6 +626,7 @@ describe("UserStatsService", () => {
       mockPrisma.userPerformerStats.findMany.mockResolvedValue([
         {
           performerId: "perf-1",
+          instanceId: "inst-a",
           oCounter: 5,
           playCount: 10,
           lastPlayedAt: new Date("2026-02-01"),
@@ -633,6 +634,7 @@ describe("UserStatsService", () => {
         },
         {
           performerId: "perf-2",
+          instanceId: "inst-a",
           oCounter: 0,
           playCount: 3,
           lastPlayedAt: new Date("2026-01-20"),
@@ -643,43 +645,86 @@ describe("UserStatsService", () => {
       const result = await userStatsService.getPerformerStats(1);
 
       expect(result.size).toBe(2);
-      expect(result.get("perf-1")).toEqual({
+      expect(result.get("perf-1\0inst-a")).toEqual({
         oCounter: 5,
         playCount: 10,
         lastPlayedAt: expect.any(String),
         lastOAt: expect.any(String),
       });
-      expect(result.get("perf-2")?.lastOAt).toBeNull();
+      expect(result.get("perf-2\0inst-a")?.lastOAt).toBeNull();
+    });
+
+    it("returns separate stats for same performerId across different instances", async () => {
+      mockPrisma.userPerformerStats.findMany.mockResolvedValue([
+        { performerId: "2", instanceId: "instance-aaa", oCounter: 5, playCount: 10, lastPlayedAt: null, lastOAt: null },
+        { performerId: "2", instanceId: "instance-bbb", oCounter: 3, playCount: 7, lastPlayedAt: null, lastOAt: null },
+      ]);
+
+      const stats = await userStatsService.getPerformerStats(1);
+
+      expect(stats.size).toBe(2);
+      expect(stats.get("2\0instance-aaa")).toEqual(
+        expect.objectContaining({ oCounter: 5, playCount: 10 })
+      );
+      expect(stats.get("2\0instance-bbb")).toEqual(
+        expect.objectContaining({ oCounter: 3, playCount: 7 })
+      );
     });
   });
 
   describe("getStudioStats", () => {
     it("returns Map of studio stats for a user", async () => {
       mockPrisma.userStudioStats.findMany.mockResolvedValue([
-        { studioId: "studio-1", oCounter: 2, playCount: 5 },
+        { studioId: "studio-1", instanceId: "inst-a", oCounter: 2, playCount: 5 },
       ] as any);
 
       const result = await userStatsService.getStudioStats(1);
 
       expect(result.size).toBe(1);
-      expect(result.get("studio-1")).toEqual({
+      expect(result.get("studio-1\0inst-a")).toEqual({
         oCounter: 2,
         playCount: 5,
       });
+    });
+
+    it("returns separate stats for same studioId across different instances", async () => {
+      mockPrisma.userStudioStats.findMany.mockResolvedValue([
+        { studioId: "5", instanceId: "inst-a", oCounter: 10, playCount: 20 },
+        { studioId: "5", instanceId: "inst-b", oCounter: 1, playCount: 2 },
+      ]);
+
+      const stats = await userStatsService.getStudioStats(1);
+
+      expect(stats.size).toBe(2);
+      expect(stats.get("5\0inst-a")).toEqual({ oCounter: 10, playCount: 20 });
+      expect(stats.get("5\0inst-b")).toEqual({ oCounter: 1, playCount: 2 });
     });
   });
 
   describe("getTagStats", () => {
     it("returns Map of tag stats for a user", async () => {
       mockPrisma.userTagStats.findMany.mockResolvedValue([
-        { tagId: "tag-1", oCounter: 3, playCount: 7 },
-        { tagId: "tag-2", oCounter: 0, playCount: 1 },
+        { tagId: "tag-1", instanceId: "inst-a", oCounter: 3, playCount: 7 },
+        { tagId: "tag-2", instanceId: "inst-a", oCounter: 0, playCount: 1 },
       ] as any);
 
       const result = await userStatsService.getTagStats(1);
 
       expect(result.size).toBe(2);
-      expect(result.get("tag-1")).toEqual({ oCounter: 3, playCount: 7 });
+      expect(result.get("tag-1\0inst-a")).toEqual({ oCounter: 3, playCount: 7 });
+    });
+
+    it("returns separate stats for same tagId across different instances", async () => {
+      mockPrisma.userTagStats.findMany.mockResolvedValue([
+        { tagId: "3", instanceId: "inst-x", oCounter: 8, playCount: 15 },
+        { tagId: "3", instanceId: "inst-y", oCounter: 2, playCount: 4 },
+      ]);
+
+      const stats = await userStatsService.getTagStats(1);
+
+      expect(stats.size).toBe(2);
+      expect(stats.get("3\0inst-x")).toEqual({ oCounter: 8, playCount: 15 });
+      expect(stats.get("3\0inst-y")).toEqual({ oCounter: 2, playCount: 4 });
     });
   });
 });
