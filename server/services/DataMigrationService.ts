@@ -82,15 +82,14 @@ const migrations: Migration[] = [
       } catch (error) {
         const duration = Date.now() - startTime;
         logger.error(
-          "[Migration 002] Stats rebuild failed - continuing startup",
+          "[Migration 002] Stats rebuild failed - will retry on next startup",
           {
             durationMs: duration,
             error: error instanceof Error ? error.message : "Unknown error",
             stack: error instanceof Error ? error.stack : undefined,
           }
         );
-        // Don't rethrow - allow startup to continue and mark migration as applied
-        // Stats can be manually rebuilt later via admin tools if needed
+        throw error;
       }
     },
   },
