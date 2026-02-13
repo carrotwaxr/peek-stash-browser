@@ -111,7 +111,7 @@ export async function mergePerformersWithUserData(
 
   const ratingMap = new Map(
     ratings.map((r) => [
-      r.performerId,
+      `${r.performerId}\0${r.instanceId || ""}`,
       {
         rating: r.rating,
         rating100: r.rating,
@@ -122,7 +122,8 @@ export async function mergePerformersWithUserData(
 
   // Merge data
   return performers.map((performer) => {
-    const stats = performerStats.get(performer.id) || {
+    const compositeKey = `${performer.id}\0${performer.instanceId || ""}`;
+    const stats = performerStats.get(compositeKey) || {
       oCounter: 0,
       playCount: 0,
       lastPlayedAt: null,
@@ -130,7 +131,7 @@ export async function mergePerformersWithUserData(
     };
     return {
       ...performer,
-      ...ratingMap.get(performer.id),
+      ...ratingMap.get(compositeKey),
       o_counter: stats.oCounter,
       play_count: stats.playCount,
       last_played_at: stats.lastPlayedAt,

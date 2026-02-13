@@ -40,7 +40,7 @@ export async function mergeTagsWithUserData(
 
   const ratingMap = new Map(
     ratings.map((r) => [
-      r.tagId,
+      `${r.tagId}\0${r.instanceId || ""}`,
       {
         rating: r.rating,
         rating100: r.rating,
@@ -51,13 +51,14 @@ export async function mergeTagsWithUserData(
 
   // Merge data
   return tags.map((tag) => {
-    const stats = tagStats.get(tag.id) || {
+    const compositeKey = `${tag.id}\0${tag.instanceId || ""}`;
+    const stats = tagStats.get(compositeKey) || {
       oCounter: 0,
       playCount: 0,
     };
     return {
       ...tag,
-      ...ratingMap.get(tag.id),
+      ...ratingMap.get(compositeKey),
       o_counter: stats.oCounter,
       play_count: stats.playCount,
     };
