@@ -1,14 +1,14 @@
 # Peek Stash Browser
 
-Web application for browsing and streaming Stash media with HLS transcoding, playlists, and multi-user support.
+Web application for browsing and streaming Stash media with multi-instance support, playlists, ratings, and multi-user access control.
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS, Video.js 8
-- **Backend**: Node.js/Express, TypeScript (strict), Prisma 6, SQLite
-- **Video**: FFmpeg for real-time HLS transcoding (360p-1080p)
+- **Frontend**: React 19, Vite 7, Tailwind CSS 3, Video.js 7
+- **Backend**: Node.js/Express 5, TypeScript (strict), Prisma 6, SQLite
+- **Video**: Proxies Stash's native HLS streams with playlist URL rewriting
 - **Deployment**: Docker (dev: docker-compose, prod: single container + Nginx)
-- **Dependency**: `stashapp-api` npm package for Stash GraphQL queries
+- **Stash API**: Internal `StashClient` using `graphql-request` + GraphQL codegen SDK
 
 ## Development
 
@@ -29,37 +29,80 @@ cd client && npm test
 cd server && npm test
 ```
 
-The app requires Docker for FFmpeg and path mapping. Direct Node.js (`npm run dev`) works for quick validation but isn't fully functional.
+Docker is required for the full dev environment. Direct Node.js (`npm run dev`) works for quick validation but isn't fully functional.
 
 ## Architecture
 
-### Video Transcoding (server/services/TranscodingManager.ts)
-- Session-based: one FFmpeg process per quality per scene
-- VOD trick: generates full playlist immediately for seek bar
-- Segment renaming: FFmpeg outputs segment_000.ts, renamed to match timeline position
-- Smart seeking: reuses sessions when possible, preserves segments on restart
-- Auto-cleanup after 90 seconds of inactivity
+### Multi-Instance Support
 
-### Path Mapping (server/utils/pathMapping.ts)
-- Translates Stash internal paths to Peek container paths
-- Configured via Setup Wizard, stored in database PathMapping table
-- Example: Stash `/data/videos/scene.mp4` → Peek `/app/media/videos/scene.mp4`
+Peek connects to **multiple Stash servers** simultaneously. This is a core architectural pattern:
 
-### Authentication
-- JWT in HTTP-only cookies (24h expiry)
-- Roles: ADMIN, USER
-- Middleware: `authenticateToken`, `requireAdmin`, `requireCacheReady`
+- `StashInstance` model stores server configs (URL, API key, priority)
+- `UserStashInstance` controls which instances each user sees
+- `StashInstanceManager` service manages connections and credentials
+- All cached entity tables use **composite keys**: `@@id([id, stashInstanceId])`
+- Query builders, stats, and user data functions all require `instanceId` awareness
+
+### Video Streaming (server/controllers/video.ts)
+
+Peek does **not** transcode video itself. It proxies Stash's native streaming:
+
+- Rewrites HLS playlist URLs to route through Peek's proxy (`/api/proxy/stash`)
+- Strips Stash API keys from segment URLs for security
+- Supports per-instance stream routing via `instanceId` parameter
+- Connection pooling and concurrency limiting via `server/controllers/proxy.ts`
 
 ### Stash Integration
-- Uses `stashapp-api` singleton via `getStash()`
-- Cache: StashCacheManager fetches all entities on startup, refreshes hourly
-- All Stash image URLs proxied via `/api/proxy/stash` to hide API key
+
+- `StashClient` (`server/graphql/StashClient.ts`): Internal GraphQL client using generated SDK
+- `StashSyncService`: Syncs entity data from Stash instances into local SQLite cache
+- `StashEntityService`: Cached entity lookups and relationships
+- `StashInstanceManager`: Multi-instance connection lifecycle
+- GraphQL codegen config: `server/codegen.yml` generates `server/graphql/generated/graphql.ts`
+- All Stash image/stream URLs proxied via `/api/proxy/stash` to hide API keys
+
+### Authentication
+
+- JWT in HTTP-only cookies (24h expiry, auto-refresh)
+- Supports reverse proxy auth via `PROXY_AUTH_HEADER`
+- Roles: ADMIN, USER
+- Middleware: `authenticate`, `requireAdmin`, `requireCacheReady` (in `server/middleware/auth.ts`)
+
+### Key Services (server/services/)
+
+| Service | Purpose |
+|---------|---------|
+| `StashInstanceManager` | Multi-instance connection management |
+| `StashSyncService` | Entity sync from Stash to local cache |
+| `StashEntityService` | Cached entity lookups and relations |
+| `SceneQueryBuilder` | Scene filtering with complex joins |
+| `PerformerQueryBuilder`, `GalleryQueryBuilder`, etc. | Per-entity query builders |
+| `UserStatsService` | User engagement tracking (play counts, O counter) |
+| `RankingComputeService` | Engagement scoring and percentile ranking |
+| `ExclusionComputationService` | Pre-computed content restriction caching |
+| `MergeReconciliationService` | Scene merge/duplicate handling |
+| `DataMigrationService` | Schema data migrations |
+
+### Controllers (server/controllers/)
+
+Video, proxy, setup, user, playlist, stats, userStats, ratings, watchHistory, download, clips, carousel, customTheme, groups, imageViewHistory, timelineController, plus `library/` subdirectory with per-entity files (scenes, performers, studios, tags, groups, galleries, images).
 
 ## Database
 
 **Always use migrations, never `prisma db push`.**
 
-Key models: User, WatchHistory, Playlist, PlaylistItem, *Rating tables, PathMapping
+### Key Model Groups
+
+- **Users**: User, UserGroup, UserGroupMembership
+- **Stash Cache**: StashScene, StashPerformer, StashStudio, StashTag, StashGroup, StashGallery, StashImage, StashClip (all with composite keys `[id, stashInstanceId]`)
+- **Multi-Instance**: StashInstance, UserStashInstance, UserCarousel
+- **User Activity**: WatchHistory, ImageViewHistory, Playlist, PlaylistItem, PlaylistShare, Download
+- **Ratings**: SceneRating, PerformerRating, StudioRating, TagRating, GalleryRating, GroupRating, ImageRating
+- **Stats**: UserPerformerStats, UserStudioStats, UserTagStats, UserEntityRanking, UserEntityStats
+- **Permissions**: UserContentRestriction, UserHiddenEntity, UserExcludedEntity
+- **Sync**: SyncState, SyncSettings, DataMigration, MergeRecord
+- **Other**: CustomTheme
+- **Junction Tables**: ScenePerformer, SceneTag, SceneGroup, SceneGallery, ImagePerformer, ImageTag, ImageGallery, GalleryPerformer, PerformerTag, StudioTag, GalleryTag, GroupTag, ClipTag
 
 ### Creating Migrations
 
@@ -101,22 +144,24 @@ In Docker, migrations are applied automatically on container startup.
 
 ## Release Process
 
-Use `/publish-peek` command. Workflow:
-1. Bump version in both client/package.json and server/package.json
-2. Commit version bump to main
-3. Create and push git tag (e.g., v1.5.3)
-4. GitHub Actions builds Docker image and creates release
+Use `/release-workflow` for the full process overview. Quick reference:
+1. Run `/pre-release` to validate (tests, lint, build, Docker build)
+2. Run `/release-alpha` (stable) or `/release-beta` (beta) to bump versions, commit, tag, and push
+3. GitHub Actions (`.github/workflows/docker-build.yml`) builds Docker image and creates release
 
 ## Key Files
 
 **Frontend**: `client/src/components/video-player/VideoPlayer.jsx`, `client/src/services/api.js`
-**Backend**: `server/services/TranscodingManager.ts`, `server/controllers/video.ts`, `server/controllers/library.ts`
+**Backend**: `server/controllers/video.ts`, `server/controllers/proxy.ts`, `server/controllers/library/scenes.ts`
+**Services**: `server/services/StashInstanceManager.ts`, `server/services/StashSyncService.ts`, `server/services/StashEntityService.ts`
+**GraphQL**: `server/graphql/StashClient.ts`, `server/graphql/generated/graphql.ts`, `server/codegen.yml`
 **Config**: `docker-compose.yml`, `Dockerfile.production`, `server/prisma/schema.prisma`
 
 ## Environment Variables
 
-Required: `STASH_URL`, `STASH_API_KEY`, `DATABASE_URL`, `JWT_SECRET`
-Optional: `CONFIG_DIR`, `STASH_INTERNAL_PATH`, `STASH_MEDIA_PATH`
+Required: `DATABASE_URL`, `JWT_SECRET`
+Instance config: `STASH_URL` and `STASH_API_KEY` (legacy env-based setup, now configurable via Setup Wizard UI with multi-instance support)
+Optional: `PROXY_AUTH_HEADER`, `SECURE_COOKIES`, `CONFIG_DIR`, `PEEK_DATA_DIR`, `PEEK_FRONTEND_PORT`, `PEEK_BACKEND_PORT`
 
 ## Integration Testing
 
