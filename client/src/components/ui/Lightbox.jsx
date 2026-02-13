@@ -23,6 +23,7 @@ const Lightbox = ({
   pageOffset = 0, // Offset of current page (e.g., page 2 with 100/page = 100)
   onIndexChange, // (index: number) => void - called when current index changes (for syncing with parent)
   isPageTransitioning = false, // Whether we're loading a new page (show loading state, hide current image)
+  transitionKey = 0, // Increments on each page boundary crossing to force index reset
   prefetchImages = [], // Images from adjacent pages to prefetch into browser cache
 }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -47,13 +48,15 @@ const Lightbox = ({
   });
   const controlsTimeoutRef = useRef(null);
 
-  // Reset index when initialIndex changes OR when lightbox opens
+  // Reset index when initialIndex changes, lightbox opens, or page transition occurs.
+  // transitionKey ensures this fires even when initialIndex is the same value
+  // (e.g., 0 on consecutive forward page boundary crossings).
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(initialIndex);
       setImageLoaded(false);
     }
-  }, [initialIndex, isOpen]);
+  }, [initialIndex, isOpen, transitionKey]);
 
   // Track the current image ID to detect when images array changes during page transitions
   const currentImageId = images[currentIndex]?.id;
@@ -681,17 +684,17 @@ const Lightbox = ({
       {/* Image container - swipe handlers here so they don't block button taps on letterbox areas */}
       <div
         {...swipeHandlers}
-        className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
+        className="relative w-[90vw] h-[90vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
         style={{
           visibility: isPageTransitioning || isShowingStaleImage ? "hidden" : "visible",
         }}
       >
-        {/* Image */}
+        {/* Image - scales down to fit but never up beyond native resolution */}
         <img
           src={imageSrc}
           alt={imageTitle}
-          className="max-w-full max-h-[90vh] object-contain"
+          className="max-w-full max-h-full object-contain"
           style={{
             opacity: imageLoaded ? 1 : 0,
             transition: "opacity 0.2s ease-in-out",

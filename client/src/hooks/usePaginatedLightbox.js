@@ -35,6 +35,10 @@ export function usePaginatedLightbox({
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [lightboxAutoPlay, setLightboxAutoPlay] = useState(false);
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
+  // Counter that increments on each page boundary crossing.
+  // Ensures Lightbox resets currentIndex even when lightboxIndex is the same value
+  // (e.g., 0 on consecutive forward crossings).
+  const [transitionKey, setTransitionKey] = useState(0);
 
   // Prefetch state for adjacent pages
   const [prevPageImages, setPrevPageImages] = useState([]);
@@ -76,6 +80,7 @@ export function usePaginatedLightbox({
         // User navigated past last image on current page - load next page
         const targetIndex = 0; // First image of next page
         setLightboxIndex(targetIndex); // Update immediately to prevent counter flicker
+        setTransitionKey((k) => k + 1); // Force Lightbox to reset even if index unchanged
         setIsPageTransitioning(true); // Show loading state until new data arrives
         pendingLightboxNav.current = targetIndex; // Also store for data callback
         handlePageChange(currentPage + 1);
@@ -84,6 +89,7 @@ export function usePaginatedLightbox({
         // User navigated before first image on current page - load previous page
         const targetIndex = perPage - 1; // Last image of previous page
         setLightboxIndex(targetIndex); // Update immediately to prevent counter flicker
+        setTransitionKey((k) => k + 1); // Force Lightbox to reset even if index unchanged
         setIsPageTransitioning(true); // Show loading state until new data arrives
         pendingLightboxNav.current = targetIndex; // Also store for data callback
         handlePageChange(currentPage - 1);
@@ -194,6 +200,7 @@ export function usePaginatedLightbox({
     lightboxIndex,
     lightboxAutoPlay,
     isPageTransitioning,
+    transitionKey,
 
     // Lightbox handlers
     openLightbox,
