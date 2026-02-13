@@ -5,12 +5,43 @@ import { useInitialFocus } from "../../hooks/useFocusTrap.js";
 import { usePageTitle } from "../../hooks/usePageTitle.js";
 import { useTVMode } from "../../hooks/useTVMode.js";
 import SceneGrid from "../scene-search/SceneGrid.jsx";
+import { Info } from "lucide-react";
 import {
   SyncProgressBanner,
   PageHeader,
   PageLayout,
   Pagination,
+  Tooltip,
 } from "../ui/index.js";
+
+const RecommendationInfoContent = () => (
+  <div className="text-sm max-w-sm">
+    <p className="mb-2">
+      Scenes are scored based on your ratings, favorites, and watch history.
+    </p>
+    <p className="mb-1">
+      <span className="font-medium">Explicit signals</span> &mdash; Performers,
+      studios, and tags you&apos;ve rated 80+ or favorited contribute the most
+      weight. Performers are weighted heaviest (5&times;), then studios
+      (3&times;), then tags (1&times;).
+    </p>
+    <p className="mb-1">
+      <span className="font-medium">Implicit signals</span> &mdash; Your
+      top-engaged entities (top 50% by engagement rank) also contribute, weighted
+      by how strongly you engage with them.
+    </p>
+    <p className="mb-1">
+      <span className="font-medium">Freshness</span> &mdash; Unwatched scenes
+      get a +30 boost. Scenes watched over 14 days ago get +20. Recently watched
+      scenes are deprioritized.
+    </p>
+    <p>
+      <span className="font-medium">Diversity</span> &mdash; Scores are grouped
+      into tiers and shuffled within each tier daily, so you see variety even
+      among similarly-scored scenes.
+    </p>
+  </div>
+);
 
 const Recommended = () => {
   usePageTitle("Recommended");
@@ -200,10 +231,20 @@ const Recommended = () => {
   return (
     <PageLayout>
       <div ref={pageRef}>
-        <PageHeader
-          title="Recommended"
-          subtitle="Personalized recommendations based on your favorites and ratings"
-        />
+        <div className="flex items-start gap-2">
+          <PageHeader
+            title="Recommended"
+            subtitle="Personalized recommendations based on your favorites and ratings"
+          />
+          <Tooltip content={<RecommendationInfoContent />} position="bottom">
+            <button
+              className="p-1 mt-1 rounded-full hover:bg-[var(--bg-secondary)] transition-colors"
+              aria-label="How recommendations work"
+            >
+              <Info size={18} style={{ color: "var(--text-muted)" }} />
+            </button>
+          </Tooltip>
+        </div>
 
         {initMessage && <SyncProgressBanner message={initMessage} />}
 
