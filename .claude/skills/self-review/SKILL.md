@@ -16,9 +16,26 @@ git diff main...HEAD
 
 Review the diff to understand the scope and intent of the changes before running automated checks.
 
-## Step 2: Code Quality Review
+## Step 2: Invoke Relevant Best-Practice Skills
 
-Review the diff against these guidelines:
+Based on which files changed, invoke the corresponding skills to have their guidelines in context during review. Check the diff stat and invoke all that apply:
+
+| Files changed | Skill to invoke |
+|---|---|
+| `client/src/components/**` (UI/layout) | `visual-style`, `responsive-design`, `web-design-guidelines` |
+| `client/src/components/**` (React logic) | `vercel-react-best-practices`, `vercel-composition-patterns` |
+| `server/controllers/**`, `server/routes/**` | `nodejs-backend-patterns`, `api-design-principles` |
+| `server/services/**` (TypeScript) | `typescript-advanced-types` |
+| `server/prisma/**`, migration files | `prisma-sqlite-expert` |
+| `server/graphql/**`, `codegen.yml` | `graphql-patterns` |
+| `Dockerfile*`, `docker-compose*` | `docker-best-practices` |
+| Test files (`**/*.test.*`) | `writing-tests` |
+
+Invoke these skills using the Skill tool before proceeding to the code quality review. You don't need to invoke every skill — only those relevant to the diff.
+
+## Step 3: Code Quality Review
+
+Review the diff against these guidelines (supplemented by the skills invoked above):
 
 ### General Principles
 
@@ -62,7 +79,7 @@ Review the diff against these guidelines:
 - No commented-out code blocks
 - mkdocs and README (docs) are kept up to date with changes
 
-## Step 3: Automated Testing Checklist
+## Step 4: Automated Testing Checklist
 
 Run each check and fix any failures before proceeding:
 
@@ -112,7 +129,7 @@ cd client && npm run build
 
 Expected: Build succeeds without errors
 
-## Step 4: Issue Severity Guide
+## Step 5: Issue Severity Guide
 
 **Blocking (must fix before PR):**
 
@@ -124,7 +141,7 @@ Expected: Build succeeds without errors
 
 **Should fix (fix now or create follow-up issue):**
 
-- Missing test coverage for new logic
+- Missing test coverage for new logic (see `writing-tests` skill for conventions)
 - Performance issues (unnecessary re-renders, N+1 queries)
 - Accessibility problems
 - Inconsistent UI patterns
@@ -135,7 +152,7 @@ Expected: Build succeeds without errors
 - Nice-to-have improvements
 - Tech debt observations
 
-## Step 5: Create Pull Request
+## Step 6: Create Pull Request
 
 After all blocking issues are fixed, create a GitHub PR:
 
