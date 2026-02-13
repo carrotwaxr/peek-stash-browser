@@ -5,7 +5,7 @@ import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks.js";
 
 /**
  * GroupCard - Card for displaying group/collection entities
@@ -54,7 +54,7 @@ const GroupCard = forwardRef(
           count: group.scene_count,
           onClick:
             group.scene_count > 0
-              ? () => navigate(`/scenes?groupIds=${group.id}${hasMultipleInstances && group.instanceId ? `&instance=${group.instanceId}` : ''}`)
+              ? () => navigate(appendInstanceParam(`/scenes?groupIds=${group.id}`, group, hasMultipleInstances))
               : undefined,
         },
         {
@@ -62,7 +62,7 @@ const GroupCard = forwardRef(
           count: group.sub_group_count,
           onClick:
             group.sub_group_count > 0
-              ? () => navigate(`/collections?groupIds=${group.id}${hasMultipleInstances && group.instanceId ? `&instance=${group.instanceId}` : ''}`)
+              ? () => navigate(appendInstanceParam(`/collections?groupIds=${group.id}`, group, hasMultipleInstances))
               : undefined,
         },
         {
