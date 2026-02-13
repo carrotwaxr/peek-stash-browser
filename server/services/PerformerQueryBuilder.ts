@@ -62,7 +62,7 @@ class PerformerQueryBuilder {
     const baseJoins = `
         FROM StashPerformer p
         LEFT JOIN PerformerRating r ON p.id = r.performerId AND p.stashInstanceId = r.instanceId AND r.userId = ?
-        LEFT JOIN UserPerformerStats s ON p.id = s.performerId AND s.userId = ?
+        LEFT JOIN UserPerformerStats s ON p.id = s.performerId AND p.stashInstanceId = s.instanceId AND s.userId = ?
     `.trim();
 
     if (applyExclusions) {

@@ -58,7 +58,7 @@ class StudioQueryBuilder {
     const baseJoins = `
         FROM StashStudio s
         LEFT JOIN StudioRating r ON s.id = r.studioId AND s.stashInstanceId = r.instanceId AND r.userId = ?
-        LEFT JOIN UserStudioStats us ON s.id = us.studioId AND us.userId = ?
+        LEFT JOIN UserStudioStats us ON s.id = us.studioId AND s.stashInstanceId = us.instanceId AND us.userId = ?
     `.trim();
 
     if (applyExclusions) {
