@@ -6,7 +6,7 @@ import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks.js";
 
 /**
  * PerformerCard - Card for displaying performer entities
@@ -45,7 +45,7 @@ const PerformerCard = forwardRef(
         {
           type: "SCENES",
           count: performer.scene_count,
-          onClick: performer.scene_count > 0 ? () => navigate(`/scenes?performerId=${performer.id}`) : undefined,
+          onClick: performer.scene_count > 0 ? () => navigate(appendInstanceParam(`/scenes?performerId=${performer.id}`, performer, hasMultipleInstances)) : undefined,
         },
         {
           type: "GROUPS",
@@ -55,7 +55,7 @@ const PerformerCard = forwardRef(
         {
           type: "IMAGES",
           count: performer.image_count,
-          onClick: performer.image_count > 0 ? () => navigate(`/images?performerId=${performer.id}`) : undefined,
+          onClick: performer.image_count > 0 ? () => navigate(appendInstanceParam(`/images?performerId=${performer.id}`, performer, hasMultipleInstances)) : undefined,
         },
         {
           type: "GALLERIES",
@@ -73,7 +73,7 @@ const PerformerCard = forwardRef(
           tooltipContent: studiosTooltip,
         },
       ];
-    }, [performer, navigate]);
+    }, [performer, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = performerSettings.showRelationshipIndicators ? indicators : [];

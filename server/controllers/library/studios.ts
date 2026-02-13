@@ -40,7 +40,7 @@ export async function mergeStudiosWithUserData(
 
   const ratingMap = new Map(
     ratings.map((r) => [
-      r.studioId,
+      `${r.studioId}\0${r.instanceId || ""}`,
       {
         rating: r.rating,
         rating100: r.rating,
@@ -51,13 +51,14 @@ export async function mergeStudiosWithUserData(
 
   // Merge data
   return studios.map((studio) => {
-    const stats = studioStats.get(studio.id) || {
+    const compositeKey = `${studio.id}\0${studio.instanceId || ""}`;
+    const stats = studioStats.get(compositeKey) || {
       oCounter: 0,
       playCount: 0,
     };
     return {
       ...studio,
-      ...ratingMap.get(studio.id),
+      ...ratingMap.get(compositeKey),
       o_counter: stats.oCounter,
       play_count: stats.playCount,
     };

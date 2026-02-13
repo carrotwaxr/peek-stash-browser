@@ -5,7 +5,7 @@ import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks.js";
 
 /**
  * StudioCard - Card for displaying studio entities
@@ -45,7 +45,7 @@ const StudioCard = forwardRef(
           count: studio.scene_count,
           onClick:
             studio.scene_count > 0
-              ? () => navigate(`/scenes?studioId=${studio.id}`)
+              ? () => navigate(appendInstanceParam(`/scenes?studioId=${studio.id}`, studio, hasMultipleInstances))
               : undefined,
         },
         {
@@ -53,7 +53,7 @@ const StudioCard = forwardRef(
           count: studio.image_count,
           onClick:
             studio.image_count > 0
-              ? () => navigate(`/images?studioId=${studio.id}`)
+              ? () => navigate(appendInstanceParam(`/images?studioId=${studio.id}`, studio, hasMultipleInstances))
               : undefined,
         },
         {
@@ -77,7 +77,7 @@ const StudioCard = forwardRef(
           tooltipContent: tagsTooltip,
         },
       ];
-    }, [studio, navigate]);
+    }, [studio, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = studioSettings.showRelationshipIndicators ? indicators : [];

@@ -4,7 +4,7 @@ import { stashEntityService } from "./StashEntityService.js";
 
 // Separator for composite map keys (entityId + instanceId).
 // Using a character that won't appear in UUIDs or Stash numeric IDs.
-const KEY_SEP = "\0";
+export const KEY_SEP = "\0";
 
 /**
  * UserStatsService
@@ -51,6 +51,7 @@ class UserStatsService {
       where: { userId },
       select: {
         performerId: true,
+        instanceId: true,
         oCounter: true,
         playCount: true,
         lastPlayedAt: true,
@@ -60,7 +61,7 @@ class UserStatsService {
 
     return new Map(
       stats.map((s) => [
-        s.performerId,
+        `${s.performerId}${KEY_SEP}${s.instanceId}`,
         {
           oCounter: s.oCounter,
           playCount: s.playCount,
@@ -82,6 +83,7 @@ class UserStatsService {
       where: { userId },
       select: {
         studioId: true,
+        instanceId: true,
         oCounter: true,
         playCount: true,
       },
@@ -89,7 +91,7 @@ class UserStatsService {
 
     return new Map(
       stats.map((s) => [
-        s.studioId,
+        `${s.studioId}${KEY_SEP}${s.instanceId}`,
         {
           oCounter: s.oCounter,
           playCount: s.playCount,
@@ -109,6 +111,7 @@ class UserStatsService {
       where: { userId },
       select: {
         tagId: true,
+        instanceId: true,
         oCounter: true,
         playCount: true,
       },
@@ -116,7 +119,7 @@ class UserStatsService {
 
     return new Map(
       stats.map((s) => [
-        s.tagId,
+        `${s.tagId}${KEY_SEP}${s.instanceId}`,
         {
           oCounter: s.oCounter,
           playCount: s.playCount,

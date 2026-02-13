@@ -49,6 +49,23 @@ export function getEntityPath(entityType, entity, hasMultipleInstances) {
  * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
  * @returns {string} The path to the scene at the specified time
  */
+/**
+ * Append instance query parameter to a filter URL for multi-instance disambiguation.
+ * Used by card indicator click handlers that navigate to filtered list views
+ * (e.g., /scenes?performerId=2&instance=abc-123).
+ *
+ * @param {string} url - Base URL with existing query params (e.g., "/scenes?performerId=2")
+ * @param {Object} entity - Entity object with instanceId
+ * @param {boolean} hasMultipleInstances - Whether multiple Stash instances are configured
+ * @returns {string} URL with instance param appended if needed
+ */
+export function appendInstanceParam(url, entity, hasMultipleInstances) {
+  if (hasMultipleInstances && entity?.instanceId) {
+    return `${url}&instance=${encodeURIComponent(entity.instanceId)}`;
+  }
+  return url;
+}
+
 export function getScenePathWithTime(scene, time, hasMultipleInstances) {
   const id = scene?.id || scene;
   const base = `/scene/${id}`;

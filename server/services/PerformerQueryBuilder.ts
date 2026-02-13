@@ -9,6 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
+import { KEY_SEP } from "./UserStatsService.js";
 
 // Filter clause builder result
 interface FilterClause {
@@ -62,7 +63,7 @@ class PerformerQueryBuilder {
     const baseJoins = `
         FROM StashPerformer p
         LEFT JOIN PerformerRating r ON p.id = r.performerId AND p.stashInstanceId = r.instanceId AND r.userId = ?
-        LEFT JOIN UserPerformerStats s ON p.id = s.performerId AND s.userId = ?
+        LEFT JOIN UserPerformerStats s ON p.id = s.performerId AND p.stashInstanceId = s.instanceId AND s.userId = ?
     `.trim();
 
     if (applyExclusions) {
@@ -1074,22 +1075,26 @@ class PerformerQueryBuilder {
   async populateRelations(performers: NormalizedPerformer[]): Promise<void> {
     if (performers.length === 0) return;
 
-    const performerIds = performers.map((p) => p.id);
+    // Build composite where clause to avoid cross-instance collisions
+    const performerWhereClause = performers.map((p) => ({
+      performerId: p.id,
+      performerInstanceId: p.instanceId || "",
+    }));
 
     // Load all junctions in parallel
     const [tagJunctions, scenePerformers, galleryPerformers] = await Promise.all([
       prisma.performerTag.findMany({
-        where: { performerId: { in: performerIds } },
+        where: { OR: performerWhereClause },
       }),
       // Get scenes this performer appears in to derive groups, studios
       prisma.scenePerformer.findMany({
-        where: { performerId: { in: performerIds } },
-        select: { performerId: true, sceneId: true },
+        where: { OR: performerWhereClause },
+        select: { performerId: true, performerInstanceId: true, sceneId: true },
       }),
       // Get galleries this performer appears in directly
       prisma.galleryPerformer.findMany({
-        where: { performerId: { in: performerIds } },
-        select: { performerId: true, galleryId: true },
+        where: { OR: performerWhereClause },
+        select: { performerId: true, performerInstanceId: true, galleryId: true },
       }),
     ]);
 
@@ -1170,12 +1175,13 @@ class PerformerQueryBuilder {
       image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
     }]));
 
-    // Build performer -> scene mapping
+    // Build performer -> scene mapping (keyed by composite performerId\0instanceId)
     const scenesByPerformer = new Map<string, Set<string>>();
     for (const sp of scenePerformers) {
-      const set = scenesByPerformer.get(sp.performerId) || new Set();
+      const key = `${sp.performerId}${KEY_SEP}${sp.performerInstanceId}`;
+      const set = scenesByPerformer.get(key) || new Set();
       set.add(sp.sceneId);
-      scenesByPerformer.set(sp.performerId, set);
+      scenesByPerformer.set(key, set);
     }
 
     // Build scene -> entities mappings
@@ -1198,30 +1204,33 @@ class PerformerQueryBuilder {
       if (s.studioId) studioByScene.set(s.id, s.studioId);
     }
 
-    // Build performer -> tags map
+    // Build performer -> tags map (keyed by composite performerId\0instanceId)
     const tagsByPerformer = new Map<string, any[]>();
     for (const junction of tagJunctions) {
       const tag = tagsById.get(junction.tagId);
       if (!tag) continue;
-      const list = tagsByPerformer.get(junction.performerId) || [];
+      const key = `${junction.performerId}${KEY_SEP}${junction.performerInstanceId}`;
+      const list = tagsByPerformer.get(key) || [];
       list.push(tag);
-      tagsByPerformer.set(junction.performerId, list);
+      tagsByPerformer.set(key, list);
     }
 
-    // Build performer -> galleries map from direct GalleryPerformer junction
+    // Build performer -> galleries map from direct GalleryPerformer junction (keyed by composite performerId\0instanceId)
     const galleriesByPerformer = new Map<string, Set<string>>();
     for (const gp of galleryPerformers) {
-      const set = galleriesByPerformer.get(gp.performerId) || new Set();
+      const key = `${gp.performerId}${KEY_SEP}${gp.performerInstanceId}`;
+      const set = galleriesByPerformer.get(key) || new Set();
       set.add(gp.galleryId);
-      galleriesByPerformer.set(gp.performerId, set);
+      galleriesByPerformer.set(key, set);
     }
 
-    // Populate performers with all relations
+    // Populate performers with all relations (using composite key for lookup)
     for (const performer of performers) {
-      performer.tags = tagsByPerformer.get(performer.id) || [];
+      const performerKey = `${performer.id}${KEY_SEP}${performer.instanceId || ""}`;
+      performer.tags = tagsByPerformer.get(performerKey) || [];
 
       // Derive groups and studios from performer's scenes
-      const performerSceneIds = scenesByPerformer.get(performer.id) || new Set();
+      const performerSceneIds = scenesByPerformer.get(performerKey) || new Set();
 
       const performerGroupIds = new Set<string>();
       const performerStudioIds = new Set<string>();
@@ -1233,7 +1242,7 @@ class PerformerQueryBuilder {
       }
 
       // Galleries come from direct GalleryPerformer association
-      const performerGalleryIds = galleriesByPerformer.get(performer.id) || new Set();
+      const performerGalleryIds = galleriesByPerformer.get(performerKey) || new Set();
 
       (performer as any).groups = [...performerGroupIds].map((id) => groupsById.get(id)).filter(Boolean);
       (performer as any).galleries = [...performerGalleryIds].map((id) => galleriesById.get(id)).filter(Boolean);

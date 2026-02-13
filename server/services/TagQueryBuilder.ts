@@ -59,7 +59,7 @@ class TagQueryBuilder {
     const baseJoins = `
         FROM StashTag t
         LEFT JOIN TagRating r ON t.id = r.tagId AND t.stashInstanceId = r.instanceId AND r.userId = ?
-        LEFT JOIN UserTagStats us ON t.id = us.tagId AND us.userId = ?
+        LEFT JOIN UserTagStats us ON t.id = us.tagId AND t.stashInstanceId = us.instanceId AND us.userId = ?
     `.trim();
 
     if (applyExclusions) {

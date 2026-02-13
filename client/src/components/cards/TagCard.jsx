@@ -5,7 +5,7 @@ import { TooltipEntityGrid } from "../ui/TooltipEntityGrid.jsx";
 import { getIndicatorBehavior } from "../../config/indicatorBehaviors.js";
 import { useCardDisplaySettings } from "../../contexts/CardDisplaySettingsContext.jsx";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
-import { getEntityPath } from "../../utils/entityLinks.js";
+import { getEntityPath, appendInstanceParam } from "../../utils/entityLinks.js";
 
 /**
  * TagCard - Card for displaying tag entities
@@ -51,7 +51,7 @@ const TagCard = forwardRef(
           count: tag.scene_count,
           onClick:
             tag.scene_count > 0
-              ? () => navigate(`/scenes?tagIds=${tag.id}`)
+              ? () => navigate(appendInstanceParam(`/scenes?tagIds=${tag.id}`, tag, hasMultipleInstances))
               : undefined,
         },
         {
@@ -59,7 +59,7 @@ const TagCard = forwardRef(
           count: tag.image_count,
           onClick:
             tag.image_count > 0
-              ? () => navigate(`/images?tagIds=${tag.id}`)
+              ? () => navigate(appendInstanceParam(`/images?tagIds=${tag.id}`, tag, hasMultipleInstances))
               : undefined,
         },
         {
@@ -83,7 +83,7 @@ const TagCard = forwardRef(
           tooltipContent: performersTooltip,
         },
       ];
-    }, [tag, navigate]);
+    }, [tag, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = tagSettings.showRelationshipIndicators ? indicators : [];
