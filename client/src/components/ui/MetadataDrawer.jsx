@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getEffectiveImageMetadata, getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import { useConfig } from "../../contexts/ConfigContext.jsx";
@@ -11,7 +11,9 @@ import SectionLink from "./SectionLink.jsx";
 import TagChips from "./TagChips.jsx";
 
 /**
- * Bottom sheet drawer displaying image metadata
+ * Adaptive metadata drawer that opens on the longer viewport axis:
+ * - Landscape (wider): opens from the right as a side panel
+ * - Portrait (taller): opens from the bottom as a sheet
  */
 const MetadataDrawer = ({
   open,
@@ -25,8 +27,21 @@ const MetadataDrawer = ({
   onOCounterChange,
 }) => {
   const [isRatingPopoverOpen, setIsRatingPopoverOpen] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(
+    () => window.innerWidth > window.innerHeight
+  );
   const ratingBadgeRef = useRef(null);
   const { hasMultipleInstances } = useConfig();
+
+  // Track viewport orientation via matchMedia (fires only on actual orientation change,
+  // consistent with hover detection pattern in Lightbox.jsx)
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: landscape)");
+    setIsLandscape(mq.matches);
+    const handler = (e) => setIsLandscape(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   if (!open || !image) return null;
 
@@ -61,27 +76,43 @@ const MetadataDrawer = ({
         aria-hidden="true"
       />
 
-      {/* Drawer */}
+      {/* Drawer - right side on landscape, bottom on portrait */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 rounded-t-lg overflow-hidden"
+        className={
+          isLandscape
+            ? "fixed top-0 right-0 bottom-0 z-50 rounded-l-lg overflow-hidden"
+            : "fixed bottom-0 left-0 right-0 z-50 rounded-t-lg overflow-hidden"
+        }
         style={{
           backgroundColor: "var(--bg-card)",
-          maxHeight: "60vh",
+          ...(isLandscape
+            ? { width: "min(400px, 40vw)" }
+            : { maxHeight: "60vh" }),
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag handle */}
-        <div className="flex justify-center py-3">
+        {/* Drag handle - horizontal bar for bottom, vertical bar for side */}
+        <div
+          className={
+            isLandscape
+              ? "flex items-center justify-center px-1.5 absolute left-0 top-0 bottom-0"
+              : "flex justify-center py-3"
+          }
+        >
           <div
-            className="w-10 h-1 rounded-full"
+            className={isLandscape ? "h-10 w-1 rounded-full" : "w-10 h-1 rounded-full"}
             style={{ backgroundColor: "var(--text-muted)" }}
           />
         </div>
 
         {/* Scrollable content */}
         <div
-          className="overflow-y-auto px-4 pb-6"
-          style={{ maxHeight: "calc(60vh - 40px)" }}
+          className={`overflow-y-auto px-4 pb-6 ${isLandscape ? "pt-4" : ""}`}
+          style={
+            isLandscape
+              ? { maxHeight: "100dvh", paddingLeft: "16px" }
+              : { maxHeight: "calc(60vh - 40px)" }
+          }
         >
           {/* Header row: Title + controls */}
           <div className="flex items-start justify-between gap-4 mb-2">

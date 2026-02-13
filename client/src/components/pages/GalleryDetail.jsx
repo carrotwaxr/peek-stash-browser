@@ -439,6 +439,7 @@ const GalleryDetail = () => {
         pageOffset={lightbox.pageOffset}
         onIndexChange={lightbox.onIndexChange}
         isPageTransitioning={lightbox.isPageTransitioning}
+        transitionKey={lightbox.transitionKey}
         prefetchImages={lightbox.prefetchImages}
       />
     </div>

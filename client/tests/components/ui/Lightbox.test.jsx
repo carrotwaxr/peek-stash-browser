@@ -229,7 +229,7 @@ describe("Lightbox", () => {
       );
 
       // Find the image container div (has visibility style)
-      const imageContainer = container.querySelector(".max-w-\\[90vw\\]");
+      const imageContainer = container.querySelector(".w-\\[90vw\\]");
       expect(imageContainer.style.visibility).toBe("visible");
 
       // Now transition
@@ -301,7 +301,7 @@ describe("Lightbox", () => {
       expect(getImgSrc()).toBe("http://example.com/page1/image0.jpg");
 
       // Verify container is hidden
-      const imageContainer = container.querySelector(".max-w-\\[90vw\\]");
+      const imageContainer = container.querySelector(".w-\\[90vw\\]");
       expect(imageContainer.style.visibility).toBe("hidden");
     });
 
@@ -332,7 +332,7 @@ describe("Lightbox", () => {
 
       const getImgSrc = () => container.querySelector("img")?.getAttribute("src");
       const getVisibility = () =>
-        container.querySelector(".max-w-\\[90vw\\]")?.style.visibility;
+        container.querySelector(".w-\\[90vw\\]")?.style.visibility;
 
       expect(getImgSrc()).toBe("http://example.com/page1/image9.jpg");
 
