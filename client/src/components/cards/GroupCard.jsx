@@ -54,7 +54,7 @@ const GroupCard = forwardRef(
           count: group.scene_count,
           onClick:
             group.scene_count > 0
-              ? () => navigate(`/scenes?groupIds=${group.id}`)
+              ? () => navigate(`/scenes?groupIds=${group.id}${hasMultipleInstances && group.instanceId ? `&instance=${group.instanceId}` : ''}`)
               : undefined,
         },
         {
@@ -62,7 +62,7 @@ const GroupCard = forwardRef(
           count: group.sub_group_count,
           onClick:
             group.sub_group_count > 0
-              ? () => navigate(`/collections?groupIds=${group.id}`)
+              ? () => navigate(`/collections?groupIds=${group.id}${hasMultipleInstances && group.instanceId ? `&instance=${group.instanceId}` : ''}`)
               : undefined,
         },
         {
@@ -81,7 +81,7 @@ const GroupCard = forwardRef(
           tooltipContent: tagsTooltip,
         },
       ];
-    }, [group, navigate]);
+    }, [group, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = groupSettings.showRelationshipIndicators ? indicators : [];

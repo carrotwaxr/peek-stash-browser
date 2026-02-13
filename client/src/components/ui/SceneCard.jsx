@@ -161,7 +161,7 @@ const SceneCard = forwardRef(
           tooltipContent: performersTooltip,
           // 'rich' behavior: tooltip only, no onClick (users navigate via entities in tooltip)
           onClick: getIndicatorBehavior('scene', 'performers') === 'nav' && scene.performers?.length > 0
-            ? () => navigate(`/performers?sceneId=${scene.id}`)
+            ? () => navigate(`/performers?sceneId=${scene.id}${hasMultipleInstances && scene.instanceId ? `&instance=${scene.instanceId}` : ''}`)
             : undefined,
         },
         {
@@ -169,7 +169,7 @@ const SceneCard = forwardRef(
           count: scene.groups?.length,
           tooltipContent: groupsTooltip,
           onClick: getIndicatorBehavior('scene', 'groups') === 'nav' && scene.groups?.length > 0
-            ? () => navigate(`/collections?sceneId=${scene.id}`)
+            ? () => navigate(`/collections?sceneId=${scene.id}${hasMultipleInstances && scene.instanceId ? `&instance=${scene.instanceId}` : ''}`)
             : undefined,
         },
         {
@@ -177,7 +177,7 @@ const SceneCard = forwardRef(
           count: scene.galleries?.length,
           tooltipContent: galleriesTooltip,
           onClick: getIndicatorBehavior('scene', 'galleries') === 'nav' && scene.galleries?.length > 0
-            ? () => navigate(`/galleries?sceneId=${scene.id}`)
+            ? () => navigate(`/galleries?sceneId=${scene.id}${hasMultipleInstances && scene.instanceId ? `&instance=${scene.instanceId}` : ''}`)
             : undefined,
         },
         {
@@ -185,11 +185,11 @@ const SceneCard = forwardRef(
           count: allTags?.length,
           tooltipContent: tagsTooltip,
           onClick: getIndicatorBehavior('scene', 'tags') === 'nav' && allTags?.length > 0
-            ? () => navigate(`/tags?sceneId=${scene.id}`)
+            ? () => navigate(`/tags?sceneId=${scene.id}${hasMultipleInstances && scene.instanceId ? `&instance=${scene.instanceId}` : ''}`)
             : undefined,
         },
       ];
-    }, [scene, allTags, navigate]);
+    }, [scene, allTags, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = sceneSettings.showRelationshipIndicators ? indicators : [];

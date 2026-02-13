@@ -71,7 +71,7 @@ const GalleryCard = forwardRef(
         count: gallery.image_count,
         // Config says 'nav' for gallery->images
         onClick: getIndicatorBehavior('gallery', 'images') === 'nav' && gallery.image_count > 0
-          ? () => navigate(`/images?galleryId=${gallery.id}`)
+          ? () => navigate(`/images?galleryId=${gallery.id}${hasMultipleInstances && gallery.instanceId ? `&instance=${gallery.instanceId}` : ''}`)
           : undefined,
       },
       {
@@ -80,7 +80,7 @@ const GalleryCard = forwardRef(
         tooltipContent: scenesTooltip,
         // Config says 'nav' for gallery->scenes
         onClick: getIndicatorBehavior('gallery', 'scenes') === 'nav' && gallery.scenes?.length > 0
-          ? () => navigate(`/scenes?galleryId=${gallery.id}`)
+          ? () => navigate(`/scenes?galleryId=${gallery.id}${hasMultipleInstances && gallery.instanceId ? `&instance=${gallery.instanceId}` : ''}`)
           : undefined,
       },
       {
@@ -88,7 +88,7 @@ const GalleryCard = forwardRef(
         count: gallery.performers?.length || 0,
         tooltipContent: performersTooltip,
         onClick: getIndicatorBehavior('gallery', 'performers') === 'nav' && gallery.performers?.length > 0
-          ? () => navigate(`/performers?galleryId=${gallery.id}`)
+          ? () => navigate(`/performers?galleryId=${gallery.id}${hasMultipleInstances && gallery.instanceId ? `&instance=${gallery.instanceId}` : ''}`)
           : undefined,
       },
       {
@@ -96,7 +96,7 @@ const GalleryCard = forwardRef(
         count: gallery.tags?.length || 0,
         tooltipContent: tagsTooltip,
         onClick: getIndicatorBehavior('gallery', 'tags') === 'nav' && gallery.tags?.length > 0
-          ? () => navigate(`/tags?galleryId=${gallery.id}`)
+          ? () => navigate(`/tags?galleryId=${gallery.id}${hasMultipleInstances && gallery.instanceId ? `&instance=${gallery.instanceId}` : ''}`)
           : undefined,
       },
     ];

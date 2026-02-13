@@ -45,7 +45,7 @@ const PerformerCard = forwardRef(
         {
           type: "SCENES",
           count: performer.scene_count,
-          onClick: performer.scene_count > 0 ? () => navigate(`/scenes?performerId=${performer.id}`) : undefined,
+          onClick: performer.scene_count > 0 ? () => navigate(`/scenes?performerId=${performer.id}${hasMultipleInstances && performer.instanceId ? `&instance=${performer.instanceId}` : ''}`) : undefined,
         },
         {
           type: "GROUPS",
@@ -55,7 +55,7 @@ const PerformerCard = forwardRef(
         {
           type: "IMAGES",
           count: performer.image_count,
-          onClick: performer.image_count > 0 ? () => navigate(`/images?performerId=${performer.id}`) : undefined,
+          onClick: performer.image_count > 0 ? () => navigate(`/images?performerId=${performer.id}${hasMultipleInstances && performer.instanceId ? `&instance=${performer.instanceId}` : ''}`) : undefined,
         },
         {
           type: "GALLERIES",
@@ -73,7 +73,7 @@ const PerformerCard = forwardRef(
           tooltipContent: studiosTooltip,
         },
       ];
-    }, [performer, navigate]);
+    }, [performer, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = performerSettings.showRelationshipIndicators ? indicators : [];

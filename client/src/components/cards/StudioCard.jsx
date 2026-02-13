@@ -45,7 +45,7 @@ const StudioCard = forwardRef(
           count: studio.scene_count,
           onClick:
             studio.scene_count > 0
-              ? () => navigate(`/scenes?studioId=${studio.id}`)
+              ? () => navigate(`/scenes?studioId=${studio.id}${hasMultipleInstances && studio.instanceId ? `&instance=${studio.instanceId}` : ''}`)
               : undefined,
         },
         {
@@ -53,7 +53,7 @@ const StudioCard = forwardRef(
           count: studio.image_count,
           onClick:
             studio.image_count > 0
-              ? () => navigate(`/images?studioId=${studio.id}`)
+              ? () => navigate(`/images?studioId=${studio.id}${hasMultipleInstances && studio.instanceId ? `&instance=${studio.instanceId}` : ''}`)
               : undefined,
         },
         {
@@ -77,7 +77,7 @@ const StudioCard = forwardRef(
           tooltipContent: tagsTooltip,
         },
       ];
-    }, [studio, navigate]);
+    }, [studio, navigate, hasMultipleInstances]);
 
     // Only show indicators if setting is enabled
     const indicatorsToShow = studioSettings.showRelationshipIndicators ? indicators : [];
