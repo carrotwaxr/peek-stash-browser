@@ -8,10 +8,11 @@ import { stashEntityService } from "../services/StashEntityService.js";
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
-// Token expires after 24 hours, but we refresh it if older than 20 hours
-// This gives users a 4-hour inactivity window before session expires
-const TOKEN_EXPIRY_HOURS = 24;
-const TOKEN_REFRESH_THRESHOLD_HOURS = 20;
+// Token expires after 2 hours, but we refresh it if older than 1 hour
+// This gives users a 1-hour inactivity window before session expires
+// Active users (making API requests) stay logged in seamlessly
+const TOKEN_EXPIRY_HOURS = 2;
+const TOKEN_REFRESH_THRESHOLD_HOURS = 1;
 
 /**
  * User information attached to request by auth middleware
