@@ -83,6 +83,9 @@ export async function mergeScenesWithUserData(
     prisma.tagRating.findMany({ where: { userId } }),
   ]);
 
+  // Use composite keys (entityId + instanceId) for multi-instance correctness
+  const KEY_SEP = "\0";
+
   // Create lookup maps for O(1) access
   const watchMap = new Map(
     watchHistory.map((wh) => {
@@ -94,7 +97,7 @@ export async function mergeScenesWithUserData(
         : JSON.parse((wh.playHistory as string) || "[]");
 
       return [
-        wh.sceneId,
+        `${wh.sceneId}${KEY_SEP}${wh.instanceId || ""}`,
         {
           o_counter: wh.oCount || 0,
           play_count: wh.playCount || 0,
@@ -112,7 +115,7 @@ export async function mergeScenesWithUserData(
 
   const ratingMap = new Map(
     sceneRatings.map((r) => [
-      r.sceneId,
+      `${r.sceneId}${KEY_SEP}${r.instanceId || ""}`,
       {
         rating: r.rating,
         rating100: r.rating, // Alias for consistency with Stash API
@@ -121,30 +124,31 @@ export async function mergeScenesWithUserData(
     ])
   );
 
-  // Create favorite lookup sets for nested entities
+  // Create favorite lookup sets for nested entities (composite key: entityId + instanceId)
   const performerFavorites = new Set(
-    performerRatings.filter((r) => r.favorite).map((r) => r.performerId)
+    performerRatings.filter((r) => r.favorite).map((r) => `${r.performerId}${KEY_SEP}${r.instanceId || ""}`)
   );
   const studioFavorites = new Set(
-    studioRatings.filter((r) => r.favorite).map((r) => r.studioId)
+    studioRatings.filter((r) => r.favorite).map((r) => `${r.studioId}${KEY_SEP}${r.instanceId || ""}`)
   );
   const tagFavorites = new Set(
-    tagRatings.filter((r) => r.favorite).map((r) => r.tagId)
+    tagRatings.filter((r) => r.favorite).map((r) => `${r.tagId}${KEY_SEP}${r.instanceId || ""}`)
   );
 
   // Merge data and update nested entity favorites
   return scenes.map((scene) => {
+    const sceneKey = `${scene.id}${KEY_SEP}${(scene as any).instanceId || ""}`;
     const mergedScene = {
       ...scene,
-      ...watchMap.get(scene.id),
-      ...ratingMap.get(scene.id),
+      ...watchMap.get(sceneKey),
+      ...ratingMap.get(sceneKey),
     };
 
     // Update favorite status for nested performers
     if (mergedScene.performers && Array.isArray(mergedScene.performers)) {
       mergedScene.performers = mergedScene.performers.map((p) => ({
         ...p,
-        favorite: performerFavorites.has(p.id),
+        favorite: performerFavorites.has(`${p.id}${KEY_SEP}${(p as any).instanceId || ""}`),
       }));
     }
 
@@ -152,7 +156,7 @@ export async function mergeScenesWithUserData(
     if (mergedScene.studio) {
       mergedScene.studio = {
         ...mergedScene.studio,
-        favorite: studioFavorites.has(mergedScene.studio.id),
+        favorite: studioFavorites.has(`${mergedScene.studio.id}${KEY_SEP}${(mergedScene.studio as any).instanceId || ""}`),
       };
     }
 
@@ -160,7 +164,7 @@ export async function mergeScenesWithUserData(
     if (mergedScene.tags && Array.isArray(mergedScene.tags)) {
       mergedScene.tags = mergedScene.tags.map((t) => ({
         ...t,
-        favorite: tagFavorites.has(t.id),
+        favorite: tagFavorites.has(`${t.id}${KEY_SEP}${(t as any).instanceId || ""}`),
       }));
     }
 

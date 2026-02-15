@@ -204,16 +204,16 @@ class RankingComputeService {
         AND e.entityType = 'performer'
         AND e.entityId = ups.performerId
       LEFT JOIN (
-        SELECT sp.performerId, SUM(w.playDuration) as totalDuration
+        SELECT sp.performerId, sp.performerInstanceId as instanceId, SUM(w.playDuration) as totalDuration
         FROM ScenePerformer sp
-        JOIN WatchHistory w ON w.sceneId = sp.sceneId AND w.userId = ${userId}
-        GROUP BY sp.performerId
-      ) dur ON dur.performerId = ups.performerId
+        JOIN WatchHistory w ON w.sceneId = sp.sceneId AND w.instanceId = sp.sceneInstanceId AND w.userId = ${userId}
+        GROUP BY sp.performerId, sp.performerInstanceId
+      ) dur ON dur.performerId = ups.performerId AND dur.instanceId = ups.instanceId
       LEFT JOIN (
-        SELECT performerId, COUNT(*) as sceneCount
+        SELECT performerId, performerInstanceId as instanceId, COUNT(*) as sceneCount
         FROM ScenePerformer
-        GROUP BY performerId
-      ) lib ON lib.performerId = ups.performerId
+        GROUP BY performerId, performerInstanceId
+      ) lib ON lib.performerId = ups.performerId AND lib.instanceId = ups.instanceId
       WHERE ups.userId = ${userId}
         AND e.id IS NULL
         AND (ups.playCount > 0 OR ups.oCounter > 0)
@@ -241,18 +241,18 @@ class RankingComputeService {
         AND e.entityType = 'studio'
         AND e.entityId = uss.studioId
       LEFT JOIN (
-        SELECT s.studioId, SUM(w.playDuration) as totalDuration
+        SELECT s.studioId, s.stashInstanceId as instanceId, SUM(w.playDuration) as totalDuration
         FROM StashScene s
-        JOIN WatchHistory w ON w.sceneId = s.id AND w.userId = ${userId}
+        JOIN WatchHistory w ON w.sceneId = s.id AND w.instanceId = s.stashInstanceId AND w.userId = ${userId}
         WHERE s.studioId IS NOT NULL
-        GROUP BY s.studioId
-      ) dur ON dur.studioId = uss.studioId
+        GROUP BY s.studioId, s.stashInstanceId
+      ) dur ON dur.studioId = uss.studioId AND dur.instanceId = uss.instanceId
       LEFT JOIN (
-        SELECT studioId, COUNT(*) as sceneCount
+        SELECT studioId, stashInstanceId as instanceId, COUNT(*) as sceneCount
         FROM StashScene
         WHERE studioId IS NOT NULL
-        GROUP BY studioId
-      ) lib ON lib.studioId = uss.studioId
+        GROUP BY studioId, stashInstanceId
+      ) lib ON lib.studioId = uss.studioId AND lib.instanceId = uss.instanceId
       WHERE uss.userId = ${userId}
         AND e.id IS NULL
         AND (uss.playCount > 0 OR uss.oCounter > 0)
@@ -280,16 +280,16 @@ class RankingComputeService {
         AND e.entityType = 'tag'
         AND e.entityId = uts.tagId
       LEFT JOIN (
-        SELECT st.tagId, SUM(w.playDuration) as totalDuration
+        SELECT st.tagId, st.tagInstanceId as instanceId, SUM(w.playDuration) as totalDuration
         FROM SceneTag st
-        JOIN WatchHistory w ON w.sceneId = st.sceneId AND w.userId = ${userId}
-        GROUP BY st.tagId
-      ) dur ON dur.tagId = uts.tagId
+        JOIN WatchHistory w ON w.sceneId = st.sceneId AND w.instanceId = st.sceneInstanceId AND w.userId = ${userId}
+        GROUP BY st.tagId, st.tagInstanceId
+      ) dur ON dur.tagId = uts.tagId AND dur.instanceId = uts.instanceId
       LEFT JOIN (
-        SELECT tagId, COUNT(*) as sceneCount
+        SELECT tagId, tagInstanceId as instanceId, COUNT(*) as sceneCount
         FROM SceneTag
-        GROUP BY tagId
-      ) lib ON lib.tagId = uts.tagId
+        GROUP BY tagId, tagInstanceId
+      ) lib ON lib.tagId = uts.tagId AND lib.instanceId = uts.instanceId
       WHERE uts.userId = ${userId}
         AND e.id IS NULL
         AND (uts.playCount > 0 OR uts.oCounter > 0)

@@ -518,8 +518,8 @@ class ExclusionComputationService {
       WHERE g.deletedAt IS NULL
       AND NOT EXISTS (
         SELECT 1 FROM ImageGallery ig
-        JOIN StashImage i ON ig.imageId = i.id
-        WHERE ig.galleryId = g.id
+        JOIN StashImage i ON ig.imageId = i.id AND ig.imageInstanceId = i.stashInstanceId
+        WHERE ig.galleryId = g.id AND ig.galleryInstanceId = g.stashInstanceId
           AND i.deletedAt IS NULL
           AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
       )
@@ -574,15 +574,15 @@ class ExclusionComputationService {
       AND p.id NOT IN (SELECT performerId FROM temp_excluded_performers)
       AND NOT EXISTS (
         SELECT 1 FROM ScenePerformer sp
-        JOIN StashScene s ON sp.sceneId = s.id
-        WHERE sp.performerId = p.id
+        JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
+        WHERE sp.performerId = p.id AND sp.performerInstanceId = p.stashInstanceId
           AND s.deletedAt IS NULL
           AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
       )
       AND NOT EXISTS (
         SELECT 1 FROM ImagePerformer ip
-        JOIN StashImage i ON ip.imageId = i.id
-        WHERE ip.performerId = p.id
+        JOIN StashImage i ON ip.imageId = i.id AND ip.imageInstanceId = i.stashInstanceId
+        WHERE ip.performerId = p.id AND ip.performerInstanceId = p.stashInstanceId
           AND i.deletedAt IS NULL
           AND i.id NOT IN (SELECT imageId FROM temp_excluded_images)
       )
@@ -664,8 +664,8 @@ class ExclusionComputationService {
       AND g.id NOT IN (SELECT groupId FROM temp_excluded_groups)
       AND NOT EXISTS (
         SELECT 1 FROM SceneGroup sg
-        JOIN StashScene s ON sg.sceneId = s.id
-        WHERE sg.groupId = g.id
+        JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
+        WHERE sg.groupId = g.id AND sg.groupInstanceId = g.stashInstanceId
           AND s.deletedAt IS NULL
           AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
       )
@@ -688,29 +688,29 @@ class ExclusionComputationService {
       WHERE t.deletedAt IS NULL
       AND NOT EXISTS (
         SELECT 1 FROM SceneTag st
-        JOIN StashScene s ON st.sceneId = s.id
-        WHERE st.tagId = t.id
+        JOIN StashScene s ON st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId
+        WHERE st.tagId = t.id AND st.tagInstanceId = t.stashInstanceId
           AND s.deletedAt IS NULL
           AND s.id NOT IN (SELECT sceneId FROM temp_excluded_scenes)
       )
       AND NOT EXISTS (
         SELECT 1 FROM PerformerTag pt
-        JOIN StashPerformer p ON pt.performerId = p.id
-        WHERE pt.tagId = t.id
+        JOIN StashPerformer p ON pt.performerId = p.id AND pt.performerInstanceId = p.stashInstanceId
+        WHERE pt.tagId = t.id AND pt.tagInstanceId = t.stashInstanceId
           AND p.deletedAt IS NULL
           AND p.id NOT IN (SELECT performerId FROM temp_excluded_performers)
       )
       AND NOT EXISTS (
         SELECT 1 FROM StudioTag stt
-        JOIN StashStudio stu ON stt.studioId = stu.id
-        WHERE stt.tagId = t.id
+        JOIN StashStudio stu ON stt.studioId = stu.id AND stt.studioInstanceId = stu.stashInstanceId
+        WHERE stt.tagId = t.id AND stt.tagInstanceId = t.stashInstanceId
           AND stu.deletedAt IS NULL
           AND stu.id NOT IN (SELECT studioId FROM temp_excluded_studios)
       )
       AND NOT EXISTS (
         SELECT 1 FROM GroupTag gt
-        JOIN StashGroup g ON gt.groupId = g.id
-        WHERE gt.tagId = t.id
+        JOIN StashGroup g ON gt.groupId = g.id AND gt.groupInstanceId = g.stashInstanceId
+        WHERE gt.tagId = t.id AND gt.tagInstanceId = t.stashInstanceId
           AND g.deletedAt IS NULL
           AND g.id NOT IN (SELECT groupId FROM temp_excluded_groups)
       )

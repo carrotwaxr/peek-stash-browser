@@ -778,16 +778,19 @@ class StashEntityService {
     if (!cached) return null;
 
     // Compute counts from junction tables (except imageCount which uses stored inherited value)
+    const instanceId = cached.stashInstanceId;
     const [sceneCount, galleryCount] = await Promise.all([
       prisma.scenePerformer.count({
         where: {
           performerId: id,
+          performerInstanceId: instanceId,
           scene: { deletedAt: null },
         },
       }),
       prisma.galleryPerformer.count({
         where: {
           performerId: id,
+          performerInstanceId: instanceId,
           gallery: { deletedAt: null },
         },
       }),
@@ -800,6 +803,7 @@ class StashEntityService {
       INNER JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
       INNER JOIN StashScene s ON sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId
       WHERE sp.performerId = ${id}
+        AND sp.performerInstanceId = ${instanceId}
         AND s.deletedAt IS NULL
     `;
     const groupCount = Number(groupCountResult[0]?.count ?? 0);
@@ -1087,34 +1091,40 @@ class StashEntityService {
     if (!cached) return null;
 
     // Compute counts from junction tables (except imageCount which uses stored inherited value)
+    const tagInstanceId = cached.stashInstanceId;
     const [sceneCount, galleryCount, performerCount, studioCount, groupCount] = await Promise.all([
       prisma.sceneTag.count({
         where: {
           tagId: id,
+          tagInstanceId,
           scene: { deletedAt: null },
         },
       }),
       prisma.galleryTag.count({
         where: {
           tagId: id,
+          tagInstanceId,
           gallery: { deletedAt: null },
         },
       }),
       prisma.performerTag.count({
         where: {
           tagId: id,
+          tagInstanceId,
           performer: { deletedAt: null },
         },
       }),
       prisma.studioTag.count({
         where: {
           tagId: id,
+          tagInstanceId,
           studio: { deletedAt: null },
         },
       }),
       prisma.groupTag.count({
         where: {
           tagId: id,
+          tagInstanceId,
           group: { deletedAt: null },
         },
       }),
@@ -1194,10 +1204,11 @@ class StashEntityService {
 
     if (!cached) return null;
 
-    // Compute image count from ImageGallery junction table
+    // Compute image count from ImageGallery junction table (instance-scoped)
     const imageCount = await prisma.imageGallery.count({
       where: {
         galleryId: id,
+        galleryInstanceId: cached.stashInstanceId,
         image: { deletedAt: null },
       },
     });
@@ -1263,9 +1274,11 @@ class StashEntityService {
     if (!cached) return null;
 
     // Compute counts from junction tables
+    const groupInstanceId = cached.stashInstanceId;
     const sceneCount = await prisma.sceneGroup.count({
       where: {
         groupId: id,
+        groupInstanceId,
         scene: { deletedAt: null },
       },
     });
@@ -1277,6 +1290,7 @@ class StashEntityService {
       INNER JOIN ScenePerformer sp ON sg.sceneId = sp.sceneId AND sg.sceneInstanceId = sp.sceneInstanceId
       INNER JOIN StashScene s ON sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId
       WHERE sg.groupId = ${id}
+        AND sg.groupInstanceId = ${groupInstanceId}
         AND s.deletedAt IS NULL
     `;
     const performerCount = Number(performerCountResult[0]?.count ?? 0);
@@ -2017,6 +2031,7 @@ class StashEntityService {
     return {
       ...DEFAULT_GALLERY_USER_FIELDS,
       id: gallery.id,
+      instanceId: gallery.stashInstanceId,
       title: gallery.title || getGalleryFallbackTitle(gallery.folderPath, gallery.fileBasename),
       date: gallery.date,
       studio: gallery.studioId ? { id: gallery.studioId } : null,
@@ -2091,6 +2106,7 @@ class StashEntityService {
 
     return {
       id: image.id,
+      instanceId: image.stashInstanceId,
       title: image.title || getImageFallbackTitle(image.filePath),
       code: image.code,
       details: image.details,

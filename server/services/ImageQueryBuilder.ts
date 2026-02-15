@@ -289,12 +289,12 @@ class ImageQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `i.id IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}))`,
+          sql: `i.id IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}) AND imageInstanceId = i.stashInstanceId)`,
           params: ids,
         };
       case "EXCLUDES":
         return {
-          sql: `i.id NOT IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}))`,
+          sql: `i.id NOT IN (SELECT imageId FROM ImageGallery WHERE galleryId IN (${placeholders}) AND imageInstanceId = i.stashInstanceId)`,
           params: ids,
         };
       default:

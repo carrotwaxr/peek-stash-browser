@@ -31,9 +31,10 @@ async function mergeImagesWithUserData(
     prisma.imageViewHistory.findMany({ where: { userId } }),
   ]);
 
+  const KEY_SEP = "\0";
   const ratingMap = new Map(
     ratings.map((r) => [
-      r.imageId,
+      `${r.imageId}${KEY_SEP}${r.instanceId || ""}`,
       {
         rating: r.rating,
         rating100: r.rating,
@@ -44,7 +45,7 @@ async function mergeImagesWithUserData(
 
   const viewHistoryMap = new Map(
     viewHistories.map((vh) => [
-      vh.imageId,
+      `${vh.imageId}${KEY_SEP}${vh.instanceId || ""}`,
       {
         oCounter: vh.oCount,
         viewCount: vh.viewCount,
@@ -59,8 +60,8 @@ async function mergeImagesWithUserData(
     favorite: false,
     oCounter: 0,
     viewCount: 0,
-    ...ratingMap.get(image.id),
-    ...viewHistoryMap.get(image.id),
+    ...ratingMap.get(`${image.id}${KEY_SEP}${image.instanceId || ""}`),
+    ...viewHistoryMap.get(`${image.id}${KEY_SEP}${image.instanceId || ""}`),
   }));
 }
 
