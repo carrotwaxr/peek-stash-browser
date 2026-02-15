@@ -206,7 +206,7 @@ class PerformerQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `p.id IN (SELECT performerId FROM PerformerTag WHERE tagId IN (${placeholders}))`,
+          sql: `p.id IN (SELECT performerId FROM PerformerTag WHERE tagId IN (${placeholders}) AND performerInstanceId = p.stashInstanceId)`,
           params: ids,
         };
 
@@ -214,8 +214,8 @@ class PerformerQueryBuilder {
         return {
           sql: `p.id IN (
             SELECT performerId FROM PerformerTag
-            WHERE tagId IN (${placeholders})
-            GROUP BY performerId
+            WHERE tagId IN (${placeholders}) AND performerInstanceId = p.stashInstanceId
+            GROUP BY performerId, performerInstanceId
             HAVING COUNT(DISTINCT tagId) = ?
           )`,
           params: [...ids, ids.length],
@@ -223,7 +223,7 @@ class PerformerQueryBuilder {
 
       case "EXCLUDES":
         return {
-          sql: `p.id NOT IN (SELECT performerId FROM PerformerTag WHERE tagId IN (${placeholders}))`,
+          sql: `p.id NOT IN (SELECT performerId FROM PerformerTag WHERE tagId IN (${placeholders}) AND performerInstanceId = p.stashInstanceId)`,
           params: ids,
         };
 
@@ -252,8 +252,9 @@ class PerformerQueryBuilder {
           sql: `p.id IN (
             SELECT DISTINCT sp.performerId
             FROM ScenePerformer sp
-            JOIN StashScene sc ON sp.sceneId = sc.id
+            JOIN StashScene sc ON sp.sceneId = sc.id AND sp.sceneInstanceId = sc.stashInstanceId
             WHERE sc.studioId IN (${placeholders}) AND sc.deletedAt IS NULL
+              AND sp.performerInstanceId = p.stashInstanceId
           )`,
           params: ids,
         };
@@ -263,8 +264,9 @@ class PerformerQueryBuilder {
           sql: `p.id NOT IN (
             SELECT DISTINCT sp.performerId
             FROM ScenePerformer sp
-            JOIN StashScene sc ON sp.sceneId = sc.id
+            JOIN StashScene sc ON sp.sceneId = sc.id AND sp.sceneInstanceId = sc.stashInstanceId
             WHERE sc.studioId IN (${placeholders}) AND sc.deletedAt IS NULL
+              AND sp.performerInstanceId = p.stashInstanceId
           )`,
           params: ids,
         };
@@ -295,6 +297,7 @@ class PerformerQueryBuilder {
           sql: `p.id IN (
             SELECT sp.performerId FROM ScenePerformer sp
             WHERE sp.sceneId IN (${placeholders})
+              AND sp.performerInstanceId = p.stashInstanceId
           )`,
           params: ids,
         };
@@ -304,7 +307,8 @@ class PerformerQueryBuilder {
           sql: `p.id IN (
             SELECT sp.performerId FROM ScenePerformer sp
             WHERE sp.sceneId IN (${placeholders})
-            GROUP BY sp.performerId
+              AND sp.performerInstanceId = p.stashInstanceId
+            GROUP BY sp.performerId, sp.performerInstanceId
             HAVING COUNT(DISTINCT sp.sceneId) = ?
           )`,
           params: [...ids, ids.length],
@@ -315,6 +319,7 @@ class PerformerQueryBuilder {
           sql: `p.id NOT IN (
             SELECT sp.performerId FROM ScenePerformer sp
             WHERE sp.sceneId IN (${placeholders})
+              AND sp.performerInstanceId = p.stashInstanceId
           )`,
           params: ids,
         };
@@ -346,6 +351,7 @@ class PerformerQueryBuilder {
             FROM ScenePerformer sp
             JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
             WHERE sg.groupId IN (${placeholders})
+              AND sp.performerInstanceId = p.stashInstanceId
           )`,
           params: ids,
         };
@@ -357,6 +363,7 @@ class PerformerQueryBuilder {
             FROM ScenePerformer sp
             JOIN SceneGroup sg ON sp.sceneId = sg.sceneId AND sp.sceneInstanceId = sg.sceneInstanceId
             WHERE sg.groupId IN (${placeholders})
+              AND sp.performerInstanceId = p.stashInstanceId
           )`,
           params: ids,
         };
@@ -1089,7 +1096,7 @@ class PerformerQueryBuilder {
       // Get scenes this performer appears in to derive groups, studios
       prisma.scenePerformer.findMany({
         where: { OR: performerWhereClause },
-        select: { performerId: true, performerInstanceId: true, sceneId: true },
+        select: { performerId: true, performerInstanceId: true, sceneId: true, sceneInstanceId: true },
       }),
       // Get galleries this performer appears in directly
       prisma.galleryPerformer.findMany({
@@ -1098,27 +1105,28 @@ class PerformerQueryBuilder {
       }),
     ]);
 
-    // Get scene IDs for this performer
+    // Get scene IDs and instance IDs for this performer
     const sceneIds = [...new Set(scenePerformers.map((sp) => sp.sceneId))];
+    const sceneInstanceIds = [...new Set(scenePerformers.map((sp) => sp.sceneInstanceId))];
 
-    // Load related entities from scenes
+    // Load related entities from scenes (with instanceId constraints)
     const [sceneGroups, sceneGalleries, scenes] = await Promise.all([
       sceneIds.length > 0
         ? prisma.sceneGroup.findMany({
-            where: { sceneId: { in: sceneIds } },
-            select: { sceneId: true, groupId: true },
+            where: { sceneId: { in: sceneIds }, sceneInstanceId: { in: sceneInstanceIds } },
+            select: { sceneId: true, groupId: true, groupInstanceId: true },
           })
         : [],
       sceneIds.length > 0
         ? prisma.sceneGallery.findMany({
-            where: { sceneId: { in: sceneIds } },
-            select: { sceneId: true, galleryId: true },
+            where: { sceneId: { in: sceneIds }, sceneInstanceId: { in: sceneInstanceIds } },
+            select: { sceneId: true, galleryId: true, galleryInstanceId: true },
           })
         : [],
       sceneIds.length > 0
         ? prisma.stashScene.findMany({
-            where: { id: { in: sceneIds } },
-            select: { id: true, studioId: true },
+            where: { id: { in: sceneIds }, stashInstanceId: { in: sceneInstanceIds } },
+            select: { id: true, stashInstanceId: true, studioId: true },
           })
         : [],
     ]);

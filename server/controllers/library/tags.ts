@@ -606,21 +606,22 @@ export const findTagsForScenes = async (
     const requestingUser = req.user;
 
     // Build query to find distinct tag IDs from matching scenes
+    // Uses instanceId constraints on junction tables for multi-instance correctness
     let sceneTagQuery = `
       SELECT DISTINCT st.tagId
       FROM SceneTag st
-      INNER JOIN StashScene s ON s.id = st.sceneId
+      INNER JOIN StashScene s ON s.id = st.sceneId AND st.sceneInstanceId = s.stashInstanceId
       LEFT JOIN UserExcludedEntity e ON e.userId = ? AND e.entityType = 'scene' AND e.entityId = s.id
       WHERE s.deletedAt IS NULL AND e.id IS NULL
     `;
     const params: (string | number)[] = [userId!];
 
     if (performerId) {
-      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.performerId = ?)`;
+      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM ScenePerformer sp WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND sp.performerId = ?)`;
       params.push(performerId);
     }
     if (tagId) {
-      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM SceneTag st2 WHERE st2.sceneId = s.id AND st2.tagId = ?)`;
+      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM SceneTag st2 WHERE st2.sceneId = s.id AND st2.sceneInstanceId = s.stashInstanceId AND st2.tagId = ?)`;
       params.push(tagId);
     }
     if (studioId) {
@@ -628,7 +629,7 @@ export const findTagsForScenes = async (
       params.push(studioId);
     }
     if (groupId) {
-      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.groupId = ?)`;
+      sceneTagQuery += ` AND EXISTS (SELECT 1 FROM SceneGroup sg WHERE sg.sceneId = s.id AND sg.sceneInstanceId = s.stashInstanceId AND sg.groupId = ?)`;
       params.push(groupId);
     }
 

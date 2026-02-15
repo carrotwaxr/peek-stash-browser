@@ -68,20 +68,21 @@ class EntityImageCountService {
       SET imageCount = COALESCE((
         SELECT COUNT(DISTINCT imageId) FROM (
           -- Direct: image has performer directly
-          SELECT ip.imageId, ip.performerId
+          SELECT ip.imageId, ip.performerId, ip.performerInstanceId
           FROM ImagePerformer ip
-          JOIN StashImage si ON ip.imageId = si.id AND si.deletedAt IS NULL
+          JOIN StashImage si ON ip.imageId = si.id AND ip.imageInstanceId = si.stashInstanceId AND si.deletedAt IS NULL
 
           UNION
 
           -- Inherited: image is in gallery that has performer
-          SELECT ig.imageId, gp.performerId
+          SELECT ig.imageId, gp.performerId, gp.performerInstanceId
           FROM ImageGallery ig
-          JOIN StashImage si ON ig.imageId = si.id AND si.deletedAt IS NULL
-          JOIN StashGallery sg ON ig.galleryId = sg.id AND sg.deletedAt IS NULL
-          JOIN GalleryPerformer gp ON ig.galleryId = gp.galleryId
+          JOIN StashImage si ON ig.imageId = si.id AND ig.imageInstanceId = si.stashInstanceId AND si.deletedAt IS NULL
+          JOIN StashGallery sg ON ig.galleryId = sg.id AND ig.galleryInstanceId = sg.stashInstanceId AND sg.deletedAt IS NULL
+          JOIN GalleryPerformer gp ON ig.galleryId = gp.galleryId AND ig.galleryInstanceId = gp.galleryInstanceId
         ) AS combined
         WHERE combined.performerId = StashPerformer.id
+          AND combined.performerInstanceId = StashPerformer.stashInstanceId
       ), 0)
       WHERE StashPerformer.deletedAt IS NULL
     `;
@@ -102,19 +103,20 @@ class EntityImageCountService {
       SET imageCount = COALESCE((
         SELECT COUNT(DISTINCT imageId) FROM (
           -- Direct: image has studio directly
-          SELECT si.id AS imageId, si.studioId
+          SELECT si.id AS imageId, si.studioId, si.stashInstanceId AS studioInstanceId
           FROM StashImage si
           WHERE si.deletedAt IS NULL AND si.studioId IS NOT NULL
 
           UNION
 
           -- Inherited: image is in gallery that has studio
-          SELECT ig.imageId, sg.studioId
+          SELECT ig.imageId, sg.studioId, sg.stashInstanceId AS studioInstanceId
           FROM ImageGallery ig
-          JOIN StashImage si ON ig.imageId = si.id AND si.deletedAt IS NULL
-          JOIN StashGallery sg ON ig.galleryId = sg.id AND sg.deletedAt IS NULL AND sg.studioId IS NOT NULL
+          JOIN StashImage si ON ig.imageId = si.id AND ig.imageInstanceId = si.stashInstanceId AND si.deletedAt IS NULL
+          JOIN StashGallery sg ON ig.galleryId = sg.id AND ig.galleryInstanceId = sg.stashInstanceId AND sg.deletedAt IS NULL AND sg.studioId IS NOT NULL
         ) AS combined
         WHERE combined.studioId = StashStudio.id
+          AND combined.studioInstanceId = StashStudio.stashInstanceId
       ), 0)
       WHERE StashStudio.deletedAt IS NULL
     `;
@@ -135,20 +137,21 @@ class EntityImageCountService {
       SET imageCount = COALESCE((
         SELECT COUNT(DISTINCT imageId) FROM (
           -- Direct: image has tag directly
-          SELECT it.imageId, it.tagId
+          SELECT it.imageId, it.tagId, it.tagInstanceId
           FROM ImageTag it
-          JOIN StashImage si ON it.imageId = si.id AND si.deletedAt IS NULL
+          JOIN StashImage si ON it.imageId = si.id AND it.imageInstanceId = si.stashInstanceId AND si.deletedAt IS NULL
 
           UNION
 
           -- Inherited: image is in gallery that has tag
-          SELECT ig.imageId, gt.tagId
+          SELECT ig.imageId, gt.tagId, gt.tagInstanceId
           FROM ImageGallery ig
-          JOIN StashImage si ON ig.imageId = si.id AND si.deletedAt IS NULL
-          JOIN StashGallery sg ON ig.galleryId = sg.id AND sg.deletedAt IS NULL
-          JOIN GalleryTag gt ON ig.galleryId = gt.galleryId
+          JOIN StashImage si ON ig.imageId = si.id AND ig.imageInstanceId = si.stashInstanceId AND si.deletedAt IS NULL
+          JOIN StashGallery sg ON ig.galleryId = sg.id AND ig.galleryInstanceId = sg.stashInstanceId AND sg.deletedAt IS NULL
+          JOIN GalleryTag gt ON ig.galleryId = gt.galleryId AND ig.galleryInstanceId = gt.galleryInstanceId
         ) AS combined
         WHERE combined.tagId = StashTag.id
+          AND combined.tagInstanceId = StashTag.stashInstanceId
       ), 0)
       WHERE StashTag.deletedAt IS NULL
     `;

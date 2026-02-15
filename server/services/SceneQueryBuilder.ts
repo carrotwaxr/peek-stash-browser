@@ -295,7 +295,7 @@ class SceneQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `s.id IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}))`,
+          sql: `s.id IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}) AND sceneInstanceId = s.stashInstanceId)`,
           params: ids,
         };
 
@@ -303,8 +303,8 @@ class SceneQueryBuilder {
         return {
           sql: `s.id IN (
             SELECT sceneId FROM SceneGallery
-            WHERE galleryId IN (${placeholders})
-            GROUP BY sceneId
+            WHERE galleryId IN (${placeholders}) AND sceneInstanceId = s.stashInstanceId
+            GROUP BY sceneId, sceneInstanceId
             HAVING COUNT(DISTINCT galleryId) = ?
           )`,
           params: [...ids, ids.length],
@@ -312,7 +312,7 @@ class SceneQueryBuilder {
 
       case "EXCLUDES":
         return {
-          sql: `s.id NOT IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}))`,
+          sql: `s.id NOT IN (SELECT sceneId FROM SceneGallery WHERE galleryId IN (${placeholders}) AND sceneInstanceId = s.stashInstanceId)`,
           params: ids,
         };
 
@@ -979,7 +979,7 @@ class SceneQueryBuilder {
     return {
       sql: `EXISTS (
         SELECT 1 FROM ScenePerformer sp
-        JOIN PerformerRating pr ON sp.performerId = pr.performerId AND pr.userId = ?
+        JOIN PerformerRating pr ON sp.performerId = pr.performerId AND sp.performerInstanceId = pr.instanceId AND pr.userId = ?
         WHERE sp.sceneId = s.id AND sp.sceneInstanceId = s.stashInstanceId AND pr.favorite = 1
       )`,
       params: [userId],
@@ -992,9 +992,9 @@ class SceneQueryBuilder {
    */
   private buildStudioFavoriteFilter(userId: number): FilterClause {
     return {
-      sql: `s.studioId IN (
-        SELECT sr.studioId FROM StudioRating sr
-        WHERE sr.userId = ? AND sr.favorite = 1
+      sql: `EXISTS (
+        SELECT 1 FROM StudioRating sr
+        WHERE sr.studioId = s.studioId AND sr.instanceId = s.stashInstanceId AND sr.userId = ? AND sr.favorite = 1
       )`,
       params: [userId],
     };
@@ -1008,7 +1008,7 @@ class SceneQueryBuilder {
     return {
       sql: `EXISTS (
         SELECT 1 FROM SceneTag st
-        JOIN TagRating tr ON st.tagId = tr.tagId AND tr.userId = ?
+        JOIN TagRating tr ON st.tagId = tr.tagId AND st.tagInstanceId = tr.instanceId AND tr.userId = ?
         WHERE st.sceneId = s.id AND st.sceneInstanceId = s.stashInstanceId AND tr.favorite = 1
       )`,
       params: [userId],
@@ -1922,6 +1922,7 @@ class SceneQueryBuilder {
   private transformStashPerformer(p: any): any {
     return {
       id: p.id,
+      instanceId: p.stashInstanceId,
       name: p.name,
       disambiguation: p.disambiguation,
       gender: p.gender,
@@ -1934,6 +1935,7 @@ class SceneQueryBuilder {
   private transformStashTag(t: any): any {
     return {
       id: t.id,
+      instanceId: t.stashInstanceId,
       name: t.name,
       image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
       favorite: t.favorite,
@@ -1943,6 +1945,7 @@ class SceneQueryBuilder {
   private transformStashStudio(s: any): any {
     return {
       id: s.id,
+      instanceId: s.stashInstanceId,
       name: s.name,
       image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
       favorite: s.favorite,

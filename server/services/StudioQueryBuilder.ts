@@ -165,7 +165,7 @@ class StudioQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `s.id IN (SELECT studioId FROM StudioTag WHERE tagId IN (${placeholders}))`,
+          sql: `s.id IN (SELECT studioId FROM StudioTag WHERE tagId IN (${placeholders}) AND studioInstanceId = s.stashInstanceId)`,
           params: ids,
         };
 
@@ -173,7 +173,7 @@ class StudioQueryBuilder {
         return {
           sql: `s.id IN (
             SELECT studioId FROM StudioTag
-            WHERE tagId IN (${placeholders})
+            WHERE tagId IN (${placeholders}) AND studioInstanceId = s.stashInstanceId
             GROUP BY studioId
             HAVING COUNT(DISTINCT tagId) = ?
           )`,
@@ -182,7 +182,7 @@ class StudioQueryBuilder {
 
       case "EXCLUDES":
         return {
-          sql: `s.id NOT IN (SELECT studioId FROM StudioTag WHERE tagId IN (${placeholders}))`,
+          sql: `s.id NOT IN (SELECT studioId FROM StudioTag WHERE tagId IN (${placeholders}) AND studioInstanceId = s.stashInstanceId)`,
           params: ids,
         };
 
@@ -598,128 +598,188 @@ class StudioQueryBuilder {
     if (studios.length === 0) return;
 
     const studioIds = studios.map((s) => s.id);
+    const studioInstanceIds = [...new Set(studios.map((s) => (s as any).instanceId))];
 
     // Load tag junctions, scenes, and galleries for this studio
+    // Use composite keys (studioId + studioInstanceId) for multi-instance correctness
     const [tagJunctions, scenes, studioGalleries] = await Promise.all([
       prisma.studioTag.findMany({
-        where: { studioId: { in: studioIds } },
+        where: {
+          studioId: { in: studioIds },
+          studioInstanceId: { in: studioInstanceIds },
+        },
       }),
       prisma.stashScene.findMany({
-        where: { studioId: { in: studioIds } },
-        select: { id: true, studioId: true },
+        where: {
+          studioId: { in: studioIds },
+          stashInstanceId: { in: studioInstanceIds },
+        },
+        select: { id: true, studioId: true, stashInstanceId: true },
       }),
       // Galleries have studioId directly
       prisma.stashGallery.findMany({
-        where: { studioId: { in: studioIds } },
-        select: { id: true, studioId: true },
+        where: {
+          studioId: { in: studioIds },
+          stashInstanceId: { in: studioInstanceIds },
+        },
+        select: { id: true, studioId: true, stashInstanceId: true },
       }),
     ]);
 
     const sceneIds = scenes.map((s) => s.id);
+    const sceneInstanceIds = [...new Set(scenes.map((s) => s.stashInstanceId))];
 
     // Load scene relationships for performers and groups
+    // Use composite keys (sceneId + sceneInstanceId) for multi-instance correctness
     const [scenePerformers, sceneGroups] = await Promise.all([
       sceneIds.length > 0
         ? prisma.scenePerformer.findMany({
-            where: { sceneId: { in: sceneIds } },
-            select: { sceneId: true, performerId: true },
+            where: {
+              sceneId: { in: sceneIds },
+              sceneInstanceId: { in: sceneInstanceIds },
+            },
+            select: { sceneId: true, sceneInstanceId: true, performerId: true, performerInstanceId: true },
           })
         : [],
       sceneIds.length > 0
         ? prisma.sceneGroup.findMany({
-            where: { sceneId: { in: sceneIds } },
-            select: { sceneId: true, groupId: true },
+            where: {
+              sceneId: { in: sceneIds },
+              sceneInstanceId: { in: sceneInstanceIds },
+            },
+            select: { sceneId: true, sceneInstanceId: true, groupId: true, groupInstanceId: true },
           })
         : [],
     ]);
 
-    // Get unique entity IDs
-    const tagIds = [...new Set(tagJunctions.map((j) => j.tagId))];
-    const performerIds = [...new Set(scenePerformers.map((sp) => sp.performerId))];
-    const groupIds = [...new Set(sceneGroups.map((sg) => sg.groupId))];
-    const galleryIds = [...new Set(studioGalleries.map((sg) => sg.id))];
+    // Collect unique entity keys (id:instanceId) from junction tables
+    const tagKeys = [...new Map(
+      tagJunctions.map((j) => [`${j.tagId}:${j.tagInstanceId}`, { id: j.tagId, instanceId: j.tagInstanceId }])
+    ).values()];
+    const performerKeys = [...new Map(
+      scenePerformers.map((j) => [`${j.performerId}:${j.performerInstanceId}`, { id: j.performerId, instanceId: j.performerInstanceId }])
+    ).values()];
+    const groupKeys = [...new Map(
+      sceneGroups.map((j) => [`${j.groupId}:${j.groupInstanceId}`, { id: j.groupId, instanceId: j.groupInstanceId }])
+    ).values()];
+    const galleryKeys = [...new Map(
+      studioGalleries.map((g) => [`${g.id}:${g.stashInstanceId}`, { id: g.id, instanceId: g.stashInstanceId }])
+    ).values()];
 
-    // Load all entities in parallel
+    // Build OR conditions for entity queries (need to match on composite keys)
+    const tagOrConditions = tagKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+    const performerOrConditions = performerKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+    const groupOrConditions = groupKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+    const galleryOrConditions = galleryKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+
+    // Load all entities in parallel using composite key lookups
     const [tags, performers, groups, galleries] = await Promise.all([
-      tagIds.length > 0 ? prisma.stashTag.findMany({ where: { id: { in: tagIds } } }) : [],
-      performerIds.length > 0 ? prisma.stashPerformer.findMany({ where: { id: { in: performerIds } } }) : [],
-      groupIds.length > 0 ? prisma.stashGroup.findMany({ where: { id: { in: groupIds } } }) : [],
-      galleryIds.length > 0 ? prisma.stashGallery.findMany({ where: { id: { in: galleryIds } } }) : [],
+      tagOrConditions.length > 0 ? prisma.stashTag.findMany({ where: { OR: tagOrConditions } }) : [],
+      performerOrConditions.length > 0 ? prisma.stashPerformer.findMany({ where: { OR: performerOrConditions } }) : [],
+      groupOrConditions.length > 0 ? prisma.stashGroup.findMany({ where: { OR: groupOrConditions } }) : [],
+      galleryOrConditions.length > 0 ? prisma.stashGallery.findMany({ where: { OR: galleryOrConditions } }) : [],
     ]);
 
-    // Build lookup maps with instanceId for multi-instance routing
-    const tagsById = new Map(tags.map((t) => [t.id, {
+    // Build lookup maps by composite key (id:instanceId)
+    const tagsById = new Map(tags.map((t) => [`${t.id}:${t.stashInstanceId}`, {
       id: t.id,
+      instanceId: t.stashInstanceId,
       name: t.name,
       image_path: this.transformUrl(t.imagePath, t.stashInstanceId),
     }]));
 
-    const performersById = new Map(performers.map((p) => [p.id, {
+    const performersById = new Map(performers.map((p) => [`${p.id}:${p.stashInstanceId}`, {
       id: p.id,
+      instanceId: p.stashInstanceId,
       name: p.name,
       image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
     }]));
 
-    const groupsById = new Map(groups.map((g) => [g.id, {
+    const groupsById = new Map(groups.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
+      instanceId: g.stashInstanceId,
       name: g.name,
       front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
     }]));
 
-    const galleriesById = new Map(galleries.map((g) => [g.id, {
+    const galleriesById = new Map(galleries.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
+      instanceId: g.stashInstanceId,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
-    // Build scene -> studio mapping
-    const studioByScene = new Map(scenes.map((s) => [s.id, s.studioId]));
+    // Build scene -> studio mapping using composite keys
+    const studioByScene = new Map(scenes.map((s) => [`${s.id}:${s.stashInstanceId}`, { studioId: s.studioId, instanceId: s.stashInstanceId }]));
 
-    // Build studio -> tags map
+    // Build studio -> tags map using composite keys
     const tagsByStudio = new Map<string, any[]>();
     for (const junction of tagJunctions) {
-      const tag = tagsById.get(junction.tagId);
-      if (!tag) continue;
-      const list = tagsByStudio.get(junction.studioId) || [];
+      const tagKey = `${junction.tagId}:${junction.tagInstanceId}`;
+      const tag = tagsById.get(tagKey);
+      if (!tag) continue; // Skip orphaned junction records
+      const studioKey = `${junction.studioId}:${junction.studioInstanceId}`;
+      const list = tagsByStudio.get(studioKey) || [];
       list.push(tag);
-      tagsByStudio.set(junction.studioId, list);
+      tagsByStudio.set(studioKey, list);
     }
 
-    // Build studio -> entities maps from scenes
+    // Build studio -> entities maps from scenes using composite keys
     const performersByStudio = new Map<string, Set<string>>();
     const groupsByStudio = new Map<string, Set<string>>();
 
     for (const sp of scenePerformers) {
-      const studioId = studioByScene.get(sp.sceneId);
-      if (!studioId) continue;
-      const set = performersByStudio.get(studioId) || new Set();
-      set.add(sp.performerId);
-      performersByStudio.set(studioId, set);
+      const sceneKey = `${sp.sceneId}:${sp.sceneInstanceId}`;
+      const studioInfo = studioByScene.get(sceneKey);
+      if (!studioInfo) continue;
+      const studioKey = `${studioInfo.studioId}:${studioInfo.instanceId}`;
+      const performerKey = `${sp.performerId}:${sp.performerInstanceId}`;
+      const set = performersByStudio.get(studioKey) || new Set();
+      set.add(performerKey);
+      performersByStudio.set(studioKey, set);
     }
 
     for (const sg of sceneGroups) {
-      const studioId = studioByScene.get(sg.sceneId);
-      if (!studioId) continue;
-      const set = groupsByStudio.get(studioId) || new Set();
-      set.add(sg.groupId);
-      groupsByStudio.set(studioId, set);
+      const sceneKey = `${sg.sceneId}:${sg.sceneInstanceId}`;
+      const studioInfo = studioByScene.get(sceneKey);
+      if (!studioInfo) continue;
+      const studioKey = `${studioInfo.studioId}:${studioInfo.instanceId}`;
+      const groupKey = `${sg.groupId}:${sg.groupInstanceId}`;
+      const set = groupsByStudio.get(studioKey) || new Set();
+      set.add(groupKey);
+      groupsByStudio.set(studioKey, set);
     }
 
-    // Build studio -> galleries map from direct studio-gallery relationship
+    // Build studio -> galleries map from direct studio-gallery relationship using composite keys
     const galleriesByStudio = new Map<string, Set<string>>();
     for (const g of studioGalleries) {
       if (!g.studioId) continue;
-      const set = galleriesByStudio.get(g.studioId) || new Set();
-      set.add(g.id);
-      galleriesByStudio.set(g.studioId, set);
+      const studioKey = `${g.studioId}:${g.stashInstanceId}`;
+      const galleryKey = `${g.id}:${g.stashInstanceId}`;
+      const set = galleriesByStudio.get(studioKey) || new Set();
+      set.add(galleryKey);
+      galleriesByStudio.set(studioKey, set);
     }
 
-    // Populate studios
+    // Populate studios using composite keys
     for (const studio of studios) {
-      studio.tags = tagsByStudio.get(studio.id) || [];
-      (studio as any).performers = [...(performersByStudio.get(studio.id) || [])].map((id) => performersById.get(id)).filter(Boolean);
-      (studio as any).groups = [...(groupsByStudio.get(studio.id) || [])].map((id) => groupsById.get(id)).filter(Boolean);
-      (studio as any).galleries = [...(galleriesByStudio.get(studio.id) || [])].map((id) => galleriesById.get(id)).filter(Boolean);
+      const studioKey = `${studio.id}:${(studio as any).instanceId}`;
+      studio.tags = tagsByStudio.get(studioKey) || [];
+      (studio as any).performers = [...(performersByStudio.get(studioKey) || [])].map((key) => performersById.get(key)).filter(Boolean);
+      (studio as any).groups = [...(groupsByStudio.get(studioKey) || [])].map((key) => groupsById.get(key)).filter(Boolean);
+      (studio as any).galleries = [...(galleriesByStudio.get(studioKey) || [])].map((key) => galleriesById.get(key)).filter(Boolean);
     }
   }
 

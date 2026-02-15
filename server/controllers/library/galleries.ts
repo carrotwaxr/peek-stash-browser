@@ -37,9 +37,10 @@ async function mergeGalleriesWithUserData(
 ): Promise<NormalizedGallery[]> {
   const ratings = await prisma.galleryRating.findMany({ where: { userId } });
 
+  const KEY_SEP = "\0";
   const ratingMap = new Map(
     ratings.map((r) => [
-      r.galleryId,
+      `${r.galleryId}${KEY_SEP}${r.instanceId || ""}`,
       {
         rating: r.rating,
         rating100: r.rating,
@@ -53,7 +54,7 @@ async function mergeGalleriesWithUserData(
     rating: null,
     rating100: null,
     favorite: false,
-    ...ratingMap.get(gallery.id),
+    ...ratingMap.get(`${gallery.id}${KEY_SEP}${(gallery as any).instanceId || ""}`),
   }));
 }
 
@@ -66,9 +67,10 @@ async function mergeImagesWithUserData(
 ): Promise<any[]> {
   const ratings = await prisma.imageRating.findMany({ where: { userId } });
 
+  const KEY_SEP = "\0";
   const ratingMap = new Map(
     ratings.map((r) => [
-      r.imageId,
+      `${r.imageId}${KEY_SEP}${r.instanceId || ""}`,
       {
         rating: r.rating,
         rating100: r.rating,
@@ -79,7 +81,7 @@ async function mergeImagesWithUserData(
 
   return images.map((image) => ({
     ...image,
-    ...ratingMap.get(image.id),
+    ...ratingMap.get(`${image.id}${KEY_SEP}${image.instanceId || ""}`),
   }));
 }
 

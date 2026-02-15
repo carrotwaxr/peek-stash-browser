@@ -208,13 +208,13 @@ class TagQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `t.id IN (SELECT tagId FROM PerformerTag WHERE performerId IN (${placeholders}))`,
+          sql: `t.id IN (SELECT tagId FROM PerformerTag WHERE performerId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
           params: ids,
         };
 
       case "EXCLUDES":
         return {
-          sql: `t.id NOT IN (SELECT tagId FROM PerformerTag WHERE performerId IN (${placeholders}))`,
+          sql: `t.id NOT IN (SELECT tagId FROM PerformerTag WHERE performerId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
           params: ids,
         };
 
@@ -240,13 +240,13 @@ class TagQueryBuilder {
     switch (modifier) {
       case "INCLUDES":
         return {
-          sql: `t.id IN (SELECT tagId FROM StudioTag WHERE studioId IN (${placeholders}))`,
+          sql: `t.id IN (SELECT tagId FROM StudioTag WHERE studioId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
           params: ids,
         };
 
       case "EXCLUDES":
         return {
-          sql: `t.id NOT IN (SELECT tagId FROM StudioTag WHERE studioId IN (${placeholders}))`,
+          sql: `t.id NOT IN (SELECT tagId FROM StudioTag WHERE studioId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
           params: ids,
         };
 
@@ -275,12 +275,12 @@ class TagQueryBuilder {
 
       if (modifier === "INCLUDES") {
         clauses.push({
-          sql: `t.id IN (SELECT tagId FROM SceneTag WHERE sceneId IN (${placeholders}))`,
+          sql: `t.id IN (SELECT tagId FROM SceneTag WHERE sceneId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
           params: ids,
         });
       } else if (modifier === "EXCLUDES") {
         clauses.push({
-          sql: `t.id NOT IN (SELECT tagId FROM SceneTag WHERE sceneId IN (${placeholders}))`,
+          sql: `t.id NOT IN (SELECT tagId FROM SceneTag WHERE sceneId IN (${placeholders}) AND tagInstanceId = t.stashInstanceId)`,
           params: ids,
         });
       }
@@ -774,6 +774,7 @@ class TagQueryBuilder {
     if (tags.length === 0) return;
 
     const tagIds = tags.map((t) => t.id);
+    const tagInstanceIds = [...new Set(tags.map((t) => (t as any).instanceId))];
 
     // Collect all parent IDs that need name hydration
     const parentIds = new Set<string>();
@@ -788,136 +789,195 @@ class TagQueryBuilder {
     }
 
     // Load all junctions in parallel (include parent tags lookup)
+    // Filter by both tagId AND tagInstanceId for multi-instance correctness
     const [performerTags, studioTags, groupTags, galleryTags, parentTagRecords] = await Promise.all([
       prisma.performerTag.findMany({
-        where: { tagId: { in: tagIds } },
-        select: { tagId: true, performerId: true },
+        where: {
+          tagId: { in: tagIds },
+          tagInstanceId: { in: tagInstanceIds }
+        },
+        select: { tagId: true, tagInstanceId: true, performerId: true, performerInstanceId: true },
       }),
       prisma.studioTag.findMany({
-        where: { tagId: { in: tagIds } },
-        select: { tagId: true, studioId: true },
+        where: {
+          tagId: { in: tagIds },
+          tagInstanceId: { in: tagInstanceIds }
+        },
+        select: { tagId: true, tagInstanceId: true, studioId: true, studioInstanceId: true },
       }),
       prisma.groupTag.findMany({
-        where: { tagId: { in: tagIds } },
-        select: { tagId: true, groupId: true },
+        where: {
+          tagId: { in: tagIds },
+          tagInstanceId: { in: tagInstanceIds }
+        },
+        select: { tagId: true, tagInstanceId: true, groupId: true, groupInstanceId: true },
       }),
       prisma.galleryTag.findMany({
-        where: { tagId: { in: tagIds } },
-        select: { tagId: true, galleryId: true },
+        where: {
+          tagId: { in: tagIds },
+          tagInstanceId: { in: tagInstanceIds }
+        },
+        select: { tagId: true, tagInstanceId: true, galleryId: true, galleryInstanceId: true },
       }),
-      // Fetch parent tag names
+      // Fetch parent tag names - filter by parent instanceIds matching tag instanceIds
       parentIds.size > 0
         ? prisma.stashTag.findMany({
-            where: { id: { in: Array.from(parentIds) } },
-            select: { id: true, name: true },
+            where: {
+              id: { in: Array.from(parentIds) },
+              stashInstanceId: { in: tagInstanceIds }
+            },
+            select: { id: true, stashInstanceId: true, name: true },
           })
         : [],
     ]);
 
-    // Build parent name lookup map and hydrate parent names
+    // Build parent name lookup map (by composite key) and hydrate parent names
     const parentNameMap = new Map<string, string>();
     for (const pt of parentTagRecords) {
-      parentNameMap.set(pt.id, pt.name || "Unknown");
+      const key = `${pt.id}:${pt.stashInstanceId}`;
+      parentNameMap.set(key, pt.name || "Unknown");
     }
     for (const tag of tags) {
       if (tag.parents && Array.isArray(tag.parents)) {
+        const tagInstanceId = (tag as any).instanceId;
         (tag as any).parents = tag.parents.map((p) => ({
           id: p.id,
-          name: parentNameMap.get(p.id) || "Unknown",
+          name: parentNameMap.get(`${p.id}:${tagInstanceId}`) || "Unknown",
         }));
       }
     }
 
-    // Get unique entity IDs
-    const performerIds = [...new Set(performerTags.map((pt) => pt.performerId))];
-    const studioIds = [...new Set(studioTags.map((st) => st.studioId))];
-    const groupIds = [...new Set(groupTags.map((gt) => gt.groupId))];
-    const galleryIds = [...new Set(galleryTags.map((gt) => gt.galleryId))];
+    // Collect unique entity keys (id:instanceId) from junction tables
+    const performerKeys = [...new Map(
+      performerTags.map((j) => [`${j.performerId}:${j.performerInstanceId}`, { id: j.performerId, instanceId: j.performerInstanceId }])
+    ).values()];
+    const studioKeys = [...new Map(
+      studioTags.map((j) => [`${j.studioId}:${j.studioInstanceId}`, { id: j.studioId, instanceId: j.studioInstanceId }])
+    ).values()];
+    const groupKeys = [...new Map(
+      groupTags.map((j) => [`${j.groupId}:${j.groupInstanceId}`, { id: j.groupId, instanceId: j.groupInstanceId }])
+    ).values()];
+    const galleryKeys = [...new Map(
+      galleryTags.map((j) => [`${j.galleryId}:${j.galleryInstanceId}`, { id: j.galleryId, instanceId: j.galleryInstanceId }])
+    ).values()];
 
-    // Load all entities in parallel
+    // Build OR conditions for entity queries (need to match on composite keys)
+    const performerOrConditions = performerKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+    const studioOrConditions = studioKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+    const groupOrConditions = groupKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+    const galleryOrConditions = galleryKeys.map((k) => ({
+      id: k.id,
+      stashInstanceId: k.instanceId,
+    }));
+
+    // Load all entities in parallel using composite key lookups
     const [performers, studios, groups, galleries] = await Promise.all([
-      performerIds.length > 0
-        ? prisma.stashPerformer.findMany({ where: { id: { in: performerIds } } })
+      performerOrConditions.length > 0
+        ? prisma.stashPerformer.findMany({ where: { OR: performerOrConditions } })
         : [],
-      studioIds.length > 0
-        ? prisma.stashStudio.findMany({ where: { id: { in: studioIds } } })
+      studioOrConditions.length > 0
+        ? prisma.stashStudio.findMany({ where: { OR: studioOrConditions } })
         : [],
-      groupIds.length > 0
-        ? prisma.stashGroup.findMany({ where: { id: { in: groupIds } } })
+      groupOrConditions.length > 0
+        ? prisma.stashGroup.findMany({ where: { OR: groupOrConditions } })
         : [],
-      galleryIds.length > 0
-        ? prisma.stashGallery.findMany({ where: { id: { in: galleryIds } } })
+      galleryOrConditions.length > 0
+        ? prisma.stashGallery.findMany({ where: { OR: galleryOrConditions } })
         : [],
     ]);
 
-    // Build lookup maps with minimal tooltip data, including instanceId for multi-instance routing
-    const performersById = new Map(performers.map((p) => [p.id, {
+    // Build lookup maps with minimal tooltip data by composite key (id:instanceId)
+    const performersById = new Map(performers.map((p) => [`${p.id}:${p.stashInstanceId}`, {
       id: p.id,
+      instanceId: p.stashInstanceId,
       name: p.name,
       image_path: this.transformUrl(p.imagePath, p.stashInstanceId),
     }]));
 
-    const studiosById = new Map(studios.map((s) => [s.id, {
+    const studiosById = new Map(studios.map((s) => [`${s.id}:${s.stashInstanceId}`, {
       id: s.id,
+      instanceId: s.stashInstanceId,
       name: s.name,
       image_path: this.transformUrl(s.imagePath, s.stashInstanceId),
     }]));
 
-    const groupsById = new Map(groups.map((g) => [g.id, {
+    const groupsById = new Map(groups.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
+      instanceId: g.stashInstanceId,
       name: g.name,
       front_image_path: this.transformUrl(g.frontImagePath, g.stashInstanceId),
     }]));
 
-    const galleriesById = new Map(galleries.map((g) => [g.id, {
+    const galleriesById = new Map(galleries.map((g) => [`${g.id}:${g.stashInstanceId}`, {
       id: g.id,
+      instanceId: g.stashInstanceId,
       title: g.title || getGalleryFallbackTitle(g.folderPath, g.fileBasename),
       cover: this.transformUrl(g.coverPath, g.stashInstanceId),
     }]));
 
-    // Build tag -> entities maps
+    // Build tag -> entities maps using composite keys
+    // Key format: tagId:tagInstanceId -> entities[]
     const performersByTag = new Map<string, any[]>();
     for (const pt of performerTags) {
-      const performer = performersById.get(pt.performerId);
-      if (!performer) continue;
-      const list = performersByTag.get(pt.tagId) || [];
+      const performerKey = `${pt.performerId}:${pt.performerInstanceId}`;
+      const performer = performersById.get(performerKey);
+      if (!performer) continue; // Skip orphaned junction records
+      const tagKey = `${pt.tagId}:${pt.tagInstanceId}`;
+      const list = performersByTag.get(tagKey) || [];
       list.push(performer);
-      performersByTag.set(pt.tagId, list);
+      performersByTag.set(tagKey, list);
     }
 
     const studiosByTag = new Map<string, any[]>();
     for (const st of studioTags) {
-      const studio = studiosById.get(st.studioId);
-      if (!studio) continue;
-      const list = studiosByTag.get(st.tagId) || [];
+      const studioKey = `${st.studioId}:${st.studioInstanceId}`;
+      const studio = studiosById.get(studioKey);
+      if (!studio) continue; // Skip orphaned junction records
+      const tagKey = `${st.tagId}:${st.tagInstanceId}`;
+      const list = studiosByTag.get(tagKey) || [];
       list.push(studio);
-      studiosByTag.set(st.tagId, list);
+      studiosByTag.set(tagKey, list);
     }
 
     const groupsByTag = new Map<string, any[]>();
     for (const gt of groupTags) {
-      const group = groupsById.get(gt.groupId);
-      if (!group) continue;
-      const list = groupsByTag.get(gt.tagId) || [];
+      const groupKey = `${gt.groupId}:${gt.groupInstanceId}`;
+      const group = groupsById.get(groupKey);
+      if (!group) continue; // Skip orphaned junction records
+      const tagKey = `${gt.tagId}:${gt.tagInstanceId}`;
+      const list = groupsByTag.get(tagKey) || [];
       list.push(group);
-      groupsByTag.set(gt.tagId, list);
+      groupsByTag.set(tagKey, list);
     }
 
     const galleriesByTag = new Map<string, any[]>();
     for (const gt of galleryTags) {
-      const gallery = galleriesById.get(gt.galleryId);
-      if (!gallery) continue;
-      const list = galleriesByTag.get(gt.tagId) || [];
+      const galleryKey = `${gt.galleryId}:${gt.galleryInstanceId}`;
+      const gallery = galleriesById.get(galleryKey);
+      if (!gallery) continue; // Skip orphaned junction records
+      const tagKey = `${gt.tagId}:${gt.tagInstanceId}`;
+      const list = galleriesByTag.get(tagKey) || [];
       list.push(gallery);
-      galleriesByTag.set(gt.tagId, list);
+      galleriesByTag.set(tagKey, list);
     }
 
-    // Populate tags with all relations
+    // Populate tags with all relations using composite keys
     for (const tag of tags) {
-      (tag as any).performers = performersByTag.get(tag.id) || [];
-      (tag as any).studios = studiosByTag.get(tag.id) || [];
-      (tag as any).groups = groupsByTag.get(tag.id) || [];
-      (tag as any).galleries = galleriesByTag.get(tag.id) || [];
+      const tagInstanceId = (tag as any).instanceId;
+      const tagKey = `${tag.id}:${tagInstanceId}`;
+      (tag as any).performers = performersByTag.get(tagKey) || [];
+      (tag as any).studios = studiosByTag.get(tagKey) || [];
+      (tag as any).groups = groupsByTag.get(tagKey) || [];
+      (tag as any).galleries = galleriesByTag.get(tagKey) || [];
     }
   }
 
