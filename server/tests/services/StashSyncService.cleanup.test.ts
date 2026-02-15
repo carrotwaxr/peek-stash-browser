@@ -12,24 +12,35 @@ vi.mock("../../prisma/singleton.js", () => ({
     stashScene: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
     },
     stashPerformer: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
     },
     stashStudio: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
     },
     stashTag: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
     },
     stashGroup: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
     },
     stashGallery: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
     },
     stashImage: {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    stashClip: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
     },
     syncState: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -348,28 +359,44 @@ describe("StashSyncService Cleanup", () => {
   });
 
   describe("Empty Stash scenario", () => {
-    it("should handle empty Stash (all entities deleted)", async () => {
-      // Stash returns no scenes - all local scenes should be soft-deleted
+    it("should skip cleanup when Stash returns 0 but local entities exist (safety check)", async () => {
+      // Stash returns no scenes
       mockFindSceneIDs.mockResolvedValue({
         findScenes: { scenes: [], count: 0 },
       });
-      // Mock $queryRawUnsafe to return 100 local scenes that should all be deleted
-      const localScenes = Array.from({ length: 100 }, (_, i) => ({
-        id: String(i + 1),
-        phash: null,
-      }));
-      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue(localScenes);
-      vi.mocked(prisma.stashScene.updateMany).mockResolvedValue({ count: 100 });
+      // Local DB has 100 scenes - safety check should prevent deletion
+      vi.mocked(prisma.stashScene.count).mockResolvedValue(100);
 
       const result = await (stashSyncService as any).cleanupDeletedEntities("scene", "test-instance");
 
-      expect(result).toBe(100);
-      // New implementation uses batched IN clauses - first batch has IDs 1-100
-      const expectedIds = Array.from({ length: 100 }, (_, i) => String(i + 1));
-      expect(prisma.stashScene.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: expectedIds }, stashInstanceId: "test-instance" },
-        data: { deletedAt: expect.any(Date) },
+      expect(result).toBe(0);
+      // updateMany should NOT be called - safety check prevented mass deletion
+      expect(prisma.stashScene.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("should allow cleanup when Stash returns 0 and no local entities exist", async () => {
+      // Stash returns no scenes and local DB is also empty
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [], count: 0 },
       });
+      vi.mocked(prisma.stashScene.count).mockResolvedValue(0);
+      vi.mocked(prisma.$queryRawUnsafe).mockResolvedValue([]);
+
+      const result = await (stashSyncService as any).cleanupDeletedEntities("scene", "test-instance");
+
+      expect(result).toBe(0);
+    });
+
+    it("should skip cleanup when Stash page 1 returns empty but claims count > 0", async () => {
+      // Stash claims 500 scenes but returns empty array (inconsistent response)
+      mockFindSceneIDs.mockResolvedValue({
+        findScenes: { scenes: [], count: 500 },
+      });
+
+      const result = await (stashSyncService as any).cleanupDeletedEntities("scene", "test-instance");
+
+      expect(result).toBe(0);
+      expect(prisma.stashScene.updateMany).not.toHaveBeenCalled();
     });
   });
 });
