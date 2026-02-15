@@ -1319,6 +1319,25 @@ class StashSyncService extends EventEmitter {
   }
 
   /**
+   * Count non-deleted local entities of a given type for a specific Stash instance.
+   * Used by cleanup safety checks to detect when Stash returns suspicious empty results.
+   */
+  private async getLocalEntityCount(entityType: EntityType, stashInstanceId?: string): Promise<number> {
+    const where = { deletedAt: null, ...(stashInstanceId ? { stashInstanceId } : {}) };
+    switch (entityType) {
+      case "scene": return prisma.stashScene.count({ where });
+      case "performer": return prisma.stashPerformer.count({ where });
+      case "studio": return prisma.stashStudio.count({ where });
+      case "tag": return prisma.stashTag.count({ where });
+      case "group": return prisma.stashGroup.count({ where });
+      case "gallery": return prisma.stashGallery.count({ where });
+      case "image": return prisma.stashImage.count({ where });
+      case "clip": return prisma.stashClip.count({ where });
+      default: return 0;
+    }
+  }
+
+  /**
    * Cleanup entities that no longer exist in Stash.
    * Called during full sync after each entity type has been synced.
    *
@@ -1410,16 +1429,43 @@ class StashSyncService extends EventEmitter {
         stashIds.push(...pageIds);
         fetchedCount += pageIds.length;
 
-        if (fetchedCount >= totalCount || pageIds.length === 0) {
+        if (fetchedCount >= totalCount) {
+          break;
+        }
+
+        // Safety: if a page returns empty results, only continue if we haven't fetched anything yet
+        // and the count says there should be data (possible Stash inconsistency)
+        if (pageIds.length === 0) {
+          if (fetchedCount === 0 && totalCount > 0) {
+            logger.warn(
+              `Stash returned 0 ${plural} on page ${page} but claims count=${totalCount}. ` +
+              `Skipping ${plural} cleanup to avoid false deletions.`
+            );
+            return 0;
+          }
           break;
         }
         page++;
       }
 
-      logger.debug(`Found ${stashIds.length} ${plural} in Stash (fetched in ${page} pages)`);
+      logger.info(`Cleanup: found ${stashIds.length} ${plural} in Stash (total: ${totalCount}, fetched in ${page} pages)`);
 
       // Check for abort before proceeding with database updates
       this.checkAbort();
+
+      // Safety check: if Stash returned zero entity IDs but we have local entities,
+      // something is likely wrong (Stash temporarily unavailable, DB locked, network issue).
+      // Skip cleanup to prevent false mass-deletion.
+      if (stashIds.length === 0) {
+        const localCount = await this.getLocalEntityCount(entityType, stashInstanceId);
+        if (localCount > 0) {
+          logger.warn(
+            `Cleanup safety: Stash returned 0 ${plural} but ${localCount} exist locally. ` +
+            `Skipping ${plural} cleanup to prevent false deletions. Run a full sync if this is expected.`
+          );
+          return 0;
+        }
+      }
 
       // Soft delete all entities that exist in Peek but not in Stash
       const now = new Date();
