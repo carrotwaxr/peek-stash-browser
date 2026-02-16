@@ -133,11 +133,10 @@ const PlaybackTab = () => {
             >
               <option value="auto">Auto (Recommended)</option>
               <option value="direct">Direct Play</option>
-              <option value="transcode">Force Transcode</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              Auto uses direct play when supported, otherwise transcodes. Direct play
-              offers best quality but limited codec support.
+              Auto uses direct play when supported, otherwise streams via Stash. Direct
+              play offers best quality but limited codec support.
             </p>
           </div>
 

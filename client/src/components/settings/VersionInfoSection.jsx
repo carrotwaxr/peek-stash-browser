@@ -50,16 +50,21 @@ const VersionInfoSection = ({ clientVersion, api }) => {
     }
   };
 
+  const parseVersion = (v) => {
+    const [core, pre] = v.split("-");
+    const parts = core.split(".").map(Number);
+    return { major: parts[0] || 0, minor: parts[1] || 0, patch: parts[2] || 0, pre: pre || null };
+  };
+
   const compareVersions = (current, latest) => {
     if (!current || !latest) return false;
-
-    const currentParts = current.split(".").map(Number);
-    const latestParts = latest.split(".").map(Number);
-
-    for (let i = 0; i < 3; i++) {
-      if ((latestParts[i] || 0) > (currentParts[i] || 0)) return true;
-      if ((latestParts[i] || 0) < (currentParts[i] || 0)) return false;
-    }
+    const c = parseVersion(current);
+    const l = parseVersion(latest);
+    if (l.major !== c.major) return l.major > c.major;
+    if (l.minor !== c.minor) return l.minor > c.minor;
+    if (l.patch !== c.patch) return l.patch > c.patch;
+    // Same core version: stable (no pre) is newer than pre-release
+    if (c.pre && !l.pre) return true;
     return false;
   };
 
@@ -206,7 +211,9 @@ const VersionInfoSection = ({ clientVersion, api }) => {
                 color: "rgb(34, 197, 94)",
               }}
             >
-              You're running the latest version
+              {clientVersion.includes("-")
+                ? `You're running a pre-release version (ahead of latest stable v${latestVersion})`
+                : "You're running the latest version"}
             </div>
           )}
         </div>

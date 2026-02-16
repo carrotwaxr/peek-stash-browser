@@ -259,12 +259,12 @@ router.put(
         if (
           typeof syncIntervalMinutes !== "number" ||
           syncIntervalMinutes < 5 ||
-          syncIntervalMinutes > 1440
+          syncIntervalMinutes > 10080
         ) {
           return res.status(400).json({
             error: "Invalid sync interval",
             message:
-              "Sync interval must be between 5 and 1440 minutes (24 hours)",
+              "Sync interval must be between 5 and 10080 minutes (7 days)",
           });
         }
       }

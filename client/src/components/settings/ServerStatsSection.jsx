@@ -298,142 +298,20 @@ const ServerStatsSection = () => {
 
         <hr className="my-6" style={{ borderColor: "var(--border-color)" }} />
 
-        {/* Database & Transcoding */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Database */}
-          <div>
-            <h3
-              className="text-sm font-semibold mb-4"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Database
-            </h3>
-            <StatCard
-              label="Database Size"
-              value={stats.database?.size || "N/A"}
-              icon={<Database className="w-4 h-4" />}
-            />
-          </div>
-
-          {/* Transcoding */}
-          <div>
-            <h3
-              className="text-sm font-semibold mb-4"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Transcoding
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <StatCard
-                label="Active"
-                value={stats.transcoding?.activeSessions || 0}
-                valueColor={
-                  stats.transcoding?.activeSessions > 0
-                    ? "var(--status-success)"
-                    : "var(--text-secondary)"
-                }
-                compact
-              />
-              <StatCard
-                label="Cache"
-                value={stats.transcoding?.cacheSize || "0 B"}
-                valueColor="var(--text-secondary)"
-                compact
-              />
-            </div>
-          </div>
+        {/* Database */}
+        <div className="mb-6">
+          <h3
+            className="text-sm font-semibold mb-4"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Database
+          </h3>
+          <StatCard
+            label="Database Size"
+            value={stats.database?.size || "N/A"}
+            icon={<Database className="w-4 h-4" />}
+          />
         </div>
-
-        {/* Active Transcoding Sessions */}
-        {stats.transcoding?.sessions?.length > 0 && (
-          <div>
-            <h3
-              className="text-sm font-semibold mb-3"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Active Transcoding Sessions
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--border-color)" }}>
-                    <th
-                      className="text-left p-2"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Scene
-                    </th>
-                    <th
-                      className="text-left p-2"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Quality
-                    </th>
-                    <th
-                      className="text-left p-2"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Age
-                    </th>
-                    <th
-                      className="text-left p-2"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {stats.transcoding.sessions.map((session, idx) => (
-                    <tr
-                      key={session.sessionId}
-                      style={{
-                        borderBottom:
-                          idx < stats.transcoding.sessions.length - 1
-                            ? "1px solid var(--border-color)"
-                            : "none",
-                      }}
-                    >
-                      <td
-                        className="p-2 font-mono text-xs"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        {session.sceneId?.substring(0, 8)}...
-                      </td>
-                      <td
-                        className="p-2"
-                        style={{ color: "var(--text-primary)" }}
-                      >
-                        {session.quality}
-                      </td>
-                      <td
-                        className="p-2"
-                        style={{ color: "var(--text-muted)" }}
-                      >
-                        {session.age}
-                      </td>
-                      <td className="p-2">
-                        <span
-                          className="px-2 py-1 rounded text-xs"
-                          style={{
-                            backgroundColor: session.isActive
-                              ? "var(--bg-success)"
-                              : "var(--bg-secondary)",
-                            color: session.isActive
-                              ? "var(--text-success)"
-                              : "var(--text-secondary)",
-                          }}
-                        >
-                          {session.isActive ? "Active" : "Idle"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </Paper.Body>
     </Paper>
   );
