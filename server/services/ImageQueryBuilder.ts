@@ -7,12 +7,7 @@
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { getImageFallbackTitle } from "../utils/titleUtils.js";
-
-// Filter clause builder result
-interface FilterClause {
-  sql: string;
-  params: (string | number | boolean)[];
-}
+import { buildFavoriteFilter, buildDateFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface ImageQueryOptions {
@@ -116,17 +111,6 @@ class ImageQueryBuilder {
     return {
       sql: `(i.stashInstanceId IN (${placeholders}) OR i.stashInstanceId IS NULL)`,
       params: allowedInstanceIds,
-    };
-  }
-
-  // Build favorite filter
-  private buildFavoriteFilter(favorite: boolean | undefined): FilterClause {
-    if (favorite === undefined) {
-      return { sql: "", params: [] };
-    }
-    return {
-      sql: favorite ? "r.favorite = 1" : "(r.favorite = 0 OR r.favorite IS NULL)",
-      params: [],
     };
   }
 
@@ -347,60 +331,6 @@ class ImageQueryBuilder {
     }
   }
 
-  // Build date filter clause
-  private buildDateFilter(
-    filter: { value?: string; value2?: string; modifier?: string } | undefined,
-    column: string
-  ): FilterClause {
-    if (!filter) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-
-    // IS_NULL and NOT_NULL don't require a value
-    if (modifier === "IS_NULL") {
-      return { sql: `${column} IS NULL`, params: [] };
-    }
-    if (modifier === "NOT_NULL") {
-      return { sql: `${column} IS NOT NULL`, params: [] };
-    }
-
-    // All other modifiers require a value
-    if (!value) {
-      return { sql: "", params: [] };
-    }
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `date(${column}) = date(?)`, params: [value] };
-      case "NOT_EQUALS":
-        return {
-          sql: `(${column} IS NULL OR date(${column}) != date(?))`,
-          params: [value],
-        };
-      case "GREATER_THAN":
-        return { sql: `${column} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${column} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2) {
-          return { sql: `${column} BETWEEN ? AND ?`, params: [value, value2] };
-        }
-        return { sql: `${column} >= ?`, params: [value] };
-      case "NOT_BETWEEN":
-        if (value2) {
-          return {
-            sql: `(${column} IS NULL OR ${column} < ? OR ${column} > ?)`,
-            params: [value, value2],
-          };
-        }
-        return { sql: `${column} < ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
   // Build sort clause
   private buildSortClause(
     sort: string,
@@ -556,7 +486,7 @@ class ImageQueryBuilder {
 
     // Add user data filters
     if (filters?.favorite !== undefined) {
-      const favoriteFilter = this.buildFavoriteFilter(filters.favorite);
+      const favoriteFilter = buildFavoriteFilter(filters.favorite);
       if (favoriteFilter.sql) whereClauses.push(favoriteFilter);
     }
 
@@ -605,17 +535,17 @@ class ImageQueryBuilder {
 
     // Add date filters
     if (filters?.date) {
-      const dateFilter = this.buildDateFilter(filters.date, "i.date");
+      const dateFilter = buildDateFilter(filters.date, "i.date");
       if (dateFilter.sql) whereClauses.push(dateFilter);
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = this.buildDateFilter(filters.created_at, "i.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(filters.created_at, "i.stashCreatedAt");
       if (createdAtFilter.sql) whereClauses.push(createdAtFilter);
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = this.buildDateFilter(filters.updated_at, "i.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(filters.updated_at, "i.stashUpdatedAt");
       if (updatedAtFilter.sql) whereClauses.push(updatedAtFilter);
     }
 
