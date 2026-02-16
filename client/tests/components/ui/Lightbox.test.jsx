@@ -5,12 +5,14 @@ import Lightbox from "../../../src/components/ui/Lightbox.jsx";
 
 // Mock the API
 vi.mock("../../../services/api.js", () => ({
+  apiGet: vi.fn().mockResolvedValue({ settings: {} }),
   libraryApi: {
     updateRating: vi.fn().mockResolvedValue({}),
     updateFavorite: vi.fn().mockResolvedValue({}),
   },
   imageViewHistoryApi: {
     recordView: vi.fn().mockResolvedValue({}),
+    incrementO: vi.fn().mockResolvedValue({}),
   },
 }));
 
@@ -374,9 +376,19 @@ describe("Lightbox", () => {
         await new Promise((r) => setTimeout(r, 0));
       });
 
-      // Should show page 2 image 0
-      expect(getVisibility()).toBe("visible");
+      // Post-transition: container stays hidden until image loads (prevents flicker)
+      expect(getVisibility()).toBe("hidden");
       expect(getImgSrc()).toBe("http://example.com/page2/image0.jpg");
+
+      // Simulate image load — now the container becomes visible
+      const img = container.querySelector("img");
+      fireEvent.load(img);
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      expect(getVisibility()).toBe("visible");
     });
   });
 

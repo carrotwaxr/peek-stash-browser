@@ -139,6 +139,7 @@ export const getUserSettings = async (
         tableColumnDefaults: true,
         cardDisplaySettings: true,
         landingPagePreference: true,
+        lightboxDoubleTapAction: true,
       },
     });
 
@@ -164,6 +165,7 @@ export const getUserSettings = async (
         tableColumnDefaults: user.tableColumnDefaults || null,
         cardDisplaySettings: user.cardDisplaySettings || null,
         landingPagePreference: user.landingPagePreference || { pages: ["home"], randomize: false },
+        lightboxDoubleTapAction: user.lightboxDoubleTapAction || "favorite",
       },
     });
   } catch (error) {
@@ -216,6 +218,7 @@ export const updateUserSettings = async (
       tableColumnDefaults,
       cardDisplaySettings,
       landingPagePreference,
+      lightboxDoubleTapAction,
     } = req.body;
 
     // Validate values
@@ -427,6 +430,16 @@ export const updateUserSettings = async (
       }
     }
 
+    // Validate lightboxDoubleTapAction if provided
+    if (lightboxDoubleTapAction !== undefined) {
+      const validActions = ["favorite", "o_counter"];
+      if (!validActions.includes(lightboxDoubleTapAction)) {
+        return res
+          .status(400)
+          .json({ error: "Lightbox double-tap action must be 'favorite' or 'o_counter'" });
+      }
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: targetUserId },
       data: {
@@ -446,6 +459,7 @@ export const updateUserSettings = async (
         ...(tableColumnDefaults !== undefined && { tableColumnDefaults }),
         ...(cardDisplaySettings !== undefined && { cardDisplaySettings }),
         ...(landingPagePreference !== undefined && { landingPagePreference }),
+        ...(lightboxDoubleTapAction !== undefined && { lightboxDoubleTapAction }),
       },
       select: {
         id: true,
@@ -463,6 +477,7 @@ export const updateUserSettings = async (
         tableColumnDefaults: true,
         cardDisplaySettings: true,
         landingPagePreference: true,
+        lightboxDoubleTapAction: true,
       },
     });
 
@@ -481,6 +496,7 @@ export const updateUserSettings = async (
         tableColumnDefaults: updatedUser.tableColumnDefaults || null,
         cardDisplaySettings: updatedUser.cardDisplaySettings || null,
         landingPagePreference: updatedUser.landingPagePreference || { pages: ["home"], randomize: false },
+        lightboxDoubleTapAction: updatedUser.lightboxDoubleTapAction || "favorite",
       },
     });
   } catch (error) {
@@ -906,6 +922,7 @@ export const saveFilterPreset = async (
       "tag",
       "group",
       "gallery",
+      "image",
       "clip",
     ];
     if (!validTypes.includes(artifactType)) {
@@ -925,6 +942,7 @@ export const saveFilterPreset = async (
         "tag",
         "group",
         "gallery",
+        "image",
         "clip",
       ];
       if (!validContexts.includes(context)) {
@@ -1009,6 +1027,7 @@ export const deleteFilterPreset = async (
       "tag",
       "group",
       "gallery",
+      "image",
       "clip",
     ];
     if (!validTypes.includes(artifactType)) {
