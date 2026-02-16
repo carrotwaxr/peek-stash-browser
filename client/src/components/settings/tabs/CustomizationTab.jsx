@@ -15,6 +15,7 @@ const CustomizationTab = () => {
   const { unitPreference, setUnitPreference } = useUnitPreference();
   const [preferredPreviewQuality, setPreferredPreviewQuality] = useState("sprite");
   const [wallPlayback, setWallPlayback] = useState("autoplay");
+  const [lightboxDoubleTapAction, setLightboxDoubleTapAction] = useState("favorite");
   const [tableColumnDefaults, setTableColumnDefaults] = useState({});
 
   // Load settings on mount
@@ -27,6 +28,7 @@ const CustomizationTab = () => {
 
         setPreferredPreviewQuality(settings.preferredPreviewQuality || "sprite");
         setWallPlayback(settings.wallPlayback || "autoplay");
+        setLightboxDoubleTapAction(settings.lightboxDoubleTapAction || "favorite");
         setTableColumnDefaults(settings.tableColumnDefaults || {});
       } catch {
         showError("Failed to load customization settings");
@@ -48,6 +50,8 @@ const CustomizationTab = () => {
         setPreferredPreviewQuality(value);
       } else if (key === "wallPlayback") {
         setWallPlayback(value);
+      } else if (key === "lightboxDoubleTapAction") {
+        setLightboxDoubleTapAction(value);
       }
       showSuccess("View preference saved!");
     } catch (err) {
@@ -184,6 +188,35 @@ const CustomizationTab = () => {
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
               Display performer height, weight, and measurements in your preferred unit
               system.
+            </p>
+          </div>
+
+          {/* Image Lightbox Double-Tap Action */}
+          <div>
+            <label
+              htmlFor="lightboxDoubleTapAction"
+              className="block text-sm font-medium mb-2"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              Image Lightbox Double-Tap Action
+            </label>
+            <select
+              id="lightboxDoubleTapAction"
+              value={lightboxDoubleTapAction}
+              onChange={(e) => saveViewPreference("lightboxDoubleTapAction", e.target.value)}
+              className="w-full px-4 py-2 rounded-lg"
+              style={{
+                backgroundColor: "var(--bg-secondary)",
+                border: "1px solid var(--border-color)",
+                color: "var(--text-primary)",
+              }}
+            >
+              <option value="favorite">Toggle Favorite (Default)</option>
+              <option value="o_counter">Increment O Counter</option>
+            </select>
+            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+              Action performed when double-tapping (mobile) or double-clicking (desktop) an
+              image in the lightbox.
             </p>
           </div>
         </div>

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Clock, Info, Maximize, Minimize, Pause, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Heart, Info, Maximize, Minimize, Pause, Play, Plus, X } from "lucide-react";
 import { useSwipeable } from "react-swipeable";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { useFullscreen } from "../../hooks/useFullscreen.js";
 import { useRatingHotkeys } from "../../hooks/useRatingHotkeys.js";
-import { imageViewHistoryApi, libraryApi } from "../../services/api.js";
+import { apiGet, imageViewHistoryApi, libraryApi } from "../../services/api.js";
 import { getImageTitle } from "../../utils/imageGalleryInheritance.js";
 import MetadataDrawer from "./MetadataDrawer.jsx";
 
@@ -48,6 +49,29 @@ const Lightbox = ({
   });
   const controlsTimeoutRef = useRef(null);
 
+  // Zoom/pan state
+  const [zoomScale, setZoomScale] = useState(1);
+  const transformRef = useRef(null);
+
+  // Double-tap/double-click preference and feedback
+  const [doubleTapAction, setDoubleTapAction] = useState("favorite");
+  const [doubleTapFeedback, setDoubleTapFeedback] = useState(null); // "favorite" | "o_counter" | null
+  const lastTapTimeRef = useRef(0);
+  const doubleTapFeedbackTimerRef = useRef(null);
+
+  // Fetch user's lightbox double-tap preference
+  useEffect(() => {
+    if (!isOpen) return;
+    apiGet("/user/settings")
+      .then((data) => {
+        const action = data?.settings?.lightboxDoubleTapAction;
+        if (action) setDoubleTapAction(action);
+      })
+      .catch(() => {
+        // Silently fall back to default
+      });
+  }, [isOpen]);
+
   // Reset index when initialIndex changes, lightbox opens, or page transition occurs.
   // transitionKey ensures this fires even when initialIndex is the same value
   // (e.g., 0 on consecutive forward page boundary crossings).
@@ -57,6 +81,28 @@ const Lightbox = ({
       setImageLoaded(false);
     }
   }, [initialIndex, isOpen, transitionKey]);
+
+  // Track whether we just completed a page transition.
+  // When isPageTransitioning goes true→false, the image container would briefly show
+  // the old image before currentIndex updates. We keep it hidden until imageLoaded fires.
+  const [isPostTransition, setIsPostTransition] = useState(false);
+  const prevTransitioningRef = useRef(isPageTransitioning);
+
+  useEffect(() => {
+    if (prevTransitioningRef.current && !isPageTransitioning) {
+      // Transition just ended — keep hidden until new image loads
+      setIsPostTransition(true);
+      setImageLoaded(false);
+    }
+    prevTransitioningRef.current = isPageTransitioning;
+  }, [isPageTransitioning]);
+
+  // Clear post-transition flag when image loads
+  useEffect(() => {
+    if (imageLoaded && isPostTransition) {
+      setIsPostTransition(false);
+    }
+  }, [imageLoaded, isPostTransition]);
 
   // Track the current image ID to detect when images array changes during page transitions
   const currentImageId = images[currentIndex]?.id;
@@ -86,6 +132,14 @@ const Lightbox = ({
       prevImageIdRef.current = currentImageId;
     }
   }, [currentImageId]);
+
+  // Reset zoom when image changes
+  useEffect(() => {
+    if (transformRef.current) {
+      transformRef.current.resetTransform(0); // instant reset (0ms)
+      setZoomScale(1);
+    }
+  }, [currentIndex]);
 
   // Notify parent of index changes (for syncing page on close)
   useEffect(() => {
@@ -280,6 +334,46 @@ const Lightbox = ({
     [images, currentIndex, onImagesUpdate]
   );
 
+  // Trigger double-tap/double-click action with visual feedback
+  const triggerDoubleTapAction = useCallback(() => {
+    const currentImage = images[currentIndex];
+    if (!currentImage?.id) return;
+
+    // Clear any existing feedback timer
+    if (doubleTapFeedbackTimerRef.current) {
+      clearTimeout(doubleTapFeedbackTimerRef.current);
+    }
+
+    if (doubleTapAction === "o_counter") {
+      const newCount = oCounter + 1;
+      handleOCounterChange(newCount);
+      imageViewHistoryApi.incrementO(currentImage.id).catch((err) => {
+        console.error("Failed to increment O counter:", err);
+      });
+      setDoubleTapFeedback("o_counter");
+    } else {
+      handleFavoriteChange(!isFavorite);
+      setDoubleTapFeedback("favorite");
+    }
+
+    // Clear feedback after animation
+    doubleTapFeedbackTimerRef.current = setTimeout(() => {
+      setDoubleTapFeedback(null);
+      doubleTapFeedbackTimerRef.current = null;
+    }, 800);
+  }, [images, currentIndex, doubleTapAction, oCounter, isFavorite, handleOCounterChange, handleFavoriteChange]);
+
+  // Desktop double-click handler on image container
+  const handleDoubleClick = useCallback((e) => {
+    // Only trigger in center zone (not edge navigation zones)
+    const clickX = e.clientX;
+    const screenWidth = window.innerWidth;
+    const clickPercent = clickX / screenWidth;
+    if (clickPercent < EDGE_ZONE_PERCENT || clickPercent > 1 - EDGE_ZONE_PERCENT) return;
+
+    triggerDoubleTapAction();
+  }, [triggerDoubleTapAction]);
+
   // Auto-hide controls after inactivity
   const showControls = useCallback(() => {
     setControlsVisible(true);
@@ -309,17 +403,35 @@ const Lightbox = ({
     showControls();
   }, [showControls]);
 
-  // Toggle controls on tap (mobile)
-  const handleTap = useCallback(() => {
-    setControlsVisible((prev) => !prev);
-  }, []);
+  // Toggle controls on tap (mobile), with double-tap detection
+  const handleTap = useCallback((e) => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapTimeRef.current;
+    lastTapTimeRef.current = now;
 
-  // Swipe gesture handlers
+    if (timeSinceLastTap < 300) {
+      // Double-tap detected — check if in center zone
+      const tapX = e?.event?.clientX ?? window.innerWidth / 2;
+      const screenWidth = window.innerWidth;
+      const tapPercent = tapX / screenWidth;
+      if (tapPercent >= EDGE_ZONE_PERCENT && tapPercent <= 1 - EDGE_ZONE_PERCENT) {
+        triggerDoubleTapAction();
+        return;
+      }
+    }
+
+    setControlsVisible((prev) => !prev);
+  }, [triggerDoubleTapAction]);
+
+  const isZoomed = zoomScale > 1;
+
+  // Swipe gesture handlers — disabled when zoomed in so pan gestures work
   const swipeHandlers = useSwipeable({
-    onSwipedLeft: () => goToNext(),
-    onSwipedRight: () => goToPrevious(),
-    onSwipedUp: () => setDrawerOpen(true),
+    onSwipedLeft: () => { if (!isZoomed) goToNext(); },
+    onSwipedRight: () => { if (!isZoomed) goToPrevious(); },
+    onSwipedUp: () => { if (!isZoomed) setDrawerOpen(true); },
     onSwipedDown: () => {
+      if (isZoomed) return;
       if (drawerOpen) {
         setDrawerOpen(false);
       } else {
@@ -328,7 +440,7 @@ const Lightbox = ({
     },
     onTap: handleTap,
     delta: 50,
-    preventScrollOnSwipe: true,
+    preventScrollOnSwipe: !isZoomed,
     trackMouse: false,
   });
 
@@ -446,11 +558,14 @@ const Lightbox = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handleCloseWithFullscreenExit, goToPrevious, goToNext, toggleSlideshow, drawerOpen, isFullscreen, toggleFullscreen, showControls]);
 
-  // Cleanup controls timeout
+  // Cleanup timers
   useEffect(() => {
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
+      }
+      if (doubleTapFeedbackTimerRef.current) {
+        clearTimeout(doubleTapFeedbackTimerRef.current);
       }
     };
   }, []);
@@ -671,8 +786,8 @@ const Lightbox = ({
         </button>
       )}
 
-      {/* Loading spinner - show when image loading, page transitioning, or showing stale image */}
-      {(!imageLoaded || isPageTransitioning || isShowingStaleImage) && (
+      {/* Loading spinner - show when image loading, page transitioning, post-transition, or showing stale image */}
+      {(!imageLoaded || isPageTransitioning || isPostTransition || isShowingStaleImage) && (
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
           style={{ color: "var(--text-primary)" }}
@@ -684,24 +799,60 @@ const Lightbox = ({
       {/* Image container - swipe handlers here so they don't block button taps on letterbox areas */}
       <div
         {...swipeHandlers}
-        className="relative w-[90vw] h-[90vh] flex items-center justify-center"
+        className={`relative flex items-center justify-center ${isFullscreen ? "w-screen h-screen" : "w-[90vw] h-[90vh]"}`}
         onClick={(e) => e.stopPropagation()}
+        onDoubleClick={handleDoubleClick}
         style={{
-          visibility: isPageTransitioning || isShowingStaleImage ? "hidden" : "visible",
+          visibility: isPageTransitioning || isShowingStaleImage || isPostTransition ? "hidden" : "visible",
         }}
       >
-        {/* Image - scales down to fit but never up beyond native resolution */}
-        <img
-          src={imageSrc}
-          alt={imageTitle}
-          className="max-w-full max-h-full object-contain"
-          style={{
-            opacity: imageLoaded ? 1 : 0,
-            transition: "opacity 0.2s ease-in-out",
-          }}
-          onLoad={() => setImageLoaded(true)}
-          onError={() => setImageLoaded(true)}
-        />
+        {/* Image with pinch-to-zoom and pan support */}
+        <TransformWrapper
+          ref={transformRef}
+          initialScale={1}
+          minScale={1}
+          maxScale={5}
+          doubleClick={{ disabled: true }}
+          onTransformed={(_ref, state) => setZoomScale(state.scale)}
+          panning={{ disabled: zoomScale <= 1 }}
+          wheel={{ step: 0.2 }}
+        >
+          <TransformComponent
+            wrapperStyle={{ width: "100%", height: "100%" }}
+            contentStyle={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <img
+              src={imageSrc}
+              alt={imageTitle}
+              className="max-w-full max-h-full object-contain"
+              style={{
+                opacity: imageLoaded ? 1 : 0,
+                transition: "opacity 0.2s ease-in-out",
+              }}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(true)}
+            />
+          </TransformComponent>
+        </TransformWrapper>
+
+        {/* Double-tap/double-click visual feedback */}
+        {doubleTapFeedback && (
+          <div
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
+            key={Date.now()}
+          >
+            <div className="animate-ping-once rounded-full bg-white/20 p-6">
+              {doubleTapFeedback === "favorite" ? (
+                <Heart size={48} className="text-red-500 fill-red-500" />
+              ) : (
+                <div className="flex items-center gap-1 text-white text-3xl font-bold">
+                  <Plus size={32} />
+                  <span>O</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Image title - hide during page transition or stale image to prevent showing wrong title */}
