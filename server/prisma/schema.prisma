@@ -30,7 +30,7 @@ model User {
   tableColumnDefaults     Json? // Object with keys: scene, performer, studio, tag, group, gallery, image - each containing {visible: string[], order: string[]}
   cardDisplaySettings     Json? // Object with per-entity-type card display toggles: {scene: {showCodeOnCard, showDescriptionOnCard, ...}, performer: {...}, ...}
   landingPagePreference   Json? @default("{\"pages\":[\"home\"],\"randomize\":false}")
-  lightboxDoubleTapAction String? @default("favorite") // "favorite" or "o_counter" - action on double-tap/double-click in image lightbox
+  lightboxDoubleTapAction String? @default("favorite") // "favorite", "o_counter", or "fullscreen" - action on double-tap/double-click in image lightbox
 
   // First-login setup wizard tracking
   setupCompleted    Boolean   @default(false)

@@ -41,7 +41,7 @@ const SceneListItem = ({
   const navigate = useNavigate();
   const { hasMultipleInstances } = useConfig();
 
-  const { selectionHandlers } = useCardSelection({
+  const { selectionHandlers, isLongPressing, handleNavigationClick } = useCardSelection({
     entity: scene,
     selectionMode,
     onToggleSelect,
@@ -105,6 +105,13 @@ const SceneListItem = ({
   };
 
   const handleClick = (e) => {
+    // Delegate to hook's click handler first — it handles long-press guard
+    // (resets isLongPressing flag and blocks the click) and selection mode toggling
+    if (isLongPressing || selectionMode) {
+      handleNavigationClick(e);
+      return;
+    }
+
     // Don't navigate if clicking on interactive elements
     const target = e.target;
     const isInteractive =
@@ -113,12 +120,6 @@ const SceneListItem = ({
       target.closest('[role="button"]');
 
     if (isInteractive) return;
-
-    // In selection mode, toggle selection instead of navigating
-    if (selectionMode && exists && scene) {
-      onToggleSelect?.(scene);
-      return;
-    }
 
     if (!exists || !scene) return;
 
@@ -164,16 +165,20 @@ const SceneListItem = ({
     >
       <div className="pt-2 px-2 pb-1 md:pt-4 md:px-4 md:pb-2">
         <div className="flex flex-col md:flex-row gap-3 md:gap-4">
-          {/* Selection Checkbox */}
-          {selectionMode && (
-            <div className="flex-shrink-0 flex items-center self-center">
+          {/* Optional Drag Handle */}
+          {dragHandle}
+
+          {/* Thumbnail - fixed width on desktop, 16:9 aspect ratio */}
+          <div className="flex-shrink-0 w-full md:w-96 relative">
+            {/* Selection Checkbox - absolute overlay on thumbnail */}
+            {(selectionMode || isSelected) && (
               <button
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   onToggleSelect?.(scene);
                 }}
-                className="w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
+                className="absolute top-2 left-2 z-20 w-8 h-8 sm:w-6 sm:h-6 rounded border-2 flex items-center justify-center transition-all"
                 style={{
                   backgroundColor: isSelected
                     ? "var(--selection-color)"
@@ -189,14 +194,7 @@ const SceneListItem = ({
                   </svg>
                 )}
               </button>
-            </div>
-          )}
-
-          {/* Optional Drag Handle */}
-          {dragHandle}
-
-          {/* Thumbnail - fixed width on desktop, 16:9 aspect ratio */}
-          <div className="flex-shrink-0 w-full md:w-96">
+            )}
             {exists ? (
               <SceneThumbnail
                 scene={scene}

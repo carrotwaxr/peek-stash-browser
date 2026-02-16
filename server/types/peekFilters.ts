@@ -93,6 +93,7 @@ export type PeekTagFilter = BaseTagFilterType & {
 export type PeekGalleryFilter = BaseGalleryFilterType & {
   ids?: { value: string[]; modifier?: string };
   favorite?: boolean;
+  hasFavoriteImage?: boolean;
   scenes?: { value: string[]; modifier?: string };
 };
 

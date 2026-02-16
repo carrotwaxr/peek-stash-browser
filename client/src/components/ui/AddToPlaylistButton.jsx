@@ -16,7 +16,7 @@ const AddToPlaylistButton = ({
   compact = false,
   buttonText,
   icon,
-  dropdownPosition = "below", // "below" or "above"
+  dropdownPosition: dropdownPositionProp, // "below", "above", or undefined for auto
   onSuccess, // Optional callback called after successful add
   excludePlaylistIds = [], // Playlist IDs to exclude from the list
   variant = "primary", // Button variant
@@ -28,11 +28,25 @@ const AddToPlaylistButton = ({
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDescription, setNewPlaylistDescription] = useState("");
   const [creating, setCreating] = useState(false);
+  const [computedPosition, setComputedPosition] = useState("below");
   const menuRef = useRef(null);
 
   // Support both single sceneId and multiple sceneIds
   const scenesToAdd = sceneIds || (sceneId ? [sceneId] : []);
   const isMultiple = scenesToAdd.length > 1;
+
+  // Auto-detect menu position when opening
+  const dropdownPosition = dropdownPositionProp || computedPosition;
+
+  useEffect(() => {
+    if (showMenu && !dropdownPositionProp && menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      const menuHeight = 280; // approximate menu height
+      const spaceAbove = rect.top;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setComputedPosition(spaceAbove < menuHeight && spaceBelow > spaceAbove ? "below" : "above");
+    }
+  }, [showMenu, dropdownPositionProp]);
 
   useEffect(() => {
     if (showMenu && playlists.length === 0) {

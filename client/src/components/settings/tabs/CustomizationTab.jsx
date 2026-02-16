@@ -213,6 +213,7 @@ const CustomizationTab = () => {
             >
               <option value="favorite">Toggle Favorite (Default)</option>
               <option value="o_counter">Increment O Counter</option>
+              <option value="fullscreen">Toggle Fullscreen</option>
             </select>
             <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
               Action performed when double-tapping (mobile) or double-clicking (desktop) an

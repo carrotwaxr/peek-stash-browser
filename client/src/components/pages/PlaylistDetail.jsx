@@ -831,7 +831,6 @@ const PlaylistDetail = () => {
                         icon={<MoreVertical size={16} />}
                         variant="secondary"
                         excludePlaylistIds={[parseInt(playlistId, 10)]}
-                        dropdownPosition="above"
                       />
                     )}
                   </div>

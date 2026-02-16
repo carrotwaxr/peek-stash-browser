@@ -305,6 +305,29 @@ class GalleryQueryBuilder {
   }
 
   /**
+   * Build filter for galleries that have at least one favorited image
+   */
+  private buildHasFavoriteImageFilter(
+    hasFavoriteImage: boolean | undefined,
+    userId: number
+  ): FilterClause {
+    if (!hasFavoriteImage) {
+      return { sql: "", params: [] };
+    }
+
+    return {
+      sql: `EXISTS (
+        SELECT 1 FROM ImageGallery ig
+        JOIN StashImage si ON ig.imageId = si.id AND ig.imageInstanceId = si.stashInstanceId
+        JOIN ImageRating ir ON ir.imageId = si.id AND ir.instanceId = si.stashInstanceId AND ir.userId = ?
+        WHERE ig.galleryId = g.id AND ig.galleryInstanceId = g.stashInstanceId
+        AND ir.favorite = 1
+      )`,
+      params: [userId],
+    };
+  }
+
+  /**
    * Build search query filter (searches title, details, photographer)
    */
   private buildSearchFilter(searchQuery: string | undefined): FilterClause {
@@ -392,6 +415,14 @@ class GalleryQueryBuilder {
     const favoriteFilter = buildFavoriteFilter(filters?.favorite);
     if (favoriteFilter.sql) {
       whereClauses.push(favoriteFilter);
+    }
+
+    // Has favorite image filter
+    if (filters?.hasFavoriteImage) {
+      const hasFavImageFilter = this.buildHasFavoriteImageFilter(filters.hasFavoriteImage, userId);
+      if (hasFavImageFilter.sql) {
+        whereClauses.push(hasFavImageFilter);
+      }
     }
 
     // Studio filter
@@ -511,7 +542,8 @@ class GalleryQueryBuilder {
     // Check if we have any user-data filters that require the JOINs
     const hasUserDataFilters =
       filters?.favorite !== undefined ||
-      filters?.rating100 !== undefined;
+      filters?.rating100 !== undefined ||
+      filters?.hasFavoriteImage;
 
     if (hasUserDataFilters || applyExclusions) {
       const countSql = `

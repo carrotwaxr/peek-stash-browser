@@ -55,9 +55,10 @@ const Lightbox = ({
 
   // Double-tap/double-click preference and feedback
   const [doubleTapAction, setDoubleTapAction] = useState("favorite");
-  const [doubleTapFeedback, setDoubleTapFeedback] = useState(null); // "favorite" | "o_counter" | null
+  const [doubleTapFeedback, setDoubleTapFeedback] = useState(null); // "favorite" | "o_counter" | "fullscreen" | null
   const lastTapTimeRef = useRef(0);
   const doubleTapFeedbackTimerRef = useRef(null);
+  const doubleTapGuardRef = useRef(0);
 
   // Fetch user's lightbox double-tap preference
   useEffect(() => {
@@ -336,6 +337,12 @@ const Lightbox = ({
 
   // Trigger double-tap/double-click action with visual feedback
   const triggerDoubleTapAction = useCallback(() => {
+    // Debounce guard: on mobile, both onTap (manual double-tap detection) and
+    // native onDoubleClick can fire for the same gesture, causing a double-toggle.
+    // Block re-entry within 500ms.
+    if (Date.now() - doubleTapGuardRef.current < 500) return;
+    doubleTapGuardRef.current = Date.now();
+
     const currentImage = images[currentIndex];
     if (!currentImage?.id) return;
 
@@ -351,6 +358,9 @@ const Lightbox = ({
         console.error("Failed to increment O counter:", err);
       });
       setDoubleTapFeedback("o_counter");
+    } else if (doubleTapAction === "fullscreen") {
+      toggleFullscreen();
+      setDoubleTapFeedback("fullscreen");
     } else {
       handleFavoriteChange(!isFavorite);
       setDoubleTapFeedback("favorite");
@@ -361,7 +371,7 @@ const Lightbox = ({
       setDoubleTapFeedback(null);
       doubleTapFeedbackTimerRef.current = null;
     }, 800);
-  }, [images, currentIndex, doubleTapAction, oCounter, isFavorite, handleOCounterChange, handleFavoriteChange]);
+  }, [images, currentIndex, doubleTapAction, oCounter, isFavorite, handleOCounterChange, handleFavoriteChange, toggleFullscreen]);
 
   // Desktop double-click handler on image container
   const handleDoubleClick = useCallback((e) => {
@@ -844,6 +854,8 @@ const Lightbox = ({
             <div className="animate-ping-once rounded-full bg-white/20 p-6">
               {doubleTapFeedback === "favorite" ? (
                 <Heart size={48} className="text-red-500 fill-red-500" />
+              ) : doubleTapFeedback === "fullscreen" ? (
+                <Maximize size={48} className="text-white" />
               ) : (
                 <div className="flex items-center gap-1 text-white text-3xl font-bold">
                   <Plus size={32} />
