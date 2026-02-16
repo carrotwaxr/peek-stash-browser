@@ -6,12 +6,7 @@
  */
 import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
-
-// Filter clause builder result
-interface FilterClause {
-  sql: string;
-  params: (string | number | boolean)[];
-}
+import type { FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface ClipQueryOptions {

@@ -9,12 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getSceneFallbackTitle } from "../utils/titleUtils.js";
-
-// Filter clause builder result
-interface FilterClause {
-  sql: string;
-  params: (string | number | boolean)[];
-}
+import { type FilterClause, buildNumericFilter, buildDateFilter, buildFavoriteFilter } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface SceneQueryOptions {
@@ -321,125 +316,6 @@ class SceneQueryBuilder {
     }
   }
 
-  /**
-   * Build favorite filter clause
-   */
-  private buildFavoriteFilter(favorite: boolean | undefined): FilterClause {
-    if (favorite === undefined) {
-      return { sql: "", params: [] };
-    }
-
-    if (favorite) {
-      return { sql: "r.favorite = 1", params: [] };
-    } else {
-      return { sql: "(r.favorite = 0 OR r.favorite IS NULL)", params: [] };
-    }
-  }
-
-  /**
-   * Build rating filter clause
-   */
-  private buildRatingFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-    const col = "COALESCE(r.rating, 0)";
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${col} = ?`, params: [value] };
-
-      case "NOT_EQUALS":
-        return { sql: `${col} != ?`, params: [value] };
-
-      case "GREATER_THAN":
-        return { sql: `${col} > ?`, params: [value] };
-
-      case "LESS_THAN":
-        return { sql: `${col} < ?`, params: [value] };
-
-      case "BETWEEN":
-        if (value2 === undefined || value2 === null) {
-          return { sql: `${col} >= ?`, params: [value] };
-        }
-        return { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] };
-
-      case "NOT_BETWEEN":
-        if (value2 === undefined || value2 === null) {
-          return { sql: `${col} < ?`, params: [value] };
-        }
-        return { sql: `(${col} < ? OR ${col} > ?)`, params: [value, value2] };
-
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build play count filter clause
-   */
-  private buildPlayCountFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-    const col = "COALESCE(w.playCount, 0)";
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${col} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${col} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${col} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${col} < ?`, params: [value] };
-      case "BETWEEN":
-        return value2 !== undefined && value2 !== null
-          ? { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] }
-          : { sql: `${col} >= ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build o_counter filter clause
-   */
-  private buildOCounterFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-    const col = "COALESCE(w.oCount, 0)";
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${col} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${col} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${col} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${col} < ?`, params: [value] };
-      case "BETWEEN":
-        return value2 !== undefined && value2 !== null
-          ? { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] }
-          : { sql: `${col} >= ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
 
   /**
    * Build ID filter clause (for specific scene IDs)
@@ -463,37 +339,6 @@ class SceneQueryBuilder {
         return { sql: `s.id NOT IN (${placeholders})`, params: ids };
       default:
         return { sql: `s.id IN (${placeholders})`, params: ids };
-    }
-  }
-
-  /**
-   * Build duration filter clause
-   */
-  private buildDurationFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined | null
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-    const col = "COALESCE(s.duration, 0)";
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${col} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${col} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${col} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${col} < ?`, params: [value] };
-      case "BETWEEN":
-        return value2 !== undefined && value2 !== null
-          ? { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] }
-          : { sql: `${col} >= ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
     }
   }
 
@@ -673,107 +518,6 @@ class SceneQueryBuilder {
       sql,
       params: [likeParam, likeParam, likeParam, likeParam, likeParam, likeParam],
     };
-  }
-
-  /**
-   * Build date filter clause (for scene date, created_at, updated_at, last_played_at)
-   */
-  private buildDateFilter(
-    filter:
-      | { value?: string | null; value2?: string | null; modifier?: string | null }
-      | undefined
-      | null,
-    column: string
-  ): FilterClause {
-    if (!filter) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-
-    // IS_NULL and NOT_NULL don't require a value
-    if (modifier === "IS_NULL") {
-      return { sql: `${column} IS NULL`, params: [] };
-    }
-    if (modifier === "NOT_NULL") {
-      return { sql: `${column} IS NOT NULL`, params: [] };
-    }
-
-    // All other modifiers require a value
-    if (!value) {
-      return { sql: "", params: [] };
-    }
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `date(${column}) = date(?)`, params: [value] };
-      case "NOT_EQUALS":
-        return {
-          sql: `(${column} IS NULL OR date(${column}) != date(?))`,
-          params: [value],
-        };
-      case "GREATER_THAN":
-        return { sql: `${column} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${column} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2) {
-          return { sql: `${column} BETWEEN ? AND ?`, params: [value, value2] };
-        }
-        return { sql: `${column} >= ?`, params: [value] };
-      case "NOT_BETWEEN":
-        if (value2) {
-          return {
-            sql: `(${column} IS NULL OR ${column} < ? OR ${column} > ?)`,
-            params: [value, value2],
-          };
-        }
-        return { sql: `${column} < ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build numeric filter clause (for bitrate, framerate, counts, etc.)
-   */
-  private buildNumericFilter(
-    filter:
-      | { value?: number | null; value2?: number | null; modifier?: string | null }
-      | undefined
-      | null,
-    column: string,
-    coalesce: number = 0
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-    const col = `COALESCE(${column}, ${coalesce})`;
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${col} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${col} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${col} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${col} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2 !== undefined && value2 !== null) {
-          return { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] };
-        }
-        return { sql: `${col} >= ?`, params: [value] };
-      case "NOT_BETWEEN":
-        if (value2 !== undefined && value2 !== null) {
-          return { sql: `(${col} < ? OR ${col} > ?)`, params: [value, value2] };
-        }
-        return { sql: `${col} < ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
-    }
   }
 
   /**
@@ -1256,7 +1000,7 @@ class SceneQueryBuilder {
 
     // Metadata filters
     if (filters?.duration) {
-      const durationFilter = this.buildDurationFilter(filters.duration);
+      const durationFilter = buildNumericFilter(filters.duration, "COALESCE(s.duration, 0)");
       if (durationFilter.sql) {
         whereClauses.push(durationFilter);
       }
@@ -1308,27 +1052,27 @@ class SceneQueryBuilder {
     }
 
     // User data filters
-    const favoriteFilter = this.buildFavoriteFilter(filters?.favorite);
+    const favoriteFilter = buildFavoriteFilter(filters?.favorite);
     if (favoriteFilter.sql) {
       whereClauses.push(favoriteFilter);
     }
 
     if (filters?.rating100) {
-      const ratingFilter = this.buildRatingFilter(filters.rating100);
+      const ratingFilter = buildNumericFilter(filters.rating100, "COALESCE(r.rating, 0)");
       if (ratingFilter.sql) {
         whereClauses.push(ratingFilter);
       }
     }
 
     if (filters?.play_count) {
-      const playCountFilter = this.buildPlayCountFilter(filters.play_count);
+      const playCountFilter = buildNumericFilter(filters.play_count, "COALESCE(w.playCount, 0)");
       if (playCountFilter.sql) {
         whereClauses.push(playCountFilter);
       }
     }
 
     if (filters?.o_counter) {
-      const oCounterFilter = this.buildOCounterFilter(filters.o_counter);
+      const oCounterFilter = buildNumericFilter(filters.o_counter, "COALESCE(w.oCount, 0)");
       if (oCounterFilter.sql) {
         whereClauses.push(oCounterFilter);
       }
@@ -1351,28 +1095,28 @@ class SceneQueryBuilder {
 
     // Date filters
     if (filters?.date) {
-      const dateFilter = this.buildDateFilter(filters.date, "s.date");
+      const dateFilter = buildDateFilter(filters.date, "s.date");
       if (dateFilter.sql) {
         whereClauses.push(dateFilter);
       }
     }
 
     if (filters?.created_at) {
-      const createdFilter = this.buildDateFilter(filters.created_at, "s.stashCreatedAt");
+      const createdFilter = buildDateFilter(filters.created_at, "s.stashCreatedAt");
       if (createdFilter.sql) {
         whereClauses.push(createdFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedFilter = this.buildDateFilter(filters.updated_at, "s.stashUpdatedAt");
+      const updatedFilter = buildDateFilter(filters.updated_at, "s.stashUpdatedAt");
       if (updatedFilter.sql) {
         whereClauses.push(updatedFilter);
       }
     }
 
     if (filters?.last_played_at) {
-      const lastPlayedFilter = this.buildDateFilter(filters.last_played_at, "w.lastPlayedAt");
+      const lastPlayedFilter = buildDateFilter(filters.last_played_at, "w.lastPlayedAt");
       if (lastPlayedFilter.sql) {
         whereClauses.push(lastPlayedFilter);
       }
@@ -1380,24 +1124,23 @@ class SceneQueryBuilder {
 
     // Numeric filters
     if (filters?.bitrate) {
-      const bitrateFilter = this.buildNumericFilter(filters.bitrate, "s.fileBitRate", 0);
+      const bitrateFilter = buildNumericFilter(filters.bitrate, "COALESCE(s.fileBitRate, 0)");
       if (bitrateFilter.sql) {
         whereClauses.push(bitrateFilter);
       }
     }
 
     if (filters?.framerate) {
-      const framerateFilter = this.buildNumericFilter(filters.framerate, "s.fileFrameRate", 0);
+      const framerateFilter = buildNumericFilter(filters.framerate, "COALESCE(s.fileFrameRate, 0)");
       if (framerateFilter.sql) {
         whereClauses.push(framerateFilter);
       }
     }
 
     if (filters?.play_duration) {
-      const playDurationFilter = this.buildNumericFilter(
+      const playDurationFilter = buildNumericFilter(
         filters.play_duration,
-        "COALESCE(w.playDuration, 0)",
-        0
+        "COALESCE(w.playDuration, 0)"
       );
       if (playDurationFilter.sql) {
         whereClauses.push(playDurationFilter);

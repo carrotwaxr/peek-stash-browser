@@ -9,12 +9,7 @@ import prisma from "../prisma/singleton.js";
 import { logger } from "../utils/logger.js";
 import { expandStudioIds, expandTagIds } from "../utils/hierarchyUtils.js";
 import { getGalleryFallbackTitle } from "../utils/titleUtils.js";
-
-// Filter clause builder result
-interface FilterClause {
-  sql: string;
-  params: (string | number | boolean)[];
-}
+import { buildNumericFilter, buildDateFilter, buildTextFilter, buildFavoriteFilter, type FilterClause } from "../utils/sqlFilterBuilders.js";
 
 // Query builder options
 export interface GalleryQueryOptions {
@@ -125,21 +120,6 @@ class GalleryQueryBuilder {
         return { sql: `g.id NOT IN (${placeholders})`, params: ids };
       default:
         return { sql: `g.id IN (${placeholders})`, params: ids };
-    }
-  }
-
-  /**
-   * Build favorite filter clause
-   */
-  private buildFavoriteFilter(favorite: boolean | undefined): FilterClause {
-    if (favorite === undefined) {
-      return { sql: "", params: [] };
-    }
-
-    if (favorite) {
-      return { sql: "r.favorite = 1", params: [] };
-    } else {
-      return { sql: "(r.favorite = 0 OR r.favorite IS NULL)", params: [] };
     }
   }
 
@@ -325,129 +305,6 @@ class GalleryQueryBuilder {
   }
 
   /**
-   * Build numeric filter clause (for rating100, image_count)
-   */
-  private buildNumericFilter(
-    filter: { value?: number | null; value2?: number | null; modifier?: string | null } | undefined | null,
-    column: string,
-    coalesce: number = 0
-  ): FilterClause {
-    if (!filter || filter.value === undefined || filter.value === null) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-    const col = `COALESCE(${column}, ${coalesce})`;
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `${col} = ?`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `${col} != ?`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${col} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${col} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2 !== undefined && value2 !== null) {
-          return { sql: `${col} BETWEEN ? AND ?`, params: [value, value2] };
-        }
-        return { sql: `${col} >= ?`, params: [value] };
-      case "NOT_BETWEEN":
-        if (value2 !== undefined && value2 !== null) {
-          return { sql: `(${col} < ? OR ${col} > ?)`, params: [value, value2] };
-        }
-        return { sql: `${col} < ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build date filter clause
-   */
-  private buildDateFilter(
-    filter: { value?: string | null; value2?: string | null; modifier?: string | null } | undefined | null,
-    column: string
-  ): FilterClause {
-    if (!filter) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, value2, modifier = "GREATER_THAN" } = filter;
-
-    // IS_NULL and NOT_NULL don't require a value
-    if (modifier === "IS_NULL") {
-      return { sql: `${column} IS NULL`, params: [] };
-    }
-    if (modifier === "NOT_NULL") {
-      return { sql: `${column} IS NOT NULL`, params: [] };
-    }
-
-    // All other modifiers require a value
-    if (!value) {
-      return { sql: "", params: [] };
-    }
-
-    switch (modifier) {
-      case "EQUALS":
-        return { sql: `date(${column}) = date(?)`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `(${column} IS NULL OR date(${column}) != date(?))`, params: [value] };
-      case "GREATER_THAN":
-        return { sql: `${column} > ?`, params: [value] };
-      case "LESS_THAN":
-        return { sql: `${column} < ?`, params: [value] };
-      case "BETWEEN":
-        if (value2) {
-          return { sql: `${column} BETWEEN ? AND ?`, params: [value, value2] };
-        }
-        return { sql: `${column} >= ?`, params: [value] };
-      case "NOT_BETWEEN":
-        if (value2) {
-          return {
-            sql: `(${column} IS NULL OR ${column} < ? OR ${column} > ?)`,
-            params: [value, value2],
-          };
-        }
-        return { sql: `${column} < ?`, params: [value] };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
-   * Build text filter clause (for title, details)
-   */
-  private buildTextFilter(
-    filter: { value?: string | null; modifier?: string | null } | undefined | null,
-    column: string
-  ): FilterClause {
-    if (!filter || !filter.value) {
-      return { sql: "", params: [] };
-    }
-
-    const { value, modifier = "INCLUDES" } = filter;
-
-    switch (modifier) {
-      case "INCLUDES":
-        return { sql: `LOWER(${column}) LIKE LOWER(?)`, params: [`%${value}%`] };
-      case "EXCLUDES":
-        return { sql: `(${column} IS NULL OR LOWER(${column}) NOT LIKE LOWER(?))`, params: [`%${value}%`] };
-      case "EQUALS":
-        return { sql: `LOWER(${column}) = LOWER(?)`, params: [value] };
-      case "NOT_EQUALS":
-        return { sql: `(${column} IS NULL OR LOWER(${column}) != LOWER(?))`, params: [value] };
-      case "IS_NULL":
-        return { sql: `(${column} IS NULL OR ${column} = '')`, params: [] };
-      case "NOT_NULL":
-        return { sql: `(${column} IS NOT NULL AND ${column} != '')`, params: [] };
-      default:
-        return { sql: "", params: [] };
-    }
-  }
-
-  /**
    * Build search query filter (searches title, details, photographer)
    */
   private buildSearchFilter(searchQuery: string | undefined): FilterClause {
@@ -532,7 +389,7 @@ class GalleryQueryBuilder {
     }
 
     // User data filters
-    const favoriteFilter = this.buildFavoriteFilter(filters?.favorite);
+    const favoriteFilter = buildFavoriteFilter(filters?.favorite);
     if (favoriteFilter.sql) {
       whereClauses.push(favoriteFilter);
     }
@@ -571,7 +428,7 @@ class GalleryQueryBuilder {
 
     // Rating filter
     if (filters?.rating100) {
-      const ratingFilter = this.buildNumericFilter(filters.rating100, "r.rating", 0);
+      const ratingFilter = buildNumericFilter(filters.rating100, "COALESCE(r.rating, 0)");
       if (ratingFilter.sql) {
         whereClauses.push(ratingFilter);
       }
@@ -579,7 +436,7 @@ class GalleryQueryBuilder {
 
     // Image count filter
     if (filters?.image_count) {
-      const imageCountFilter = this.buildNumericFilter(filters.image_count, "g.imageCount", 0);
+      const imageCountFilter = buildNumericFilter(filters.image_count, "COALESCE(g.imageCount, 0)");
       if (imageCountFilter.sql) {
         whereClauses.push(imageCountFilter);
       }
@@ -587,7 +444,7 @@ class GalleryQueryBuilder {
 
     // Title filter
     if (filters?.title) {
-      const titleFilter = this.buildTextFilter(filters.title, "g.title");
+      const titleFilter = buildTextFilter(filters.title, "g.title");
       if (titleFilter.sql) {
         whereClauses.push(titleFilter);
       }
@@ -595,21 +452,21 @@ class GalleryQueryBuilder {
 
     // Date filters
     if (filters?.date) {
-      const dateFilter = this.buildDateFilter(filters.date as any, "g.date");
+      const dateFilter = buildDateFilter(filters.date as any, "g.date");
       if (dateFilter.sql) {
         whereClauses.push(dateFilter);
       }
     }
 
     if (filters?.created_at) {
-      const createdAtFilter = this.buildDateFilter(filters.created_at as any, "g.stashCreatedAt");
+      const createdAtFilter = buildDateFilter(filters.created_at as any, "g.stashCreatedAt");
       if (createdAtFilter.sql) {
         whereClauses.push(createdAtFilter);
       }
     }
 
     if (filters?.updated_at) {
-      const updatedAtFilter = this.buildDateFilter(filters.updated_at as any, "g.stashUpdatedAt");
+      const updatedAtFilter = buildDateFilter(filters.updated_at as any, "g.stashUpdatedAt");
       if (updatedAtFilter.sql) {
         whereClauses.push(updatedAtFilter);
       }
