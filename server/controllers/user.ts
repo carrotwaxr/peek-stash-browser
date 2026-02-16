@@ -432,11 +432,11 @@ export const updateUserSettings = async (
 
     // Validate lightboxDoubleTapAction if provided
     if (lightboxDoubleTapAction !== undefined) {
-      const validActions = ["favorite", "o_counter"];
+      const validActions = ["favorite", "o_counter", "fullscreen"];
       if (!validActions.includes(lightboxDoubleTapAction)) {
         return res
           .status(400)
-          .json({ error: "Lightbox double-tap action must be 'favorite' or 'o_counter'" });
+          .json({ error: "Lightbox double-tap action must be 'favorite', 'o_counter', or 'fullscreen'" });
       }
     }
 

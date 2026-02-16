@@ -1215,6 +1215,13 @@ export const GALLERY_FILTER_OPTIONS = [
     defaultValue: false,
     placeholder: "Favorites Only",
   },
+  {
+    key: "hasFavoriteImage",
+    label: "Has Favorite Image",
+    type: "checkbox",
+    defaultValue: false,
+    placeholder: "Has at least one favorited image",
+  },
 ];
 
 // Image filter options (with gallery-umbrella inheritance)
@@ -2709,6 +2716,11 @@ export const buildGalleryFilter = (filters) => {
   // Boolean filter
   if (filters.favorite === true || filters.favorite === "TRUE") {
     galleryFilter.favorite = true;
+  }
+
+  // Has favorite image filter
+  if (filters.hasFavoriteImage === true || filters.hasFavoriteImage === "TRUE") {
+    galleryFilter.hasFavoriteImage = true;
   }
 
   // Rating filter (0-100 scale)
