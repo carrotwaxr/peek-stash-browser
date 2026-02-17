@@ -293,7 +293,7 @@ describe("RecommendationScoringService", () => {
     const mockScene = {
       id: "scene1",
       title: "Test Scene",
-      stashInstanceId: INST_ID,
+      instanceId: INST_ID,
       performers: [
         { id: "perf1", name: "Performer 1", tags: [] },
         { id: "perf2", name: "Performer 2", tags: [] },

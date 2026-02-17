@@ -313,14 +313,14 @@ describe("UserStatsService", () => {
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
           id: "scene-1",
-          stashInstanceId: "instance-a",
+          instanceId: "instance-a",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: { id: "studio-1", name: "Studio A" },
           tags: [],
         },
         {
           id: "scene-2",
-          stashInstanceId: "instance-b",
+          instanceId: "instance-b",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: { id: "studio-1", name: "Studio A" },
           tags: [],
@@ -377,14 +377,14 @@ describe("UserStatsService", () => {
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
           id: "scene-1",
-          stashInstanceId: "instance-a",
+          instanceId: "instance-a",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: null,
           tags: [],
         },
         {
           id: "scene-2",
-          stashInstanceId: "instance-a",
+          instanceId: "instance-a",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: null,
           tags: [],
@@ -420,7 +420,7 @@ describe("UserStatsService", () => {
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
           id: "scene-1",
-          stashInstanceId: "",
+          instanceId: "",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: null,
           tags: [],
@@ -460,7 +460,7 @@ describe("UserStatsService", () => {
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
           id: "scene-1",
-          stashInstanceId: "inst-a",
+          instanceId: "inst-a",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: null,
           tags: [],
@@ -493,7 +493,7 @@ describe("UserStatsService", () => {
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
           id: "scene-1",
-          stashInstanceId: "inst-a",
+          instanceId: "inst-a",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: null,
           tags: [],
@@ -531,7 +531,7 @@ describe("UserStatsService", () => {
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
           id: "scene-1",
-          stashInstanceId: "inst-a",
+          instanceId: "inst-a",
           performers: [{ id: "perf-1", name: "Jane" }],
           studio: null,
           tags: [],
@@ -573,14 +573,14 @@ describe("UserStatsService", () => {
       mockGetScenesByIdsWithRelations.mockResolvedValue([
         {
           id: "scene-1",
-          stashInstanceId: "instance-a",
+          instanceId: "instance-a",
           performers: [],
           studio: { id: "studio-1", name: "Studio A" },
           tags: [],
         },
         {
           id: "scene-2",
-          stashInstanceId: "instance-b",
+          instanceId: "instance-b",
           performers: [],
           studio: { id: "studio-1", name: "Studio A" },
           tags: [],

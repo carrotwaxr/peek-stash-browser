@@ -48,6 +48,8 @@ CREATE INDEX "Download_instanceId_idx" ON "Download"("instanceId");
 -- 4. MergeRecord: Add source and target instanceId columns
 ALTER TABLE "MergeRecord" ADD COLUMN "sourceInstanceId" TEXT NOT NULL DEFAULT '';
 ALTER TABLE "MergeRecord" ADD COLUMN "targetInstanceId" TEXT NOT NULL DEFAULT '';
+CREATE INDEX "MergeRecord_sourceInstanceId_idx" ON "MergeRecord"("sourceInstanceId");
+CREATE INDEX "MergeRecord_targetInstanceId_idx" ON "MergeRecord"("targetInstanceId");
 
 -- 5. UserEntityStats: Add instanceId and update unique constraint
 CREATE TABLE "UserEntityStats_new" (

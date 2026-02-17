@@ -354,7 +354,7 @@ const Lightbox = ({
     if (doubleTapAction === "o_counter") {
       const newCount = oCounter + 1;
       handleOCounterChange(newCount);
-      imageViewHistoryApi.incrementO(currentImage.id, currentImage.stashInstanceId || currentImage.instanceId).catch((err) => {
+      imageViewHistoryApi.incrementO(currentImage.id, currentImage.instanceId).catch((err) => {
         console.error("Failed to increment O counter:", err);
       });
       setDoubleTapFeedback("o_counter");
@@ -482,7 +482,7 @@ const Lightbox = ({
 
     // Start 3-second dwell timer
     viewTimerRef.current = setTimeout(() => {
-      imageViewHistoryApi.recordView(currentImage.id, currentImage.stashInstanceId || currentImage.instanceId).catch((err) => {
+      imageViewHistoryApi.recordView(currentImage.id, currentImage.instanceId).catch((err) => {
         console.error("Failed to record image view:", err);
       });
       viewTimerRef.current = null;

@@ -14,6 +14,7 @@ import { stashInstanceManager } from "./StashInstanceManager.js";
 import type {
   NormalizedGallery,
   NormalizedGroup,
+  NormalizedImage,
   NormalizedPerformer,
   NormalizedScene,
   NormalizedStudio,
@@ -1455,7 +1456,7 @@ class StashEntityService {
    * @param id - Image ID
    * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getImage(id: string, instanceId?: string): Promise<any | null> {
+  async getImage(id: string, instanceId?: string): Promise<NormalizedImage | null> {
     const cached = await prisma.stashImage.findFirst({
       where: {
         id,
@@ -1475,7 +1476,7 @@ class StashEntityService {
    * @param ids - Array of image IDs
    * @param instanceId - Optional Stash instance ID for multi-instance disambiguation
    */
-  async getImagesByIds(ids: string[], instanceId?: string): Promise<any[]> {
+  async getImagesByIds(ids: string[], instanceId?: string): Promise<NormalizedImage[]> {
     if (ids.length === 0) return [];
 
     const instanceFilter = instanceId ? { stashInstanceId: instanceId } : {};

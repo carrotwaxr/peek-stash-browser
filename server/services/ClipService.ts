@@ -120,7 +120,6 @@ export class ClipService {
     const queryOptions: QueryBuilderOptions = {
       userId,
       ...options,
-      allowedInstanceIds: options.allowedInstanceIds,
     };
 
     const result = await clipQueryBuilder.getClips(queryOptions);

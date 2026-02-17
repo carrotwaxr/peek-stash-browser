@@ -2111,6 +2111,17 @@ export const hideEntity = async (
       return res.status(400).json({ error: "Invalid entity type" });
     }
 
+    // Validate instanceId if provided
+    if (instanceId) {
+      const { stashInstanceManager } = await import(
+        "../services/StashInstanceManager.js"
+      );
+      const instance = stashInstanceManager.getConfig(instanceId);
+      if (!instance) {
+        return res.status(400).json({ error: "Invalid instanceId" });
+      }
+    }
+
     // Import service
     const { userHiddenEntityService } = await import(
       "../services/UserHiddenEntityService.js"
@@ -2167,6 +2178,18 @@ export const unhideEntity = async (
     );
 
     const unhideInstanceId = (req.query.instanceId as string) || "";
+
+    // Validate instanceId if provided
+    if (unhideInstanceId) {
+      const { stashInstanceManager } = await import(
+        "../services/StashInstanceManager.js"
+      );
+      const instance = stashInstanceManager.getConfig(unhideInstanceId);
+      if (!instance) {
+        return res.status(400).json({ error: "Invalid instanceId" });
+      }
+    }
+
     await userHiddenEntityService.unhideEntity(userId, entityType as any, entityId, unhideInstanceId);
 
     res.json({ success: true, message: "Entity restored successfully" });

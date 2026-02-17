@@ -2,15 +2,42 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { NormalizedScene } from "../../types/index.js";
 
-// ─── Test 1 & 2: StashEntityService ─────────────────────────────────────────
+// ─── Mocks ──────────────────────────────────────────────────────────────────
 // Mock prisma before importing service
 vi.mock("../../prisma/singleton.js", () => ({
   default: {
     stashPerformer: { findFirst: vi.fn() },
     stashStudio: { findMany: vi.fn() },
-    scenePerformer: { count: vi.fn() },
+    scenePerformer: { findMany: vi.fn(), count: vi.fn() },
     galleryPerformer: { count: vi.fn() },
+    stashScene: { findMany: vi.fn() },
+    sceneTag: { findMany: vi.fn() },
+    performerTag: { findMany: vi.fn() },
+    studioTag: { findMany: vi.fn() },
+    groupTag: { findMany: vi.fn() },
+    sceneGroup: { findMany: vi.fn() },
+    sceneGallery: { findMany: vi.fn() },
+    imageGallery: { findMany: vi.fn() },
+    userExcludedEntity: {
+      upsert: vi.fn(),
+      deleteMany: vi.fn(),
+      createMany: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    userContentRestriction: { findMany: vi.fn() },
+    userHiddenEntity: { findMany: vi.fn() },
+    userEntityStats: { upsert: vi.fn() },
+    user: { findMany: vi.fn() },
+    stashTag: { count: vi.fn() },
+    stashGroup: { count: vi.fn() },
+    stashGallery: { count: vi.fn() },
+    stashImage: { count: vi.fn() },
+    stashClip: { count: vi.fn() },
+    $transaction: vi.fn(),
     $queryRaw: vi.fn(),
+    $queryRawUnsafe: vi.fn(),
+    $executeRaw: vi.fn(),
   },
 }));
 
@@ -24,6 +51,7 @@ vi.mock("../../services/StashInstanceManager.js", () => ({
 
 import prisma from "../../prisma/singleton.js";
 import { stashEntityService } from "../../services/StashEntityService.js";
+import { exclusionComputationService } from "../../services/ExclusionComputationService.js";
 import {
   scoreSceneByPreferences,
   PERFORMER_FAVORITE_WEIGHT,
@@ -251,6 +279,191 @@ describe("Multi-Instance Isolation", () => {
       // Both scenes should get the boost
       expect(scoreA).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
       expect(scoreB).toBeCloseTo(PERFORMER_FAVORITE_WEIGHT, 2);
+    });
+  });
+
+  describe("ExclusionComputationService scoped cascades", () => {
+    const INST_A = "inst-a";
+    const INST_B = "inst-b";
+
+    beforeEach(() => {
+      // Default empty responses for cascade-related queries
+      mockPrisma.scenePerformer.findMany.mockResolvedValue([]);
+      mockPrisma.stashScene.findMany.mockResolvedValue([]);
+      mockPrisma.sceneTag.findMany.mockResolvedValue([]);
+      mockPrisma.performerTag.findMany.mockResolvedValue([]);
+      mockPrisma.studioTag.findMany.mockResolvedValue([]);
+      mockPrisma.groupTag.findMany.mockResolvedValue([]);
+      mockPrisma.sceneGroup.findMany.mockResolvedValue([]);
+      mockPrisma.sceneGallery.findMany.mockResolvedValue([]);
+      mockPrisma.imageGallery.findMany.mockResolvedValue([]);
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([]);
+      mockPrisma.userExcludedEntity.upsert.mockResolvedValue({});
+      mockPrisma.$transaction.mockImplementation(async (callback: any) => {
+        return callback(mockPrisma);
+      });
+    });
+
+    it("hiding performer from instance A cascades only to instance A scenes", async () => {
+      // Performer perf1 in instance A has scenes scene1 and scene2
+      // Performer perf1 in instance B has scene3
+      // When hiding perf1 from inst-a, only scene1 and scene2 should cascade
+      mockPrisma.scenePerformer.findMany.mockResolvedValue([
+        { sceneId: "scene1", sceneInstanceId: INST_A, performerId: "perf1" },
+        { sceneId: "scene2", sceneInstanceId: INST_A, performerId: "perf1" },
+        // scene3 from inst-b should NOT appear because the query filters by performerInstanceId
+      ]);
+
+      await exclusionComputationService.addHiddenEntity(1, "performer", "perf1", INST_A);
+
+      // Verify the query included instance filtering
+      expect(mockPrisma.scenePerformer.findMany).toHaveBeenCalledWith({
+        where: { performerId: "perf1", performerInstanceId: INST_A },
+        select: { sceneId: true, sceneInstanceId: true },
+      });
+
+      // Verify direct hidden entity upsert includes instanceId
+      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_entityType_entityId_instanceId: {
+              userId: 1,
+              entityType: "performer",
+              entityId: "perf1",
+              instanceId: INST_A,
+            },
+          },
+          create: expect.objectContaining({
+            instanceId: INST_A,
+            reason: "hidden",
+          }),
+        })
+      );
+
+      // Verify cascade exclusion records carry the instance's sceneInstanceId
+      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_entityType_entityId_instanceId: {
+              userId: 1,
+              entityType: "scene",
+              entityId: "scene1",
+              instanceId: INST_A,
+            },
+          },
+          create: expect.objectContaining({
+            instanceId: INST_A,
+            reason: "cascade",
+          }),
+        })
+      );
+
+      // 1 hidden + 2 cascade scenes = 3 upserts
+      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(3);
+    });
+
+    it("hiding performer without instanceId does not filter by instance", async () => {
+      // When no instanceId is provided, cascade should NOT filter by instance
+      mockPrisma.scenePerformer.findMany.mockResolvedValue([
+        { sceneId: "scene1", sceneInstanceId: INST_A, performerId: "perf1" },
+        { sceneId: "scene3", sceneInstanceId: INST_B, performerId: "perf1" },
+      ]);
+
+      await exclusionComputationService.addHiddenEntity(1, "performer", "perf1");
+
+      // Without instanceId, query should not include instance filter
+      expect(mockPrisma.scenePerformer.findMany).toHaveBeenCalledWith({
+        where: { performerId: "perf1" },
+        select: { sceneId: true, sceneInstanceId: true },
+      });
+
+      // Cascade exclusions should have empty instanceId (global)
+      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_entityType_entityId_instanceId: {
+              userId: 1,
+              entityType: "scene",
+              entityId: "scene1",
+              instanceId: "",
+            },
+          },
+          create: expect.objectContaining({
+            instanceId: "",
+            reason: "cascade",
+          }),
+        })
+      );
+
+      // 1 hidden + 2 cascade scenes = 3 upserts
+      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(3);
+    });
+
+    it("hiding studio from instance A cascades only to instance A scenes", async () => {
+      mockPrisma.stashScene.findMany.mockResolvedValue([
+        { id: "scene1", stashInstanceId: INST_A, studioId: "studio1" },
+      ]);
+
+      await exclusionComputationService.addHiddenEntity(1, "studio", "studio1", INST_A);
+
+      // Verify the query included instance + deletedAt filtering
+      expect(mockPrisma.stashScene.findMany).toHaveBeenCalledWith({
+        where: { studioId: "studio1", stashInstanceId: INST_A, deletedAt: null },
+        select: { id: true, stashInstanceId: true },
+      });
+
+      // Cascade exclusion record should carry instance A
+      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId_entityType_entityId_instanceId: {
+              userId: 1,
+              entityType: "scene",
+              entityId: "scene1",
+              instanceId: INST_A,
+            },
+          },
+        })
+      );
+    });
+
+    it("hiding tag from instance A cascades only within that instance", async () => {
+      // Tag -> Scenes direct
+      mockPrisma.sceneTag.findMany.mockResolvedValue([
+        { sceneId: "scene1", sceneInstanceId: INST_A, tagId: "tag1" },
+      ]);
+      // Tag -> Scenes inherited
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: "scene2" }]);
+      // Tag -> Performers
+      mockPrisma.performerTag.findMany.mockResolvedValue([
+        { performerId: "perf1", performerInstanceId: INST_A, tagId: "tag1" },
+      ]);
+      // Tag -> Studios
+      mockPrisma.studioTag.findMany.mockResolvedValue([]);
+      // Tag -> Groups
+      mockPrisma.groupTag.findMany.mockResolvedValue([]);
+
+      await exclusionComputationService.addHiddenEntity(1, "tag", "tag1", INST_A);
+
+      // Verify all junction queries include instance filtering
+      expect(mockPrisma.sceneTag.findMany).toHaveBeenCalledWith({
+        where: { tagId: "tag1", tagInstanceId: INST_A },
+        select: { sceneId: true, sceneInstanceId: true },
+      });
+      expect(mockPrisma.performerTag.findMany).toHaveBeenCalledWith({
+        where: { tagId: "tag1", tagInstanceId: INST_A },
+        select: { performerId: true, performerInstanceId: true },
+      });
+
+      // Inherited tag query should include instance filter in SQL
+      expect(mockPrisma.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.stringContaining("stashInstanceId = ?"),
+        INST_A,
+        "tag1"
+      );
+
+      // 1 hidden tag + 1 direct scene + 1 inherited scene + 1 performer = 4 upserts
+      expect(mockPrisma.userExcludedEntity.upsert).toHaveBeenCalledTimes(4);
     });
   });
 

@@ -259,6 +259,10 @@ export async function getEntityInstanceIds(
           select: { id: true, stashInstanceId: true },
         });
         warnBatchDuplicates(entityType, scenes);
+        // First-write-wins for duplicate entity IDs across instances.
+        // Query order is undefined, so the winning instance is arbitrary.
+        // This is acceptable since this function is a fallback — callers
+        // should prefer providing instanceId directly.
         scenes.forEach(s => {
           if (s.stashInstanceId && !result.has(s.id)) {
             result.set(s.id, s.stashInstanceId);

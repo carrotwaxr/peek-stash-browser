@@ -696,6 +696,9 @@ class GroupQueryBuilder {
     const tagKeys = [...new Map(
       tagJunctions.map((j) => [`${j.tagId}:${j.tagInstanceId}`, { id: j.tagId, instanceId: j.tagInstanceId }])
     ).values()];
+    // Cast to `any` because studioId is set on the raw SQL row in transformRow()
+    // but NormalizedGroup (from GraphQL's Group type) only has `studio?: Maybe<Studio>`,
+    // not a flat studioId field.
     const studioKeys = [...new Map(
       groups
         .filter((g) => (g as any).studioId)

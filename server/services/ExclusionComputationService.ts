@@ -47,6 +47,23 @@ interface ExclusionRecord {
   reason: string;
 }
 
+/** Source exclusion with entityId and instanceId for global/scoped split */
+interface ScopedExclusion {
+  entityId: string;
+  instanceId: string;
+}
+
+/**
+ * Split exclusions into global (empty instanceId → all instances) and
+ * instance-scoped (non-empty instanceId → that instance only).
+ */
+function splitGlobalScoped(excluded: ScopedExclusion[]) {
+  return {
+    globalIds: excluded.filter(e => !e.instanceId).map(e => e.entityId),
+    scoped: excluded.filter(e => e.instanceId),
+  };
+}
+
 /**
  * Result of recomputing exclusions for all users.
  */
@@ -258,6 +275,47 @@ class ExclusionComputationService {
   }
 
   /**
+   * Helper: cascade exclusions via a junction table, handling global/scoped split.
+   *
+   * Global exclusions (empty instanceId) query by source ID only.
+   * Scoped exclusions query by source ID + instance ID, propagating
+   * the target's instanceId to the cascade record.
+   */
+  private async cascadeViaJunction(
+    excluded: ScopedExclusion[],
+    tx: TransactionClient,
+    junctionDelegate: { findMany: (args: any) => Promise<any[]> },
+    sourceIdField: string,
+    sourceInstanceField: string,
+    targetIdField: string,
+    targetInstanceField: string,
+    targetEntityType: string,
+    addCascade: (type: string, id: string, instanceId?: string) => void,
+  ): Promise<void> {
+    const { globalIds, scoped } = splitGlobalScoped(excluded);
+
+    if (globalIds.length > 0) {
+      const results = await junctionDelegate.findMany({
+        where: { [sourceIdField]: { in: globalIds } },
+        select: { [targetIdField]: true },
+      });
+      for (const r of results) addCascade(targetEntityType, r[targetIdField]);
+    }
+    if (scoped.length > 0) {
+      const results = await junctionDelegate.findMany({
+        where: {
+          OR: scoped.map(e => ({
+            [sourceIdField]: e.entityId,
+            [sourceInstanceField]: e.instanceId,
+          })),
+        },
+        select: { [targetIdField]: true, [targetInstanceField]: true },
+      });
+      for (const r of results) addCascade(targetEntityType, r[targetIdField], r[targetInstanceField]);
+    }
+  }
+
+  /**
    * Compute cascade exclusions based on direct exclusions.
    * When an entity is excluded, related entities should also be cascade-excluded.
    *
@@ -325,34 +383,17 @@ class ExclusionComputationService {
 
     // 1. Performer -> Scenes
     if (excludedPerformers.length > 0) {
-      const globalIds = excludedPerformers.filter(e => !e.instanceId).map(e => e.entityId);
-      const scoped = excludedPerformers.filter(e => e.instanceId);
-
-      if (globalIds.length > 0) {
-        const sps = await tx.scenePerformer.findMany({
-          where: { performerId: { in: globalIds } },
-          select: { sceneId: true },
-        });
-        for (const sp of sps) addCascade("scene", sp.sceneId);
-      }
-      if (scoped.length > 0) {
-        const sps = await tx.scenePerformer.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              performerId: e.entityId,
-              performerInstanceId: e.instanceId,
-            })),
-          },
-          select: { sceneId: true, sceneInstanceId: true },
-        });
-        for (const sp of sps) addCascade("scene", sp.sceneId, sp.sceneInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedPerformers, tx, tx.scenePerformer,
+        "performerId", "performerInstanceId",
+        "sceneId", "sceneInstanceId",
+        "scene", addCascade
+      );
     }
 
-    // 2. Studio -> Scenes
+    // 2. Studio -> Scenes (direct column, not junction table — needs deletedAt filter)
     if (excludedStudios.length > 0) {
-      const globalIds = excludedStudios.filter(e => !e.instanceId).map(e => e.entityId);
-      const scoped = excludedStudios.filter(e => e.instanceId);
+      const { globalIds, scoped } = splitGlobalScoped(excludedStudios);
 
       if (globalIds.length > 0) {
         const scenes = await tx.stashScene.findMany({
@@ -378,31 +419,17 @@ class ExclusionComputationService {
 
     // 3. Tag -> Scenes/Performers/Studios/Groups
     if (excludedTags.length > 0) {
-      const globalIds = excludedTags.filter(e => !e.instanceId).map(e => e.entityId);
-      const scoped = excludedTags.filter(e => e.instanceId);
+      const { globalIds, scoped } = splitGlobalScoped(excludedTags);
 
       // 3a. Scenes with direct tag
-      if (globalIds.length > 0) {
-        const sts = await tx.sceneTag.findMany({
-          where: { tagId: { in: globalIds } },
-          select: { sceneId: true },
-        });
-        for (const st of sts) addCascade("scene", st.sceneId);
-      }
-      if (scoped.length > 0) {
-        const sts = await tx.sceneTag.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              tagId: e.entityId,
-              tagInstanceId: e.instanceId,
-            })),
-          },
-          select: { sceneId: true, sceneInstanceId: true },
-        });
-        for (const st of sts) addCascade("scene", st.sceneId, st.sceneInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedTags, tx, tx.sceneTag,
+        "tagId", "tagInstanceId",
+        "sceneId", "sceneInstanceId",
+        "scene", addCascade
+      );
 
-      // 3b. Scenes with inherited tag (via inheritedTagIds JSON column)
+      // 3b. Scenes with inherited tag (via inheritedTagIds JSON column — raw SQL required)
       if (globalIds.length > 0) {
         const tagList = globalIds.map(t => `'${t}'`).join(",");
         const inheritedScenes = await (tx as any).$queryRaw`
@@ -416,7 +443,6 @@ class ExclusionComputationService {
         for (const s of inheritedScenes) addCascade("scene", s.id);
       }
       if (scoped.length > 0) {
-        // Group scoped tags by instanceId for efficient batched queries
         const scopedByInstance = new Map<string, string[]>();
         for (const st of scoped) {
           const list = scopedByInstance.get(st.instanceId) || [];
@@ -439,141 +465,57 @@ class ExclusionComputationService {
       }
 
       // 3c. Performers with tag
-      if (globalIds.length > 0) {
-        const pts = await tx.performerTag.findMany({
-          where: { tagId: { in: globalIds } },
-          select: { performerId: true },
-        });
-        for (const pt of pts) addCascade("performer", pt.performerId);
-      }
-      if (scoped.length > 0) {
-        const pts = await tx.performerTag.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              tagId: e.entityId,
-              tagInstanceId: e.instanceId,
-            })),
-          },
-          select: { performerId: true, performerInstanceId: true },
-        });
-        for (const pt of pts) addCascade("performer", pt.performerId, pt.performerInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedTags, tx, tx.performerTag,
+        "tagId", "tagInstanceId",
+        "performerId", "performerInstanceId",
+        "performer", addCascade
+      );
 
       // 3d. Studios with tag
-      if (globalIds.length > 0) {
-        const sts = await tx.studioTag.findMany({
-          where: { tagId: { in: globalIds } },
-          select: { studioId: true },
-        });
-        for (const st of sts) addCascade("studio", st.studioId);
-      }
-      if (scoped.length > 0) {
-        const sts = await tx.studioTag.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              tagId: e.entityId,
-              tagInstanceId: e.instanceId,
-            })),
-          },
-          select: { studioId: true, studioInstanceId: true },
-        });
-        for (const st of sts) addCascade("studio", st.studioId, st.studioInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedTags, tx, tx.studioTag,
+        "tagId", "tagInstanceId",
+        "studioId", "studioInstanceId",
+        "studio", addCascade
+      );
 
       // 3e. Groups with tag
-      if (globalIds.length > 0) {
-        const gts = await tx.groupTag.findMany({
-          where: { tagId: { in: globalIds } },
-          select: { groupId: true },
-        });
-        for (const gt of gts) addCascade("group", gt.groupId);
-      }
-      if (scoped.length > 0) {
-        const gts = await tx.groupTag.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              tagId: e.entityId,
-              tagInstanceId: e.instanceId,
-            })),
-          },
-          select: { groupId: true, groupInstanceId: true },
-        });
-        for (const gt of gts) addCascade("group", gt.groupId, gt.groupInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedTags, tx, tx.groupTag,
+        "tagId", "tagInstanceId",
+        "groupId", "groupInstanceId",
+        "group", addCascade
+      );
     }
 
     // 4. Group -> Scenes
     if (excludedGroups.length > 0) {
-      const globalIds = excludedGroups.filter(e => !e.instanceId).map(e => e.entityId);
-      const scoped = excludedGroups.filter(e => e.instanceId);
-
-      if (globalIds.length > 0) {
-        const sgs = await tx.sceneGroup.findMany({
-          where: { groupId: { in: globalIds } },
-          select: { sceneId: true },
-        });
-        for (const sg of sgs) addCascade("scene", sg.sceneId);
-      }
-      if (scoped.length > 0) {
-        const sgs = await tx.sceneGroup.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              groupId: e.entityId,
-              groupInstanceId: e.instanceId,
-            })),
-          },
-          select: { sceneId: true, sceneInstanceId: true },
-        });
-        for (const sg of sgs) addCascade("scene", sg.sceneId, sg.sceneInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedGroups, tx, tx.sceneGroup,
+        "groupId", "groupInstanceId",
+        "sceneId", "sceneInstanceId",
+        "scene", addCascade
+      );
     }
 
     // 5. Gallery -> Scenes/Images
     if (excludedGalleries.length > 0) {
-      const globalIds = excludedGalleries.filter(e => !e.instanceId).map(e => e.entityId);
-      const scoped = excludedGalleries.filter(e => e.instanceId);
-
       // 5a. Linked scenes
-      if (globalIds.length > 0) {
-        const sgs = await tx.sceneGallery.findMany({
-          where: { galleryId: { in: globalIds } },
-          select: { sceneId: true },
-        });
-        for (const sg of sgs) addCascade("scene", sg.sceneId);
-      }
-      if (scoped.length > 0) {
-        const sgs = await tx.sceneGallery.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              galleryId: e.entityId,
-              galleryInstanceId: e.instanceId,
-            })),
-          },
-          select: { sceneId: true, sceneInstanceId: true },
-        });
-        for (const sg of sgs) addCascade("scene", sg.sceneId, sg.sceneInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedGalleries, tx, tx.sceneGallery,
+        "galleryId", "galleryInstanceId",
+        "sceneId", "sceneInstanceId",
+        "scene", addCascade
+      );
 
       // 5b. Images in gallery
-      if (globalIds.length > 0) {
-        const igs = await tx.imageGallery.findMany({
-          where: { galleryId: { in: globalIds } },
-          select: { imageId: true },
-        });
-        for (const ig of igs) addCascade("image", ig.imageId);
-      }
-      if (scoped.length > 0) {
-        const igs = await tx.imageGallery.findMany({
-          where: {
-            OR: scoped.map(e => ({
-              galleryId: e.entityId,
-              galleryInstanceId: e.instanceId,
-            })),
-          },
-          select: { imageId: true, imageInstanceId: true },
-        });
-        for (const ig of igs) addCascade("image", ig.imageId, ig.imageInstanceId);
-      }
+      await this.cascadeViaJunction(
+        excludedGalleries, tx, tx.imageGallery,
+        "galleryId", "galleryInstanceId",
+        "imageId", "imageInstanceId",
+        "image", addCascade
+      );
     }
 
     return cascadeExclusions;
@@ -670,6 +612,7 @@ class ExclusionComputationService {
         userId,
         entityType: "gallery",
         entityId: row.galleryId,
+        instanceId: "",
         reason: "empty",
       });
     }
@@ -735,6 +678,7 @@ class ExclusionComputationService {
         userId,
         entityType: "performer",
         entityId: row.performerId,
+        instanceId: "",
         reason: "empty",
       });
     }
@@ -788,6 +732,7 @@ class ExclusionComputationService {
         userId,
         entityType: "studio",
         entityId: row.studioId,
+        instanceId: "",
         reason: "empty",
       });
     }
@@ -830,6 +775,7 @@ class ExclusionComputationService {
         userId,
         entityType: "group",
         entityId: row.groupId,
+        instanceId: "",
         reason: "empty",
       });
     }
@@ -896,6 +842,7 @@ class ExclusionComputationService {
         userId,
         entityType: "tag",
         entityId: row.tagId,
+        instanceId: "",
         reason: "empty",
       });
     }
@@ -1015,27 +962,29 @@ class ExclusionComputationService {
   async addHiddenEntity(
     userId: number,
     entityType: string,
-    entityId: string
+    entityId: string,
+    instanceId: string = ""
   ): Promise<void> {
     const startTime = Date.now();
     logger.info("ExclusionComputationService.addHiddenEntity", {
       userId,
       entityType,
       entityId,
+      instanceId,
     });
 
     await prisma.$transaction(async (tx) => {
       // Add the direct exclusion
       await tx.userExcludedEntity.upsert({
         where: {
-          userId_entityType_entityId_instanceId: { userId, entityType, entityId, instanceId: "" },
+          userId_entityType_entityId_instanceId: { userId, entityType, entityId, instanceId },
         },
-        create: { userId, entityType, entityId, instanceId: "", reason: "hidden" },
+        create: { userId, entityType, entityId, instanceId, reason: "hidden" },
         update: { reason: "hidden" },
       });
 
-      // Compute cascades for this specific entity
-      await this.addCascadesForEntity(tx, userId, entityType, entityId);
+      // Compute cascades for this specific entity (scoped to instance when provided)
+      await this.addCascadesForEntity(tx, userId, entityType, entityId, instanceId || undefined);
     }, {
       timeout: 30000, // 30 seconds for hide operation
     });
@@ -1044,6 +993,7 @@ class ExclusionComputationService {
       userId,
       entityType,
       entityId,
+      instanceId,
       durationMs: Date.now() - startTime,
     });
   }
@@ -1289,12 +1239,14 @@ class ExclusionComputationService {
   async removeHiddenEntity(
     userId: number,
     entityType: string,
-    entityId: string
+    entityId: string,
+    instanceId: string = ""
   ): Promise<void> {
     logger.info("ExclusionComputationService.removeHiddenEntity", {
       userId,
       entityType,
       entityId,
+      instanceId,
     });
 
     // Queue async recompute - the unhide might affect cascade exclusions

@@ -1327,5 +1327,7 @@ model MergeRecord {
 
   @@index([sourceSceneId])
   @@index([targetSceneId])
+  @@index([sourceInstanceId])
+  @@index([targetInstanceId])
   @@index([userId])
 }

@@ -61,8 +61,8 @@ class UserHiddenEntityService {
     // Invalidate local cache for this user
     this.hiddenIdsCache.delete(userId);
 
-    // Update pre-computed exclusions
-    await exclusionComputationService.addHiddenEntity(userId, entityType, entityId);
+    // Update pre-computed exclusions (pass instanceId so cascades are scoped)
+    await exclusionComputationService.addHiddenEntity(userId, entityType, entityId, instanceId);
   }
 
   /**
@@ -79,7 +79,7 @@ class UserHiddenEntityService {
         userId,
         entityType,
         entityId,
-        ...(instanceId && { instanceId }),
+        instanceId,
       },
     });
 
@@ -87,7 +87,7 @@ class UserHiddenEntityService {
     this.hiddenIdsCache.delete(userId);
 
     // Update pre-computed exclusions (async recompute)
-    await exclusionComputationService.removeHiddenEntity(userId, entityType, entityId);
+    await exclusionComputationService.removeHiddenEntity(userId, entityType, entityId, instanceId);
   }
 
   /**
