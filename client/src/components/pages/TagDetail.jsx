@@ -48,8 +48,19 @@ const TagDetail = () => {
   // Include sub-tags toggle state (from URL param or default false)
   const includeSubTags = searchParams.get('includeSubTags') === 'true';
 
-  // Get active tab from URL or default to 'scenes'
-  const activeTab = searchParams.get('tab') || 'scenes';
+  // Compute tabs with counts for smart default selection
+  const contentTabs = [
+    { id: 'scenes', label: 'Scenes', count: tag?.scene_count || 0 },
+    { id: 'galleries', label: 'Galleries', count: tag?.gallery_count || 0 },
+    { id: 'images', label: 'Images', count: tag?.image_count || 0 },
+    { id: 'performers', label: 'Performers', count: tag?.performer_count || 0 },
+    { id: 'studios', label: 'Studios', count: tag?.studio_count || 0 },
+    { id: 'groups', label: 'Collections', count: tag?.group_count || 0 },
+  ];
+  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
+
+  // Get active tab from URL or default to first tab with content
+  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
 
   // Handler for toggling include sub-tags
   const handleIncludeSubTagsChange = (checked) => {
@@ -264,102 +275,103 @@ const TagDetail = () => {
             </div>
           )}
 
-          <TabNavigation
-            tabs={[
-              { id: 'scenes', label: 'Scenes', count: tag.scene_count || 0 },
-              { id: 'galleries', label: 'Galleries', count: tag.gallery_count || 0 },
-              { id: 'images', label: 'Images', count: tag.image_count || 0 },
-              { id: 'performers', label: 'Performers', count: tag.performer_count || 0 },
-              { id: 'studios', label: 'Studios', count: tag.studio_count || 0 },
-              { id: 'groups', label: 'Collections', count: tag.group_count || 0 },
-            ]}
-            defaultTab="scenes"
-          />
+          {contentTabs.every(t => t.count === 0) ? (
+            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+              This tag has no content in Peek
+            </div>
+          ) : (
+            <>
+              <TabNavigation
+                tabs={contentTabs}
+                defaultTab={effectiveDefaultTab}
+              />
 
-          {/* Tab Content */}
-          {activeTab === 'scenes' && (
-            <SceneSearch
-              key={`scenes-${includeSubTags}`}
-              context="scene_tag"
-              permanentFilters={{
-                tags: {
-                  value: [parseInt(tagId, 10)],
-                  modifier: "INCLUDES",
-                  ...(includeSubTags && { depth: -1 }),
-                },
-              }}
-              permanentFiltersMetadata={{
-                tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
-              }}
-              title={`Scenes tagged with ${tag?.name || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
-              fromPageTitle={tag?.name || "Tag"}
-            />
-          )}
+              {/* Tab Content */}
+              {activeTab === 'scenes' && (
+                <SceneSearch
+                  key={`scenes-${includeSubTags}`}
+                  context="scene_tag"
+                  permanentFilters={{
+                    tags: {
+                      value: [parseInt(tagId, 10)],
+                      modifier: "INCLUDES",
+                      ...(includeSubTags && { depth: -1 }),
+                    },
+                  }}
+                  permanentFiltersMetadata={{
+                    tags: [{ id: tagId, name: tag?.name || "Unknown Tag" }],
+                  }}
+                  title={`Scenes tagged with ${tag?.name || "this tag"}${includeSubTags ? " (and sub-tags)" : ""}`}
+                  fromPageTitle={tag?.name || "Tag"}
+                />
+              )}
 
-          {activeTab === 'galleries' && (
-            <GalleryGrid
-              key={`galleries-${includeSubTags}`}
-              lockedFilters={{
-                gallery_filter: {
-                  tags: {
-                    value: [parseInt(tagId, 10)],
-                    modifier: "INCLUDES",
-                    ...(includeSubTags && { depth: -1 }),
-                  },
-                },
-              }}
-              hideLockedFilters
-              emptyMessage={`No galleries found with tag "${tag?.name}"`}
-            />
-          )}
+              {activeTab === 'galleries' && (
+                <GalleryGrid
+                  key={`galleries-${includeSubTags}`}
+                  lockedFilters={{
+                    gallery_filter: {
+                      tags: {
+                        value: [parseInt(tagId, 10)],
+                        modifier: "INCLUDES",
+                        ...(includeSubTags && { depth: -1 }),
+                      },
+                    },
+                  }}
+                  hideLockedFilters
+                  emptyMessage={`No galleries found with tag "${tag?.name}"`}
+                />
+              )}
 
-          {activeTab === 'images' && (
-            <ImagesTab tagId={tagId} tagName={tag?.name} includeSubTags={includeSubTags} />
-          )}
+              {activeTab === 'images' && (
+                <ImagesTab tagId={tagId} tagName={tag?.name} includeSubTags={includeSubTags} />
+              )}
 
-          {activeTab === 'performers' && (
-            <PerformerGrid
-              lockedFilters={{
-                performer_filter: {
-                  tags: {
-                    value: [parseInt(tagId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
-              hideLockedFilters
-              emptyMessage={`No performers found with tag "${tag?.name}"`}
-            />
-          )}
+              {activeTab === 'performers' && (
+                <PerformerGrid
+                  lockedFilters={{
+                    performer_filter: {
+                      tags: {
+                        value: [parseInt(tagId, 10)],
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
+                  hideLockedFilters
+                  emptyMessage={`No performers found with tag "${tag?.name}"`}
+                />
+              )}
 
-          {activeTab === 'studios' && (
-            <StudioGrid
-              lockedFilters={{
-                studio_filter: {
-                  tags: {
-                    value: [parseInt(tagId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
-              hideLockedFilters
-              emptyMessage={`No studios found with tag "${tag?.name}"`}
-            />
-          )}
+              {activeTab === 'studios' && (
+                <StudioGrid
+                  lockedFilters={{
+                    studio_filter: {
+                      tags: {
+                        value: [parseInt(tagId, 10)],
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
+                  hideLockedFilters
+                  emptyMessage={`No studios found with tag "${tag?.name}"`}
+                />
+              )}
 
-          {activeTab === 'groups' && (
-            <GroupGrid
-              lockedFilters={{
-                group_filter: {
-                  tags: {
-                    value: [parseInt(tagId, 10)],
-                    modifier: "INCLUDES",
-                  },
-                },
-              }}
-              hideLockedFilters
-              emptyMessage={`No collections found with tag "${tag?.name}"`}
-            />
+              {activeTab === 'groups' && (
+                <GroupGrid
+                  lockedFilters={{
+                    group_filter: {
+                      tags: {
+                        value: [parseInt(tagId, 10)],
+                        modifier: "INCLUDES",
+                      },
+                    },
+                  }}
+                  hideLockedFilters
+                  emptyMessage={`No collections found with tag "${tag?.name}"`}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

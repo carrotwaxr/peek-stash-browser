@@ -44,8 +44,17 @@ const PerformerDetail = () => {
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
 
-  // Get active tab from URL or default to 'scenes'
-  const activeTab = searchParams.get('tab') || 'scenes';
+  // Compute tabs with counts for smart default selection
+  const contentTabs = [
+    { id: 'scenes', label: 'Scenes', count: performer?.scene_count || 0 },
+    { id: 'galleries', label: 'Galleries', count: performer?.gallery_count || 0 },
+    { id: 'images', label: 'Images', count: performer?.image_count || 0 },
+    { id: 'groups', label: 'Collections', count: performer?.group_count || 0 },
+  ];
+  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
+
+  // Get active tab from URL or default to first tab with content
+  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
 
   // Set page title to performer name
   usePageTitle(performer?.name || "Performer");
@@ -180,57 +189,60 @@ const PerformerDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          <TabNavigation
-            tabs={[
-              { id: 'scenes', label: 'Scenes', count: performer.scene_count || 0 },
-              { id: 'galleries', label: 'Galleries', count: performer.gallery_count || 0 },
-              { id: 'images', label: 'Images', count: performer.image_count || 0 },
-              { id: 'groups', label: 'Collections', count: performer.group_count || 0 },
-            ]}
-            defaultTab="scenes"
-          />
+          {contentTabs.every(t => t.count === 0) ? (
+            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+              This performer has no content in Peek
+            </div>
+          ) : (
+            <>
+              <TabNavigation
+                tabs={contentTabs}
+                defaultTab={effectiveDefaultTab}
+              />
 
-          {/* Tab Content */}
-          {activeTab === 'scenes' && (
-            <SceneSearch
-              context="scene_performer"
-              permanentFilters={{
-                performers: {
-                  value: [parseInt(performerId, 10)],
-                  modifier: "INCLUDES" } }}
-              permanentFiltersMetadata={{
-                performers: [{ id: performerId, name: performer.name }] }}
-              title={`Scenes featuring ${performer.name}`}
-              fromPageTitle={performer?.name || "Performer"}
-            />
-          )}
+              {/* Tab Content */}
+              {activeTab === 'scenes' && (
+                <SceneSearch
+                  context="scene_performer"
+                  permanentFilters={{
+                    performers: {
+                      value: [parseInt(performerId, 10)],
+                      modifier: "INCLUDES" } }}
+                  permanentFiltersMetadata={{
+                    performers: [{ id: performerId, name: performer.name }] }}
+                  title={`Scenes featuring ${performer.name}`}
+                  fromPageTitle={performer?.name || "Performer"}
+                />
+              )}
 
-          {activeTab === 'galleries' && (
-            <GalleryGrid
-              lockedFilters={{
-                gallery_filter: {
-                  performers: {
-                    value: [parseInt(performerId, 10)],
-                    modifier: "INCLUDES" } } }}
-              hideLockedFilters
-              emptyMessage={`No galleries found for ${performer.name}`}
-            />
-          )}
+              {activeTab === 'galleries' && (
+                <GalleryGrid
+                  lockedFilters={{
+                    gallery_filter: {
+                      performers: {
+                        value: [parseInt(performerId, 10)],
+                        modifier: "INCLUDES" } } }}
+                  hideLockedFilters
+                  emptyMessage={`No galleries found for ${performer.name}`}
+                />
+              )}
 
-          {activeTab === 'images' && (
-            <ImagesTab performerId={performerId} performerName={performer?.name} />
-          )}
+              {activeTab === 'images' && (
+                <ImagesTab performerId={performerId} performerName={performer?.name} />
+              )}
 
-          {activeTab === 'groups' && (
-            <GroupGrid
-              lockedFilters={{
-                group_filter: {
-                  performers: {
-                    value: [parseInt(performerId, 10)],
-                    modifier: "INCLUDES" } } }}
-              hideLockedFilters
-              emptyMessage={`No collections found for ${performer.name}`}
-            />
+              {activeTab === 'groups' && (
+                <GroupGrid
+                  lockedFilters={{
+                    group_filter: {
+                      performers: {
+                        value: [parseInt(performerId, 10)],
+                        modifier: "INCLUDES" } } }}
+                  hideLockedFilters
+                  emptyMessage={`No collections found for ${performer.name}`}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

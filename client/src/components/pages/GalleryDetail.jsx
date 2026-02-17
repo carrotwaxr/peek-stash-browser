@@ -51,8 +51,18 @@ const GalleryDetail = () => {
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
 
-  // Get active tab from URL or default to 'images'
-  const activeTab = searchParams.get('tab') || 'images';
+  // Compute tabs with counts for smart default selection
+  // Note: totalCount is used for images when available (more accurate than gallery.image_count during pagination)
+  const galleryImageCount = totalCount || gallery?.image_count || 0;
+  const galleryScenesCount = gallery?.scenes?.length || 0;
+  const contentTabs = [
+    { id: 'images', label: 'Images', count: galleryImageCount },
+    { id: 'scenes', label: 'Scenes', count: galleryScenesCount },
+  ];
+  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'images';
+
+  // Get active tab from URL or default to first tab with content
+  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
 
   // URL-based page state for image pagination
   const urlPage = parseInt(searchParams.get('page')) || 1;
@@ -359,69 +369,74 @@ const GalleryDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mb-6">
-          <TabNavigation
-            tabs={[
-              { id: 'images', label: 'Images', count: totalCount || gallery.image_count || 0 },
-              { id: 'scenes', label: 'Scenes', count: gallery.scenes?.length || 0 },
-            ]}
-            defaultTab="images"
-          />
-
-          {/* Images Tab */}
-          {activeTab === 'images' && (
-            <div className="mt-6">
-              {/* Pagination - Top */}
-              {lightbox.totalPages > 1 && (
-                <div className="mb-4">
-                  <Pagination
-                    currentPage={lightbox.currentPage}
-                    totalPages={lightbox.totalPages}
-                    onPageChange={lightbox.setCurrentPage}
-                  />
-                </div>
-              )}
-
-              <WallView
-                items={images}
-                entityType="image"
-                zoomLevel="medium"
-                onItemClick={(image) => {
-                  const index = images.findIndex((img) => img.id === image.id);
-                  lightbox.openLightbox(index >= 0 ? index : 0);
-                }}
-                loading={imagesLoading}
-                emptyMessage="No images found in this gallery"
+          {contentTabs.every(t => t.count === 0) ? (
+            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+              This gallery has no content in Peek
+            </div>
+          ) : (
+            <>
+              <TabNavigation
+                tabs={contentTabs}
+                defaultTab={effectiveDefaultTab}
               />
 
-              {/* Pagination - Bottom */}
-              {lightbox.totalPages > 1 && (
-                <div className="mt-4">
-                  <Pagination
-                    currentPage={lightbox.currentPage}
-                    totalPages={lightbox.totalPages}
-                    onPageChange={lightbox.setCurrentPage}
+              {/* Images Tab */}
+              {activeTab === 'images' && (
+                <div className="mt-6">
+                  {/* Pagination - Top */}
+                  {lightbox.totalPages > 1 && (
+                    <div className="mb-4">
+                      <Pagination
+                        currentPage={lightbox.currentPage}
+                        totalPages={lightbox.totalPages}
+                        onPageChange={lightbox.setCurrentPage}
+                      />
+                    </div>
+                  )}
+
+                  <WallView
+                    items={images}
+                    entityType="image"
+                    zoomLevel="medium"
+                    onItemClick={(image) => {
+                      const index = images.findIndex((img) => img.id === image.id);
+                      lightbox.openLightbox(index >= 0 ? index : 0);
+                    }}
+                    loading={imagesLoading}
+                    emptyMessage="No images found in this gallery"
                   />
+
+                  {/* Pagination - Bottom */}
+                  {lightbox.totalPages > 1 && (
+                    <div className="mt-4">
+                      <Pagination
+                        currentPage={lightbox.currentPage}
+                        totalPages={lightbox.totalPages}
+                        onPageChange={lightbox.setCurrentPage}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Scenes Tab */}
-          {activeTab === 'scenes' && (
-            <SceneSearch
-              context="gallery_scenes"
-              permanentFilters={{
-                galleries: {
-                  value: [parseInt(galleryId, 10)],
-                  modifier: "INCLUDES"
-                }
-              }}
-              permanentFiltersMetadata={{
-                galleries: [{ id: galleryId, title: galleryTitle(gallery) }]
-              }}
-              title={`Scenes in ${galleryTitle(gallery)}`}
-              fromPageTitle={galleryTitle(gallery) || "Gallery"}
-            />
+              {/* Scenes Tab */}
+              {activeTab === 'scenes' && (
+                <SceneSearch
+                  context="gallery_scenes"
+                  permanentFilters={{
+                    galleries: {
+                      value: [parseInt(galleryId, 10)],
+                      modifier: "INCLUDES"
+                    }
+                  }}
+                  permanentFiltersMetadata={{
+                    galleries: [{ id: galleryId, title: galleryTitle(gallery) }]
+                  }}
+                  title={`Scenes in ${galleryTitle(gallery)}`}
+                  fromPageTitle={galleryTitle(gallery) || "Gallery"}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

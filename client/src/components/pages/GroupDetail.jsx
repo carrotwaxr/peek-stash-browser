@@ -43,8 +43,15 @@ const GroupDetail = () => {
   // Get instance from URL query param for multi-stash support
   const instanceId = searchParams.get("instance");
 
-  // Get active tab from URL or default to 'scenes'
-  const activeTab = searchParams.get('tab') || 'scenes';
+  // Compute tabs with counts for smart default selection
+  const contentTabs = [
+    { id: 'scenes', label: 'Scenes', count: group?.scene_count || 0 },
+    { id: 'performers', label: 'Performers', count: group?.performer_count || 0 },
+  ];
+  const effectiveDefaultTab = contentTabs.find(t => t.count > 0)?.id || 'scenes';
+
+  // Get active tab from URL or default to first tab with content
+  const activeTab = searchParams.get('tab') || effectiveDefaultTab;
 
   // Set page title to group name
   usePageTitle(group?.name || "Collection");
@@ -185,40 +192,45 @@ const GroupDetail = () => {
 
         {/* Tabbed Content Section */}
         <div className="mt-8">
-          <TabNavigation
-            tabs={[
-              { id: 'scenes', label: 'Scenes', count: group?.scene_count || 0 },
-              { id: 'performers', label: 'Performers', count: group?.performer_count || 0 },
-            ]}
-            defaultTab="scenes"
-          />
+          {contentTabs.every(t => t.count === 0) ? (
+            <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
+              This collection has no content in Peek
+            </div>
+          ) : (
+            <>
+              <TabNavigation
+                tabs={contentTabs}
+                defaultTab={effectiveDefaultTab}
+              />
 
-          {/* Tab Content */}
-          {activeTab === 'scenes' && (
-            <SceneSearch
-              context="scene_group"
-              initialSort="scene_index"
-              permanentFilters={{
-                groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" } }}
-              permanentFiltersMetadata={{
-                groups: [
-                  { id: groupId, name: group?.name || "Unknown Collection" },
-                ] }}
-              title={`Scenes in ${group?.name || "this collection"}`}
-              fromPageTitle={group?.name || "Collection"}
-            />
-          )}
+              {/* Tab Content */}
+              {activeTab === 'scenes' && (
+                <SceneSearch
+                  context="scene_group"
+                  initialSort="scene_index"
+                  permanentFilters={{
+                    groups: { value: [parseInt(groupId, 10)], modifier: "INCLUDES" } }}
+                  permanentFiltersMetadata={{
+                    groups: [
+                      { id: groupId, name: group?.name || "Unknown Collection" },
+                    ] }}
+                  title={`Scenes in ${group?.name || "this collection"}`}
+                  fromPageTitle={group?.name || "Collection"}
+                />
+              )}
 
-          {activeTab === 'performers' && (
-            <PerformerGrid
-              lockedFilters={{
-                performer_filter: {
-                  groups: {
-                    value: [parseInt(groupId, 10)],
-                    modifier: "INCLUDES" } } }}
-              hideLockedFilters
-              emptyMessage={`No performers found in "${group?.name}"`}
-            />
+              {activeTab === 'performers' && (
+                <PerformerGrid
+                  lockedFilters={{
+                    performer_filter: {
+                      groups: {
+                        value: [parseInt(groupId, 10)],
+                        modifier: "INCLUDES" } } }}
+                  hideLockedFilters
+                  emptyMessage={`No performers found in "${group?.name}"`}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

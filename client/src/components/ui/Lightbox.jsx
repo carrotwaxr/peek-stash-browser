@@ -55,7 +55,7 @@ const Lightbox = ({
 
   // Double-tap/double-click preference and feedback
   const [doubleTapAction, setDoubleTapAction] = useState("favorite");
-  const [doubleTapFeedback, setDoubleTapFeedback] = useState(null); // "favorite" | "o_counter" | "fullscreen" | null
+  const [doubleTapFeedback, setDoubleTapFeedback] = useState(null); // "favorite_add" | "favorite_remove" | "o_counter" | "fullscreen" | null
   const lastTapTimeRef = useRef(0);
   const doubleTapFeedbackTimerRef = useRef(null);
   const doubleTapGuardRef = useRef(0);
@@ -166,6 +166,23 @@ const Lightbox = ({
     const handleChange = (e) => setHasHoverCapability(e.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  // Detect portrait orientation on mobile for nav arrow positioning
+  const [isPortraitMobile, setIsPortraitMobile] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      setIsPortraitMobile(
+        window.innerWidth <= 768 && window.matchMedia("(orientation: portrait)").matches
+      );
+    };
+    check();
+    window.addEventListener("resize", check);
+    window.addEventListener("orientationchange", check);
+    return () => {
+      window.removeEventListener("resize", check);
+      window.removeEventListener("orientationchange", check);
+    };
   }, []);
 
   // Prefetch images from adjacent pages into browser cache
@@ -362,8 +379,9 @@ const Lightbox = ({
       toggleFullscreen();
       setDoubleTapFeedback("fullscreen");
     } else {
-      handleFavoriteChange(!isFavorite);
-      setDoubleTapFeedback("favorite");
+      const newFavoriteValue = !isFavorite;
+      handleFavoriteChange(newFavoriteValue);
+      setDoubleTapFeedback(newFavoriteValue ? "favorite_add" : "favorite_remove");
     }
 
     // Clear feedback after animation
@@ -763,10 +781,11 @@ const Lightbox = ({
             e.stopPropagation();
             goToPrevious();
           }}
-          className={`absolute left-4 top-1/2 transform -translate-y-1/2 z-50 p-3 rounded-full transition-all duration-300 ${
+          className={`absolute left-4 transform -translate-y-1/2 z-50 p-3 rounded-full transition-all duration-300 ${
             controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           style={{
+            top: isPortraitMobile ? "62%" : "50%",
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             color: "var(--text-primary)",
           }}
@@ -783,10 +802,11 @@ const Lightbox = ({
             e.stopPropagation();
             goToNext();
           }}
-          className={`absolute right-4 top-1/2 transform -translate-y-1/2 z-50 p-3 rounded-full transition-all duration-300 ${
+          className={`absolute right-4 transform -translate-y-1/2 z-50 p-3 rounded-full transition-all duration-300 ${
             controlsVisible ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
           style={{
+            top: isPortraitMobile ? "62%" : "50%",
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             color: "var(--text-primary)",
           }}
@@ -851,9 +871,15 @@ const Lightbox = ({
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
             key={Date.now()}
           >
-            <div className="animate-ping-once rounded-full bg-white/20 p-6">
-              {doubleTapFeedback === "favorite" ? (
+            <div className={`rounded-full bg-white/20 p-6 ${
+              doubleTapFeedback === "favorite_add" ? "animate-heart-pop" :
+              doubleTapFeedback === "favorite_remove" ? "animate-heart-shrink" :
+              "animate-ping-once"
+            }`}>
+              {doubleTapFeedback === "favorite_add" ? (
                 <Heart size={48} className="text-red-500 fill-red-500" />
+              ) : doubleTapFeedback === "favorite_remove" ? (
+                <Heart size={48} className="text-white/70" />
               ) : doubleTapFeedback === "fullscreen" ? (
                 <Maximize size={48} className="text-white" />
               ) : (
